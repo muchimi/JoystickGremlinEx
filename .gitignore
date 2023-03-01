@@ -1,12 +1,22 @@
+# IDE & tool generated files
 *.sw[op]
 *.pyc
 *.wxs
 
-.idea
+# IDE & Python generated folders
 __pycache__
+.idea
+.pytest_cache
+.qt_for_python
+.vscode
 
+# Logfiles
+debug.txt
+
+# Development folders
 /build
-/doc
+/doc/build
+/doc/api
 /dist
 /releases
 /venv

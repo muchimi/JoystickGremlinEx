@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott
+# Copyright (C) 2015 - 2020 Lionel Ott
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,88 +20,10 @@ import importlib
 import logging
 import os
 
-from . import common, error
+from PySide6 import QtQml
 
-
-@common.SingletonDecorator
-class ContainerPlugins:
-
-    """Handles discovery and handling of container plugins."""
-
-    def __init__(self):
-        """Initializes the container plugin manager."""
-        self._plugins = {}
-        self._discover_plugins()
-
-        self._tag_to_type_map = {}
-        self._name_to_type_map = {}
-
-        self._create_maps()
-
-    @property
-    def repository(self):
-        """Returns the dictionary of all found plugins.
-
-        :return dictionary containing all plugins found
-        """
-        return self._plugins
-
-    @property
-    def tag_map(self):
-        """Returns the mapping from a container tag to the container plugin.
-
-        :return mapping from container name to container plugin
-        """
-        return self._tag_to_type_map
-
-    def get_class(self, name):
-        """Returns the class object corresponding to the given name.
-
-        :param name of the container class to return
-        :return class object corresponding to the provided name
-        """
-        if name not in self._name_to_type_map:
-            raise error.GremlinError(
-                "No container with name '{}' exists".format(name)
-            )
-        return self._name_to_type_map[name]
-
-    def _discover_plugins(self):
-        """Processes known plugin folders for action plugins."""
-        for root, dirs, files in os.walk("container_plugins"):
-            for fname in [v for v in files if v == "__init__.py"]:
-                try:
-                    folder, module = os.path.split(root)
-                    if folder != "container_plugins":
-                        continue
-
-                    # Attempt to load the file and if it looks like a proper
-                    # action_plugins store it in the registry
-                    plugin = importlib.import_module(
-                        "container_plugins.{}".format(module)
-                    )
-                    if "version" in plugin.__dict__:
-                        self._plugins[plugin.name] = plugin.create
-                        logging.getLogger("system").debug(
-                            "Loaded: {}".format(plugin.name)
-                        )
-                    else:
-                        del plugin
-                except Exception as e:
-                    # Log an error and ignore the action_plugins if
-                    # anything is wrong with it
-                    logging.getLogger("system").warning(
-                        "Loading container_plugins '{}' failed due to: {}".format(
-                            fname,
-                            e
-                        )
-                    )
-
-    def _create_maps(self):
-        """Creates a lookup table from container tag to container object."""
-        for entry in self._plugins.values():
-            self._tag_to_type_map[entry.tag] = entry
-            self._name_to_type_map[entry.name] = entry
+from gremlin import common, error
+from gremlin.types import InputType
 
 
 @common.SingletonDecorator
@@ -170,10 +92,10 @@ class ActionPlugins:
     def _create_type_action_map(self):
         """Creates a lookup table from input types to available actions."""
         self._type_to_action_map = {
-            common.InputType.JoystickAxis: [],
-            common.InputType.JoystickButton: [],
-            common.InputType.JoystickHat: [],
-            common.InputType.Keyboard: []
+            InputType.JoystickAxis: [],
+            InputType.JoystickButton: [],
+            InputType.JoystickHat: [],
+            InputType.Keyboard: []
         }
 
         for entry in self._plugins.values():
@@ -197,13 +119,30 @@ class ActionPlugins:
 
                     # Attempt to load the file and if it looks like a proper
                     # action_plugins store it in the registry
-                    plugin = importlib.import_module(
-                        "action_plugins.{}".format(module)
-                    )
-                    if "version" in plugin.__dict__:
-                        self._plugins[plugin.name] = plugin.create
+                    try:
+                        plugin_module_name = "action_plugins.{}".format(module)
+                        plugin = importlib.import_module(plugin_module_name)
+                    except (ModuleNotFoundError, ImportError) as e:
+                        logging.getLogger("system").error(
+                            f"Failed to load plugin '{plugin_module_name}' "
+                            f"with error: '{e}"
+                        )
+                        continue
+
+                    if "create" in plugin.__dict__:
+                        # Store plugin class information
+                        self._plugins[plugin.create.tag] = plugin.create
                         logging.getLogger("system").debug(
-                            "Loaded: {}".format(plugin.name)
+                            "Loaded: {}".format(plugin.create.tag)
+                        )
+
+                        # Register QML type
+                        QtQml.qmlRegisterType(
+                            plugin.create,
+                            "Gremlin.ActionPlugins",
+                            1,
+                            0,
+                            plugin.create.__name__
                         )
                     else:
                         del plugin
@@ -216,3 +155,4 @@ class ActionPlugins:
                             e
                         )
                     )
+                    raise(e)

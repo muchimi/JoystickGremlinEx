@@ -4,6 +4,11 @@ Joystick Gremlin
 Introduction
 ------------
 
+**Getting Help:** If you have issues running Gremlin or questions on how to
+make certain things work, the best place to ask for help is in the
+#joystick-gremlin channel on the HOTAS discord which can be found here
+https://discord.gg/szqaJE7.
+
 Joystick Gremlin is a program that allows the configuration of joystick like
 devices, similar to what CH Control Manager and Thrustmaster's T.A.R.G.E.T. do
 for their respectively supported joysticks. However, Joystick Gremlin works
@@ -26,25 +31,25 @@ The main features are:
 Joystick Gremlin provides a graphical user interface which allows commonly
 performed tasks, such as input remapping, axis response curve setups, and macro
 recording to be performed easily. Functionality that is not accessible via the
-UI can be implemented through custom modules. 
+UI can be implemented through custom modules.
 
 
 Used Software & Other Sources
 -----------------------------
 Joystick Gremlin uses the following software and resources:
 
-- [pyinstaller](http://www.pyinstaller.org/)
-- [PyQT5](http://www.riverbankcomputing.co.uk/software/pyqt/intro)
+- [Python 3.7](https://www.python.org)
+- [PySide6](https://www.qt.io/qt-for-python)
 - [PyWin32](http://sourceforge.net/projects/pywin32)
-- [vJoy](http://vjoystick.sourceforge.net)
-- [Python 3.4](https://www.python.org)
+- [Reportlab](https://www.reportlab.com/)
+- [PyTest](https://docs.pytest.org/en/latest/)
+- [PyInstaller](http://www.pyinstaller.org/)
+- [vJoy](https://github.com/jshafer817/vJoy/releases/tag/v2.1.9.1)
 - [Modern UI Icons](http://modernuiicons.com/)
 
-Currently the 32bit version of Python is needed and the following packages should be installed via PiP to get the source running:
- 
- - PyQT5
- - pypiwin32
- 
+Currently the 32bit version of Python is needed and the following packages
+should be installed via PiP to get the source running:
+
 
 Generating the MSI Installer
 ----------------------------

@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott
+# Copyright (C) 2015 - 2022 Lionel Ott
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,11 +21,14 @@ import logging
 import time
 from threading import Thread, Timer
 
-from PyQt5 import QtCore
+from PySide6 import QtCore
 
 import dill
-from . import common, config, error, joystick_handling, windows_event_hook, \
-    macro, util
+
+import gremlin.keyboard
+import gremlin.types
+from gremlin import common, config, error, joystick_handling, util, \
+    windows_event_hook
 
 
 class Event:
@@ -104,7 +107,7 @@ class Event:
 
         :return integer hash value of this event
         """
-        if self.event_type == common.InputType.Keyboard:
+        if self.event_type == gremlin.types.InputType.Keyboard:
             return hash((
                 self.device_guid,
                 self.event_type.value,
@@ -126,9 +129,9 @@ class Event:
         :param key the Key object from which to create the Event
         :return Event object corresponding to the provided key
         """
-        assert isinstance(key, macro.Key)
+        assert isinstance(key, gremlin.keyboard.Key)
         return Event(
-            event_type=common.InputType.Keyboard,
+            event_type=gremlin.types.InputType.Keyboard,
             identifier=(key.scan_code, key.is_extended),
             device_guid=dill.GUID_Keyboard
         )
@@ -142,15 +145,15 @@ class EventListener(QtCore.QObject):
     """
 
     # Signal emitted when joystick events are received
-    joystick_event = QtCore.pyqtSignal(Event)
+    joystick_event = QtCore.Signal(Event)
     # Signal emitted when keyboard events are received
-    keyboard_event = QtCore.pyqtSignal(Event)
+    keyboard_event = QtCore.Signal(Event)
     # Signal emitted when mouse events are received
-    mouse_event = QtCore.pyqtSignal(Event)
+    mouse_event = QtCore.Signal(Event)
     # Signal emitted when virtual button events are received
-    virtual_event = QtCore.pyqtSignal(Event)
+    virtual_event = QtCore.Signal(Event)
     # Signal emitted when a joystick is attached or removed
-    device_change_event = QtCore.pyqtSignal()
+    device_change_event = QtCore.Signal()
 
     def __init__(self):
         """Creates a new instance."""
@@ -211,7 +214,7 @@ class EventListener(QtCore.QObject):
         event = dill.InputEvent(data)
         if event.input_type == dill.InputType.Axis:
             self.joystick_event.emit(Event(
-                event_type=common.InputType.JoystickAxis,
+                event_type=gremlin.types.InputType.JoystickAxis,
                 device_guid=event.device_guid,
                 identifier=event.input_index,
                 value=self._apply_calibration(event),
@@ -219,17 +222,17 @@ class EventListener(QtCore.QObject):
             ))
         elif event.input_type == dill.InputType.Button:
             self.joystick_event.emit(Event(
-                event_type=common.InputType.JoystickButton,
+                event_type=gremlin.types.InputType.JoystickButton,
                 device_guid=event.device_guid,
                 identifier=event.input_index,
                 is_pressed=event.value == 1
             ))
         elif event.input_type == dill.InputType.Hat:
             self.joystick_event.emit(Event(
-                event_type=common.InputType.JoystickHat,
+                event_type=gremlin.types.InputType.JoystickHat,
                 device_guid=event.device_guid,
                 identifier=event.input_index,
-                value=util.dill_hat_lookup[event.value]
+                value=util.dill_hat_lookup(event.value)
             ))
 
     def _joystick_device_handler(self, data, action):
@@ -274,7 +277,7 @@ class EventListener(QtCore.QObject):
         if not is_repeat:
             self._keyboard_state[key_id] = is_pressed
             self.keyboard_event.emit(Event(
-                event_type=common.InputType.Keyboard,
+                event_type=gremlin.types.InputType.Keyboard,
                 device_guid=dill.GUID_Keyboard,
                 identifier=key_id,
                 is_pressed=is_pressed,
@@ -294,7 +297,7 @@ class EventListener(QtCore.QObject):
         # Ignore events we created via the macro system
         if not event.is_injected:
             self.mouse_event.emit(Event(
-                event_type=common.InputType.Mouse,
+                event_type=gremlin.types.InputType.Mouse,
                 device_guid=dill.GUID_Keyboard,
                 identifier=event.button_id,
                 is_pressed=event.is_pressed,
@@ -339,9 +342,9 @@ class EventHandler(QtCore.QObject):
     """Listens to the inputs from multiple different input devices."""
 
     # Signal emitted when the mode is changed
-    mode_changed = QtCore.pyqtSignal(str)
+    mode_changed = QtCore.Signal(str)
     # Signal emitted when the application is pause / resumed
-    is_active = QtCore.pyqtSignal(bool)
+    is_active = QtCore.Signal(bool)
 
     def __init__(self):
         """Initializes the EventHandler instance."""
@@ -401,18 +404,23 @@ class EventHandler(QtCore.QObject):
             permanent
         ))
 
-    def build_event_lookup(self, inheritance_tree):
-        """Builds the lookup table linking event to callback.
+    def build_event_lookup(self, modes):
+        """Builds the lookup table linking events to callbacks.
 
-        This takes mode inheritance into account.
+        This takes mode inheritance into account to create items in children
+        if they do not override a parent's action.
 
-        :param inheritance_tree the tree of parent and children in the
-            inheritance structure
+        Args:
+            modes: information about the mode hierarchy
         """
-        # Propagate events from parent to children if the children lack
-        # handlers for the available events
-        for parent, children in inheritance_tree.items():
+        stack = modes.hierarchy[:]
+        while len(stack) > 0:
+            node = stack.pop()
+            stack.extend(node.children[:])
+
             # Each device is treated separately
+            parent = node.value
+            children = [e.value for e in node.children]
             for device_guid in self.callbacks:
                 # Only attempt to copy handlers if we have any available in
                 # the parent mode
@@ -427,9 +435,6 @@ class EventHandler(QtCore.QObject):
                         for event, callbacks in parent_cb.items():
                             if event not in device_cb[child]:
                                 device_cb[child][event] = callbacks
-
-            # Recurse until we've dealt with all modes
-            self.build_event_lookup(children)
 
     def change_mode(self, new_mode):
         """Changes the currently active mode.
@@ -475,7 +480,7 @@ class EventHandler(QtCore.QObject):
         """Removes all attached callbacks."""
         self.callbacks = {}
 
-    @QtCore.pyqtSlot(Event)
+    @QtCore.Slot(Event)
     def process_event(self, event):
         """Processes a single event by passing it to all callbacks
         registered for this event.

@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott
+# Copyright (C) 2015 - 2022 Lionel Ott
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,9 +20,10 @@ import logging
 import threading
 
 import dill
-
-from . import common, error, util
 from vjoy import vjoy
+
+from gremlin import error, util
+from gremlin.types import InputType
 
 
 # List of all joystick devices
@@ -111,22 +112,22 @@ def select_first_valid_vjoy_input(valid_types):
         Dictionary containing the information about the selected vJoy input
     """
     for dev in vjoy_devices():
-        if common.InputType.JoystickAxis in valid_types and dev.axis_count > 0:
+        if InputType.JoystickAxis in valid_types and dev.axis_count > 0:
             return {
                 "device_id": dev.vjoy_id,
-                "input_type": common.InputType.JoystickAxis,
+                "input_type": InputType.JoystickAxis,
                 "input_id": dev.axis_map[0].axis_index
             }
-        elif common.InputType.JoystickButton in valid_types and dev.button_count > 0:
+        elif InputType.JoystickButton in valid_types and dev.button_count > 0:
             return {
                 "device_id": dev.vjoy_id,
-                "input_type": common.InputType.JoystickButton,
+                "input_type": InputType.JoystickButton,
                 "input_id": 1
             }
-        elif common.InputType.JoystickHat in valid_types and dev.hat_count > 0:
+        elif InputType.JoystickHat in valid_types and dev.hat_count > 0:
             return {
                 "device_id": dev.vjoy_id,
-                "input_type": common.InputType.JoystickHat,
+                "input_type": InputType.JoystickHat,
                 "input_id": 1
             }
     return None
@@ -308,7 +309,17 @@ def joystick_devices_initialization():
     vjoy_proxy.reset()
 
     # Update device list which will be used when queries for joystick devices
-    # are made
-    _joystick_devices = devices
+    # are made. Order the devices such that vJoy devices are last and the
+    # physical devices are ordered by name.
+    sorted_devices = sorted(
+        [dev for dev in devices if not dev.is_virtual],
+        key=lambda x: x.name
+    )
+    sorted_devices.extend(sorted(
+        [dev for dev in devices if dev.is_virtual],
+        key=lambda x: x.vjoy_id
+    ))
+
+    _joystick_devices = sorted_devices
 
     _joystick_init_lock.release()

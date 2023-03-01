@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott
+# Copyright (C) 2015 - 2022 Lionel Ott
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,19 +16,23 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
+import collections
 import functools
 import heapq
 import inspect
 import logging
 import time
 import threading
+from typing import Callable
 
-from PyQt5 import QtCore
+from PySide6 import QtCore
 
-from dill import DILL, GUID_Invalid
+import gremlin.common
+import gremlin.keyboard
+import gremlin.types
+from dill import DILL, GUID, GUID_Invalid
 
-from . import common, error, event_handler, joystick_handling, \
-    macro, profile, util
+from . import common, error, event_handler, joystick_handling, util
 
 
 
@@ -267,7 +271,7 @@ def register_callback(callback, device, input_type, input_id):
     device : JoystickDecorator
         Joystick decorator specifying the device and mode in which to execute
         the callback
-    input_type : common.InputType
+    input_type : gremlin.types.InputType
         Type of input on which to execute the callback
     input_id : int
         Index of the input on which to execute the callback
@@ -306,6 +310,8 @@ class JoystickWrapper:
 
         @property
         def value(self):
+            # FIXME: This bypasses calibration and any other possible
+            #        mappings we might do in the future
             return DILL.get_axis(self._joystick_guid, self._index) / float(32768)
 
     class Button(Input):
@@ -317,8 +323,7 @@ class JoystickWrapper:
 
         @property
         def is_pressed(self):
-            val = DILL.get_button(self._joystick_guid, self._index)
-            return val #DILL.get_button(self._joystick_guid, self._index)
+            return DILL.get_button(self._joystick_guid, self._index)
 
     class Hat(Input):
 
@@ -329,9 +334,9 @@ class JoystickWrapper:
 
         @property
         def direction(self):
-            return util.dill_hat_lookup[
+            return util.dill_hat_lookup(
                 DILL.get_hat(self._joystick_guid, self._index)
-            ]
+            )
 
     def __init__(self, device_guid):
         """Creates a new wrapper object for the given object id.
@@ -425,12 +430,29 @@ class JoystickWrapper:
             )
         return self._hats[index]
 
-    def axis_count(self):
+    def axis_count(self) -> int:
         """Returns the number of axis of the joystick.
 
-        :return number of axes
+        Returns:
+            Number of axes
         """
         return self._info.axis_count
+
+    def button_count(self) -> int:
+        """Returns the number of buttons on the joystick.
+
+        Returns:
+            Number of buttons
+        """
+        return self._info.button_count
+
+    def hat_count(self) -> int:
+        """Returns the number of hats on the joystick.
+
+        Returns:
+            Number of hats
+        """
+        return self._info.hat_count
 
     def _init_axes(self):
         """Initializes the axes of the joystick.
@@ -558,13 +580,13 @@ class Keyboard(QtCore.QObject):
         QtCore.QObject.__init__(self)
         self._keyboard_state = {}
 
-    @QtCore.pyqtSlot(event_handler.Event)
+    @QtCore.Slot(event_handler.Event)
     def keyboard_event(self, event):
         """Handles keyboard events and updates state.
 
         :param event the keyboard event to use to update state
         """
-        key = macro.key_from_code(
+        key = gremlin.keyboard.key_from_code(
             event.identifier[0],
             event.identifier[1]
         )
@@ -577,8 +599,8 @@ class Keyboard(QtCore.QObject):
         :return True if the key is pressed, False otherwise
         """
         if isinstance(key, str):
-            key = macro.key_from_name(key)
-        elif isinstance(key, macro.Key):
+            key = gremlin.keyboard.key_from_name(key)
+        elif isinstance(key, gremlin.keyboard.Key):
             pass
         return self._keyboard_state.get(key, False)
 
@@ -623,7 +645,7 @@ class JoystickDecorator:
         self.mode = mode
         # Convert string based GUID to the actual GUID object
         try:
-            self.device_guid = profile.parse_guid(device_guid)
+            self.device_guid = util.parse_guid(device_guid)
         except error.ProfileError:
             logging.getLogger("system").error(
                 "Invalid guid value '' received".format(device_guid)
@@ -639,6 +661,11 @@ class JoystickDecorator:
         self.hat = functools.partial(
             _hat, device_guid=self.device_guid, mode=mode
         )
+
+
+ButtonReleaseEntry = collections.namedtuple(
+    "Entry", ["callback", "event", "mode"]
+)
 
 
 @common.SingletonDecorator
@@ -659,12 +686,17 @@ class ButtonReleaseActions(QtCore.QObject):
         self._current_mode = eh.active_mode
         eh.mode_changed.connect(self._mode_changed_cb)
 
-    def register_callback(self, callback, physical_event):
+    def register_callback(
+        self,
+        callback: Callable[[], None],
+        physical_event: event_handler.Event
+    ) -> None:
         """Registers a callback with the system.
 
-        :param callback the function to run when the corresponding button is
-            released
-        :param physical_event the physical event of the button being pressed
+        Args:
+            callback: the function to run when the corresponding button is
+                released
+            physical_event: the physical event of the button being pressed
         """
         release_evt = physical_event.clone()
         release_evt.is_pressed = False
@@ -673,57 +705,72 @@ class ButtonReleaseActions(QtCore.QObject):
             self._registry[release_evt] = []
         # Do not record the mode since we may want to run the release action
         # independent of a mode
-        self._registry[release_evt].append((callback, None))
+        self._registry[release_evt].append(
+            ButtonReleaseEntry(callback, release_evt, None)
+        )
 
-    def register_button_release(self, vjoy_input, physical_event):
+    def register_button_release(
+        self,
+        vjoy_input: int,
+        physical_event: event_handler.Event,
+        activate_on: bool
+    ):
         """Registers a physical and vjoy button pair for tracking.
 
-        This method ensures that vjoy buttons are released even if they
-        have been pressed in a different mode then the active one when
-        the physical button that pressed them is released.
+        This method ensures that a vjoy button is pressed/released when the
+        specified physical event occurs next. This is useful for cases where
+        an action was triggered in a different mode or using a different
+        condition.
 
-        :param vjoy_input the vjoy button to release, represented as
-            (vjoy_device_id, vjoy_button_id)
-        :param physical_event the button event when release should
-            trigger the release of the vjoy button
+        Args:
+            vjoy_input: the vjoy button to release, represented as
+                (vjoy_device_id, vjoy_button_id)
+            physical_event: the button event when release should
+                trigger the release of the vjoy button
         """
         release_evt = physical_event.clone()
-        release_evt.is_pressed = False
+        release_evt.is_pressed = activate_on
 
         if release_evt not in self._registry:
             self._registry[release_evt] = []
         # Record current mode so we only release if we've changed mode
-        self._registry[release_evt].append((
-            lambda: self._create_release_callback(vjoy_input),
+        self._registry[release_evt].append(ButtonReleaseEntry(
+            lambda: self._release_callback_prototype(vjoy_input),
+            release_evt,
             self._current_mode
         ))
 
-    def _create_release_callback(self, vjoy_input):
-        """Creates a button release callback.
+    def _release_callback_prototype(self, vjoy_input: int) -> None:
+        """Prototype of a button release callback, used with lambdas.
 
-        :param vjoy_input the vjoy input data to use in the release
-        :return button release callback
+        Args:
+            vjoy_input: the vjoy input data to use in the release
         """
         vjoy = joystick_handling.VJoyProxy()
-        # Check if the button is valid otherwise we cause Gremlin
-        # to crash
+        # Check if the button is valid otherwise we cause Gremlin to crash
         if vjoy[vjoy_input[0]].is_button_valid(vjoy_input[1]):
             vjoy[vjoy_input[0]].button(vjoy_input[1]).is_pressed = False
         else:
             logging.getLogger("system").warning(
-                "Attempted to use non existent button: vJoy {:d} button {:d}".format(
-                    vjoy_input[0], vjoy_input[1])
+                f"Attempted to use non existent button: " +
+                f"vJoy {vjoy_input[0]:d} button {vjoy_input[1]:d}"
             )
 
-    def _input_event_cb(self, evt):
+    def _input_event_cb(self, event: event_handler.Event):
         """Runs callbacks associated with the given event.
 
-        :param evt the event to process
+        Args:
+            event: the event to process
         """
-        if evt in self._registry and not evt.is_pressed:
-            for entry in self._registry[evt]:
-                entry[0]()
-            self._registry[evt] = []
+        #if evt in [e for e in self._registry if e.is_pressed != evt.is_pressed]:
+        if event in self._registry:
+            new_list = []
+            for entry in self._registry[event]:
+                if entry.event.is_pressed == event.is_pressed:
+                    entry.callback()
+                else:
+                    new_list.append(entry)
+            self._registry[event] = new_list
 
     def _mode_changed_cb(self, mode):
         """Updates the current mode variable.
@@ -744,20 +791,23 @@ class JoystickInputSignificant:
         self._mre_registry = {}
         self._time_registry = {}
 
-    def should_process(self, event):
+    def should_process(self, event: event_handler.Event) -> bool:
         """Returns whether or not a particular event is significant enough to
         process.
 
-        :param event the event to check for significance
-        :return True if it should be processed, False otherwise
+        Args:
+            event: the event to check for significance
+
+        Returns:
+            True if the event should be processed, False otherwise
         """
         self._mre_registry[event] = event
 
-        if event.event_type == common.InputType.JoystickAxis:
+        if event.event_type == gremlin.types.InputType.JoystickAxis:
             return self._process_axis(event)
-        elif event.event_type == common.InputType.JoystickButton:
+        elif event.event_type == gremlin.types.InputType.JoystickButton:
             return self._process_button(event)
-        elif event.event_type == common.InputType.JoystickHat:
+        elif event.event_type == gremlin.types.InputType.JoystickHat:
             return self._process_hat(event)
         else:
             logging.getLogger("system").warning(
@@ -765,24 +815,31 @@ class JoystickInputSignificant:
             )
             return False
 
-    def last_event(self, event):
+    def last_event(self, event: event_handler.Event) -> event_handler.Event:
         """Returns the most recent event of this type.
 
-        :param event the type of event for which to return the most recent one
+        Args:
+            event: the type of event for which to return the most recent one
+
+        Returns:
+            Latest event instance corresponding to the specified event
         """
         return self._mre_registry[event]
 
-    def reset(self):
+    def reset(self) -> None:
         """Resets the detector to a clean state for subsequent uses."""
         self._event_registry = {}
         self._mre_registry = {}
         self._time_registry = {}
 
-    def _process_axis(self, event):
+    def _process_axis(self, event: event_handler.Event) -> bool:
         """Process an axis event.
 
-        :param event the axis event to process
-        :return True if it should be processed, False otherwise
+        Args:
+            event: the axis event to process
+
+        Returns:
+            True if it should be processed, False otherwise
         """
         if event in self._event_registry:
             # Reset everything if we have no recent data
@@ -804,19 +861,25 @@ class JoystickInputSignificant:
             self._time_registry[event] = time.time()
             return False
 
-    def _process_button(self, event):
+    def _process_button(self, event: event_handler.Event) -> bool:
         """Process a button event.
 
-        :param event the button event to process
-        :return True if it should be processed, False otherwise
+        Args:
+            event: the button event to process
+
+        Returns:
+            True if it should be processed, False otherwise
         """
         return True
 
-    def _process_hat(self, event):
+    def _process_hat(self, event: event_handler.Event) -> bool:
         """Process a hat event.
 
-        :param event the hat event to process
-        :return True if it should be processed, False otherwise
+        Args:
+            event: the hat event to process
+
+        Returns:
+            True if it should be processed, False otherwise
         """
         return event.value != (0, 0)
 
@@ -838,7 +901,7 @@ def _button(button_id, device_guid, mode, always_execute=False):
             callback(*args, **kwargs)
 
         event = event_handler.Event(
-            event_type=common.InputType.JoystickButton,
+            event_type=gremlin.types.InputType.JoystickButton,
             device_guid=device_guid,
             identifier=button_id
         )
@@ -866,7 +929,7 @@ def _hat(hat_id, device_guid, mode, always_execute=False):
             callback(*args, **kwargs)
 
         event = event_handler.Event(
-            event_type=common.InputType.JoystickHat,
+            event_type=gremlin.types.InputType.JoystickHat,
             device_guid=device_guid,
             identifier=hat_id
         )
@@ -894,7 +957,7 @@ def _axis(axis_id, device_guid, mode, always_execute=False):
             callback(*args, **kwargs)
 
         event = event_handler.Event(
-            event_type=common.InputType.JoystickAxis,
+            event_type=gremlin.types.InputType.JoystickAxis,
             device_guid=device_guid,
             identifier=axis_id
         )
@@ -920,7 +983,7 @@ def keyboard(key_name, mode, always_execute=False):
         def wrapper_fn(*args, **kwargs):
             callback(*args, **kwargs)
 
-        key = macro.key_from_name(key_name)
+        key = gremlin.keyboard.key_from_name(key_name)
         event = event_handler.Event.from_key(key)
         callback_registry.add(wrapper_fn, event, mode, always_execute)
 
@@ -1005,3 +1068,39 @@ def deadzone(value, low, low_center, high_center, high):
         return min(1, max(0, (value - high_center) / abs(high - high_center)))
     else:
         return max(-1, min(0, (value - low_center) / abs(low - low_center)))
+
+
+def format_input(event: event_handler.Event) -> str:
+    """Formats the input specified the the device and event into a string.
+
+    Args:
+        event: event to format
+
+    Returns:
+        Textual representation of the event
+    """
+    # Retrieve device instance belonging to this event
+    device = None
+    for dev in joystick_handling.joystick_devices():
+        if dev.device_guid == event.device_guid:
+            device = dev
+            break
+
+    # Retrieve device name
+    label = ""
+    if device is None:
+        logging.warning(
+            f"Unable to find a device with GUID {str(event.device_guid)}"
+        )
+        label = "Unknown"
+    else:
+        label = device.name
+
+    # Retrive input name
+    label += " - "
+    label += gremlin.common.input_to_ui_string(
+        event.event_type,
+        event.identifier
+    )
+
+    return label

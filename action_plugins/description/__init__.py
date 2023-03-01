@@ -15,57 +15,50 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations
 
-import os
-from PyQt5 import QtWidgets
+from typing import Optional
 from xml.etree import ElementTree
 
-from gremlin.base_classes import AbstractAction, AbstractFunctor
-from gremlin.common import InputType
-import gremlin.ui.input_item
+from PySide6 import QtCore
+from PySide6.QtCore import Property, Signal
+
+from gremlin import event_handler, profile_library, util
+from gremlin.base_classes import AbstractActionModel, AbstractFunctor, Value
+from gremlin.types import InputType, PropertyType
 
 
-class DescriptionActionWidget(gremlin.ui.input_item.AbstractActionWidget):
+class DescriptionFunctor(AbstractFunctor):
 
-    """Widget for the description action."""
+    """Implements the function executed of the Description action at runtime."""
 
-    def __init__(self, action_data, parent=None):
-        super().__init__(action_data, parent=parent)
-        assert(isinstance(action_data, DescriptionAction))
-
-    def _create_ui(self):
-        self.inner_layout = QtWidgets.QHBoxLayout()
-        self.label = QtWidgets.QLabel("<b>Action description</b>")
-        self.description = QtWidgets.QLineEdit()
-        self.description.textChanged.connect(self._update_description)
-        self.inner_layout.addWidget(self.label)
-        self.inner_layout.addWidget(self.description)
-        self.main_layout.addLayout(self.inner_layout)
-
-    def _populate_ui(self):
-        self.description.setText(self.action_data.description)
-
-    def _update_description(self, value):
-        self.action_data.description = value
-
-
-class DescriptionActionFunctor(AbstractFunctor):
-
-    def __init__(self, action):
+    def __init__(self, action: DescriptionModel):
         super().__init__(action)
 
-    def process_event(self, event, value):
-        return True
+    def process_event(
+        self,
+        event: event_handler.Event,
+        value: Value
+    ) -> None:
+        """Processes the provided event.
+
+        Args:
+            event: the input event to process
+            value: the potentially modified input value
+        """
+        pass
 
 
-class DescriptionAction(AbstractAction):
+class DescriptionModel(AbstractActionModel):
 
-    """Action for adding a description to a set of actions."""
+    """Model of a description action."""
 
+    version = 1
     name = "Description"
     tag = "description"
 
-    default_button_activation = (True, False)
+    functor = DescriptionFunctor
+
     input_types = [
         InputType.JoystickAxis,
         InputType.JoystickButton,
@@ -73,33 +66,56 @@ class DescriptionAction(AbstractAction):
         InputType.Keyboard
     ]
 
-    functor = DescriptionActionFunctor
-    widget = DescriptionActionWidget
+    # Signal emitted when the description variable's content changes
+    descriptionChanged = Signal()
 
-    def __init__(self, parent):
-        super().__init__(parent)
-        self.description = ""
+    def __init__(
+            self,
+            action_tree: profile_library.ActionTree,
+            input_type: InputType=InputType.JoystickButton,
+            parent: Optional[QtCore.QObject] = None
+    ):
+        super().__init__(action_tree, input_type, parent)
 
-    def icon(self):
-        return "{}/icon.png".format(os.path.dirname(os.path.realpath(__file__)))
+        # Model variables
+        self._description = ""
 
-    def requires_virtual_button(self):
-        return False
+    def _get_description(self) -> str:
+        return self._description
 
-    def _parse_xml(self, node):
-        self.description = gremlin.profile.safe_read(
-            node, "description", str, ""
+    def _set_description(self, value: str) -> None:
+        if str(value) == self._description:
+            return
+        self._description = str(value)
+        self.descriptionChanged.emit()
+
+    def from_xml(self, node: ElementTree.Element) -> None:
+        self._id = util.read_action_id(node)
+        self._description = util.read_property(
+            node, "description", PropertyType.String
         )
 
-    def _generate_xml(self):
-        node = ElementTree.Element("description")
-        node.set("description", str(self.description))
+    def to_xml(self) -> ElementTree.Element:
+        node = util.create_action_node(DescriptionModel.tag, self._id)
+        node.append(util.create_property_node(
+            "description", self._description, PropertyType.String
+        ))
         return node
 
-    def _is_valid(self):
+    def is_valid(self) -> True:
         return True
 
+    def qml_path(self) -> str:
+        return "file:///" + QtCore.QFile(
+            "core_plugins:description/DescriptionAction.qml"
+        ).fileName()
 
-version = 1
-name = "description"
-create = DescriptionAction
+    description = Property(
+        str,
+        fget=_get_description,
+        fset=_set_description,
+        notify=descriptionChanged
+    )
+
+
+create = DescriptionModel
