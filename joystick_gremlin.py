@@ -28,6 +28,7 @@ import sys
 import time
 import traceback
 
+
 # Import QtMultimedia so pyinstaller doesn't miss it
 import PyQt5
 from PyQt5 import QtCore, QtGui, QtMultimedia, QtWidgets

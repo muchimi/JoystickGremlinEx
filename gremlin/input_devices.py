@@ -31,6 +31,9 @@ from . import common, error, event_handler, joystick_handling, \
     macro, profile, util
 
 
+
+
+
 class CallbackRegistry:
 
     """Registry of all callbacks known to the system."""
@@ -134,8 +137,10 @@ class PeriodicRegistry:
                 callback = plugin.install(callback, partial_fn)
         return callback
 
+
     def _thread_loop(self):
         """Main execution loop run in a separate thread."""
+        import uuid
         # Setup plugins to use
         self._plugins = [
             JoystickPlugin(),
@@ -143,32 +148,96 @@ class PeriodicRegistry:
             KeyboardPlugin()
         ]
         callback_map = {}
-
+        period_map = {}
         # Populate the queue
         self._queue = []
         for item in self._registry.values():
             plugin_cb = self._install_plugins(item[1])
-            callback_map[plugin_cb] = item[0]
-            heapq.heappush(
-                self._queue,
-                (time.time() + callback_map[plugin_cb], plugin_cb)
-            )
+            node_id = str(uuid.uuid1())
+            callback_map[node_id] = plugin_cb
+            period_map[node_id] = item[0]
+            value = time.time() + period_map[node_id]
+            heapq.heappush(self._queue, (value, node_id))
+
 
         # Main thread loop
         while self._running:
             # Process all events that require running
-            while self._queue[0][0] < time.time():
-                item = heapq.heappop(self._queue)
-                item[1]()
+            if self._queue:
+                while self._queue[0][0] < time.time():
+                    value, node_id = heapq.heappop(self._queue)
+                    callback_map[node_id]()
 
-                heapq.heappush(
-                    self._queue,
-                    (time.time() + callback_map[item[1]], item[1])
-                )
+                    heapq.heappush(
+                        self._queue,
+                        (time.time() + period_map[node_id], node_id)
+                    )
 
             # Sleep until either the next function needs to be run or
             # our timeout expires
             time.sleep(min(self._queue[0][0] - time.time(), 1.0))
+
+            
+
+class SimpleRegistry:
+
+    """Registry for functions executed on a profile activation """
+
+    def __init__(self):
+        """Creates a new instance."""
+        self._registry = {}
+        self._running = False
+        self._plugins = []
+
+    def start(self):
+        """Starts the event loop."""
+        # Only proceed if we have functions to call
+        if len(self._registry) == 0:
+            return
+
+        # Only create a new thread and start it if the thread is not
+        # currently running
+        self._running = True
+        for item in self._registry.values():
+            plugin_cb = self._install_plugins(item)
+            plugin_cb()
+
+
+
+    def stop(self):
+        """Stops the event loop."""
+        self._running = False
+
+
+    def add(self, callback):
+        """Adds a function to execute periodically.
+
+        :param callback the function to execute
+        :param interval the time between executions
+        """
+        self._registry[callback] = callback
+
+
+    def clear(self):
+        """Clears the registry."""
+        self._registry = {}
+
+    def _install_plugins(self, callback):
+        """Installs the current plugins into the given callback.
+
+        :param callback the callback function to install the plugins
+            into
+        :return new callback with plugins installed
+        """
+        signature = inspect.signature(callback).parameters
+        partial_fn = functools.partial
+        if "self" in signature:
+            partial_fn = functools.partialmethod
+        for plugin in self._plugins:
+            if plugin.keyword in signature:
+                callback = plugin.install(callback, partial_fn)
+        return callback
+
 
 
 # Global registry of all registered callbacks
@@ -176,6 +245,12 @@ callback_registry = CallbackRegistry()
 
 # Global registry of all periodic callbacks
 periodic_registry = PeriodicRegistry()
+
+# Global registry of all start callbacks
+start_registry = SimpleRegistry()
+
+# Global registry of all stop callbacks
+stop_registry = SimpleRegistry()
 
 
 def register_callback(callback, device, input_type, input_id):
@@ -867,6 +942,34 @@ def periodic(interval):
             callback(*args, **kwargs)
 
         periodic_registry.add(wrapper_fn, interval)
+
+        return wrapper_fn
+
+    return wrap
+
+def gremlin_start():
+    ''' decorator when a profile is activated '''
+    def wrap(callback):
+
+        @functools.wraps(callback)
+        def wrapper_fn(*args, **kwargs):
+            callback(*args, **kwargs)
+
+        start_registry.add(wrapper_fn)
+
+        return wrapper_fn
+
+    return wrap
+
+def gremlin_stop():
+    ''' decorator when a profile is de-activated '''
+    def wrap(callback):
+
+        @functools.wraps(callback)
+        def wrapper_fn(*args, **kwargs):
+            callback(*args, **kwargs)
+
+        stop_registry.add(wrapper_fn)
 
         return wrapper_fn
 

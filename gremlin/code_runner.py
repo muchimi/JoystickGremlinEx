@@ -67,6 +67,12 @@ class CodeRunner:
         self._inheritance_tree = inheritance_tree
         self._reset_state()
 
+        # clear any startup routines
+        input_devices.start_registry.clear()
+        input_devices.stop_registry.clear()
+
+
+
         # Check if we want to override the start mode as determined by the
         # heuristic
         if settings.startup_mode is not None:
@@ -117,6 +123,8 @@ class CodeRunner:
                     tmp = importlib.util.module_from_spec(spec)
                     tmp.__gremlin_identifier = (plugin.file_name, instance.name)
                     spec.loader.exec_module(tmp)
+           
+            
 
             # Update system path list searched by Python
             sys.path = system_paths
@@ -259,6 +267,10 @@ class CodeRunner:
             evt_listener.keyboard_event.connect(kb.keyboard_event)
             evt_listener.gremlin_active = True
 
+            # call start functions
+            input_devices.start_registry.start()
+
+
             input_devices.periodic_registry.start()
             macro.MacroManager().start()
 
@@ -267,7 +279,7 @@ class CodeRunner:
             self._running = True
 
             sendinput.MouseController().start()
-        except ImportError as e:
+        except Exception as e:
             util.display_error(
                 "Unable to launch due to missing user plugin: {}"
                 .format(str(e))
@@ -275,6 +287,13 @@ class CodeRunner:
 
     def stop(self):
         """Stops listening to events and unloads all callbacks."""
+
+        # call stop function in plugins
+        input_devices.stop_registry.start()
+        input_devices.stop_registry.stop()
+        input_devices.stop_registry.clear()
+
+
         # Disconnect all signals
         if self._running:
             evt_lst = event_handler.EventListener()
@@ -289,6 +308,9 @@ class CodeRunner:
             )
         self._running = False
 
+
+        
+
         # Empty callback registry
         input_devices.callback_registry.clear()
         self.event_handler.clear()
@@ -296,6 +318,12 @@ class CodeRunner:
         # Stop periodic events and clear registry
         input_devices.periodic_registry.stop()
         input_devices.periodic_registry.clear()
+
+        # stop
+        input_devices.start_registry.stop()
+        input_devices.start_registry.clear()
+
+        
 
         macro.MacroManager().stop()
         sendinput.MouseController().stop()

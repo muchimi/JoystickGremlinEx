@@ -472,11 +472,12 @@ class VJoy:
         :param vjoy_id id of the vJoy device to initialize.
         """
         self.vjoy_id = None
+        version = VJoyInterface.GetvJoyVersion()
 
         if not VJoyInterface.vJoyEnabled():
             logging.getLogger("system").error("vJoy is not currently running")
             raise VJoyError("vJoy is not currently running")
-        if VJoyInterface.GetvJoyVersion() != 0x218:
+        if version  <= 0x218:
             logging.getLogger("system").error(
                 "Running incompatible vJoy version, 2.1.8 required"
             )

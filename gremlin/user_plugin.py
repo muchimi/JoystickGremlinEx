@@ -54,7 +54,11 @@ def get_variable_definitions(fname):
         fname
     )
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    try:
+        spec.loader.exec_module(module)
+    except Exception as ex:
+        logging.getLogger("system").error(f"Plugin: Scan error encountered: {ex}")
+        return {}
 
     variables = {}
     for key, value in module.__dict__.items():

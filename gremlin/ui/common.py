@@ -869,9 +869,12 @@ class ModeWidget(QtWidgets.QWidget):
         :param profile_data the device for which the mode selection is generated
         :param current_mode the currently active mode
         """
-        # To prevent emitting lots of change events the slot is first
+        # To prevent emitting lots of change events the slot is first6
         # disconnected and then at the end reconnected again.
-        self.selector.currentIndexChanged.disconnect(self._mode_changed_cb)
+        try:
+            self.selector.currentIndexChanged.disconnect(self._mode_changed_cb)
+        except:
+            pass
 
         self.profile = profile_data
 
@@ -912,6 +915,7 @@ class ModeWidget(QtWidgets.QWidget):
                 current_mode = mode_names[0]
             self.selector.setCurrentIndex(self.mode_list.index(current_mode))
             self._mode_changed_cb(self.mode_list.index(current_mode))
+
 
         # Reconnect change signal
         self.selector.currentIndexChanged.connect(self._mode_changed_cb)
