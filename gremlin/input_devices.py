@@ -185,7 +185,7 @@ class PeriodicRegistry:
 
 class SimpleRegistry:
 
-    """Registry for functions executed on a profile activation """
+    """Registry for functions executed  """
 
     def __init__(self):
         """Creates a new instance."""
@@ -205,7 +205,6 @@ class SimpleRegistry:
         for item in self._registry.values():
             plugin_cb = self._install_plugins(item)
             plugin_cb()
-
 
 
     def stop(self):
@@ -243,6 +242,55 @@ class SimpleRegistry:
         return callback
 
 
+class ModeChangeRegistry():
+    """Registry for functions executed on mode change """
+    def __init__(self):
+        """Creates a new instance."""
+        self._registry = {}
+        self._running = False
+        self._plugins = []
+
+    def add(self, callback):
+        """Adds a function to execute periodically.
+
+        :param callback the function to execute
+        :param interval the time between executions
+        """
+        self._registry[callback] = callback
+
+
+    def clear(self):
+        """Clears the registry."""
+        self._registry = {}
+
+    def _install_plugins(self, callback):
+        """Installs the current plugins into the given callback.
+
+        :param callback the callback function to install the plugins
+            into
+        :return new callback with plugins installed
+        """
+        signature = inspect.signature(callback).parameters
+        print ("Signature:")
+        for item in signature:
+            print(item)
+        print("End signature")
+        partial_fn = functools.partial
+        if "self" in signature:
+            partial_fn = functools.partialmethod
+        for plugin in self._plugins:
+            if plugin.keyword in signature:
+                callback = plugin.install(callback, partial_fn)
+        return callback
+
+    def mode_changed(self, mode_name):
+            
+        if len(self._registry) == 0:
+            return
+        for item in self._registry.values():
+            plugin_cb = self._install_plugins(item)
+            plugin_cb(mode_name)
+
 
 # Global registry of all registered callbacks
 callback_registry = CallbackRegistry()
@@ -255,6 +303,11 @@ start_registry = SimpleRegistry()
 
 # Global registry of all stop callbacks
 stop_registry = SimpleRegistry()
+
+
+
+# Global registry of all mode change callbacks
+mode_registry = ModeChangeRegistry()
 
 
 def register_callback(callback, device, input_type, input_id):
@@ -1033,6 +1086,20 @@ def gremlin_stop():
             callback(*args, **kwargs)
 
         stop_registry.add(wrapper_fn)
+
+        return wrapper_fn
+
+    return wrap
+
+
+def gremlin_mode():
+    ''' decorator when gremlin changes profile modes - passes the new mode to the plugin '''
+    def wrap(callback):
+        @functools.wraps(callback)
+        def wrapper_fn(*args, **kwargs):
+            callback(*args, **kwargs)
+
+        mode_registry.add(wrapper_fn)
 
         return wrapper_fn
 

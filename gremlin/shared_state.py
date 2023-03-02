@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2020 Lionel Ott
+# Copyright (C) 2015 - 2019 Lionel Ott
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -44,12 +44,11 @@ def suspend_input_highlighting():
     return _suspend_input_highlighting
 
 
-def set_suspend_input_highlighting(value: bool) -> None:
-    """Sets the input highlighting behavior.
+def set_suspend_input_highlighting(value):
+    """Sets the input highlighting behaviour.
 
-    Args:
-        value: if True disables automatic selection of used inputs, if False
-            inputs will automatically be selected upon use
+    :param value if True disables automatic selection of used inputs, if False
+        inputs will automatically be selected upon use
     """
     global _suspend_input_highlighting, _suspend_timer
     if _suspend_timer is not None:

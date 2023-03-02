@@ -33,7 +33,7 @@ added_binaries = [
 
 a = Analysis(
     ["joystick_gremlin.py"],
-    pathex=['C:\\Users\\etien\\Joystick Gremlin'],
+    pathex=['C:\\Users\\Ivan Dolvich\\PycharmProjects\\JoystickGremlin'],
     binaries=added_binaries,
     datas=added_files,
     hiddenimports=[],
@@ -42,8 +42,7 @@ a = Analysis(
     excludes=None,
     win_no_prefer_redirects=None,
     win_private_assemblies=None,
-    cipher=block_cipher,
-	
+    cipher=block_cipher
 )
 
 pyz = PYZ(

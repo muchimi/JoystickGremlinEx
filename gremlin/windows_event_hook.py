@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2020 Lionel Ott
+# Copyright (C) 2015 - 2019 Lionel Ott
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,8 +20,8 @@ import ctypes
 from ctypes import wintypes
 import threading
 
-from gremlin.common import SingletonDecorator
-from gremlin.types import MouseButton
+import gremlin.common
+
 
 user32 = ctypes.WinDLL("user32")
 
@@ -183,25 +183,25 @@ def process_mouse_event(n_code, w_param, l_param):
         button_id = None
         is_pressed = True
         if w_param in [WM_LBUTTONDOWN, WM_LBUTTONUP]:
-            button_id = MouseButton.Left
+            button_id = gremlin.common.MouseButton.Left
             is_pressed = w_param == WM_LBUTTONDOWN
         elif w_param in [WM_RBUTTONDOWN, WM_RBUTTONUP]:
-            button_id = MouseButton.Right
+            button_id = gremlin.common.MouseButton.Right
             is_pressed = w_param == WM_RBUTTONDOWN
         elif w_param in [WM_MBUTTONDOWN, WM_MBUTTONUP]:
-            button_id = MouseButton.Middle
+            button_id = gremlin.common.MouseButton.Middle
             is_pressed = w_param == WM_MBUTTONDOWN
         elif w_param in [WM_XBUTTONDOWN, WM_XBUTTONUP]:
             if msg.mouseData & (0x0001 << 16):
-                button_id = MouseButton.Back
+                button_id = gremlin.common.MouseButton.Back
             elif msg.mouseData & (0x0002 << 16):
-                button_id = MouseButton.Forward
+                button_id = gremlin.common.MouseButton.Forward
             is_pressed = w_param == WM_XBUTTONDOWN
         elif w_param == WM_MOUSEWHEEL:
             if (msg.mouseData >> 16) == 120:
-                button_id = MouseButton.WheelUp
+                button_id = gremlin.common.MouseButton.WheelUp
             elif (msg.mouseData >> 16) == 65416:
-                button_id = MouseButton.WheelDown
+                button_id = gremlin.common.MouseButton.WheelDown
 
         # Create the event and pass it to all all registered callbacks
         evt = MouseEvent(button_id, is_pressed, False)
@@ -280,7 +280,7 @@ class MouseEvent:
         return self._is_injected
 
 
-@SingletonDecorator
+@gremlin.common.SingletonDecorator
 class KeyboardHook:
 
     """Hooks into the event stream and grabs keyboard related events
@@ -335,7 +335,7 @@ class KeyboardHook:
             user32.DispatchMessageW(ctypes.byref(msg))
 
 
-@SingletonDecorator
+@gremlin.common.SingletonDecorator
 class MouseHook:
 
     """Hooks into the event stream and grabs mouse related events

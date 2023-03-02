@@ -31,25 +31,25 @@ The main features are:
 Joystick Gremlin provides a graphical user interface which allows commonly
 performed tasks, such as input remapping, axis response curve setups, and macro
 recording to be performed easily. Functionality that is not accessible via the
-UI can be implemented through custom modules.
+UI can be implemented through custom modules. 
 
 
 Used Software & Other Sources
 -----------------------------
 Joystick Gremlin uses the following software and resources:
 
-- [Python 3.7](https://www.python.org)
-- [PySide6](https://www.qt.io/qt-for-python)
+- [pyinstaller](http://www.pyinstaller.org/)
+- [PyQT5](http://www.riverbankcomputing.co.uk/software/pyqt/intro)
 - [PyWin32](http://sourceforge.net/projects/pywin32)
-- [Reportlab](https://www.reportlab.com/)
-- [PyTest](https://docs.pytest.org/en/latest/)
-- [PyInstaller](http://www.pyinstaller.org/)
-- [vJoy](https://github.com/jshafer817/vJoy/releases/tag/v2.1.9.1)
+- [vJoy](http://vjoystick.sourceforge.net)
+- [Python 3.4](https://www.python.org)
 - [Modern UI Icons](http://modernuiicons.com/)
 
-Currently the 32bit version of Python is needed and the following packages
-should be installed via PiP to get the source running:
-
+Currently the 32bit version of Python is needed and the following packages should be installed via PiP to get the source running:
+ 
+ - PyQT5
+ - pypiwin32
+ 
 
 Generating the MSI Installer
 ----------------------------

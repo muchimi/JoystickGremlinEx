@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2020 Lionel Ott
+# Copyright (C) 2015 - 2019 Lionel Ott
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -23,8 +23,7 @@ import math
 import threading
 import time
 
-from gremlin.common import SingletonDecorator
-from gremlin.types import MouseButton
+from gremlin.common import MouseButton, SingletonDecorator
 from gremlin.util import deg2rad
 
 
@@ -69,7 +68,7 @@ class MotionType(enum.Enum):
 
 class MouseMotion:
 
-    """Base class of all mouse motion behaviors."""
+    """Base class of all mouse motion behaviours."""
 
     # Time step between calls
     delta_t = 0.01

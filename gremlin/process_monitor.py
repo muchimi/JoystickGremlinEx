@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2020 Lionel Ott
+# Copyright (C) 2015 - 2019 Lionel Ott
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,7 +21,7 @@ import os
 import time
 import threading
 
-from PySide6 import QtCore
+from PyQt5 import QtCore
 
 import win32gui
 import win32process
@@ -37,7 +37,7 @@ class ProcessMonitor(QtCore.QObject):
     """
 
     # Signal emitted when the active window changes
-    process_changed = QtCore.Signal(str)
+    process_changed = QtCore.pyqtSignal(str)
 
     # Definition of the flags for limited information queries
     PROCESS_QUERY_LIMITED_INFORMATION = 0x1000

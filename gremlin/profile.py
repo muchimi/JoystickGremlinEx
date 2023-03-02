@@ -1363,7 +1363,6 @@ class Profile:
                     tree[mode_name] = {}
                 elif mode.inherit:
                     stack = [mode_name, ]
-                    
                     parent = device.modes[mode.inherit]
                     stack.append(parent.name)
                     while parent.inherit is not None:

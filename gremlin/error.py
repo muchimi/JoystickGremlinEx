@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2020 Lionel Ott
+# Copyright (C) 2015 - 2019 Lionel Ott
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -72,6 +72,14 @@ class MissingImplementationError(GremlinError):
 class VJoyError(GremlinError):
 
     """Exception raised when an error occurs within the vJoy module."""
+
+    def __init__(self, value):
+        super().__init__(value)
+
+
+class HidGuardianError(GremlinError):
+
+    """Exception raised when an error related to HidGuardian."""
 
     def __init__(self, value):
         super().__init__(value)

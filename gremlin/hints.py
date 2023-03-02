@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2020 Lionel Ott
+# Copyright (C) 2015 - 2019 Lionel Ott
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -25,10 +25,7 @@ from gremlin.util import resource_path
 hint = {}
 
 
-try:
-    with open(resource_path("doc/hints.csv")) as csv_stream:
-        reader = csv.reader(csv_stream, delimiter=",", quotechar="\"")
-        for row in reader:
-            hint[row[0]] = row[1]
-except FileNotFoundError:
-    pass
+with open(resource_path("doc/hints.csv")) as csv_stream:
+    reader = csv.reader(csv_stream, delimiter=",", quotechar="\"")
+    for row in reader:
+        hint[row[0]] = row[1]

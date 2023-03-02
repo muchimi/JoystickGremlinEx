@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2022 Lionel Ott
+# Copyright (C) 2015 - 2019 Lionel Ott
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,7 +17,6 @@
 
 
 import collections
-
 import gremlin.util
 
 
@@ -28,7 +27,7 @@ Point2D = collections.namedtuple("Point2D", ["x", "y"])
 class CubicSpline:
 
     """Creates a new cubic spline based interpolation.
-
+    
     The methods requires a set of control points which are used to
     create a C2 spline which passes through all of them.
     """

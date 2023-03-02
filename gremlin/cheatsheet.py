@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2020 Lionel Ott
+# Copyright (C) 2015 - 2019 Lionel Ott
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -23,7 +23,7 @@ from reportlab.platypus import BaseDocTemplate, Paragraph, \
     Spacer, Frame, PageTemplate, Table, Flowable, PageBreak
 
 import gremlin
-import gremlin.keyboard
+
 
 hat_direction_abbrev = {
     "center": "C",
@@ -407,6 +407,6 @@ def format_input_name(input_type, identifier):
     }
 
     if input_type == gremlin.common.InputType.Keyboard:
-        return gremlin.keyboard.key_from_code(identifier[0], identifier[1]).name
+        return gremlin.macro.key_from_code(identifier[0], identifier[1]).name
     else:
         return "{} {}".format(type_map[input_type], identifier)
