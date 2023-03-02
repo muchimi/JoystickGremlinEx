@@ -1,6 +1,7 @@
 *.sw[op]
 *.pyc
 *.wxs
+*.backup
 
 .idea
 __pycache__

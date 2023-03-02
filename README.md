@@ -1,70 +1,52 @@
-Joystick Gremlin
+Joystick Gremlin EX
 ================
 
 Introduction
 ------------
 
-**Getting Help:** If you have issues running Gremlin or questions on how to
-make certain things work, the best place to ask for help is in the
-#joystick-gremlin channel on the HOTAS discord which can be found here
-https://discord.gg/szqaJE7.
+For general Joystick Gremlin documentation - consult https://whitemagic.github.io/JoystickGremlin/
 
-Joystick Gremlin is a program that allows the configuration of joystick like
-devices, similar to what CH Control Manager and Thrustmaster's T.A.R.G.E.T. do
-for their respectively supported joysticks. However, Joystick Gremlin works
-with any device be it from different manufacturers or custom devices that
-appear as a joystick to Windows. Joystick Gremlin uses the virtual joysticks
-provided by vJoy to map physical to virtual inputs and apply various other
-transformations such as response curves to analogue axes. In addition to
-managing joysticks, Joystick Gremlin also provides keyboard macros, a flexible
-mode system, scripting using Python, and many other features.
+This custom version adds to release 13.3 of Gremlin:
 
-The main features are:
-- Works with arbitrary joystick like devices
-- User interface for common configuration tasks
-- Merging of multiple physical devices into a single virtual device
-- Axis response curve and dead zone configuration
-- Arbitrary number of modes with inheritance and customizable mode switching
-- Keyboard macros for joystick buttons and keyboard keys
-- Python scripting
-
-Joystick Gremlin provides a graphical user interface which allows commonly
-performed tasks, such as input remapping, axis response curve setups, and macro
-recording to be performed easily. Functionality that is not accessible via the
-UI can be implemented through custom modules. 
+- Upgrade x64 Python 10 (I will consider Python 11 later)
+- Improved stability when loading a plugin that has an error on load
 
 
-Used Software & Other Sources
------------------------------
-Joystick Gremlin uses the following software and resources:
+Adds a few decorators not in version 13:
 
-- [pyinstaller](http://www.pyinstaller.org/)
-- [PyQT5](http://www.riverbankcomputing.co.uk/software/pyqt/intro)
-- [PyWin32](http://sourceforge.net/projects/pywin32)
-- [vJoy](http://vjoystick.sourceforge.net)
-- [Python 3.4](https://www.python.org)
-- [Modern UI Icons](http://modernuiicons.com/)
+### @gremlin_start
 
-Currently the 32bit version of Python is needed and the following packages should be installed via PiP to get the source running:
- 
- - PyQT5
- - pypiwin32
- 
+Called when a profile is started
 
-Generating the MSI Installer
-----------------------------
+### @gremlin_stop
 
-The job of turning the Python code in a windows executable and
-packaging everything up into an installable MSI file is performed
-by [pyinstaller](http://www.pyinstaller.org/) and
-[wix](http://wixtoolset.org/). The steps needed to build the code
-and assemble it into the installer is automated using a batch
-script and can be run as:
-  ```
-  deploy.bat
-  ```
-To simply generate the executable code without the MSI installer the
-following command can be used:
-  ```
-  pyinstaller -y --clean joystick_gremlin.spec
-  ```
+Called when a profile is stopped
+
+### @gremlin_mode
+
+Called when the mode is changed (use def mode_change(mode) - mode will be a string).
+
+
+## Recommended Resources
+
+#### OSC support in Joystick Gremlin from TouchOSC
+
+https://github.com/muchimi/TouchOsc
+
+Transforms any touch screen into a GameGlass equivalent
+
+
+#### HIDHIDE
+
+This tool hides raw hardware only exposing the VJOY devices.  Essential to not confuse games or simulators.
+
+https://github.com/ViGEm/HidHide
+
+#### Hexler TouchOSC
+
+
+A touch enabled surface designer initially setup for the OSC (open sound control) and MIDI protocols to control musical instruments, DAWs and live performances.  Supports multiple platforms.  Has a free version but the license is well worth the price.  Simple set of controls, but very powerful because of the available LUA based scripting and works on any platform, thus making your phone, tablet or touch-enabled desktop function as an input device.
+
+https://hexler.net/touchosc#_
+
+I also recommend the Protokol tool to diagnose any OSC issues.
