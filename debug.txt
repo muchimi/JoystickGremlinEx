@@ -21116,3 +21116,441 @@
 [2023-03-02 20:19:35.311] [debug] [info]   linear=0 id=0
 [2023-03-02 20:19:35.311] [debug] [info]   linear=0 id=0
 [2023-03-02 20:19:35.311] [debug] [info]   linear=0 id=0
+[2023-03-02 21:15:56.860] [debug] [info] Setting device change callback
+[2023-03-02 21:15:56.860] [debug] [info] Setting event callback
+[2023-03-02 21:15:59.316] [debug] [info] Initializing DILL v1.3
+[2023-03-02 21:15:59.485] [debug] [info] {2D3260A0-6FA6-11E7-8002-444553540000}: Processing device: vJoy Device
+[2023-03-02 21:15:59.492] [debug] [info] Device summary: vJoy Device {2D3260A0-6FA6-11E7-8002-444553540000}
+[2023-03-02 21:15:59.492] [debug] [info] Axis=8 Buttons=128 Hats=4
+[2023-03-02 21:15:59.492] [debug] [info] Axis map
+[2023-03-02 21:15:59.492] [debug] [info]   linear=1 id=1
+[2023-03-02 21:15:59.492] [debug] [info]   linear=2 id=2
+[2023-03-02 21:15:59.492] [debug] [info]   linear=3 id=3
+[2023-03-02 21:15:59.492] [debug] [info]   linear=4 id=4
+[2023-03-02 21:15:59.492] [debug] [info]   linear=5 id=5
+[2023-03-02 21:15:59.492] [debug] [info]   linear=6 id=6
+[2023-03-02 21:15:59.492] [debug] [info]   linear=7 id=7
+[2023-03-02 21:15:59.492] [debug] [info]   linear=8 id=8
+[2023-03-02 21:15:59.494] [debug] [info] {B11A3E70-DDE1-11EC-8001-444553540000}: Processing device: Alpha Flight Controls
+[2023-03-02 21:15:59.495] [debug] [info] Device summary: Alpha Flight Controls {B11A3E70-DDE1-11EC-8001-444553540000}
+[2023-03-02 21:15:59.495] [debug] [info] Axis=2 Buttons=35 Hats=1
+[2023-03-02 21:15:59.495] [debug] [info] Axis map
+[2023-03-02 21:15:59.495] [debug] [info]   linear=1 id=1
+[2023-03-02 21:15:59.495] [debug] [info]   linear=2 id=2
+[2023-03-02 21:15:59.495] [debug] [info]   linear=0 id=0
+[2023-03-02 21:15:59.495] [debug] [info]   linear=0 id=0
+[2023-03-02 21:15:59.495] [debug] [info]   linear=0 id=0
+[2023-03-02 21:15:59.495] [debug] [info]   linear=0 id=0
+[2023-03-02 21:15:59.495] [debug] [info]   linear=0 id=0
+[2023-03-02 21:15:59.495] [debug] [info]   linear=0 id=0
+[2023-03-02 21:15:59.497] [debug] [info] {705DC1A0-C170-11E7-8003-444553540000}: Processing device: vJoy Device
+[2023-03-02 21:15:59.499] [debug] [info] Device summary: vJoy Device {705DC1A0-C170-11E7-8003-444553540000}
+[2023-03-02 21:15:59.499] [debug] [info] Axis=8 Buttons=128 Hats=3
+[2023-03-02 21:15:59.499] [debug] [info] Axis map
+[2023-03-02 21:15:59.499] [debug] [info]   linear=1 id=1
+[2023-03-02 21:15:59.499] [debug] [info]   linear=2 id=2
+[2023-03-02 21:15:59.499] [debug] [info]   linear=3 id=3
+[2023-03-02 21:15:59.499] [debug] [info]   linear=4 id=4
+[2023-03-02 21:15:59.499] [debug] [info]   linear=5 id=5
+[2023-03-02 21:15:59.499] [debug] [info]   linear=6 id=6
+[2023-03-02 21:15:59.499] [debug] [info]   linear=7 id=7
+[2023-03-02 21:15:59.499] [debug] [info]   linear=8 id=8
+[2023-03-02 21:15:59.505] [debug] [info] {0D258FE0-1A64-11EC-8001-444553540000}: Processing device: Bravo Throttle Quadrant
+[2023-03-02 21:15:59.505] [debug] [info] Device summary: Bravo Throttle Quadrant {0D258FE0-1A64-11EC-8001-444553540000}
+[2023-03-02 21:15:59.505] [debug] [info] Axis=6 Buttons=48 Hats=0
+[2023-03-02 21:15:59.505] [debug] [info] Axis map
+[2023-03-02 21:15:59.505] [debug] [info]   linear=1 id=1
+[2023-03-02 21:15:59.505] [debug] [info]   linear=2 id=2
+[2023-03-02 21:15:59.505] [debug] [info]   linear=3 id=3
+[2023-03-02 21:15:59.505] [debug] [info]   linear=4 id=4
+[2023-03-02 21:15:59.505] [debug] [info]   linear=5 id=5
+[2023-03-02 21:15:59.505] [debug] [info]   linear=6 id=6
+[2023-03-02 21:15:59.505] [debug] [info]   linear=0 id=0
+[2023-03-02 21:15:59.505] [debug] [info]   linear=0 id=0
+[2023-03-02 21:15:59.513] [debug] [info] {8245C100-2705-11E9-8002-444553540000}: Processing device: vJoy Device
+[2023-03-02 21:15:59.514] [debug] [info] Device summary: vJoy Device {8245C100-2705-11E9-8002-444553540000}
+[2023-03-02 21:15:59.514] [debug] [info] Axis=8 Buttons=128 Hats=2
+[2023-03-02 21:15:59.514] [debug] [info] Axis map
+[2023-03-02 21:15:59.514] [debug] [info]   linear=1 id=1
+[2023-03-02 21:15:59.514] [debug] [info]   linear=2 id=2
+[2023-03-02 21:15:59.514] [debug] [info]   linear=3 id=3
+[2023-03-02 21:15:59.514] [debug] [info]   linear=4 id=4
+[2023-03-02 21:15:59.514] [debug] [info]   linear=5 id=5
+[2023-03-02 21:15:59.514] [debug] [info]   linear=6 id=6
+[2023-03-02 21:15:59.514] [debug] [info]   linear=7 id=7
+[2023-03-02 21:15:59.514] [debug] [info]   linear=8 id=8
+[2023-03-02 21:15:59.516] [debug] [info] {15138A40-F2A1-11EA-8001-444553540000}: Processing device: LEFT VPC Stick WarBRD
+[2023-03-02 21:15:59.517] [debug] [info] Device summary: LEFT VPC Stick WarBRD {15138A40-F2A1-11EA-8001-444553540000}
+[2023-03-02 21:15:59.517] [debug] [info] Axis=6 Buttons=31 Hats=0
+[2023-03-02 21:15:59.517] [debug] [info] Axis map
+[2023-03-02 21:15:59.517] [debug] [info]   linear=1 id=1
+[2023-03-02 21:15:59.517] [debug] [info]   linear=2 id=2
+[2023-03-02 21:15:59.517] [debug] [info]   linear=3 id=3
+[2023-03-02 21:15:59.517] [debug] [info]   linear=4 id=4
+[2023-03-02 21:15:59.517] [debug] [info]   linear=5 id=5
+[2023-03-02 21:15:59.517] [debug] [info]   linear=6 id=7
+[2023-03-02 21:15:59.517] [debug] [info]   linear=0 id=0
+[2023-03-02 21:15:59.517] [debug] [info]   linear=0 id=0
+[2023-03-02 21:15:59.524] [debug] [info] {203C80E0-15C8-11EA-8002-444553540000}: Processing device: vJoy Device
+[2023-03-02 21:15:59.525] [debug] [info] Device summary: vJoy Device {203C80E0-15C8-11EA-8002-444553540000}
+[2023-03-02 21:15:59.525] [debug] [info] Axis=8 Buttons=128 Hats=1
+[2023-03-02 21:15:59.525] [debug] [info] Axis map
+[2023-03-02 21:15:59.525] [debug] [info]   linear=1 id=1
+[2023-03-02 21:15:59.525] [debug] [info]   linear=2 id=2
+[2023-03-02 21:15:59.525] [debug] [info]   linear=3 id=3
+[2023-03-02 21:15:59.525] [debug] [info]   linear=4 id=4
+[2023-03-02 21:15:59.525] [debug] [info]   linear=5 id=5
+[2023-03-02 21:15:59.525] [debug] [info]   linear=6 id=6
+[2023-03-02 21:15:59.525] [debug] [info]   linear=7 id=7
+[2023-03-02 21:15:59.525] [debug] [info]   linear=8 id=8
+[2023-03-02 21:15:59.529] [debug] [info] {EAB183B0-A739-11ED-8002-444553540000}: Processing device: vJoy Device
+[2023-03-02 21:15:59.530] [debug] [info] Device summary: vJoy Device {EAB183B0-A739-11ED-8002-444553540000}
+[2023-03-02 21:15:59.530] [debug] [info] Axis=8 Buttons=128 Hats=0
+[2023-03-02 21:15:59.530] [debug] [info] Axis map
+[2023-03-02 21:15:59.530] [debug] [info]   linear=1 id=1
+[2023-03-02 21:15:59.530] [debug] [info]   linear=2 id=2
+[2023-03-02 21:15:59.530] [debug] [info]   linear=3 id=3
+[2023-03-02 21:15:59.530] [debug] [info]   linear=4 id=4
+[2023-03-02 21:15:59.530] [debug] [info]   linear=5 id=5
+[2023-03-02 21:15:59.530] [debug] [info]   linear=6 id=6
+[2023-03-02 21:15:59.530] [debug] [info]   linear=7 id=7
+[2023-03-02 21:15:59.530] [debug] [info]   linear=8 id=8
+[2023-03-02 21:15:59.541] [debug] [info] {83E65A90-1F06-11ED-8001-444553540000}: Processing device: RaspberryPi Pico
+[2023-03-02 21:15:59.542] [debug] [info] Device summary: RaspberryPi Pico {83E65A90-1F06-11ED-8001-444553540000}
+[2023-03-02 21:15:59.542] [debug] [info] Axis=8 Buttons=128 Hats=4
+[2023-03-02 21:15:59.542] [debug] [info] Axis map
+[2023-03-02 21:15:59.542] [debug] [info]   linear=1 id=1
+[2023-03-02 21:15:59.542] [debug] [info]   linear=2 id=2
+[2023-03-02 21:15:59.542] [debug] [info]   linear=3 id=3
+[2023-03-02 21:15:59.542] [debug] [info]   linear=4 id=4
+[2023-03-02 21:15:59.542] [debug] [info]   linear=5 id=5
+[2023-03-02 21:15:59.542] [debug] [info]   linear=6 id=6
+[2023-03-02 21:15:59.542] [debug] [info]   linear=7 id=7
+[2023-03-02 21:15:59.542] [debug] [info]   linear=8 id=8
+[2023-03-02 21:15:59.547] [debug] [info] {A60B8530-25E9-11E7-8003-444553540000}: Processing device: Throttle - HOTAS Warthog
+[2023-03-02 21:15:59.547] [debug] [info] Device summary: Throttle - HOTAS Warthog {A60B8530-25E9-11E7-8003-444553540000}
+[2023-03-02 21:15:59.547] [debug] [info] Axis=5 Buttons=32 Hats=1
+[2023-03-02 21:15:59.547] [debug] [info] Axis map
+[2023-03-02 21:15:59.547] [debug] [info]   linear=1 id=1
+[2023-03-02 21:15:59.547] [debug] [info]   linear=2 id=2
+[2023-03-02 21:15:59.547] [debug] [info]   linear=3 id=3
+[2023-03-02 21:15:59.547] [debug] [info]   linear=4 id=6
+[2023-03-02 21:15:59.547] [debug] [info]   linear=5 id=7
+[2023-03-02 21:15[2023-03-02 21:21:34.741] [debug] [info] Setting device change callback
+[2023-03-02 21:21:34.741] [debug] [info] Setting event callback
+[2023-03-02 21:21:37.591] [debug] [info] Initializing DILL v1.3
+[2023-03-02 21:21:37.754] [debug] [info] {2D3260A0-6FA6-11E7-8002-444553540000}: Processing device: vJoy Device
+[2023-03-02 21:21:37.760] [debug] [info] Device summary: vJoy Device {2D3260A0-6FA6-11E7-8002-444553540000}
+[2023-03-02 21:21:37.760] [debug] [info] Axis=8 Buttons=128 Hats=4
+[2023-03-02 21:21:37.760] [debug] [info] Axis map
+[2023-03-02 21:21:37.760] [debug] [info]   linear=1 id=1
+[2023-03-02 21:21:37.760] [debug] [info]   linear=2 id=2
+[2023-03-02 21:21:37.760] [debug] [info]   linear=3 id=3
+[2023-03-02 21:21:37.760] [debug] [info]   linear=4 id=4
+[2023-03-02 21:21:37.760] [debug] [info]   linear=5 id=5
+[2023-03-02 21:21:37.760] [debug] [info]   linear=6 id=6
+[2023-03-02 21:21:37.760] [debug] [info]   linear=7 id=7
+[2023-03-02 21:21:37.760] [debug] [info]   linear=8 id=8
+[2023-03-02 21:21:37.762] [debug] [info] {B11A3E70-DDE1-11EC-8001-444553540000}: Processing device: Alpha Flight Controls
+[2023-03-02 21:21:37.762] [debug] [info] Device summary: Alpha Flight Controls {B11A3E70-DDE1-11EC-8001-444553540000}
+[2023-03-02 21:21:37.762] [debug] [info] Axis=2 Buttons=35 Hats=1
+[2023-03-02 21:21:37.762] [debug] [info] Axis map
+[2023-03-02 21:21:37.762] [debug] [info]   linear=1 id=1
+[2023-03-02 21:21:37.762] [debug] [info]   linear=2 id=2
+[2023-03-02 21:21:37.762] [debug] [info]   linear=0 id=0
+[2023-03-02 21:21:37.762] [debug] [info]   linear=0 id=0
+[2023-03-02 21:21:37.762] [debug] [info]   linear=0 id=0
+[2023-03-02 21:21:37.762] [debug] [info]   linear=0 id=0
+[2023-03-02 21:21:37.762] [debug] [info]   linear=0 id=0
+[2023-03-02 21:21:37.762] [debug] [info]   linear=0 id=0
+[2023-03-02 21:21:37.764] [debug] [info] {705DC1A0-C170-11E7-8003-444553540000}: Processing device: vJoy Device
+[2023-03-02 21:21:37.765] [debug] [info] Device summary: vJoy Device {705DC1A0-C170-11E7-8003-444553540000}
+[2023-03-02 21:21:37.765] [debug] [info] Axis=8 Buttons=128 Hats=3
+[2023-03-02 21:21:37.765] [debug] [info] Axis map
+[2023-03-02 21:21:37.765] [debug] [info]   linear=1 id=1
+[2023-03-02 21:21:37.765] [debug] [info]   linear=2 id=2
+[2023-03-02 21:21:37.765] [debug] [info]   linear=3 id=3
+[2023-03-02 21:21:37.765] [debug] [info]   linear=4 id=4
+[2023-03-02 21:21:37.765] [debug] [info]   linear=5 id=5
+[2023-03-02 21:21:37.765] [debug] [info]   linear=6 id=6
+[2023-03-02 21:21:37.765] [debug] [info]   linear=7 id=7
+[2023-03-02 21:21:37.765] [debug] [info]   linear=8 id=8
+[2023-03-02 21:21:37.770] [debug] [info] {0D258FE0-1A64-11EC-8001-444553540000}: Processing device: Bravo Throttle Quadrant
+[2023-03-02 21:21:37.771] [debug] [info] Device summary: Bravo Throttle Quadrant {0D258FE0-1A64-11EC-8001-444553540000}
+[2023-03-02 21:21:37.771] [debug] [info] Axis=6 Buttons=48 Hats=0
+[2023-03-02 21:21:37.771] [debug] [info] Axis map
+[2023-03-02 21:21:37.771] [debug] [info]   linear=1 id=1
+[2023-03-02 21:21:37.771] [debug] [info]   linear=2 id=2
+[2023-03-02 21:21:37.771] [debug] [info]   linear=3 id=3
+[2023-03-02 21:21:37.771] [debug] [info]   linear=4 id=4
+[2023-03-02 21:21:37.771] [debug] [info]   linear=5 id=5
+[2023-03-02 21:21:37.771] [debug] [info]   linear=6 id=6
+[2023-03-02 21:21:37.771] [debug] [info]   linear=0 id=0
+[2023-03-02 21:21:37.771] [debug] [info]   linear=0 id=0
+[2023-03-02 21:21:37.778] [debug] [info] {8245C100-2705-11E9-8002-444553540000}: Processing device: vJoy Device
+[2023-03-02 21:21:37.779] [debug] [info] Device summary: vJoy Device {8245C100-2705-11E9-8002-444553540000}
+[2023-03-02 21:21:37.779] [debug] [info] Axis=8 Buttons=128 Hats=2
+[2023-03-02 21:21:37.779] [debug] [info] Axis map
+[2023-03-02 21:21:37.779] [debug] [info]   linear=1 id=1
+[2023-03-02 21:21:37.779] [debug] [info]   linear=2 id=2
+[2023-03-02 21:21:37.779] [debug] [info]   linear=3 id=3
+[2023-03-02 21:21:37.779] [debug] [info]   linear=4 id=4
+[2023-03-02 21:21:37.779] [debug] [info]   linear=5 id=5
+[2023-03-02 21:21:37.779] [debug] [info]   linear=6 id=6
+[2023-03-02 21:21:37.780] [debug] [info]   linear=7 id=7
+[2023-03-02 21:21:37.780] [debug] [info]   linear=8 id=8
+[2023-03-02 21:21:37.781] [debug] [info] {15138A40-F2A1-11EA-8001-444553540000}: Processing device: LEFT VPC Stick WarBRD
+[2023-03-02 21:21:37.782] [debug] [info] Device summary: LEFT VPC Stick WarBRD {15138A40-F2A1-11EA-8001-444553540000}
+[2023-03-02 21:21:37.782] [debug] [info] Axis=6 Buttons=31 Hats=0
+[2023-03-02 21:21:37.782] [debug] [info] Axis map
+[2023-03-02 21:21:37.782] [debug] [info]   linear=1 id=1
+[2023-03-02 21:21:37.782] [debug] [info]   linear=2 id=2
+[2023-03-02 21:21:37.782] [debug] [info]   linear=3 id=3
+[2023-03-02 21:21:37.782] [debug] [info]   linear=4 id=4
+[2023-03-02 21:21:37.782] [debug] [info]   linear=5 id=5
+[2023-03-02 21:21:37.782] [debug] [info]   linear=6 id=7
+[2023-03-02 21:21:37.782] [debug] [info]   linear=0 id=0
+[2023-03-02 21:21:37.782] [debug] [info]   linear=0 id=0
+[2023-03-02 21:21:37.788] [debug] [info] {203C80E0-15C8-11EA-8002-444553540000}: Processing device: vJoy Device
+[2023-03-02 21:21:37.790] [debug] [info] Device summary: vJoy Device {203C80E0-15C8-11EA-8002-444553540000}
+[2023-03-02 21:21:37.790] [debug] [info] Axis=8 Buttons=128 Hats=1
+[2023-03-02 21:21:37.790] [debug] [info] Axis map
+[2023-03-02 21:21:37.790] [debug] [info]   linear=1 id=1
+[2023-03-02 21:21:37.790] [debug] [info]   linear=2 id=2
+[2023-03-02 21:21:37.790] [debug] [info]   linear=3 id=3
+[2023-03-02 21:21:37.790] [debug] [info]   linear=4 id=4
+[2023-03-02 21:21:37.790] [debug] [info]   linear=5 id=5
+[2023-03-02 21:21:37.790] [debug] [info]   linear=6 id=6
+[2023-03-02 21:21:37.790] [debug] [info]   linear=7 id=7
+[2023-03-02 21:21:37.790] [debug] [info]   linear=8 id=8
+[2023-03-02 21:21:37.793] [debug] [info] {EAB183B0-A739-11ED-8002-444553540000}: Processing device: vJoy Device
+[2023-03-02 21:21:37.794] [debug] [info] Device summary: vJoy Device {EAB183B0-A739-11ED-8002-444553540000}
+[2023-03-02 21:21:37.794] [debug] [info] Axis=8 Buttons=128 Hats=0
+[2023-03-02 21:21:37.794] [debug] [info] Axis map
+[2023-03-02 21:21:37.794] [debug] [info]   linear=1 id=1
+[2023-03-02 21:21:37.794] [debug] [info]   linear=2 id=2
+[2023-03-02 21:21:37.794] [debug] [info]   linear=3 id=3
+[2023-03-02 21:21:37.794] [debug] [info]   linear=4 id=4
+[2023-03-02 21:21:37.794] [debug] [info]   linear=5 id=5
+[2023-03-02 21:21:37.794] [debug] [info]   linear=6 id=6
+[2023-03-02 21:21:37.794] [debug] [info]   linear=7 id=7
+[2023-03-02 21:21:37.794] [debug] [info]   linear=8 id=8
+[2023-03-02 21:21:37.803] [debug] [info] {83E65A90-1F06-11ED-8001-444553540000}: Processing device: RaspberryPi Pico
+[2023-03-02 21:21:37.804] [debug] [info] Device summary: RaspberryPi Pico {83E65A90-1F06-11ED-8001-444553540000}
+[2023-03-02 21:21:37.804] [debug] [info] Axis=8 Buttons=128 Hats=4
+[2023-03-02 21:21:37.804] [debug] [info] Axis map
+[2023-03-02 21:21:37.804] [debug] [info]   linear=1 id=1
+[2023-03-02 21:21:37.804] [debug] [info]   linear=2 id=2
+[2023-03-02 21:21:37.804] [debug] [info]   linear=3 id=3
+[2023-03-02 21:21:37.804] [debug] [info]   linear=4 id=4
+[2023-03-02 21:21:37.804] [debug] [info]   linear=5 id=5
+[2023-03-02 21:21:37.804] [debug] [info]   linear=6 id=6
+[2023-03-02 21:21:37.804] [debug] [info]   linear=7 id=7
+[2023-03-02 21:21:37.804] [debug] [info]   linear=8 id=8
+[2023-03-02 21:21:37.809] [debug] [info] {A60B8530-25E9-11E7-8003-444553540000}: Processing device: Throttle - HOTAS Warthog
+[2023-03-02 21:21:37.809] [debug] [info] Device summary: Throttle - HOTAS Warthog {A60B8530-25E9-11E7-8003-444553540000}
+[2023-03-02 21:21:37.809] [debug] [info] Axis=5 Buttons=32 Hats=1
+[2023-03-02 21:21:37.809] [debug] [info] Axis map
+[2023-03-02 21:21:37.809] [debug] [info]   linear=1 id=1
+[2023-03-02 21:21:37.809] [debug] [info]   linear=2 id=2
+[2023-03-02 21:21:37.809] [debug] [info]   linear=3 id=3
+[2023-03-02 21:21:37.809] [debug] [info]   linear=4 id=6
+[2023-03-02 21:21:37.809] [debug] [info]   linear=5 id=7
+[2023-03-02 21:21:37.809] [debug] [info]   linear=0 id=0
+[2023-03-02 21:21:37.809] [debug] [info]   linear=0 id=0
+[2023-03-02 21:21:37.809] [debug] [info]   linear=0 id=0
+[2023-03-02 21:21:37.819] [debug] [info] {5CDF3590-F2A1-11EA-8002-444553540000}: Processing device: RIGHT VPC Stick WarBRD
+[2023-03-02 21:21:37.820] [debug] [info] Device summary: RIGHT VPC Stick WarBRD {5CDF3590-F2A1-11EA-8002-444553540000}
+[2023-03-02 21:21:37.820] [debug] [info] Axis=6 Buttons=31 Hats=0
+[2023-03-02 21:21:37.820] [debug] [info] Axis map
+[2023-03-02 21:21:37.820] [debug] [info]   linear=1 id=1
+[2023-03-02 21:21:37.820] [debug] [info]   linear=2 id=2
+[2023-03-02 21:21:37.820] [debug] [info]   linear=3 id=3
+[2023-03-02 21:21:37.820] [debug] [info]   linear=4 id=4
+[2023-03-02 21:21:37.820] [debug] [info]   linear=5 id=5
+[2023-03-02 21:21:37.820] [debug] [info]   linear=6 id=7
+[2023-03-02 21:21:37.820] [debug] [info]   linear=0 id=0
+[2023-03-02 21:21:37.820] [debug] [info]   linear=0 id=0
+[2023-03-02 21:21:37.821] [debug] [info] {A5AA2B50-25E9-11E7-8001-444553540000}: Processing device: T-Rudder
+[2023-03-02 21:21:37.821] [debug] [info] Device summary: T-Rudder {A5AA2B50-25E9-11E7-8001-444553540000}
+[2023-03-02 21:21:37.821] [debug] [info] Axis=3 Buttons=0 Hats=0
+[2023-03-02 21:21:37.821] [debug] [info] Axis map
+[2023-03-02 21:21:37.821] [debug] [info]   linear=1 id=1
+[2023-03-02 21:21:37.821] [debug] [info]   linear=2 id=2
+[2023-03-02 21:21:37.821] [debug] [info]   linear=3 id=3
+[2023-03-02 21:21:37.821] [debug] [info]   linear=0 id=0
+[2023-03-02 21:21:37.821] [debug] [info]   linear=0 id=0
+[2023-03-02 21:21:37.821] [debug] [info]   linear=0 id=0
+[2023-03-02 21:21:37.821] [debug] [info]   linear=0 id=0
+[2023-03-02 21:21:37.821] [debug] [info]   linear=0 id=0
+[2023-03-02 21:21:37.947] [debug] [info] {A4F58A50-2156-11E9-8001-444553540000}: Processing device: DSD Flight Series Button Controller
+[2023-03-02 21:21:37.947] [debug] [info] Device summary: DSD Flight Series Button Controller {A4F58A50-2156-11E9-8001-444553540000}
+[2023-03-02 21:21:37.947] [debug] [info] Axis=0 Buttons=32 Hats=0
+[2023-03-02 21:21:37.947] [debug] [info] Axis map
+[2023-03-02 21:21:37.947] [debug] [info]   linear=0 id=0
+[2023-03-02 21:21:37.947] [debug] [info]   linear=0 id=0
+[2023-03-02 21:21:37.947] [debug] [info]   linear=0 id=0
+[2023-03-02 21:21:37.947] [debug] [info]   linear=0 id=0
+[2023-03-02 21:21:37.947] [debug] [info]   linear=0 id=0
+[2023-03-02 21:21:37.947] [debug] [info]   linear=0 id=0
+[2023-03-02 21:21:37.947] [debug] [info]   linear=0 id=0
+[2023-03-02 21:21:37.947] [debug] [info]   linear=0 id=0
+[2023-03-02 21:26:44.085] [debug] [info] Setting device change callback
+[2023-03-02 21:26:44.085] [debug] [info] Setting event callback
+[2023-03-02 21:26:57.988] [debug] [info] Initializing DILL v1.3
+[2023-03-02 21:26:58.151] [debug] [info] {2D3260A0-6FA6-11E7-8002-444553540000}: Processing device: vJoy Device
+[2023-03-02 21:26:58.158] [debug] [info] Device summary: vJoy Device {2D3260A0-6FA6-11E7-8002-444553540000}
+[2023-03-02 21:26:58.158] [debug] [info] Axis=8 Buttons=128 Hats=4
+[2023-03-02 21:26:58.158] [debug] [info] Axis map
+[2023-03-02 21:26:58.158] [debug] [info]   linear=1 id=1
+[2023-03-02 21:26:58.158] [debug] [info]   linear=2 id=2
+[2023-03-02 21:26:58.158] [debug] [info]   linear=3 id=3
+[2023-03-02 21:26:58.158] [debug] [info]   linear=4 id=4
+[2023-03-02 21:26:58.158] [debug] [info]   linear=5 id=5
+[2023-03-02 21:26:58.158] [debug] [info]   linear=6 id=6
+[2023-03-02 21:26:58.158] [debug] [info]   linear=7 id=7
+[2023-03-02 21:26:58.158] [debug] [info]   linear=8 id=8
+[2023-03-02 21:26:58.160] [debug] [info] {B11A3E70-DDE1-11EC-8001-444553540000}: Processing device: Alpha Flight Controls
+[2023-03-02 21:26:58.160] [debug] [info] Device summary: Alpha Flight Controls {B11A3E70-DDE1-11EC-8001-444553540000}
+[2023-03-02 21:26:58.160] [debug] [info] Axis=2 Buttons=35 Hats=1
+[2023-03-02 21:26:58.160] [debug] [info] Axis map
+[2023-03-02 21:26:58.160] [debug] [info]   linear=1 id=1
+[2023-03-02 21:26:58.160] [debug] [info]   linear=2 id=2
+[2023-03-02 21:26:58.160] [debug] [info]   linear=0 id=0
+[2023-03-02 21:26:58.160] [debug] [info]   linear=0 id=0
+[2023-03-02 21:26:58.160] [debug] [info]   linear=0 id=0
+[2023-03-02 21:26:58.160] [debug] [info]   linear=0 id=0
+[2023-03-02 21:26:58.160] [debug] [info]   linear=0 id=0
+[2023-03-02 21:26:58.160] [debug] [info]   linear=0 id=0
+[2023-03-02 21:26:58.162] [debug] [info] {705DC1A0-C170-11E7-8003-444553540000}: Processing device: vJoy Device
+[2023-03-02 21:26:58.163] [debug] [info] Device summary: vJoy Device {705DC1A0-C170-11E7-8003-444553540000}
+[2023-03-02 21:26:58.163] [debug] [info] Axis=8 Buttons=128 Hats=3
+[2023-03-02 21:26:58.163] [debug] [info] Axis map
+[2023-03-02 21:26:58.163] [debug] [info]   linear=1 id=1
+[2023-03-02 21:26:58.163] [debug] [info]   linear=2 id=2
+[2023-03-02 21:26:58.163] [debug] [info]   linear=3 id=3
+[2023-03-02 21:26:58.163] [debug] [info]   linear=4 id=4
+[2023-03-02 21:26:58.163] [debug] [info]   linear=5 id=5
+[2023-03-02 21:26:58.163] [debug] [info]   linear=6 id=6
+[2023-03-02 21:26:58.163] [debug] [info]   linear=7 id=7
+[2023-03-02 21:26:58.163] [debug] [info]   linear=8 id=8
+[2023-03-02 21:26:58.167] [debug] [info] {0D258FE0-1A64-11EC-8001-444553540000}: Processing device: Bravo Throttle Quadrant
+[2023-03-02 21:26:58.168] [debug] [info] Device summary: Bravo Throttle Quadrant {0D258FE0-1A64-11EC-8001-444553540000}
+[2023-03-02 21:26:58.168] [debug] [info] Axis=6 Buttons=48 Hats=0
+[2023-03-02 21:26:58.168] [debug] [info] Axis map
+[2023-03-02 21:26:58.168] [debug] [info]   linear=1 id=1
+[2023-03-02 21:26:58.168] [debug] [info]   linear=2 id=2
+[2023-03-02 21:26:58.168] [debug] [info]   linear=3 id=3
+[2023-03-02 21:26:58.168] [debug] [info]   linear=4 id=4
+[2023-03-02 21:26:58.168] [debug] [info]   linear=5 id=5
+[2023-03-02 21:26:58.168] [debug] [info]   linear=6 id=6
+[2023-03-02 21:26:58.168] [debug] [info]   linear=0 id=0
+[2023-03-02 21:26:58.168] [debug] [info]   linear=0 id=0
+[2023-03-02 21:26:58.176] [debug] [info] {8245C100-2705-11E9-8002-444553540000}: Processing device: vJoy Device
+[2023-03-02 21:26:58.178] [debug] [info] Device summary: vJoy Device {8245C100-2705-11E9-8002-444553540000}
+[2023-03-02 21:26:58.178] [debug] [info] Axis=8 Buttons=128 Hats=2
+[2023-03-02 21:26:58.178] [debug] [info] Axis map
+[2023-03-02 21:26:58.178] [debug] [info]   linear=1 id=1
+[2023-03-02 21:26:58.178] [debug] [info]   linear=2 id=2
+[2023-03-02 21:26:58.178] [debug] [info]   linear=3 id=3
+[2023-03-02 21:26:58.178] [debug] [info]   linear=4 id=4
+[2023-03-02 21:26:58.178] [debug] [info]   linear=5 id=5
+[2023-03-02 21:26:58.178] [debug] [info]   linear=6 id=6
+[2023-03-02 21:26:58.178] [debug] [info]   linear=7 id=7
+[2023-03-02 21:26:58.178] [debug] [info]   linear=8 id=8
+[2023-03-02 21:26:58.179] [debug] [info] {15138A40-F2A1-11EA-8001-444553540000}: Processing device: LEFT VPC Stick WarBRD
+[2023-03-02 21:26:58.180] [debug] [info] Device summary: LEFT VPC Stick WarBRD {15138A40-F2A1-11EA-8001-444553540000}
+[2023-03-02 21:26:58.180] [debug] [info] Axis=6 Buttons=31 Hats=0
+[2023-03-02 21:26:58.180] [debug] [info] Axis map
+[2023-03-02 21:26:58.180] [debug] [info]   linear=1 id=1
+[2023-03-02 21:26:58.180] [debug] [info]   linear=2 id=2
+[2023-03-02 21:26:58.180] [debug] [info]   linear=3 id=3
+[2023-03-02 21:26:58.180] [debug] [info]   linear=4 id=4
+[2023-03-02 21:26:58.180] [debug] [info]   linear=5 id=5
+[2023-03-02 21:26:58.180] [debug] [info]   linear=6 id=7
+[2023-03-02 21:26:58.180] [debug] [info]   linear=0 id=0
+[2023-03-02 21:26:58.180] [debug] [info]   linear=0 id=0
+[2023-03-02 21:26:58.187] [debug] [info] {203C80E0-15C8-11EA-8002-444553540000}: Processing device: vJoy Device
+[2023-03-02 21:26:58.188] [debug] [info] Device summary: vJoy Device {203C80E0-15C8-11EA-8002-444553540000}
+[2023-03-02 21:26:58.188] [debug] [info] Axis=8 Buttons=128 Hats=1
+[2023-03-02 21:26:58.188] [debug] [info] Axis map
+[2023-03-02 21:26:58.188] [debug] [info]   linear=1 id=1
+[2023-03-02 21:26:58.188] [debug] [info]   linear=2 id=2
+[2023-03-02 21:26:58.188] [debug] [info]   linear=3 id=3
+[2023-03-02 21:26:58.188] [debug] [info]   linear=4 id=4
+[2023-03-02 21:26:58.188] [debug] [info]   linear=5 id=5
+[2023-03-02 21:26:58.188] [debug] [info]   linear=6 id=6
+[2023-03-02 21:26:58.188] [debug] [info]   linear=7 id=7
+[2023-03-02 21:26:58.188] [debug] [info]   linear=8 id=8
+[2023-03-02 21:26:58.191] [debug] [info] {EAB183B0-A739-11ED-8002-444553540000}: Processing device: vJoy Device
+[2023-03-02 21:26:58.193] [debug] [info] Device summary: vJoy Device {EAB183B0-A739-11ED-8002-444553540000}
+[2023-03-02 21:26:58.193] [debug] [info] Axis=8 Buttons=128 Hats=0
+[2023-03-02 21:26:58.193] [debug] [info] Axis map
+[2023-03-02 21:26:58.193] [debug] [info]   linear=1 id=1
+[2023-03-02 21:26:58.193] [debug] [info]   linear=2 id=2
+[2023-03-02 21:26:58.193] [debug] [info]   linear=3 id=3
+[2023-03-02 21:26:58.193] [debug] [info]   linear=4 id=4
+[2023-03-02 21:26:58.193] [debug] [info]   linear=5 id=5
+[2023-03-02 21:26:58.193] [debug] [info]   linear=6 id=6
+[2023-03-02 21:26:58.193] [debug] [info]   linear=7 id=7
+[2023-03-02 21:26:58.193] [debug] [info]   linear=8 id=8
+[2023-03-02 21:26:58.204] [debug] [info] {83E65A90-1F06-11ED-8001-444553540000}: Processing device: RaspberryPi Pico
+[2023-03-02 21:26:58.204] [debug] [info] Device summary: RaspberryPi Pico {83E65A90-1F06-11ED-8001-444553540000}
+[2023-03-02 21:26:58.204] [debug] [info] Axis=8 Buttons=128 Hats=4
+[2023-03-02 21:26:58.204] [debug] [info] Axis map
+[2023-03-02 21:26:58.204] [debug] [info]   linear=1 id=1
+[2023-03-02 21:26:58.204] [debug] [info]   linear=2 id=2
+[2023-03-02 21:26:58.204] [debug] [info]   linear=3 id=3
+[2023-03-02 21:26:58.204] [debug] [info]   linear=4 id=4
+[2023-03-02 21:26:58.204] [debug] [info]   linear=5 id=5
+[2023-03-02 21:26:58.204] [debug] [info]   linear=6 id=6
+[2023-03-02 21:26:58.204] [debug] [info]   linear=7 id=7
+[2023-03-02 21:26:58.204] [debug] [info]   linear=8 id=8
+[2023-03-02 21:26:58.209] [debug] [info] {A60B8530-25E9-11E7-8003-444553540000}: Processing device: Throttle - HOTAS Warthog
+[2023-03-02 21:26:58.209] [debug] [info] Device summary: Throttle - HOTAS Warthog {A60B8530-25E9-11E7-8003-444553540000}
+[2023-03-02 21:26:58.209] [debug] [info] Axis=5 Buttons=32 Hats=1
+[2023-03-02 21:26:58.209] [debug] [info] Axis map
+[2023-03-02 21:26:58.209] [debug] [info]   linear=1 id=1
+[2023-03-02 21:26:58.209] [debug] [info]   linear=2 id=2
+[2023-03-02 21:26:58.209] [debug] [info]   linear=3 id=3
+[2023-03-02 21:26:58.209] [debug] [info]   linear=4 id=6
+[2023-03-02 21:26:58.209] [debug] [info]   linear=5 id=7
+[2023-03-02 21:26:58.209] [debug] [info]   linear=0 id=0
+[2023-03-02 21:26:58.209] [debug] [info]   linear=0 id=0
+[2023-03-02 21:26:58.209] [debug] [info]   linear=0 id=0
+[2023-03-02 21:26:58.220] [debug] [info] {5CDF3590-F2A1-11EA-8002-444553540000}: Processing device: RIGHT VPC Stick WarBRD
+[2023-03-02 21:26:58.220] [debug] [info] Device summary: RIGHT VPC Stick WarBRD {5CDF3590-F2A1-11EA-8002-444553540000}
+[2023-03-02 21:26:58.220] [debug] [info] Axis=6 Buttons=31 Hats=0
+[2023-03-02 21:26:58.220] [debug] [info] Axis map
+[2023-03-02 21:26:58.220] [debug] [info]   linear=1 id=1
+[2023-03-02 21:26:58.220] [debug] [info]   linear=2 id=2
+[2023-03-02 21:26:58.220] [debug] [info]   linear=3 id=3
+[2023-03-02 21:26:58.220] [debug] [info]   linear=4 id=4
+[2023-03-02 21:26:58.220] [debug] [info]   linear=5 id=5
+[2023-03-02 21:26:58.220] [debug] [info]   linear=6 id=7
+[2023-03-02 21:26:58.220] [debug] [info]   linear=0 id=0
+[2023-03-02 21:26:58.220] [debug] [info]   linear=0 id=0
+[2023-03-02 21:26:58.221] [debug] [info] {A5AA2B50-25E9-11E7-8001-444553540000}: Processing device: T-Rudder
+[2023-03-02 21:26:58.222] [debug] [info] Device summary: T-Rudder {A5AA2B50-25E9-11E7-8001-444553540000}
+[2023-03-02 21:26:58.222] [debug] [info] Axis=3 Buttons=0 Hats=0
+[2023-03-02 21:26:58.222] [debug] [info] Axis map
+[2023-03-02 21:26:58.222] [debug] [info]   linear=1 id=1
+[2023-03-02 21:26:58.222] [debug] [info]   linear=2 id=2
+[2023-03-02 21:26:58.222] [debug] [info]   linear=3 id=3
+[2023-03-02 21:26:58.222] [debug] [info]   linear=0 id=0
+[2023-03-02 21:26:58.222] [debug] [info]   linear=0 id=0
+[2023-03-02 21:26:58.222] [debug] [info]   linear=0 id=0
+[2023-03-02 21:26:58.222] [debug] [info]   linear=0 id=0
+[2023-03-02 21:26:58.222] [debug] [info]   linear=0 id=0
+[2023-03-02 21:26:58.347] [debug] [info] {A4F58A50-2156-11E9-8001-444553540000}: Processing device: DSD Flight Series Button Controller
+[2023-03-02 21:26:58.348] [debug] [info] Device summary: DSD Flight Series Button Controller {A4F58A50-2156-11E9-8001-444553540000}
+[2023-03-02 21:26:58.348] [debug] [info] Axis=0 Buttons=32 Hats=0
+[2023-03-02 21:26:58.348] [debug] [info] Axis map
+[2023-03-02 21:26:58.348] [debug] [info]   linear=0 id=0
+[2023-03-02 21:26:58.348] [debug] [info]   linear=0 id=0
+[2023-03-02 21:26:58.348] [debug] [info]   linear=0 id=0
+[2023-03-02 21:26:58.348] [debug] [info]   linear=0 id=0
+[2023-03-02 21:26:58.348] [debug] [info]   linear=0 id=0
+[2023-03-02 21:26:58.348] [debug] [info]   linear=0 id=0
+[2023-03-02 21:26:58.348] [debug] [info]   linear=0 id=0
+[2023-03-02 21:26:58.348] [debug] [info]   linear=0 id=0

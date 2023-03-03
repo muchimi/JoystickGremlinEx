@@ -1190,8 +1190,8 @@ class SwapDevicesUi(common.BaseDialogUi):
         geom = root.geometry()
 
         self.input_dialog.setGeometry(
-            geom.x() + geom.width() / 2 - 150,
-            geom.y() + geom.height() / 2 - 75,
+            int(geom.x() + geom.width() / 2 - 150),
+            int(geom.y() + geom.height() / 2 - 75),
             300,
             150
         )

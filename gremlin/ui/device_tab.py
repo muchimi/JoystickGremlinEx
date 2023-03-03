@@ -589,8 +589,8 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         geom = root.geometry()
 
         self.button_press_dialog.setGeometry(
-            geom.x() + geom.width() / 2 - 150,
-            geom.y() + geom.height() / 2 - 75,
+            int(geom.x() + geom.width() / 2 - 150),
+            int(geom.y() + geom.height() / 2 - 75),
             300,
             150
         )

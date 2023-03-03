@@ -243,8 +243,8 @@ class KeyboardConditionWidget(AbstractConditionWidget):
         geom = root.geometry()
 
         self.button_press_dialog.setGeometry(
-            geom.x() + geom.width() / 2 - 150,
-            geom.y() + geom.height() / 2 - 75,
+            int(geom.x() + geom.width() / 2 - 150),
+            int(geom.y() + geom.height() / 2 - 75),
             300,
             150
         )
@@ -427,8 +427,8 @@ class JoystickConditionWidget(AbstractConditionWidget):
         geom = root.geometry()
 
         self.input_dialog.setGeometry(
-            geom.x() + geom.width() / 2 - 150,
-            geom.y() + geom.height() / 2 - 75,
+            int(geom.x() + geom.width() / 2 - 150),
+            int(geom.y() + geom.height() / 2 - 75),
             300,
             150
         )

@@ -735,8 +735,8 @@ class PhysicalInputVariable(AbstractVariable):
         # Display the dialog centered in the middle of the UI
         geom = QtWidgets.QApplication.topLevelWindows()[0].geometry()
         widget.setGeometry(
-            geom.x() + geom.width() / 2 - 150,
-            geom.y() + geom.height() / 2 - 75,
+            int(geom.x() + geom.width() / 2 - 150),
+            int(geom.y() + geom.height() / 2 - 75),
             300,
             150
         )

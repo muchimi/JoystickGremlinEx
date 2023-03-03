@@ -200,8 +200,8 @@ class GremlinUi(QtWidgets.QMainWindow):
             gremlin.ui.dialogs.DeviceInformationUi()
         geom = self.geometry()
         self.modal_windows["device_information"].setGeometry(
-            geom.x() + geom.width() / 2 - 150,
-            geom.y() + geom.height() / 2 - 75,
+            int(geom.x() + geom.width() / 2 - 150),
+            int(geom.y() + geom.height() / 2 - 75),
             300,
             150
         )
@@ -281,8 +281,8 @@ class GremlinUi(QtWidgets.QMainWindow):
             gremlin.ui.dialogs.SwapDevicesUi(self._profile)
         geom = self.geometry()
         self.modal_windows["swap_devices"].setGeometry(
-            geom.x() + geom.width() / 2 - 150,
-            geom.y() + geom.height() / 2 - 75,
+            int(geom.x() + geom.width() / 2 - 150),
+            int(geom.y() + geom.height() / 2 - 75),
             300,
             150
         )
