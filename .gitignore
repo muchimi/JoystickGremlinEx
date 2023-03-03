@@ -2,6 +2,7 @@
 *.pyc
 *.wxs
 *.backup
+debug.txt
 
 .idea
 __pycache__
@@ -10,3 +11,7 @@ __pycache__
 /doc
 /releases
 /venv
+debug.txt
+joystick_gremlin.zip
+
+joystick_gremlin.zip
