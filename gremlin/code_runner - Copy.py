@@ -70,6 +70,7 @@ class CodeRunner:
         # clear any startup routines
         input_devices.start_registry.clear()
         input_devices.stop_registry.clear()
+        input_devices.mode_registry.clear()
 
 
 
@@ -271,10 +272,13 @@ class CodeRunner:
             input_devices.start_registry.start()
             input_devices.periodic_registry.start()
 
-
+            # hook mode change callbacks
             self.event_handler.mode_changed.connect(
-                input_devices.mode_registry.mode_changed_cb
+                input_devices.mode_registry.mode_changed
             )
+
+
+
 
             macro.MacroManager().start()
 
@@ -296,6 +300,7 @@ class CodeRunner:
         input_devices.stop_registry.start()
         input_devices.stop_registry.stop()
         input_devices.stop_registry.clear()
+        input_devices.mode_registry.clear()
 
 
         # Disconnect all signals

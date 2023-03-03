@@ -21,7 +21,7 @@ from PyQt5 import QtWidgets, QtCore, QtGui
 import gremlin
 from gremlin.common import DeviceType, InputType
 from . import activation_condition, common, virtual_button
-
+from functools import partial 
 
 class InputIdentifier:
 
@@ -255,6 +255,18 @@ class InputItemListView(common.AbstractView):
             is selected
         """
         return lambda x: self.select_item(index)
+    
+
+    def select_input(self, input_type, identifier):
+        ''' selects an entry based on input type and ID'''
+        for index in range(self.model.rows()):
+            data = self.model.data(index)
+            if data.input_type != input_type:
+                continue
+            if data.input_id == identifier:
+                self.select_item(index)
+                return
+
 
     def select_item(self, index, emit_signal=True):
         """Handles selecting a specific item.
@@ -273,16 +285,23 @@ class InputItemListView(common.AbstractView):
         # Go through all entries in the layout, deselecting those that are
         # actual widgets and selecting the previously selected one
         valid_index = False
+        # height = 0
         for i in range(self.scroll_layout.count()):
             item = self.scroll_layout.itemAt(i)
             if item.widget():
-                item.widget().setAutoFillBackground(False)
+                widget = item.widget()
+                # height += widget.height
+                widget.setAutoFillBackground(False)
                 if i == index:
                     palette = QtGui.QPalette()
                     palette.setColor(QtGui.QPalette.Background, QtCore.Qt.darkGray)
-                    item.widget().setAutoFillBackground(True)
-                    item.widget().setPalette(palette)
+                    widget.setAutoFillBackground(True)
+                    widget.setPalette(palette)
                     valid_index = True
+
+
+                    # self.scroll_area.ensureVisible(x,height)
+                    QtCore.QTimer.singleShot(0, partial(self.scroll_area.ensureWidgetVisible, widget))
 
         if emit_signal and valid_index:
             self.item_selected.emit(index)

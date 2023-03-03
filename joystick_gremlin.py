@@ -399,8 +399,8 @@ class GremlinUi(QtWidgets.QMainWindow):
             gremlin.ui.input_viewer.InputViewerUi()
         geom = self.geometry()
         self.modal_windows["input_viewer"].setGeometry(
-            geom.x() + geom.width() / 2 - 350,
-            geom.y() + geom.height() / 2 - 150,
+            int(geom.x() + geom.width() / 2 - 350),
+            int(geom.y() + geom.height() / 2 - 150),
             700,
             300
         )

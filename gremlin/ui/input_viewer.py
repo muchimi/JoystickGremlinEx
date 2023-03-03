@@ -666,15 +666,17 @@ class TimeLinePlotWidget(QtWidgets.QWidget):
         # Step size per update
         self._step_size = 1
 
+        interval = int(1000/60)
+
         # Update the plot
         self._update_timer = QtCore.QTimer(self)
         self._update_timer.timeout.connect(self._update_pixmap)
-        self._update_timer.start(1000/60)
+        self._update_timer.start(interval)
 
         # Redrawing of the widget
         self._repaint_timer = QtCore.QTimer(self)
         self._repaint_timer.timeout.connect(self.update)
-        self._repaint_timer.start(1000/60)
+        self._repaint_timer.start(interval)
 
     def resizeEvent(self, event):
         """Handles resizing this widget.
@@ -740,7 +742,7 @@ class TimeLinePlotWidget(QtWidgets.QWidget):
             self._vertical_timestep = time.time()
         self._horizontal_steps += 1
         if self._horizontal_steps <= 5:
-            quarter = self._pixmap.height() / 4
+            quarter = int(self._pixmap.height() / 4)
             x = self._pixmap.width()-1
             pixmap_painter.drawPoint(x, quarter)
             pixmap_painter.drawPoint(x, 2*quarter)
@@ -753,8 +755,8 @@ class TimeLinePlotWidget(QtWidgets.QWidget):
             pixmap_painter.setPen(TimeLinePlotWidget.pens[key])
             pixmap_painter.drawLine(
                 self._pixmap.width()-self._step_size-1,
-                2 + (self._pixmap.height()-4) * (value[0] + 1) / 2.0,
+                int(2 + (self._pixmap.height()-4) * (value[0] + 1) / 2.0),
                 self._pixmap.width()-1,
-                2 + (self._pixmap.height()-4) * (value[1] + 1) / 2.0
+                int(2 + (self._pixmap.height()-4) * (value[1] + 1) / 2.0)
             )
             value[0] = value[1]

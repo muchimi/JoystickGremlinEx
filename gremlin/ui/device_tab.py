@@ -372,6 +372,29 @@ class JoystickDeviceTabWidget(QtWidgets.QWidget):
 
         self.main_layout.addLayout(self.left_panel_layout)
 
+
+        # listen to device changes
+        el = gremlin.event_handler.EventListener()
+        el.joystick_event.connect(self._device_update)
+
+
+
+    def _device_update(self, event):
+        if self.device.device_guid != event.device_guid:
+            return
+                
+        if event.event_type == gremlin.common.InputType.JoystickButton:
+            if not event.is_pressed:
+                return
+        elif event.event_type == gremlin.common.InputType.JoystickAxis:
+            pass
+        elif event.event_type == gremlin.common.InputType.JoystickHat:
+            if not event.is_pressed:
+                return
+
+        self.input_item_list_view.select_input(event.event_type, event.identifier)
+
+
     def input_item_selected_cb(self, index):
         """Handles the selection of an input item.
 
