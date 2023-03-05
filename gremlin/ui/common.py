@@ -538,12 +538,13 @@ class DualSlider(QtWidgets.QWidget):
 
 class AbstractInputSelector(QtWidgets.QWidget):
 
+
     def __init__(self, change_cb, valid_types, parent=None):
         super().__init__(parent)
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
 
-        self.chage_cb = change_cb
+        self.change_cb = change_cb
         self.valid_types = valid_types
         self.device_list = []
 
@@ -635,6 +636,7 @@ class AbstractInputSelector(QtWidgets.QWidget):
             self._device_id_registry.append(self._device_identifier(device))
         self.main_layout.addWidget(self.device_dropdown)
         self.device_dropdown.activated.connect(self._update_device)
+        
 
     def _create_input_dropdown(self):
         count_map = {
@@ -650,20 +652,27 @@ class AbstractInputSelector(QtWidgets.QWidget):
         # will be invisible unless it is selected as the active device
         for device in self.device_list:
             selection = QtWidgets.QComboBox(self)
+            # selection.setEditable(True)
+            # selection.setInsertPolicy(QtWidgets.QComboBox.InsertPolicy.NoInsert)
             selection.setMaxVisibleItems(20)
             self._input_type_registry.append([])
+            
 
             # Add items based on the input type
+            max_col = 32
+         
             for input_type in self.valid_types:
                 for i in range(count_map[input_type](device)):
                     input_id = i+1
                     if input_type == gremlin.common.InputType.JoystickAxis:
                         input_id = device.axis_map[i].axis_index
 
-                    selection.addItem(gremlin.common.input_to_ui_string(
+                    s_ui = gremlin.common.input_to_ui_string(
                         input_type,
                         input_id
-                    ))
+                    )
+                    selection.addItem(s_ui)
+                    
                     self._input_type_registry[-1].append(input_type)
 
             # Add the selection and hide it
@@ -672,17 +681,23 @@ class AbstractInputSelector(QtWidgets.QWidget):
             self.main_layout.addWidget(selection)
             self.input_item_dropdowns.append(selection)
 
+            selection.currentIndexChanged.connect(self._execute_callback)
+
         # Show the first entry by default
         if len(self.input_item_dropdowns) > 0:
             self.input_item_dropdowns[0].setVisible(True)
+   
 
     def _execute_callback(self):
-        self.chage_cb(self.get_selection())
+        self.change_cb(self.get_selection())
+
+
 
 
 class JoystickSelector(AbstractInputSelector):
 
     """Widget allowing the selection of input items on a physical joystick."""
+
 
     def __init__(self, change_cb, valid_types, parent=None):
         """Creates a new JoystickSelector instance.
@@ -724,6 +739,10 @@ class VJoySelector(AbstractInputSelector):
 
     """Widget allowing the selection of vJoy inputs."""
 
+
+
+
+
     def __init__(self, change_cb, valid_types, invalid_ids={}, parent=None):
         """Creates a widget to select a vJoy output.
 
@@ -762,6 +781,7 @@ class VJoySelector(AbstractInputSelector):
         return device.vjoy_id
 
 
+
 class ActionSelector(QtWidgets.QWidget):
 
     """Widget permitting the selection of actions."""
@@ -783,6 +803,7 @@ class ActionSelector(QtWidgets.QWidget):
         self.main_layout = QtWidgets.QHBoxLayout(self)
 
         self.action_dropdown = QtWidgets.QComboBox()
+
         for name in self._valid_action_list():
             self.action_dropdown.addItem(name)
         cfg = gremlin.config.Configuration()

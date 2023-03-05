@@ -26,6 +26,8 @@ import uuid
 from xml.dom import minidom
 from xml.etree import ElementTree
 
+from PyQt5 import QtCore
+
 import dill
 
 import action_plugins
@@ -1299,21 +1301,24 @@ class Settings:
         self.vjoy_initial_values[vid][aid] = value
 
 
-class Profile:
+class Profile():
 
     """Stores the contents of an entire configuration profile.
 
     This includes configurations for each device's modes.
     """
 
-    def __init__(self):
+
+    def __init__(self, parent = None):
         """Constructor creating a new instance."""
+
+        
         self.devices = {}
         self.vjoy_devices = {}
         self.merge_axes = []
         self.plugins = []
         self.settings = Settings(self)
-        self.parent = None
+        self.parent = parent
 
     def initialize_joystick_device(self, device, modes):
         """Ensures a joystick is properly initialized in the profile.
@@ -1672,6 +1677,7 @@ class Profile:
             }
 
         return entry
+
 
 
 class Device:

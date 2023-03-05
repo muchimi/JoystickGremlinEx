@@ -52,6 +52,7 @@ import gremlin.ui.profile_settings
 from gremlin.ui.ui_gremlin import Ui_Gremlin
 
 
+
 class GremlinUi(QtWidgets.QMainWindow):
 
     """Main window of the Joystick Gremlin user interface."""
@@ -963,6 +964,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             # trip over insignificant input item additions.
             if profile_updated:
                 self._profile.to_xml(fname)
+
         except (KeyError, TypeError) as error:
             # An error occurred while parsing an existing profile,
             # creating an empty profile instead
