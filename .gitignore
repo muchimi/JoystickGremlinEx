@@ -3,7 +3,6 @@
 *.wxs
 *.backup
 debug.txt
-
 .idea
 __pycache__
 
