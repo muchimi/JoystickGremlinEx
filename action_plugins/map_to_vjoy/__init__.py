@@ -867,7 +867,13 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
 
     """Executes a remap action when called."""
 
-
+    def findMainWindow(self):
+        # Global function to find the (open) QMainWindow in application
+        app = QtWidgets.QApplication.instance()
+        for widget in app.topLevelWidgets():
+            if isinstance(widget, QtWidgets.QMainWindow):
+                return widget
+        return None
 
     def __init__(self, action):
         super().__init__(action)
@@ -878,6 +884,7 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
         self.axis_scaling = action.axis_scaling
         self.action_mode = action.action_mode
         self.pulse_delay = action.pulse_delay
+        self.start_pressed = action.start_pressed
 
         self.needs_auto_release = self._check_for_auto_release(action)
         self.thread_running = False
@@ -887,13 +894,24 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
         self.axis_delta_value = 0.0
         self.axis_value = 0.0
 
+          
+
+        ui = self.findMainWindow()
+        if ui:
+            ui.profile_start.connect(self._profile_start)
+
+
+    def _profile_start(self):
+        # setup initial state
+        if self.input_type == InputType.JoystickButton:
+            joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = self.start_pressed
 	
-        # async routine to pulse a button
-        def _fire_pulse(vjoy_device_id, vjoy_input_id, duration = 0.25):
-            button = gremlin.joystick_handling.vjoy_devices[vjoy_device_id].buttons(vjoy_input_id)
-            button.is_pressed = True
-            time.sleep(duration)
-            button.is_pressed = False
+    # async routine to pulse a button
+    def _fire_pulse(vjoy_device_id, vjoy_input_id, duration = 0.25):
+        button = gremlin.joystick_handling.vjoy_devices[vjoy_device_id].buttons(vjoy_input_id)
+        button.is_pressed = True
+        time.sleep(duration)
+        button.is_pressed = False
 
 
     def process_event(self, event, value):
