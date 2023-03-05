@@ -31,8 +31,85 @@ from gremlin.profile import safe_format, safe_read, Profile
 import gremlin.ui.common
 import gremlin.ui.input_item
 import os
+import action_plugins
 
+
+class GridClickWidget(QtWidgets.QWidget):
+    ''' implements a widget that reponds to a mouse click '''
+    pressPos = None
+    clicked = QtCore.pyqtSignal()
+
+    def __init__(self, vjoy_device_id, input_type, vjoy_input_id, parent = None):
+        super(GridClickWidget, self).__init__(parent=parent)
+        self.vjoy_device_id = vjoy_device_id
+        self.input_type = input_type
+        self.vjoy_input_id = vjoy_input_id
+        
+
+    def mousePressEvent(self, event):
+        if event.button() == QtCore.Qt.LeftButton :
+            self.pressPos = event.pos()
+
+    def mouseReleaseEvent(self, event):
+        # ensure that the left button was pressed *and* released within the
+        # geometry of the widget; if so, emit the signal;
+        if (self.pressPos is not None and 
+            event.button() == QtCore.Qt.LeftButton and 
+            event.pos() in self.rect()):
+                self.clicked.emit()
+        self.pressPos = None
+
+class GridButton(QtWidgets.QPushButton):
+    def __init__(self, action):
+        super(GridButton,self).__init__()
+        self.action = action
+
+    def _clicked(self):
+        pass
+        
     
+class GridPopupWindow(QtWidgets.QDialog):
+    def __init__(self, vjoy_device_id, input_type, vjoy_input_id):
+        super(GridPopupWindow, self).__init__()
+
+        self.vjoy_device_id = vjoy_device_id
+        self.input_type = input_type
+        self.vjoy_input_id = vjoy_input_id
+
+        self.setWindowTitle("Mapping Details")
+
+        usage_data = VJoyUsageState()
+        action_map = usage_data.get_action_map(vjoy_device_id, input_type, vjoy_input_id)
+        if not action_map:
+            self.close()
+
+
+        
+        box = QtWidgets.QVBoxLayout()
+        self.layout = box
+        
+        source =  QtWidgets.QWidget()
+        source_box = QtWidgets.QHBoxLayout(source)
+        source_box.addWidget(QtWidgets.QLabel(f"Vjoy {vjoy_device_id} Button {vjoy_input_id} mapped by:"))
+        box.addWidget(source)
+
+        for action in action_map:
+            item = QtWidgets.QWidget()
+            item_box = QtWidgets.QHBoxLayout(item)
+            item_box.addWidget(QtWidgets.QLabel(action.device_name))
+            if action.device_input_type == InputType.JoystickAxis:
+                name = f"Axis {action.device_input_id}"
+            elif action.device_input_type == InputType.JoystickButton:
+                name = f"Button {action.device_input_id}"
+            elif action.device_input_type == InputType.JoystickHat:                
+                name = f"Hat {action.device_input_id}"
+            item_box.addWidget(QtWidgets.QLabel(name))
+            #item_box.addWidget(GridButton(action))
+            box.addWidget(item)
+
+
+        self.setLayout(box)
+
 
 class VJoyUsageState():
     ''' tracks assigned VJOY functions '''
@@ -40,6 +117,35 @@ class VJoyUsageState():
     _device_list = None
     _profile = None
     _load_list = []
+
+    # holds the mapping by vjoy device, input and ID to a list of raw hardware defining the mapping
+    _action_map = None
+
+    # list of users buttons by vjoy device ID
+    _used_map = {}
+    # list of unused buttons by vjoy device ID
+    _unused_map = {}
+
+    class MappingData:
+        vjoy_device_id = None
+        vjoy_input_type = None
+        vjoy_input_id = None
+        device_input_type = None
+        device_guid = None
+        device_name = None
+        device_input_id = None
+
+        def __init__(self, vjoy_device_id, input_type, vjoy_input_id, action_data):
+            self.vjoy_device_id = vjoy_device_id
+            self.vjoy_input_type = input_type
+            self.vjoy_input_id = vjoy_input_id
+            
+            device_guid, device_name, dev_input_type, dev_input_id = action_data
+            self.device_guid = device_guid
+            self.device_name = device_name
+            self.device_input_type = dev_input_type
+            self.device_input_id = dev_input_id
+            
     
 
     def __init__(self, profile = None):
@@ -63,11 +169,20 @@ class VJoyUsageState():
                 self.set_state(device_id, input_type, input_id, True)
             VJoyUsageState._load_list.clear()
 
+
+
+
     def set_profile(self, profile):
         ''' loads profile data and free input lists'''
         if profile != VJoyUsageState._profile:
             VJoyUsageState._profile = profile
-            VJoyUsageState._free_inputs = VJoyUsageState._profile.list_unused_vjoy_inputs()
+            self._load_inputs()
+            # VJoyUsageState._free_inputs = VJoyUsageState._profile.list_unused_vjoy_inputs()
+
+            for device_id in VJoyUsageState._free_inputs.keys():
+                used = []
+
+
 
 
     def map_input_type(self, input_type) -> str:
@@ -166,6 +281,124 @@ class VJoyUsageState():
         '''
         return self.get_count(device_id,input_type)
     
+
+
+    def _load_inputs(self):
+        """Returns a list of unused vjoy inputs for the given profile.
+
+        :return dictionary of unused inputs for each input type
+        """
+
+
+
+
+        vjoy_devices = joystick_handling.vjoy_devices()
+        devices = self._profile.devices
+        # action_plugins = gremlin.plugin_manager.ActionPlugins()
+
+        def extract_remap_actions(action_sets):
+            """Returns a list of remap actions from a list of actions.
+
+            :param action_sets set of actions from which to extract Remap actions
+            :return list of Remap actions contained in the provided list of actions
+            """
+            remap_actions = []
+            for actions in [a for a in action_sets if a is not None]:
+                for action in actions:
+                    if isinstance(action, action_plugins.remap.Remap) or isinstance(action, VjoyRemap):
+                        remap_actions.append(action)
+            return remap_actions
+
+
+
+        # Create list of all inputs provided by the vjoy devices
+        vjoy = {}
+        for entry in vjoy_devices:
+            vjoy[entry.vjoy_id] = {"axis": [], "button": [], "hat": []}
+            for i in range(entry.axis_count):
+                vjoy[entry.vjoy_id]["axis"].append(
+                    entry.axis_map[i].axis_index
+                )
+            for i in range(entry.button_count):
+                vjoy[entry.vjoy_id]["button"].append(i+1)
+            for i in range(entry.hat_count):
+                vjoy[entry.vjoy_id]["hat"].append(i+1)
+
+        # List all input types
+        all_input_types = [
+            InputType.JoystickAxis,
+            InputType.JoystickButton,
+            InputType.JoystickHat,
+            InputType.Keyboard
+        ]
+
+        # Create a list of all used remap actions
+        remap_actions = []
+        for dev in devices.values():
+            for mode in dev.modes.values():
+                for input_type in all_input_types:
+                    for item in mode.config[input_type].values():
+                        for container in item.containers:
+                            action_list = extract_remap_actions(container.action_sets)
+                            remap_actions.append([dev, input_type, item.input_id, action_list])
+        
+        action_map = {}
+        # Remove all remap actions from the list of available inputs
+        for dev, input_type, input_id, actions in remap_actions:
+            # Skip remap actions that have invalid configuration
+            if not actions:
+                # no actions found
+                continue
+            
+            for action in actions:
+                type_name = InputType.to_string(action.input_type)
+                if action.vjoy_input_id in [0, None] \
+                        or action.vjoy_device_id in [0, None] \
+                        or action.vjoy_input_id not in vjoy[action.vjoy_device_id][type_name]:
+                    continue
+
+                vjoy_device_id = action.vjoy_device_id
+                vjoy_input_id = action.vjoy_input_id
+
+                if not vjoy_device_id in action_map.keys():
+                    action_map[vjoy_device_id] = {}
+                if not input_type in action_map[vjoy_device_id].keys():    
+                    action_map[vjoy_device_id][input_type] = {}
+
+                if not vjoy_input_id in action_map[vjoy_device_id][input_type].keys():
+                    action_map[vjoy_device_id][input_type][vjoy_input_id] = []
+
+                action_map[vjoy_device_id][input_type][vjoy_input_id].append([dev.device_guid, dev.name, input_type, input_id])
+
+                idx = vjoy[action.vjoy_device_id][type_name].index(action.vjoy_input_id)
+                del vjoy[action.vjoy_device_id][type_name][idx]
+
+        VJoyUsageState._free_inputs = vjoy
+        VJoyUsageState._action_map = action_map
+
+    def get_action_map(self, vjoy_device_id, input_type, input_id):
+        ''' gets what's mapped to a vjoy device by input type and input id '''
+        if not VJoyUsageState._action_map:
+            self._load_inputs()
+
+        if not vjoy_device_id in VJoyUsageState._action_map.keys():
+            # no mappings for this vjoy device
+            return []
+        if not input_type in VJoyUsageState._action_map[vjoy_device_id].keys():
+            # no mappings for this type of input
+            return []
+        if not input_id in VJoyUsageState._action_map[vjoy_device_id][input_type]:
+            # no mapping for this specific id
+            return []
+        
+        action_map = []
+        for action_data in VJoyUsageState._action_map[vjoy_device_id][input_type][input_id]:
+            data = VJoyUsageState.MappingData(vjoy_device_id, input_type, input_id, action_data)
+            action_map.append(data)
+
+        return action_map
+
+    
 usage_data = VJoyUsageState()
 
 class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
@@ -243,6 +476,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
            self._create_input_axis()
 
         elif self.input_type == InputType.JoystickButton:
+            self._create_button_options()
             self._create_input_grid()
 
         self.main_layout.setContentsMargins(0, 0, 0, 0)
@@ -274,6 +508,96 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         if self.action_data.input_type == InputType.JoystickAxis:
             self.remap_type_widget.show()
 
+    def _create_button_options(self):
+        ''' creates the button option panel '''
+        self.option_widget =  QtWidgets.QWidget()
+        option_box = QtWidgets.QHBoxLayout(self.option_widget)
+        self.cb_action_list = QtWidgets.QComboBox()
+
+        lbl = QtWidgets.QLabel("Behavior:")
+
+        option_box.addWidget(lbl)
+        option_box.addWidget(self.cb_action_list)
+        self.cb_action_list.addItem("Default",VjoyAction.VJoyNormal)
+        self.cb_action_list.addItem("Pulse",VjoyAction.VJoyPulse)
+        self.cb_action_list.addItem("Toggle",VjoyAction.VJoyToggle)
+        self.cb_action_list.setFixedWidth(60)
+        self.main_layout.addWidget(self.option_widget)
+
+        # pulse panel
+
+        self.pulse_widget = QtWidgets.QWidget()
+        delay_box = QtWidgets.QHBoxLayout(self.pulse_widget)
+        self.pulse_spin_widget = QtWidgets.QSpinBox()
+        self.pulse_spin_widget.setMinimum(0)
+        self.pulse_spin_widget.setMaximum(60000)
+        delay_box.addWidget(QtWidgets.QLabel("Duration (ms):"))
+        delay_box.addWidget(self.pulse_spin_widget)
+
+
+
+        self.start_widget = QtWidgets.QWidget()
+        self.start_button_group = QtWidgets.QButtonGroup()
+        
+        start_layout = QtWidgets.QHBoxLayout(self.start_widget)
+        self.rb_start_released = QtWidgets.QRadioButton("Released")
+        self.rb_start_pressed = QtWidgets.QRadioButton("Pressed")
+        
+        self.start_button_group.addButton(self.rb_start_released)
+        self.start_button_group.addButton(self.rb_start_pressed)
+
+        self.start_button_group.setId(self.rb_start_released, 0)
+        self.start_button_group.setId(self.rb_start_pressed, 1)
+
+        if self.action_data.start_pressed:
+            self.rb_start_pressed.setChecked(True)
+        else:
+            self.rb_start_released.setChecked(True)
+
+        start_layout.addWidget(QtWidgets.QLabel("Start Mode:"))
+        start_layout.addWidget(self.rb_start_released )
+        start_layout.addWidget(self.rb_start_pressed )
+
+        # add the two containers to the option line
+
+        option_box.addWidget(self.start_widget)
+        option_box.addWidget(self.pulse_widget)
+        option_box.addStretch()
+
+
+        # update based on current mode
+        self._action_mode_changed(self.action_data.action_mode)
+       
+        # hook events
+        self.cb_action_list.currentIndexChanged.connect(self._action_mode_changed)
+        self.pulse_spin_widget.valueChanged.connect(self._pulse_value_changed)
+        self.start_button_group.buttonClicked.connect(self._start_changed)
+
+    def _action_mode_changed(self, index):
+        ''' called when the drop down value changes '''
+        action = self.cb_action_list.itemData(index)
+        if action == VjoyAction.VJoyPulse:
+            self.pulse_widget.setVisible(True)
+            self.start_widget.setVisible(False)
+        else:
+            self.pulse_widget.setVisible(False)
+            self.start_widget.setVisible(True)
+
+        self.action_data.action_mode = action
+
+    def _pulse_value_changed(self, value):
+        ''' called when the pulse value changes '''
+        if value >= 0:
+            self.action_data.pulse_delay = value
+
+
+    def _start_changed(self, rb):
+        ''' called when the start mode is changed '''
+        id = self.start_button_group.checkedId()
+        self.action_data.start_pressed = id == 1
+
+
+
     def _create_input_grid(self):
         ''' create a grid of buttons for easy selection'''
         
@@ -300,6 +624,10 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             max_col = 16
             col = 0
             row = 0
+
+            vjoy_device_id = dev.vjoy_id
+            input_type = InputType.JoystickButton
+
 
             for id in range(1, count+1):
                 # container for the vertical box
@@ -328,21 +656,25 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
                 v_box.addWidget(h_cont)
 
                 # line 2
-                h_cont = QtWidgets.QWidget()
-                h_cont.setFixedWidth(36)
-                h_box = QtWidgets.QHBoxLayout(h_cont)
+                line2_cont = GridClickWidget(vjoy_device_id, input_type, id)
+                line2_cont.setFixedWidth(36)
+                h_box = QtWidgets.QHBoxLayout(line2_cont)
                 h_box.setContentsMargins(0,0,0,0)
                 h_box.setSpacing(0)
+                
 
                 icon_lbl = QtWidgets.QLabel()
                 
                 lbl = QtWidgets.QLabel(name)
+                
 
                 self.icon_map[id] = icon_lbl
                 
                 h_box.addWidget(icon_lbl)
                 h_box.addWidget(lbl)
-                v_box.addWidget(h_cont)
+                v_box.addWidget(line2_cont)
+
+                line2_cont.clicked.connect(self._grid_button_clicked)
 
 
                 grid.addWidget(v_cont, row, col)
@@ -356,9 +688,17 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             self._populate_grid(device_id, input_type)
 
             
+    def _grid_button_clicked(self):
+        sender = self.sender()
+        vjoy_device_id = sender.vjoy_device_id
+        input_type = sender.input_type
+        vjoy_input_id = sender.vjoy_input_id
+
+        popup = GridPopupWindow(vjoy_device_id, input_type, vjoy_input_id)
+        popup.exec()
                 
 
-    def _select_changed(self, cb):
+    def _select_changed(self, rb):
         # called when a button is toggled
         id = self.button_group.checkedId()
         #id = int(cb.objectName())
@@ -441,6 +781,14 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
                 self.relative_checkbox.clicked.connect(self.save_changes)
                 self.relative_scaling.valueChanged.connect(self.save_changes)
 
+            elif self.action_data.input_type == InputType.JoystickButton:
+                self.cb_action_list.setCurrentIndex(self.action_data.action_mode)
+                self.pulse_spin_widget.setValue(self.action_data.pulse_delay)
+                if self.action_data.start_pressed:
+                    self.rb_start_pressed.setChecked(True)
+                else:
+                    self.rb_start_released.setChecked(True)
+
             # Save changes so the UI updates properly
             self.save_changes()
 
@@ -519,6 +867,8 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
 
     """Executes a remap action when called."""
 
+
+
     def __init__(self, action):
         super().__init__(action)
         self.vjoy_device_id = action.vjoy_device_id
@@ -526,6 +876,8 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
         self.input_type = action.input_type
         self.axis_mode = action.axis_mode
         self.axis_scaling = action.axis_scaling
+        self.action_mode = action.action_mode
+        self.pulse_delay = action.pulse_delay
 
         self.needs_auto_release = self._check_for_auto_release(action)
         self.thread_running = False
@@ -534,6 +886,15 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
         self.thread = None
         self.axis_delta_value = 0.0
         self.axis_value = 0.0
+
+	
+        # async routine to pulse a button
+        def _fire_pulse(vjoy_device_id, vjoy_input_id, duration = 0.25):
+            button = gremlin.joystick_handling.vjoy_devices[vjoy_device_id].buttons(vjoy_input_id)
+            button.is_pressed = True
+            time.sleep(duration)
+            button.is_pressed = False
+
 
     def process_event(self, event, value):
         if self.input_type == InputType.JoystickAxis:
@@ -554,13 +915,28 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
                     self.thread.start()
 
         elif self.input_type == InputType.JoystickButton:
-            if event.event_type in [InputType.JoystickButton, InputType.Keyboard] \
-                    and event.is_pressed \
-                    and self.needs_auto_release:
-                input_devices.ButtonReleaseActions().register_button_release(
-                    (self.vjoy_device_id, self.vjoy_input_id),
-                    event
-                )
+
+            if self.action_mode == VjoyAction.VJoyNormal:
+                # normal default behavior
+                if event.event_type in [InputType.JoystickButton, InputType.Keyboard] \
+                        and event.is_pressed \
+                        and self.needs_auto_release:
+                    input_devices.ButtonReleaseActions().register_button_release(
+                        (self.vjoy_device_id, self.vjoy_input_id),
+                        event
+                    )
+            elif self.action_mode == VjoyAction.VJoyToggle:
+                # toggle action
+                if event.event_type in [InputType.JoystickButton, InputType.Keyboard] \
+                        and event.is_pressed:
+                    button = gremlin.joystick_handling.vjoy_devices[self.vjoy_device_id].buttons(self.vjoy_input_id)
+                    button.is_pressed = not button.is_pressed
+            elif self.action_mode == VjoyAction.VJoyPulse:
+                # pulse action
+                threading.Timer(0.01, self._fire_pulse, [self.vjoy_device_id, self.vjoy_input_id,self.pulse_delay/1000]).start()
+
+
+
 
             joystick_handling.VJoyProxy()[self.vjoy_device_id] \
                 .button(self.vjoy_input_id).is_pressed = value.current
@@ -619,6 +995,12 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
         return needs_auto_release
 
 
+class VjoyAction:
+    ''' defines available vjoy actions supported by this plugin'''
+    VJoyNormal = 0 # normal
+    VJoyToggle = 1 # toggle function on/off
+    VJoyPulse = 2 # pulse function (pulses a button)
+
 class VjoyRemap(gremlin.base_classes.AbstractAction):
 
     """Action remapping physical joystick inputs to vJoy inputs."""
@@ -651,6 +1033,10 @@ class VjoyRemap(gremlin.base_classes.AbstractAction):
         self.input_type = self.parent.parent.input_type
         self.axis_mode = "absolute"
         self.axis_scaling = 1.0
+        self.action_mode = VjoyAction.VJoyNormal
+        self.current_state = 0 # toggle value for the input 1 means set, any other value means not set for buttons
+        self.pulse_delay = 250 # pulse delay
+        self.start_pressed = False # true if a button starts as pressed when the profile is loaded
 
         
 
@@ -725,11 +1111,23 @@ class VjoyRemap(gremlin.base_classes.AbstractAction):
             usage_data = VJoyUsageState()
             usage_data.push_load_list(self.vjoy_device_id,self.input_type,self.vjoy_input_id)
             
+            self.action_mode = VjoyAction.VJoyNormal
+            self.pulse_delay = 250
 
             if self.get_input_type() == InputType.JoystickAxis and \
-                    self.input_type == InputType.JoystickAxis:
+                self.input_type == InputType.JoystickAxis:
                 self.axis_mode = safe_read(node, "axis-type", str, "absolute")
                 self.axis_scaling = safe_read(node, "axis-scaling", float, 1.0)
+            elif self.get_input_type() == InputType.JoystickButton and self.input_type == InputType.JoystickButton:
+
+                if "action_mode" in node.attrib:
+                    self.action_mode = safe_read(node,"action_mode", int, VjoyAction.VJoyNormal)
+                if "pulse_delay" in node.attrib:
+                    self.pulse_delay = safe_read(node,"pulse_delay", int, 250)
+                if "start_pressed" in node.attrib:
+                    self.start_pressed = safe_read(node,"start_pressed", bool, False)
+
+
         except ProfileError:
             self.vjoy_input_id = None
             self.vjoy_device_id = None
@@ -752,10 +1150,14 @@ class VjoyRemap(gremlin.base_classes.AbstractAction):
                 str(self.vjoy_input_id)
             )
 
-        if self.get_input_type() == InputType.JoystickAxis and \
-                self.input_type == InputType.JoystickAxis:
+        if self.get_input_type() == InputType.JoystickAxis and self.input_type == InputType.JoystickAxis:
             node.set("axis-type", safe_format(self.axis_mode, str))
             node.set("axis-scaling", safe_format(self.axis_scaling, float))
+
+        elif self.get_input_type() == InputType.JoystickButton and self.input_type == InputType.JoystickButton:
+            node.set("action_mode", safe_format(self.action_mode, int))
+            node.set("pulse_delay", safe_format(self.pulse_delay, int))
+            node.set("start_pressed", safe_format(self.start_pressed, bool))
 
         
 
