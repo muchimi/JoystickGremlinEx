@@ -208,6 +208,8 @@ class EventListener(QtCore.QObject):
 
         :param data the joystick event
         """
+
+        
         event = dill.InputEvent(data)
         if event.input_type == dill.InputType.Axis:
             self.joystick_event.emit(Event(

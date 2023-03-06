@@ -766,7 +766,7 @@ class ButtonReleaseActions(QtCore.QObject):
         self,
         vjoy_input: int,
         physical_event: event_handler.Event,
-        activate_on: bool
+        activate_on: bool = False
     ):
         """Registers a physical and vjoy button pair for tracking.
 

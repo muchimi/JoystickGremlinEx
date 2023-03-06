@@ -827,7 +827,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
             elif self.action_data.input_type == InputType.JoystickButton:
                 self._populate_grid(device_id, input_id)
-                print(f"used: {self.usage_state.used_list(device_id, self.action_data.input_type)}")
+                #print(f"used: {self.usage_state.used_list(device_id, self.action_data.input_type)}")
 
             # Signal changes
             if input_type_changed: # or input_id_changed:
