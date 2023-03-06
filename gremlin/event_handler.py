@@ -152,6 +152,12 @@ class EventListener(QtCore.QObject):
     # Signal emitted when a joystick is attached or removed
     device_change_event = QtCore.pyqtSignal()
 
+    # Signal emitted when a profile is changed (to refresh UI)
+    profile_changed = QtCore.pyqtSignal()
+    profile_start = QtCore.pyqtSignal()
+    profile_stop = QtCore.pyqtSignal()
+        
+
     def __init__(self):
         """Creates a new instance."""
         QtCore.QObject.__init__(self)

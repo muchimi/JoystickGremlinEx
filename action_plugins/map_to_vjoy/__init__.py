@@ -218,13 +218,17 @@ class VJoyUsageState():
         if state:
             if input_id in unused_list:
                 unused_list.remove(input_id)
-                print(f"Set state: device: {device_id} type: {name} id: {input_id}")                
+                #print(f"Set state: device: {device_id} type: {name} id: {input_id}")                
         else:
             # clear state
             if not input_id in unused_list:
                 unused_list.append(input_id)
                 unused_list.sort()                
-                print(f"Clear state: device: {device_id} type: {name} id: {input_id}")
+                #print(f"Clear state: device: {device_id} type: {name} id: {input_id}")
+
+        # update the UI when a state change occurs
+        el = gremlin.event_handler.EventListener()
+        el.profile_changed.emit()
 
                 
 
@@ -724,6 +728,8 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         
         self.active_id = id
 
+        gremlin.event_handler
+
         
 
 
@@ -810,7 +816,8 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             device_id = vjoy_data['device_id']
             input_id = vjoy_data['input_id']
 
-            print(f"change detect: device {device_id} input id {input_id}")
+            # print(f"change detect: device {device_id} input id {input_id}")
+
 
             input_type_changed = self.action_data.input_type != vjoy_data["input_type"]
             input_id_changed = self.action_data.vjoy_device_id != vjoy_data["input_id"]
@@ -895,10 +902,8 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
         self.axis_value = 0.0
 
           
-
-        ui = self.findMainWindow()
-        if ui:
-            ui.profile_start.connect(self._profile_start)
+        el = gremlin.event_handler.EventListener()
+        el.profile_start.connect(self._profile_start)
 
 
     def _profile_start(self):
@@ -1144,6 +1149,7 @@ class VjoyRemap(gremlin.base_classes.AbstractAction):
                     self.pulse_delay = safe_read(node,"pulse_delay", int, 250)
                 if "start_pressed" in node.attrib:
                     self.start_pressed = safe_read(node,"start_pressed", bool, False)
+                    pass
 
 
         except ProfileError:

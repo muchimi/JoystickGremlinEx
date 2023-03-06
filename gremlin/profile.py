@@ -172,7 +172,11 @@ def safe_read(node, key, type_cast=None, default_value=None):
 
     if type_cast is not None:
         try:
-            value = type_cast(value)
+            if type_cast == bool:
+                value = value.strip().lower()
+                value = value == "true"
+            else:
+                value = type_cast(value)
         except ValueError:
             msg = "Failed casting '{}' to type '{}'".format(
                 value, str(type_cast)

@@ -903,7 +903,7 @@ class JoystickInputSignificant:
             # Update state
             else:
                 self._time_registry[event] = time.time()
-                if abs(self._event_registry[event].value - event.value) > 0.25:
+                if abs(self._event_registry[event].value - event.value) > 0.5:
                     self._event_registry[event] = event
                     self._time_registry[event] = time.time()
                     return True

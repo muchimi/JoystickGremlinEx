@@ -56,8 +56,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
     """Main window of the Joystick Gremlin user interface."""
 
-    profile_start = QtCore.pyqtSignal()
-    profile_stop = QtCore.pyqtSignal()
+
 
     ui = None
 
@@ -141,7 +140,6 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.apply_window_settings()
 
         GremlinUi.ui = self
-
 
 
     def closeEvent(self, evt):
@@ -320,6 +318,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         :param checked True when the runner is to be activated, False
             otherwise
         """
+
+        el = gremlin.event_handler.EventListener()
         if checked:
             # Generate the code for the profile and run it
             self._profile_auto_activated = False
@@ -330,7 +330,9 @@ class GremlinUi(QtWidgets.QMainWindow):
                 self._profile
             )
             self.ui.tray_icon.setIcon(QtGui.QIcon("gfx/icon_active.ico"))
-            self.profile_start.emit()
+            
+            el.profile_start.emit()
+
         else:
             # Stop running the code
             self.runner.stop()
@@ -343,7 +345,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             ]:
                 self.ui.devices.currentWidget().refresh()
             self.ui.tray_icon.setIcon(QtGui.QIcon("gfx/icon.ico"))
-            self.profile_stop.emit()
+            el.profile_stop.emit()
 
     def create_1to1_mapping(self):
         """Creates a 1 to 1 mapping of the given device to the first
