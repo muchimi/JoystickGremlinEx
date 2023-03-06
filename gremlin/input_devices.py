@@ -33,7 +33,7 @@ import gremlin.types
 from dill import DILL, GUID, GUID_Invalid
 
 from . import common, error, event_handler, joystick_handling, util
-
+from gremlin.common import InputType
 
 
 
@@ -840,9 +840,7 @@ class JoystickInputSignificant:
 
     def __init__(self):
         """Initializes the instance."""
-        self._event_registry = {}
-        self._mre_registry = {}
-        self._time_registry = {}
+        self.reset()
 
     def should_process(self, event: event_handler.Event) -> bool:
         """Returns whether or not a particular event is significant enough to
@@ -856,11 +854,11 @@ class JoystickInputSignificant:
         """
         self._mre_registry[event] = event
 
-        if event.event_type == gremlin.types.InputType.JoystickAxis:
+        if event.event_type == InputType.JoystickAxis:
             return self._process_axis(event)
-        elif event.event_type == gremlin.types.InputType.JoystickButton:
+        elif event.event_type == InputType.JoystickButton:
             return self._process_button(event)
-        elif event.event_type == gremlin.types.InputType.JoystickHat:
+        elif event.event_type == InputType.JoystickHat:
             return self._process_hat(event)
         else:
             logging.getLogger("system").warning(
@@ -884,6 +882,7 @@ class JoystickInputSignificant:
         self._event_registry = {}
         self._mre_registry = {}
         self._time_registry = {}
+        
 
     def _process_axis(self, event: event_handler.Event) -> bool:
         """Process an axis event.
@@ -894,6 +893,7 @@ class JoystickInputSignificant:
         Returns:
             True if it should be processed, False otherwise
         """
+
         if event in self._event_registry:
             # Reset everything if we have no recent data
             if self._time_registry[event] + 5.0 < time.time():
@@ -903,7 +903,7 @@ class JoystickInputSignificant:
             # Update state
             else:
                 self._time_registry[event] = time.time()
-                if abs(self._event_registry[event].value - event.value) > 0.5:
+                if abs(self._event_registry[event].value - event.value) > 0.25:
                     self._event_registry[event] = event
                     self._time_registry[event] = time.time()
                     return True

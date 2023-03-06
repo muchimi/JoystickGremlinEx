@@ -134,6 +134,17 @@ class Event:
         )
 
 
+class DeviceChangeEvent:
+    ''' sent when a new device is selected '''
+    def __init__(self):
+        self.device_guid = None
+        self.device_name = None
+        self.device_input_id = 0
+        self.device_input_type = 0
+        self.input_type = 0
+        self.input_id = 0
+
+
 @common.SingletonDecorator
 class EventListener(QtCore.QObject):
 
@@ -154,8 +165,16 @@ class EventListener(QtCore.QObject):
 
     # Signal emitted when a profile is changed (to refresh UI)
     profile_changed = QtCore.pyqtSignal()
+    
+    # signal emitted when the selected hardware device changes
+    profile_device_changed = QtCore.pyqtSignal(DeviceChangeEvent)
+
+    # signal emitted when the selected hardware device changes
+    profile_device_mapping_changed = QtCore.pyqtSignal(DeviceChangeEvent)
+
     profile_start = QtCore.pyqtSignal()
     profile_stop = QtCore.pyqtSignal()
+    
         
 
     def __init__(self):

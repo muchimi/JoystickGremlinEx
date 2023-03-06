@@ -202,6 +202,25 @@ class InputItemListView(common.AbstractView):
         # Add the scroll area to the main layout
         self.main_layout.addWidget(self.scroll_area)
 
+        el = gremlin.event_handler.EventListener()
+        el.profile_device_mapping_changed.connect(self._profile_device_mapping_changed)
+
+
+    def _profile_device_mapping_changed(self, event):
+        if not event.device_guid:
+            return
+        for index in range(self.model.rows()):
+            data = self.model.data(index)
+            if data.input_type not in self.shown_input_types:
+                continue
+            if data.input_type != event.device_input_type:
+                continue
+            if data.input_id != event.device_input_id:
+                continue
+            self.redraw_index(index)
+
+
+
     def limit_input_types(self, types):
         """Limits the items shown to the given types.
 
@@ -303,8 +322,19 @@ class InputItemListView(common.AbstractView):
                     # self.scroll_area.ensureVisible(x,height)
                     QtCore.QTimer.singleShot(0, partial(self.scroll_area.ensureWidgetVisible, widget))
 
+                    # signal the hardware input device changed
+                    el = gremlin.event_handler.EventListener()
+                    event = gremlin.event_handler.DeviceChangeEvent()
+                    data = self.model.data(index)
+                    event.device_guid = self.model._device_data.device_guid
+                    event.device_name = self.model._device_data.name
+                    event.device_input_type = data.input_type
+                    event.device_input_id = data.input_id
+                    el.profile_device_changed.emit(event)
+
         if emit_signal and valid_index:
             self.item_selected.emit(index)
+            
 
 
 class ActionSetModel(common.AbstractModel):
