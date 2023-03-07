@@ -680,11 +680,16 @@ class AbstractContainer(profile.ProfileData):
         """
         action_name_map = plugin_manager.ActionPlugins().tag_map
         for child in node:
+            # if child.tag == "remap":
+            #     child.tag = "vjoyremap"
+
             if child.tag not in action_name_map:
                 logging.getLogger("system").warning(
                     "Unknown node present: {}".format(child.tag)
                 )
                 continue
+
+            
 
             entry = action_name_map[child.tag](self)
             entry.from_xml(child)

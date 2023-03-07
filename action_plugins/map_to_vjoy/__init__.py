@@ -990,6 +990,7 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
         self.lock.release()
 
     def process_event(self, event, value):
+        ''' runs when a joystick even occurs like a button press or axis movement '''
         if self.input_type == InputType.JoystickAxis:
             if self.axis_mode == "absolute":
                 joystick_handling.VJoyProxy()[self.vjoy_device_id] \

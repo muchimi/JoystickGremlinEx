@@ -698,7 +698,7 @@ class JoystickDecorator:
         self.mode = mode
         # Convert string based GUID to the actual GUID object
         try:
-            self.device_guid = util.parse_guid(device_guid)
+            self.device_guid = gremlin.profile.parse_guid(device_guid)
         except error.ProfileError:
             logging.getLogger("system").error(
                 "Invalid guid value '' received".format(device_guid)

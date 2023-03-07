@@ -93,16 +93,26 @@ def parse_bool(value, default_value=False):
 
     # Attempt to parse the value
     try:
-        int_value = int(value)
-        if int_value in [0, 1]:
-            return int_value == 1
+        if value.isnumeric():
+            int_value = int(value)
+            if int_value in [0, 1]:
+                return int_value == 1
+            else:
+                raise error.ProfileError(
+                    "Invalid bool value used: {}".format(value)
+                )
         else:
-            raise error.ProfileError(
-                "Invalid bool value used: {}".format(value)
-            )
+            value = value.lower()
+            if value in ["true", "false"]:
+                return value == "true"
+            else: 
+                raise error.ProfileError(
+                    "Invalid bool value used: {}".format(value)
+                )
     except ValueError:
-        if value.lower() in ["true", "false"]:
-            return True if value.lower() == "true" else False
+        value = value.lower()
+        if value in ["true", "false"]:
+            return value == "true"
         else:
             raise error.ProfileError(
                 "Invalid bool value used: {}".format(value)

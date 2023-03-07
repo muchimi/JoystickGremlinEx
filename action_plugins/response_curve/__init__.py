@@ -779,7 +779,7 @@ class CurveView(QtWidgets.QGraphicsScene):
         curve_fn = self.model.get_curve_function()
         if curve_fn:
             path = QtGui.QPainterPath(
-                QtCore.QPointF(-g_scene_size, -g_scene_size*curve_fn(-1))
+                QtCore.QPointF(int(-g_scene_size),int(-g_scene_size*curve_fn(-1)))
             )
             for x in range(-int(g_scene_size), int(g_scene_size+1), 2):
                 path.lineTo(x, -g_scene_size * curve_fn(x / g_scene_size))
@@ -838,10 +838,7 @@ class CurveView(QtWidgets.QGraphicsScene):
         :param painter the painter object
         :param rect the drawing rectangle
         """
-        painter.drawImage(
-            QtCore.QPoint(-g_scene_size, -g_scene_size),
-            self.background_image
-        )
+        painter.drawImage(QtCore.QPoint(int(-g_scene_size), int(-g_scene_size)),self.background_image)
 
 
 class ControlPointEditorWidget(QtWidgets.QWidget):

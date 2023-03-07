@@ -380,8 +380,17 @@ class JoystickDeviceTabWidget(QtWidgets.QWidget):
         el.profile_stop.connect(self._profile_stop)
 
         self.running = False
-        
+        self.updating = False
+        self.last_event = None
+
     def _device_update(self, event):
+        if self.running:
+            return 
+
+        if self.last_event == event:
+            return
+        
+        self.last_event = event
         if self.device.device_guid != event.device_guid:
             return
                 
@@ -396,6 +405,7 @@ class JoystickDeviceTabWidget(QtWidgets.QWidget):
 
         self.input_item_list_view.select_input(event.event_type, event.identifier)
 
+        
 
     def _profile_start(self):
         self.running = True
@@ -427,7 +437,7 @@ class JoystickDeviceTabWidget(QtWidgets.QWidget):
             widget.description_changed.connect(change_cb)
 
             self.main_layout.addWidget(widget)
-            el = gremlin.event_handler
+            
 
     def mode_changed_cb(self, mode):
         """Handles mode change.
