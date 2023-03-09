@@ -849,7 +849,7 @@ class HoldRepeat(AbstractRepeat):
         self.delay = float(node.get("delay"))
 
 
-def key_from_name(name):
+def key_from_name(name, validate = False):
     """Returns the key corresponding to the provided name.
 
     If no key exists with the provided name None is returned.
@@ -868,6 +868,10 @@ def key_from_name(name):
     # Attempt to create the key to store and return if successful
     key = _unicode_to_key(name)
     if key is None:
+        if validate:
+            # skip error reporting on validation
+            return None
+        
         logging.getLogger("system").warning(
             "Invalid key name specified \"{}\"".format(name)
         )

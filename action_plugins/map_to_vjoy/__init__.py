@@ -528,6 +528,27 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         if self.action_data.input_type == InputType.JoystickAxis:
             self.remap_type_widget.show()
 
+    def get_axis_name(self, input_id):
+        ''' gets the axis name based on the input # '''
+        if input_id == 1:
+            axis_name = "X"
+        elif input_id == 2:
+            axis_name = "Y"
+        elif input_id == 3:
+            axis_name = "Z"      
+        elif input_id == 4:
+            axis_name = "RX"
+        elif input_id == 5:
+            axis_name = "RY"
+        elif input_id == 6:
+            axis_name = "RZ"
+        elif input_id == 7:
+            axis_name = "S1"                                                                          
+        elif input_id == 8:
+            axis_name = "S2"      
+        else:
+            axis_name = "(unknown)"
+        return axis_name
 
     def _create_header(self):
         ''' shows what device is currently selected '''
@@ -536,31 +557,20 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         box.addWidget(QtWidgets.QLabel(VJoyUsageState._active_device_name))
         input_type = VJoyUsageState._active_device_input_type
         input_id = VJoyUsageState._active_device_input_id
+        vjoy_device_id = self.action_data.vjoy_device_id      
+        vjoy_input_id = self.action_data.vjoy_input_id
         if input_type == InputType.JoystickAxis:
-            if input_id == 1:
-                axis_name = "X"
-            elif input_id == 2:
-                axis_name = "Y"
-            elif input_id == 3:
-                axis_name = "Z"      
-            elif input_id == 4:
-                axis_name = "RX"
-            elif input_id == 5:
-                axis_name = "RY"
-            elif input_id == 6:
-                axis_name = "RZ"
-            elif input_id == 7:
-                axis_name = "S1"                                                                          
-            elif input_id == 8:
-                axis_name = "S2"                
-            else:
-                axis_name = "(unknown)"
-            name = f"Axis {input_id} ({axis_name})"
+            axis_name = self.get_axis_name(input_id)
+            name = f"Axis {input_id} ({axis_name}) -> Vjoy device {vjoy_device_id} axis {vjoy_input_id} ({self.get_axis_name(vjoy_input_id)})"
         elif input_type == InputType.JoystickButton:
-            name = f"Button {input_id}"
+            name = f"Button {input_id} -> Vjoy device {vjoy_device_id} button {vjoy_input_id}"
         elif input_type == InputType.JoystickHat:                
-            name = f"Hat {input_id}"
+            name = f"Hat {input_id} -> Vjoy device {vjoy_device_id} hat {vjoy_input_id}"
         box.addWidget(QtWidgets.QLabel(name))
+        
+        
+        
+
         box.addStretch()
 
         self.main_layout.addWidget(header)
@@ -590,8 +600,6 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.pulse_spin_widget.setMaximum(60000)
         delay_box.addWidget(QtWidgets.QLabel("Duration (ms):"))
         delay_box.addWidget(self.pulse_spin_widget)
-
-
 
         self.start_widget = QtWidgets.QWidget()
         self.start_button_group = QtWidgets.QButtonGroup()

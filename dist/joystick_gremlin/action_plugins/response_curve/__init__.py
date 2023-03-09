@@ -838,10 +838,7 @@ class CurveView(QtWidgets.QGraphicsScene):
         :param painter the painter object
         :param rect the drawing rectangle
         """
-        painter.drawImage(
-            QtCore.QPoint(int(-g_scene_size),int(-g_scene_size)),
-            self.background_image
-        )
+        painter.drawImage(QtCore.QPoint(int(-g_scene_size), int(-g_scene_size)),self.background_image)
 
 
 class ControlPointEditorWidget(QtWidgets.QWidget):
