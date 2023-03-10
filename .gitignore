@@ -5,7 +5,7 @@
 debug.txt
 .idea
 __pycache__
-
+/dist
 /build
 /doc
 /releases
