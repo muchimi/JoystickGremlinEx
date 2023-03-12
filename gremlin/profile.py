@@ -182,9 +182,9 @@ def safe_read(node, key, type_cast=None, default_value=None):
 
     if type_cast is not None:
         try:
-            if type_cast == bool:
-                value = value.strip().lower()
-                value = value == "true"
+            if type_cast == bool and isinstance(value,str):
+                    value = value.strip().lower()
+                    value = value == "true"
             else:
                 value = type_cast(value)
         except ValueError:

@@ -91,6 +91,7 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.remap_type_widget = QtWidgets.QWidget()
             self.remap_type_layout = QtWidgets.QHBoxLayout(self.remap_type_widget)
 
+
             self.absolute_checkbox = QtWidgets.QRadioButton("Absolute")
             self.absolute_checkbox.setChecked(True)
             self.relative_checkbox = QtWidgets.QRadioButton("Relative")

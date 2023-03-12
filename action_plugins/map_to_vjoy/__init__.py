@@ -504,18 +504,16 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _create_input_axis(self):
         ''' creates the axis input widget '''
-
-        
-
         self.remap_type_widget = QtWidgets.QWidget()
         self.remap_type_layout = QtWidgets.QHBoxLayout(self.remap_type_widget)
-
+        self.reverse_checkbox = QtWidgets.QCheckBox("Reverse")
         self.absolute_checkbox = QtWidgets.QRadioButton("Absolute")
         self.absolute_checkbox.setChecked(True)
         self.relative_checkbox = QtWidgets.QRadioButton("Relative")
         self.relative_scaling = gremlin.ui.common.DynamicDoubleSpinBox()
 
         self.remap_type_layout.addStretch()
+        self.remap_type_layout.addWidget(self.reverse_checkbox)
         self.remap_type_layout.addWidget(self.absolute_checkbox)
         self.remap_type_layout.addWidget(self.relative_checkbox)
         self.remap_type_layout.addWidget(self.relative_scaling)
@@ -846,12 +844,17 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             )
 
             if self.action_data.input_type == InputType.JoystickAxis:
+                
+                self.reverse_checkbox.setChecked(self.action_data.reverse)
+                if self.action_data.reverse:
+                    pass
                 if self.action_data.axis_mode == "absolute":
                     self.absolute_checkbox.setChecked(True)
                 else:
                     self.relative_checkbox.setChecked(True)
                 self.relative_scaling.setValue(self.action_data.axis_scaling)
 
+                self.reverse_checkbox.clicked.connect(self._reverse_changed)
                 self.absolute_checkbox.clicked.connect(self.save_changes)
                 self.relative_checkbox.clicked.connect(self.save_changes)
                 self.relative_scaling.valueChanged.connect(self.save_changes)
@@ -876,6 +879,8 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             logging.getLogger("system").error(str(e))
 
 
+    def _reverse_changed(self):
+        self.action_data.reverse = self.reverse_checkbox.isChecked()
     
     def save_changes(self):
         """Saves UI contents to the profile data storage."""
@@ -896,6 +901,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.action_data.input_type = vjoy_data["input_type"]
 
             if self.action_data.input_type == InputType.JoystickAxis:
+
                 self.action_data.axis_mode = "absolute"
                 if self.relative_checkbox.isChecked():
                     self.action_data.axis_mode = "relative"
@@ -956,6 +962,7 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
         self.vjoy_device_id = action.vjoy_device_id
         self.vjoy_input_id = action.vjoy_input_id
         self.input_type = action.input_type
+        self.reverse = action.reverse
         self.axis_mode = action.axis_mode
         self.axis_scaling = action.axis_scaling
         self.action_mode = action.action_mode
@@ -1000,13 +1007,14 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
     def process_event(self, event, value):
         ''' runs when a joystick even occurs like a button press or axis movement '''
         if self.input_type == InputType.JoystickAxis:
+            target = -value.current if self.reverse else value.current
+                
             if self.axis_mode == "absolute":
-                joystick_handling.VJoyProxy()[self.vjoy_device_id] \
-                    .axis(self.vjoy_input_id).value = value.current
+                joystick_handling.VJoyProxy()[self.vjoy_device_id].axis(self.vjoy_input_id).value = target
             else:
                 self.should_stop_thread = abs(event.value) < 0.05
                 self.axis_delta_value = \
-                    value.current * (self.axis_scaling / 1000.0)
+                    target * (self.axis_scaling / 1000.0)
                 self.thread_last_update = time.time()
                 if self.thread_running is False:
                     if isinstance(self.thread, threading.Thread):
@@ -1133,6 +1141,7 @@ class VjoyRemap(gremlin.base_classes.AbstractAction):
         self.vjoy_device_id = None
         self.vjoy_input_id = None
         self.input_type = self.parent.parent.input_type
+        self._reverse = False
         self.axis_mode = "absolute"
         self.axis_scaling = 1.0
         self.action_mode = VjoyAction.VJoyNormal
@@ -1140,7 +1149,12 @@ class VjoyRemap(gremlin.base_classes.AbstractAction):
         self.pulse_delay = 250 # pulse delay
         self.start_pressed = False # true if a button starts as pressed when the profile is loaded
 
-        
+    @property
+    def reverse(self):
+        return self._reverse
+    @reverse.setter
+    def reverse(self,value):
+        self._reverse = value
 
     def icon(self):
         """Returns the icon corresponding to the remapped input.
@@ -1218,6 +1232,9 @@ class VjoyRemap(gremlin.base_classes.AbstractAction):
 
             if self.get_input_type() == InputType.JoystickAxis and \
                 self.input_type == InputType.JoystickAxis:
+                self.reverse = safe_read(node,"reverse",bool,False)
+                if self.reverse:
+                    pass
                 self.axis_mode = safe_read(node, "axis-type", str, "absolute")
                 self.axis_scaling = safe_read(node, "axis-scaling", float, 1.0)
             elif self.get_input_type() == InputType.JoystickButton and self.input_type == InputType.JoystickButton:
@@ -1254,6 +1271,7 @@ class VjoyRemap(gremlin.base_classes.AbstractAction):
             )
 
         if self.get_input_type() == InputType.JoystickAxis and self.input_type == InputType.JoystickAxis:
+            node.set("reverse", safe_format(self.reverse,bool))
             node.set("axis-type", safe_format(self.axis_mode, str))
             node.set("axis-scaling", safe_format(self.axis_scaling, float))
 

@@ -350,6 +350,7 @@ class MacroActionEditor(QtWidgets.QWidget):
         # Axis mode configuration
         if action.input_type == gremlin.common.InputType.JoystickAxis:
             self.ui_elements["axis_type_layout"] = QtWidgets.QHBoxLayout()
+            self.ui_elements["axis_reverse"] = QtWidgets.QCheckBox("Reverse")
             self.ui_elements["axis_absolute"] = QtWidgets.QRadioButton("Absolute")
             self.ui_elements["axis_relative"] = QtWidgets.QRadioButton("Relative")
             if action.axis_type == "absolute":
@@ -365,12 +366,10 @@ class MacroActionEditor(QtWidgets.QWidget):
                 self._modify_vjoy_axis
             )
 
-            self.ui_elements["axis_type_layout"].addWidget(
-                self.ui_elements["axis_absolute"]
-            )
-            self.ui_elements["axis_type_layout"].addWidget(
-                self.ui_elements["axis_relative"]
-            )
+            self.ui_elements["axis_type_layout"].addWidget(self.ui_elements["axis_reverse"])
+            self.ui_elements["axis_type_layout"].addWidget(self.ui_elements["axis_absolute"])
+            self.ui_elements["axis_type_layout"].addWidget(self.ui_elements["axis_relative"])
+
             self.action_layout.addLayout(self.ui_elements["axis_type_layout"])
 
         self._create_joystick_inputs_ui(action)

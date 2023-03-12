@@ -312,6 +312,7 @@ class JoystickDeviceTabWidget(QtWidgets.QWidget):
         self.current_mode = current_mode
 
         self.device = device
+        self.last_item_data = None
 
         self.main_layout = QtWidgets.QHBoxLayout(self)
         self.left_panel_layout = QtWidgets.QVBoxLayout()
@@ -422,6 +423,10 @@ class JoystickDeviceTabWidget(QtWidgets.QWidget):
             index,
             self.device_profile.modes[self.current_mode]
         )
+
+        if self.last_item_data == item_data:
+            return
+        self.last_item_data = item_data
 
         # Remove the existing widget, if there is one
         item = self.main_layout.takeAt(1)
