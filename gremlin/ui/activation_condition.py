@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PySide6 import QtCore, QtGui, QtWidgets
 
 import logging
 
@@ -30,7 +30,7 @@ class ActivationConditionWidget(QtWidgets.QWidget):
     """Widget displaying the UI used to configure activation conditions."""
 
     # Signal which is emitted whenever the widget's contents change
-    activation_condition_modified = QtCore.pyqtSignal()
+    activation_condition_modified = QtCore.Signal()
 
     # Maps activation type name to index
     activation_type_to_index = {
@@ -127,7 +127,7 @@ class AbstractConditionWidget(QtWidgets.QGroupBox):
     """Abstract class for condition ui widgets."""
 
     # Signal emitted when a condition is deleted
-    deleted = QtCore.pyqtSignal(base_classes.AbstractCondition)
+    deleted = QtCore.Signal(base_classes.AbstractCondition)
 
     def __init__(self, condition_data, parent=None):
         """Creates a new widget.

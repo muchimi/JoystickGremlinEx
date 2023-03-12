@@ -17,7 +17,7 @@
 
 from xml.etree import ElementTree
 
-from PyQt5 import QtWidgets
+from PySide6 import QtWidgets
 
 import dill
 

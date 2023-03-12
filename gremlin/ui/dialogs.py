@@ -20,7 +20,7 @@ import subprocess
 import sys
 import winreg
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PySide6 import QtCore, QtGui, QtWidgets
 
 import dill
 
@@ -584,7 +584,7 @@ class ProcessWindow(common.BaseDialogUi):
     """Displays active processes in a window for the user to select."""
 
     # Signal emitted when the user selects a process
-    process_selected = QtCore.pyqtSignal(str)
+    process_selected = QtCore.Signal(str)
 
     def __init__(self, parent=None):
         """Creates a new instance.
@@ -751,7 +751,7 @@ class ModeManagerUi(common.BaseDialogUi):
     """Enables the creation of modes and configuring their inheritance."""
 
     # Signal emitted when mode configuration changes
-    modes_changed = QtCore.pyqtSignal()
+    modes_changed = QtCore.Signal()
 
     def __init__(self, profile_data, parent=None):
         """Creates a new instance.

@@ -21,7 +21,7 @@ import math
 import os
 from xml.etree import ElementTree
 
-from PyQt5 import QtCore, QtWidgets
+from PySide6 import QtCore, QtWidgets
 
 from gremlin.base_classes import AbstractAction, AbstractFunctor
 from gremlin.common import InputType, MouseButton

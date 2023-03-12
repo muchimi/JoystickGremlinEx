@@ -21,7 +21,7 @@ import threading
 import time
 from xml.etree import ElementTree
 
-from PyQt5 import QtWidgets, QtCore, QtGui
+from PySide6 import QtWidgets, QtCore, QtGui
 
 from gremlin.base_classes import InputActionCondition
 from gremlin.common import InputType
@@ -37,7 +37,7 @@ import action_plugins
 class GridClickWidget(QtWidgets.QWidget):
     ''' implements a widget that reponds to a mouse click '''
     pressPos = None
-    clicked = QtCore.pyqtSignal()
+    clicked = QtCore.Signal()
 
     def __init__(self, vjoy_device_id, input_type, vjoy_input_id, parent = None):
         super(GridClickWidget, self).__init__(parent=parent)

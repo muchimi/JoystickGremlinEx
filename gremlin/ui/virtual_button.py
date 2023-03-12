@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from PyQt5 import QtWidgets, QtCore, QtGui
+from PySide6 import QtWidgets, QtCore, QtGui
 
 import gremlin
 
@@ -25,7 +25,7 @@ class AbstractVirtualButtonWidget(QtWidgets.QGroupBox):
 
     """Base class for activation condition widgets."""
 
-    virtual_button_modified = QtCore.pyqtSignal()
+    virtual_button_modified = QtCore.Signal()
 
     def __init__(self, condition_data, parent=None, layout_direction="vertical"):
         """Creates a new activation condition widget.

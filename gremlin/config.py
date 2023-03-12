@@ -21,7 +21,7 @@ import time
 import os
 import re
 
-from PyQt5 import QtCore
+from PySide6 import QtCore
 
 from . import common, util
 

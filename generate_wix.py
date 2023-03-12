@@ -210,7 +210,7 @@ def create_document():
     prod = create_node(
         "Product",
         {
-            "Name": "Joystick Gremlin",
+            "Name": "Joystick Gremlin EX",
             "Manufacturer": "H2IK",
             # "Id": "a0a7fc85-8651-4b57-b7ee-a7f718857939", # 4.0.0
             # "Id": "447529e9-4f78-4baf-b51c-21db602a5f7b", # 4.0.1
@@ -226,12 +226,13 @@ def create_document():
             # "Id": "bec63861-eeae-4f75-bb01-3a76cab1c319", # 10.0.0
             # "Id": "5598cb71-2825-4a78-8f4b-682aefd14323", # 11.0.0
             # "Id": "290a3110-0745-48d6-93d2-d954cb584b6f", # 12.0.0
-            #"Id": "6019660b-26bd-430b-9b95-ca6a55201060",  # 13.0.0
-            "Id": "0dad4221-c8cf-4424-8dcd-3886274e89ef", # 13.1.0
+            # "Id": "6019660b-26bd-430b-9b95-ca6a55201060",  # 13.0.0
+            # "Id": "0dad4221-c8cf-4424-8dcd-3886274e89ef", # 13.1.0
+            "Id": "6472cca8-d352-4186-8a98-ca6ba33d083c", # 13.1.3
             "UpgradeCode": "0464914b-97da-4889-8699-bcde4e767517",
             "Language": "1033",
             "Codepage": "1252",
-            "Version": "13.1.0"
+            "Version": "13.1.3"
         })
     mug = create_node("MajorUpgrade",
         {
@@ -244,7 +245,7 @@ def create_document():
         {
             "Id": "*",
             "Keywords": "Installer",
-            "Description": "Joystick Gremlin R13.1 Installer",
+            "Description": "Joystick Gremlin R13.1.3 Installer",
             "Manufacturer": "H2IK",
             "InstallerVersion": "100",
             "Languages": "1033",

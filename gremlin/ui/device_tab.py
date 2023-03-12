@@ -18,7 +18,7 @@
 
 import logging
 
-from PyQt5 import QtWidgets, QtCore
+from PySide6 import QtWidgets, QtCore
 
 import container_plugins.basic
 import gremlin
@@ -33,7 +33,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
     """
 
     # Signal emitted when the description changes
-    description_changed = QtCore.pyqtSignal(str)
+    description_changed = QtCore.Signal(str)
 
     def __init__(self, item_data, parent=None):
         """Creates a new object instance.
@@ -433,7 +433,8 @@ class JoystickDeviceTabWidget(QtWidgets.QWidget):
         if item is not None and item.widget():
             item.widget().hide()
             item.widget().deleteLater()
-        self.main_layout.removeItem(item)
+        if item:
+            self.main_layout.removeItem(item)
 
         if item_data is not None:
             widget = InputItemConfiguration(item_data)
@@ -458,7 +459,8 @@ class JoystickDeviceTabWidget(QtWidgets.QWidget):
         if item is not None and item.widget():
             item.widget().hide()
             item.widget().deleteLater()
-        self.main_layout.removeItem(item)
+        if item:
+            self.main_layout.removeItem(item)
 
         # Select the first input item
         self.input_item_list_view.select_item(0)

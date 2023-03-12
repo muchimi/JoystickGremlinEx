@@ -21,7 +21,7 @@ import logging
 import time
 from threading import Thread, Timer
 
-from PyQt5 import QtCore
+from PySide6 import QtCore
 
 import dill
 from . import common, config, error, joystick_handling, windows_event_hook, \
@@ -153,27 +153,27 @@ class EventListener(QtCore.QObject):
     """
 
     # Signal emitted when joystick events are received
-    joystick_event = QtCore.pyqtSignal(Event)
+    joystick_event = QtCore.Signal(Event)
     # Signal emitted when keyboard events are received
-    keyboard_event = QtCore.pyqtSignal(Event)
+    keyboard_event = QtCore.Signal(Event)
     # Signal emitted when mouse events are received
-    mouse_event = QtCore.pyqtSignal(Event)
+    mouse_event = QtCore.Signal(Event)
     # Signal emitted when virtual button events are received
-    virtual_event = QtCore.pyqtSignal(Event)
+    virtual_event = QtCore.Signal(Event)
     # Signal emitted when a joystick is attached or removed
-    device_change_event = QtCore.pyqtSignal()
+    device_change_event = QtCore.Signal()
 
     # Signal emitted when a profile is changed (to refresh UI)
-    profile_changed = QtCore.pyqtSignal()
+    profile_changed = QtCore.Signal()
     
     # signal emitted when the selected hardware device changes
-    profile_device_changed = QtCore.pyqtSignal(DeviceChangeEvent)
+    profile_device_changed = QtCore.Signal(DeviceChangeEvent)
 
     # signal emitted when the selected hardware device changes
-    profile_device_mapping_changed = QtCore.pyqtSignal(DeviceChangeEvent)
+    profile_device_mapping_changed = QtCore.Signal(DeviceChangeEvent)
 
-    profile_start = QtCore.pyqtSignal()
-    profile_stop = QtCore.pyqtSignal()
+    profile_start = QtCore.Signal()
+    profile_stop = QtCore.Signal()
     
         
 
@@ -366,9 +366,9 @@ class EventHandler(QtCore.QObject):
     """Listens to the inputs from multiple different input devices."""
 
     # Signal emitted when the mode is changed
-    mode_changed = QtCore.pyqtSignal(str)
+    mode_changed = QtCore.Signal(str)
     # Signal emitted when the application is pause / resumed
-    is_active = QtCore.pyqtSignal(bool)
+    is_active = QtCore.Signal(bool)
 
     def __init__(self):
         """Initializes the EventHandler instance."""
@@ -502,7 +502,7 @@ class EventHandler(QtCore.QObject):
         """Removes all attached callbacks."""
         self.callbacks = {}
 
-    @QtCore.pyqtSlot(Event)
+    @QtCore.Slot(Event)
     def process_event(self, event):
         """Processes a single event by passing it to all callbacks
         registered for this event.

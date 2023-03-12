@@ -21,7 +21,7 @@ import logging
 import os
 import pickle
 import time
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PySide6 import QtCore, QtGui, QtWidgets
 from xml.etree import ElementTree
 
 from gremlin.base_classes import AbstractAction, AbstractFunctor

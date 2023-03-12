@@ -19,7 +19,7 @@
 import threading
 import time
 
-from PyQt5 import QtCore
+from PySide6 import QtCore
 
 from . import common, event_handler, input_devices, joystick_handling
 

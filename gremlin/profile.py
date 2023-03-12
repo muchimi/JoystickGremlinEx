@@ -26,7 +26,7 @@ import uuid
 from xml.dom import minidom
 from xml.etree import ElementTree
 
-from PyQt5 import QtCore
+from PySide6 import QtCore
 
 import dill
 

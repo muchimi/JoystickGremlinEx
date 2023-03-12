@@ -17,7 +17,7 @@
 
 import logging
 
-from PyQt5 import QtWidgets, QtCore, QtGui
+from PySide6 import QtWidgets, QtCore, QtGui
 
 import gremlin
 from . import common
@@ -163,11 +163,11 @@ class MergeAxisEntry(QtWidgets.QDockWidget):
     """UI dialog which allows configuring how to merge two axes."""
 
     # Signal which is emitted whenever the widget is closed
-    closed = QtCore.pyqtSignal(QtWidgets.QWidget)
+    closed = QtCore.Signal(QtWidgets.QWidget)
 
     # Palette used to render widgets
     palette = QtGui.QPalette()
-    palette.setColor(QtGui.QPalette.Background, QtCore.Qt.lightGray)
+    palette.setColor(QtGui.QPalette.ColorRole.Window, QtGui.QColorConstants.LightGray)
 
     def __init__(self, change_cb, profile_data, parent=None):
         """Creates a new instance.

@@ -17,7 +17,7 @@
 
 import logging
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PySide6 import QtCore, QtGui, QtWidgets
 
 from gremlin.common import PluginVariableType
 import gremlin.profile
@@ -241,7 +241,7 @@ class ModuleManagementController(QtCore.QObject):
 
 class ModuleManagementView(QtWidgets.QSplitter):
 
-    add_module = QtCore.pyqtSignal(str)
+    add_module = QtCore.Signal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -381,7 +381,7 @@ class InstanceWidget(QtWidgets.QWidget):
 
     """Shows the controls for a particular module instance."""
 
-    renamed = QtCore.pyqtSignal(str)
+    renamed = QtCore.Signal(str)
 
     def __init__(self, name, parent=None):
         super().__init__(parent)

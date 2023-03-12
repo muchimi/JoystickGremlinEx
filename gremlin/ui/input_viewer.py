@@ -19,7 +19,7 @@ import copy
 import enum
 import time
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PySide6 import QtCore, QtGui, QtWidgets
 
 import dill
 
@@ -41,7 +41,7 @@ class VisualizationSelector(QtWidgets.QWidget):
     """Presents a list of possibly device and visualization widgets."""
 
     # Event emitted when the visualization configuration changes
-    changed = QtCore.pyqtSignal(
+    changed = QtCore.Signal(
         dill.DeviceSummary,
         VisualizationType,
         bool

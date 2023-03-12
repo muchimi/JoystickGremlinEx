@@ -18,7 +18,7 @@
 
 import logging
 import os
-from PyQt5 import QtCore, QtWidgets
+from PySide6 import QtCore, QtWidgets
 from xml.etree import ElementTree
 
 from gremlin.base_classes import AbstractAction, AbstractFunctor

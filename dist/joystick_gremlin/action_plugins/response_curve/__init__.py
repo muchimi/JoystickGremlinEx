@@ -20,7 +20,7 @@ import enum
 import logging
 import os
 import time
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PySide6 import QtCore, QtGui, QtWidgets
 from xml.etree import ElementTree
 
 import gremlin
@@ -174,9 +174,9 @@ class AbstractCurveModel(QtCore.QObject):
     """Abstract base class for all  curve models."""
 
     # Signal emitted when model data changes
-    content_modified = QtCore.pyqtSignal()
+    content_modified = QtCore.Signal()
     # Signal emitted when points are added or removed
-    content_added = QtCore.pyqtSignal()
+    content_added = QtCore.Signal()
 
     def __init__(self, profile_data, parent=None):
         """Initializes an empty model.

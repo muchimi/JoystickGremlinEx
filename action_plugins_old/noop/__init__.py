@@ -17,7 +17,7 @@
 
 
 import os
-from PyQt5 import QtWidgets
+from PySide6 import QtWidgets
 from xml.etree import ElementTree
 
 from gremlin.base_classes import AbstractAction, AbstractFunctor

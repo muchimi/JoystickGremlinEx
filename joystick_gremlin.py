@@ -29,8 +29,8 @@ import time
 import traceback
 
 # Import QtMultimedia so pyinstaller doesn't miss it
-import PyQt5
-from PyQt5 import QtCore, QtGui, QtMultimedia, QtWidgets
+import PySide6
+from PySide6 import QtCore, QtGui, QtMultimedia, QtWidgets
 
 import dill
 
@@ -574,10 +574,10 @@ class GremlinUi(QtWidgets.QMainWindow):
         """Creates the system tray icon and menu."""
         self.ui.tray_menu = QtWidgets.QMenu("Menu")
         self.ui.action_tray_show = \
-            QtWidgets.QAction("Show / Hide", self)
+            QtGui.QAction("Show / Hide", self)
         self.ui.action_tray_enable = \
-            QtWidgets.QAction("Enable / Disable", self)
-        self.ui.action_tray_quit = QtWidgets.QAction("Quit", self)
+            QtGui.QAction("Enable / Disable", self)
+        self.ui.action_tray_quit = QtGui.QAction("Quit", self)
         self.ui.tray_menu.addAction(self.ui.action_tray_show)
         self.ui.tray_menu.addAction(self.ui.action_tray_enable)
         self.ui.tray_menu.addAction(self.ui.action_tray_quit)
@@ -817,10 +817,11 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         :param new_mode the name of the new current mode
         """
-        self._current_mode = new_mode
+        if self._current_mode != new_mode:
+            self._current_mode = new_mode
 
-        for tab in self.tabs.values():
-            tab.mode_changed_cb(new_mode)
+            for tab in self.tabs.values():
+                tab.mode_changed_cb(new_mode)
 
     def _process_changed_cb(self, path):
         """Handles changes in the active process.
@@ -1179,9 +1180,7 @@ class GremlinUi(QtWidgets.QMainWindow):
     def _update_window_title(self):
         """Updates the window title to include the current profile."""
         if self._profile_fname is not None:
-            self.setWindowTitle("{}".format(
-                os.path.basename(self._profile_fname))
-            )
+            self.setWindowTitle(f"{os.path.basename(self._profile_fname)}")
         else:
             self.setWindowTitle("")
 
@@ -1242,7 +1241,7 @@ if __name__ == "__main__":
 
     # Fix some dumb Qt bugs
     QtWidgets.QApplication.addLibraryPath(os.path.join(
-        os.path.dirname(PyQt5.__file__),
+        os.path.dirname(PySide6.__file__),
         "plugins"
     ))
 
@@ -1336,7 +1335,7 @@ if __name__ == "__main__":
 
     # Run UI
     syslog.info("Gremlin UI launching")
-    app.exec_()
+    app.exec()
     syslog.info("Gremlin UI terminated")
 
     # Terminate potentially running EventListener loop

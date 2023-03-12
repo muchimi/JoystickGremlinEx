@@ -21,7 +21,7 @@ import threading
 import time
 from xml.etree import ElementTree
 
-from PyQt5 import QtWidgets
+from PySide6 import QtWidgets
 
 import gremlin
 import gremlin.ui.common

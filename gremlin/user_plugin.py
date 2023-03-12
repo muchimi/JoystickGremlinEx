@@ -25,7 +25,7 @@ import random
 import string
 import uuid
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PySide6 import QtCore, QtGui, QtWidgets
 
 import dill
 from gremlin import common, error, input_devices, joystick_handling, profile, shared_state
@@ -201,7 +201,7 @@ class AbstractVariable(QtCore.QObject):
     """Represents the base class of all variables used in plugins."""
 
     # Signal emitted when the value of the variable changes
-    value_changed = QtCore.pyqtSignal(dict)
+    value_changed = QtCore.Signal(dict)
 
     def __init__(self, label, description, variable_type, is_optional=False):
         """Creates a new instance.

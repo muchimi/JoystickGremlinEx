@@ -21,7 +21,7 @@ import threading
 import time
 from xml.etree import ElementTree
 
-from PyQt5 import QtWidgets
+from PySide6 import QtWidgets
 
 from gremlin.base_classes import InputActionCondition
 from gremlin.common import InputType

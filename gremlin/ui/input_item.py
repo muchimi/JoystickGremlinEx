@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import enum
-from PyQt5 import QtWidgets, QtCore, QtGui
+from PySide6 import QtWidgets, QtCore, QtGui
 
 import gremlin
 from gremlin.common import DeviceType, InputType
@@ -299,42 +299,44 @@ class InputItemListView(common.AbstractView):
         # axes into account
         if isinstance(index, gremlin.event_handler.Event):
             index = self.model.event_to_index(index)
-        self.current_index = index
 
-        # Go through all entries in the layout, deselecting those that are
-        # actual widgets and selecting the previously selected one
-        valid_index = False
-        # height = 0
-        for i in range(self.scroll_layout.count()):
-            item = self.scroll_layout.itemAt(i)
-            if item.widget():
-                widget = item.widget()
-                # height += widget.height
-                widget.setAutoFillBackground(False)
-                if i == index:
-                    palette = QtGui.QPalette()
-                    palette.setColor(QtGui.QPalette.Background, QtCore.Qt.darkGray)
-                    widget.setAutoFillBackground(True)
-                    widget.setPalette(palette)
-                    valid_index = True
+        if self.current_index != index:
+            self.current_index = index
+
+            # Go through all entries in the layout, deselecting those that are
+            # actual widgets and selecting the previously selected one
+            valid_index = False
+            # height = 0
+            for i in range(self.scroll_layout.count()):
+                item = self.scroll_layout.itemAt(i)
+                if item.widget():
+                    widget = item.widget()
+                    # height += widget.height
+                    widget.setAutoFillBackground(False)
+                    if i == index:
+                        palette = QtGui.QPalette()
+                        palette.setColor(QtGui.QPalette.ColorRole.Window, QtGui.QColorConstants.DarkGray)
+                        widget.setAutoFillBackground(True)
+                        widget.setPalette(palette)
+                        valid_index = True
 
 
-                    # self.scroll_area.ensureVisible(x,height)
-                    QtCore.QTimer.singleShot(0, partial(self.scroll_area.ensureWidgetVisible, widget))
+                        # self.scroll_area.ensureVisible(x,height)
+                        QtCore.QTimer.singleShot(0, partial(self.scroll_area.ensureWidgetVisible, widget))
 
-                    # signal the hardware input device changed
-                    el = gremlin.event_handler.EventListener()
-                    event = gremlin.event_handler.DeviceChangeEvent()
-                    data = self.model.data(index)
-                    event.device_guid = self.model._device_data.device_guid
-                    event.device_name = self.model._device_data.name
-                    event.device_input_type = data.input_type
-                    event.device_input_id = data.input_id
-                    el.profile_device_changed.emit(event)
+                        # signal the hardware input device changed
+                        el = gremlin.event_handler.EventListener()
+                        event = gremlin.event_handler.DeviceChangeEvent()
+                        data = self.model.data(index)
+                        event.device_guid = self.model._device_data.device_guid
+                        event.device_name = self.model._device_data.name
+                        event.device_input_type = data.input_type
+                        event.device_input_id = data.input_id
+                        el.profile_device_changed.emit(event)
 
-        if emit_signal and valid_index:
-            self.item_selected.emit(index)
-            
+            if emit_signal and valid_index:
+                self.item_selected.emit(index)
+                
 
 
 class ActionSetModel(common.AbstractModel):
@@ -375,7 +377,7 @@ class ActionSetView(common.AbstractView):
         Count = 6
 
     # Signal emitted when an interaction is triggered on an action
-    interacted = QtCore.pyqtSignal(Interactions)
+    interacted = QtCore.Signal(Interactions)
 
     def __init__(
             self,
@@ -462,7 +464,7 @@ class ActionSetView(common.AbstractView):
         :param allowed_interactions list of allowed interactions
         """
         palette = QtGui.QPalette()
-        palette.setColor(QtGui.QPalette.Background, QtCore.Qt.red)
+        palette.setColor(QtGui.QPalette.ColorRole.Window, QtGui.QColorConstants.Red)
 
         self.controls_layout = QtWidgets.QVBoxLayout()
         if ActionSetView.Interactions.Up in self.allowed_interactions:
@@ -510,7 +512,7 @@ class InputItemButton(QtWidgets.QFrame):
     """
 
     # Signal emitted whenever this button is pressed
-    selected = QtCore.pyqtSignal(InputIdentifier)
+    selected = QtCore.Signal(InputIdentifier)
 
     def __init__(self, identifier, parent=None):
         """Creates a new instance.
@@ -595,7 +597,7 @@ class ContainerSelector(QtWidgets.QWidget):
     """Allows the selection of a container type."""
 
     # Signal emitted when a container type is selected
-    container_added = QtCore.pyqtSignal(str)
+    container_added = QtCore.Signal(str)
 
     def __init__(self, input_type, parent=None):
         """Creates a new selector instance.
@@ -640,15 +642,15 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
     """Base class for container widgets."""
 
     # Signal which is emitted whenever the widget is closed
-    closed = QtCore.pyqtSignal(QtWidgets.QWidget)
+    closed = QtCore.Signal(QtWidgets.QWidget)
 
     # Signal which is emitted whenever the widget's contents change as well as
     # the UI tab that was active when the event was emitted
-    container_modified = QtCore.pyqtSignal()
+    container_modified = QtCore.Signal()
 
     # Palette used to render widgets
     palette = QtGui.QPalette()
-    palette.setColor(QtGui.QPalette.Background, QtCore.Qt.lightGray)
+    palette.setColor(QtGui.QPalette.ColorRole.Window, QtGui.QColorConstants.LightGray)
 
     # Maps virtual button data to virtual button widgets
     virtual_axis_to_widget = {
@@ -847,7 +849,7 @@ class AbstractActionWidget(QtWidgets.QFrame):
     module."""
 
     # Signal which is emitted whenever the widget's contents change
-    action_modified = QtCore.pyqtSignal()
+    action_modified = QtCore.Signal()
 
     def __init__(
             self,
@@ -1080,7 +1082,7 @@ class BasicActionWrapper(AbstractActionWrapper):
     """Wraps an action widget and displays the basic config dialog."""
 
     # Signal which is emitted whenever the widget is closed
-    closed = QtCore.pyqtSignal(QtWidgets.QWidget)
+    closed = QtCore.Signal(QtWidgets.QWidget)
 
     def __init__(self, action_widget, parent=None):
         """Wraps an existing action widget.
