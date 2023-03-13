@@ -591,6 +591,14 @@ class ActionLabel(QtWidgets.QLabel):
         QtWidgets.QLabel.__init__(self, parent)
         self.setPixmap(QtGui.QPixmap(action_entry.icon()))
 
+        self.action_entry = action_entry
+
+        el = gremlin.event_handler.EventListener()
+        el.icon_changed.connect(self._icon_change)
+
+    def _icon_change(self, event):
+        self.setPixmap(QtGui.QPixmap(self.action_entry.icon()))
+
 
 class ContainerSelector(QtWidgets.QWidget):
 
