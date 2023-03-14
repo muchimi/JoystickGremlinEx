@@ -142,7 +142,8 @@ class DeviceChangeEvent:
         self.device_input_id = 0
         self.device_input_type = 0
         self.input_type = 0
-        self.input_id = 0
+        self.vjoy_device_id = 0
+        self.vjoy_input_id = 0
 
 
 @common.SingletonDecorator
