@@ -37,13 +37,15 @@ import action_plugins
 
 class VjoyAction:
     ''' defines available vjoy actions supported by this plugin'''
-    VJoyButton = 0 # normal set button
+    VJoyButton = 0 # action on button press
     VJoyToggle = 1 # toggle function on/off
     VJoyPulse = 2 # pulse function (pulses a button),
     VJoyInvertAxis = 3 # invert axis function
     VJoySetAxis = 4 # set axis value
     VJoyAxis = 5 # normal map to axis
     VJoyHat = 6 #  normal map to hat
+    VJoyRangeAxis = 7 # scale axis
+  
 
     @staticmethod
     def to_string(mode):
@@ -61,6 +63,9 @@ class VjoyAction:
             return "VJoyAxis"
         if mode == VjoyAction.VJoyHat:
             return "VJoyHat"
+        if mode == VjoyAction.VJoyRangeAxis:
+            return "VJoyRangeAxis"
+        
         return "VJoyButton"
     
     @staticmethod
@@ -68,21 +73,7 @@ class VjoyAction:
         str = str.lower().strip()
         if str.isnumeric():
             mode = int(str)
-            if mode == 0:
-                return VjoyAction.VJoyButton
-            if mode == 1:
-                return VjoyAction.VJoyToggle
-            if mode == 2:
-                return VjoyAction.VJoyPulse
-            if mode == 3:
-                return VjoyAction.VJoyInvertAxis
-            if mode == 4:
-                return VjoyAction.VJoySetAxis
-            if mode == 5:
-                return VjoyAction.VJoyAxis
-            if mode == 6:
-                return VjoyAction.VJoyHat
-            return VjoyAction.VJoyButton
+            return mode
 
         if str == "jvoybutton":
             return VjoyAction.VJoyButton
@@ -98,6 +89,10 @@ class VjoyAction:
             return VjoyAction.VJoyAxis
         if str == "vjoyhat":
             return VjoyAction.VJoyHat
+        if str == "VJoyRangeAxis":
+            return VjoyAction.VJoyRangeAxis
+        
+        
         return VjoyAction.VJoyButton
 
 class GridClickWidget(QtWidgets.QWidget):
@@ -198,6 +193,7 @@ class VJoyUsageState():
     _active_device_input_id = 0 # id of the function on the hardware device (button #, hat # or axis #)
  
     _axis_invert_map = {} # holds map of inverted axes for output
+    _axis_range_map = {} # holds active axis range maps
 
     class MappingData:
         vjoy_device_id = None
@@ -263,8 +259,10 @@ class VJoyUsageState():
                 for dev in devices:
                     dev_id = dev.vjoy_id
                     VJoyUsageState._axis_invert_map[dev_id] = {}
+                    VJoyUsageState._axis_range_map[dev_id] = {}
                     for axis_id in range(1, dev.axis_count+1):
                         VJoyUsageState._axis_invert_map[dev_id][axis_id] = False
+                        VJoyUsageState._axis_range_map[dev_id][axis_id] = [-1.0, 1.0]
 
     def set_inverted(self, device_id, input_id, inverted):
         ''' sets the inversion flag for a given vjoy device '''
@@ -277,6 +275,23 @@ class VJoyUsageState():
     def toggle_inverted(self, device_id, input_id):
         ''' toggles inversion state of specified device/axis is inverted '''
         VJoyUsageState._axis_invert_map[device_id][input_id] = not VJoyUsageState._axis_invert_map[device_id][input_id]
+
+    def set_range(self, device_id, input_id, min_range = -1.0, max_range = 1.0):
+        ''' sets the axis min/max range for the active range computation '''
+        if min_range > max_range:
+            r = min_range
+            min_range = max_range
+            max_range = r
+            
+        VJoyUsageState._axis_range_map[device_id][input_id] = [min_range, max_range]
+
+    def get_range(self, device_id, input_id):
+        ''' gets the current range for an axis (min,max)'''
+        return VJoyUsageState._axis_range_map[device_id][input_id]
+    
+
+
+
 
     def set_profile(self, profile):
         ''' loads profile data and free input lists'''
@@ -584,7 +599,10 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _get_selector_input_type(self):
         ''' gets a modified input type based on the current mode '''
         input_type = self._get_input_type()
-        if input_type == InputType.JoystickButton and self.action_data.action_mode in (VjoyAction.VJoySetAxis, VjoyAction.VJoyInvertAxis):
+        if input_type == InputType.JoystickButton and \
+                        self.action_data.action_mode in (VjoyAction.VJoySetAxis,
+                                                         VjoyAction.VJoyInvertAxis,
+                                                         VjoyAction.VJoyRangeAxis):
             return InputType.JoystickAxis
         return self._get_input_type()
 
@@ -601,13 +619,35 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.absolute_checkbox.setChecked(True)
         self.relative_checkbox = QtWidgets.QRadioButton("Relative")
         self.relative_scaling = gremlin.ui.common.DynamicDoubleSpinBox()
+        self.sb_start_value = gremlin.ui.common.DynamicDoubleSpinBox()
+        self.sb_start_value.setMinimum(-1.0)
+        self.sb_start_value.setMaximum(1.0)
+        self.sb_start_value.setDecimals(3)
+        self.sb_axis_range_low = gremlin.ui.common.DynamicDoubleSpinBox()
+        self.sb_axis_range_low.setMinimum(-1.0)
+        self.sb_axis_range_low.setMaximum(1.0)
+        self.sb_axis_range_low.setDecimals(3)
+        self.sb_axis_range_high = gremlin.ui.common.DynamicDoubleSpinBox()
+        self.sb_axis_range_high.setMinimum(-1.0)
+        self.sb_axis_range_high.setMaximum(1.0)        
+        self.sb_axis_range_high.setDecimals(3)
 
         self.remap_type_layout.addStretch()
         self.remap_type_layout.addWidget(self.reverse_checkbox)
         self.remap_type_layout.addWidget(self.absolute_checkbox)
         self.remap_type_layout.addWidget(self.relative_checkbox)
+        
+        self.remap_type_layout.addWidget(QtWidgets.QLabel("Start Value:"))
+        self.remap_type_layout.addWidget(self.sb_start_value)
+
+        self.remap_type_layout.addWidget(QtWidgets.QLabel("Scale:"))
         self.remap_type_layout.addWidget(self.relative_scaling)
-        self.remap_type_layout.addWidget(QtWidgets.QLabel("Scale"))
+
+        self.remap_type_layout.addWidget(QtWidgets.QLabel("Range Min:"))
+        self.remap_type_layout.addWidget(self.sb_axis_range_low)
+        self.remap_type_layout.addWidget(QtWidgets.QLabel("Max:"))
+        self.remap_type_layout.addWidget(self.sb_axis_range_high)
+        self.remap_type_layout.addStretch()
 
         self.main_layout.addWidget(self.axis_widget)
 
@@ -615,6 +655,10 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.absolute_checkbox.clicked.connect(self._axis_mode_changed)
         self.relative_checkbox.clicked.connect(self._axis_mode_changed)
         self.relative_scaling.valueChanged.connect(self._axis_scaling_changed)
+
+        self.sb_start_value.valueChanged.connect(self._axis_start_value_changed)
+        self.sb_axis_range_low.valueChanged.connect(self._axis_range_low_changed)
+        self.sb_axis_range_high.valueChanged.connect(self._axis_range_high_changed)
 
 
     def get_axis_name(self, input_id):
@@ -681,12 +725,14 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         row = 0
         grid.addWidget(lbl,row,0)
         grid.addWidget(self.cb_action_list, row, 1)
+
         self.action_label = QtWidgets.QLabel()
-        grid.addWidget(self.action_label,row,2)
+        grid.addWidget(self.action_label,row,2,1,3)
+
 
         # vjoy device selection - display vjoy target ID and vjoy target input - the input changes based on the behavior
 
-        row = 1        
+        row = 2        
         lbl = QtWidgets.QLabel("Device:")
         grid.addWidget(lbl,row,0)
         self.cb_vjoy_device_selector = QtWidgets.QComboBox()
@@ -707,6 +753,9 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         grid.addWidget(lbl,row,0)
         grid.addWidget(self.cb_vjoy_input_selector,row,1)
 
+        row = 4
+        self.chkb_exec_on_release = QtWidgets.QCheckBox("Exec on release")
+        grid.addWidget(self.chkb_exec_on_release, row, 1, 1, 3)
 
         # selector hooks
         self.cb_vjoy_device_selector.currentIndexChanged.connect(self._vjoy_device_id_changed)
@@ -714,7 +763,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 
         # pulse panel
-        row = 4
+        
         self.pulse_widget = QtWidgets.QWidget()
         delay_box = QtWidgets.QHBoxLayout(self.pulse_widget)
         self.pulse_spin_widget = QtWidgets.QSpinBox()
@@ -726,7 +775,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         delay_box.addStretch()
         
 
-        row = 5
+        
         self.target_value_widget = QtWidgets.QWidget()
         target_value_box = QtWidgets.QHBoxLayout(self.target_value_widget)
         lbl = QtWidgets.QLabel("Value:")
@@ -741,7 +790,8 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         target_value_box.addStretch()
 
 
-        row = 6
+        # start button state widget
+        
         self.start_widget = QtWidgets.QWidget()
         self.start_button_group = QtWidgets.QButtonGroup()
         
@@ -765,24 +815,59 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         start_layout.addWidget(self.rb_start_pressed )
         start_layout.addStretch()
 
-        self.main_layout.addWidget(self.selector_widget)
 
+        # set axis range widget
+        self.axis_range_value_widget = QtWidgets.QWidget()
+        box = QtWidgets.QHBoxLayout(self.axis_range_value_widget)
+        self.sb_button_range_low = gremlin.ui.common.DynamicDoubleSpinBox()
+        self.sb_button_range_low.setMinimum(-1.0)
+        self.sb_button_range_low.setMaximum(1.0)
+        self.sb_button_range_low.setDecimals(3)
+        self.sb_button_range_high = gremlin.ui.common.DynamicDoubleSpinBox()
+        self.sb_button_range_high.setMinimum(-1.0)
+        self.sb_button_range_high.setMaximum(1.0)        
+        self.sb_button_range_high.setDecimals(3)
+        self.b_range_reset = QtWidgets.QPushButton("Reset")
+        self.b_range_half = QtWidgets.QPushButton("Half")
+        self.b_range_lhalf = QtWidgets.QPushButton("L-Half")
+        self.b_range_hhalf = QtWidgets.QPushButton("H-Half")
+
+        box.addWidget(QtWidgets.QLabel("Range Min:"))
+        box.addWidget(self.sb_button_range_low)
+        box.addWidget(QtWidgets.QLabel("Max:"))
+        box.addWidget(self.sb_button_range_high)
+        box.addWidget(self.b_range_reset)
+        box.addWidget(self.b_range_half)
+        box.addWidget(self.b_range_lhalf)
+        box.addWidget(self.b_range_hhalf)
+        box.addStretch()
+
+
+
+        self.main_layout.addWidget(self.selector_widget)
         self.main_layout.addWidget(self.pulse_widget)
         self.main_layout.addWidget(self.start_widget)
         self.main_layout.addWidget(self.target_value_widget)
+        self.main_layout.addWidget(self.axis_range_value_widget)
        
         # hook events
 
         
         
 
-        # self.target_device_id_selector.currentIndexChanged.connect(self._target_device_id_changed)
-        # self.target_input_id_selector.currentIndexChanged.connect(self._target_input_id_changed)
+        self.chkb_exec_on_release.clicked.connect(self._exec_on_release_changed)
         self.target_value_text.textChanged.connect(self._target_value_changed)
-
-
         self.pulse_spin_widget.valueChanged.connect(self._pulse_value_changed)
         self.start_button_group.buttonClicked.connect(self._start_changed)
+        self.sb_button_range_low.valueChanged.connect(self._button_range_low_changed)
+        self.sb_button_range_high.valueChanged.connect(self._button_range_high_changed)
+
+        self.b_range_reset.clicked.connect(self._b_range_reset_clicked)
+        self.b_range_half.clicked.connect(self._b_range_half_clicked)
+        self.b_range_lhalf.clicked.connect(self._b_range_lhalf_clicked)
+        self.b_range_hhalf.clicked.connect(self._b_range_hhalf_clicked)
+        
+
 
         
     def load_actions_from_input_type(self):
@@ -796,11 +881,12 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
                 self.action_data.action_mode = VjoyAction.VJoyAxis
             elif self.action_data.input_type == InputType.JoystickButton:
                 # various button modes
-                self.cb_action_list.addItem("Button", VjoyAction.VJoyButton)
+                self.cb_action_list.addItem("Button Press", VjoyAction.VJoyButton)
                 self.cb_action_list.addItem("Pulse", VjoyAction.VJoyPulse)
                 self.cb_action_list.addItem("Toggle", VjoyAction.VJoyToggle)
                 self.cb_action_list.addItem("Invert Axis", VjoyAction.VJoyInvertAxis)
-                self.cb_action_list.addItem("Set Axis", VjoyAction.VJoySetAxis)
+                self.cb_action_list.addItem("Set Axis Value", VjoyAction.VJoySetAxis)
+                self.cb_action_list.addItem("Set Axis Range", VjoyAction.VJoyRangeAxis)
                 if self.action_data.action_mode in (VjoyAction.VJoyAxis, VjoyAction.VJoyHat):
                     self.action_data.action_mode = VjoyAction.VJoyButton
             elif self.action_data.input_type == InputType.JoystickHat:
@@ -839,7 +925,9 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         event.device_guid = usage_data._active_device_guid
         event.device_name = usage_data._active_device_name
         event.device_input_type = self.action_data.input_type
-        event.device_input_id = self.action_data.input_id
+        event.device_input_id = usage_data._active_device_input_id
+        event.vjoy_device_id = self.action_data.vjoy_device_id
+        event.vjoy_input_id = self.action_data.vjoy_input_id
         el.profile_device_changed.emit(event)
         el.icon_changed.emit(event)
 
@@ -857,7 +945,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
                 count = dev.button_count
                 for id in range(1, count+1):
                     self.cb_vjoy_input_selector.addItem(f"Button {id}",id)
-            elif input_type == InputType.JoystickButton:
+            elif input_type == InputType.JoystickHat:
                 count = dev.button_count
                 for id in range(1, count+1):
                     self.cb_vjoy_input_selector.addItem(f"Hat {id}",id)
@@ -886,6 +974,8 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         grid_visible = action in (VjoyAction.VJoyPulse, VjoyAction.VJoyButton, VjoyAction.VJoyToggle)
         self.button_grid_widget.setVisible(grid_visible)
         self.axis_widget.setVisible(action == VjoyAction.VJoyAxis)
+        self.axis_range_value_widget.setVisible(action == VjoyAction.VJoyRangeAxis)
+        self.chkb_exec_on_release.setVisible(grid_visible)
 
         if action == VjoyAction.VJoyAxis:
             self.action_label.setText("Maps a vjoy axis")
@@ -894,13 +984,15 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         elif action == VjoyAction.VJoyHat:
             self.action_label.setText("Maps to a vjoy hat")
         elif action == VjoyAction.VJoyInvertAxis:
-            self.action_label.setText("Inverts alll output to the specififed axis")
+            self.action_label.setText("Inverts all output to the specififed axis")
         elif action == VjoyAction.VJoyPulse:
             self.action_label.setText("Pulse the vjoy button for a given duration")
         elif action == VjoyAction.VJoySetAxis:
             self.action_label.setText("Sets the vjoy axis to a specific value (-1..+1)")
         elif action == VjoyAction.VJoyToggle:
             self.action_label.setText("Toggles the vjoy button state")
+        elif action ==VjoyAction.VJoyRangeAxis:
+            self.action_label.setText("Sets the vjoy axis active output range")
         else:
             self.action_label.setText("Unknown")
 
@@ -1120,8 +1212,17 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
                         else:
                             self.relative_checkbox.setChecked(True)
 
+                with QtCore.QSignalBlocker(self.sb_start_value):
+                    self.sb_start_value.setValue(self.action_data.axis_start_value)
+
                 with QtCore.QSignalBlocker(self.relative_scaling):
                     self.relative_scaling.setValue(self.action_data.axis_scaling)
+
+                with QtCore.QSignalBlocker(self.sb_axis_range_low):
+                    self.sb_axis_range_low.setValue(self.action_data.range_low)                    
+
+                with QtCore.QSignalBlocker(self.sb_axis_range_high):
+                    self.sb_axis_range_high.setValue(self.action_data.range_high)
 
             elif self.action_data.input_type == InputType.JoystickButton:
                 self.cb_action_list.setCurrentIndex(self.action_data.action_mode)
@@ -1130,6 +1231,16 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
                     self.rb_start_pressed.setChecked(True)
                 else:
                     self.rb_start_released.setChecked(True)
+
+
+                with QtCore.QSignalBlocker(self.sb_button_range_low):
+                    self.sb_button_range_low.setValue(self.action_data.range_low)                    
+
+                with QtCore.QSignalBlocker(self.sb_button_range_high):
+                    self.sb_button_range_high.setValue(self.action_data.range_high)    
+
+                with QtCore.QSignalBlocker(self.chkb_exec_on_release):
+                    self.chkb_exec_on_release.setChecked(self.action_data.exec_on_release)
 
             # update based on current mode
             self.load_actions_from_input_type()
@@ -1153,7 +1264,42 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.action_data.axis_mode = 'absolute' if self.absolute_checkbox.isChecked() else "relative"
     
     def _axis_scaling_changed(self):
-        self.action_data = self.relative_scaling.value
+        self.action_data.axis_scaling = self.relative_scaling.value()
+
+    def _axis_range_low_changed(self):
+        self.action_data.range_low = self.sb_axis_range_low.value()
+
+    def _axis_range_high_changed(self):
+        self.action_data.range_high = self.sb_axis_range_high.value()    
+
+    def _axis_start_value_changed(self):
+        self.action_data.axis_start_value = self.sb_start_value.value()
+
+    def _button_range_low_changed(self):
+        self.action_data.range_low = self.sb_button_range_low.value()
+
+    def _button_range_high_changed(self):
+        self.action_data.range_high = self.sb_button_range_high.value()
+    
+    
+    def _b_range_reset_clicked(self, value):
+        self.sb_button_range_low.setValue(-1.0)
+        self.sb_button_range_high.setValue(1.0)
+        
+    def _b_range_half_clicked(self, value):
+        self.sb_button_range_low.setValue(-0.5)
+        self.sb_button_range_high.setValue(0.5)
+
+    def _b_range_lhalf_clicked(self, value):
+        self.sb_button_range_low.setValue(-1.0)
+        self.sb_button_range_high.setValue(0.0)
+
+    def _b_range_hhalf_clicked(self, value):
+        self.sb_button_range_low.setValue(0.0)
+        self.sb_button_range_high.setValue(1.0)
+
+    def _exec_on_release_changed(self, value):
+        self.action_data.exec_on_release = self.chkb_exec_on_release.isChecked()
     
     def _populate_grid(self, device_id, input_id):
         ''' updates the usage grid based on current VJOY mappings '''
@@ -1208,8 +1354,10 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
         self.start_pressed = action.start_pressed
         self.target_value = action.target_value
         self.target_value_valid = action.target_value_valid
-        
+        self.range_low = action.range_low
+        self.range_high = action.range_high
 
+        self.exec_on_release = action.exec_on_release
 
         self.needs_auto_release = self._check_for_auto_release(action)
         self.thread_running = False
@@ -1218,6 +1366,7 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
         self.thread = None
         self.axis_delta_value = 0.0
         self.axis_value = 0.0
+        self.axis_start_value = action.axis_start_value
 
         self.lock = threading.Lock()
 
@@ -1229,7 +1378,12 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
     def _profile_start(self):
         # setup initial state
         if self.input_type == InputType.JoystickButton:
+            # set start button state
             joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = self.start_pressed
+        if self.input_type == InputType.JoystickAxis:
+            # set start axis range
+            usage_data.set_range(self.vjoy_device_id, self.vjoy_input_id, self.range_low, self.range_high)
+            joystick_handling.VJoyProxy()[self.vjoy_device_id].axis(self.vjoy_input_id).value = self.axis_start_value
 	
     # async routine to pulse a button
     def _fire_pulse(self, *args):
@@ -1252,7 +1406,14 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
             target = -value.current if self.reverse else value.current
                 
             if self.axis_mode == "absolute":
-                joystick_handling.VJoyProxy()[self.vjoy_device_id].axis(self.vjoy_input_id).value = target
+                # apply any range function to the raw position
+                #input_min = -1.0 
+                #input_max = +1.0
+                # sub-range is r_min, r_max 
+                # y = r_min + (x - input_min)*(r_max - r_min)/(input_max - input_min)
+                r_min, r_max = usage_data.get_range(self.vjoy_device_id, self.vjoy_input_id)
+                value = r_min + (target + 1.0)*((r_max - r_min)/2.0)
+                joystick_handling.VJoyProxy()[self.vjoy_device_id].axis(self.vjoy_input_id).value = value
             else:
                 self.should_stop_thread = abs(event.value) < 0.05
                 self.axis_delta_value = \
@@ -1268,15 +1429,27 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
 
         elif self.input_type == InputType.JoystickButton:
 
+            target_press = not self.exec_on_release
+
             if self.action_mode == VjoyAction.VJoyButton:
                 # normal default behavior
-                if event.event_type in [InputType.JoystickButton, InputType.Keyboard] \
-                        and event.is_pressed \
-                        and self.needs_auto_release:
-                    input_devices.ButtonReleaseActions().register_button_release(
-                        (self.vjoy_device_id, self.vjoy_input_id),
-                        event
-                    )
+                if self.exec_on_release:
+                    if not event.is_pressed:
+                        joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = True
+                else:
+
+                    if event.event_type in [InputType.JoystickButton, InputType.Keyboard] \
+                            and event.is_pressed \
+                            and self.needs_auto_release:
+                        input_devices.ButtonReleaseActions().register_button_release(
+                            (self.vjoy_device_id, self.vjoy_input_id),
+                            event
+                        )
+
+                    if event.is_pressed:
+                        joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = value.current                        
+                    
+            
             elif self.action_mode == VjoyAction.VJoyToggle:
                 # toggle action
                 if event.event_type in [InputType.JoystickButton, InputType.Keyboard] \
@@ -1284,17 +1457,25 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
                     button = joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id)
                     button.is_pressed = not button.is_pressed
             elif self.action_mode == VjoyAction.VJoyPulse:
+                
                 # pulse action
-                if not self.lock.locked():
-                    threading.Timer(0.01, self._fire_pulse, [self.vjoy_device_id, self.vjoy_input_id, self.pulse_delay/1000]).start()
+                if event.is_pressed == target_press:
+                    if not self.lock.locked():
+                        threading.Timer(0.01, self._fire_pulse, [self.vjoy_device_id, self.vjoy_input_id, self.pulse_delay/1000]).start()
             elif self.action_mode == VjoyAction.VJoyInvertAxis:
                 # invert the specified axis
-                usage_data.toggle_inverted(self.target_device_id, self.target_input_id)
+                if event.is_pressed == target_press:
+                    usage_data.toggle_inverted(self.vjoy_device_id, self.vjoy_input_id)
 
             elif self.action_mode == VjoyAction.VJoySetAxis:
                 # set the value on the specified axis
-                if self.target_value_valid:
+                if self.target_value_valid and event.is_pressed == target_press:
                     joystick_handling.VJoyProxy()[self.target_device_id].axis(self.target_input_id).value = self.target_value
+
+            elif self.action_mode == VjoyAction.VJoyRangeAxis:
+                # changes the output range on the target device / axis
+                if event.is_pressed == target_press:
+                    usage_data.set_range(self.vjoy_device_id, self.vjoy_input_id, self.range_low, self.range_high)
 
             else:
                 # basic handling
@@ -1390,7 +1571,14 @@ class VjoyRemap(gremlin.base_classes.AbstractAction):
         self._reverse = False
         self.axis_mode = "absolute"
         self.axis_scaling = 1.0
+        self.axis_start_value = -1.0
+        self.exec_on_release = False
+
         self._action_mode = VjoyAction.VJoyButton
+
+        self.range_low = -1.0 # axis range min
+        self.range_high = 1.0 # axis range max
+        
 
         # pick an appropriate default action set for the type of input this is
         if self.input_type == InputType.JoystickAxis:
@@ -1563,6 +1751,18 @@ class VjoyRemap(gremlin.base_classes.AbstractAction):
                 self.target_value  = safe_read(node,"target_value", float, 0.0)                                        
                 self.target_value_valid = True
 
+            if "range_low" in node.attrib:
+                self.range_low = safe_read(node,"range_low", float, -1.0)
+        
+            if "range_high" in node.attrib:
+                self.range_high = safe_read(node,"range_high", float, 1.0)
+
+            if "axis_start_value" in node.attrib:
+                self.axis_start_value = safe_read(node,"axis_start_value", float, -1.0)
+
+            if "exec_on_release" in node.attrib:
+                self.exec_on_release = safe_read(node,"exec_on_release",bool, False)
+
         except ProfileError:
             self.vjoy_input_id = None
             self.vjoy_device_id = None
@@ -1594,15 +1794,20 @@ class VjoyRemap(gremlin.base_classes.AbstractAction):
             node.set("reverse", safe_format(self.reverse,bool))
             node.set("axis-type", safe_format(self.axis_mode, str))
             node.set("axis-scaling", safe_format(self.axis_scaling, float))
+            node.set("axis_start_value", safe_format(self.axis_start_value, float))
 
-        elif self.action_mode == VjoyAction.VJoyButton:
+        if self.action_mode == VjoyAction.VJoyButton:
             node.set("start_pressed", safe_format(self.start_pressed, bool))
+            
         elif self.action_mode == VjoyAction.VJoyPulse:
             node.set("pulse_delay", safe_format(self.pulse_delay, int))
         elif self.action_mode == VjoyAction.VJoySetAxis:
             node.set("target_value", safe_format(self.target_value, float))
-            
-
+        
+        node.set("range_low", safe_format(self.range_low, float))
+        node.set("range_high", safe_format(self.range_high, float))
+        node.set("exec_on_release", safe_format(self.exec_on_release, bool))
+        
         return node
 
     def _is_valid(self):
