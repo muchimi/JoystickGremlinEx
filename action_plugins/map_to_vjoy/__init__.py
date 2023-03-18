@@ -612,17 +612,37 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _create_input_axis(self):
         ''' creates the axis input widget '''
+
+
+
         self.axis_widget = QtWidgets.QWidget()
-        self.remap_type_layout = QtWidgets.QHBoxLayout(self.axis_widget)
+        axis_grid = QtWidgets.QGridLayout(self.axis_widget)
+        axis_grid.setColumnStretch(8,1)
+        
         self.reverse_checkbox = QtWidgets.QCheckBox("Reverse")
         self.absolute_checkbox = QtWidgets.QRadioButton("Absolute")
         self.absolute_checkbox.setChecked(True)
         self.relative_checkbox = QtWidgets.QRadioButton("Relative")
         self.relative_scaling = gremlin.ui.common.DynamicDoubleSpinBox()
+
+
         self.sb_start_value = gremlin.ui.common.DynamicDoubleSpinBox()
+        # w = 100
+        # self.set_width(self.sb_start_value,w)
         self.sb_start_value.setMinimum(-1.0)
         self.sb_start_value.setMaximum(1.0)
         self.sb_start_value.setDecimals(3)
+
+
+        self.b_min_value = QtWidgets.QPushButton("-1")
+        w = 32
+        self.set_width(self.b_min_value,w)
+        self.b_center_value = QtWidgets.QPushButton("0")
+        
+        self.set_width(self.b_center_value,w)
+        self.b_max_value = QtWidgets.QPushButton("+1")
+        self.set_width(self.b_max_value,w)
+
         self.sb_axis_range_low = gremlin.ui.common.DynamicDoubleSpinBox()
         self.sb_axis_range_low.setMinimum(-1.0)
         self.sb_axis_range_low.setMaximum(1.0)
@@ -632,24 +652,61 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.sb_axis_range_high.setMaximum(1.0)        
         self.sb_axis_range_high.setDecimals(3)
 
-        self.remap_type_layout.addStretch()
-        self.remap_type_layout.addWidget(self.reverse_checkbox)
-        self.remap_type_layout.addWidget(self.absolute_checkbox)
-        self.remap_type_layout.addWidget(self.relative_checkbox)
         
-        self.remap_type_layout.addWidget(QtWidgets.QLabel("Start Value:"))
-        self.remap_type_layout.addWidget(self.sb_start_value)
 
-        self.remap_type_layout.addWidget(QtWidgets.QLabel("Scale:"))
-        self.remap_type_layout.addWidget(self.relative_scaling)
+        row = 0
+        col = 0
+        axis_grid.addWidget(QtWidgets.QLabel("Reverse Axis:"),row,col)
+        row+=1
+        axis_grid.addWidget(self.reverse_checkbox,row,col)
 
-        self.remap_type_layout.addWidget(QtWidgets.QLabel("Range Min:"))
-        self.remap_type_layout.addWidget(self.sb_axis_range_low)
-        self.remap_type_layout.addWidget(QtWidgets.QLabel("Max:"))
-        self.remap_type_layout.addWidget(self.sb_axis_range_high)
-        self.remap_type_layout.addStretch()
+        row = 0
+        col+=1
+        axis_grid.addWidget(QtWidgets.QLabel("Output Mode:"),row,col)
+        row+=1
+        axis_grid.addWidget(self.absolute_checkbox,row,col)
+        row+=1
+        axis_grid.addWidget(self.relative_checkbox,row,col)
+
+
+        row = 0
+        col+=1
+        axis_grid.addWidget(QtWidgets.QLabel("Start Value:"),row,col,1,3)
+
+        row+=1
+        axis_grid.addWidget(self.sb_start_value,row,col,1,3)
+
+        row+=1
+        axis_grid.addWidget(self.b_min_value,row,col)
+        col+=1
+        axis_grid.addWidget(self.b_center_value,row,col)
+        col+=1
+        axis_grid.addWidget(self.b_max_value,row,col)
+
+        row = 0
+        col+=1
+        axis_grid.addWidget(QtWidgets.QLabel("Axis"),row,col)
+        row+=1
+        axis_grid.addWidget(QtWidgets.QLabel("Scale:"),row,col)
+        row+=1
+        axis_grid.addWidget(self.relative_scaling,row,col)
+
+        row = 0
+        col+=1
+        axis_grid.addWidget(QtWidgets.QLabel("Axis Output Range:"),row,col,1,2)
+        row+=1
+        axis_grid.addWidget(QtWidgets.QLabel("Min:"),row,col)
+        row+=1
+        axis_grid.addWidget(self.sb_axis_range_low,row,col)
+
+        col+=1
+        row=1
+        axis_grid.addWidget(QtWidgets.QLabel("Max:"),row,col)
+        row+=1
+        axis_grid.addWidget(self.sb_axis_range_high,row,col)
 
         self.main_layout.addWidget(self.axis_widget)
+        
 
         self.reverse_checkbox.clicked.connect(self._axis_reverse_changed) 
         self.absolute_checkbox.clicked.connect(self._axis_mode_changed)
@@ -657,6 +714,11 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.relative_scaling.valueChanged.connect(self._axis_scaling_changed)
 
         self.sb_start_value.valueChanged.connect(self._axis_start_value_changed)
+        self.b_min_value.clicked.connect(self._b_min_start_value_clicked)
+        self.b_center_value.clicked.connect(self._b_center_start_value_clicked)
+        self.b_max_value.clicked.connect(self._b_max_start_value_clicked)
+
+
         self.sb_axis_range_low.valueChanged.connect(self._axis_range_low_changed)
         self.sb_axis_range_high.valueChanged.connect(self._axis_range_high_changed)
 
@@ -705,8 +767,8 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.main_layout.addWidget(header)
 
 
-    def set_width(self, widget, width):
-        widget.resize(width, widget.height())
+    def set_width(self, widget, width, height = 22):
+        widget.setFixedSize(width, height)
 
 
 
@@ -1298,6 +1360,16 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.sb_button_range_low.setValue(0.0)
         self.sb_button_range_high.setValue(1.0)
 
+
+    def _b_min_start_value_clicked(self, value):
+        self.sb_start_value.setValue(-1.0)
+
+    def _b_center_start_value_clicked(self, value):
+        self.sb_start_value.setValue(0.0)        
+
+    def _b_max_start_value_clicked(self, value):
+        self.sb_start_value.setValue(1.0)
+
     def _exec_on_release_changed(self, value):
         self.action_data.exec_on_release = self.chkb_exec_on_release.isChecked()
     
@@ -1383,6 +1455,7 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
         if self.input_type == InputType.JoystickAxis:
             # set start axis range
             usage_data.set_range(self.vjoy_device_id, self.vjoy_input_id, self.range_low, self.range_high)
+            # print(f"Axis start value: vjoy: {self.vjoy_device_id} axis: {self.vjoy_input_id}  value: {self.axis_start_value}")
             joystick_handling.VJoyProxy()[self.vjoy_device_id].axis(self.vjoy_input_id).value = self.axis_start_value
 	
     # async routine to pulse a button
@@ -1571,7 +1644,7 @@ class VjoyRemap(gremlin.base_classes.AbstractAction):
         self._reverse = False
         self.axis_mode = "absolute"
         self.axis_scaling = 1.0
-        self.axis_start_value = -1.0
+        self.axis_start_value = 0.0
         self.exec_on_release = False
 
         self._action_mode = VjoyAction.VJoyButton
