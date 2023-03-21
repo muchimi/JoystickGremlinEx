@@ -12,5 +12,5 @@ __pycache__
 /venv
 debug.txt
 joystick_gremlin.zip
-
+*.exe
 joystick_gremlin.zip
