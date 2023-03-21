@@ -351,11 +351,11 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
         ordered_action_set = []
         for action in action_set:
             # if not isinstance(action, action_plugins.remap.Remap):
-            if not action.tag == "remap":
+            if not "remap" in action.tag :
                 ordered_action_set.append(action)
         for action in action_set:
             # if isinstance(action, action_plugins.remap.Remap):
-            if action.tag == "remap":
+            if "remap" in action.tag:
                 ordered_action_set.append(action)
 
         # Create functors
