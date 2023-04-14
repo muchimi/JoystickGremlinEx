@@ -8,7 +8,7 @@ For general Joystick Gremlin documentation - consult https://whitemagic.github.i
 
 This custom version adds to release 13.3 of Gremlin:
 
-- Upgrade x64 Python 10 (I will consider Python 11 later)
+- Upgrade x64 Python 11 (improved execution speed over Python 10)
 - Improved stability when loading a plugin that has an error on load
 
 
@@ -28,6 +28,12 @@ Called when the mode is changed (use def mode_change(mode) - mode will be a stri
 
 
 ## Recommended Resources
+
+#### VJOY virtual joystick driver 
+ 
+https://github.com/shauleiz/vJoy
+
+Installs one or more virtual programmable HID joysticks on Windows with up to 8 axes, 4 hats and 128 buttons per the DirectInput specification.
 
 #### OSC support in Joystick Gremlin from TouchOSC
 

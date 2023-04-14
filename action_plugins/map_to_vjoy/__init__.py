@@ -1473,6 +1473,29 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
         button.is_pressed = False
         self.lock.release()
 
+    # def smooth(self, value, reverse = False, power = 3):
+    #     '''
+    #         int smoothIt(int from, int to, int val, int power, int reverse) {
+    #         float to2;
+    #         to2 = to - from;
+    #         int ret;
+    #         if (reverse == 1) {
+    #             ret = (pow((val - from) / to2 - 1, power) + 1) * to2 + from; //
+    #             return ret;
+    #         } else {
+    #             ret = pow((val - from) / to2, power) * to2 + from; //
+    #             return ret;
+    #         }
+    #         }        
+        
+    #     '''
+    #     v_end = 1.0
+    #     v_start = 0.0
+    #     power = 3
+    #     if reverse:
+    #         return (pow((value - v_start) / v_end - 1, power) + 1) * v_end + v_start
+    #     return pow((value - v_start) / v_end, power) * v_end + v_start
+    
     def process_event(self, event, value):
         ''' runs when a joystick even occurs like a button press or axis movement '''
         if self.input_type == InputType.JoystickAxis :
