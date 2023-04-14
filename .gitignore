@@ -2,7 +2,7 @@
 *.pyc
 *.wxs
 *.backup
-debug.txt
+*debug*.txt
 .idea
 __pycache__
 /dist
