@@ -613,7 +613,7 @@ class MacroListModel(QtCore.QAbstractListModel):
         """
         idx = index.row()
         if idx >= len(self._data):
-            return QtCore.QVariant()
+            return ""
 
         entry = self._data[idx]
         if role == QtCore.Qt.DisplayRole:
@@ -673,9 +673,9 @@ class MacroListModel(QtCore.QAbstractListModel):
                 action = "press" if entry.is_pressed else "release"
                 return MacroListModel.icon_lookup[action]
             else:
-                return QtCore.QVariant()
+                return ""
         else:
-            return QtCore.QVariant()
+            return ""
 
     def mimeTypes(self):
         """Returns the MIME types supported by this model for drag & drop.

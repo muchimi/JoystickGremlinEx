@@ -796,9 +796,16 @@ class GremlinUi(QtWidgets.QMainWindow):
         # active tab
         if event.device_guid not in self.tabs:
             return
+        
+        process_input = self._should_process_input(event)
+        
+        if not process_input:
+            return
 
         tab_switch_needed = self.ui.devices.currentWidget() \
                             != self.tabs[event.device_guid]
+        
+        
 
         # Switch to the tab corresponding to the event's device if the option
         # is set in the options
@@ -809,7 +816,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         # If we want to act on the given event figure out which button
         # needs to be pressed and press is
-        if not tab_switch_needed and self._should_process_input(event):
+        if not tab_switch_needed and process_input:
             widget.input_item_list_view.select_item(event)
 
     def _mode_changed_cb(self, new_mode):
@@ -1128,15 +1135,13 @@ class GremlinUi(QtWidgets.QMainWindow):
         """
         el = gremlin.event_handler.EventListener()
         if is_enabled:
-            el.joystick_event.connect(
-                self._joystick_input_selection
-            )
+            el.joystick_event.connect(self._joystick_input_selection)
         else:
             # Try to disconnect the handler and if it's not there ignore
             # the exception raised by QT
             try:
                 el.joystick_event.disconnect(self._joystick_input_selection)
-            except TypeError:
+            except:
                 pass
 
     def _should_process_input(self, event):
@@ -1152,8 +1157,12 @@ class GremlinUi(QtWidgets.QMainWindow):
         """
         # Check whether or not the event's input is significant enough to
         # be processed further
-        process_input = gremlin.input_devices.JoystickInputSignificant() \
-            .should_process(event)
+
+        # minimum deviation to look for for an axis 
+        deviation = 0.1 if self.runner.is_running() else 0.5
+
+
+        process_input = gremlin.input_devices.JoystickInputSignificant().should_process(event, deviation)
 
         # Check if we should actually react to the event
         if event == self._last_input_event:
@@ -1165,6 +1174,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         else:
             self._last_input_event = event
             self._last_input_timestamp = time.time()
+
             return True
 
     def _update_statusbar_repeater(self, text):

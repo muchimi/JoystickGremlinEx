@@ -1040,7 +1040,7 @@ class InputListenerWidget(QtWidgets.QFrame):
         self.setWindowFlags(QtCore.Qt.FramelessWindowHint)
         self.setFrameStyle(QtWidgets.QFrame.Plain | QtWidgets.QFrame.Box)
         palette = QtGui.QPalette()
-        palette.setColor(QtGui.QPalette.Background, QtCore.Qt.darkGray)
+        palette.setColor(QtGui.QPalette.ColorRole.Window, QtGui.QColorConstants.DarkGray)
         self.setPalette(palette)
 
         # Disable ui input selection on joystick input

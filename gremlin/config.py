@@ -363,6 +363,7 @@ class Configuration:
             self._data["highlight_device"] = value
             self.save()
 
+
     @property
     def mode_change_message(self):
         """Returns whether or not to show a windows notification on mode change.

@@ -842,7 +842,7 @@ class JoystickInputSignificant:
         """Initializes the instance."""
         self.reset()
 
-    def should_process(self, event: event_handler.Event) -> bool:
+    def should_process(self, event: event_handler.Event, deviation = 0.1) -> bool:
         """Returns whether or not a particular event is significant enough to
         process.
 
@@ -855,7 +855,7 @@ class JoystickInputSignificant:
         self._mre_registry[event] = event
 
         if event.event_type == InputType.JoystickAxis:
-            return self._process_axis(event)
+            return self._process_axis(event, deviation)
         elif event.event_type == InputType.JoystickButton:
             return self._process_button(event)
         elif event.event_type == InputType.JoystickHat:
@@ -884,7 +884,7 @@ class JoystickInputSignificant:
         self._time_registry = {}
         
 
-    def _process_axis(self, event: event_handler.Event) -> bool:
+    def _process_axis(self, event: event_handler.Event, deviation = 0.1) -> bool:
         """Process an axis event.
 
         Args:
@@ -895,19 +895,22 @@ class JoystickInputSignificant:
         """
 
         if event in self._event_registry:
-            # Reset everything if we have no recent data
-            if self._time_registry[event] + 5.0 < time.time():
+            # Reset everything if we have no recent data (10 seconds)
+            if self._time_registry[event] + 10.0 < time.time():
                 self._event_registry[event] = event
                 self._time_registry[event] = time.time()
                 return False
             # Update state
             else:
                 self._time_registry[event] = time.time()
-                if abs(self._event_registry[event].value - event.value) > 0.25:
+                
+                if abs(self._event_registry[event].value - event.value) > deviation:
                     self._event_registry[event] = event
                     self._time_registry[event] = time.time()
+                    # print (f"axis move: {abs(self._event_registry[event].value - event.value)} deviation: {deviation} TRUE")    
                     return True
                 else:
+                    #print (f"axis move: {abs(self._event_registry[event].value - event.value)} deviation: {deviation} FALSE")    
                     return False
         else:
             self._event_registry[event] = event
