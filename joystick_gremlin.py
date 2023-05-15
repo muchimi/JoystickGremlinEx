@@ -28,9 +28,12 @@ import sys
 import time
 import traceback
 
+
 # Import QtMultimedia so pyinstaller doesn't miss it
 import PySide6
 from PySide6 import QtCore, QtGui, QtMultimedia, QtWidgets
+
+from gremlin.common import InputType
 
 import dill
 
@@ -775,7 +778,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.ui.actionActivate.setChecked(False)
         self.activate(False)
 
-    def _joystick_input_selection(self, event):
+    def _process_joystick_input_selection(self, event, buttons_only = False):
         """Handles joystick events to select the appropriate input item.
 
         :param event the event to process
@@ -797,7 +800,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         if event.device_guid not in self.tabs:
             return
         
-        process_input = self._should_process_input(event)
+        process_input = self._should_process_input(event, buttons_only)
         
         if not process_input:
             return
@@ -818,6 +821,22 @@ class GremlinUi(QtWidgets.QMainWindow):
         # needs to be pressed and press is
         if not tab_switch_needed and process_input:
             widget.input_item_list_view.select_item(event)
+
+
+    def _joystick_input_selection(self, event):
+        """Handles joystick events to select the appropriate input item. (buttons + axes)
+
+        :param event the event to process
+        """
+        self._process_joystick_input_selection(event, False)
+
+    def _joystick_input_button_selection(self, event):
+        """Handles joystick events to select the appropriate input item. (buttons only)
+
+        :param event the event to process
+        """
+        self._process_joystick_input_selection(event, True)
+
 
     def _mode_changed_cb(self, new_mode):
         """Updates the current mode to the provided one.
@@ -903,6 +922,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         self._set_joystick_input_highlighting(
             self.config.highlight_input
         )
+        self._set_joystick_input_buttons_highlighting(self.config.highlight_input_buttons)
         if not ignore_minimize:
             self.setHidden(self.config.start_minimized)
         if self.config.autoload_profiles:
@@ -1144,7 +1164,26 @@ class GremlinUi(QtWidgets.QMainWindow):
             except:
                 pass
 
-    def _should_process_input(self, event):
+
+    def _set_joystick_input_buttons_highlighting(self, is_enabled):
+        """Enables / disables the highlighting of the current input button when used.
+
+        :param is_enabled if True the input highlighting is enabled and
+            disabled otherwise
+        """
+        el = gremlin.event_handler.EventListener()
+        if is_enabled:
+            el.joystick_event.connect(self._joystick_input_button_selection)
+        else:
+            # Try to disconnect the handler and if it's not there ignore
+            # the exception raised by QT
+            try:
+                el.joystick_event.disconnect(self._joystick_input_button_selection)
+            except:
+                pass
+
+
+    def _should_process_input(self, event, buttons_only = False):
         """Returns True when to process and input, False otherwise.
 
         This enforces a certain downtime between subsequent inputs
@@ -1158,24 +1197,35 @@ class GremlinUi(QtWidgets.QMainWindow):
         # Check whether or not the event's input is significant enough to
         # be processed further
 
+        is_running = self.runner.is_running()
+
         # minimum deviation to look for for an axis 
-        deviation = 0.1 if self.runner.is_running() else 0.5
+        deviation = 0.1 if is_running else 0.5
 
+       
+        if not is_running and buttons_only and event.event_type == InputType.JoystickAxis:
+            # ignore axis moves if button only mode
+            return False
 
-        process_input = gremlin.input_devices.JoystickInputSignificant().should_process(event, deviation)
 
         # Check if we should actually react to the event
         if event == self._last_input_event:
             return False
-        elif self._last_input_timestamp + 0.25 > time.time():
+        
+        delay = 0.25 if event.event_type == InputType.JoystickAxis else 0.1
+
+        if self._last_input_timestamp + delay > time.time():
             return False
-        elif not process_input:
-            return False
-        else:
+        
+        process_input = gremlin.input_devices.JoystickInputSignificant().should_process(event, deviation)
+
+        if process_input:
             self._last_input_event = event
             self._last_input_timestamp = time.time()
 
             return True
+        
+        return False
 
     def _update_statusbar_repeater(self, text):
         """Updates the statusbar with information from the input
@@ -1286,7 +1336,7 @@ if __name__ == "__main__":
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(app_id)
     app = QtWidgets.QApplication(sys.argv)
     app.setWindowIcon(QtGui.QIcon("gfx/icon.png"))
-    app.setApplicationDisplayName("Joystick Gremlin")
+    app.setApplicationDisplayName("Joystick Gremlin Ex")
 
     # Ensure joystick devices are correctly setup
     dill.DILL.init()

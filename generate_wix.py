@@ -179,7 +179,7 @@ def create_feature(data):
             {
                 "Id": "Complete",
                 "Level": 1,
-                "Title": "Joystick Gremlin",
+                "Title": "Joystick Gremlin Ex",
                 "Description": "The main program",
                 "Display": "expand",
                 "ConfigurableDirectory": "INSTALLDIR"
@@ -338,7 +338,7 @@ def create_shortcuts(doc, root):
                 {
                     "Id": "startmenu_joystick_gremlin",
                     "Directory": "ProgramMenuDir",
-                    "Name": "Joystick Gremlin",
+                    "Name": "Joystick Gremlin Ex,
                     "WorkingDirectory": "INSTALLDIR",
                     "Advertise": "yes",
                     "Icon": "icon.ico"
@@ -349,7 +349,7 @@ def create_shortcuts(doc, root):
                 {
                     "Id": "desktop_joystick_gremlin",
                     "Directory": "DesktopFolder",
-                    "Name": "Joystick Gremlin",
+                    "Name": "Joystick Gremlin Ex",
                     "WorkingDirectory": "INSTALLDIR",
                     "Advertise": "yes",
                     "Icon": "icon.ico"
@@ -363,11 +363,11 @@ def create_shortcuts(doc, root):
     )
     n2 = create_node(
         "Directory",
-        {"Id": "ProgramMenuDir", "Name": "Joystick Gremlin"}
+        {"Id": "ProgramMenuDir", "Name": "Joystick Gremlin Ex"}
     )
     n3 = create_node(
         "Component",
-        {"Id": "ProgramMenuDir", "Guid": "e7a50051-e76c-457e-9d43-824ae5ce7ef5"}
+        {"Id": "ProgramMenuDir", "Guid": "11ab7593-4b4e-470d-8a56-4791b40c0838"}
     )
     n3.append(create_node(
         "RemoveFolder",

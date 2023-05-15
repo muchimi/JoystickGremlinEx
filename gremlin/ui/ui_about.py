@@ -52,7 +52,7 @@ class Ui_About(object):
 
     def retranslateUi(self, About):
         _translate = QtCore.QCoreApplication.translate
-        About.setWindowTitle(_translate("About", "About JoystickGremlin"))
+        About.setWindowTitle(_translate("About", "About JoystickGremlin Ex"))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab), _translate("About", "About"))
         self.jg_license.setHtml(_translate("About", "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n"
 "<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\n"

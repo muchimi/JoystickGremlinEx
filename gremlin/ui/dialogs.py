@@ -60,10 +60,17 @@ class OptionsUi(common.BaseDialogUi):
 
         # Highlight input option
         self.highlight_input = QtWidgets.QCheckBox(
-            "Highlight currently used input"
+            "Highlight currently used input (axis + buttons)"
         )
         self.highlight_input.clicked.connect(self._highlight_input)
         self.highlight_input.setChecked(self.config.highlight_input)
+
+        # Highlight input option buttons
+        self.highlight_input_buttons = QtWidgets.QCheckBox(
+            "Highlight currently used buttons"
+        )
+        self.highlight_input_buttons.clicked.connect(self._highlight_input_buttons)
+        self.highlight_input_buttons.setChecked(self.config.highlight_input_buttons)
 
         # Switch to highlighted device
         self.highlight_device = QtWidgets.QCheckBox(
@@ -161,6 +168,7 @@ class OptionsUi(common.BaseDialogUi):
         self.macro_axis_minimum_change_layout.addStretch()
 
         self.general_layout.addWidget(self.highlight_input)
+        self.general_layout.addWidget(self.highlight_input_buttons)
         self.general_layout.addWidget(self.highlight_device)
         self.general_layout.addWidget(self.close_to_systray)
         self.general_layout.addWidget(self.activate_on_launch)
@@ -425,6 +433,17 @@ If this option is on, the last active profile will remain active until a differe
         """
         self.config.highlight_input = clicked
         self.config.save()
+
+    def _highlight_input_buttons(self, clicked):
+        """Stores preference for input highlighting (buttons).
+
+        :param clicked whether or not the checkbox is ticked
+        """
+        self.config.highlight_input_buttons = clicked
+        self.config.save()
+
+        
+
 
     def _highlight_device(self, clicked):
         """Stores preference for device highlighting.

@@ -199,7 +199,8 @@ def joystick_devices_initialization():
     # Process all connected devices in order to properly initialize the
     # device registry
     devices = []
-    for i in range(dill.DILL.get_device_count()):
+    device_count = dill.DILL.get_device_count()
+    for i in range(device_count):
         info = dill.DILL.get_device_information_by_index(i)
         devices.append(info)
 

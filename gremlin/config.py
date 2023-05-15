@@ -339,6 +339,32 @@ class Configuration:
             self.save()
 
     @property
+    def highlight_input_buttons(self):
+        """Returns whether or not to highlight inputs.
+
+        This enables / disables the feature where using a physical input
+        automatically selects it in the UI.
+
+        :return True if the feature is enabled, False otherwise
+        """
+        return self._data.get("highlight_input_buttons", True)
+
+    @highlight_input_buttons.setter
+    def highlight_input_buttons(self, value):
+        """Sets whether or not to highlight inputs.
+
+        This enables / disables the feature where using a physical input
+        automatically selects it in the UI.
+
+        :param value Flag indicating whether or not to enable / disable the
+            feature
+        """
+        if type(value) == bool:
+            self._data["highlight_input_buttons"] = value
+            self.save()
+
+
+    @property
     def highlight_device(self):
         """Returns whether or not highlighting swaps device tabs.
 

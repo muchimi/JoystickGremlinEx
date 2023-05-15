@@ -842,6 +842,7 @@ class JoystickInputSignificant:
         """Initializes the instance."""
         self.reset()
 
+   
     def should_process(self, event: event_handler.Event, deviation = 0.1) -> bool:
         """Returns whether or not a particular event is significant enough to
         process.

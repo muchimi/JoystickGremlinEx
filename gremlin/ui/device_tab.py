@@ -399,7 +399,11 @@ class JoystickDeviceTabWidget(QtWidgets.QWidget):
             if not event.is_pressed:
                 return
         elif event.event_type == gremlin.common.InputType.JoystickAxis:
-            pass
+            cfg = gremlin.config.Configuration()
+            if not cfg.highlight_input:
+                return
+            if not gremlin.input_devices.JoystickInputSignificant().should_process(event):
+                return
         elif event.event_type == gremlin.common.InputType.JoystickHat:
             if not event.is_pressed:
                 return

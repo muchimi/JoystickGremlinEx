@@ -137,7 +137,7 @@ class Ui_Gremlin(object):
 
     def retranslateUi(self, Gremlin):
         _translate = QtCore.QCoreApplication.translate
-        Gremlin.setWindowTitle(_translate("Gremlin", "Joystick Gremlin"))
+        Gremlin.setWindowTitle(_translate("Gremlin", "Joystick Gremlin Ex"))
         self.devices.setTabText(self.devices.indexOf(self.tab), _translate("Gremlin", "Tab 1"))
         self.devices.setTabText(self.devices.indexOf(self.tab_2), _translate("Gremlin", "Tab 2"))
         self.menuFile.setTitle(_translate("Gremlin", "&File"))
