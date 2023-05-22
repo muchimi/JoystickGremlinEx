@@ -268,6 +268,12 @@ class CodeRunner:
             evt_listener.keyboard_event.connect(kb.keyboard_event)
             evt_listener.gremlin_active = True
 
+            # connect remote gremlin client
+            input_devices.remote_server.start()
+            input_devices.remote_client.start()
+            
+            #evt_listener.remote_event.connect(self.event_handler.process_event)
+
             # call start functions
             input_devices.start_registry.start()
             input_devices.periodic_registry.start()
@@ -296,6 +302,11 @@ class CodeRunner:
     def stop(self):
         """Stops listening to events and unloads all callbacks."""
 
+
+        # stop remote client
+        input_devices.remote_client.stop()
+        input_devices.remote_server.stop()
+
         # call stop function in plugins
         input_devices.stop_registry.start()
         input_devices.stop_registry.stop()
@@ -318,7 +329,8 @@ class CodeRunner:
         self._running = False
 
 
-        
+
+                
 
         # Empty callback registry
         input_devices.callback_registry.clear()
@@ -332,7 +344,6 @@ class CodeRunner:
         input_devices.start_registry.stop()
         input_devices.start_registry.clear()
 
-        
 
         macro.MacroManager().stop()
         sendinput.MouseController().stop()

@@ -1502,6 +1502,8 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
         self.axis_value = 0.0
         self.axis_start_value = action.axis_start_value
 
+        self.remote_client = input_devices.remote_client
+
         self.lock = threading.Lock()
 
           
@@ -1519,6 +1521,8 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
             usage_data.set_range(self.vjoy_device_id, self.vjoy_input_id, self.range_low, self.range_high)
             # print(f"Axis start value: vjoy: {self.vjoy_device_id} axis: {self.vjoy_input_id}  value: {self.axis_start_value}")
             joystick_handling.VJoyProxy()[self.vjoy_device_id].axis(self.vjoy_input_id).value = self.axis_start_value
+            self.remote_client.send_axis(self.vjoy_device_id, self.vjoy_input_id, self.axis_start_value)
+
 	
     # async routine to pulse a button
     def _fire_pulse(self, *args):
@@ -1531,8 +1535,10 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
 
         button = joystick_handling.VJoyProxy()[vjoy_device_id].button(vjoy_input_id)
         button.is_pressed = True
+        self.remote_client.send_button(vjoy_device_id, vjoy_input_id, True)
         time.sleep(duration)
         button.is_pressed = False
+        self.remote_client.send_button(vjoy_device_id, vjoy_input_id, False)
         self.lock.release()
 
     # def smooth(self, value, reverse = False, power = 3):
@@ -1573,8 +1579,10 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
                     print (f"In range {value.current}")
                     if not event.is_pressed:
                         joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = True
+                        self.remote_client.send_button(self.vjoy_device_id, self.vjoy_input_id, True)
                 else:
                     joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = False 
+                    self.remote_client.send_button(self.vjoy_device_id, self.vjoy_input_id, False)
 
             elif self.axis_mode == "absolute":
                 # apply any range function to the raw position
@@ -1585,6 +1593,7 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
                 r_min, r_max = usage_data.get_range(self.vjoy_device_id, self.vjoy_input_id)
                 value = r_min + (target + 1.0)*((r_max - r_min)/2.0)
                 joystick_handling.VJoyProxy()[self.vjoy_device_id].axis(self.vjoy_input_id).value = value
+                self.remote_client.send_axis(self.vjoy_device_id, self.vjoy_input_id, value)
             else:
                 self.should_stop_thread = abs(event.value) < 0.05
                 self.axis_delta_value = \
@@ -1593,9 +1602,7 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
                 if self.thread_running is False:
                     if isinstance(self.thread, threading.Thread):
                         self.thread.join()
-                    self.thread = threading.Thread(
-                        target=self.relative_axis_thread
-                    )
+                    self.thread = threading.Thread(target=self.relative_axis_thread)
                     self.thread.start()
 
         elif self.input_type == InputType.JoystickButton:
@@ -1627,6 +1634,8 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
                         and event.is_pressed:
                     button = joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id)
                     button.is_pressed = not button.is_pressed
+                    self.remote_client.send_button(self.vjoy_device_id, self.vjoy_input_id, button.is_pressed)
+
             elif self.action_mode == VjoyAction.VJoyPulse:
                 
                 # pulse action
@@ -1641,7 +1650,8 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
             elif self.action_mode == VjoyAction.VJoySetAxis:
                 # set the value on the specified axis
                 if self.target_value_valid and event.is_pressed == target_press:
-                    joystick_handling.VJoyProxy()[self.target_device_id].axis(self.target_input_id).value = self.target_value
+                    joystick_handling.VJoyProxy()[self.vjoy_device_id].axis(self.vjoy_input_id).value = self.target_value
+                    self.remote_client.send_axis(self.vjoy_device_id, self.vjoy_input_id, self.target_value)
 
             elif self.action_mode == VjoyAction.VJoyRangeAxis:
                 # changes the output range on the target device / axis
@@ -1650,12 +1660,12 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
 
             else:
                 # basic handling
-                joystick_handling.VJoyProxy()[self.vjoy_device_id] \
-                    .button(self.vjoy_input_id).is_pressed = value.current
+                joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = value.current
+                self.remote_client.send_button(self.vjoy_device_id, self.vjoy_input_id, value.current)
+
 
         elif self.input_type == InputType.JoystickHat:
-            joystick_handling.VJoyProxy()[self.vjoy_device_id] \
-                .hat(self.vjoy_input_id).direction = value.current
+            joystick_handling.VJoyProxy()[self.vjoy_device_id].hat(self.vjoy_input_id).direction = value.current
 
         return True
 
@@ -1765,6 +1775,7 @@ class VjoyRemap(gremlin.base_classes.AbstractAction):
         self.target_value = 0.0
         self.target_value_valid = True
         
+
         
 
     @property

@@ -166,6 +166,9 @@ class EventListener(QtCore.QObject):
     # Signal emitted when the icon needs to be refreshed
     icon_changed = QtCore.Signal(DeviceChangeEvent)
 
+    # signal emitted when a remote inputs are received
+    remote_event = QtCore.Signal(Event)
+
     # Signal emitted when a profile is changed (to refresh UI)
     profile_changed = QtCore.Signal()
     

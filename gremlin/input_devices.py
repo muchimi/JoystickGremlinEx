@@ -36,7 +36,10 @@ from . import common, error, event_handler, joystick_handling, util
 from gremlin.common import InputType
 
 
+import socketserver, socket, msgpack
 
+
+syslog = logging.getLogger("system")
 
 class CallbackRegistry:
 
@@ -292,6 +295,265 @@ class ModeChangeRegistry():
             plugin_cb(mode_name)
 
 
+class GremlinServer(socketserver.ThreadingMixIn,socketserver.UDPServer):
+    pass
+
+class GremlinSocketHandler(socketserver.BaseRequestHandler):
+    ''' handles remote input from a gremlin client on the network '''
+    def handle(self):
+        
+      
+        # handles input data
+        raw_data = self.request[0].strip()
+        socket = self.request[1]
+        
+        current_thread = threading.currentThread()
+        data = msgpack.unpackb(raw_data)
+        syslog.debug(f"Gremlin received remote data: {data}")
+
+        sender = data["sender"]
+
+        if sender == client_id:
+            # ignore our own broadcasts
+            return 
+        
+        action = data["action"]
+        device = data["device"]
+        target = data["target"]
+        value = data["value"]
+        proxy = joystick_handling.VJoyProxy()
+        if device in proxy.vjoy_devices:
+            # valid device
+            vjoy = proxy[device]
+            
+            if action == "button":
+                # emit button change
+                if target > 0 and target < vjoy.button_count:
+                    proxy[device].button(target).is_pressed = value
+            elif action == "axis":
+                if target > 0 and target <= vjoy.axis_count:
+                    proxy[device].axis(target).value = value
+            elif action == "hat":
+                if target > 0 and target <= vjoy.hat_count:
+                    proxy[device].hat(target).direction = value
+       
+
+
+class RPCGremlin():
+    ''' remote UDP multicast listener '''
+
+    MULTICAST_GROUP = '224.0.0.25' # non routable - clients must be on the same vlan
+    # multicast time to live
+    MULTICAST_TTL = 2
+
+    def __init__(self):
+        # self._address = "0.0.0.0"
+        # self._server_address = "localhost"
+        config = gremlin.config.Configuration()
+        self._port = config.server_port
+        self._server = None
+        self._running = False
+        self._thread = None
+        self._server_thread = None
+        self._keep_running = False
+        
+
+    def _run(self):
+        import struct
+        syslog.debug("Starting gremlin listener...")
+        self._server = GremlinServer(('', self._port),GremlinSocketHandler)
+        self._server_thread = threading.Thread(target=self._server.serve_forever)
+        self._server_thread.daemon = True
+        try:
+            self._server_thread.start()
+            # enable listen to multicast UDP
+            group = socket.inet_aton(RPCGremlin.MULTICAST_GROUP)
+            mreq = struct.pack('4sL', group, socket.INADDR_ANY)
+            self._server.socket.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
+            syslog.debug(f"Starting gremlin server listener:  multicast group {RPCGremlin.MULTICAST_GROUP} port {self._port} ...")
+            self._keep_running = True
+            self._running = True
+            while self._keep_running:
+                time.sleep(10)
+        except Exception as ex:
+            pass
+
+        self._server.shutdown()
+        self._server.server_close()
+        self._running = False
+        syslog.debug("Gremlin listener stopped.")
+        
+    @property
+    def running(self):
+        return self._running
+
+    def start(self):
+        ''' starts the listener '''
+
+        config = gremlin.config.Configuration()
+        if not config.enable_remote_control:
+            syslog.debug("Remote control disabled - Gremlin listener not started")
+            return
+        if self._running:
+            # already running
+            return
+        self._thread = threading.Thread(target=self._run)
+        self._thread.start()
+
+        
+
+    def stop(self):
+        ''' stops the loop'''
+        if not self._running:
+            return
+        
+        # stop the server loop
+        self._keep_running = False
+        self._thread.join()
+        self._thread = None
+
+        syslog.debug("Gremlin RPC server stopped...")
+
+    
+
+
+class RemoteServer(QtCore.QObject):
+    """ Provides access to remote a remote Gremlin instance events """
+
+    def __init__(self):
+        """Initialises a new object."""
+        QtCore.QObject.__init__(self)
+        self._rpc = None
+        
+
+    def start(self):
+        ''' start listening '''
+        config = gremlin.config.Configuration()
+        self._enabled = config.enable_remote_control
+        if self._enabled:
+            self._rpc = RPCGremlin()
+            self._rpc.start()
+            syslog.debug("Gremlin RPC server started...")
+        
+
+    def stop(self):
+        ''' stop listening'''
+        if self._rpc:
+            self._rpc.stop()
+
+    @property
+    def running(self):
+        ''' true if the server is running'''
+        return self._rpc and self._rpc.running
+    
+    @property
+    def enabled(self):
+        ''' true if server is accepting input from clients '''
+        return self._enabled
+    
+    @enabled.setter
+    def enabled(self, value):
+        self._enabled = value
+    
+
+class RemoteClient(QtCore.QObject):
+    """ Provides access to remote a remote Gremlin instance events """
+
+    def __init__(self):
+        """Initialises a new object."""
+        QtCore.QObject.__init__(self)
+        self._host = "localhost"
+        config = gremlin.config.Configuration()
+        self._port = config.server_port
+        self._enabled = config.enable_remote_broadcast
+        self._address = (RPCGremlin.MULTICAST_GROUP, self._port)
+        self._sock = None
+        self._id = 
+
+    def start(self):
+        ''' creates a multicast client send socket'''
+        import struct
+        if not self._enabled:
+            return
+        
+        if not self._sock:
+            self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            ttl = struct.pack('b', RPCGremlin.MULTICAST_TTL)
+            self._sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
+            syslog.debug("Gremlin RPC client started...")
+
+    def stop(self):
+        ''' closes the client socket'''
+        if not self._enabled:
+            return        
+        if self._sock:
+            self._sock.close()
+            self._sock = None
+            syslog.debug("Gremlin RPC client stopped.")
+
+    def _send(self, data = None):
+        ''' sends data to the socket'''
+        if data:
+            self._sock.sendto(data, self._address)
+
+    def send_button(self, device_id, button_id, is_pressed):
+        ''' handles a remote joystick event '''
+        if self._enabled:
+            data = {}
+            data["sender"] = client_id
+            data["action"] = "button"
+            data["device"] = device_id
+            data["target"] = button_id
+            data["value"] = is_pressed
+            raw_data = msgpack.packb(data)
+            self._send(raw_data)
+            syslog.debug(f"remote gremlin event set button: {device_id} {button_id} {is_pressed}")
+
+    def send_axis(self, device_id, axis_id, value):
+        ''' handles a remote joystick event '''
+        if self._enabled:
+            data = {}
+            data["sender"] = client_id
+            data["action"] = "axis"
+            data["device"] = device_id
+            data["target"] = axis_id
+            data["value"] = value
+            raw_data = msgpack.packb(data)
+            self._send(raw_data)
+            syslog.debug(f"remote gremlin event set axis: {device_id} {axis_id} {value}")
+
+    def send_hat(self, device_id, hat_id, direction):
+        ''' handles a remote joystick event '''
+        if self._enabled:
+            data = {}
+            data["sender"] = client_id
+            data["action"] = "hat"
+            data["device"] = device_id
+            data["target"] = hat_id
+            data["value"] = direction
+            raw_data = msgpack.packb(data)
+            self._send(raw_data)
+            syslog.debug(f"remote gremlin event set hat: {device_id} {hat_id} {direction}")    
+
+    @property
+    def enabled(self):
+        ''' enables or disabled sending remote events'''
+        return self._enabled
+    
+    @enabled.setter
+    def enabled(self, value):
+        self._enabled = value
+
+
+def get_guid(strip=True):
+    ''' generates a reasonably lowercase unique guid string '''
+    import uuid
+    guid = f"{uuid.uuid4()}"
+    if strip:
+        return guid.replace("-",'')
+    return guid
+    
+
 # Global registry of all registered callbacks
 callback_registry = CallbackRegistry()
 
@@ -303,6 +565,16 @@ start_registry = SimpleRegistry()
 
 # Global registry of all stop callbacks
 stop_registry = SimpleRegistry()
+
+# Global remote server = listens to remote client events
+remote_server = RemoteServer()
+
+# Global remote client = sends events to server
+remote_client = RemoteClient()
+
+# unique ID of this client
+client_id = get_guid()
+
 
 
 
@@ -387,9 +659,7 @@ class JoystickWrapper:
 
         @property
         def direction(self):
-            return util.dill_hat_lookup(
-                DILL.get_hat(self._joystick_guid, self._index)
-            )
+            return util.dill_hat_lookup(DILL.get_hat(self._joystick_guid, self._index))
 
     def __init__(self, device_guid):
         """Creates a new wrapper object for the given object id.
@@ -1047,6 +1317,10 @@ def keyboard(key_name, mode, always_execute=False):
         return wrapper_fn
 
     return wrap
+
+
+
+
 
 
 def periodic(interval):

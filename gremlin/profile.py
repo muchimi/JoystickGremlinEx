@@ -31,10 +31,8 @@ from PySide6 import QtCore
 import dill
 
 import action_plugins
-from gremlin.common import DeviceType, InputType, MergeAxisOperation, \
-    PluginVariableType
-from . import base_classes, common, error, input_devices, joystick_handling, \
-    plugin_manager, util
+from gremlin.common import DeviceType, InputType, MergeAxisOperation, PluginVariableType
+from . import base_classes, common, error, input_devices, joystick_handling, plugin_manager, util
 
 
 # Data struct representing profile information of a device

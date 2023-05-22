@@ -73,6 +73,9 @@ class VJoyProxy:
         VJoyProxy.vjoy_devices = {}
 
 
+        
+
+
 def joystick_devices():
     """Returns the list of joystick like devices.
 
@@ -214,17 +217,12 @@ def joystick_devices_initialization():
     for new_dev in devices:
         if new_dev not in _joystick_devices:
             device_added = True
-            syslog.debug("Added: name={} guid={}".format(
-                new_dev.name,
-                new_dev.device_guid
-            ))
+            syslog.debug(f"Added: name={new_dev.name} guid={new_dev.device_guid}")
+                
     for old_dev in _joystick_devices:
         if old_dev not in devices:
             device_removed = True
-            syslog.debug("Removed: name={} guid={}".format(
-                old_dev.name,
-                old_dev.device_guid
-            ))
+            syslog.debug(f"Removed: name={old_dev.name} guid={old_dev.device_guid}")
 
     # Terminate if no change occurred
     if not device_added and not device_removed:
@@ -240,9 +238,7 @@ def joystick_devices_initialization():
     vjoy_lookup = {}
     for dev in [dev for dev in devices if dev.is_virtual]:
         hash_value = (dev.axis_count, dev.button_count, dev.hat_count)
-        syslog.debug(
-            "vJoy guid={}: {}".format(dev.device_guid, hash_value)
-        )
+        syslog.debug(f"vJoy guid={dev.device_guid}: {hash_value}")
 
         # Only unique combinations of axes, buttons, and hats are allowed
         # for vJoy devices
@@ -274,8 +270,7 @@ def joystick_devices_initialization():
         )
 
         if not vjoy.hat_configuration_valid(i):
-            error_string = "vJoy id {:d}: Hats are set to discrete but have " \
-                           "to be set as continuous.".format(i)
+            error_string = f"vJoy id {i:d}: Hats are set to discrete but have to be set as continuous."
             syslog.debug(error_string)
             util.display_error(error_string)
 
@@ -283,13 +278,10 @@ def joystick_devices_initialization():
         # the previous step we can directly link the SDL and vJoy device
         if hash_value in vjoy_lookup:
             vjoy_lookup[hash_value].set_vjoy_id(i)
-            syslog.debug("vjoy id {:d}: {} - MATCH".format(i, hash_value))
+            syslog.debug(f"vjoy id {i:d}: {hash_value} - MATCH")
         else:
             should_terminate = True
-            syslog.debug(
-                "vjoy id {:d}: {} - ERROR - vJoy device exists "
-                "but DILL does not see it".format(i, hash_value)
-            )
+            syslog.debug(f"vjoy id {i:d}: {hash_value} - ERROR - vJoy device exists but DILL does not see it")
 
         # If the device can be acquired, configure the mapping from
         # vJoy axis id, which may not be sequential, to the
@@ -298,7 +290,7 @@ def joystick_devices_initialization():
             try:
                 vjoy_dev = vjoy_proxy[i]
             except error.VJoyError as e:
-                syslog.debug("vJoy id {:} can't be acquired".format(i))
+                syslog.debug(f"vJoy id {i:} can't be acquired")
 
     if should_terminate:
         raise error.GremlinError(

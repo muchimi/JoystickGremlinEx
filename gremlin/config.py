@@ -391,6 +391,46 @@ class Configuration:
 
 
     @property
+    def enable_remote_control(self):
+        ''' enables or disables remote control from another gremlin instance on the network '''
+        return self._data.get("allow_remote_control",False)
+    
+    @enable_remote_control.setter
+    def enable_remote_control(self, value):
+        if type(value) == bool:
+            self._data["allow_remote_control"] = value
+            self.save()
+
+    @property 
+    def enable_remote_broadcast(self):
+        ''' enables gremlin to broadcast control changes over UDP multicast '''
+        return self._data.get("enable_remote_broadcast",False)
+
+    @enable_remote_broadcast.setter
+    def enable_remote_broadcast(self, value):
+        if type(value) == bool:
+            self._data["enable_remote_broadcast"] = value
+            self.save()
+
+
+
+    @property
+    def server_port(self):
+        ''' port number to use for the gremlin server '''
+        return self._data.get("server_port",6012)
+    
+    @server_port.setter
+    def server_port(self, value):
+        if type(value) == float:
+            value = int(value)
+        elif type(value) == str and value.isnumeric():
+            value = int(value)
+
+        if type(value) == int:
+            self._data["server_port"] = value
+            self.save()
+
+    @property
     def mode_change_message(self):
         """Returns whether or not to show a windows notification on mode change.
 

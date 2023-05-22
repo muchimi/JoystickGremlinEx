@@ -118,6 +118,40 @@ class OptionsUi(common.BaseDialogUi):
             self.config.mode_change_message
         )
 
+
+        # remote control section
+        self.remote_control_layout = QtWidgets.QHBoxLayout()
+        self.remote_control_label = QtWidgets.QLabel("Remote control")
+
+        self.enable_remote_control = QtWidgets.QCheckBox("Enable remote control")
+        self.enable_remote_control.setChecked(self.config.enable_remote_control)
+        self.enable_remote_control.clicked.connect(self._enable_remote_control)
+
+        
+        self.enable_remote_broadcast = QtWidgets.QCheckBox("Enable broadcast")
+        self.enable_remote_broadcast.setChecked(self.config.enable_remote_broadcast)
+        self.enable_remote_broadcast.clicked.connect(self._enable_remote_broadcast)
+
+
+        self.remote_control_label = QtWidgets.QLabel("Port:")
+        
+        self.remote_control_port = QtWidgets.QDoubleSpinBox()
+        self.remote_control_port.setRange(4096,65535)
+        self.remote_control_port.setDecimals(0)
+        self.remote_control_port.setValue(float(self.config.server_port))
+        self.remote_control_port.valueChanged.connect(self._remote_control_server_port)
+
+        self.remote_control_layout.addWidget(self.enable_remote_control)
+        self.remote_control_layout.addWidget(self.enable_remote_broadcast)
+        self.remote_control_layout.addWidget(self.remote_control_label)
+        self.remote_control_layout.addWidget(self.remote_control_port)
+        self.remote_control_layout.addStretch()
+
+
+
+
+
+
         # Default action selection
         self.default_action_layout = QtWidgets.QHBoxLayout()
         self.default_action_label = QtWidgets.QLabel("Default action")
@@ -178,6 +212,7 @@ class OptionsUi(common.BaseDialogUi):
         self.general_layout.addLayout(self.default_action_layout)
         self.general_layout.addLayout(self.macro_axis_polling_layout)
         self.general_layout.addLayout(self.macro_axis_minimum_change_layout)
+        self.general_layout.addLayout(self.remote_control_layout)
         self.general_layout.addStretch()
         self.tab_container.addTab(self.general_page, "General")
 
@@ -570,6 +605,23 @@ If this option is on, the last active profile will remain active until a differe
         :param value the name of the newly selected action
         """
         self.config.default_action = value
+        self.config.save()
+
+
+    def _enable_remote_control(self, clicked):        
+        ''' updates remote control flag '''
+        self.config.enable_remote_control = clicked
+        self.config.save()
+
+    def _enable_remote_broadcast(self, clicked):        
+        ''' updates remote broadcast flag '''
+        self.config.enable_remote_broadcast = clicked
+        self.config.save()
+
+
+    def _remote_control_server_port(self, value):
+        ''' updates the remote control server port'''
+        self.config.server_port = value
         self.config.save()
 
     def _macro_axis_polling_rate(self, value):

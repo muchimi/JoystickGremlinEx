@@ -1263,6 +1263,9 @@ def configure_logger(config):
     logger.debug("Starting Joystick Gremlin R13.3")
     logger.debug("-" * 80)
 
+    console = logging.StreamHandler()
+    logger.addHandler(console)
+
 
 def exception_hook(exception_type, value, trace):
     """Logs any uncaught exceptions.
