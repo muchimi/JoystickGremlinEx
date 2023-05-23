@@ -30,7 +30,7 @@ from gremlin.util import rad2deg
 import gremlin.ui.common
 import gremlin.ui.input_item
 import gremlin.sendinput
-
+from gremlin import input_devices
 
 class MapToMouseWidget(gremlin.ui.input_item.AbstractActionWidget):
 
@@ -346,11 +346,14 @@ class MapToMouseFunctor(AbstractFunctor):
                 if self.config.button_id == MouseButton.WheelDown:
                     direction = 1
                 gremlin.sendinput.mouse_wheel(direction)
+                input_devices.remote_client.send_mouse_wheel(direction)
         else:
             if value.current:
                 gremlin.sendinput.mouse_press(self.config.button_id)
+                input_devices.remote_client.send_mouse_button(self.config.button_id.value, True)
             else:
                 gremlin.sendinput.mouse_release(self.config.button_id)
+                input_devices.remote_client.send_mouse_button(self.config.button_id.value, False)
 
     def _perform_axis_motion(self, event, value):
         """Processes events destined for an axis.
@@ -366,6 +369,7 @@ class MapToMouseFunctor(AbstractFunctor):
         dx = delta_motion if self.config.direction == 90 else None
         dy = delta_motion if self.config.direction != 90 else None
         self.mouse_controller.set_absolute_motion(dx, dy)
+        input_devices.remote_client.send_mouse_motion(dx, dy)
 
     def _perform_button_motion(self, event, value):
         if event.is_pressed:
@@ -377,6 +381,7 @@ class MapToMouseFunctor(AbstractFunctor):
             )
         else:
             self.mouse_controller.set_absolute_motion(0, 0)
+            input_devices.remote_client.send_mouse_motion(0, 0)
 
     def _perform_hat_motion(self, event, value):
         """Processes events destined for a hat.

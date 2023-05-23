@@ -1626,6 +1626,7 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
 
                     if event.is_pressed:
                         joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = value.current                        
+                        self.remote_client.send_button(self.vjoy_device_id, self.vjoy_input_id, value.current )
                     
             
             elif self.action_mode == VjoyAction.VJoyToggle:
@@ -1666,6 +1667,7 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
 
         elif self.input_type == InputType.JoystickHat:
             joystick_handling.VJoyProxy()[self.vjoy_device_id].hat(self.vjoy_input_id).direction = value.current
+            self.remote_client.send_hat(self.vjoy_device_id, self.vjoy_input_id, value.current)
 
         return True
 

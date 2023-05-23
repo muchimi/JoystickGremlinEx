@@ -28,7 +28,7 @@ import win32con
 import win32api
 
 import gremlin
-
+from gremlin import input_devices
 
 MacroEntry = collections.namedtuple(
     "MacroEntry",
@@ -195,6 +195,7 @@ def _send_key_down(key):
     """
     flags = win32con.KEYEVENTF_EXTENDEDKEY if key.is_extended else 0
     win32api.keybd_event(key.virtual_code, key.scan_code, flags, 0)
+    input_devices.remote_client.send_key(key.virtual_code, key.scan_code, flags )
 
 
 def _send_key_up(key):
@@ -205,6 +206,7 @@ def _send_key_up(key):
     flags = win32con.KEYEVENTF_EXTENDEDKEY if key.is_extended else 0
     flags |= win32con.KEYEVENTF_KEYUP
     win32api.keybd_event(key.virtual_code, key.scan_code, flags, 0)
+    input_devices.remote_client.send_key(key.virtual_code, key.scan_code, flags )
 
 
 @gremlin.common.SingletonDecorator

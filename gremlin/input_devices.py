@@ -34,7 +34,8 @@ from dill import DILL, GUID, GUID_Invalid
 
 from . import common, error, event_handler, joystick_handling, util
 from gremlin.common import InputType
-
+import win32api
+import gremlin.sendinput
 
 import socketserver, socket, msgpack
 
@@ -305,44 +306,74 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
       
         # handles input data
         raw_data = self.request[0].strip()
-        socket = self.request[1]
+        # socket = self.request[1]
         
-        current_thread = threading.currentThread()
         data = msgpack.unpackb(raw_data)
-        syslog.debug(f"Gremlin received remote data: {data}")
+        # syslog.debug(f"Gremlin received remote data: {data}")
 
         sender = data["sender"]
-
         if sender == remote_client.id:
             # ignore our own broadcasts
             return 
         
         action = data["action"]
-        device = data["device"]
-        target = data["target"]
-        value = data["value"]
-        proxy = joystick_handling.VJoyProxy()
-        if device in proxy.vjoy_devices:
-            # valid device
-            vjoy = proxy[device]
+        if action == "key":
+            # keyboard output
+            virtual_code = data["vc"]
+            scan_code = data["sc"]
+            flags = data["flags"]
+            win32api.keybd_event(virtual_code, scan_code, flags, 0)
+        elif action == "mouse":
             
-            if action == "button":
-                # emit button change
-                if target > 0 and target < vjoy.button_count:
-                    proxy[device].button(target).is_pressed = value
-            elif action == "axis":
-                if target > 0 and target <= vjoy.axis_count:
-                    proxy[device].axis(target).value = value
-            elif action == "hat":
-                if target > 0 and target <= vjoy.hat_count:
-                    proxy[device].hat(target).direction = value
+            subtype = data["subtype"]
+            if subtype == "wheel":
+                direction = data["direction"]
+                gremlin.sendinput.mouse_wheel(direction)
+
+            elif subtype == "button":
+                button_id = data["button"]
+                button = gremlin.sendinput.MouseButton.to_enum(button_id)
+                is_pressed = data["value"]
+                if is_pressed:
+                    gremlin.sendinput.mouse_press(button)
+                else:
+                    gremlin.sendinput.mouse_release(button)
+            elif subtype == "axis":
+                dx = data["dx"]
+                dy = data["dy"]
+                mouse_controller = gremlin.sendinput.MouseController()
+                mouse_controller.set_absolute_motion(dx, dy)
+
+
+        elif action in ("button","axis","hat"):
+            # joystick button
+            device = data["device"]
+            target = data["target"]
+            value = data["value"]
+            proxy = joystick_handling.VJoyProxy()
+            if device in proxy.vjoy_devices:
+                # valid device
+                vjoy = proxy[device]
+                
+                if action == "button":
+                    # emit button change
+                    if target > 0 and target < vjoy.button_count:
+                        proxy[device].button(target).is_pressed = value
+                elif action == "axis":
+                    if target > 0 and target <= vjoy.axis_count:
+                        proxy[device].axis(target).value = value
+                elif action == "hat":
+                    if target > 0 and target <= vjoy.hat_count:
+                        proxy[device].hat(target).direction = value
+                
+                    
        
 
 
 class RPCGremlin():
     ''' remote UDP multicast listener '''
 
-    MULTICAST_GROUP = '224.0.0.25' # non routable - clients must be on the same vlan
+    MULTICAST_GROUP = '224.3.29.72' # multicast group
     # multicast time to live
     MULTICAST_TTL = 2
 
@@ -509,7 +540,7 @@ class RemoteClient(QtCore.QObject):
             data["value"] = is_pressed
             raw_data = msgpack.packb(data)
             self._send(raw_data)
-            syslog.debug(f"remote gremlin event set button: {device_id} {button_id} {is_pressed}")
+            #syslog.debug(f"remote gremlin event set button: {device_id} {button_id} {is_pressed}")
 
     def send_axis(self, device_id, axis_id, value):
         ''' handles a remote joystick event '''
@@ -522,7 +553,7 @@ class RemoteClient(QtCore.QObject):
             data["value"] = value
             raw_data = msgpack.packb(data)
             self._send(raw_data)
-            syslog.debug(f"remote gremlin event set axis: {device_id} {axis_id} {value}")
+            #syslog.debug(f"remote gremlin event set axis: {device_id} {axis_id} {value}")
 
     def send_hat(self, device_id, hat_id, direction):
         ''' handles a remote joystick event '''
@@ -535,7 +566,61 @@ class RemoteClient(QtCore.QObject):
             data["value"] = direction
             raw_data = msgpack.packb(data)
             self._send(raw_data)
-            syslog.debug(f"remote gremlin event set hat: {device_id} {hat_id} {direction}")    
+            #syslog.debug(f"remote gremlin event set hat: {device_id} {hat_id} {direction}")
+
+    def send_key(self, virtual_code, scan_code, flags):
+        ''' handles a key event '''
+        if self._enabled:
+            data = {}
+            data["sender"] = self._id
+            data["action"] = "key"
+            data["vc"] = virtual_code
+            data["sc"] = scan_code
+            data["flags"] = flags
+            raw_data = msgpack.packb(data)
+            self._send(raw_data)
+            #syslog.debug(f"remote gremlin event set key: virtual code: {virtual_code} scan code: {scan_code} flags: {flags}")
+
+    def send_mouse_button(self, button_id, is_pressed):
+        ''' sends a mouse button press or release '''
+        if self._enabled:
+            data = {}
+            data["sender"] = self._id
+            data["action"] = "mouse"
+            data["subtype"] = "button"
+            data["button"] = button_id
+            data["value"] = is_pressed
+            raw_data = msgpack.packb(data)
+            self._send(raw_data)
+            #syslog.debug(f"remote gremlin event set mouse: button: {button_id} pressed: {is_pressed}")
+
+    def send_mouse_wheel(self, direction):
+        ''' sends mousewheel data  '''
+        if self._enabled:
+            data = {}
+            data["sender"] = self._id
+            data["action"] = "mouse"
+            data["subtype"] = "wheel"
+            data["direction"] = direction
+            
+            raw_data = msgpack.packb(data)
+            self._send(raw_data)
+            #syslog.debug(f"remote gremlin event set mouse: wheel {direction}")
+
+    def send_mouse_motion(self, dx, dy):
+        ''' sends mouse motion data '''
+        if self._enabled:
+            data = {}
+            data["sender"] = self._id
+            data["action"] = "mouse"
+            data["subtype"] = "axis"
+            data["dx"] = dx
+            data["dy"] = dy
+            
+            raw_data = msgpack.packb(data)
+            self._send(raw_data)
+            #syslog.debug(f"remote gremlin event set mouse: axis {dx} {dy}")
+
 
     @property
     def enabled(self):
@@ -1080,6 +1165,8 @@ class ButtonReleaseActions(QtCore.QObject):
         # Check if the button is valid otherwise we cause Gremlin to crash
         if vjoy[vjoy_input[0]].is_button_valid(vjoy_input[1]):
             vjoy[vjoy_input[0]].button(vjoy_input[1]).is_pressed = False
+            remote_client.send_button(vjoy_input[0], vjoy_input[1], False )
+            
         else:
             logging.getLogger("system").warning(
                 f"Attempted to use non existent button: " +

@@ -24,6 +24,7 @@ import win32api
 import win32con
 
 import gremlin
+from gremlin import input_devices
 
 
 def _create_function(lib_name, fn_name, param_types, return_type):
@@ -246,6 +247,7 @@ def send_key_down(key):
     """
     flags = win32con.KEYEVENTF_EXTENDEDKEY if key.is_extended else 0
     win32api.keybd_event(key.virtual_code, key.scan_code, flags, 0)
+    input_devices.remote_client.send_key(key.virtual_code, key.scan_code, flags )
 
 
 def send_key_up(key):
@@ -256,7 +258,7 @@ def send_key_up(key):
     flags = win32con.KEYEVENTF_EXTENDEDKEY if key.is_extended else 0
     flags |= win32con.KEYEVENTF_KEYUP
     win32api.keybd_event(key.virtual_code, key.scan_code, flags, 0)
-
+    input_devices.remote_client.send_key(key.virtual_code, key.scan_code, flags )
 
 def key_from_name(name):
     """Returns the key corresponding to the provided name.
