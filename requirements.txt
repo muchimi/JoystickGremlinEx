@@ -3,3 +3,4 @@ reportlab
 PyInstaller
 pywin32
 pytest
+msgpack

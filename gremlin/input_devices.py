@@ -356,6 +356,7 @@ class RPCGremlin():
         self._thread = None
         self._server_thread = None
         self._keep_running = False
+
         
 
     def _run(self):
@@ -414,7 +415,6 @@ class RPCGremlin():
 
         syslog.debug("Gremlin RPC server stopped...")
 
-    
 
 
 class RemoteServer(QtCore.QObject):
@@ -424,7 +424,7 @@ class RemoteServer(QtCore.QObject):
         """Initialises a new object."""
         QtCore.QObject.__init__(self)
         self._rpc = None
-        
+
 
     def start(self):
         ''' start listening '''
@@ -454,7 +454,7 @@ class RemoteServer(QtCore.QObject):
     @enabled.setter
     def enabled(self, value):
         self._enabled = value
-    
+
 
 class RemoteClient(QtCore.QObject):
     """ Provides access to remote a remote Gremlin instance events """
@@ -468,7 +468,9 @@ class RemoteClient(QtCore.QObject):
         self._enabled = config.enable_remote_broadcast
         self._address = (RPCGremlin.MULTICAST_GROUP, self._port)
         self._sock = None
-        self._id = 
+        # unique ID of this client
+        self._id = get_guid()
+        
 
     def start(self):
         ''' creates a multicast client send socket'''
@@ -500,7 +502,7 @@ class RemoteClient(QtCore.QObject):
         ''' handles a remote joystick event '''
         if self._enabled:
             data = {}
-            data["sender"] = client_id
+            data["sender"] = self._id
             data["action"] = "button"
             data["device"] = device_id
             data["target"] = button_id
@@ -513,7 +515,7 @@ class RemoteClient(QtCore.QObject):
         ''' handles a remote joystick event '''
         if self._enabled:
             data = {}
-            data["sender"] = client_id
+            data["sender"] = self._id
             data["action"] = "axis"
             data["device"] = device_id
             data["target"] = axis_id
@@ -526,7 +528,7 @@ class RemoteClient(QtCore.QObject):
         ''' handles a remote joystick event '''
         if self._enabled:
             data = {}
-            data["sender"] = client_id
+            data["sender"] = self._id
             data["action"] = "hat"
             data["device"] = device_id
             data["target"] = hat_id
@@ -543,6 +545,12 @@ class RemoteClient(QtCore.QObject):
     @enabled.setter
     def enabled(self, value):
         self._enabled = value
+
+    @property
+    def id(self):
+        return self._id
+
+            
 
 
 def get_guid(strip=True):
@@ -572,8 +580,7 @@ remote_server = RemoteServer()
 # Global remote client = sends events to server
 remote_client = RemoteClient()
 
-# unique ID of this client
-client_id = get_guid()
+
 
 
 
