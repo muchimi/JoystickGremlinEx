@@ -339,9 +339,7 @@ class MapToMouseFunctor(AbstractFunctor):
 
     def _perform_mouse_button(self, event, value):
         assert self.config.motion_input is False
-        is_local = input_devices.remote_client.is_local
-        is_remote = input_devices.remote_client.is_remote
-
+        (is_local, is_remote) = input_devices.remote_state.state
         if self.config.button_id in [MouseButton.WheelDown, MouseButton.WheelUp]:
             if value.current:
                 direction = -16
@@ -376,15 +374,15 @@ class MapToMouseFunctor(AbstractFunctor):
 
         dx = delta_motion if self.config.direction == 90 else None
         dy = delta_motion if self.config.direction != 90 else None
-        if input_devices.remote_client.is_local:
+        (is_local, is_remote) = input_devices.remote_state.state
+        if is_local:
             self.mouse_controller.set_absolute_motion(dx, dy)
-        if input_devices.remote_client.is_remote:
+        if is_remote:
             input_devices.remote_client.send_mouse_motion(dx, dy)
 
     def _perform_button_motion(self, event, value):
+        (is_local, is_remote) = input_devices.remote_state.state
         if event.is_pressed:
-            is_local = input_devices.remote_client.is_local
-            is_remote = input_devices.remote_client.is_remote 
             if is_local:
                 self.mouse_controller.set_accelerated_motion(
                     self.config.direction,
@@ -394,11 +392,11 @@ class MapToMouseFunctor(AbstractFunctor):
                 )
             if is_remote:
                 input_devices.remote_client.send_mouse_acceleration(self.config.direction, self.config.min_speed, self.config.max_speed, self.config.time_to_max_speed)
-      
+     
         else:
-            if input_devices.remote_client.is_local:
+            if is_local:
                 self.mouse_controller.set_absolute_motion(0, 0)
-            if input_devices.remote_client.is_remote:
+            if is_remote:
                 input_devices.remote_client.send_mouse_motion(0, 0)
 
     def _perform_hat_motion(self, event, value):

@@ -323,8 +323,9 @@ class JoystickDeviceTabWidget(QtWidgets.QWidget):
             device_profile,
             current_mode
         )
-        self.input_item_list_view = input_item.InputItemListView()
+        self.input_item_list_view = input_item.InputItemListView(name=device.name)
         self.input_item_list_view.setMinimumWidth(375)
+        
 
         # Handle vJoy as input and vJoy as output devices properly
         vjoy_as_input = self.device_profile.parent.settings.vjoy_as_input
@@ -335,8 +336,8 @@ class JoystickDeviceTabWidget(QtWidgets.QWidget):
             self.input_item_list_view.limit_input_types([InputType.JoystickAxis])
         self.input_item_list_view.set_model(self.input_item_list_model)
 
-        # TODO: make this saner
         self.input_item_list_view.redraw()
+    
 
         # Handle user interaction
         self.input_item_list_view.item_selected.connect(

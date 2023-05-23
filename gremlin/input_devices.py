@@ -41,7 +41,133 @@ import socketserver, socket, msgpack
 import enum
 
 
+
 syslog = logging.getLogger("system")
+
+
+class VjoyAction(enum.Enum):
+    ''' defines available vjoy actions supported by this plugin'''
+    VJoyButton = 0 # action on button press
+    VJoyToggle = 1 # toggle function on/off
+    VJoyPulse = 2 # pulse function (pulses a button),
+    VJoyInvertAxis = 3 # invert axis function
+    VJoySetAxis = 4 # set axis value
+    VJoyAxis = 5 # normal map to axis
+    VJoyHat = 6 #  normal map to hat
+    VJoyRangeAxis = 7 # scale axis
+    VJoyAxisToButton = 8 # axis to button mapping
+    VJoyToggleRemote = 9 # toggle remote control
+    VJoyEnableRemoteOnly = 10 # enables remote control, disables local control
+    VJoyEnableLocalOnly = 11 # enables local control, disables remote control
+    VJoyDisableRemote = 12 # turns remote control off
+    VJoyDisableLocal = 13 # turns local control off 
+    VJoyEnableRemote = 14 # enables remote control (does not impact local control)
+    VJoyEnableLocal = 15 # enables local control (does not impact remote control)
+    VJoyEnableLocalAndRemote = 16 # enables concurrent local/remote control
+
+  
+
+    @staticmethod
+    def to_string(mode):
+        return mode.name
+    
+    def __str__(self):
+        return str(self.value)
+    
+    @classmethod
+    def _missing_(cls, name):
+        for item in cls:
+            if item.name.lower() == name.lower():
+                return item
+            return cls.VJoyButton
+
+    
+    @staticmethod
+    def from_string(str):
+        str = str.lower().strip()
+        if str.isnumeric():
+            mode = int(str)
+            return VjoyAction(mode)
+        for item in VjoyAction:
+            if item.name.lower() == str:
+                return item
+
+        return None
+    
+
+@common.SingletonDecorator
+class RemoteControl():
+    ''' holds remote control status information'''
+
+    def __init__(self):
+        self._is_remote = False
+        self._is_local = False
+        self._mode = VjoyAction.VJoyEnableLocalOnly
+        self._is_broadcast = False
+        self._update(self._mode)
+        el = event_handler.EventListener()
+        el.broadcast_changed.connect(self._broadcast_changed)
+        
+    def _update(self, value):
+        
+        if value == VjoyAction.VJoyDisableLocal:
+            self._is_local = False
+        elif value == VjoyAction.VJoyDisableRemote:
+            self._is_remote = False
+        elif value == VjoyAction.VJoyEnableLocalOnly:
+            self._is_local = True
+            self._is_remote = False
+        elif value == VjoyAction.VJoyEnableRemoteOnly:
+            self._is_local = False
+            self._is_remote = True
+        elif value == VjoyAction.VJoyEnableLocalAndRemote:
+            self._is_local = True
+            self._is_remote = True
+        elif value == VjoyAction.VJoyEnableLocal:
+            self._is_local = True
+        elif value == VjoyAction.VJoyEnableRemote:
+            self._is_remote = True            
+        elif value == VjoyAction.VJoyToggleRemote:
+            self._is_local = not self._is_local
+            self._is_remote = not self._is_remote
+        else:
+            # not sure what this was
+            return
+        
+        self._mode = value
+        syslog.debug(f"Remote control status: local: {self._is_local} remote: {self._is_remote}")
+
+    def _broadcast_changed(self):
+        ''' called when broadcast config item changes '''
+        config = gremlin.config.Configuration()
+        self._is_broadcast = config.enable_remote_broadcast
+
+    @property
+    def mode(self):
+        ''' gets the current mode '''
+        return self._mode
+    
+    @mode.setter
+    def mode(self, value):
+        self._update(value)
+
+    @property
+    def is_local(self):
+        ''' status of local control '''
+        return self._is_local
+    @property
+    def is_remote(self):
+        ''' status of remote control '''
+        return self._is_remote and self._is_broadcast
+    
+    @property
+    def state(self):
+        ''' returns status as a pair of flags, local, remote'''
+        return (self.is_local, self.is_remote)    
+
+
+remote_state = RemoteControl()
+
 
 class CallbackRegistry:
 
@@ -489,11 +615,14 @@ class RemoteServer(QtCore.QObject):
     @property
     def enabled(self):
         ''' true if server is accepting input from clients '''
-        return self._enabled
+        return remote_state.is_remote
+        
     
     @enabled.setter
     def enabled(self, value):
         self._enabled = value
+
+
 
 
 class RemoteClient(QtCore.QObject):
@@ -515,44 +644,11 @@ class RemoteClient(QtCore.QObject):
         self._sock = None
         # unique ID of this client
         self._id = get_guid()
-        self._mode = RemoteClient.ClientMode.Local
-        
-
-    @property
-    def is_local(self):
-        ''' true if local control enabled '''
-        return self._mode in (RemoteClient.ClientMode.Local, RemoteClient.ClientMode.LocalAndRemote)
-    
-    @property
-    def is_remote(self):
-        ''' true if remote control enabled '''
-        return self._mode in (RemoteClient.ClientMode.Remote, RemoteClient.ClientMode.LocalAndRemote)
-    
-    @property
-    def mode(self):
-        ''' client mode '''
-        return self._mode
-    
-    @mode.setter
-    def mode(self, value):
-        config = gremlin.config.Configuration()
-        if value == RemoteClient.ClientMode.Remote and not config.enable_remote_broadcast:
-            syslog.debug("Unable to set remote mode - broadcast is not enabled in options")
-            return
-        
-        self._mode = value
-
-    
-    def toggle_mode(self):
-        ''' toggles output mode between remote and local '''
-        if self._mode == RemoteClient.ClientMode.Local:
-            self._mode = RemoteClient.ClientMode.Remote
-
 
     def start(self):
         ''' creates a multicast client send socket'''
         import struct
-        if not self._enabled:
+        if not self.enabled:
             return
         
         if not self._sock:
@@ -563,8 +659,7 @@ class RemoteClient(QtCore.QObject):
 
     def stop(self):
         ''' closes the client socket'''
-        if not self._enabled:
-            return        
+
         if self._sock:
             self._sock.close()
             self._sock = None
@@ -577,7 +672,7 @@ class RemoteClient(QtCore.QObject):
 
     def send_button(self, device_id, button_id, is_pressed):
         ''' handles a remote joystick event '''
-        if self._enabled:
+        if self.enabled:
             data = {}
             data["sender"] = self._id
             data["action"] = "button"
@@ -590,7 +685,7 @@ class RemoteClient(QtCore.QObject):
 
     def toggle_button(self, device_id, button_id):
         ''' toggles a button '''
-        if self._enabled:
+        if self.enabled:
             data = {}
             data["sender"] = self._id
             data["action"] = "toggle"
@@ -602,7 +697,7 @@ class RemoteClient(QtCore.QObject):
 
     def send_axis(self, device_id, axis_id, value):
         ''' handles a remote joystick event '''
-        if self._enabled:
+        if self.enabled:
             data = {}
             data["sender"] = self._id
             data["action"] = "axis"
@@ -615,7 +710,7 @@ class RemoteClient(QtCore.QObject):
 
     def send_hat(self, device_id, hat_id, direction):
         ''' handles a remote joystick event '''
-        if self._enabled:
+        if self.enabled:
             data = {}
             data["sender"] = self._id
             data["action"] = "hat"
@@ -628,7 +723,7 @@ class RemoteClient(QtCore.QObject):
 
     def send_key(self, virtual_code, scan_code, flags):
         ''' handles a key event '''
-        if self._enabled:
+        if self.enabled:
             data = {}
             data["sender"] = self._id
             data["action"] = "key"
@@ -641,7 +736,7 @@ class RemoteClient(QtCore.QObject):
 
     def send_mouse_button(self, button_id, is_pressed):
         ''' sends a mouse button press or release '''
-        if self._enabled:
+        if self.enabled:
             data = {}
             data["sender"] = self._id
             data["action"] = "mouse"
@@ -654,7 +749,7 @@ class RemoteClient(QtCore.QObject):
 
     def send_mouse_wheel(self, direction):
         ''' sends mousewheel data  '''
-        if self._enabled:
+        if self.enabled:
             data = {}
             data["sender"] = self._id
             data["action"] = "mouse"
@@ -667,7 +762,7 @@ class RemoteClient(QtCore.QObject):
 
     def send_mouse_motion(self, dx, dy):
         ''' sends mouse motion data '''
-        if self._enabled:
+        if self.enabled:
             data = {}
             data["sender"] = self._id
             data["action"] = "mouse"
@@ -680,7 +775,7 @@ class RemoteClient(QtCore.QObject):
             #syslog.debug(f"remote gremlin event set mouse: axis {dx} {dy}")
 
     def send_mouse_motion_acceleration(self, a, min_speed, max_speed, time_to_max_speed):
-        if self._enabled:
+        if self.enabled:
             data = {}
             data["sender"] = self._id
             data["action"] = "mouse"
@@ -696,11 +791,8 @@ class RemoteClient(QtCore.QObject):
     @property
     def enabled(self):
         ''' enables or disabled sending remote events'''
-        return self._enabled
+        return remote_state.is_remote
     
-    @enabled.setter
-    def enabled(self, value):
-        self._enabled = value
 
     @property
     def id(self):

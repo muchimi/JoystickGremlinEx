@@ -248,8 +248,7 @@ def send_key_down(key):
     flags = win32con.KEYEVENTF_EXTENDEDKEY if key.is_extended else 0
 
     
-    is_remote = input_devices.remote_client.is_remote
-    is_local =  input_devices.remote_client.is_local
+    (is_local, is_remote) = input_devices.remote_state.state
     if is_local:
         win32api.keybd_event(key.virtual_code, key.scan_code, flags, 0)
     if is_remote:
@@ -265,8 +264,7 @@ def send_key_up(key):
     flags |= win32con.KEYEVENTF_KEYUP
 
 
-    is_remote = input_devices.remote_client.is_remote
-    is_local =  input_devices.remote_client.is_local
+    (is_local, is_remote) = input_devices.remote_state.state
     if is_local:
         win32api.keybd_event(key.virtual_code, key.scan_code, flags, 0)
     if is_remote:

@@ -31,6 +31,7 @@ from gremlin.profile import safe_format, safe_read, parse_guid, write_guid
 from gremlin.ui.common import NoKeyboardPushButton
 import gremlin.ui.input_item
 
+syslog = logging.getLogger("system")
 
 class MacroActionEditor(QtWidgets.QWidget):
 
@@ -310,20 +311,43 @@ class MacroActionEditor(QtWidgets.QWidget):
     def _pause_ui(self):
         """Creates and populates the PauseAction editor UI."""
         self.ui_elements["duration_label"] = QtWidgets.QLabel("Duration")
-        self.ui_elements["duration_spinbox"] = \
-            gremlin.ui.common.DynamicDoubleSpinBox()
+        self.ui_elements["duration_spinbox"] = gremlin.ui.common.DynamicDoubleSpinBox()
         self.ui_elements["duration_spinbox"].setSingleStep(0.1)
         self.ui_elements["duration_spinbox"].setMaximum(3600)
-        duration = 0.5
-        if self.model.get_entry(self.index.row()) is not None:
-            duration = self.model.get_entry(self.index.row()).duration
-        self.ui_elements["duration_spinbox"].setValue(duration)
-        self.ui_elements["duration_spinbox"].valueChanged.connect(
-            self._update_pause
-        )
 
+        self.ui_elements["duration_is_random"] = QtWidgets.QCheckBox("Random")
+
+        self.ui_elements["duration_max_label"] = QtWidgets.QLabel("Max duration (0 to disable)")
+
+        self.ui_elements["duration_spinbox_max"] = gremlin.ui.common.DynamicDoubleSpinBox()
+        self.ui_elements["duration_spinbox_max"].setSingleStep(0.1)
+        self.ui_elements["duration_spinbox_max"].setMaximum(3600)
+
+        duration = 0.5
+        duration_max = 0
+        is_random = False
+        if self.model.get_entry(self.index.row()) is not None:
+            model : gremlin.macro.PauseAction = self.model.get_entry(self.index.row()) # PauseAction model
+            duration = model.duration
+            duration_max = model.duration_max
+            is_random = model.is_random
+
+        self.ui_elements["duration_spinbox"].setValue(duration)
+        self.ui_elements["duration_spinbox"].valueChanged.connect(self._update_pause)
+
+        self.ui_elements["duration_spinbox_max"].setValue(duration_max)
+        self.ui_elements["duration_spinbox_max"].valueChanged.connect(self._update_pause_max)
+
+        self.ui_elements["duration_is_random"].setChecked(is_random)
+        self.ui_elements["duration_is_random"].clicked.connect(self._update_pause_is_random)
+
+
+        self.action_layout.addWidget(self.ui_elements["duration_is_random"])
         self.action_layout.addWidget(self.ui_elements["duration_label"])
         self.action_layout.addWidget(self.ui_elements["duration_spinbox"])
+        self.action_layout.addWidget(self.ui_elements["duration_max_label"])
+        self.action_layout.addWidget(self.ui_elements["duration_spinbox_max"])
+
 
     def _vjoy_ui(self):
         """Creates and populates the vJoyAction editor UI."""
@@ -468,6 +492,23 @@ class MacroActionEditor(QtWidgets.QWidget):
         self.model.get_entry(self.index.row()).duration = value
         self._update_model()
 
+    def _update_pause_max(self, value):
+        """Update the model data when editor changes occur.
+
+        :param value the pause max duration in seconds
+        """
+        self.model.get_entry(self.index.row()).duration_max= value
+        self._update_model()
+
+    def _update_pause_is_random(self, data):
+        """Update the model data when editor changes occur.
+
+        :param value the pause random function
+        """
+        self.model.get_entry(self.index.row()).is_random= self.ui_elements["duration_is_random"].isChecked()
+        self._update_model()
+
+
     def _update_model(self):
         """Forces an update of the model at the current index."""
         self.model.update(self.index)
@@ -602,7 +643,8 @@ class MacroListModel(QtCore.QAbstractListModel):
         :param parent the parent of the model
         :return number of rows in the model
         """
-        return len(self._data)
+        count = len(self._data)
+        return count
 
     def data(self, index, role):
         """Return the data of the index for the specified role.
@@ -611,58 +653,19 @@ class MacroListModel(QtCore.QAbstractListModel):
         :param role the role for which the data is to be formatted
         :return data formatted for the given role at the given index
         """
+
+        if not index.isValid():
+            return None
+
         idx = index.row()
         if idx >= len(self._data):
             return ""
 
         entry = self._data[idx]
-        if role == QtCore.Qt.DisplayRole:
-            if isinstance(entry, gremlin.macro.JoystickAction):
-                device_name = "Unknown"
-                for joy in gremlin.joystick_handling.joystick_devices():
-                    if joy.device_guid == entry.device_guid:
-                        device_name = joy.name
-
-                return "{} {} {} - {}".format(
-                    device_name,
-                    InputType.to_string(entry.input_type).capitalize(),
-                    entry.input_id,
-                    MacroListModel.value_format[entry.input_type](entry)
-                )
-            elif isinstance(entry, gremlin.macro.KeyAction):
-                return "{} key {}".format(
-                    "Press" if entry.is_pressed else "Release",
-                    entry.key.name
-                )
-            elif isinstance(entry, gremlin.macro.MouseButtonAction):
-                if entry.button in [
-                    gremlin.common.MouseButton.WheelDown,
-                    gremlin.common.MouseButton.WheelUp,
-                ]:
-                    return "{}".format(
-                        gremlin.common.MouseButton.to_string(entry.button)
-                    )
-                else:
-                    return "{} {} mouse button".format(
-                        "Press" if entry.is_pressed else "Release",
-                        gremlin.common.MouseButton.to_string(entry.button)
-                    )
-            elif isinstance(entry, gremlin.macro.MouseMotionAction):
-                return "Move mouse by x: {:d} y: {:d}".format(
-                    entry.dx,
-                    entry.dy
-                )
-            elif isinstance(entry, gremlin.macro.PauseAction):
-                return "Pause for {:.4f} s".format(entry.duration)
-            elif isinstance(entry, gremlin.macro.VJoyAction):
-                return "vJoy {} {} {} - {}".format(
-                    entry.vjoy_id,
-                    InputType.to_string(entry.input_type).capitalize(),
-                    entry.input_id,
-                    MacroListModel.value_format[entry.input_type](entry)
-                )
-            else:
-                raise gremlin.error.GremlinError("Unknown macro action")
+        
+        if role == QtCore.Qt.SizeHintRole:
+            # size hint
+            return QtCore.QSize(200, 26)
         elif role == QtCore.Qt.DecorationRole:
             if isinstance(entry, gremlin.macro.PauseAction):
                 return MacroListModel.icon_lookup["pause"]
@@ -674,8 +677,52 @@ class MacroListModel(QtCore.QAbstractListModel):
                 return MacroListModel.icon_lookup[action]
             else:
                 return ""
-        else:
-            return ""
+        elif role == QtCore.Qt.DisplayRole:
+            if isinstance(entry, gremlin.macro.JoystickAction):
+                device_name = "Unknown"
+                for joy in gremlin.joystick_handling.joystick_devices():
+                    if joy.device_guid == entry.device_guid:
+                        device_name = joy.name
+                display =  f"{device_name} {InputType.to_string(entry.input_type).capitalize()} {entry.input_id} - {MacroListModel.value_format[entry.input_type](entry)}"
+            elif isinstance(entry, gremlin.macro.KeyAction):
+                display =  f"{'Press' if entry.is_pressed else 'Release'} key {entry.key.name}"
+            elif isinstance(entry, gremlin.macro.MouseButtonAction):
+                if entry.button in [
+                    gremlin.common.MouseButton.WheelDown,
+                    gremlin.common.MouseButton.WheelUp,
+                ]:
+                    display =  f"{gremlin.common.MouseButton.to_string(entry.button)}"
+                else:
+                    display =  f"{'Press' if entry.is_pressed else 'Release'} {gremlin.common.MouseButton.to_string(entry.button)} mouse button"
+            elif isinstance(entry, gremlin.macro.MouseMotionAction):
+                display =  f"Move mouse by x: {entry.dx:d} y: {entry.dy:d}"
+            elif isinstance(entry, gremlin.macro.PauseAction):
+                msg = f"Pause for {entry.duration:.3f} s"
+                if entry.duration_max != 0:
+                    msg += f" to {entry.duration_max:.3f} s"
+                if entry.is_random:
+                    msg += " (random)"
+                display = msg
+
+
+            elif isinstance(entry, gremlin.macro.VJoyAction):
+                display =  f"vJoy {entry.vjoy_id} {InputType.to_string(entry.input_type).capitalize()} {entry.input_id} - {MacroListModel.value_format[entry.input_type](entry)}"
+            else:
+                raise gremlin.error.GremlinError("Unknown macro action")
+            
+            syslog.debug(display)
+            return display
+        elif role == QtCore.Qt.FontRole:
+            font = QtGui.QFont()
+            return font
+        elif role == QtCore.Qt.ToolTipRole:
+            return "Macro entry"
+        elif role == QtCore.Qt.TextAlignmentRole:
+            return QtCore.Qt.AlignmentFlag.AlignVCenter | QtCore.Qt.AlignmentFlag.AlignLeft
+
+
+        return None
+    
 
     def mimeTypes(self):
         """Returns the MIME types supported by this model for drag & drop.
@@ -836,6 +883,8 @@ class MacroListView(QtWidgets.QListView):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        # # self.setAlternatingRowColors(True)
+        # self.setStyleSheet("color: black; background-color: white;")
 
     def keyPressEvent(self, evt):
         """Process key events.
@@ -1135,13 +1184,18 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.editor_settings_layout = QtWidgets.QVBoxLayout()
         self.buttons_layout = QtWidgets.QVBoxLayout()
 
+        #self.delegate = MacroItemDelegate(self)
+
         # Create list view for macro actions and setup drag & drop support
         self.list_view = MacroListView()
         self.list_view.setDragDropMode(QtWidgets.QAbstractItemView.InternalMove)
         self.list_view.setDefaultDropAction(QtCore.Qt.MoveAction)
         self.list_view.setModel(self.model)
-        self.list_view.setCurrentIndex(self.model.index(0, 0))
+        self.list_view.setModelColumn(0)
+        #self.list_view.setCurrentIndex(self.model.index(0, 0))
         self.list_view.clicked.connect(self._edit_action)
+        #self.list_view.setItemDelegate(self.delegate)
+
 
         # Create editor as well as settings place holder widgets
         self.editor_widget = QtWidgets.QWidget()
@@ -1156,7 +1210,7 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             "Add a new action",
             False
         )
-        self.button_new_entry.clicked.connect(self._pause_cb)
+        self.button_new_entry.clicked.connect(self._add_entry)
 
         self.button_delete = self._create_toolbutton(
             "gfx/list_delete",
@@ -1267,7 +1321,11 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.toolbar.setMinimumHeight(230)
 
         # Assemble the entire widget
+
+
         self.main_layout.addWidget(self.list_view)
+        self.main_layout.addWidget(self.toolbar)
+
         self.main_layout.addWidget(self.toolbar)
         self.main_layout.addLayout(self.editor_settings_layout)
 
@@ -1437,8 +1495,12 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _pause_cb(self):
         """Adds a pause macro action to the list."""
-        self._insert_entry_at_current_index(gremlin.macro.PauseAction(0.01))
+        self._insert_entry_at_current_index(gremlin.macro.PauseAction(0.250))
         self._refresh_editor_ui()
+
+
+    def _add_entry(self):
+        self._pause_cb()
 
     def _delete_cb(self):
         """Callback executed when the delete button is pressed."""
@@ -1596,8 +1658,12 @@ class Macro(AbstractAction):
                 )
                 self.sequence.append(mouse_motion)
             elif child.tag == "pause":
-                self.sequence.append(
-                    gremlin.macro.PauseAction(float(child.get("duration")))
+                self.sequence.append (
+                    gremlin.macro.PauseAction(
+                                        float(child.get("duration")),
+                                        safe_read(child, "duration_max", float, 0),
+                                        gremlin.profile.parse_bool(child.get("is_random"))
+                                        )
                 )
             elif child.tag == "vjoy":
                 vjoy_action = gremlin.macro.VJoyAction(
@@ -1657,6 +1723,8 @@ class Macro(AbstractAction):
             elif isinstance(entry, gremlin.macro.PauseAction):
                 pause_node = ElementTree.Element("pause")
                 pause_node.set("duration", str(entry.duration))
+                pause_node.set("duration_max", str(entry.duration_max))
+                pause_node.set("is_random", str(entry.is_random))
                 action_list.append(pause_node)
             elif isinstance(entry, gremlin.macro.VJoyAction):
                 vjoy_node = ElementTree.Element("vjoy")

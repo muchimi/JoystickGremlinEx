@@ -23,7 +23,7 @@ import re
 
 from PySide6 import QtCore
 
-from . import common, util
+from . import common, util, event_handler
 
 
 @common.SingletonDecorator
@@ -86,6 +86,8 @@ class Configuration:
                 indent=4
             )
             hdl.write(encoder.encode(self._data))
+
+
 
     def set_calibration(self, dev_id, limits):
         """Sets the calibration data for all axes of a device.
@@ -408,9 +410,14 @@ class Configuration:
 
     @enable_remote_broadcast.setter
     def enable_remote_broadcast(self, value):
-        if type(value) == bool:
+        if type(value) == bool and self._data["enable_remote_broadcast"] != value:
             self._data["enable_remote_broadcast"] = value
             self.save()
+
+            eh = event_handler.EventListener()
+            eh.broadcast_changed.emit()
+
+
 
 
 

@@ -23,6 +23,9 @@ from gremlin.common import DeviceType, InputType
 from . import activation_condition, common, virtual_button
 from functools import partial 
 
+import logging
+syslog = logging.getLogger("system")
+
 class InputIdentifier:
 
     """Represents the identifier of a single input item."""
@@ -169,7 +172,7 @@ class InputItemListView(common.AbstractView):
         InputType.Keyboard: ""
     }
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, name = "Not set"):
         """Creates a new view instance.
 
         :param parent the parent of the widget
@@ -182,9 +185,9 @@ class InputItemListView(common.AbstractView):
             InputType.JoystickHat,
             InputType.Keyboard
         ]
-
-        # Storage for the currently selected index
+        self.name = name
         self.current_index = None
+        #syslog.debug("listview init")
 
         # Create required UI items
         self.main_layout = QtWidgets.QVBoxLayout(self)
@@ -204,6 +207,16 @@ class InputItemListView(common.AbstractView):
 
         el = gremlin.event_handler.EventListener()
         el.profile_device_mapping_changed.connect(self._profile_device_mapping_changed)
+
+    @property
+    def current_index(self):
+        return self._current_index
+    @current_index.setter
+    def current_index(self, value):
+        if value is None:
+            pass
+        #syslog.debug(f"listview index {self.name} set to {value}")
+        self._current_index = value
 
 
     def _profile_device_mapping_changed(self, event):
@@ -285,6 +298,16 @@ class InputItemListView(common.AbstractView):
             if data.input_id == identifier:
                 self.select_item(index)
                 return
+            
+    def selected_item(self):
+        ''' returns the currently selected input in the list view '''
+        
+        index = self.current_index
+        if not index:
+            return None
+        
+        return self.model.data(index)
+
 
 
     def select_item(self, index, emit_signal=True):

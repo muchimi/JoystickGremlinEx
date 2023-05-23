@@ -617,15 +617,31 @@ class PauseAction(AbstractAction):
 
     """Represents the pause in a macro between pressed."""
 
-    def __init__(self, duration):
+    def __init__(self, duration, duration_max = 0, is_random = False):
         """Creates a new Pause object for use in a macro.
 
         :param duration the duration in seconds of the pause
         """
         self.duration = duration
+        self.duration_max = duration_max
+        self.is_random = is_random
 
     def __call__(self):
-        time.sleep(self.duration)
+        import random
+        if self.is_random:
+            # random pause
+            duration_min = self.duration
+            duration_max = self.duration if self.duration_max == 0 else duration_min
+            if duration_max != duration_min:
+                # duration varies between min and max
+                duration = random.uniform(duration_min, duration_max)
+            else:
+                # duration varies up to min
+                duration = random.uniform(0, duration_min)
+        else:
+            duration = self.duration
+
+        time.sleep(duration)
 
 
 class VJoyAction(AbstractAction):

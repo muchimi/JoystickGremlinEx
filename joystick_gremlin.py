@@ -145,6 +145,13 @@ class GremlinUi(QtWidgets.QMainWindow):
         GremlinUi.ui = self
 
 
+    def refresh(self):
+        ''' forces a refreshes the UI by processing events '''
+        app = QtWidgets.QApplication.instance()
+        app.processEvents(QtCore.QEventLoop.ProcessEventsFlag.AllEvents, 1)
+
+
+
     def closeEvent(self, evt):
         """Terminate the entire application if the main window is closed.
 
@@ -779,7 +786,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.activate(False)
 
     def _process_joystick_input_selection(self, event, buttons_only = False):
-        """Handles joystick events to select the appropriate input item.
+        """Handles joystick events to select the appropriate input item for device highligthing in the UI
 
         :param event the event to process
         """
@@ -789,9 +796,17 @@ class GremlinUi(QtWidgets.QMainWindow):
             return
         if gremlin.shared_state.suspend_input_highlighting():
             return
+        
 
-        # Do not attempt to highlight inputs on non device tabs
-        widget = self.ui.devices.currentWidget()
+        # Switch to the tab corresponding to the event's device if the option
+        tab_switch_needed = self.ui.devices.currentWidget() != self.tabs[event.device_guid] 
+        if self.config.highlight_device and tab_switch_needed:
+            self.ui.devices.setCurrentWidget(self.tabs[event.device_guid])
+            self.refresh()        
+
+        
+        # get the widget for the tab corresponding to the device
+        widget = self.tabs[event.device_guid] 
         if not isinstance(widget, gremlin.ui.device_tab.JoystickDeviceTabWidget):
             return
 
@@ -800,27 +815,21 @@ class GremlinUi(QtWidgets.QMainWindow):
         if event.device_guid not in self.tabs:
             return
         
-        process_input = self._should_process_input(event, buttons_only)
+        process_input = self._should_process_input(event, widget, buttons_only)
         
         if not process_input:
             return
 
-        tab_switch_needed = self.ui.devices.currentWidget() \
-                            != self.tabs[event.device_guid]
         
         
 
-        # Switch to the tab corresponding to the event's device if the option
-        # is set in the options
-        if self.config.highlight_device and tab_switch_needed:
-            self.ui.devices.setCurrentWidget(self.tabs[event.device_guid])
-            tab_switch_needed = False
-            time.sleep(0.1)
+        
 
         # If we want to act on the given event figure out which button
         # needs to be pressed and press is
-        if not tab_switch_needed and process_input:
-            widget.input_item_list_view.select_item(event)
+        widget.input_item_list_view.select_item(event)
+        index = widget.input_item_list_view.current_index
+        widget.input_item_list_view.redraw_index(index)
 
 
     def _joystick_input_selection(self, event):
@@ -1183,7 +1192,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                 pass
 
 
-    def _should_process_input(self, event, buttons_only = False):
+    def _should_process_input(self, event, widget, buttons_only = False):
         """Returns True when to process and input, False otherwise.
 
         This enforces a certain downtime between subsequent inputs
@@ -1207,21 +1216,40 @@ class GremlinUi(QtWidgets.QMainWindow):
             # ignore axis moves if button only mode
             return False
 
+        # see what is displayed currently in the UI
+        data = widget.input_item_list_view.selected_item()
+        if data:
+            # if event.event_type == InputType.JoystickButton:
+            #     pass
+            if data.input_type == event.event_type and data.input_id == event.identifier:
+                return False
 
-        # Check if we should actually react to the event
-        if event == self._last_input_event:
-            return False
-        
-        delay = 0.25 if event.event_type == InputType.JoystickAxis else 0.1
 
-        if self._last_input_timestamp + delay > time.time():
-            return False
+            # Check if we should actually react to the event
+            if event == self._last_input_event:
+                return False
+            
+       
         
-        process_input = gremlin.input_devices.JoystickInputSignificant().should_process(event, deviation)
+
+        if event.event_type == InputType.JoystickAxis:
+            # only worry about axis deviation delta if it's an axis
+
+            delay = 0.25 if event.event_type == InputType.JoystickAxis else 0.1
+
+            if self._last_input_timestamp + delay > time.time():
+                return False
+
+            process_input = gremlin.input_devices.JoystickInputSignificant().should_process(event, deviation)
+
+        else:
+            process_input = True
+        
 
         if process_input:
             self._last_input_event = event
             self._last_input_timestamp = time.time()
+
 
             return True
         
