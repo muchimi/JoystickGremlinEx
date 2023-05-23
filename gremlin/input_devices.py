@@ -313,7 +313,7 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
 
         sender = data["sender"]
 
-        if sender == client_id:
+        if sender == remote_client.id:
             # ignore our own broadcasts
             return 
         
