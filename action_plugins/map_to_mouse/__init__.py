@@ -339,21 +339,29 @@ class MapToMouseFunctor(AbstractFunctor):
 
     def _perform_mouse_button(self, event, value):
         assert self.config.motion_input is False
+        is_local = input_devices.remote_client.is_local
+        is_remote = input_devices.remote_client.is_remote
 
         if self.config.button_id in [MouseButton.WheelDown, MouseButton.WheelUp]:
             if value.current:
-                direction = -1
+                direction = -16
                 if self.config.button_id == MouseButton.WheelDown:
                     direction = 1
-                gremlin.sendinput.mouse_wheel(direction)
-                input_devices.remote_client.send_mouse_wheel(direction)
+                if is_local:
+                    gremlin.sendinput.mouse_wheel(direction)
+                if is_remote:
+                    input_devices.remote_client.send_mouse_wheel(direction)
         else:
             if value.current:
-                gremlin.sendinput.mouse_press(self.config.button_id)
-                input_devices.remote_client.send_mouse_button(self.config.button_id.value, True)
+                if is_local:
+                    gremlin.sendinput.mouse_press(self.config.button_id)
+                if is_remote:
+                    input_devices.remote_client.send_mouse_button(self.config.button_id.value, True)
             else:
-                gremlin.sendinput.mouse_release(self.config.button_id)
-                input_devices.remote_client.send_mouse_button(self.config.button_id.value, False)
+                if is_local:
+                    gremlin.sendinput.mouse_release(self.config.button_id)
+                if is_remote:
+                    input_devices.remote_client.send_mouse_button(self.config.button_id.value, False)
 
     def _perform_axis_motion(self, event, value):
         """Processes events destined for an axis.
@@ -368,20 +376,30 @@ class MapToMouseFunctor(AbstractFunctor):
 
         dx = delta_motion if self.config.direction == 90 else None
         dy = delta_motion if self.config.direction != 90 else None
-        self.mouse_controller.set_absolute_motion(dx, dy)
-        input_devices.remote_client.send_mouse_motion(dx, dy)
+        if input_devices.remote_client.is_local:
+            self.mouse_controller.set_absolute_motion(dx, dy)
+        if input_devices.remote_client.is_remote:
+            input_devices.remote_client.send_mouse_motion(dx, dy)
 
     def _perform_button_motion(self, event, value):
         if event.is_pressed:
-            self.mouse_controller.set_accelerated_motion(
-                self.config.direction,
-                self.config.min_speed,
-                self.config.max_speed,
-                self.config.time_to_max_speed
-            )
+            is_local = input_devices.remote_client.is_local
+            is_remote = input_devices.remote_client.is_remote 
+            if is_local:
+                self.mouse_controller.set_accelerated_motion(
+                    self.config.direction,
+                    self.config.min_speed,
+                    self.config.max_speed,
+                    self.config.time_to_max_speed
+                )
+            if is_remote:
+                input_devices.remote_client.send_mouse_acceleration(self.config.direction, self.config.min_speed, self.config.max_speed, self.config.time_to_max_speed)
+      
         else:
-            self.mouse_controller.set_absolute_motion(0, 0)
-            input_devices.remote_client.send_mouse_motion(0, 0)
+            if input_devices.remote_client.is_local:
+                self.mouse_controller.set_absolute_motion(0, 0)
+            if input_devices.remote_client.is_remote:
+                input_devices.remote_client.send_mouse_motion(0, 0)
 
     def _perform_hat_motion(self, event, value):
         """Processes events destined for a hat.
@@ -389,15 +407,25 @@ class MapToMouseFunctor(AbstractFunctor):
         :param event the event triggering the code execution
         :param value the current value of the event chain
         """
+        is_local = input_devices.remote_client.is_local
+        is_remote = input_devices.remote_client.is_remote
         if value.current == (0, 0):
-            self.mouse_controller.set_absolute_motion(0, 0)
+            if is_local:
+                self.mouse_controller.set_absolute_motion(0, 0)
+            if is_remote:
+                input_devices.remote_client.send_mouse_motion(0, 0)
+
         else:
-            self.mouse_controller.set_accelerated_motion(
-                rad2deg(math.atan2(-value.current[1], value.current[0])) + 90.0,
-                self.config.min_speed,
-                self.config.max_speed,
-                self.config.time_to_max_speed
-            )
+            a = rad2deg(math.atan2(-value.current[1], value.current[0])) + 90.0
+            if is_local:
+                self.mouse_controller.set_accelerated_motion(
+                    a,
+                    self.config.min_speed,
+                    self.config.max_speed,
+                    self.config.time_to_max_speed
+                )
+            if is_remote:
+                input_devices.remote_client.send_mouse_acceleration(a, self.config.min_speed, self.config.max_speed, self.config.time_to_max_speed)
 
 
 class MapToMouse(AbstractAction):

@@ -246,8 +246,14 @@ def send_key_down(key):
     :param key the key for which to send the KEYDOWN event
     """
     flags = win32con.KEYEVENTF_EXTENDEDKEY if key.is_extended else 0
-    win32api.keybd_event(key.virtual_code, key.scan_code, flags, 0)
-    input_devices.remote_client.send_key(key.virtual_code, key.scan_code, flags )
+
+    
+    is_remote = input_devices.remote_client.is_remote
+    is_local =  input_devices.remote_client.is_local
+    if is_local:
+        win32api.keybd_event(key.virtual_code, key.scan_code, flags, 0)
+    if is_remote:
+        input_devices.remote_client.send_key(key.virtual_code, key.scan_code, flags )
 
 
 def send_key_up(key):
@@ -257,8 +263,14 @@ def send_key_up(key):
     """
     flags = win32con.KEYEVENTF_EXTENDEDKEY if key.is_extended else 0
     flags |= win32con.KEYEVENTF_KEYUP
-    win32api.keybd_event(key.virtual_code, key.scan_code, flags, 0)
-    input_devices.remote_client.send_key(key.virtual_code, key.scan_code, flags )
+
+
+    is_remote = input_devices.remote_client.is_remote
+    is_local =  input_devices.remote_client.is_local
+    if is_local:
+        win32api.keybd_event(key.virtual_code, key.scan_code, flags, 0)
+    if is_remote:
+        input_devices.remote_client.send_key(key.virtual_code, key.scan_code, flags )
 
 def key_from_name(name):
     """Returns the key corresponding to the provided name.

@@ -38,6 +38,7 @@ import win32api
 import gremlin.sendinput
 
 import socketserver, socket, msgpack
+import enum
 
 
 syslog = logging.getLogger("system")
@@ -343,6 +344,14 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
                 dy = data["dy"]
                 mouse_controller = gremlin.sendinput.MouseController()
                 mouse_controller.set_absolute_motion(dx, dy)
+            elif subtype == "amotion":
+                # accelerated motion
+                a = data["acc"]
+                min_speed = data["min_speed"]
+                max_speed = data["max_speed"] 
+                time_to_max_speed = data["time_to_speed"]
+                mouse_controller = gremlin.sendinput.MouseController()
+                mouse_controller.set_accelerated_motion(a,min_speed,max_speed,time_to_max_speed)
 
 
         elif action in ("button","axis","hat"):
@@ -490,10 +499,15 @@ class RemoteServer(QtCore.QObject):
 class RemoteClient(QtCore.QObject):
     """ Provides access to remote a remote Gremlin instance events """
 
+    class ClientMode(enum.Enum):
+        Local = 1
+        Remote = 2
+        LocalAndRemote = 3
+
     def __init__(self):
         """Initialises a new object."""
         QtCore.QObject.__init__(self)
-        self._host = "localhost"
+        #self._host = "localhost"
         config = gremlin.config.Configuration()
         self._port = config.server_port
         self._enabled = config.enable_remote_broadcast
@@ -501,7 +515,39 @@ class RemoteClient(QtCore.QObject):
         self._sock = None
         # unique ID of this client
         self._id = get_guid()
+        self._mode = RemoteClient.ClientMode.Local
         
+
+    @property
+    def is_local(self):
+        ''' true if local control enabled '''
+        return self._mode in (RemoteClient.ClientMode.Local, RemoteClient.ClientMode.LocalAndRemote)
+    
+    @property
+    def is_remote(self):
+        ''' true if remote control enabled '''
+        return self._mode in (RemoteClient.ClientMode.Remote, RemoteClient.ClientMode.LocalAndRemote)
+    
+    @property
+    def mode(self):
+        ''' client mode '''
+        return self._mode
+    
+    @mode.setter
+    def mode(self, value):
+        config = gremlin.config.Configuration()
+        if value == RemoteClient.ClientMode.Remote and not config.enable_remote_broadcast:
+            syslog.debug("Unable to set remote mode - broadcast is not enabled in options")
+            return
+        
+        self._mode = value
+
+    
+    def toggle_mode(self):
+        ''' toggles output mode between remote and local '''
+        if self._mode == RemoteClient.ClientMode.Local:
+            self._mode = RemoteClient.ClientMode.Remote
+
 
     def start(self):
         ''' creates a multicast client send socket'''
@@ -541,6 +587,18 @@ class RemoteClient(QtCore.QObject):
             raw_data = msgpack.packb(data)
             self._send(raw_data)
             #syslog.debug(f"remote gremlin event set button: {device_id} {button_id} {is_pressed}")
+
+    def toggle_button(self, device_id, button_id):
+        ''' toggles a button '''
+        if self._enabled:
+            data = {}
+            data["sender"] = self._id
+            data["action"] = "toggle"
+            data["device"] = device_id
+            data["target"] = button_id
+            raw_data = msgpack.packb(data)
+            self._send(raw_data)
+            #syslog.debug(f"remote gremlin event toggle button: {device_id} {button_id}")
 
     def send_axis(self, device_id, axis_id, value):
         ''' handles a remote joystick event '''
@@ -620,6 +678,19 @@ class RemoteClient(QtCore.QObject):
             raw_data = msgpack.packb(data)
             self._send(raw_data)
             #syslog.debug(f"remote gremlin event set mouse: axis {dx} {dy}")
+
+    def send_mouse_motion_acceleration(self, a, min_speed, max_speed, time_to_max_speed):
+        if self._enabled:
+            data = {}
+            data["sender"] = self._id
+            data["action"] = "mouse"
+            data["subtype"] = "amotion"
+            data["acc"] = a
+            data["min_speed"] = min_speed
+            data["max_speed"] = max_speed
+            data["time_to_speed"] = time_to_max_speed
+            raw_data = msgpack.packb(data)
+            self._send(raw_data)
 
 
     @property
