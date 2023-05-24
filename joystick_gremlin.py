@@ -34,6 +34,7 @@ import PySide6
 from PySide6 import QtCore, QtGui, QtMultimedia, QtWidgets
 
 from gremlin.common import InputType
+import gremlin.event_handler 
 
 import dill
 
@@ -53,6 +54,7 @@ import gremlin.ui.profile_creator
 import gremlin.ui.profile_settings
 
 from gremlin.ui.ui_gremlin import Ui_Gremlin
+from gremlin.input_devices import remote_state
 
 
 class GremlinUi(QtWidgets.QMainWindow):
@@ -119,6 +121,10 @@ class GremlinUi(QtWidgets.QMainWindow):
         self._create_statusbar()
         self._update_statusbar_active(False)
 
+        # hook status bar to events
+        el = gremlin.event_handler.EventListener()
+        el.broadcast_changed.connect(self._update_status_bar)
+
         # Load existing configuration or create a new one otherwise
         if self.config.last_profile and os.path.isfile(self.config.last_profile):
             self._do_load_profile(self.config.last_profile)
@@ -143,6 +149,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.apply_window_settings()
 
         GremlinUi.ui = self
+
+
 
 
     def refresh(self):
@@ -890,23 +898,39 @@ class GremlinUi(QtWidgets.QMainWindow):
         if reason == QtWidgets.QSystemTrayIcon.Trigger:
             self.setHidden(not self.isHidden())
 
+
     def _update_statusbar_active(self, is_active):
+        self._is_active = is_active
+        self._update_status_bar()
+
+    def _update_status_bar(self):
+        # updates the status bar
+
+    
         """Updates the status bar with the current state of the system.
 
         :param is_active True if the system is active, False otherwise
         """
-        if is_active:
+        if self._is_active:
             text_active = "<font color=\"green\">Active</font>"
         else:
             text_active = "<font color=\"red\">Paused</font>"
         if self.ui.actionActivate.isChecked():
-            text_running = "Running and {}".format(text_active)
+            text_running = f"Running and {text_active}"
         else:
             text_running = "Not Running"
 
-        self.status_bar_is_active.setText(
-            "<b>Status: </b> {}".format(text_running)
-        )
+        # remote control status
+        if remote_state.is_local:
+            local_msg = "<font color=\"green\">Active</font>"
+        else:
+            local_msg = "<font color=\"red\">Disabled</font>"
+        if remote_state.is_remote:
+            remote_msg = "<font color=\"green\">Active</font>"
+        else:
+            remote_msg = "<font color=\"red\">Disabled</font>"
+
+        self.status_bar_is_active.setText(f"<b>Status:</b> {text_running} <b>Local Control</b> {local_msg} <b>Broadcast:</b> {remote_msg}")
 
     def _update_statusbar_mode(self, mode):
         """Updates the status bar display of the current mode.

@@ -410,13 +410,24 @@ class Configuration:
 
     @enable_remote_broadcast.setter
     def enable_remote_broadcast(self, value):
+        ''' remote broadcast master switch enable '''
         if type(value) == bool and self._data["enable_remote_broadcast"] != value:
             self._data["enable_remote_broadcast"] = value
             self.save()
 
             eh = event_handler.EventListener()
-            eh.broadcast_changed.emit()
+            eh.config_changed.emit()
 
+    @property
+    def enable_broadcast_speech(self):
+        ''' speech on broadcast change mode enable'''
+        return self._data.get("enable_broadcast_speech",True)
+    
+    @enable_broadcast_speech.setter
+    def enable_broadcast_speech(self, value):
+        if type(value) == bool and self._data["enable_broadcast_speech"] != value:
+            self._data["enable_broadcast_speech"] = value
+            self.save()
 
 
 

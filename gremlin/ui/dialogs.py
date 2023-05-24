@@ -133,6 +133,10 @@ class OptionsUi(common.BaseDialogUi):
         self.enable_remote_broadcast.clicked.connect(self._enable_remote_broadcast)
 
 
+        self.enable_broadcast_speech = QtWidgets.QCheckBox("Enable speech on broadcast mode change")
+        self.enable_broadcast_speech.setChecked(self.config.enable_broadcast_speech)
+        self.enable_broadcast_speech.clicked.connect(self._enable_broadcast_speech)
+
         self.remote_control_label = QtWidgets.QLabel("Port:")
         
         self.remote_control_port = QtWidgets.QDoubleSpinBox()
@@ -146,6 +150,8 @@ class OptionsUi(common.BaseDialogUi):
         self.remote_control_layout.addWidget(self.remote_control_label)
         self.remote_control_layout.addWidget(self.remote_control_port)
         self.remote_control_layout.addStretch()
+
+
 
 
 
@@ -213,6 +219,7 @@ class OptionsUi(common.BaseDialogUi):
         self.general_layout.addLayout(self.macro_axis_polling_layout)
         self.general_layout.addLayout(self.macro_axis_minimum_change_layout)
         self.general_layout.addLayout(self.remote_control_layout)
+        self.general_layout.addWidget(self.enable_broadcast_speech)
         self.general_layout.addStretch()
         self.tab_container.addTab(self.general_page, "General")
 
@@ -618,6 +625,9 @@ If this option is on, the last active profile will remain active until a differe
         self.config.enable_remote_broadcast = clicked
         self.config.save()
 
+    def _enable_broadcast_speech(self, clicked):
+        self.config.enable_broadcast_speech = clicked
+        self.config.save()
 
     def _remote_control_server_port(self, value):
         ''' updates the remote control server port'''

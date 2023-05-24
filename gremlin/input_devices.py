@@ -35,7 +35,7 @@ from dill import DILL, GUID, GUID_Invalid
 from . import common, error, event_handler, joystick_handling, util
 from gremlin.common import InputType
 import win32api
-import gremlin.sendinput
+import gremlin.sendinput, gremlin.tts
 
 import socketserver, socket, msgpack
 import enum
@@ -95,6 +95,33 @@ class VjoyAction(enum.Enum):
         return None
     
 
+    @staticmethod
+    def is_command(value):
+        return value in (
+        VjoyAction.VJoyDisableLocal,
+        VjoyAction.VJoyDisableRemote,
+        VjoyAction.VJoyEnableLocalOnly,
+        VjoyAction.VJoyEnableRemoteOnly,
+        VjoyAction.VJoyEnableLocalAndRemote,
+        VjoyAction.VJoyEnableLocal,
+        VjoyAction.VJoyEnableRemote,
+        VjoyAction.VJoyToggleRemote,
+        )
+
+
+class InternalSpeech():
+	''' tts interface '''
+	def __init__(self):
+		import win32com.client
+		self.speaker = win32com.client.Dispatch("SAPI.SpVoice")
+
+	def speak(self, text):
+		try:
+			self.speaker.speak(text)
+		except:
+			pass
+
+
 @common.SingletonDecorator
 class RemoteControl():
     ''' holds remote control status information'''
@@ -103,33 +130,37 @@ class RemoteControl():
         self._is_remote = False
         self._is_local = False
         self._mode = VjoyAction.VJoyEnableLocalOnly
-        self._is_broadcast = False
+        config = gremlin.config.Configuration()
+        self._is_broadcast = config.enable_remote_broadcast
         self._update(self._mode)
         el = event_handler.EventListener()
+        el.config_changed.connect(self._config_changed)
         el.broadcast_changed.connect(self._broadcast_changed)
         
     def _update(self, value):
         
+        is_local = self._is_local
+        is_remote = self._is_remote
         if value == VjoyAction.VJoyDisableLocal:
-            self._is_local = False
+            is_local = False
         elif value == VjoyAction.VJoyDisableRemote:
-            self._is_remote = False
+            is_remote = False
         elif value == VjoyAction.VJoyEnableLocalOnly:
-            self._is_local = True
-            self._is_remote = False
+            is_local = True
+            is_remote = False
         elif value == VjoyAction.VJoyEnableRemoteOnly:
-            self._is_local = False
-            self._is_remote = True
+            is_local = False
+            is_remote = True
         elif value == VjoyAction.VJoyEnableLocalAndRemote:
-            self._is_local = True
-            self._is_remote = True
+            is_local = True
+            is_remote = True
         elif value == VjoyAction.VJoyEnableLocal:
-            self._is_local = True
+            is_local = True
         elif value == VjoyAction.VJoyEnableRemote:
-            self._is_remote = True            
+            is_remote = True            
         elif value == VjoyAction.VJoyToggleRemote:
-            self._is_local = not self._is_local
-            self._is_remote = not self._is_remote
+            is_local = not self._is_local
+            is_remote = not self._is_remote
         else:
             # not sure what this was
             return
@@ -137,11 +168,39 @@ class RemoteControl():
         self._mode = value
         syslog.debug(f"Remote control status: local: {self._is_local} remote: {self._is_remote}")
 
-    def _broadcast_changed(self):
+        if self._is_local != is_local or self._is_remote != is_remote:
+            # status changed
+            self._is_local = is_local
+            self._is_remote = is_remote
+            el = event_handler.EventListener()
+            el.broadcast_changed.emit()
+
+
+    def _config_changed(self):
         ''' called when broadcast config item changes '''
         config = gremlin.config.Configuration()
-        self._is_broadcast = config.enable_remote_broadcast
+        if self._is_broadcast != config.enable_remote_broadcast:
+            self._is_broadcast = config.enable_remote_broadcast
+            el = event_handler.EventListener()
+            el.broadcast_changed.emit()
 
+    def say(self, msg):
+        speech = InternalSpeech()
+        speech.speak(msg)
+
+    def _broadcast_changed(self):
+        config = gremlin.config.Configuration()
+        if config.enable_broadcast_speech:
+            msg = None
+            if self._is_local and self._is_remote:
+                msg = "Concurrent control mode enabled"
+            elif self._is_local:
+                msg = "Local control is enabled"
+            elif self._is_remote:
+                msg = "Remote control is enabled"
+            if msg:
+                threading.Thread(target = self.say, args=(msg,)).start()
+        
     @property
     def mode(self):
         ''' gets the current mode '''

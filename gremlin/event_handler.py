@@ -179,6 +179,9 @@ class EventListener(QtCore.QObject):
     profile_stop = QtCore.Signal()
     
     # occurs on broadcast configuration change
+    config_changed =  QtCore.Signal()
+
+    # occurs on broadcast mode change
     broadcast_changed = QtCore.Signal()
         
 

@@ -1010,22 +1010,25 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         else:
             self.target_value_valid = False
 
-    def _update_ui_action_mode(self, action):
+    def _update_ui_action_mode(self, action_data):
         ''' updates ui based on the current action ode'''
+        action = action_data.action_mode
         pulse_visible = action == VjoyAction.VJoyPulse
         start_visible = action == VjoyAction.VJoyButton
         axis_visible = action == VjoyAction.VJoyAxis
         grid_visible = action in (VjoyAction.VJoyPulse, VjoyAction.VJoyButton, VjoyAction.VJoyToggle, VjoyAction.VJoyAxisToButton)
         range_visible = action in (VjoyAction.VJoyRangeAxis, VjoyAction.VJoyAxisToButton)
         target_value_visible = action == VjoyAction.VJoyButton
-        selector_visible = not action in (VjoyAction.VJoyEnableLocal, VjoyAction.VJoyEnableRemoteOnly,VjoyAction.VJoyToggleRemote)
+        is_command = VjoyAction.is_command(action)
+        selector_visible = not is_command
+        exec_on_release_visible =  action_data.input_type == InputType.JoystickButton # or is_command
 
         self.pulse_widget.setVisible(pulse_visible)
         self.start_widget.setVisible(start_visible)
         self.button_grid_widget.setVisible(grid_visible)
         self.axis_widget.setVisible(axis_visible)
         self.axis_range_value_widget.setVisible(range_visible)
-        self.chkb_exec_on_release.setVisible(grid_visible)
+        self.chkb_exec_on_release.setVisible(exec_on_release_visible)
         self.target_value_widget.setVisible(target_value_visible)
 
         self.lbl_vjoy_device_selector.setVisible(selector_visible)
@@ -1074,7 +1077,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             action = self.cb_action_list.itemData(index)
             self.action_data.action_mode = action
             self.action_data.input_id = self.action_data.get_input_id()
-            self._update_ui_action_mode(action)
+            self._update_ui_action_mode(self.action_data)
             self._update_vjoy_device_input_list()
             self.notify_device_changed()
 
@@ -1353,7 +1356,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
             self._populate_grid(vjoy_dev_id, input_type)
             self._update_vjoy_device_input_list()
-            self._update_ui_action_mode(self.action_data.action_mode)
+            self._update_ui_action_mode(self.action_data)
 
         except gremlin.error.GremlinError as e:
             util.display_error(
@@ -1668,18 +1671,10 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
                 if event.is_pressed == target_press:
                     usage_data.set_range(self.vjoy_device_id, self.vjoy_input_id, self.range_low, self.range_high)
 
-            elif self.action_mode in (
-                VjoyAction.VJoyDisableLocal,
-                VjoyAction.VJoyDisableRemote,
-                VjoyAction.VJoyEnableLocalOnly,
-                VjoyAction.VJoyEnableRemoteOnly,
-                VjoyAction.VJoyEnableLocalAndRemote,
-                VjoyAction.VJoyEnableLocal,
-                VjoyAction.VJoyEnableRemote,
-                VjoyAction.VJoyToggleRemote,
-                ):
+            elif VjoyAction.is_command(self.action_mode):
                 # update remote control mode
-                remote_state.mode = self.action_mode
+                if event.is_pressed == target_press:
+                    remote_state.mode = self.action_mode
 
             else:
                 # basic handling
