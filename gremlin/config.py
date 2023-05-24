@@ -411,7 +411,7 @@ class Configuration:
     @enable_remote_broadcast.setter
     def enable_remote_broadcast(self, value):
         ''' remote broadcast master switch enable '''
-        if type(value) == bool and self._data["enable_remote_broadcast"] != value:
+        if type(value) == bool and self._data.get("enable_remote_broadcast",False)!= value:
             self._data["enable_remote_broadcast"] = value
             self.save()
 
@@ -425,7 +425,8 @@ class Configuration:
     
     @enable_broadcast_speech.setter
     def enable_broadcast_speech(self, value):
-        if type(value) == bool and self._data["enable_broadcast_speech"] != value:
+
+        if type(value) == bool and self._data.get("enable_broadcast_speech",True) != value:
             self._data["enable_broadcast_speech"] = value
             self.save()
 

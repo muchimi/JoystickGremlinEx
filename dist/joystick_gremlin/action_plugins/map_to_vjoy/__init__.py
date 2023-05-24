@@ -32,74 +32,15 @@ import gremlin.ui.common
 import gremlin.ui.input_item
 import os
 import action_plugins
+import enum
+from gremlin.input_devices import VjoyAction, remote_state
+
 
 IdMapToButton = -2 # map to button special ID
+syslog = logging.getLogger("system")
 
-class VjoyAction:
-    ''' defines available vjoy actions supported by this plugin'''
-    VJoyButton = 0 # action on button press
-    VJoyToggle = 1 # toggle function on/off
-    VJoyPulse = 2 # pulse function (pulses a button),
-    VJoyInvertAxis = 3 # invert axis function
-    VJoySetAxis = 4 # set axis value
-    VJoyAxis = 5 # normal map to axis
-    VJoyHat = 6 #  normal map to hat
-    VJoyRangeAxis = 7 # scale axis
-    VJoyAxisToButton = 8 # axis to button mapping
-    
 
-  
 
-    @staticmethod
-    def to_string(mode):
-        if mode == VjoyAction.VJoyButton:
-            return "VJoyButton"
-        if mode == VjoyAction.VJoyToggle:
-            return "VJoyToggle"
-        if mode == VjoyAction.VJoyPulse:
-            return "VJoyPulse"
-        if mode == VjoyAction.VJoyInvertAxis:
-            return "VJoyInvertAxis"        
-        if mode == VjoyAction.VJoySetAxis:
-            return "VJoySetAxis"
-        if mode == VjoyAction.VJoyAxis:
-            return "VJoyAxis"
-        if mode == VjoyAction.VJoyHat:
-            return "VJoyHat"
-        if mode == VjoyAction.VJoyRangeAxis:
-            return "VJoyRangeAxis"
-        if mode == VjoyAction.VJoyAxisToButton:
-            return "VJoyAxisToButton"
-        
-        return "VJoyButton"
-    
-    @staticmethod
-    def from_string(str):
-        str = str.lower().strip()
-        if str.isnumeric():
-            mode = int(str)
-            return mode
-        # **** LOWERCASE ****
-        if str == "vjoybutton":
-            return VjoyAction.VJoyButton
-        if str == "vjoytoggle":
-            return VjoyAction.VJoyToggle
-        if str == "vjoypulse":
-            return VjoyAction.VJoyPulse
-        if str == "vjoyinvertaxis":
-            return VjoyAction.VJoyInvertAxis
-        if str == "vjoysetaxis":
-            return VjoyAction.VJoySetAxis
-        if str == "vjoyaxis":
-            return VjoyAction.VJoyAxis
-        if str == "vjoyhat":
-            return VjoyAction.VJoyHat
-        if str == "vJoyrangeaxis":
-            return VjoyAction.VJoyRangeAxis
-        if str == "vjoyaxistobutton":
-            return VjoyAction.VJoyAxisToButton
-        
-        return VjoyAction.VJoyButton
 
 class GridClickWidget(QtWidgets.QWidget):
     ''' implements a widget that reponds to a mouse click '''
@@ -759,13 +700,39 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         input_id = VJoyUsageState._active_device_input_id
         vjoy_device_id = self.action_data.vjoy_device_id      
         vjoy_input_id = self.action_data.vjoy_input_id
+
+
+        # command modes
+        value = self.action_data.action_mode
+        if value in (
+                VjoyAction.VJoyDisableLocal,
+                VjoyAction.VJoyDisableRemote,
+                VjoyAction.VJoyEnableLocalOnly,
+                VjoyAction.VJoyEnableRemoteOnly,
+                VjoyAction.VJoyEnableLocalAndRemote,
+                VjoyAction.VJoyEnableLocal,
+                VjoyAction.VJoyEnableRemote,
+                VjoyAction.VJoyToggleRemote,
+                ):
+            action_name = "GremlinEx Command"
+        else:
+            action_name = None
+
         if input_type == InputType.JoystickAxis:
             axis_name = self.get_axis_name(input_id)
-            name = f"Axis {input_id} ({axis_name}) -> Vjoy device {vjoy_device_id} axis {vjoy_input_id} ({self.get_axis_name(vjoy_input_id)})"
+            if not action_name:
+                action_name = f"Vjoy device {vjoy_device_id} axis {vjoy_input_id} ({self.get_axis_name(vjoy_input_id)})"
+            name = f"Axis {input_id} ({axis_name}) -> {action_name}"
         elif input_type == InputType.JoystickButton:
-            name = f"Button {input_id} -> Vjoy device {vjoy_device_id} button {vjoy_input_id}"
+            if not action_name:
+                action_name = f"Vjoy device {vjoy_device_id} button {vjoy_input_id}"
+            name = f"Button {input_id} -> {action_name}"
         elif input_type == InputType.JoystickHat:                
-            name = f"Hat {input_id} -> Vjoy device {vjoy_device_id} hat {vjoy_input_id}"
+            if not action_name:
+                action_name = f"Vjoy device {vjoy_device_id} hat {vjoy_input_id}"
+            name = f"Hat {input_id} -> {action_name}"
+        
+        
         box.addWidget(QtWidgets.QLabel(name))
         box.addStretch()
 
@@ -800,8 +767,8 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         # vjoy device selection - display vjoy target ID and vjoy target input - the input changes based on the behavior
 
         row = 2        
-        lbl = QtWidgets.QLabel("Device:")
-        grid.addWidget(lbl,row,0)
+        self.lbl_vjoy_device_selector = QtWidgets.QLabel("Device:")
+        grid.addWidget(self.lbl_vjoy_device_selector,row,0)
         self.cb_vjoy_device_selector = QtWidgets.QComboBox()
         grid.addWidget(self.cb_vjoy_device_selector,row,1)
         
@@ -958,6 +925,14 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
                 self.cb_action_list.addItem("Invert Axis", VjoyAction.VJoyInvertAxis)
                 self.cb_action_list.addItem("Set Axis Value", VjoyAction.VJoySetAxis)
                 self.cb_action_list.addItem("Set Axis Range", VjoyAction.VJoyRangeAxis)
+                self.cb_action_list.addItem("Set Local Control Only", VjoyAction.VJoyEnableLocalOnly)
+                self.cb_action_list.addItem("Set Remote Control Only", VjoyAction.VJoyEnableRemoteOnly)
+                self.cb_action_list.addItem("Enable Local Control", VjoyAction.VJoyEnableLocal)
+                self.cb_action_list.addItem("Enable Remote Control", VjoyAction.VJoyEnableRemote)
+                self.cb_action_list.addItem("Enable Concurrent Local + Remote Control", VjoyAction.VJoyEnableLocalAndRemote)
+                self.cb_action_list.addItem("Disable Local Control", VjoyAction.VJoyDisableLocal)
+                self.cb_action_list.addItem("Disable Remote Control", VjoyAction.VJoyDisableRemote)
+                self.cb_action_list.addItem("Toggle Control", VjoyAction.VJoyToggleRemote)
                 
                
             elif self.action_data.input_type == InputType.JoystickHat:
@@ -1035,23 +1010,29 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         else:
             self.target_value_valid = False
 
-    def _update_ui_action_mode(self, action):
+    def _update_ui_action_mode(self, action_data):
         ''' updates ui based on the current action ode'''
+        action = action_data.action_mode
         pulse_visible = action == VjoyAction.VJoyPulse
         start_visible = action == VjoyAction.VJoyButton
         axis_visible = action == VjoyAction.VJoyAxis
         grid_visible = action in (VjoyAction.VJoyPulse, VjoyAction.VJoyButton, VjoyAction.VJoyToggle, VjoyAction.VJoyAxisToButton)
         range_visible = action in (VjoyAction.VJoyRangeAxis, VjoyAction.VJoyAxisToButton)
         target_value_visible = action == VjoyAction.VJoyButton
-        selector_visible = True # action != VjoyAction.VJoyAxisToButton
+        is_command = VjoyAction.is_command(action)
+        selector_visible = not is_command
+        exec_on_release_visible =  action_data.input_type == InputType.JoystickButton # or is_command
 
         self.pulse_widget.setVisible(pulse_visible)
         self.start_widget.setVisible(start_visible)
         self.button_grid_widget.setVisible(grid_visible)
         self.axis_widget.setVisible(axis_visible)
         self.axis_range_value_widget.setVisible(range_visible)
-        self.chkb_exec_on_release.setVisible(grid_visible)
+        self.chkb_exec_on_release.setVisible(exec_on_release_visible)
         self.target_value_widget.setVisible(target_value_visible)
+
+        self.lbl_vjoy_device_selector.setVisible(selector_visible)
+        self.cb_vjoy_device_selector.setVisible(selector_visible)
         self.cb_vjoy_input_selector.setVisible(selector_visible)
         self.lbl_vjoy_input_selector.setVisible(selector_visible)
 
@@ -1074,6 +1055,18 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.action_label.setText("Sets the vjoy axis active output range")
         elif action == VjoyAction.VJoyAxisToButton:
             self.action_label.setText("Maps an axis range to a button value when the axis is in that range")
+        elif action == VjoyAction.VJoyEnableLocalOnly:
+            self.action_label.setText("Enables local output mode and disables remote control")
+        elif action == VjoyAction.VJoyEnableRemoteOnly:
+            self.action_label.setText("Enables remote control and disables local control")
+        elif action == VjoyAction.VJoyEnableLocal:
+            self.action_label.setText("Enables local output (can be concurrent with remote control)")
+        elif action == VjoyAction.VJoyEnableRemoteOnly:
+            self.action_label.setText("Enables remote control (can be concurrent with local control)")
+        elif action == VjoyAction.VJoyEnableLocalAndRemote:
+            self.action_label.setText("Enables local and remote control concurrently")
+        elif action == VjoyAction.VJoyToggleRemote:
+            self.action_label.setText("Toggles between local and remote output modes")
         else:
             self.action_label.setText("Unknown")
 
@@ -1084,7 +1077,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             action = self.cb_action_list.itemData(index)
             self.action_data.action_mode = action
             self.action_data.input_id = self.action_data.get_input_id()
-            self._update_ui_action_mode(action)
+            self._update_ui_action_mode(self.action_data)
             self._update_vjoy_device_input_list()
             self.notify_device_changed()
 
@@ -1340,6 +1333,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             if self.action_data.action_mode == VjoyAction.VJoyAxisToButton:
                 is_button_mode = True
             
+            
 
             if is_button_mode:
                 self.pulse_spin_widget.setValue(self.action_data.pulse_delay)
@@ -1362,7 +1356,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
             self._populate_grid(vjoy_dev_id, input_type)
             self._update_vjoy_device_input_list()
-            self._update_ui_action_mode(self.action_data.action_mode)
+            self._update_ui_action_mode(self.action_data)
 
         except gremlin.error.GremlinError as e:
             util.display_error(
@@ -1502,6 +1496,8 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
         self.axis_value = 0.0
         self.axis_start_value = action.axis_start_value
 
+        self.remote_client = input_devices.remote_client
+
         self.lock = threading.Lock()
 
           
@@ -1519,6 +1515,8 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
             usage_data.set_range(self.vjoy_device_id, self.vjoy_input_id, self.range_low, self.range_high)
             # print(f"Axis start value: vjoy: {self.vjoy_device_id} axis: {self.vjoy_input_id}  value: {self.axis_start_value}")
             joystick_handling.VJoyProxy()[self.vjoy_device_id].axis(self.vjoy_input_id).value = self.axis_start_value
+            self.remote_client.send_axis(self.vjoy_device_id, self.vjoy_input_id, self.axis_start_value)
+
 	
     # async routine to pulse a button
     def _fire_pulse(self, *args):
@@ -1531,8 +1529,10 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
 
         button = joystick_handling.VJoyProxy()[vjoy_device_id].button(vjoy_input_id)
         button.is_pressed = True
+        self.remote_client.send_button(vjoy_device_id, vjoy_input_id, True)
         time.sleep(duration)
         button.is_pressed = False
+        self.remote_client.send_button(vjoy_device_id, vjoy_input_id, False)
         self.lock.release()
 
     # def smooth(self, value, reverse = False, power = 3):
@@ -1559,7 +1559,9 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
     #     return pow((value - v_start) / v_end, power) * v_end + v_start
     
     def process_event(self, event, value):
-        ''' runs when a joystick even occurs like a button press or axis movement '''
+        ''' runs when a joystick even occurs like a button press or axis movement when a profile is running '''
+        (is_local, is_remote) = input_devices.remote_state.state
+        
         if self.input_type == InputType.JoystickAxis :
             target = -value.current if self.reverse else value.current
 
@@ -1572,9 +1574,15 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
                     # axis in range
                     print (f"In range {value.current}")
                     if not event.is_pressed:
-                        joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = True
+                        if is_local:
+                            joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = True
+                        if is_remote:
+                            self.remote_client.send_button(self.vjoy_device_id, self.vjoy_input_id, True)
                 else:
-                    joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = False 
+                    if is_local:
+                        joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = False 
+                    if is_remote:
+                        self.remote_client.send_button(self.vjoy_device_id, self.vjoy_input_id, False)
 
             elif self.axis_mode == "absolute":
                 # apply any range function to the raw position
@@ -1584,7 +1592,10 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
                 # y = r_min + (x - input_min)*(r_max - r_min)/(input_max - input_min)
                 r_min, r_max = usage_data.get_range(self.vjoy_device_id, self.vjoy_input_id)
                 value = r_min + (target + 1.0)*((r_max - r_min)/2.0)
-                joystick_handling.VJoyProxy()[self.vjoy_device_id].axis(self.vjoy_input_id).value = value
+                if is_local:
+                    joystick_handling.VJoyProxy()[self.vjoy_device_id].axis(self.vjoy_input_id).value = value
+                if is_remote:
+                    self.remote_client.send_axis(self.vjoy_device_id, self.vjoy_input_id, value)
             else:
                 self.should_stop_thread = abs(event.value) < 0.05
                 self.axis_delta_value = \
@@ -1593,9 +1604,7 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
                 if self.thread_running is False:
                     if isinstance(self.thread, threading.Thread):
                         self.thread.join()
-                    self.thread = threading.Thread(
-                        target=self.relative_axis_thread
-                    )
+                    self.thread = threading.Thread(target=self.relative_axis_thread)
                     self.thread.start()
 
         elif self.input_type == InputType.JoystickButton:
@@ -1606,7 +1615,10 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
                 # normal default behavior
                 if self.exec_on_release:
                     if not event.is_pressed:
-                        joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = True
+                        if is_local:
+                            joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = True
+                        if is_remote:
+                            self.remote_client.send_button(self.vjoy_device_id, self.vjoy_input_id, True )
                 else:
 
                     if event.event_type in [InputType.JoystickButton, InputType.Keyboard] \
@@ -1618,15 +1630,23 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
                         )
 
                     if event.is_pressed:
-                        joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = value.current                        
+                        if is_local:    
+                            joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = value.current                        
+                        if is_remote:
+                            self.remote_client.send_button(self.vjoy_device_id, self.vjoy_input_id, value.current )
                     
             
             elif self.action_mode == VjoyAction.VJoyToggle:
                 # toggle action
                 if event.event_type in [InputType.JoystickButton, InputType.Keyboard] \
                         and event.is_pressed:
-                    button = joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id)
-                    button.is_pressed = not button.is_pressed
+                    if is_local:
+                        button = joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id)
+                        button.is_pressed = not button.is_pressed
+                    if is_remote:
+                        self.remote_client.toggle_button(self.vjoy_device_id, self.vjoy_input_id)
+                    
+
             elif self.action_mode == VjoyAction.VJoyPulse:
                 
                 # pulse action
@@ -1641,21 +1661,34 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
             elif self.action_mode == VjoyAction.VJoySetAxis:
                 # set the value on the specified axis
                 if self.target_value_valid and event.is_pressed == target_press:
-                    joystick_handling.VJoyProxy()[self.target_device_id].axis(self.target_input_id).value = self.target_value
+                    if is_local:
+                        joystick_handling.VJoyProxy()[self.vjoy_device_id].axis(self.vjoy_input_id).value = self.target_value
+                    if is_remote:
+                        self.remote_client.send_axis(self.vjoy_device_id, self.vjoy_input_id, self.target_value)
 
             elif self.action_mode == VjoyAction.VJoyRangeAxis:
                 # changes the output range on the target device / axis
                 if event.is_pressed == target_press:
                     usage_data.set_range(self.vjoy_device_id, self.vjoy_input_id, self.range_low, self.range_high)
 
+            elif VjoyAction.is_command(self.action_mode):
+                # update remote control mode
+                if event.is_pressed == target_press:
+                    remote_state.mode = self.action_mode
+
             else:
                 # basic handling
-                joystick_handling.VJoyProxy()[self.vjoy_device_id] \
-                    .button(self.vjoy_input_id).is_pressed = value.current
+                if is_local:
+                    joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = value.current
+                if is_remote:
+                    self.remote_client.send_button(self.vjoy_device_id, self.vjoy_input_id, value.current)
+
 
         elif self.input_type == InputType.JoystickHat:
-            joystick_handling.VJoyProxy()[self.vjoy_device_id] \
-                .hat(self.vjoy_input_id).direction = value.current
+            if is_local:
+                joystick_handling.VJoyProxy()[self.vjoy_device_id].hat(self.vjoy_input_id).direction = value.current
+            if is_remote:
+                self.remote_client.send_hat(self.vjoy_device_id, self.vjoy_input_id, value.current)
 
         return True
 
@@ -1663,6 +1696,7 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
         self.thread_running = True
         vjoy_dev = joystick_handling.VJoyProxy()[self.vjoy_device_id]
         self.axis_value = vjoy_dev.axis(self.vjoy_input_id).value
+        (is_local, is_remote) = input_devices.remote_state.state
         while self.thread_running:
             try:
                 # If the vjoy value has was changed from what we set it to
@@ -1677,7 +1711,11 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
                     -1.0,
                     min(1.0, self.axis_value + self.axis_delta_value)
                 )
-                vjoy_dev.axis(self.vjoy_input_id).value = self.axis_value
+                
+                if is_local:
+                    vjoy_dev.axis(self.vjoy_input_id).value = self.axis_value
+                if is_remote:
+                    self.remote_client.send_axis(self.vjoy_device_id, self.vjoy_input_id, self.axis_value)
 
                 if self.should_stop_thread and \
                         self.thread_last_update + 1.0 < time.time():
@@ -1765,6 +1803,7 @@ class VjoyRemap(gremlin.base_classes.AbstractAction):
         self.target_value = 0.0
         self.target_value_valid = True
         
+
         
 
     @property
