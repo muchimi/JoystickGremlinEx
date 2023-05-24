@@ -706,10 +706,14 @@ class RemoteClient(QtCore.QObject):
 
     def start(self):
         ''' creates a multicast client send socket'''
-        import struct
         if not self.enabled:
             return
+        self.ensure_socket()
         
+
+    def ensure_socket(self):
+        # makes sure the socket exists
+        import struct
         if not self._sock:
             self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             ttl = struct.pack('b', RPCGremlin.MULTICAST_TTL)
@@ -718,7 +722,8 @@ class RemoteClient(QtCore.QObject):
 
     def stop(self):
         ''' closes the client socket'''
-
+        if not self.enabled:
+            return
         if self._sock:
             self._sock.close()
             self._sock = None
@@ -727,6 +732,7 @@ class RemoteClient(QtCore.QObject):
     def _send(self, data = None):
         ''' sends data to the socket'''
         if data:
+            self.ensure_socket()
             self._sock.sendto(data, self._address)
 
     def send_button(self, device_id, button_id, is_pressed):
