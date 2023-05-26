@@ -128,6 +128,23 @@ class InputItemListModel(common.AbstractModel):
                 return input_items.config[InputType.JoystickHat][
                     index - axis_count - button_count + 1
                 ]
+            
+    
+    def action_id_to_index(self, action_id):
+        ''' get the model index containing the action id'''
+        
+        if action_id:
+            # find the row by action_id
+            for index in range(self.rows()):
+                data = self.data(index)
+                for container in data.containers:
+                    for action_list in container.action_sets:
+                        for action_data in action_list:
+                            if action_data.action_id == action_id:
+                                return index
+
+        # not found       
+        return -1
 
     def event_to_index(self, event):
         """Converts an event to a model index.
@@ -135,7 +152,10 @@ class InputItemListModel(common.AbstractModel):
         :param event the event to convert
         :return index corresponding to the event's input
         """
+
         input_items = self._device_data.modes[self._mode]
+
+        
         offset_map = dict()
         offset_map[InputType.Keyboard] = 0
         offset_map[InputType.JoystickAxis] =\
@@ -322,7 +342,11 @@ class InputItemListView(common.AbstractView):
         # event into an index, taking the possible non-contiguous nature of
         # axes into account
         if isinstance(index, gremlin.event_handler.Event):
-            index = self.model.event_to_index(index)
+            event = index
+            if event.action_id:
+                index = self.mode.action_id_to_index(event.action_id)
+            else:
+                index = self.model.event_to_index(event)
 
         if self.current_index != index:
             self.current_index = index

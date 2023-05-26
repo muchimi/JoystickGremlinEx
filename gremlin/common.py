@@ -416,3 +416,13 @@ _MergeAxisOperation_to_enum_lookup = {
     "maximum": MergeAxisOperation.Maximum,
     "sum": MergeAxisOperation.Sum
 }
+
+
+def get_guid(strip=True):
+    ''' generates a reasonably lowercase unique guid string '''
+    import uuid
+    guid = f"{uuid.uuid4()}"
+    if strip:
+        return guid.replace("-",'')
+    return guid
+    

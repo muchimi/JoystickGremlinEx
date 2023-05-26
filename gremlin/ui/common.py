@@ -17,8 +17,11 @@
 
 import enum
 import threading
+from typing import Optional
 
 from PySide6 import QtWidgets, QtCore, QtGui
+import PySide6.QtGui
+import PySide6.QtWidgets
 
 import gremlin
 
@@ -1190,3 +1193,18 @@ def clear_layout(layout):
             child.widget().hide()
             child.widget().deleteLater()
         layout.removeItem(child)
+
+
+class NoWheelComboBox (QtWidgets.QComboBox):
+    ''' implements a combo box with no-wheel scrolling to avoid inadvertent switching of entries while scolling containers '''
+
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.setFocusPolicy(QtCore.Qt.FocusPolicy.StrongFocus)
+
+    def wheelEvent(self, event) -> None:
+        # blitz wheel events if the box is not in focus
+        if self.hasFocus():
+            return super().wheelEvent(event)
+        
+    

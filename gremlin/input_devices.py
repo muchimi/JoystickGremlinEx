@@ -778,7 +778,7 @@ class RemoteClient(QtCore.QObject):
         self._address = (RPCGremlin.MULTICAST_GROUP, self._port)
         self._sock = None
         # unique ID of this client
-        self._id = get_guid()
+        self._id = common.get_guid()
 
     def start(self):
         ''' creates a multicast client send socket'''
@@ -954,14 +954,6 @@ class RemoteClient(QtCore.QObject):
             
 
 
-def get_guid(strip=True):
-    ''' generates a reasonably lowercase unique guid string '''
-    import uuid
-    guid = f"{uuid.uuid4()}"
-    if strip:
-        return guid.replace("-",'')
-    return guid
-    
 
 # Global registry of all registered callbacks
 callback_registry = CallbackRegistry()

@@ -2013,6 +2013,9 @@ class ProfileData(metaclass=ABCMeta):
         """
         self.parent = parent
         self.code = None
+        self._id = None  # unique ID for this entry
+
+
 
     def from_xml(self, node):
         """Initializes this node's values based on the provided XML node.

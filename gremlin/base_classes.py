@@ -485,13 +485,38 @@ class AbstractAction(profile.ProfileData):
         super().__init__(parent)
 
         self.activation_condition = None
+        self._id = None
+
+
+
+    @property
+    def action_id(self):
+        ''' id '''
+        if not self._id:
+            # generate a new ID
+            self._id = common.get_guid()
+        return self._id
+    @action_id.setter
+    def action_id(self, value):
+        ''' id setter'''
+        self._id = value
+
+    
 
     def from_xml(self, node):
         """Populates the instance with data from the given XML node.
 
         :param node the XML node to populate fields with
         """
+
+        # set the action ID first as it can be read by subsequent code
+        if "action_id" in node.attrib:
+            self.action_id = safe_read(node, "action_id", str)
+
+
         super().from_xml(node)
+
+
 
         for child in node.findall("activation-condition"):
             self.parent.activation_condition_type = "action"
@@ -512,6 +537,9 @@ class AbstractAction(profile.ProfileData):
         node = super().to_xml()
         if self.activation_condition:
             node.append(self.activation_condition.to_xml())
+
+        # output the ID
+        node.set("action_id", self.action_id)
         return node
 
     def icon(self):

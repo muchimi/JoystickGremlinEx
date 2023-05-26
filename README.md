@@ -14,23 +14,36 @@ This custom version adds to release 13.3 of Gremlin:
 - Remote data control of another GremlinEx client on the local network
 - OSC message handling
 - VjoyRemap plugin for control
- 
 
-Adds a few new custom Gremlin script decorators not in default version 13:
 
-### @gremlin_start
+# Automatic Input detection
 
-Called when a profile is started - lets a script to initialization when a profile starts to run
+GremlinEx can auto-highlight hardware joystick input devices by clicking a button or moving an axis on them.   This eliminates the guesswork on how the hardware maps to buttons or axes.
 
-### @gremlin_stop
+Automatic detection is only active when a profile is not running.
 
-Called when a profile is stopped - lets a script cleanup when the profile stops running
+When in this mode, GremlinEx will attempt to display the correct input - I say attempt because it can get confused sometimes with multiple active concurrent inputs.
 
-### @gremlin_mode
+The default behavior is it waits for an axis or a button to be activated before displaying anything, so the initial load up UI may not reflect the input until it's touched again.
 
-Called when the mode is changed (use def mode_change(mode) - mode will be a string) - lets a script get a notification when there is a profile mode change somewhere in GremlinEx.
+GremlinEx has a built in protection against multiple inputs, but will display the last detected input if multiple inputs were sent.
 
-## Remote control feature
+There are three options that control this behavior in the GremlinEx options panel:
+
+| Option      | Description |
+| ----------- | ----------- |
+| Highlight currently used input (axis + button) | Will switch focus to the input device for axis or button changes - this can make it difficult to just pick a button|
+| Highlight currently used buttons | Detects button changes only (axis movement is ignored but can be overriden - see below (this is recommended) | 
+| Highlight swaps device tabs | Changes input tabs automatically (this is a recommended) |
+
+### Button detect only overrides
+
+Holding the left-shift key down when in button detect mode temporarily enables axis detection as well as button detection.  This is the same as the first option in the table above.
+
+Holding the left-shift key and the left-control key when in button detect mode temporarily enables exclusive axis detection and ignores button presses.  This is helpful when you have a hardware axis that also has detents along the way that send button inputs.  In this mode, these buttons will be ignored. 
+
+
+# Remote control feature
 
 GremlinEx adds a feature to link multiple GremlinEx instances running on separate computers.  This is helpful to share a single set of controls and a single profile on a master machine to one or more client machines on the local network.
 
@@ -159,7 +172,24 @@ The commands are only available to button bindings at this time.
 | ----------- | ----------- |
 | Axis To Button     | Maps a raw input range to a specific button.  While the raw input is in that range, the button will be output.  Combine multiples of those to create more than one trigger.  Use-case: detent programming based on axis position.  | |
 
-## Recipes
+# Plugin Script enhancements
+ 
+
+GremlinEx adds a few custom Gremlin script decorators to facilitate custom scripting and control from Python.
+
+### @gremlin_start
+
+Called when a profile is started - lets a script to initialization when a profile starts to run
+
+### @gremlin_stop
+
+Called when a profile is stopped - lets a script cleanup when the profile stops running
+
+### @gremlin_mode
+
+Called when the mode is changed (use def mode_change(mode) - mode will be a string) - lets a script get a notification when there is a profile mode change somewhere in GremlinEx.
+
+# Recipes
 
 ### One way or two way switch to two way switch / three way switch
 

@@ -56,6 +56,7 @@ class Event:
             is_pressed=None,
             raw_value=None,
             force_remote = False,
+            action_id = None,
     ):
         """Creates a new Event object.
 
@@ -66,6 +67,8 @@ class Event:
         :param value the value of a joystick axis or hat
         :param is_pressed boolean flag indicating if a button or key
         :param raw_value the raw SDL value of the axis
+        :param force_remote flag that indicates if the action should be executed on the remote only
+        :param action_id the ID of the action to execute or that generated the event
             is pressed
         """
         self.event_type = event_type
@@ -75,6 +78,7 @@ class Event:
         self.value = value
         self.raw_value = raw_value
         self.force_remote = force_remote
+        self.action_id = action_id # the current action id to load
 
     def clone(self):
         """Returns a clone of the event.
@@ -88,7 +92,8 @@ class Event:
             self.value,
             self.is_pressed,
             self.raw_value,
-            self.force_remote
+            self.force_remote,
+            self.action_id
         )
 
     def __eq__(self, other):
