@@ -528,6 +528,7 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
 
         # Input type specific setups
         self.input_item_list_view.set_model(self.input_item_list_model)
+        
 
         # TODO: make this saner
         self.input_item_list_view.redraw()

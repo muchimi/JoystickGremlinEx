@@ -84,6 +84,7 @@ class VjoyAction(enum.Enum):
     
     @staticmethod
     def from_string(str):
+        ''' converts from a string representation (text or numeric) to the enum, not case sensitive'''
         str = str.lower().strip()
         if str.isnumeric():
             mode = int(str)
@@ -93,6 +94,78 @@ class VjoyAction(enum.Enum):
                 return item
 
         return None
+    
+    @staticmethod
+    def to_description(action):
+        ''' returns a descriptive string for the action '''
+        if action == VjoyAction.VJoyAxis:
+            return "Maps a vjoy axis"
+        elif action == VjoyAction.VJoyButton:
+            return "Maps to a vjoy button"
+        elif action == VjoyAction.VJoyHat:
+            return "Maps to a vjoy hat"
+        elif action == VjoyAction.VJoyInvertAxis:
+            return "Inverts all output to the specififed axis"
+        elif action == VjoyAction.VJoyPulse:
+            return "Pulse the vjoy button for a given duration"
+        elif action == VjoyAction.VJoySetAxis:
+            return "Sets the vjoy axis to a specific value (-1..+1)"
+        elif action == VjoyAction.VJoyToggle:
+            return "Toggles the vjoy button state"
+        elif action ==VjoyAction.VJoyRangeAxis:
+            return "Sets the vjoy axis active output range"
+        elif action == VjoyAction.VJoyAxisToButton:
+            return "Maps an axis range to a button value when the axis is in that range"
+        elif action == VjoyAction.VJoyEnableLocalOnly:
+            return "Enables local output mode and disables remote control"
+        elif action == VjoyAction.VJoyEnableRemoteOnly:
+            return "Enables remote control and disables local control"
+        elif action == VjoyAction.VJoyEnableLocal:
+            return "Enables local output (can be concurrent with remote control)"
+        elif action == VjoyAction.VJoyEnableRemoteOnly:
+            return "Enables remote control (can be concurrent with local control)"
+        elif action == VjoyAction.VJoyEnableLocalAndRemote:
+            return "Enables local and remote control concurrently"
+        elif action == VjoyAction.VJoyToggleRemote:
+            return "Toggles between local and remote output modes"
+        
+        return "Unknown"
+        
+    @staticmethod
+    def to_name(action):
+        ''' returns a name string for the action '''
+        if action == VjoyAction.VJoyAxis:
+            return "Axis"
+        elif action == VjoyAction.VJoyButton:
+            return "Button Press"
+        elif action == VjoyAction.VJoyHat:
+            return "Hat"
+        elif action == VjoyAction.VJoyInvertAxis:
+            return "Invert Axis"
+        elif action == VjoyAction.VJoyPulse:
+            return "Pulse Button"
+        elif action == VjoyAction.VJoySetAxis:
+            return "Sets Axis Value"
+        elif action == VjoyAction.VJoyToggle:
+            return "Toggle Button"
+        elif action ==VjoyAction.VJoyRangeAxis:
+            return "Set Axis Range"
+        elif action == VjoyAction.VJoyAxisToButton:
+            return "Axis to Button"
+        elif action == VjoyAction.VJoyEnableLocalOnly:
+            return "Local Control Only"
+        elif action == VjoyAction.VJoyEnableRemoteOnly:
+            return "Enable Remote Control (exclusive)"
+        elif action == VjoyAction.VJoyEnableLocal:
+            return "Enables Local Control"
+        elif action == VjoyAction.VJoyEnableRemoteOnly:
+            return "Enables Remote Control (exclusive)"
+        elif action == VjoyAction.VJoyEnableLocalAndRemote:
+            return "Enable Concurrent Local and Remote control"
+        elif action == VjoyAction.VJoyToggleRemote:
+            return "Toggle Control"
+        
+        return "Unknown"        
     
 
     @staticmethod
@@ -486,7 +559,11 @@ class GremlinServer(socketserver.ThreadingMixIn,socketserver.UDPServer):
     pass
 
 class GremlinSocketHandler(socketserver.BaseRequestHandler):
-    ''' handles remote input from a gremlin client on the network '''
+    ''' handles remote input from a gremlin client on the network 
+    
+        received network events are processed here
+    
+    '''
     def handle(self):
         
       
@@ -539,7 +616,7 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
                 mouse_controller.set_accelerated_motion(a,min_speed,max_speed,time_to_max_speed)
 
 
-        elif action in ("button","axis","hat"):
+        elif action in ("button","axis","hat","relative_axis"):
             # joystick button
             device = data["device"]
             target = data["target"]
@@ -559,10 +636,9 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
                 elif action == "hat":
                     if target > 0 and target <= vjoy.hat_count:
                         proxy[device].hat(target).direction = value
-                
-                    
-       
-
+                elif action == "relative_axis":
+                     if target > 0 and target <= vjoy.axis_count:
+                        proxy[device].axis(target).value = max(-1.0,min(1.0, proxy[device].axis(target).value + value))
 
 class RPCGremlin():
     ''' remote UDP multicast listener '''
@@ -600,7 +676,7 @@ class RPCGremlin():
             self._keep_running = True
             self._running = True
             while self._keep_running:
-                time.sleep(10)
+                time.sleep(1)
         except Exception as ex:
             pass
 
@@ -685,7 +761,7 @@ class RemoteServer(QtCore.QObject):
 
 
 class RemoteClient(QtCore.QObject):
-    """ Provides access to remote a remote Gremlin instance events """
+    """ Provides access to a remote Gremlin instance """
 
     class ClientMode(enum.Enum):
         Local = 1
@@ -772,6 +848,18 @@ class RemoteClient(QtCore.QObject):
             raw_data = msgpack.packb(data)
             self._send(raw_data)
             #syslog.debug(f"remote gremlin event set axis: {device_id} {axis_id} {value}")
+
+    def send_relative_axis(self, device_id, axis_id, value):
+        ''' handles a remote relative axis joystick event '''
+        if self.enabled:
+            data = {}
+            data["sender"] = self._id
+            data["action"] = "relative_axis"
+            data["device"] = device_id
+            data["target"] = axis_id
+            data["value"] = value
+            raw_data = msgpack.packb(data)
+            self._send(raw_data)        
 
     def send_hat(self, device_id, hat_id, direction):
         ''' handles a remote joystick event '''
@@ -1492,7 +1580,7 @@ class JoystickInputSignificant:
             if self._time_registry[event] + 10.0 < time.time():
                 self._event_registry[event] = event
                 self._time_registry[event] = time.time()
-                return False
+                return True
             # Update state
             else:
                 self._time_registry[event] = time.time()

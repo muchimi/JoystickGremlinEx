@@ -30,6 +30,8 @@ import gremlin.macro
 from gremlin.profile import safe_format, safe_read, parse_guid, write_guid
 from gremlin.ui.common import NoKeyboardPushButton
 import gremlin.ui.input_item
+import gremlin.input_devices
+from gremlin.input_devices import VjoyAction
 
 syslog = logging.getLogger("system")
 
@@ -82,8 +84,13 @@ class MacroActionEditor(QtWidgets.QWidget):
             "vJoy": MacroActionEditor.ActionTypeData(
                 "vJoy",
                 self._vjoy_ui,
-                gremlin.macro.VJoyAction
-            )
+                gremlin.macro.VJoyMacroAction
+            ),
+            "Remote Control": MacroActionEditor.ActionTypeData(
+                "Remote Control",
+                self._remote_control_ui,
+                gremlin.macro.RemoteControlAction
+            ),
         }
 
         self.setMinimumWidth(200)
@@ -92,12 +99,19 @@ class MacroActionEditor(QtWidgets.QWidget):
         self.group_box = QtWidgets.QGroupBox("Action Settings")
         self.group_layout = QtWidgets.QVBoxLayout(self.group_box)
         self.main_layout.addWidget(self.group_box)
+
+        self.blank_label = QtWidgets.QLabel("Please add an action.")
+        self.main_layout.addWidget(self.blank_label)
+
+
         self.ui_elements = {}
         self._create_ui()
         self._populate_ui()
 
     def _create_ui(self):
         """Creates the editor UI."""
+
+
         self.action_selector = QtWidgets.QComboBox()
         for action_name in sorted(self.action_types):
             self.action_selector.addItem(action_name)
@@ -111,6 +125,19 @@ class MacroActionEditor(QtWidgets.QWidget):
 
     def _populate_ui(self):
         """Populate the UI elements with data from the model."""
+
+
+        # ensure there's a selected item in the model
+        if self.model.rowCount() == 0:
+            # no entries in the list
+            self.group_box.setVisible(False)
+            self.blank_label.setVisible(True)
+            return
+        
+        # at least one entry in the list
+        self.group_box.setVisible(True)
+        self.blank_label.setVisible(False)
+        
         self.action_selector.currentTextChanged.disconnect(self._change_action)
 
         entry = self.model.get_entry(self.index.row())
@@ -170,7 +197,7 @@ class MacroActionEditor(QtWidgets.QWidget):
             )
         elif value == "vJoy":
             self.model.set_entry(
-                gremlin.macro.VJoyAction(
+                gremlin.macro.VJoyMacroAction(
                     1,
                     gremlin.common.InputType.JoystickButton,
                     1,
@@ -178,6 +205,9 @@ class MacroActionEditor(QtWidgets.QWidget):
                 ),
                 self.index.row()
             )
+        elif value == "Remote Control":
+            self.mode.set_entry(gremlin.macro.RemoteControlAction(), self.index.row)
+
 
         # Update the UI elements
         self._update_model()
@@ -351,103 +381,144 @@ class MacroActionEditor(QtWidgets.QWidget):
 
     def _vjoy_ui(self):
         """Creates and populates the vJoyAction editor UI."""
+        
         action = self.model.get_entry(self.index.row())
         if action is None:
             return
 
-        # vJoy input selection
-        self.ui_elements["vjoy_selector"] = gremlin.ui.common.VJoySelector(
-            self._modify_vjoy,
-            [
-                gremlin.common.InputType.JoystickAxis,
-                gremlin.common.InputType.JoystickButton,
-                gremlin.common.InputType.JoystickHat
-            ]
-        )
+        if not "vjoy_selector" in self.ui_elements.keys():
+
+            # vJoy input selection
+            self.ui_elements["vjoy_selector"] = gremlin.ui.common.VJoySelector(
+                self._modify_vjoy,
+                [
+                    gremlin.common.InputType.JoystickAxis,
+                    gremlin.common.InputType.JoystickButton,
+                    gremlin.common.InputType.JoystickHat
+                ]
+            )
+
+
+            self.action_layout.addWidget(self.ui_elements["vjoy_selector"])
+
         self.ui_elements["vjoy_selector"].set_selection(
             action.input_type,
             action.vjoy_id,
             action.input_id
         )
-        self.action_layout.addWidget(self.ui_elements["vjoy_selector"])
 
         # Axis mode configuration
         if action.input_type == gremlin.common.InputType.JoystickAxis:
-            self.ui_elements["axis_type_layout"] = QtWidgets.QHBoxLayout()
-            self.ui_elements["axis_reverse"] = QtWidgets.QCheckBox("Reverse")
-            self.ui_elements["axis_absolute"] = QtWidgets.QRadioButton("Absolute")
-            self.ui_elements["axis_relative"] = QtWidgets.QRadioButton("Relative")
-            if action.axis_type == "absolute":
-                self.ui_elements["axis_absolute"].setChecked(True)
-                self.ui_elements["axis_relative"].setChecked(False)
-            elif action.axis_type == "relative":
-                self.ui_elements["axis_absolute"].setChecked(False)
-                self.ui_elements["axis_relative"].setChecked(True)
-            self.ui_elements["axis_absolute"].clicked.connect(
-                self._modify_vjoy_axis
-            )
-            self.ui_elements["axis_relative"].clicked.connect(
-                self._modify_vjoy_axis
-            )
+            if not "axis_type_layout" in self.ui_elements.keys():
+                self.ui_elements["axis_type_layout"] = QtWidgets.QHBoxLayout()
+                self.ui_elements["axis_reverse"] = QtWidgets.QCheckBox("Reverse")
+                self.ui_elements["axis_absolute"] = QtWidgets.QRadioButton("Absolute")
+                self.ui_elements["axis_relative"] = QtWidgets.QRadioButton("Relative")
+                if action.axis_type == "absolute":
+                    self.ui_elements["axis_absolute"].setChecked(True)
+                    self.ui_elements["axis_relative"].setChecked(False)
+                elif action.axis_type == "relative":
+                    self.ui_elements["axis_absolute"].setChecked(False)
+                    self.ui_elements["axis_relative"].setChecked(True)
+                self.ui_elements["axis_absolute"].clicked.connect(
+                    self._modify_vjoy_axis
+                )
+                self.ui_elements["axis_relative"].clicked.connect(
+                    self._modify_vjoy_axis
+                )
 
-            self.ui_elements["axis_type_layout"].addWidget(self.ui_elements["axis_reverse"])
-            self.ui_elements["axis_type_layout"].addWidget(self.ui_elements["axis_absolute"])
-            self.ui_elements["axis_type_layout"].addWidget(self.ui_elements["axis_relative"])
+                self.ui_elements["axis_type_layout"].addWidget(self.ui_elements["axis_reverse"])
+                self.ui_elements["axis_type_layout"].addWidget(self.ui_elements["axis_absolute"])
+                self.ui_elements["axis_type_layout"].addWidget(self.ui_elements["axis_relative"])
+                
+                self.action_layout.addLayout(self.ui_elements["axis_type_layout"])
+                
 
-            self.action_layout.addLayout(self.ui_elements["axis_type_layout"])
+            
 
         self._create_joystick_inputs_ui(action)
+
 
     def _create_joystick_inputs_ui(self, action):
         # Handle display of value based on the actual input type
         if action.input_type == gremlin.common.InputType.JoystickAxis:
-            self.ui_elements["axis_value"] = \
-                gremlin.ui.common.DynamicDoubleSpinBox()
-            self.ui_elements["axis_value"].setRange(-1.0, 1.0)
-            self.ui_elements["axis_value"].setSingleStep(0.1)
-            self.ui_elements["axis_value"].setDecimals(3)
-            self.ui_elements["axis_value"].setValue(action.value)
-            self.ui_elements["axis_value"].valueChanged.connect(
-                self._modify_axis_state
-            )
+            if "axis_value" in self.ui_elements.keys():
+                self.ui_elements["axis_value"] = \
+                    gremlin.ui.common.DynamicDoubleSpinBox()
+                self.ui_elements["axis_value"].setRange(-1.0, 1.0)
+                self.ui_elements["axis_value"].setSingleStep(0.1)
+                self.ui_elements["axis_value"].setDecimals(3)
+                self.ui_elements["axis_value"].setValue(action.value)
+                self.ui_elements["axis_value"].valueChanged.connect(
+                    self._modify_axis_state
+                )
 
-            self.action_layout.addWidget(self.ui_elements["axis_value"])
+                self.action_layout.addWidget(self.ui_elements["axis_value"])
 
         elif action.input_type == gremlin.common.InputType.JoystickButton:
-            self.ui_elements["button_press"] = QtWidgets.QRadioButton("Press")
-            self.ui_elements["button_release"] = QtWidgets.QRadioButton("Release")
-            if action.value:
-                self.ui_elements["button_press"].setChecked(True)
-            else:
-                self.ui_elements["button_release"].setChecked(True)
+            if not "button_press" in self.ui_elements.keys():
+                self.ui_elements["button_press"] = QtWidgets.QRadioButton("Press")
+                self.ui_elements["button_release"] = QtWidgets.QRadioButton("Release")
+                if action.value:
+                    self.ui_elements["button_press"].setChecked(True)
+                else:
+                    self.ui_elements["button_release"].setChecked(True)
 
-            self.ui_elements["button_press"].toggled.connect(
-                self._modify_button_state
-            )
-            self.ui_elements["button_release"].toggled.connect(
-                self._modify_button_state
-            )
-            self.action_layout.addWidget(self.ui_elements["button_press"])
-            self.action_layout.addWidget(self.ui_elements["button_release"])
+                self.ui_elements["button_press"].toggled.connect(
+                    self._modify_button_state
+                )
+                self.ui_elements["button_release"].toggled.connect(
+                    self._modify_button_state
+                )
+                self.action_layout.addWidget(self.ui_elements["button_press"])
+                self.action_layout.addWidget(self.ui_elements["button_release"])
 
         elif action.input_type == gremlin.common.InputType.JoystickHat:
-            self.ui_elements["hat_direction"] = QtWidgets.QComboBox()
-            directions = [
-                "Center", "North", "North East", "East", "South East",
-                "South", "South West", "West", "North West"
-            ]
-            for val in directions:
-                self.ui_elements["hat_direction"].addItem(val)
-            self.ui_elements["hat_direction"].currentTextChanged.connect(
-                self._modify_hat_state
-            )
-            hat_direction = (0, 0)
-            if isinstance(action.value, tuple):
-                hat_direction = action.value
-            self.ui_elements["hat_direction"].setCurrentText(
-                gremlin.common.direction_tuple_lookup[hat_direction]
-            )
-            self.action_layout.addWidget(self.ui_elements["hat_direction"])
+            if not "hat_direction" in self.ui_elements.keys():
+                self.ui_elements["hat_direction"] = QtWidgets.QComboBox()
+                directions = [
+                    "Center", "North", "North East", "East", "South East",
+                    "South", "South West", "West", "North West"
+                ]
+                for val in directions:
+                    self.ui_elements["hat_direction"].addItem(val)
+                self.ui_elements["hat_direction"].currentTextChanged.connect(
+                    self._modify_hat_state
+                )
+                hat_direction = (0, 0)
+                if isinstance(action.value, tuple):
+                    hat_direction = action.value
+                self.ui_elements["hat_direction"].setCurrentText(
+                    gremlin.common.direction_tuple_lookup[hat_direction]
+                )
+                self.action_layout.addWidget(self.ui_elements["hat_direction"])
+
+
+    def _remote_control_ui(self):
+        self.ui_elements["remote_control_cb_label"] = QtWidgets.QLabel("Remote control command:") 
+        cb = QtWidgets.QComboBox()
+        self.ui_elements["remote_control_cb"] = cb
+        self.ui_elements["remote_control_label"] = QtWidgets.QLabel()
+        commands = [
+            VjoyAction.VJoyEnableLocalOnly, 
+            VjoyAction.VJoyEnableRemoteOnly,
+            VjoyAction.VJoyDisableLocal, 
+            VjoyAction.VJoyEnableLocal, 
+            VjoyAction.VJoyEnableRemote, 
+            VjoyAction.VJoyDisableRemote, 
+            VjoyAction.VJoyEnableLocalAndRemote,
+        ]
+         
+        for cmd in commands:
+            cb.addItem(VjoyAction.to_name(cmd), cmd)
+
+
+        self.ui_elements["remote_control_label"].setText(VjoyAction.to_description(commands[0]))
+        cb.currentIndexChanged.connect(self._modify_remote_control)
+
+        self.action_layout.addWidget(self.ui_elements["remote_control_cb_label"])
+        self.action_layout.addWidget(cb)
+        self.action_layout.addWidget(self.ui_elements["remote_control_label"])
 
     def _modify_button_state(self, state):
         action = self.model.get_entry(self.index.row())
@@ -509,6 +580,14 @@ class MacroActionEditor(QtWidgets.QWidget):
         self._update_model()
 
 
+    def _modify_remote_control(self, index):
+        ''' occurs when the remote control command changes '''
+        command = self.ui_elements["remote_control_cb"].itemData(index)
+        self.ui_elements["remote_control_label"].setText(gremlin.input_devices.VjoyAction.to_description(command))
+        self.model.get_entry(self.index.row()).command = command
+        self._update_model()
+
+
     def _update_model(self):
         """Forces an update of the model at the current index."""
         self.model.update(self.index)
@@ -527,6 +606,9 @@ class MacroActionEditor(QtWidgets.QWidget):
             input_types,
             return_kb_event=True
         )
+
+
+
 
         # Display the dialog centered in the middle of the UI
         root = self
@@ -676,7 +758,7 @@ class MacroListModel(QtCore.QAbstractListModel):
                 action = "press" if entry.is_pressed else "release"
                 return MacroListModel.icon_lookup[action]
             else:
-                return ""
+                return None
         elif role == QtCore.Qt.DisplayRole:
             if isinstance(entry, gremlin.macro.JoystickAction):
                 device_name = "Unknown"
@@ -705,10 +787,14 @@ class MacroListModel(QtCore.QAbstractListModel):
                 display = msg
 
 
-            elif isinstance(entry, gremlin.macro.VJoyAction):
+            elif isinstance(entry, gremlin.macro.VJoyMacroAction):
                 display =  f"vJoy {entry.vjoy_id} {InputType.to_string(entry.input_type).capitalize()} {entry.input_id} - {MacroListModel.value_format[entry.input_type](entry)}"
+
+            elif isinstance(entry, gremlin.macro.RemoteControlAction):
+                display = f"Remote control: {VjoyAction.to_name(entry.command)}"
             else:
                 raise gremlin.error.GremlinError("Unknown macro action")
+            
             
             syslog.debug(display)
             return display
@@ -1075,6 +1161,7 @@ class MacroSettingsWidget(QtWidgets.QWidget):
         """Creates the UI elements"""
         # Create UI elements
         self.exclusive_checkbox = QtWidgets.QCheckBox("Exclusive")
+        self.force_remote_checkbox = QtWidgets.QCheckBox("Remote Only")
         self.repeat_dropdown = QtWidgets.QComboBox()
         self.repeat_dropdown.addItems(["None", "Count", "Toggle", "Hold"])
         self.repeat_widget = None
@@ -1088,6 +1175,7 @@ class MacroSettingsWidget(QtWidgets.QWidget):
 
         # Populate UI elements
         self.exclusive_checkbox.setChecked(self.action_data.exclusive)
+        self.force_remote_checkbox.setChecked(self.action_data.force_remote)
         if self.action_data.repeat is not None:
             mode_name = MacroSettingsWidget.storage_to_name[
                 type(self.action_data.repeat)
@@ -1099,10 +1187,15 @@ class MacroSettingsWidget(QtWidgets.QWidget):
 
         # Connect signals
         self.exclusive_checkbox.clicked.connect(self._update_settings)
+        self.force_remote_checkbox.clicked.connect(self._update_settings)
         self.repeat_dropdown.currentTextChanged.connect(self._update_settings)
 
         # Place UI elements
-        self.group_layout.addWidget(self.exclusive_checkbox)
+        widget = QtWidgets.QWidget()
+        box = QtWidgets.QHBoxLayout(widget)
+        box.addWidget(self.exclusive_checkbox)
+        box.addWidget(self.force_remote_checkbox) 
+        self.group_layout.addWidget(widget)
         self.group_layout.addWidget(self.repeat_dropdown)
         if self.repeat_widget is not None:
             self.group_layout.addWidget(self.repeat_widget)
@@ -1113,6 +1206,7 @@ class MacroSettingsWidget(QtWidgets.QWidget):
         :param value the value of a change (ignored)
         """
         self.action_data.exclusive = self.exclusive_checkbox.isChecked()
+        self.action_data.force_remote = self.force_remote_checkbox.isChecked()
 
         # Only create a new repeat widget if it changed
         widget_type = MacroSettingsWidget.name_to_widget.get(
@@ -1583,6 +1677,7 @@ class Macro(AbstractAction):
         self.sequence = []
         self.exclusive = False
         self.repeat = None
+        self.force_remote = False
 
     def icon(self):
         return "{}/icon.png".format(os.path.dirname(os.path.realpath(__file__)))
@@ -1602,11 +1697,14 @@ class Macro(AbstractAction):
         self.sequence = []
         self.exclusive = False
         self.repeat = None
+        self.force_remote = False
 
         # Read properties
         for child in node.find("properties"):
             if child.tag == "exclusive":
                 self.exclusive = True
+            elif child.tag == "force_remote":
+                self.force_remote = True
             elif child.tag == "repeat":
                 repeat_type = child.get("type")
                 if repeat_type == "count":
@@ -1666,7 +1764,7 @@ class Macro(AbstractAction):
                                         )
                 )
             elif child.tag == "vjoy":
-                vjoy_action = gremlin.macro.VJoyAction(
+                vjoy_action = gremlin.macro.VJoyMacroAction(
                     safe_read(child, "vjoy-id", int),
                     gremlin.common.InputType.to_enum(
                         safe_read(child, "input-type")
@@ -1677,6 +1775,13 @@ class Macro(AbstractAction):
                 )
                 self._str_to_joy_value(vjoy_action)
                 self.sequence.append(vjoy_action)
+
+            elif child.tag == "remote_control":
+                remote_control_action = gremlin.macro.RemoteControlAction()
+                cmd = safe_read(child, "command", str, "VJoyEnableLocalOnly")
+                remote_control_action.command = VjoyAction.from_string(cmd)
+                self.sequence.append(remote_control_action)
+
 
     def _generate_xml(self):
         """Generates a XML node corresponding to this object.
@@ -1690,6 +1795,11 @@ class Macro(AbstractAction):
             properties.append(prop_node)
         if self.repeat:
             properties.append(self.repeat.to_xml())
+        if self.force_remote:
+            prop_node = ElementTree.Element("force_remote")
+            properties.append(prop_node)
+
+
         node.append(properties)
 
         action_list = ElementTree.Element("actions")
@@ -1726,7 +1836,7 @@ class Macro(AbstractAction):
                 pause_node.set("duration_max", str(entry.duration_max))
                 pause_node.set("is_random", str(entry.is_random))
                 action_list.append(pause_node)
-            elif isinstance(entry, gremlin.macro.VJoyAction):
+            elif isinstance(entry, gremlin.macro.VJoyMacroAction):
                 vjoy_node = ElementTree.Element("vjoy")
                 vjoy_node.set("vjoy-id", str(entry.vjoy_id))
                 vjoy_node.set(
@@ -1738,6 +1848,10 @@ class Macro(AbstractAction):
                 if entry.input_type == InputType.JoystickAxis:
                     vjoy_node.set("axis-type", safe_format(entry.axis_type, str))
                 action_list.append(vjoy_node)
+            elif isinstance(entry, gremlin.macro.RemoteControlAction):
+                action_node = ElementTree.Element("remote_control")
+                action_node.set("command",entry.command.name)
+                action_list.append(action_node)
 
         node.append(action_list)
         return node

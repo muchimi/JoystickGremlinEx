@@ -16,19 +16,19 @@ This custom version adds to release 13.3 of Gremlin:
 - VjoyRemap plugin for control
  
 
-Adds a few decorators not in version 13:
+Adds a few new custom Gremlin script decorators not in default version 13:
 
 ### @gremlin_start
 
-Called when a profile is started
+Called when a profile is started - lets a script to initialization when a profile starts to run
 
 ### @gremlin_stop
 
-Called when a profile is stopped
+Called when a profile is stopped - lets a script cleanup when the profile stops running
 
 ### @gremlin_mode
 
-Called when the mode is changed (use def mode_change(mode) - mode will be a string).
+Called when the mode is changed (use def mode_change(mode) - mode will be a string) - lets a script get a notification when there is a profile mode change somewhere in GremlinEx.
 
 ## Remote control feature
 
@@ -46,9 +46,47 @@ By output events, we mean that inputs into GremlinEx are not broadcast to client
 
 ### Master machine setup
 
-The master machine will have the broadcast option enabled and an available UDP port setup (default 6012).  When the broadcast feature is enabled, the comptuer will by default broadcast all output events from GremlinEx to the clients on the network.
+The master machine is the machine responsible for broadcasting control events to clients on the local network.  Thus it will typically be the primary system with all the physical hardware managed by GremlinEx.
 
-While more than one master machine can broadcast, it's recommended to only have one.
+The broadcast machine or master system will have the broadcast option enabled and an available UDP port setup (default 6012).  When the broadcast feature is enabled, GremlinEx will broadcast all output events.
+
+Important: to broadcast, the option must be enabled in the checkbox, and the GremlinEx profile must also have enabled the broadcast functionality on.  This is needed because when GremlinEx first starts, it defauts to local control only.
+
+Profile commands can be mapped via the VjoyRemap plugin to control whether GemlinEx sends outputs to the local (internal) or clients, or both concurrently.
+
+While more than one master machine can broadcast, it's recommended to only have one.  Multiple machines will allow more than one machine to send broadcast commands to clients for unique setup needs.
+
+The enable speech checkbox can be selected for GremlinEx to send a verbal mode change event whenever local/remote mode control is changed in case the GremlinEx window is not visible.
+
+GremlinEx shows what output mode is active in the status bar.
+
+<sup>GremlinEx options setup for a broadcast machine:</sup>
+
+![](img/server_options.jpg)
+
+
+#### Local mode
+
+In this mode, GremlinEx sends VJOY, keyboard and mouse events to the local machine.
+
+The status bar displays
+
+![](img/local_control.jpg)
+
+
+#### Broadcast mode
+
+In this mode, GremlinEx sends VJOY, keyboard and mouse events to clients on the network.    The clients must have the remote control checkbox enabled, match the port number, and have a profile running (empty profile is fine) to respond to the broadcast events.
+
+
+The status bar displays
+
+![](img/remote_control.jpg)
+
+#### Concurrent mode
+
+GremlinEx can send to the local and remote clients at the same time (concurrent mode) by sending the Concurrent command. 
+
 
 
 ### Client machine setup
@@ -61,14 +99,82 @@ Clients will only output to VJOY outputs that match the master.  So if the clien
 
 Clients will ignore events for devices that do not exist on the client (such as an invalid VJOY device number, or an invalid button for that defined device).
 
-## Master control functions
+<sup>GremlinEx options setup for a client:</sup>
 
-The VJoyRemap plugin adds three control function specific to remote control:
-1. Enable remote control (which disables local control) - when this command is issued, the master machine will only output events to remote clients and stop sending events to itself.   This mode should be used when the master only controls another client on the network.
-2. Enable local control (which disables remote control) - when this command is issued - the master machine will output regular events to the local machine only.  This mode is used when the master does not control the remote client.
-3. Toggle local/remote control.   This command toggles between the two states.
+![](img/client_options.jpg)
+
+The enable remote control checkbox is checked, and the port (default 6012) must match the broadcast machine's port.
+
+## Master remote control functions
+
+Local and broadcast (sending output to remote GremlinEx instances on network machines) control can be enabled or disabled via GremlinEx commands bound to a joystick button (or in script).
+
+Commands are available in the VjoyRemap plugin when bound to a joystick button and available from the drop down of actions for that button.
 
 
+The VjoyRemap commands are:
+
+| Command      | Description |
+| ----------- | ----------- |
+| Set Remote Control Only      | Enables broadcast mode and disables local output mode.  In this mode, GremlinEx only sends output to network clients.       |
+| Set Local Control Only  | Enables local mode and disables broadcast mode.  In this mode, GremlinEx only sends output to the local machine.         |
+| Enable Remote Control      | Enables broadcast mode. This activates broadcast mode regardless of the local output setting. |
+| Disable Remote Control      | Disables broadcast mode. This disables broadcast mode regardless of the local output setting. |
+| Enable Local Control      | Enables local mode. This activates local output mode regardless of the broadcast output setting. |
+| Disable Local Control      | Disables local mode. This disables local output mode regardless of the broadcast output setting. |
+| Enable Concurrent Local + Remote Control      | Enables both local and broadcast modes. GremlinEx output goes to both local and remote machines at the same time. |
+| Toggle Control      | Inverts current output settings for both local and broadcast controls, whatever they are. |
+
+
+The commands are only available to button bindings at this time.
+
+## VJoyRemap button press actions
+
+
+| Command      | Description |
+| ----------- | ----------- |
+| Button Press     | Outputs a single button to the given VJOY device.  The exec on release option sends the output when the physical button is released.  Start mode sets the output status on profile start.   |
+| Pulse     | Outputs a single button to the given VJOY device momentarily.  The default pulse duration is 250 milliseconds, which can be adjusted.  The exec on release option sends the output when the physical button is released.  Start mode sets the output status on profile start.   |
+| Toggle     | Toggles (flips) the button output on the given VJOY device. If it was on, it's off, if it was off, it toggles on.  Useful for on/off type activites.    |
+| Invert Axis     |  Inverts the specified output axis on the VJOY device.  This flips the direction of output of the axis on the fly by mapping it to a button.  This is specific to games that map the same axis but they are inverted (example in Star Citizen is ship throttle vs vehicle throttle).  When mapped to a physical switch on the throttle, converts from ship mode to vehicle mode for the throttle.  |
+| Set Axis Value     | Sets the axis value on the given VJOY axis to a specific value between -1 (min) and +1 (max).  This is useful for detent programming.  |
+| Set Axis Range     | Modifies the output range of an axis in VJOY.  The output will be calibrated to the new min/max and has convenience buttons to set half ranges. Use-case: increase sensitivity of physical axis, such as, for landing or roll. |
+
+
+## VJoyRemap axis mapping actions
+
+| Command      | Description | |
+| ----------- | ----------- | ----------- |
+| Axis     | Maps source axis to a VJOY output axis. Options:    | |
+| | Reverse | Inverts the output of the axis |
+| | Absolute | The value of the output matches the raw input value  |
+| | Relative | The value of the output is relative to the raw input value  |
+| | Start Value | The default axis position on profile start |
+| | Scale | Scaling factor applied to the raw input.  Use case: increase sensitivity. |
+| | Min/Max Range | Sets the default output min/max range.  The raw input is calibrated to only output between the two values (scale is computed automatically) |
+
+&nbsp;
+
+| Command      | Description |
+| ----------- | ----------- |
+| Axis To Button     | Maps a raw input range to a specific button.  While the raw input is in that range, the button will be output.  Combine multiples of those to create more than one trigger.  Use-case: detent programming based on axis position.  | |
+
+## Recipes
+
+### One way or two way switch to two way switch / three way switch
+
+Some hardware controllers have physical two or three position switches when only one (or two) position records a button press.
+
+In GremlinEx, button presses can be output for each position by adding more than one mapping to each physical button that is triggered on the physical hardware in pairs.
+
+One responds to button presses on the raw hardware, the other responds to a button release on the raw hardware.
+
+| Mapping     | Description |
+| ----------- | ----------- |
+| Send VJOY output   | Sends a button press to VJOY device and button when the position of the button is active.      |
+| Send VJOY output (on release)   | Sends a button press to VJOY device and button when the position of the button is no longer active.  The checkbox "execute on release" is selected in this case.  |
+
+The equivalent pulse commands can be send to send a momentary pulse rather than having the button on all the time if that is needed.
 
 
 

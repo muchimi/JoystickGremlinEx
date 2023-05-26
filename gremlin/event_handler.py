@@ -54,7 +54,8 @@ class Event:
             device_guid,
             value=None,
             is_pressed=None,
-            raw_value=None
+            raw_value=None,
+            force_remote = False,
     ):
         """Creates a new Event object.
 
@@ -73,6 +74,7 @@ class Event:
         self.is_pressed = is_pressed
         self.value = value
         self.raw_value = raw_value
+        self.force_remote = force_remote
 
     def clone(self):
         """Returns a clone of the event.
@@ -85,7 +87,8 @@ class Event:
             self.device_guid,
             self.value,
             self.is_pressed,
-            self.raw_value
+            self.raw_value,
+            self.force_remote
         )
 
     def __eq__(self, other):

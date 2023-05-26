@@ -89,8 +89,6 @@ class GridPopupWindow(QtWidgets.QDialog):
         action_map = usage_data.get_action_map(vjoy_device_id, input_type, vjoy_input_id)
         if not action_map:
             self.close()
-
-
         
         box = QtWidgets.QVBoxLayout()
         self.layout = box
@@ -848,7 +846,6 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         start_layout.addWidget(self.rb_start_pressed )
         start_layout.addStretch()
 
-
         # set axis range widget
         self.axis_range_value_widget = QtWidgets.QWidget()
         box = QtWidgets.QHBoxLayout(self.axis_range_value_widget)
@@ -858,7 +855,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.sb_button_range_low.setDecimals(3)
         self.sb_button_range_high = gremlin.ui.common.DynamicDoubleSpinBox()
         self.sb_button_range_high.setMinimum(-1.0)
-        self.sb_button_range_high.setMaximum(1.0)        
+        self.sb_button_range_high.setMaximum(1.0)  
         self.sb_button_range_high.setDecimals(3)
         self.b_range_reset = QtWidgets.QPushButton("Reset")
         self.b_range_half = QtWidgets.QPushButton("Half")
@@ -866,6 +863,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.b_range_hhalf = QtWidgets.QPushButton("H-Half")
         self.b_range_top = QtWidgets.QPushButton("Top")
         self.b_range_bottom = QtWidgets.QPushButton("Bot")
+
 
         box.addWidget(QtWidgets.QLabel("Range Min:"))
         box.addWidget(self.sb_button_range_low)
@@ -879,12 +877,23 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         box.addWidget(self.b_range_top)
         box.addStretch()
 
+        # button to axis value widget
+        self.button_to_axis_widget = QtWidgets.QWidget()
+        box = QtWidgets.QHBoxLayout(self.button_to_axis_widget)
+        self.sb_button_to_axis_value = gremlin.ui.common.DynamicDoubleSpinBox()
+        self.sb_button_to_axis_value.setMinimum(-1.0)
+        self.sb_button_to_axis_value.setMaximum(1.0)
+        self.sb_button_to_axis_value.setDecimals(3)
+        box.addWidget(QtWidgets.QLabel("Axis Value:"))
+        box.addWidget(self.sb_button_to_axis_value)
+        box.addStretch()
 
         self.main_layout.addWidget(self.selector_widget)
         self.main_layout.addWidget(self.pulse_widget)
         self.main_layout.addWidget(self.start_widget)
         self.main_layout.addWidget(self.target_value_widget)
         self.main_layout.addWidget(self.axis_range_value_widget)
+        self.main_layout.addWidget(self.button_to_axis_widget)
        
         # hook events
 
@@ -897,6 +906,8 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.start_button_group.buttonClicked.connect(self._start_changed)
         self.sb_button_range_low.valueChanged.connect(self._button_range_low_changed)
         self.sb_button_range_high.valueChanged.connect(self._button_range_high_changed)
+        self.sb_button_to_axis_value.valueChanged.connect(self._button_to_axis_value_changed)
+
 
         self.b_range_reset.clicked.connect(self._b_range_reset_clicked)
         self.b_range_half.clicked.connect(self._b_range_half_clicked)
@@ -1022,6 +1033,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         is_command = VjoyAction.is_command(action)
         selector_visible = not is_command
         exec_on_release_visible =  action_data.input_type == InputType.JoystickButton # or is_command
+        button_to_axis_visible = action == VjoyAction.VJoySetAxis
 
         self.pulse_widget.setVisible(pulse_visible)
         self.start_widget.setVisible(start_visible)
@@ -1030,46 +1042,15 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.axis_range_value_widget.setVisible(range_visible)
         self.chkb_exec_on_release.setVisible(exec_on_release_visible)
         self.target_value_widget.setVisible(target_value_visible)
+        self.button_to_axis_widget.setVisible(button_to_axis_visible)
 
         self.lbl_vjoy_device_selector.setVisible(selector_visible)
         self.cb_vjoy_device_selector.setVisible(selector_visible)
         self.cb_vjoy_input_selector.setVisible(selector_visible)
         self.lbl_vjoy_input_selector.setVisible(selector_visible)
 
-
-        if action == VjoyAction.VJoyAxis:
-            self.action_label.setText("Maps a vjoy axis")
-        elif action == VjoyAction.VJoyButton:
-            self.action_label.setText("Maps to a vjoy button")
-        elif action == VjoyAction.VJoyHat:
-            self.action_label.setText("Maps to a vjoy hat")
-        elif action == VjoyAction.VJoyInvertAxis:
-            self.action_label.setText("Inverts all output to the specififed axis")
-        elif action == VjoyAction.VJoyPulse:
-            self.action_label.setText("Pulse the vjoy button for a given duration")
-        elif action == VjoyAction.VJoySetAxis:
-            self.action_label.setText("Sets the vjoy axis to a specific value (-1..+1)")
-        elif action == VjoyAction.VJoyToggle:
-            self.action_label.setText("Toggles the vjoy button state")
-        elif action ==VjoyAction.VJoyRangeAxis:
-            self.action_label.setText("Sets the vjoy axis active output range")
-        elif action == VjoyAction.VJoyAxisToButton:
-            self.action_label.setText("Maps an axis range to a button value when the axis is in that range")
-        elif action == VjoyAction.VJoyEnableLocalOnly:
-            self.action_label.setText("Enables local output mode and disables remote control")
-        elif action == VjoyAction.VJoyEnableRemoteOnly:
-            self.action_label.setText("Enables remote control and disables local control")
-        elif action == VjoyAction.VJoyEnableLocal:
-            self.action_label.setText("Enables local output (can be concurrent with remote control)")
-        elif action == VjoyAction.VJoyEnableRemoteOnly:
-            self.action_label.setText("Enables remote control (can be concurrent with local control)")
-        elif action == VjoyAction.VJoyEnableLocalAndRemote:
-            self.action_label.setText("Enables local and remote control concurrently")
-        elif action == VjoyAction.VJoyToggleRemote:
-            self.action_label.setText("Toggles between local and remote output modes")
-        else:
-            self.action_label.setText("Unknown")
-
+        self.action_label.setText(VjoyAction.to_description(action))
+        
 
     def _action_mode_changed(self, index):
         ''' called when the drop down value changes '''
@@ -1391,6 +1372,8 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _button_range_high_changed(self):
         self.action_data.range_high = self.sb_button_range_high.value()
     
+    def _button_to_axis_value_changed(self):
+        self.action_data.target_value = self.sb_button_to_axis_value.value()
     
     def _b_range_reset_clicked(self, value):
         self.sb_button_range_low.setValue(-1.0)
@@ -1561,6 +1544,10 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
     def process_event(self, event, value):
         ''' runs when a joystick even occurs like a button press or axis movement when a profile is running '''
         (is_local, is_remote) = input_devices.remote_state.state
+        if event.force_remote:
+            # force remote mode on if specified in the event
+            is_remote = True
+            is_local = False
         
         if self.input_type == InputType.JoystickAxis :
             target = -value.current if self.reverse else value.current

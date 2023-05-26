@@ -276,6 +276,7 @@ class InputItemListView(common.AbstractView):
 
         data = self.model.data(index)
         widget = self.scroll_layout.itemAt(index).widget()
+        
         widget.create_action_icons(data)
         widget.update_description(data.description)
 

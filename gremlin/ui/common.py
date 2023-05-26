@@ -1097,6 +1097,8 @@ class InputListenerWidget(QtWidgets.QFrame):
                 event.identifier[1]
         )
 
+
+
         # Return immediately once the first key press is detected
         if not self._multi_keys:
             if event.is_pressed and key == gremlin.macro.key_from_name("esc"):
