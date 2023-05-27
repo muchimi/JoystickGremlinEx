@@ -203,7 +203,7 @@ def _send_key_down(key, is_local = True, is_remote = False):
     if is_local:
         win32api.keybd_event(key.virtual_code, key.scan_code, flags, 0)
     if is_remote:
-        gremlin.input_devices.remote_client.remote_client.send_key(key.virtual_code, key.scan_code, flags )
+        gremlin.input_devices.remote_client.send_key(key.virtual_code, key.scan_code, flags )
     
 
 
@@ -367,12 +367,11 @@ class MacroManager:
         :param macro the macro object to be executed
         """
         # Handle macros with a repeat mode
+        (is_local, is_remote) = gremlin.input_devices.remote_state.state
         if macro.force_remote:
-            is_local = False
             is_remote = True
-        else:
-            is_local = True
-            is_remote = gremlin.input_devices.remote_state.is_remote
+            is_local = False
+
 
         if macro.repeat is not None:
             delay = macro.repeat.delay

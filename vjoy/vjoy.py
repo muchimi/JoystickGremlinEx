@@ -44,14 +44,14 @@ class AxisName(enum.Enum):
 
     """Enumeration of the valid axis names."""
 
-    X = 0x30
-    Y = 0x31
-    Z = 0x32
-    RX = 0x33
-    RY = 0x34
-    RZ = 0x35
-    SL0 = 0x36
-    SL1 = 0x37
+    X = 0x30  # 1
+    Y = 0x31  # 2
+    Z = 0x32  # 3
+    RX = 0x33 # 4
+    RY = 0x34 # 5
+    RZ = 0x35 # 6
+    SL0 = 0x36 # 7
+    SL1 = 0x37 # 8
 
 
 class HatType(enum.Enum):

@@ -752,7 +752,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 
         # behavior combo box  - lets the user select the output behavior
-        self.cb_action_list = QtWidgets.QComboBox()
+        self.cb_action_list = gremlin.ui.common.NoWheelComboBox()
         self.cb_action_list.currentIndexChanged.connect(self._action_mode_changed)
         lbl = QtWidgets.QLabel("Mode:")
        
@@ -769,7 +769,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         row = 2        
         self.lbl_vjoy_device_selector = QtWidgets.QLabel("Device:")
         grid.addWidget(self.lbl_vjoy_device_selector,row,0)
-        self.cb_vjoy_device_selector = QtWidgets.QComboBox()
+        self.cb_vjoy_device_selector = gremlin.ui.common.NoWheelComboBox()
         grid.addWidget(self.cb_vjoy_device_selector,row,1)
         
                              
@@ -781,7 +781,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         
 
         row = 3
-        self.cb_vjoy_input_selector = QtWidgets.QComboBox()
+        self.cb_vjoy_input_selector = gremlin.ui.common.NoWheelComboBox()
         self.lbl_vjoy_input_selector = QtWidgets.QLabel("Output:")
         grid.addWidget(self.lbl_vjoy_input_selector,row,0)
         grid.addWidget(self.cb_vjoy_input_selector,row,1)
