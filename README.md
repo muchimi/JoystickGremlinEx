@@ -172,6 +172,21 @@ The commands are only available to button bindings at this time.
 | ----------- | ----------- |
 | Axis To Button     | Maps a raw input range to a specific button.  While the raw input is in that range, the button will be output.  Combine multiples of those to create more than one trigger.  Use-case: detent programming based on axis position.  | |
 
+# Map to mouse EX plugin
+
+This plugin is identical to the Map to Mouse plugin but adds a wiggle function. When wiggle is enabled, the mouse will move slightly by itself every 10 to 40 seconds and move back.  It will do that until wiggle mode is turned off.  
+  
+The purpose of wiggle is to keep an application alive.
+
+| Command      | Description |
+| ----------- | ----------- |
+| Mouse Button | Outputs one of the mouse buttons |
+| Mouse Axis | Moves the mouse |
+| Wiggle Enable | Jolts the mouse every few seconds  |
+| Wiggle Disable | Stops the mouse wiggling if it was turned on.  |
+
+Mouse commands can forced to be sent to remote hosts only, or to send them concurrently to the remote host regardless of the remote control state.
+
 # Plugin Script enhancements
  
 

@@ -108,7 +108,7 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.motion_widget = QtWidgets.QWidget()
         self.motion_layout = QtWidgets.QGridLayout(self.motion_widget)
         self.release_widget = QtWidgets.QWidget() 
-        self.release_layout = QtWidgets.QHBoxLayout(self.release_widget)
+        self.options_layout = QtWidgets.QHBoxLayout(self.release_widget)
 
 
 
@@ -127,10 +127,20 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self.mode_widget.currentIndexChanged.connect(self._action_mode_changed)
 
+        self.chkb_force_remote_output = QtWidgets.QCheckBox("Force Remote output")
+        self.chkb_force_remote_output_only = QtWidgets.QCheckBox("Remote Only")
+
+        self.chkb_force_remote_output.clicked.connect(self._force_remote_output_changed)
+        self.chkb_force_remote_output_only.clicked.connect(self._force_remote_output_only_changed)
 
         self.chkb_exec_on_release = QtWidgets.QCheckBox("Exec on release")
         self.chkb_exec_on_release.clicked.connect(self._exec_on_release_changed)
-        self.release_layout.addWidget(self.chkb_exec_on_release)
+        
+        self.options_layout.addWidget(self.chkb_exec_on_release)
+        self.options_layout.addWidget(self.chkb_force_remote_output)
+        self.options_layout.addWidget(self.chkb_force_remote_output_only)
+        
+        self.options_layout.addStretch()
 
         # self.button_group = QtWidgets.QButtonGroup()
         # self.button_radio = QtWidgets.QRadioButton("Button")
@@ -305,7 +315,13 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _exec_on_release_changed(self, value):
         self.action_data.exec_on_release = self.chkb_exec_on_release.isChecked()
-                
+
+    def _force_remote_output_changed(self, value):
+        self.action_data.force_remote_output = self.chkb_force_remote_output.isChecked()
+        
+    def _force_remote_output_only_changed(self, value):
+        self.action_data.force_remote_output_only = self.chkb_force_remote_output_only.isChecked()
+                        
 
     def _update_axis(self):
         """Updates the axis data with UI information."""
@@ -469,6 +485,8 @@ class MapToMouseExFunctor(AbstractFunctor):
     # shared wiggle thread
     _wiggle_thread = None
     _wiggle_stop_requested = False
+    _wiggle_local = False
+    _wiggle_remote = False
     _mouse_controller = None
 
 
@@ -527,10 +545,20 @@ class MapToMouseExFunctor(AbstractFunctor):
             self._perform_mouse_button(event, value)
 
         return True
+    
+    def get_state(self):
+        ''' gets the control state '''
+        (is_local, is_remote) = input_devices.remote_state.state
+        if self.action.force_remote_output:
+            is_remote = True
+        if self.action.force_remote_output_only:
+            # force remote only
+            is_local = False
+        return (is_local, is_remote)
 
     def _perform_mouse_button(self, event, value):
         assert self.action.motion_input is False
-        (is_local, is_remote) = input_devices.remote_state.state
+        (is_local, is_remote) = self.get_state()
         if self.action.button_id in [MouseButton.WheelDown, MouseButton.WheelUp]:
             if value.current:
                 direction = -16
@@ -567,14 +595,14 @@ class MapToMouseExFunctor(AbstractFunctor):
 
         dx = delta_motion if self.action.direction == 90 else None
         dy = delta_motion if self.action.direction != 90 else None
-        (is_local, is_remote) = input_devices.remote_state.state
+        (is_local, is_remote) = self.get_state()
         if is_local:
             MapToMouseExFunctor._mouse_controller.set_absolute_motion(dx, dy)
         if is_remote:
             input_devices.remote_client.send_mouse_motion(dx, dy)
 
     def _perform_button_motion(self, event, value):
-        (is_local, is_remote) = input_devices.remote_state.state
+        (is_local, is_remote) = self.get_state()
         if event.is_pressed:
             if is_local:
                 MapToMouseExFunctor._mouse_controller.set_accelerated_motion(
@@ -598,8 +626,7 @@ class MapToMouseExFunctor(AbstractFunctor):
         :param event the event triggering the code execution
         :param value the current value of the event chain
         """
-        is_local = input_devices.remote_client.is_local
-        is_remote = input_devices.remote_client.is_remote
+        (is_local, is_remote) = self.get_state()
         if value.current == (0, 0):
             if is_local:
                 MapToMouseExFunctor._mouse_controller.set_absolute_motion(0, 0)
@@ -621,9 +648,13 @@ class MapToMouseExFunctor(AbstractFunctor):
 
     def _wiggle_start(self):
         ''' starts the wiggle thread '''
+
         if MapToMouseExFunctor._wiggle_thread:
             # already started
             return 
+        (is_local, is_remote) = self.get_state()
+        MapToMouseExFunctor._wiggle_local = is_local
+        MapToMouseExFunctor._wiggle_remote = is_remote        
         MapToMouseExFunctor._wiggle_stop_requested = False
         MapToMouseExFunctor._wiggle_thread = threading.Thread(target=MapToMouseExFunctor._wiggle)
         MapToMouseExFunctor._wiggle_thread.start()
@@ -643,7 +674,8 @@ class MapToMouseExFunctor(AbstractFunctor):
     def _wiggle():
         ''' wiggles the mouse '''
         syslog.debug("Wiggle start...")
-        (is_local, is_remote) = input_devices.remote_state.state
+        is_local = MapToMouseExFunctor._wiggle_local
+        is_remote = MapToMouseExFunctor._wiggle_remote
         t_wait = time.time()
         while not MapToMouseExFunctor._wiggle_stop_requested:
             if time.time() >= t_wait:
@@ -710,6 +742,9 @@ class MapToMouseEx(AbstractAction):
 
         self.action_mode = MouseAction.MouseButton
         self.exec_on_release = False
+        self.force_remote_output = False
+        self.force_remote_output_only = False
+
         self.input_type = InputType.JoystickButton
 
 
@@ -758,9 +793,15 @@ class MapToMouseEx(AbstractAction):
 
         # get the type of mapping this is
         
-        
         if "exec_on_release" in node.attrib:
             self.exec_on_release = safe_read(node,"exec_on_release",bool, False)
+
+        if "force_remote" in node.attrib:
+            self.force_remote_output = safe_read(node,"force_remote_output",bool, False)
+
+        if "remote_only" in node.attrib:
+            self.force_remote_output_only = safe_read(node,"force_remote_output_only",bool, False)
+
 
     def _generate_xml(self):
         """Returns an XML node containing this instance's information.
@@ -777,6 +818,8 @@ class MapToMouseEx(AbstractAction):
         node.set("max-speed", safe_format(self.max_speed, int))
         node.set("time-to-max-speed", safe_format(self.time_to_max_speed, float))
         node.set("exec_on_release", safe_format(self.exec_on_release, bool))
+        node.set("force_remote_output", safe_format(self.force_remote_output, bool))
+        node.set("force_remote_output_only", safe_format(self.force_remote_output_only, bool))
 
         return node
 
