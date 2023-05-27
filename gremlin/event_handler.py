@@ -525,7 +525,9 @@ class EventHandler(QtCore.QObject):
 
         :param event the event to process
         """
-        for cb in self._matching_callbacks(event):
+
+        m_list = self._matching_callbacks(event)
+        for cb in m_list:
             try:
                 cb(event)
             except error.VJoyError as e:

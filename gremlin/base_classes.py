@@ -459,16 +459,19 @@ class AbstractFunctor(metaclass=ABCMeta):
         :param instance the object which contains the information needed to
             execute it later on
         """
-        pass
-
+        
     @abstractmethod
     def process_event(self, event, value):
         """Processes the functor using the provided event and value data.
 
         :param event the raw event that caused the functor to be executed
         :param value the possibly modified value
+
+        returns: True to continute the execution sequence, False to abort it
+
         """
         pass
+
 
 
 class AbstractAction(profile.ProfileData):

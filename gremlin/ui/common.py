@@ -1198,7 +1198,7 @@ def clear_layout(layout):
 class NoWheelComboBox (QtWidgets.QComboBox):
     ''' implements a combo box with no-wheel scrolling to avoid inadvertent switching of entries while scolling containers '''
 
-    def __init__(self, parent):
+    def __init__(self, parent = None):
         super().__init__(parent)
         self.setFocusPolicy(QtCore.Qt.FocusPolicy.StrongFocus)
 

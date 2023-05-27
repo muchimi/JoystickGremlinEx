@@ -129,7 +129,7 @@ class VjoyAction(enum.Enum):
         elif action == VjoyAction.VJoyToggleRemote:
             return "Toggles between local and remote output modes"
         
-        return "Unknown"
+        return f"Unknown {action}"
         
     @staticmethod
     def to_name(action):

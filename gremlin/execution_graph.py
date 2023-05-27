@@ -161,6 +161,8 @@ class AbstractExecutionGraph(metaclass=ABCMeta):
         :param event the raw event that caused the execution of this graph
         :param value the possibly modified value extracted from the event
         """
+        
+
         # Processing an event twice is needed when a virtual axis button has
         # "jumped" over it's activation region without triggering it. Once
         # this is detected the "press" event is sent and the second run ensures
@@ -169,6 +171,7 @@ class AbstractExecutionGraph(metaclass=ABCMeta):
 
         while self.current_index is not None and len(self.functors) > 0:
             functor = self.functors[self.current_index]
+
             result = functor.process_event(event, value)
 
             if isinstance(functor, actions.AxisButton):

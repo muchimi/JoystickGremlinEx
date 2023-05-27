@@ -340,7 +340,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             otherwise
         """
 
-        el = gremlin.event_handler.EventListener()
+
         if checked:
             # Generate the code for the profile and run it
             self._profile_auto_activated = False
@@ -352,7 +352,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             )
             self.ui.tray_icon.setIcon(QtGui.QIcon("gfx/icon_active.ico"))
             
-            el.profile_start.emit()
+            
 
         else:
             # Stop running the code
@@ -366,7 +366,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             ]:
                 self.ui.devices.currentWidget().refresh()
             self.ui.tray_icon.setIcon(QtGui.QIcon("gfx/icon.ico"))
-            el.profile_stop.emit()
+            
 
     def create_1to1_mapping(self):
         """Creates a 1 to 1 mapping of the given device to the first

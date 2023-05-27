@@ -293,6 +293,11 @@ class CodeRunner:
             self._running = True
 
             sendinput.MouseController().start()
+
+            # tell listener profiles are starting
+            el = gremlin.event_handler.EventListener()
+            el.profile_start.emit()
+
         except Exception as e:
             util.display_error(
                 "Unable to launch due to missing user plugin: {}"
@@ -301,6 +306,9 @@ class CodeRunner:
 
     def stop(self):
         """Stops listening to events and unloads all callbacks."""
+
+        el = gremlin.event_handler.EventListener()
+        el.profile_stop.emit()
 
 
         # stop remote client
@@ -317,6 +325,10 @@ class CodeRunner:
         # Disconnect all signals
         if self._running:
             evt_lst = event_handler.EventListener()
+
+            # tell listeners profile is stopping
+            evt_lst.profile_stop.emit()
+
             kb = input_devices.Keyboard()
             evt_lst.keyboard_event.disconnect(self.event_handler.process_event)
             evt_lst.joystick_event.disconnect(self.event_handler.process_event)
@@ -326,6 +338,10 @@ class CodeRunner:
             self.event_handler.mode_changed.disconnect(
                 self._vjoy_curves.mode_changed
             )
+
+
+
+
         self._running = False
 
 
