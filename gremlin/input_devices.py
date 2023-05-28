@@ -778,6 +778,8 @@ class RemoteClient(QtCore.QObject):
         Remote = 2
         LocalAndRemote = 3
 
+        
+
     def __init__(self):
         """Initialises a new object."""
         QtCore.QObject.__init__(self)
@@ -790,11 +792,13 @@ class RemoteClient(QtCore.QObject):
         # unique ID of this client
         self._id = common.get_guid()
         self._alive_thread = None
-        self._alive_thread_stop_requested = False
+
 
     def start(self):
         ''' creates a multicast client send socket'''
+
         if not self._alive_thread:        
+            syslog.debug("Starting Alive thread...")
             self._alive_thread_stop_requested = False
             self._alive_thread = threading.Thread(target=self._alive_ticker)
             self._alive_thread.setName("remote_alive")
@@ -815,8 +819,11 @@ class RemoteClient(QtCore.QObject):
     def stop(self):
         ''' closes the client socket'''
         if self._alive_thread:
+            syslog.debug("Alive stop requested...")
             self._alive_thread_stop_requested = True
             self._alive_thread.join()
+            syslog.debug("Alive thread stopped")
+            self._alive_thread = None
             
         
         if self._sock:
@@ -826,13 +833,18 @@ class RemoteClient(QtCore.QObject):
 
     def _alive_ticker(self):
         ''' sends an alive packet to keep the remote alive '''
+
+        notify_time = time.time()
         while not self._alive_thread_stop_requested:
-            data = {}
-            data["sender"] = self._id
-            data["action"] = "hb"
-            raw_data = msgpack.packb(data)
-            self._send(raw_data)
-            time.sleep(30)
+            if time.time() >= notify_time:
+                data = {}
+                data["sender"] = self._id
+                data["action"] = "hb"
+                raw_data = msgpack.packb(data)
+                self._send(raw_data)
+                syslog.debug("Alive heartbeat")
+                notify_time = time.time() + 30
+            time.sleep(1)
         
 
     def _send(self, data = None):
