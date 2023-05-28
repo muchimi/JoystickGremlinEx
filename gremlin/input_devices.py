@@ -64,6 +64,7 @@ class VjoyAction(enum.Enum):
     VJoyEnableRemote = 14 # enables remote control (does not impact local control)
     VJoyEnableLocal = 15 # enables local control (does not impact remote control)
     VJoyEnableLocalAndRemote = 16 # enables concurrent local/remote control
+    # VjoyMergeAxis = 17 # merges two axes into one (usually used to combine toe-brakes into a single axis)
 
   
 
@@ -128,6 +129,8 @@ class VjoyAction(enum.Enum):
             return "Enables local and remote control concurrently"
         elif action == VjoyAction.VJoyToggleRemote:
             return "Toggles between local and remote output modes"
+        # elif action == VjoyAction.VjoyMergeAxis:
+        #     return "Merges two axes into one"
         
         return f"Unknown {action}"
         
@@ -164,6 +167,8 @@ class VjoyAction(enum.Enum):
             return "Enable Concurrent Local and Remote control"
         elif action == VjoyAction.VJoyToggleRemote:
             return "Toggle Control"
+        # elif action == VjoyAction.VjoyMergeAxis:
+        #     return "Merge Axis"
         
         return "Unknown"        
     
@@ -558,6 +563,7 @@ class ModeChangeRegistry():
 class GremlinServer(socketserver.ThreadingMixIn,socketserver.UDPServer):
     pass
 
+
 class GremlinSocketHandler(socketserver.BaseRequestHandler):
     ''' handles remote input from a gremlin client on the network 
     
@@ -580,6 +586,10 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
             return 
         
         action = data["action"]
+        if action == "hb":
+            # heart beat
+            return 
+        
         if action == "key":
             # keyboard output
             virtual_code = data["vc"]
@@ -759,7 +769,7 @@ class RemoteServer(QtCore.QObject):
 
 
 
-
+@common.SingletonDecorator
 class RemoteClient(QtCore.QObject):
     """ Provides access to a remote Gremlin instance """
 
@@ -779,13 +789,19 @@ class RemoteClient(QtCore.QObject):
         self._sock = None
         # unique ID of this client
         self._id = common.get_guid()
+        self._alive_thread = None
+        self._alive_thread_stop_requested = False
 
     def start(self):
         ''' creates a multicast client send socket'''
-        if not self.enabled:
-            return
+        if not self._alive_thread:        
+            self._alive_thread_stop_requested = False
+            self._alive_thread = threading.Thread(target=self._alive_ticker)
+            self._alive_thread.setName("remote_alive")
+            self._alive_thread.start()
+
         self.ensure_socket()
-        
+
 
     def ensure_socket(self):
         # makes sure the socket exists
@@ -798,12 +814,26 @@ class RemoteClient(QtCore.QObject):
 
     def stop(self):
         ''' closes the client socket'''
-        if not self.enabled:
-            return
+        if self._alive_thread:
+            self._alive_thread_stop_requested = True
+            self._alive_thread.join()
+            
+        
         if self._sock:
             self._sock.close()
             self._sock = None
             syslog.debug("Gremlin RPC client stopped.")
+
+    def _alive_ticker(self):
+        ''' sends an alive packet to keep the remote alive '''
+        while not self._alive_thread_stop_requested:
+            data = {}
+            data["sender"] = self._id
+            data["action"] = "hb"
+            raw_data = msgpack.packb(data)
+            self._send(raw_data)
+            time.sleep(30)
+        
 
     def _send(self, data = None):
         ''' sends data to the socket'''

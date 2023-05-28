@@ -25,7 +25,7 @@ import dill
 
 import gremlin
 from . import common, error, execution_graph, plugin_manager, profile
-from gremlin.profile import parse_guid, safe_read, write_guid
+from gremlin.profile import parse_guid, safe_read, write_guid, Device
 
 
 class ActivationRule(enum.Enum):
@@ -490,6 +490,24 @@ class AbstractAction(profile.ProfileData):
         self.activation_condition = None
         self._id = None
 
+    @property
+    def hardware_device(self):
+        ''' gets the hardware device attached to this action '''
+        return self.parent.hardware_device
+    
+    @property
+    def hardware_input_id(self):
+        ''' gets the input id on the hardware device attached to this '''
+        return self.parent.hardware_input_id
+    
+    @property
+    def hardware_input_type(self):
+        ''' gets the type of hardware device attached to this '''
+        return self.parent.hardware_input_type
+    
+    @property
+    def hardware_device_guid(self):
+        return self.parent.hardware_device_guid
 
 
     @property
@@ -589,6 +607,49 @@ class AbstractContainer(profile.ProfileData):
         # FIXME: This is ugly and shouldn't be done but for now the least
         #   terrible option
         self.current_view_type = None
+
+        # attached hardware device to this container
+        self.device = self._get_hardware_device(parent)
+        if self.device:
+            self.device_guid = self.device.device_guid
+            self.device_input_id = parent.input_id
+            self.device_input_type = parent.input_type
+        else:
+            self.device_guid = None
+            self.device_input_id = None
+            self.device_input_type = None
+
+
+    def _get_hardware_device(self, parent):
+        ''' gets the hardware device attached to this action '''
+        while parent and not isinstance(parent, Device):
+            parent = parent.parent
+        if parent:
+            return parent
+        return None
+    
+    @property
+    def hardware_device(self):
+        ''' gets the hardware device attached to this '''
+        return self.device
+
+
+    @property
+    def hardware_device_guid(self):
+        ''' gets the GUID of the mapped hardware device'''
+        return self.device_guid
+    
+    @property
+    def hardware_input_id(self):
+        ''' gets the input id on the hardware device attached to this '''
+        return self.device_input_id
+    
+    @property
+    def hardware_input_type(self):
+        ''' gets the type of hardware device attached to this '''
+        return self.device_input_type
+    
+
 
     def add_action(self, action, index=-1):
         """Adds an action to this container.

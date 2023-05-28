@@ -147,7 +147,7 @@ class BasicContainer(gremlin.base_classes.AbstractContainer):
         :param parent the InputItem this container is linked to
         """
         super().__init__(parent)
-
+    
     def add_action(self, action, index=-1):
         assert isinstance(action, gremlin.base_classes.AbstractAction)
 
