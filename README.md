@@ -206,11 +206,11 @@ Called when the mode is changed (use def mode_change(mode) - mode will be a stri
 
 # Recipes
 
-### One way or two way switch to two way switch / three way switch
+## One way or two way switch to two way switch / three way switch
 
-Some hardware controllers have physical two or three position switches when only one (or two) position records a button press.
+Some hardware controllers only have a trigger on one (two) positions out of two (three).  Usually the center doesn't have a button mapped.  
 
-In GremlinEx, button presses can be output for each position by adding more than one mapping to each physical button that is triggered on the physical hardware in pairs.
+In GremlinEx VjoyRemap a button trigger can easily be output for each position of a switch by adding a release mapping to the hardware positions that do trigger on.  The trigger occurs then when the switch leaves the position and turns off.
 
 One responds to button presses on the raw hardware, the other responds to a button release on the raw hardware.
 
@@ -220,6 +220,16 @@ One responds to button presses on the raw hardware, the other responds to a butt
 | Send VJOY output (on release)   | Sends a button press to VJOY device and button when the position of the button is no longer active.  The checkbox "execute on release" is selected in this case.  |
 
 The equivalent pulse commands can be send to send a momentary pulse rather than having the button on all the time if that is needed.
+
+## Scripting logic
+
+Any logic that depends on reading more than one hardware value is best done as a plugin.  Plugins are Python files "attached" to a GremlinEx profile and the script enhancements make it possible to run a function when a hardware event occurs.
+
+### Attaching a function to a hardware event
+
+You use a Python decorator to map a function to a hardware event.  The decorator starts with the @ sign and tells GremlinEx what hardware and input you are mapping to.
+
+GremlinEx adds a Script Generator button to the Device Information dialog that copies all current hardware device names, IDs and automatically creates decorators out of them that can be pasted directly into a Python script file.
 
 
 

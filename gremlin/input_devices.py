@@ -786,23 +786,25 @@ class RemoteClient(QtCore.QObject):
         #self._host = "localhost"
         config = gremlin.config.Configuration()
         self._port = config.server_port
-        self._enabled = config.enable_remote_broadcast
+        self._broadcast_enabled = config.enable_remote_broadcast
         self._address = (RPCGremlin.MULTICAST_GROUP, self._port)
         self._sock = None
         # unique ID of this client
         self._id = common.get_guid()
         self._alive_thread = None
+        self._alive_thread_stop_requested = False
 
 
     def start(self):
         ''' creates a multicast client send socket'''
-
-        if not self._alive_thread:        
-            syslog.debug("Starting Alive thread...")
-            self._alive_thread_stop_requested = False
-            self._alive_thread = threading.Thread(target=self._alive_ticker)
-            self._alive_thread.setName("remote_alive")
-            self._alive_thread.start()
+        if self._broadcast_enabled:
+            # alive thread is only on master machine
+            if not self._alive_thread:        
+                syslog.debug("Starting Alive thread...")
+                self._alive_thread_stop_requested = False
+                self._alive_thread = threading.Thread(target=self._alive_ticker)
+                self._alive_thread.setName("remote_alive")
+                self._alive_thread.start()
 
         self.ensure_socket()
 

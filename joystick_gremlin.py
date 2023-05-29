@@ -65,6 +65,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
     ui = None
 
+
     def __init__(self, parent=None):
         """Creates a new main ui window.
 
@@ -155,6 +156,10 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         GremlinUi.ui = self
 
+    @property
+    def current_profile(self):
+        ''' gets the curernt active profile '''
+        return self._profile
 
     def refresh(self):
         ''' forces a refreshes the UI by processing events '''
@@ -225,13 +230,15 @@ class GremlinUi(QtWidgets.QMainWindow):
     def device_information(self):
         """Opens the device information window."""
         self.modal_windows["device_information"] = \
-            gremlin.ui.dialogs.DeviceInformationUi()
+            gremlin.ui.dialogs.DeviceInformationUi(self._profile)
         geom = self.geometry()
+        w = 500
+        h = 300
         self.modal_windows["device_information"].setGeometry(
-            int(geom.x() + geom.width() / 2 - 150),
-            int(geom.y() + geom.height() / 2 - 75),
-            300,
-            150
+            int(geom.x() + geom.width() / 2 - w/2),
+            int(geom.y() + geom.height() / 2 - h/2),
+            w,
+            h
         )
         self.modal_windows["device_information"].show()
         self.modal_windows["device_information"].closed.connect(

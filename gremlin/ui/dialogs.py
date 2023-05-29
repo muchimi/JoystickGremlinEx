@@ -25,6 +25,7 @@ from PySide6 import QtCore, QtGui, QtWidgets
 import dill
 
 import gremlin
+from joystick_gremlin import GremlinUi
 from . import common, ui_about
 
 
@@ -1108,17 +1109,20 @@ class DeviceInformationUi(common.BaseDialogUi):
     """Widget which displays information about all connected joystick
     devices."""
 
-    def __init__(self, parent=None):
+    def __init__(self, profile_data, parent=None):
         """Creates a new instance.
 
         :param parent the parent widget
         """
         super().__init__(parent)
 
+        self.profile = profile_data
+
         self.devices = gremlin.joystick_handling.joystick_devices()
 
         self.setWindowTitle("Device Information")
         self.main_layout = QtWidgets.QGridLayout(self)
+        w = 230
 
         self.main_layout.addWidget(QtWidgets.QLabel("<b>Name</b>"), 0, 0)
         self.main_layout.addWidget(QtWidgets.QLabel("<b>Axes</b>"), 0, 1)
@@ -1129,8 +1133,13 @@ class DeviceInformationUi(common.BaseDialogUi):
         self.main_layout.addWidget(QtWidgets.QLabel("<b>GUID"), 0, 6)
 
         for i, entry in enumerate(self.devices):
+            w_name = QtWidgets.QLineEdit()
+            w_name.setText(entry.name)
+            w_name.setReadOnly(True)
+            w_name.setMinimumWidth(w)
+            w_name.setMaximumWidth(w)
             self.main_layout.addWidget(
-                QtWidgets.QLabel(entry.name), i+1, 0
+                w_name, i+1, 0
             )
             self.main_layout.addWidget(
                 QtWidgets.QLabel(str(entry.axis_count)), i+1, 1
@@ -1150,13 +1159,64 @@ class DeviceInformationUi(common.BaseDialogUi):
             guid_field = QtWidgets.QLineEdit()
             guid_field.setText(str(entry.device_guid))
             guid_field.setReadOnly(True)
-            guid_field.setMinimumWidth(230)
-            guid_field.setMaximumWidth(230)
+            guid_field.setMinimumWidth(w)
+            guid_field.setMaximumWidth(w)
             self.main_layout.addWidget(guid_field, i+1, 6)
+
+        self.script_copy_button = QtWidgets.QPushButton("Generate plugin script header")
+        self.script_copy_button.clicked.connect(self._copy_to_script)
+        self.main_layout.addWidget(self.script_copy_button, len(self.devices)+1, 1)
 
         self.close_button = QtWidgets.QPushButton("Close")
         self.close_button.clicked.connect(lambda: self.close())
         self.main_layout.addWidget(self.close_button, len(self.devices)+1, 3)
+
+    def _copy_to_script(self):
+        ''' copies device entries to clipboard in script format '''
+        import re
+        s_list = []
+        a_map = {}
+
+        s_list.append("# GremlinEx plugin script device list\n")
+
+        # grab all defined modes in the current profile
+        mode_list = set()
+        for device in self.profile.devices.values():
+            for mode in device.modes.values():
+                if mode.name is None:
+                    continue
+                mode_list.add(mode.name)
+
+        mode_list = list(mode_list)
+        mode_list.sort()
+        
+        for i, entry in enumerate(self.devices):
+            if entry.is_virtual:
+                # skip virtual devices
+                continue
+            var_name = re.sub('[^0-9a-zA-Z]+', '_', entry.name) # cleanup non alphanumeric in the name for clean variable names
+            s_list.append(f"\n# device {entry.name} - axis count: {entry.axis_count}  hat count: {entry.hat_count}  button count: {entry.button_count}")
+            s_list.append(f"{var_name}_NAME = \"{entry.name}\"")
+            s_list.append(f"{var_name}_GUID = \"{entry.device_guid}\"")
+            for mode_name in mode_list:
+                mode_suffix = mode_name.replace(" ","_")
+                if not mode_name in a_map.keys():
+                    a_map[mode_name] = set()
+                a_map[mode_name].add(f"{var_name}_{mode_suffix} = gremlin.input_devices.JoystickDecorator({var_name}_NAME, {var_name}_GUID, \"{mode_name}\")")
+
+        script = ""
+        for line in s_list:
+            script += line + "\n"
+
+        script += "\n# plugin decorator definitions\n"        
+        for mode_name in a_map.keys():
+            script += f"\n# decorators for mode {mode_name}\n"
+            for line in a_map[mode_name]:
+                script += line + "\n"
+
+        app = QtWidgets.QApplication.instance()
+        app.clipboard().setText(script)
+
 
 
 class SwapDevicesUi(common.BaseDialogUi):
