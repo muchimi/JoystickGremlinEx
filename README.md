@@ -176,14 +176,16 @@ The commands are only available to button bindings at this time.
 
 This plugin is identical to the Map to Mouse plugin but adds a wiggle function. When wiggle is enabled, the mouse will move slightly by itself every 10 to 40 seconds and move back.  It will do that until wiggle mode is turned off.  
   
-The purpose of wiggle is to keep an application alive.
+The purpose of wiggle is to keep an application alive.   Wiggle is turned on/off separately for remote/local clients.
 
 | Command      | Description |
 | ----------- | ----------- |
 | Mouse Button | Outputs one of the mouse buttons |
 | Mouse Axis | Moves the mouse |
-| Wiggle Enable | Jolts the mouse every few seconds  |
-| Wiggle Disable | Stops the mouse wiggling if it was turned on.  |
+| Wiggle Enable (local) | Jolts the mouse every few seconds  |
+| Wiggle Disable (local) | Stops the mouse wiggling if it was turned on.  |
+| Wiggle Enable (remote) | Jolts the mouse every few seconds on remote clients  |
+| Wiggle Disable (remote) | Stops the mouse wiggling if it was turned on for remote clients  |
 
 Mouse commands can forced to be sent to remote hosts only, or to send them concurrently to the remote host regardless of the remote control state.
 
@@ -192,17 +194,23 @@ Mouse commands can forced to be sent to remote hosts only, or to send them concu
 
 GremlinEx adds a few custom Gremlin script decorators to facilitate custom scripting and control from Python.
 
-### @gremlin_start
+### @gremlin.input_devices.gremlin_start
 
 Called when a profile is started - lets a script to initialization when a profile starts to run
 
-### @gremlin_stop
+### @gremlin.input_devices.gremlin_stop
 
 Called when a profile is stopped - lets a script cleanup when the profile stops running
 
-### @gremlin_mode
+### @gremlin.input_devices.gremlin_mode
 
 Called when the mode is changed (use def mode_change(mode) - mode will be a string) - lets a script get a notification when there is a profile mode change somewhere in GremlinEx.
+
+
+### @gremlin.input_devices.gremlin_state
+
+Called when the state information is changed (local, remote or broadcast mode). The event properties is_local, is_remote and is_broadcast are flags that contain the current state of GremlinEx.
+
 
 # Recipes
 

@@ -153,6 +153,13 @@ class DeviceChangeEvent:
         self.vjoy_device_id = 0
         self.vjoy_input_id = 0
 
+class StateChangeEvent:
+    ''' sent when the state changes '''
+    def __init__(self, is_local = False, is_remote = False, is_broadcast_enabled = False):
+        self.is_local = is_local
+        self.is_remote = is_remote
+        self.is_broadcast_enabled = is_broadcast_enabled
+
 
 @common.SingletonDecorator
 class EventListener(QtCore.QObject):
@@ -190,7 +197,7 @@ class EventListener(QtCore.QObject):
     config_changed =  QtCore.Signal()
 
     # occurs on broadcast mode change
-    broadcast_changed = QtCore.Signal()
+    broadcast_changed = QtCore.Signal(StateChangeEvent)
         
 
     def __init__(self):

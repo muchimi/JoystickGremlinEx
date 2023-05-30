@@ -26,8 +26,10 @@ syslog = logging.getLogger("system")
 class MouseAction(enum.Enum):
     MouseButton = 0 # output a mouse button
     MouseMotion = 1 # output a mouse motion
-    MouseWiggleOn = 2 # enable mouse wiggle
-    MouseWiggleOff = 3 # disable mouse wiggle
+    MouseWiggleOnLocal = 2 # enable mouse wiggle - local machine only
+    MouseWiggleOffLocal = 3 # disable mouse wiggle - locla machine only
+    MouseWiggleOnRemote = 4 # enable mouse wiggle - remote machines only
+    MouseWiggleOffRemote = 5 # disable mouse wiggle - remote machines only
 
 
     @staticmethod
@@ -64,10 +66,15 @@ class MouseAction(enum.Enum):
             return "Maps a mouse button"
         elif action == MouseAction.MouseMotion:
             return "Maps to a mouse motion axis"
-        elif action == MouseAction.MouseWiggleOff:
-            return "Turns wiggle mode off"
-        elif action == MouseAction.MouseWiggleOn:
-            return "Turns wiggle mode on"
+        elif action == MouseAction.MouseWiggleOffLocal:
+            return "Turns wiggle mode off (local only)"
+        elif action == MouseAction.MouseWiggleOnLocal:
+            return "Turns wiggle mode on (local only)"
+        
+        elif action == MouseAction.MouseWiggleOffRemote:
+            return "Turns wiggle mode off (remote only)"
+        elif action == MouseAction.MouseWiggleOnRemote:
+            return "Turns wiggle mode on (remote only)"
         
         return f"Unknown {action}"
     
@@ -78,10 +85,15 @@ class MouseAction(enum.Enum):
             return "Mouse button"
         elif action == MouseAction.MouseMotion:
             return "Mouse axis"
-        elif action == MouseAction.MouseWiggleOff:
-            return "Wiggle Disable"
-        elif action == MouseAction.MouseWiggleOn:
-            return "Wiggle Enable"
+        elif action == MouseAction.MouseWiggleOffLocal:
+            return "Wiggle Disable (local)"
+        elif action == MouseAction.MouseWiggleOnLocal:
+            return "Wiggle Enable (local)"
+        elif action == MouseAction.MouseWiggleOffRemote:
+            return "Wiggle Disable (remote)"
+        elif action == MouseAction.MouseWiggleOnRemote:
+            return "Wiggle Enable (remote)"        
+                
         return f"Unknown {action}"
 
 class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
@@ -421,30 +433,11 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self.action_data.motion_input = show_motion
         
-        
-        # if self.motion_radio.isChecked():
-        #     self.action_data.action_mode = MouseAction.MouseMotion
-        #     self.action_data.motion_input = True
-        #     show_motion = True
-        # elif self.button_radio.isChecked():
-        #     self.action_data.action_mode  = MouseAction.MouseButton
-        #     show_button = True
-        # elif self.wiggle_start_radio.isChecked():
-        #     self.action_data.action_mode  = MouseAction.MouseWiggleOn
-        # elif self.wiggle_stop_radio.isChecked():
-        #     self.action_data.action_mode  = MouseAction.MouseWiggleOff
             
         #show_motion = self.action_data.motion_input
         self.motion_widget.setVisible(show_motion)
         self.button_widget.setVisible(show_button)
         self.chkb_exec_on_release.setVisible(show_release)
-
-        # if self.action_data.motion_input:
-        #     self.button_widget.hide()
-        #     self.motion_widget.show()
-        # else:
-        #     self.button_widget.show()
-        #     self.motion_widget.hide()
 
         # Emit modification signal to ensure virtual button settings
         # are updated correctly
@@ -483,10 +476,10 @@ class MapToMouseExFunctor(AbstractFunctor):
     """
 
     # shared wiggle thread
-    _wiggle_thread = None
-    _wiggle_stop_requested = False
-    _wiggle_local = False
-    _wiggle_remote = False
+    _wiggle_local_thread = None
+    _wiggle_remote_thread = None
+    _wiggle_local_stop_requested = False
+    _wiggle_remote_stop_requested = False
     _mouse_controller = None
 
 
@@ -516,23 +509,31 @@ class MapToMouseExFunctor(AbstractFunctor):
 
         #syslog.debug(f"Process mouse functor event: {self.action_mode.name}  {self.action.action_id} exec on release: {self.action.exec_on_release}")
         if self.input_type == InputType.JoystickButton:
-
-            if self.action_mode == MouseAction.MouseWiggleOn:
-                # start the wiggle thread
+            if self.action_mode == MouseAction.MouseWiggleOnLocal:
+                # start the local wiggle thread
                 if self.exec_on_release and not event.is_pressed:
-                        self._wiggle_start()
-                        syslog.debug("Wiggle start requested (exec on release)")
+                        self._wiggle_start(is_local=True)
                 elif not self.exec_on_release and event.is_pressed:
-                    self._wiggle_start()
-                    syslog.debug("Wiggle start requested")
-            elif self.action_mode == MouseAction.MouseWiggleOff:
+                    self._wiggle_start(is_local=True)
+                    
+            elif self.action_mode == MouseAction.MouseWiggleOffLocal:
                 if self.exec_on_release and not event.is_pressed:
-                        syslog.debug("Wiggle stop requested (exec on release)")
-                        self._wiggle_stop()
+                        self._wiggle_stop(is_local = True)
                 elif not self.exec_on_release and event.is_pressed:
-                    syslog.debug("Wiggle stop requested")
-                    self._wiggle_stop()
+                    self._wiggle_stop(is_local=True)
 
+            elif self.action_mode == MouseAction.MouseWiggleOnRemote:
+                # start the local wiggle thread
+                if self.exec_on_release and not event.is_pressed:
+                    self._wiggle_start(is_remote=True)
+                elif not self.exec_on_release and event.is_pressed:
+                    self._wiggle_start(is_remote=True)
+                    
+            elif self.action_mode == MouseAction.MouseWiggleOffRemote:
+                if self.exec_on_release and not event.is_pressed:
+                    self._wiggle_stop(is_remote = True)
+                elif not self.exec_on_release and event.is_pressed:
+                    self._wiggle_stop(is_remote=True)
             
         elif self.action_mode == MouseAction.MouseMotion:
             if event.event_type == InputType.JoystickAxis:
@@ -646,68 +647,85 @@ class MapToMouseExFunctor(AbstractFunctor):
                 input_devices.remote_client.send_mouse_acceleration(a, self.action.min_speed, self.action.max_speed, self.action.time_to_max_speed)
 
 
-    def _wiggle_start(self):
-        ''' starts the wiggle thread '''
+    def _wiggle_start(self, is_local = False, is_remote = False):
+        ''' starts the wiggle thread, local or remote '''
 
-        if MapToMouseExFunctor._wiggle_thread:
-            # already started
-            return 
-        (is_local, is_remote) = self.get_state()
-        MapToMouseExFunctor._wiggle_local = is_local
-        MapToMouseExFunctor._wiggle_remote = is_remote        
-        MapToMouseExFunctor._wiggle_stop_requested = False
-        MapToMouseExFunctor._wiggle_thread = threading.Thread(target=MapToMouseExFunctor._wiggle)
-        MapToMouseExFunctor._wiggle_thread.start()
+        if is_local and not MapToMouseExFunctor._wiggle_local_thread:
+            syslog.debug("Wiggle start local requested...")
+            MapToMouseExFunctor._wiggle_local_stop_requested = False
+            MapToMouseExFunctor._wiggle_local_thread = threading.Thread(target=MapToMouseExFunctor._wiggle_local)
+            MapToMouseExFunctor._wiggle_local_thread.start()
 
-    def _wiggle_stop(self):
-        ''' stops the wiggle thread '''
-        if not MapToMouseExFunctor._wiggle_thread:
-            # already started
-            return 
-        syslog.debug("Wiggle stop requested...")
-        MapToMouseExFunctor._wiggle_stop_requested = True
-        MapToMouseExFunctor._wiggle_thread.join()
-        syslog.debug("Wiggle thread exited...")
-        MapToMouseExFunctor._wiggle_thread = None
+        if is_remote and not MapToMouseExFunctor._wiggle_remote_thread:
+            syslog.debug("Wiggle start remote requested...")
+            MapToMouseExFunctor._wiggle_remote_stop_requested = False
+            MapToMouseExFunctor._wiggle_remote_thread = threading.Thread(target=MapToMouseExFunctor._wiggle_remote)
+            MapToMouseExFunctor._wiggle_remote_thread.start()
+
+    def _wiggle_stop(self, is_local = False, is_remote = False):
+        ''' stops the wiggle thread, local or remote '''
+
+        if is_local and MapToMouseExFunctor._wiggle_local_thread:
+            syslog.debug("Wiggle stop local requested...")
+            MapToMouseExFunctor._wiggle_local_stop_requested = True
+            MapToMouseExFunctor._wiggle_local_thread.join()
+            syslog.debug("Wiggle thread local exited...")
+            MapToMouseExFunctor._wiggle_local_thread = None
+
+        if is_remote and MapToMouseExFunctor._wiggle_remote_thread:
+            syslog.debug("Wiggle stop local requested...")
+            MapToMouseExFunctor._wiggle_remote_stop_requested = True
+            MapToMouseExFunctor._wiggle_remote_thread.join()
+            syslog.debug("Wiggle thread remote exited...")
+            MapToMouseExFunctor._wiggle_remote_thread = None            
 
     @staticmethod
-    def _wiggle():
+    def _wiggle_local():
         ''' wiggles the mouse '''
-        syslog.debug("Wiggle start...")
-        is_local = MapToMouseExFunctor._wiggle_local
-        is_remote = MapToMouseExFunctor._wiggle_remote
-
-        msg = "wiggle mode on"
-        if is_local and is_remote:
-            msg = "wiggle mode on for local and remote clients"
-        elif is_local:
-            msg = "local wiggle mode on"
-        elif is_remote:
-            msg = "remote wiggle mode on"            
+        syslog.debug("Wiggle local start...")
+        msg = "local wiggle mode on"
         input_devices.remote_state.say(msg)
 
         t_wait = time.time()
-        while not MapToMouseExFunctor._wiggle_stop_requested:
+        while not MapToMouseExFunctor._wiggle_local_stop_requested:
             if time.time() >= t_wait:
-                syslog.debug("wiggling...")
-                if is_local:
-                    MapToMouseExFunctor._mouse_controller.set_absolute_motion(1, 1)
-                    time.sleep(1)
-                    MapToMouseExFunctor._mouse_controller.set_absolute_motion(-1, -1)
-                    time.sleep(0.5)
-                    MapToMouseExFunctor._mouse_controller.set_absolute_motion(0, 0)
-                if is_remote:
-                    input_devices.remote_client.send_mouse_motion(1, 1)
-                    time.sleep(1)
-                    input_devices.remote_client.send_mouse_motion(-1, -1)
-                    time.sleep(0.5)
-                    input_devices.remote_client.send_mouse_motion(0,0)
+                syslog.debug("wiggling local...")
+                MapToMouseExFunctor._mouse_controller.set_absolute_motion(1, 1)
+                time.sleep(1)
+                MapToMouseExFunctor._mouse_controller.set_absolute_motion(-1, -1)
+                time.sleep(0.5)
+                MapToMouseExFunctor._mouse_controller.set_absolute_motion(0, 0)
                 t_wait = time.time() + random.uniform(10,40)
             time.sleep(0.5)
             
-        syslog.debug("Wiggle stop...")
-        input_devices.remote_state.say("wiggle mode off")
+        syslog.debug("Wiggle local stop...")
+        input_devices.remote_state.say("local wiggle mode off")
 
+
+
+    @staticmethod
+    def _wiggle_remote():
+        ''' wiggles the mouse - remote clients'''
+        syslog.debug("Wiggle remote start...")
+
+        msg = "remote wiggle mode on"
+        input_devices.remote_state.say(msg)
+
+        t_wait = time.time()
+        while not MapToMouseExFunctor._wiggle_remote_stop_requested:
+            if time.time() >= t_wait:
+                syslog.debug("wiggling remote...")
+                input_devices.remote_client.send_mouse_motion(1, 1)
+                time.sleep(1)
+                input_devices.remote_client.send_mouse_motion(-1, -1)
+                time.sleep(0.5)
+                input_devices.remote_client.send_mouse_motion(0,0)
+                t_wait = time.time() + random.uniform(10,40)
+            time.sleep(0.5)
+            
+        syslog.debug("Wiggle remote stop...")
+        input_devices.remote_state.say("remote wiggle mode off")
+        
 
 class MapToMouseEx(AbstractAction):
 

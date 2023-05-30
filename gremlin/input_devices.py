@@ -251,7 +251,7 @@ class RemoteControl():
             self._is_local = is_local
             self._is_remote = is_remote
             el = event_handler.EventListener()
-            el.broadcast_changed.emit()
+            el.broadcast_changed.emit(event_handler.StateChangeEvent(self._is_local, self._is_remote, self._is_broadcast))
 
 
     def _config_changed(self):
@@ -260,21 +260,21 @@ class RemoteControl():
         if self._is_broadcast != config.enable_remote_broadcast:
             self._is_broadcast = config.enable_remote_broadcast
             el = event_handler.EventListener()
-            el.broadcast_changed.emit()
+            el.broadcast_changed.emit(event_handler.StateChangeEvent(self._is_local, self._is_remote, self._is_broadcast))
 
     def say(self, msg):
         speech = InternalSpeech()
         speech.speak(msg)
 
-    def _broadcast_changed(self):
+    def _broadcast_changed(self, event: event_handler.StateChangeEvent):
         config = gremlin.config.Configuration()
         if config.enable_broadcast_speech:
             msg = None
-            if self._is_local and self._is_remote:
+            if event.is_local and event.is_remote:
                 msg = "Concurrent control mode enabled"
-            elif self._is_local:
+            elif event.is_local:
                 msg = "Local control is enabled"
-            elif self._is_remote:
+            elif event.is_remote:
                 msg = "Remote control is enabled"
             if msg:
                 threading.Thread(target = self.say, args=(msg,)).start()
@@ -300,7 +300,12 @@ class RemoteControl():
     @property
     def state(self):
         ''' returns status as a pair of flags, local, remote'''
-        return (self.is_local, self.is_remote)    
+        return (self.is_local, self.is_remote)
+    
+    def to_state_event(self) -> event_handler.StateChangeEvent:
+        ''' returns event data for the current state '''
+        event = event_handler.StateChangeEvent(self.is_local, self.is_remote, self._is_broadcast)
+        return event
 
 
 remote_state = RemoteControl()
@@ -552,12 +557,65 @@ class ModeChangeRegistry():
         return callback
 
     def mode_changed(self, mode_name):
-            
+        ''' calls all registered callbacks when the GremlinEx mode changes '''
         if len(self._registry) == 0:
             return
         for item in self._registry.values():
             plugin_cb = self._install_plugins(item)
             plugin_cb(mode_name)
+
+
+
+class StateChangeRegistry():
+    """Registry for functions executed on state (remote/local) change """
+    def __init__(self):
+        """Creates a new instance."""
+        self._registry = {}
+        self._running = False
+        self._plugins = []
+        el = event_handler.EventListener()
+        el.broadcast_changed.connect(self.state_changed)
+
+    def add(self, callback):
+        """Adds a function to execute periodically.
+
+        :param callback the function to execute
+        :param interval the time between executions
+        """
+        self._registry[callback] = callback
+
+
+    def clear(self):
+        """Clears the registry."""
+        self._registry = {}
+
+    def _install_plugins(self, callback):
+        """Installs the current plugins into the given callback.
+
+        :param callback the callback function to install the plugins
+            into
+        :return new callback with plugins installed
+        """
+        signature = inspect.signature(callback).parameters
+        for item in signature:
+            print(item)
+        partial_fn = functools.partial
+        if "self" in signature:
+            partial_fn = functools.partialmethod
+        for plugin in self._plugins:
+            if plugin.keyword in signature:
+                callback = plugin.install(callback, partial_fn)
+        return callback
+
+    def state_changed(self, event):
+        ''' calls all registered callbacks when the GremlinEx local or remote states change '''
+        if len(self._registry) == 0:
+            return
+        for item in self._registry.values():
+            plugin_cb = self._install_plugins(item)
+            plugin_cb(event)
+
+
 
 
 class GremlinServer(socketserver.ThreadingMixIn,socketserver.UDPServer):
@@ -1011,19 +1069,18 @@ start_registry = SimpleRegistry()
 # Global registry of all stop callbacks
 stop_registry = SimpleRegistry()
 
+# Global registry of all mode change callbacks
+mode_registry = ModeChangeRegistry()
+
+# Global state registry of all state change callbacks
+state_registry = StateChangeRegistry()
+
 # Global remote server = listens to remote client events
 remote_server = RemoteServer()
 
 # Global remote client = sends events to server
 remote_client = RemoteClient()
 
-
-
-
-
-
-# Global registry of all mode change callbacks
-mode_registry = ModeChangeRegistry()
 
 
 def register_callback(callback, device, input_type, input_id):
@@ -1824,6 +1881,19 @@ def gremlin_mode():
             callback(*args, **kwargs)
 
         mode_registry.add(wrapper_fn)
+
+        return wrapper_fn
+
+    return wrap
+
+def gremlin_state():
+    ''' decorator when gremlin changes states local or remote or both '''
+    def wrap(callback):
+        @functools.wraps(callback)
+        def wrapper_fn(*args, **kwargs):
+            callback(*args, **kwargs)
+
+        state_registry.add(wrapper_fn)
 
         return wrapper_fn
 

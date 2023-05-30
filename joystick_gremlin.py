@@ -911,9 +911,9 @@ class GremlinUi(QtWidgets.QMainWindow):
 
     def _update_statusbar_active(self, is_active):
         self._is_active = is_active
-        self._update_status_bar()
+        self._update_status_bar(remote_state.to_state_event())
 
-    def _update_status_bar(self):
+    def _update_status_bar(self, event):
         # updates the status bar
 
     
@@ -929,13 +929,13 @@ class GremlinUi(QtWidgets.QMainWindow):
             text_running = f"Running and {text_active}"
         else:
             text_running = "Not Running"
-
+        
         # remote control status
-        if remote_state.is_local:
+        if event.is_local:
             local_msg = "<font color=\"green\">Active</font>"
         else:
             local_msg = "<font color=\"red\">Disabled</font>"
-        if remote_state.is_remote:
+        if event.is_remote:
             remote_msg = "<font color=\"green\">Active</font>"
         else:
             remote_msg = "<font color=\"red\">Disabled</font>"

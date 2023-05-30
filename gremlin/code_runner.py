@@ -31,6 +31,8 @@ from gremlin import event_handler, input_devices, \
 import vjoy as vjoy_module
 
 
+syslog = logging.getLogger("system")
+
 class CodeRunner:
 
     """Runs the actual profile code."""
@@ -283,6 +285,10 @@ class CodeRunner:
                 input_devices.mode_registry.mode_changed
             )
 
+            # hook state change callbacks
+            evt_listener.broadcast_changed.connect(
+                input_devices.state_registry.state_changed
+            )
 
 
 
@@ -299,10 +305,10 @@ class CodeRunner:
             el.profile_start.emit()
 
         except Exception as e:
-            util.display_error(
-                "Unable to launch due to missing user plugin: {}"
-                .format(str(e))
-            )
+            msg = f"Unable to launch user plugin due to an error: {e}"
+            syslog.debug(msg)
+            util.display_error(msg)
+            
 
     def stop(self):
         """Stops listening to events and unloads all callbacks."""
