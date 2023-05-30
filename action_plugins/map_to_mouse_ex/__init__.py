@@ -676,6 +676,16 @@ class MapToMouseExFunctor(AbstractFunctor):
         syslog.debug("Wiggle start...")
         is_local = MapToMouseExFunctor._wiggle_local
         is_remote = MapToMouseExFunctor._wiggle_remote
+
+        msg = "wiggle mode on"
+        if is_local and is_remote:
+            msg = "wiggle mode on for local and remote clients"
+        elif is_local:
+            msg = "local wiggle mode on"
+        elif is_remote:
+            msg = "remote wiggle mode on"            
+        input_devices.remote_state.say(msg)
+
         t_wait = time.time()
         while not MapToMouseExFunctor._wiggle_stop_requested:
             if time.time() >= t_wait:
@@ -696,6 +706,7 @@ class MapToMouseExFunctor(AbstractFunctor):
             time.sleep(0.5)
             
         syslog.debug("Wiggle stop...")
+        input_devices.remote_state.say("wiggle mode off")
 
 
 class MapToMouseEx(AbstractAction):
