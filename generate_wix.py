@@ -228,11 +228,11 @@ def create_document():
             # "Id": "290a3110-0745-48d6-93d2-d954cb584b6f", # 12.0.0
             # "Id": "6019660b-26bd-430b-9b95-ca6a55201060",  # 13.0.0
             # "Id": "0dad4221-c8cf-4424-8dcd-3886274e89ef", # 13.1.0
-            "Id": "6472cca8-d352-4186-8a98-ca6ba33d083c", # 13.1.3
+            "Id": "6472cca8-d352-4186-8a98-ca6ba33d083c", # gremlinEx
             "UpgradeCode": "0464914b-97da-4889-8699-bcde4e767517",
             "Language": "1033",
             "Codepage": "1252",
-            "Version": "13.1.3"
+            "Version": "13.37ex"
         })
     mug = create_node("MajorUpgrade",
         {

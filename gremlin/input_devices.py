@@ -310,6 +310,10 @@ class RemoteControl():
 
 remote_state = RemoteControl()
 
+def get_remote_state():
+    ''' gets the remote state '''
+    return remote_state
+
 
 class CallbackRegistry:
 
@@ -913,9 +917,9 @@ class RemoteClient(QtCore.QObject):
             self.ensure_socket()
             self._sock.sendto(data, self._address)
 
-    def send_button(self, device_id, button_id, is_pressed):
+    def send_button(self, device_id, button_id, is_pressed, force_remote = False):
         ''' handles a remote joystick event '''
-        if self.enabled:
+        if self.enabled or force_remote:
             data = {}
             data["sender"] = self._id
             data["action"] = "button"
@@ -926,9 +930,9 @@ class RemoteClient(QtCore.QObject):
             self._send(raw_data)
             #syslog.debug(f"remote gremlin event set button: {device_id} {button_id} {is_pressed}")
 
-    def toggle_button(self, device_id, button_id):
+    def toggle_button(self, device_id, button_id, force_remote = False):
         ''' toggles a button '''
-        if self.enabled:
+        if self.enabled or force_remote:
             data = {}
             data["sender"] = self._id
             data["action"] = "toggle"
@@ -938,9 +942,9 @@ class RemoteClient(QtCore.QObject):
             self._send(raw_data)
             #syslog.debug(f"remote gremlin event toggle button: {device_id} {button_id}")
 
-    def send_axis(self, device_id, axis_id, value):
+    def send_axis(self, device_id, axis_id, value, force_remote = False):
         ''' handles a remote joystick event '''
-        if self.enabled:
+        if self.enabled or force_remote:
             data = {}
             data["sender"] = self._id
             data["action"] = "axis"
@@ -951,9 +955,9 @@ class RemoteClient(QtCore.QObject):
             self._send(raw_data)
             #syslog.debug(f"remote gremlin event set axis: {device_id} {axis_id} {value}")
 
-    def send_relative_axis(self, device_id, axis_id, value):
+    def send_relative_axis(self, device_id, axis_id, value, force_remote = False):
         ''' handles a remote relative axis joystick event '''
-        if self.enabled:
+        if self.enabled or force_remote:
             data = {}
             data["sender"] = self._id
             data["action"] = "relative_axis"
@@ -963,9 +967,9 @@ class RemoteClient(QtCore.QObject):
             raw_data = msgpack.packb(data)
             self._send(raw_data)        
 
-    def send_hat(self, device_id, hat_id, direction):
+    def send_hat(self, device_id, hat_id, direction, force_remote = False):
         ''' handles a remote joystick event '''
-        if self.enabled:
+        if self.enabled or force_remote:
             data = {}
             data["sender"] = self._id
             data["action"] = "hat"
@@ -976,9 +980,9 @@ class RemoteClient(QtCore.QObject):
             self._send(raw_data)
             #syslog.debug(f"remote gremlin event set hat: {device_id} {hat_id} {direction}")
 
-    def send_key(self, virtual_code, scan_code, flags):
+    def send_key(self, virtual_code, scan_code, flags, force_remote = False):
         ''' handles a key event '''
-        if self.enabled:
+        if self.enabled or force_remote:
             data = {}
             data["sender"] = self._id
             data["action"] = "key"
@@ -989,9 +993,9 @@ class RemoteClient(QtCore.QObject):
             self._send(raw_data)
             #syslog.debug(f"remote gremlin event set key: virtual code: {virtual_code} scan code: {scan_code} flags: {flags}")
 
-    def send_mouse_button(self, button_id, is_pressed):
+    def send_mouse_button(self, button_id, is_pressed, force_remote = False):
         ''' sends a mouse button press or release '''
-        if self.enabled:
+        if self.enabled or force_remote:
             data = {}
             data["sender"] = self._id
             data["action"] = "mouse"
@@ -1002,9 +1006,9 @@ class RemoteClient(QtCore.QObject):
             self._send(raw_data)
             #syslog.debug(f"remote gremlin event set mouse: button: {button_id} pressed: {is_pressed}")
 
-    def send_mouse_wheel(self, direction):
+    def send_mouse_wheel(self, direction, force_remote = False):
         ''' sends mousewheel data  '''
-        if self.enabled:
+        if self.enabled or force_remote:
             data = {}
             data["sender"] = self._id
             data["action"] = "mouse"
@@ -1015,9 +1019,9 @@ class RemoteClient(QtCore.QObject):
             self._send(raw_data)
             #syslog.debug(f"remote gremlin event set mouse: wheel {direction}")
 
-    def send_mouse_motion(self, dx, dy):
+    def send_mouse_motion(self, dx, dy, force_remote = False):
         ''' sends mouse motion data '''
-        if self.enabled:
+        if self.enabled or force_remote:
             data = {}
             data["sender"] = self._id
             data["action"] = "mouse"
@@ -1029,8 +1033,8 @@ class RemoteClient(QtCore.QObject):
             self._send(raw_data)
             #syslog.debug(f"remote gremlin event set mouse: axis {dx} {dy}")
 
-    def send_mouse_motion_acceleration(self, a, min_speed, max_speed, time_to_max_speed):
-        if self.enabled:
+    def send_mouse_motion_acceleration(self, a, min_speed, max_speed, time_to_max_speed, force_remote = False):
+        if self.enabled or force_remote:
             data = {}
             data["sender"] = self._id
             data["action"] = "mouse"

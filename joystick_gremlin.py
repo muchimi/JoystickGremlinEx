@@ -56,6 +56,9 @@ import gremlin.ui.profile_settings
 from gremlin.ui.ui_gremlin import Ui_Gremlin
 from gremlin.input_devices import remote_state
 
+APPLICATION_NAME = "Joystick Gremlin Ex"
+APPLICATION_VERSION = "13.38"
+
 
 class GremlinUi(QtWidgets.QMainWindow):
 
@@ -1485,7 +1488,8 @@ if __name__ == "__main__":
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(app_id)
     app = QtWidgets.QApplication(sys.argv)
     app.setWindowIcon(QtGui.QIcon("gfx/icon.png"))
-    app.setApplicationDisplayName("Joystick Gremlin Ex")
+    app.setApplicationDisplayName(APPLICATION_NAME + " " + APPLICATION_VERSION)
+    app.setApplicationVersion(APPLICATION_VERSION)
 
     # Ensure joystick devices are correctly setup
     dill.DILL.init()

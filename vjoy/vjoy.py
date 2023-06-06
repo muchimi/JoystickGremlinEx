@@ -478,7 +478,7 @@ class VJoy:
             raise VJoyError("vJoy is not currently running")
         if VJoyInterface.GetvJoyVersion() < 0x218:
             logging.getLogger("system").error(
-                "Running incompatible vJoy version, 2.1.8 required"
+                "Running incompatible vJoy version, 2.1.8+ is required"
             )
             raise VJoyError("Running incompatible vJoy version, 2.1.8  or later required")
         elif VJoyInterface.GetVJDStatus(vjoy_id) != VJoyState.Free.value:
