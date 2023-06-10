@@ -64,6 +64,9 @@ class VjoyAction(enum.Enum):
     VJoyEnableRemote = 14 # enables remote control (does not impact local control)
     VJoyEnableLocal = 15 # enables local control (does not impact remote control)
     VJoyEnableLocalAndRemote = 16 # enables concurrent local/remote control
+    VJoyEnablePairedRemote = 17 # enables primary fire one and two on remote client
+    VJoyDisablePairedRemote = 18 # disable primary fire one and two on remote client
+
     # VjoyMergeAxis = 17 # merges two axes into one (usually used to combine toe-brakes into a single axis)
 
   
@@ -129,6 +132,10 @@ class VjoyAction(enum.Enum):
             return "Enables local and remote control concurrently"
         elif action == VjoyAction.VJoyToggleRemote:
             return "Toggles between local and remote output modes"
+        elif action == VjoyAction.VJoyEnablePairedRemote:
+            return "Enables paired remote output mode - remote will echo local"
+        elif action == VjoyAction.VJoyDisablePairedRemote:
+            return "Disables paired remote output mode"
         # elif action == VjoyAction.VjoyMergeAxis:
         #     return "Merges two axes into one"
         
@@ -167,6 +174,10 @@ class VjoyAction(enum.Enum):
             return "Enable Concurrent Local and Remote control"
         elif action == VjoyAction.VJoyToggleRemote:
             return "Toggle Control"
+        elif action == VjoyAction.VJoyEnablePairedRemote:
+            return "Enable remote pairing"
+        elif action == VjoyAction.VJoyDisablePairedRemote:
+            return "Disable remote pairing"
         # elif action == VjoyAction.VjoyMergeAxis:
         #     return "Merge Axis"
         
@@ -184,6 +195,8 @@ class VjoyAction(enum.Enum):
         VjoyAction.VJoyEnableLocal,
         VjoyAction.VJoyEnableRemote,
         VjoyAction.VJoyToggleRemote,
+        VjoyAction.VJoyEnablePairedRemote,
+        VjoyAction.VJoyDisablePairedRemote
         )
 
 
@@ -207,6 +220,7 @@ class RemoteControl():
     def __init__(self):
         self._is_remote = False
         self._is_local = False
+        self._is_paired = False
         self._mode = VjoyAction.VJoyEnableLocalOnly
         config = gremlin.config.Configuration()
         self._is_broadcast = config.enable_remote_broadcast
@@ -219,6 +233,7 @@ class RemoteControl():
         
         is_local = self._is_local
         is_remote = self._is_remote
+        is_paired = self._is_paired
         if value == VjoyAction.VJoyDisableLocal:
             is_local = False
         elif value == VjoyAction.VJoyDisableRemote:
@@ -239,6 +254,10 @@ class RemoteControl():
         elif value == VjoyAction.VJoyToggleRemote:
             is_local = not self._is_local
             is_remote = not self._is_remote
+        elif value == VjoyAction.VJoyEnablePairedRemote:
+            is_paired = True
+        elif value == VjoyAction.VJoyDisablePairedRemote:
+            is_paired = False
         else:
             # not sure what this was
             return
@@ -253,6 +272,15 @@ class RemoteControl():
             el = event_handler.EventListener()
             el.broadcast_changed.emit(event_handler.StateChangeEvent(self._is_local, self._is_remote, self._is_broadcast))
 
+        if self._is_paired != is_paired:
+            # pairing mode changed
+            self._is_paired = is_paired
+            if is_paired:
+                msg = "Paired mode enabled"
+            else:
+                msg = "Paired mode disabled"
+            syslog.debug(f"Paired mode changed: {msg}")
+            threading.Thread(target = self.say, args=(msg,)).start()
 
     def _config_changed(self):
         ''' called when broadcast config item changes '''
@@ -301,6 +329,12 @@ class RemoteControl():
     def state(self):
         ''' returns status as a pair of flags, local, remote'''
         return (self.is_local, self.is_remote)
+    
+    @property
+    def paired(self):
+        ''' paired status '''
+        return self._is_paired
+
     
     def to_state_event(self) -> event_handler.StateChangeEvent:
         ''' returns event data for the current state '''
@@ -495,7 +529,7 @@ class SimpleRegistry:
         :param callback the function to execute
         :param interval the time between executions
         """
-        self._registry[callback] = callback
+        self._registry[callback] =  callback
 
 
     def clear(self):
@@ -717,7 +751,7 @@ class RPCGremlin():
 
     MULTICAST_GROUP = '224.3.29.72' # multicast group
     # multicast time to live
-    MULTICAST_TTL = 2
+    MULTICAST_TTL = 1
 
     def __init__(self):
         # self._address = "0.0.0.0"
@@ -1541,7 +1575,11 @@ class ButtonReleaseActions(QtCore.QObject):
         self,
         vjoy_input: int,
         physical_event: event_handler.Event,
-        activate_on: bool = False
+        activate_on: bool = False,
+        is_local = True,
+        is_remote = False,
+        force_remote = False,
+        
     ):
         """Registers a physical and vjoy button pair for tracking.
 
@@ -1563,22 +1601,26 @@ class ButtonReleaseActions(QtCore.QObject):
             self._registry[release_evt] = []
         # Record current mode so we only release if we've changed mode
         self._registry[release_evt].append(ButtonReleaseEntry(
-            lambda: self._release_callback_prototype(vjoy_input),
+            lambda: self._release_callback_prototype(vjoy_input, is_local, is_remote, force_remote),
             release_evt,
             self._current_mode
         ))
 
-    def _release_callback_prototype(self, vjoy_input: int) -> None:
+    def _release_callback_prototype(self, vjoy_input: int, is_local = False, is_remote = False, force_remote = False) -> None:
         """Prototype of a button release callback, used with lambdas.
 
         Args:
             vjoy_input: the vjoy input data to use in the release
         """
-        vjoy = joystick_handling.VJoyProxy()
+
         # Check if the button is valid otherwise we cause Gremlin to crash
+        vjoy = joystick_handling.VJoyProxy()
         if vjoy[vjoy_input[0]].is_button_valid(vjoy_input[1]):
-            vjoy[vjoy_input[0]].button(vjoy_input[1]).is_pressed = False
-            remote_client.send_button(vjoy_input[0], vjoy_input[1], False )
+            if is_local:
+                vjoy[vjoy_input[0]].button(vjoy_input[1]).is_pressed = False
+                
+            if is_remote or force_remote:
+                remote_client.send_button(vjoy_input[0], vjoy_input[1], False, force_remote = force_remote )
             
         else:
             logging.getLogger("system").warning(
@@ -1848,6 +1890,9 @@ def periodic(interval):
 
     return wrap
 
+
+
+
 def gremlin_start():
     ''' decorator when a profile is activated '''
     def wrap(callback):
@@ -1855,7 +1900,7 @@ def gremlin_start():
         @functools.wraps(callback)
         def wrapper_fn(*args, **kwargs):
             callback(*args, **kwargs)
-
+        vjoy = joystick_handling.VJoyProxy()
         start_registry.add(wrapper_fn)
 
         return wrapper_fn

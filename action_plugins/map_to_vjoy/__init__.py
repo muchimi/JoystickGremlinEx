@@ -787,8 +787,18 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         grid.addWidget(self.cb_vjoy_input_selector,row,1)
 
         row = 4
+
+        source =  QtWidgets.QWidget()
+        box = QtWidgets.QHBoxLayout(source)
+
         self.chkb_exec_on_release = QtWidgets.QCheckBox("Exec on release")
-        grid.addWidget(self.chkb_exec_on_release, row, 1, 1, 3)
+        box.addWidget(self.chkb_exec_on_release)
+
+        self.chkb_paired = QtWidgets.QCheckBox("Paired Group Member")
+        box.addWidget(self.chkb_paired)
+
+
+        grid.addWidget(source, row, 1)
 
         # selector hooks
         self.cb_vjoy_device_selector.currentIndexChanged.connect(self._vjoy_device_id_changed)
@@ -929,6 +939,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         
 
         self.chkb_exec_on_release.clicked.connect(self._exec_on_release_changed)
+        self.chkb_paired.clicked.connect(self._paired_changed)
         self.target_value_text.textChanged.connect(self._target_value_changed)
         self.pulse_spin_widget.valueChanged.connect(self._pulse_value_changed)
         self.start_button_group.buttonClicked.connect(self._start_changed)
@@ -975,7 +986,10 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
                             VjoyAction.VJoyEnableLocalAndRemote,
                             VjoyAction.VJoyDisableLocal,
                             VjoyAction.VJoyDisableRemote,
-                            VjoyAction.VJoyToggleRemote
+                            VjoyAction.VJoyToggleRemote,
+                            VjoyAction.VJoyEnablePairedRemote,
+                            VjoyAction.VJoyDisablePairedRemote,
+                            
                 )
                 
             elif self.action_data.input_type == InputType.JoystickHat:
@@ -1079,7 +1093,9 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         range_visible = False
         target_value_visible = False
         exec_on_release_visible = False
+        paired_visible = False
         hardware_widget_visible = False
+
         if input_type == InputType.JoystickAxis:
             
             grid_visible = action == VjoyAction.VJoyAxisToButton
@@ -1091,6 +1107,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             pulse_visible = action == VjoyAction.VJoyPulse
             start_visible = action == VjoyAction.VJoyButton
             grid_visible = action in (VjoyAction.VJoyPulse, VjoyAction.VJoyButton, VjoyAction.VJoyToggle)
+            paired_visible = action == VjoyAction.VJoyButton
             target_value_visible = action == VjoyAction.VJoyButton
             exec_on_release_visible =  action_data.input_type == InputType.JoystickButton # or is_command
         elif input_type == InputType.JoystickHat:
@@ -1121,6 +1138,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self.axis_range_value_widget.setVisible(range_visible)
         self.chkb_exec_on_release.setVisible(exec_on_release_visible)
+        self.chkb_paired.setVisible(paired_visible)
         self.target_value_widget.setVisible(target_value_visible)
         self.button_to_axis_widget.setVisible(button_to_axis_visible)
 
@@ -1421,6 +1439,8 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
                 with QtCore.QSignalBlocker(self.chkb_exec_on_release):
                     self.chkb_exec_on_release.setChecked(self.action_data.exec_on_release)
 
+                with QtCore.QSignalBlocker(self.chkb_paired):
+                    self.chkb_paired.setChecked(self.action_data.paired)
 
             # populate hardware devices if in merge mode
             self._populate_hardware()
@@ -1504,6 +1524,9 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _exec_on_release_changed(self, value):
         self.action_data.exec_on_release = self.chkb_exec_on_release.isChecked()
+
+    def _paired_changed(self, value):
+        self.action_data.paired = self.chkb_paired.isChecked()
     
     def _populate_grid(self, device_id, input_id):
         ''' updates the usage grid based on current VJOY mappings '''
@@ -1609,6 +1632,7 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
         self.range_high = action.range_high
 
         self.exec_on_release = action.exec_on_release
+        self.paired = action.paired
 
         self.needs_auto_release = self._check_for_auto_release(action)
         self.thread_running = False
@@ -1714,25 +1738,7 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
                         joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = False 
                     if is_remote:
                         self.remote_client.send_button(self.vjoy_device_id, self.vjoy_input_id, False)
-            # elif self.action_mode == VjoyAction.VjoyMergeAxis:
-            #     # merge two axes
-            #     if self.merge_guid:
-            #         try:
-            #             # grab the current value of the first axis
-            #             joy = input_devices.JoystickProxy()[self.merge_guid]
-            #             a_value = value.current
-            #             b_value = joy.axis(self.merge_axis).value
-            #             value = (a_value - b_value) / 2.0
-            #             if self.reverse:
-            #                 value = -value
-            #             if is_local:
-            #                 joystick_handling.VJoyProxy()[self.vjoy_device_id].axis(self.vjoy_input_id).value = value
-            #             if is_remote:
-            #                 self.remote_client.send_axis(self.vjoy_device_id, self.vjoy_input_id, value)
-            #         except:
-            #             pass
-                    
-
+  
                     
 
             elif self.axis_mode == "absolute":
@@ -1761,6 +1767,8 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
         elif self.input_type == InputType.JoystickButton:
 
             target_press = not self.exec_on_release
+            is_paired = remote_state.paired
+            force_remote = event.force_remote or is_paired
 
             if self.action_mode == VjoyAction.VJoyButton:
                 # normal default behavior
@@ -1768,23 +1776,24 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
                     if not event.is_pressed:
                         if is_local:
                             joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = True
-                        if is_remote:
-                            self.remote_client.send_button(self.vjoy_device_id, self.vjoy_input_id, True )
+                        if is_remote or is_paired:
+                            self.remote_client.send_button(self.vjoy_device_id, self.vjoy_input_id, True, force_remote = force_remote )
                 else:
 
-                    if event.event_type in [InputType.JoystickButton, InputType.Keyboard] \
-                            and event.is_pressed \
-                            and self.needs_auto_release:
+                    if event.event_type in [InputType.JoystickButton, InputType.Keyboard] and event.is_pressed and self.needs_auto_release:
                         input_devices.ButtonReleaseActions().register_button_release(
                             (self.vjoy_device_id, self.vjoy_input_id),
-                            event
+                            event,
+                            is_local = is_local,
+                            is_remote = is_remote,
+                            force_remote = force_remote
                         )
 
                     if event.is_pressed:
                         if is_local:    
                             joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = value.current                        
-                        if is_remote:
-                            self.remote_client.send_button(self.vjoy_device_id, self.vjoy_input_id, value.current )
+                        if is_remote or is_paired:
+                            self.remote_client.send_button(self.vjoy_device_id, self.vjoy_input_id, value.current, force_remote = is_paired )
                     
             
             elif self.action_mode == VjoyAction.VJoyToggle:
@@ -1826,6 +1835,7 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
                 # update remote control mode
                 if event.is_pressed == target_press:
                     remote_state.mode = self.action_mode
+
 
             else:
                 # basic handling
@@ -1937,7 +1947,8 @@ class VjoyRemap(gremlin.base_classes.AbstractAction):
         self.axis_mode = "absolute"
         self.axis_scaling = 1.0
         self.axis_start_value = 0.0
-        self.exec_on_release = False
+        self._exec_on_release = False
+        self._paired = False
         self.merge_device_a_guid = self.hardware_device_guid
         self.merge_device_a_axis = self.hardware_input_id
         self._merge_device_b_guid = None
@@ -1981,6 +1992,22 @@ class VjoyRemap(gremlin.base_classes.AbstractAction):
     @merge_device_b_axis.setter
     def merge_device_b_axis(self, value):
         self._merge_device_b_axis = value
+
+    @property
+    def exec_on_release(self):
+        return self._exec_on_release
+    
+    @exec_on_release.setter
+    def exec_on_release(self, value):
+        self._exec_on_release = value
+
+    @property
+    def paired(self):
+        return self._paired
+    
+    @paired.setter
+    def paired(self, value):
+        self._paired = value
         
 
     @property
@@ -2164,6 +2191,11 @@ class VjoyRemap(gremlin.base_classes.AbstractAction):
 
             if "exec_on_release" in node.attrib:
                 self.exec_on_release = safe_read(node,"exec_on_release",bool, False)
+                if self.exec_on_release:
+                    pass
+
+            if "paired" in node.attrib:
+                self.paired = safe_read(node,"paired", bool, False)
 
             # if "merge_device_guid" in node.attrib:
             #     self.merge_device_b_guid = parse_guid(safe_read(node,"merge_device_guid", str, None))
@@ -2212,9 +2244,10 @@ class VjoyRemap(gremlin.base_classes.AbstractAction):
             reverse = safe_format(self.reverse_configured, bool)
             node.set("reverse", reverse)
 
-        elif self.action_mode == VjoyAction.VJoyButton:
+        elif self.action_mode == VjoyAction.VJoyButton or VjoyAction.is_command(self.action_mode):
             node.set("start_pressed", safe_format(self.start_pressed, bool))
             node.set("exec_on_release", safe_format(self.exec_on_release, bool))
+            node.set("paired", safe_format(self.paired, bool))
             
         elif self.action_mode == VjoyAction.VJoyPulse:
             node.set("pulse_delay", safe_format(self.pulse_delay, int))

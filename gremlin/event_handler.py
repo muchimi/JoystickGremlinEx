@@ -24,8 +24,7 @@ from threading import Thread, Timer
 from PySide6 import QtCore
 
 import dill
-from . import common, config, error, joystick_handling, windows_event_hook, \
-    macro, util
+from . import common, config, error, joystick_handling, windows_event_hook, macro, util
 
 
 class Event:

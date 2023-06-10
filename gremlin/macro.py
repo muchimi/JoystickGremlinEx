@@ -647,7 +647,7 @@ class KeyAction(AbstractAction):
         self.is_pressed = is_pressed
 
     def __call__(self, is_local = True, is_remote = False, force_remote = False):
-()        if self.is_pressed:
+        if self.is_pressed:
             _send_key_down(self.key, is_local, is_remote, force_remote)
         else:
             _send_key_up(self.key, is_local, is_remote, force_remote)

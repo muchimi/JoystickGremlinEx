@@ -148,6 +148,7 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.chkb_exec_on_release = QtWidgets.QCheckBox("Exec on release")
         self.chkb_exec_on_release.clicked.connect(self._exec_on_release_changed)
         
+        
         self.options_layout.addWidget(self.chkb_exec_on_release)
         self.options_layout.addWidget(self.chkb_force_remote_output)
         self.options_layout.addWidget(self.chkb_force_remote_output_only)
