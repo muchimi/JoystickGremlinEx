@@ -376,10 +376,16 @@ class MacroManager:
         :param macro the macro object to be executed
         """
         # Handle macros with a repeat mode
-        if not is_local:
-            is_local = macro.is_local
+        # if not is_local:
+        #     is_local = macro.is_local
+        # if not is_remote:
+        #     is_remote = macro.is_remote
+
+        (state_is_local, state_is_remote) = gremlin.input_devices.remote_state.state
         if not is_remote:
-            is_remote = macro.is_remote
+            is_remote = state_is_remote
+        if not is_local:
+            is_local = state_is_local
         
         if macro.force_remote:
             is_remote = True
@@ -411,7 +417,7 @@ class MacroManager:
         # Handle simple one shot macros
         else:
             for action in macro.sequence:
-                action(is_local, is_remote)
+                action(is_local, is_remote, macro.force_remote)
 
         # Remove macro from active set, notify manager, and remove any
         # potential callbacks
@@ -647,6 +653,11 @@ class KeyAction(AbstractAction):
         self.is_pressed = is_pressed
 
     def __call__(self, is_local = True, is_remote = False, force_remote = False):
+        # ignore passed local/remote states
+        (is_local, is_remote) = gremlin.input_devices.remote_state.state
+        if force_remote:
+            is_local = False
+            is_remote = True
         if self.is_pressed:
             _send_key_down(self.key, is_local, is_remote, force_remote)
         else:
@@ -671,6 +682,11 @@ class MouseButtonAction(AbstractAction):
         self.is_pressed = is_pressed
 
     def __call__(self, is_local = True, is_remote = False, force_remote = False):
+        # ignore passed local/remote states
+        (is_local, is_remote) = gremlin.input_devices.remote_state.state
+        if force_remote:
+            is_local = False
+            is_remote = True
         if self.button == gremlin.common.MouseButton.WheelDown:
             if is_local:
                 gremlin.sendinput.mouse_wheel(1)
@@ -707,6 +723,11 @@ class MouseMotionAction(AbstractAction):
         self.dy = int(dy)
 
     def __call__(self, is_local = True, is_remote = False, force_remote = False):
+        # ignore passed local/remote states
+        (is_local, is_remote) = gremlin.input_devices.remote_state.state
+        if force_remote:
+            is_local = False
+            is_remote = True        
         if is_local:
             gremlin.sendinput.mouse_relative_motion(self.dx, self.dy)
         if is_remote:
@@ -764,6 +785,11 @@ class VJoyMacroAction(AbstractAction):
         self.axis_type = axis_type
 
     def __call__(self, is_local = True, is_remote = False, force_remote = False):
+        # ignore passed local/remote states
+        (is_local, is_remote) = gremlin.input_devices.remote_state.state
+        if force_remote:
+            is_local = False
+            is_remote = True        
         vjoy = gremlin.joystick_handling.VJoyProxy()[self.vjoy_id]
         if self.input_type == gremlin.common.InputType.JoystickAxis:
             if self.axis_type == "absolute":
