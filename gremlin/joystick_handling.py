@@ -55,8 +55,8 @@ class VJoyProxy:
             try:
                 device = vjoy.VJoy(key)
                 VJoyProxy.vjoy_devices[key] = device
-                msg = f"Registering vJoy id={key}"
-                logging.getLogger("system").debug(msg)
+                # msg = f"Registering vJoy id={key}"
+                # logging.getLogger("system").debug(msg)
                 return device
             except error.VJoyError as e:
                 msg = f"Failed accessing vJoy id={key}, error is: {e}"
