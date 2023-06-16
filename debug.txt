@@ -9780,4 +9780,318 @@
 [2023-06-10 16:12:43.595] [debug] [error] {8245C100-2705-11E9-8002-444553540000}: Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
 [2023-06-10 16:12:43.595] [debug] [error] {8245C100-2705-11E9-8002-444553540000} Failed reading device in buffered mode, falling back to polling, Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
 [2023-06-10 16:12:43.595] [debug] [error] {83E65A90-1F06-11ED-8001-444553540000}: Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
-[2023-06-1
+[2023-06-1[2023-06-11 15:32:52.819] [debug] [info] Setting device change callback
+[2023-06-11 15:32:52.819] [debug] [info] Setting event callback
+[2023-06-11 15:32:54.357] [debug] [info] Initializing DILL v1.3
+[2023-06-11 15:32:54.596] [debug] [info] {643C4030-90C5-11EC-8003-444553540000}: Processing device: vJoy Device
+[2023-06-11 15:32:54.602] [debug] [info] Device summary: vJoy Device {643C4030-90C5-11EC-8003-444553540000}
+[2023-06-11 15:32:54.602] [debug] [info] Axis=8 Buttons=128 Hats=4
+[2023-06-11 15:32:54.602] [debug] [info] Axis map
+[2023-06-11 15:32:54.602] [debug] [info]   linear=1 id=1
+[2023-06-11 15:32:54.602] [debug] [info]   linear=2 id=2
+[2023-06-11 15:32:54.602] [debug] [info]   linear=3 id=3
+[2023-06-11 15:32:54.602] [debug] [info]   linear=4 id=4
+[2023-06-11 15:32:54.602] [debug] [info]   linear=5 id=5
+[2023-06-11 15:32:54.602] [debug] [info]   linear=6 id=6
+[2023-06-11 15:32:54.602] [debug] [info]   linear=7 id=7
+[2023-06-11 15:32:54.602] [debug] [info]   linear=8 id=8
+[2023-06-11 15:32:54.607] [debug] [info] {4B1FEAB0-90C6-11EC-8003-444553540000}: Processing device: vJoy Device
+[2023-06-11 15:32:54.609] [debug] [info] Device summary: vJoy Device {4B1FEAB0-90C6-11EC-8003-444553540000}
+[2023-06-11 15:32:54.609] [debug] [info] Axis=8 Buttons=128 Hats=3
+[2023-06-11 15:32:54.609] [debug] [info] Axis map
+[2023-06-11 15:32:54.609] [debug] [info]   linear=1 id=1
+[2023-06-11 15:32:54.609] [debug] [info]   linear=2 id=2
+[2023-06-11 15:32:54.609] [debug] [info]   linear=3 id=3
+[2023-06-11 15:32:54.609] [debug] [info]   linear=4 id=4
+[2023-06-11 15:32:54.609] [debug] [info]   linear=5 id=5
+[2023-06-11 15:32:54.609] [debug] [info]   linear=6 id=6
+[2023-06-11 15:32:54.609] [debug] [info]   linear=7 id=7
+[2023-06-11 15:32:54.609] [debug] [info]   linear=8 id=8
+[2023-06-11 15:32:54.624] [debug] [info] {C9DB8AE0-FCB2-11ED-8009-444553540000}: Processing device: vJoy Device
+[2023-06-11 15:32:54.626] [debug] [info] Device summary: vJoy Device {C9DB8AE0-FCB2-11ED-8009-444553540000}
+[2023-06-11 15:32:54.626] [debug] [info] Axis=8 Buttons=128 Hats=2
+[2023-06-11 15:32:54.626] [debug] [info] Axis map
+[2023-06-11 15:32:54.626] [debug] [info]   linear=1 id=1
+[2023-06-11 15:32:54.626] [debug] [info]   linear=2 id=2
+[2023-06-11 15:32:54.626] [debug] [info]   linear=3 id=3
+[2023-06-11 15:32:54.626] [debug] [info]   linear=4 id=4
+[2023-06-11 15:32:54.626] [debug] [info]   linear=5 id=5
+[2023-06-11 15:32:54.626] [debug] [info]   linear=6 id=6
+[2023-06-11 15:32:54.626] [debug] [info]   linear=7 id=7
+[2023-06-11 15:32:54.626] [debug] [info]   linear=8 id=8
+[2023-06-11 15:32:54.629] [debug] [error] {643C4030-90C5-11EC-8003-444553540000}: Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
+[2023-06-11 15:32:54.629] [debug] [error] {643C4030-90C5-11EC-8003-444553540000} Failed reading device in buffered mode, falling back to polling, Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
+[2023-06-11 15:32:54.629] [debug] [error] {4B1FEAB0-90C6-11EC-8003-444553540000}: Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
+[2023-06-11 15:32:54.629] [debug] [error] {4B1FEAB0-90C6-11EC-8003-444553540000} Failed reading device in buffered mode, falling back to polling, Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
+[2023-06-11 15:32:54.629] [debug] [error] {C9DB8AE0-FCB2-11ED-8009-444553540000}: Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
+[2023-06-11 15:32:54.629] [debug] [error] {C9DB8AE0-FCB2-11ED-8009-444553540000} Failed reading device in buffered mode, falling back to polling, Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
+[2023-06-11 15:51:57.127] [debug] [info] Setting device change callback
+[2023-06-11 15:51:57.127] [debug] [info] Setting event callback
+[2023-06-11 15:51:58.763] [debug] [info] Initializing DILL v1.3
+[2023-06-11 15:51:58.975] [debug] [info] {643C4030-90C5-11EC-8003-444553540000}: Processing device: vJoy Device
+[2023-06-11 15:51:58.979] [debug] [info] Device summary: vJoy Device {643C4030-90C5-11EC-8003-444553540000}
+[2023-06-11 15:51:58.979] [debug] [info] Axis=8 Buttons=128 Hats=4
+[2023-06-11 15:51:58.979] [debug] [info] Axis map
+[2023-06-11 15:51:58.979] [debug] [info]   linear=1 id=1
+[2023-06-11 15:51:58.979] [debug] [info]   linear=2 id=2
+[2023-06-11 15:51:58.979] [debug] [info]   linear=3 id=3
+[2023-06-11 15:51:58.979] [debug] [info]   linear=4 id=4
+[2023-06-11 15:51:58.979] [debug] [info]   linear=5 id=5
+[2023-06-11 15:51:58.979] [debug] [info]   linear=6 id=6
+[2023-06-11 15:51:58.979] [debug] [info]   linear=7 id=7
+[2023-06-11 15:51:58.979] [debug] [info]   linear=8 id=8
+[2023-06-11 15:51:58.983] [debug] [info] {4B1FEAB0-90C6-11EC-8003-444553540000}: Processing device: vJoy Device
+[2023-06-11 15:51:58.984] [debug] [info] Device summary: vJoy Device {4B1FEAB0-90C6-11EC-8003-444553540000}
+[2023-06-11 15:51:58.984] [debug] [info] Axis=8 Buttons=128 Hats=3
+[2023-06-11 15:51:58.984] [debug] [info] Axis map
+[2023-06-11 15:51:58.984] [debug] [info]   linear=1 id=1
+[2023-06-11 15:51:58.984] [debug] [info]   linear=2 id=2
+[2023-06-11 15:51:58.984] [debug] [info]   linear=3 id=3
+[2023-06-11 15:51:58.984] [debug] [info]   linear=4 id=4
+[2023-06-11 15:51:58.984] [debug] [info]   linear=5 id=5
+[2023-06-11 15:51:58.984] [debug] [info]   linear=6 id=6
+[2023-06-11 15:51:58.984] [debug] [info]   linear=7 id=7
+[2023-06-11 15:51:58.984] [debug] [info]   linear=8 id=8
+[2023-06-11 15:51:58.997] [debug] [info] {C9DB8AE0-FCB2-11ED-8009-444553540000}: Processing device: vJoy Device
+[2023-06-11 15:51:58.998] [debug] [info] Device summary: vJoy Device {C9DB8AE0-FCB2-11ED-8009-444553540000}
+[2023-06-11 15:51:58.998] [debug] [info] Axis=8 Buttons=128 Hats=2
+[2023-06-11 15:51:58.998] [debug] [info] Axis map
+[2023-06-11 15:51:58.998] [debug] [info]   linear=1 id=1
+[2023-06-11 15:51:58.998] [debug] [info]   linear=2 id=2
+[2023-06-11 15:51:58.998] [debug] [info]   linear=3 id=3
+[2023-06-11 15:51:58.998] [debug] [info]   linear=4 id=4
+[2023-06-11 15:51:58.998] [debug] [info]   linear=5 id=5
+[2023-06-11 15:51:58.998] [debug] [info]   linear=6 id=6
+[2023-06-11 15:51:58.998] [debug] [info]   linear=7 id=7
+[2023-06-11 15:51:58.998] [debug] [info]   linear=8 id=8
+[2023-06-11 15:51:59.001] [debug] [error] {643C4030-90C5-11EC-8003-444553540000}: Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
+[2023-06-11 15:51:59.001] [debug] [error] {643C4030-90C5-11EC-8003-444553540000} Failed reading device in buffered mode, falling back to polling, Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
+[2023-06-11 15:51:59.001] [debug] [error] {4B1FEAB0-90C6-11EC-8003-444553540000}: Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
+[2023-06-11 15:51:59.001] [debug] [error] {4B1FEAB0-90C6-11EC-8003-444553540000} Failed reading device in buffered mode, falling back to polling, Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
+[2023-06-11 15:51:59.001] [debug] [error] {C9DB8AE0-FCB2-11ED-8009-444553540000}: Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
+[2023-06-11 15:51:59.001] [debug] [error] {C9DB8AE0-FCB2-11ED-8009-444553540000} Failed reading device in buffered mode, falling back to polling, Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
+[2023-06-15 21:56:27.478] [debug] [info] Setting device change callback
+[2023-06-15 21:56:27.478] [debug] [info] Setting event callback
+[2023-06-15 21:56:28.744] [debug] [info] Initializing DILL v1.3
+[2023-06-15 21:56:28.949] [debug] [info] {643C4030-90C5-11EC-8003-444553540000}: Processing device: vJoy Device
+[2023-06-15 21:56:28.956] [debug] [info] Device summary: vJoy Device {643C4030-90C5-11EC-8003-444553540000}
+[2023-06-15 21:56:28.956] [debug] [info] Axis=8 Buttons=128 Hats=4
+[2023-06-15 21:56:28.956] [debug] [info] Axis map
+[2023-06-15 21:56:28.956] [debug] [info]   linear=1 id=1
+[2023-06-15 21:56:28.956] [debug] [info]   linear=2 id=2
+[2023-06-15 21:56:28.956] [debug] [info]   linear=3 id=3
+[2023-06-15 21:56:28.956] [debug] [info]   linear=4 id=4
+[2023-06-15 21:56:28.956] [debug] [info]   linear=5 id=5
+[2023-06-15 21:56:28.956] [debug] [info]   linear=6 id=6
+[2023-06-15 21:56:28.956] [debug] [info]   linear=7 id=7
+[2023-06-15 21:56:28.956] [debug] [info]   linear=8 id=8
+[2023-06-15 21:56:28.961] [debug] [info] {4B1FEAB0-90C6-11EC-8003-444553540000}: Processing device: vJoy Device
+[2023-06-15 21:56:28.962] [debug] [info] Device summary: vJoy Device {4B1FEAB0-90C6-11EC-8003-444553540000}
+[2023-06-15 21:56:28.962] [debug] [info] Axis=8 Buttons=128 Hats=3
+[2023-06-15 21:56:28.962] [debug] [info] Axis map
+[2023-06-15 21:56:28.962] [debug] [info]   linear=1 id=1
+[2023-06-15 21:56:28.962] [debug] [info]   linear=2 id=2
+[2023-06-15 21:56:28.962] [debug] [info]   linear=3 id=3
+[2023-06-15 21:56:28.962] [debug] [info]   linear=4 id=4
+[2023-06-15 21:56:28.962] [debug] [info]   linear=5 id=5
+[2023-06-15 21:56:28.962] [debug] [info]   linear=6 id=6
+[2023-06-15 21:56:28.962] [debug] [info]   linear=7 id=7
+[2023-06-15 21:56:28.962] [debug] [info]   linear=8 id=8
+[2023-06-15 21:56:28.975] [debug] [info] {C9DB8AE0-FCB2-11ED-8009-444553540000}: Processing device: vJoy Device
+[2023-06-15 21:56:28.976] [debug] [info] Device summary: vJoy Device {C9DB8AE0-FCB2-11ED-8009-444553540000}
+[2023-06-15 21:56:28.976] [debug] [info] Axis=8 Buttons=128 Hats=2
+[2023-06-15 21:56:28.976] [debug] [info] Axis map
+[2023-06-15 21:56:28.976] [debug] [info]   linear=1 id=1
+[2023-06-15 21:56:28.976] [debug] [info]   linear=2 id=2
+[2023-06-15 21:56:28.976] [debug] [info]   linear=3 id=3
+[2023-06-15 21:56:28.976] [debug] [info]   linear=4 id=4
+[2023-06-15 21:56:28.976] [debug] [info]   linear=5 id=5
+[2023-06-15 21:56:28.976] [debug] [info]   linear=6 id=6
+[2023-06-15 21:56:28.976] [debug] [info]   linear=7 id=7
+[2023-06-15 21:56:28.976] [debug] [info]   linear=8 id=8
+[2023-06-15 21:56:28.978] [debug] [error] {643C4030-90C5-11EC-8003-444553540000}: Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
+[2023-06-15 21:56:28.978] [debug] [error] {643C4030-90C5-11EC-8003-444553540000} Failed reading device in buffered mode, falling back to polling, Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
+[2023-06-15 21:56:28.978] [debug] [error] {4B1FEAB0-90C6-11EC-8003-444553540000}: Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
+[2023-06-15 21:56:28.978] [debug] [error] {4B1FEAB0-90C6-11EC-8003-444553540000} Failed reading device in buffered mode, falling back to polling, Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
+[2023-06-15 21:56:28.978] [debug] [error] {C9DB8AE0-FCB2-11ED-8009-444553540000}: Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
+[2023-06-15 21:56:28.978] [debug] [error] {C9DB8AE0-FCB2-11ED-8009-444553540000} Failed reading device in buffered mode, falling back to polling, Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
+[2023-06-15 21:59:14.509] [debug] [info] Setting device change callback
+[2023-06-15 21:59:14.509] [debug] [info] Setting event callback
+[2023-06-15 21:59:14.807] [debug] [info] Initializing DILL v1.3
+[2023-06-15 21:59:15.022] [debug] [info] {643C4030-90C5-11EC-8003-444553540000}: Processing device: vJoy Device
+[2023-06-15 21:59:15.027] [debug] [info] Device summary: vJoy Device {643C4030-90C5-11EC-8003-444553540000}
+[2023-06-15 21:59:15.027] [debug] [info] Axis=8 Buttons=128 Hats=4
+[2023-06-15 21:59:15.027] [debug] [info] Axis map
+[2023-06-15 21:59:15.027] [debug] [info]   linear=1 id=1
+[2023-06-15 21:59:15.027] [debug] [info]   linear=2 id=2
+[2023-06-15 21:59:15.027] [debug] [info]   linear=3 id=3
+[2023-06-15 21:59:15.027] [debug] [info]   linear=4 id=4
+[2023-06-15 21:59:15.027] [debug] [info]   linear=5 id=5
+[2023-06-15 21:59:15.027] [debug] [info]   linear=6 id=6
+[2023-06-15 21:59:15.027] [debug] [info]   linear=7 id=7
+[2023-06-15 21:59:15.027] [debug] [info]   linear=8 id=8
+[2023-06-15 21:59:15.031] [debug] [info] {4B1FEAB0-90C6-11EC-8003-444553540000}: Processing device: vJoy Device
+[2023-06-15 21:59:15.032] [debug] [info] Device summary: vJoy Device {4B1FEAB0-90C6-11EC-8003-444553540000}
+[2023-06-15 21:59:15.032] [debug] [info] Axis=8 Buttons=128 Hats=3
+[2023-06-15 21:59:15.032] [debug] [info] Axis map
+[2023-06-15 21:59:15.032] [debug] [info]   linear=1 id=1
+[2023-06-15 21:59:15.032] [debug] [info]   linear=2 id=2
+[2023-06-15 21:59:15.032] [debug] [info]   linear=3 id=3
+[2023-06-15 21:59:15.032] [debug] [info]   linear=4 id=4
+[2023-06-15 21:59:15.032] [debug] [info]   linear=5 id=5
+[2023-06-15 21:59:15.032] [debug] [info]   linear=6 id=6
+[2023-06-15 21:59:15.032] [debug] [info]   linear=7 id=7
+[2023-06-15 21:59:15.032] [debug] [info]   linear=8 id=8
+[2023-06-15 21:59:15.044] [debug] [info] {C9DB8AE0-FCB2-11ED-8009-444553540000}: Processing device: vJoy Device
+[2023-06-15 21:59:15.045] [debug] [info] Device summary: vJoy Device {C9DB8AE0-FCB2-11ED-8009-444553540000}
+[2023-06-15 21:59:15.045] [debug] [info] Axis=8 Buttons=128 Hats=2
+[2023-06-15 21:59:15.045] [debug] [info] Axis map
+[2023-06-15 21:59:15.045] [debug] [info]   linear=1 id=1
+[2023-06-15 21:59:15.045] [debug] [info]   linear=2 id=2
+[2023-06-15 21:59:15.045] [debug] [info]   linear=3 id=3
+[2023-06-15 21:59:15.045] [debug] [info]   linear=4 id=4
+[2023-06-15 21:59:15.045] [debug] [info]   linear=5 id=5
+[2023-06-15 21:59:15.045] [debug] [info]   linear=6 id=6
+[2023-06-15 21:59:15.045] [debug] [info]   linear=7 id=7
+[2023-06-15 21:59:15.045] [debug] [info]   linear=8 id=8
+[2023-06-15 21:59:15.048] [debug] [error] {643C4030-90C5-11EC-8003-444553540000}: Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
+[2023-06-15 21:59:15.048] [debug] [error] {643C4030-90C5-11EC-8003-444553540000} Failed reading device in buffered mode, falling back to polling, Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
+[2023-06-15 21:59:15.048] [debug] [error] {4B1FEAB0-90C6-11EC-8003-444553540000}: Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
+[2023-06-15 21:59:15.048] [debug] [error] {4B1FEAB0-90C6-11EC-8003-444553540000} Failed reading device in buffered mode, falling back to polling, Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
+[2023-06-15 21:59:15.048] [debug] [error] {C9DB8AE0-FCB2-11ED-8009-444553540000}: Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
+[2023-06-15 21:59:15.048] [debug] [error] {C9DB8AE0-FCB2-11ED-8009-444553540000} Failed reading device in buffered mode, falling back to polling, Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
+[2023-06-15 22:01:31.522] [debug] [info] Setting device change callback
+[2023-06-15 22:01:31.522] [debug] [info] Setting event callback
+[2023-06-15 22:01:31.819] [debug] [info] Initializing DILL v1.3
+[2023-06-15 22:01:32.026] [debug] [info] {643C4030-90C5-11EC-8003-444553540000}: Processing device: vJoy Device
+[2023-06-15 22:01:32.031] [debug] [info] Device summary: vJoy Device {643C4030-90C5-11EC-8003-444553540000}
+[2023-06-15 22:01:32.031] [debug] [info] Axis=8 Buttons=128 Hats=4
+[2023-06-15 22:01:32.031] [debug] [info] Axis map
+[2023-06-15 22:01:32.031] [debug] [info]   linear=1 id=1
+[2023-06-15 22:01:32.031] [debug] [info]   linear=2 id=2
+[2023-06-15 22:01:32.031] [debug] [info]   linear=3 id=3
+[2023-06-15 22:01:32.031] [debug] [info]   linear=4 id=4
+[2023-06-15 22:01:32.031] [debug] [info]   linear=5 id=5
+[2023-06-15 22:01:32.031] [debug] [info]   linear=6 id=6
+[2023-06-15 22:01:32.031] [debug] [info]   linear=7 id=7
+[2023-06-15 22:01:32.031] [debug] [info]   linear=8 id=8
+[2023-06-15 22:01:32.037] [debug] [info] {4B1FEAB0-90C6-11EC-8003-444553540000}: Processing device: vJoy Device
+[2023-06-15 22:01:32.038] [debug] [info] Device summary: vJoy Device {4B1FEAB0-90C6-11EC-8003-444553540000}
+[2023-06-15 22:01:32.038] [debug] [info] Axis=8 Buttons=128 Hats=3
+[2023-06-15 22:01:32.038] [debug] [info] Axis map
+[2023-06-15 22:01:32.038] [debug] [info]   linear=1 id=1
+[2023-06-15 22:01:32.038] [debug] [info]   linear=2 id=2
+[2023-06-15 22:01:32.038] [debug] [info]   linear=3 id=3
+[2023-06-15 22:01:32.038] [debug] [info]   linear=4 id=4
+[2023-06-15 22:01:32.038] [debug] [info]   linear=5 id=5
+[2023-06-15 22:01:32.038] [debug] [info]   linear=6 id=6
+[2023-06-15 22:01:32.038] [debug] [info]   linear=7 id=7
+[2023-06-15 22:01:32.038] [debug] [info]   linear=8 id=8
+[2023-06-15 22:01:32.050] [debug] [info] {C9DB8AE0-FCB2-11ED-8009-444553540000}: Processing device: vJoy Device
+[2023-06-15 22:01:32.051] [debug] [info] Device summary: vJoy Device {C9DB8AE0-FCB2-11ED-8009-444553540000}
+[2023-06-15 22:01:32.051] [debug] [info] Axis=8 Buttons=128 Hats=2
+[2023-06-15 22:01:32.051] [debug] [info] Axis map
+[2023-06-15 22:01:32.051] [debug] [info]   linear=1 id=1
+[2023-06-15 22:01:32.051] [debug] [info]   linear=2 id=2
+[2023-06-15 22:01:32.051] [debug] [info]   linear=3 id=3
+[2023-06-15 22:01:32.051] [debug] [info]   linear=4 id=4
+[2023-06-15 22:01:32.051] [debug] [info]   linear=5 id=5
+[2023-06-15 22:01:32.051] [debug] [info]   linear=6 id=6
+[2023-06-15 22:01:32.051] [debug] [info]   linear=7 id=7
+[2023-06-15 22:01:32.051] [debug] [info]   linear=8 id=8
+[2023-06-15 22:01:32.054] [debug] [error] {643C4030-90C5-11EC-8003-444553540000}: Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
+[2023-06-15 22:01:32.054] [debug] [error] {643C4030-90C5-11EC-8003-444553540000} Failed reading device in buffered mode, falling back to polling, Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
+[2023-06-15 22:01:32.054] [debug] [error] {4B1FEAB0-90C6-11EC-8003-444553540000}: Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
+[2023-06-15 22:01:32.054] [debug] [error] {4B1FEAB0-90C6-11EC-8003-444553540000} Failed reading device in buffered mode, falling back to polling, Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
+[2023-06-15 22:01:32.054] [debug] [error] {C9DB8AE0-FCB2-11ED-8009-444553540000}: Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
+[2023-06-15 22:01:32.054] [debug] [error] {C9DB8AE0-FCB2-11ED-8009-444553540000} Failed reading device in buffered mode, falling back to polling, Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
+[2023-06-15 22:09:43.731] [debug] [info] Setting device change callback
+[2023-06-15 22:09:43.731] [debug] [info] Setting event callback
+[2023-06-15 22:09:44.023] [debug] [info] Initializing DILL v1.3
+[2023-06-15 22:09:44.234] [debug] [info] {643C4030-90C5-11EC-8003-444553540000}: Processing device: vJoy Device
+[2023-06-15 22:09:44.240] [debug] [info] Device summary: vJoy Device {643C4030-90C5-11EC-8003-444553540000}
+[2023-06-15 22:09:44.240] [debug] [info] Axis=8 Buttons=128 Hats=4
+[2023-06-15 22:09:44.240] [debug] [info] Axis map
+[2023-06-15 22:09:44.240] [debug] [info]   linear=1 id=1
+[2023-06-15 22:09:44.240] [debug] [info]   linear=2 id=2
+[2023-06-15 22:09:44.240] [debug] [info]   linear=3 id=3
+[2023-06-15 22:09:44.240] [debug] [info]   linear=4 id=4
+[2023-06-15 22:09:44.240] [debug] [info]   linear=5 id=5
+[2023-06-15 22:09:44.240] [debug] [info]   linear=6 id=6
+[2023-06-15 22:09:44.240] [debug] [info]   linear=7 id=7
+[2023-06-15 22:09:44.240] [debug] [info]   linear=8 id=8
+[2023-06-15 22:09:44.246] [debug] [info] {4B1FEAB0-90C6-11EC-8003-444553540000}: Processing device: vJoy Device
+[2023-06-15 22:09:44.247] [debug] [info] Device summary: vJoy Device {4B1FEAB0-90C6-11EC-8003-444553540000}
+[2023-06-15 22:09:44.247] [debug] [info] Axis=8 Buttons=128 Hats=3
+[2023-06-15 22:09:44.247] [debug] [info] Axis map
+[2023-06-15 22:09:44.247] [debug] [info]   linear=1 id=1
+[2023-06-15 22:09:44.247] [debug] [info]   linear=2 id=2
+[2023-06-15 22:09:44.247] [debug] [info]   linear=3 id=3
+[2023-06-15 22:09:44.247] [debug] [info]   linear=4 id=4
+[2023-06-15 22:09:44.247] [debug] [info]   linear=5 id=5
+[2023-06-15 22:09:44.247] [debug] [info]   linear=6 id=6
+[2023-06-15 22:09:44.247] [debug] [info]   linear=7 id=7
+[2023-06-15 22:09:44.247] [debug] [info]   linear=8 id=8
+[2023-06-15 22:09:44.260] [debug] [info] {C9DB8AE0-FCB2-11ED-8009-444553540000}: Processing device: vJoy Device
+[2023-06-15 22:09:44.261] [debug] [info] Device summary: vJoy Device {C9DB8AE0-FCB2-11ED-8009-444553540000}
+[2023-06-15 22:09:44.261] [debug] [info] Axis=8 Buttons=128 Hats=2
+[2023-06-15 22:09:44.261] [debug] [info] Axis map
+[2023-06-15 22:09:44.261] [debug] [info]   linear=1 id=1
+[2023-06-15 22:09:44.261] [debug] [info]   linear=2 id=2
+[2023-06-15 22:09:44.261] [debug] [info]   linear=3 id=3
+[2023-06-15 22:09:44.261] [debug] [info]   linear=4 id=4
+[2023-06-15 22:09:44.261] [debug] [info]   linear=5 id=5
+[2023-06-15 22:09:44.261] [debug] [info]   linear=6 id=6
+[2023-06-15 22:09:44.261] [debug] [info]   linear=7 id=7
+[2023-06-15 22:09:44.261] [debug] [info]   linear=8 id=8
+[2023-06-15 22:09:44.263] [debug] [error] {643C4030-90C5-11EC-8003-444553540000}: Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
+[2023-06-15 22:09:44.263] [debug] [error] {643C4030-90C5-11EC-8003-444553540000} Failed reading device in buffered mode, falling back to polling, Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
+[2023-06-15 22:09:44.263] [debug] [error] {4B1FEAB0-90C6-11EC-8003-444553540000}: Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
+[2023-06-15 22:09:44.263] [debug] [error] {4B1FEAB0-90C6-11EC-8003-444553540000} Failed reading device in buffered mode, falling back to polling, Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
+[2023-06-15 22:09:44.263] [debug] [error] {C9DB8AE0-FCB2-11ED-8009-444553540000}: Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
+[2023-06-15 22:09:44.263] [debug] [error] {C9DB8AE0-FCB2-11ED-8009-444553540000} Failed reading device in buffered mode, falling back to polling, Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
+[2023-06-15 22:23:36.983] [debug] [info] Setting device change callback
+[2023-06-15 22:23:36.983] [debug] [info] Setting event callback
+[2023-06-15 22:23:37.898] [debug] [info] Initializing DILL v1.3
+[2023-06-15 22:23:38.130] [debug] [info] {643C4030-90C5-11EC-8003-444553540000}: Processing device: vJoy Device
+[2023-06-15 22:23:38.135] [debug] [info] Device summary: vJoy Device {643C4030-90C5-11EC-8003-444553540000}
+[2023-06-15 22:23:38.135] [debug] [info] Axis=8 Buttons=128 Hats=4
+[2023-06-15 22:23:38.135] [debug] [info] Axis map
+[2023-06-15 22:23:38.135] [debug] [info]   linear=1 id=1
+[2023-06-15 22:23:38.135] [debug] [info]   linear=2 id=2
+[2023-06-15 22:23:38.135] [debug] [info]   linear=3 id=3
+[2023-06-15 22:23:38.135] [debug] [info]   linear=4 id=4
+[2023-06-15 22:23:38.135] [debug] [info]   linear=5 id=5
+[2023-06-15 22:23:38.135] [debug] [info]   linear=6 id=6
+[2023-06-15 22:23:38.135] [debug] [info]   linear=7 id=7
+[2023-06-15 22:23:38.135] [debug] [info]   linear=8 id=8
+[2023-06-15 22:23:38.141] [debug] [info] {4B1FEAB0-90C6-11EC-8003-444553540000}: Processing device: vJoy Device
+[2023-06-15 22:23:38.142] [debug] [info] Device summary: vJoy Device {4B1FEAB0-90C6-11EC-8003-444553540000}
+[2023-06-15 22:23:38.142] [debug] [info] Axis=8 Buttons=128 Hats=3
+[2023-06-15 22:23:38.142] [debug] [info] Axis map
+[2023-06-15 22:23:38.142] [debug] [info]   linear=1 id=1
+[2023-06-15 22:23:38.142] [debug] [info]   linear=2 id=2
+[2023-06-15 22:23:38.142] [debug] [info]   linear=3 id=3
+[2023-06-15 22:23:38.142] [debug] [info]   linear=4 id=4
+[2023-06-15 22:23:38.142] [debug] [info]   linear=5 id=5
+[2023-06-15 22:23:38.142] [debug] [info]   linear=6 id=6
+[2023-06-15 22:23:38.142] [debug] [info]   linear=7 id=7
+[2023-06-15 22:23:38.142] [debug] [info]   linear=8 id=8
+[2023-06-15 22:23:38.155] [debug] [info] {C9DB8AE0-FCB2-11ED-8009-444553540000}: Processing device: vJoy Device
+[2023-06-15 22:23:38.156] [debug] [info] Device summary: vJoy Device {C9DB8AE0-FCB2-11ED-8009-444553540000}
+[2023-06-15 22:23:38.156] [debug] [info] Axis=8 Buttons=128 Hats=2
+[2023-06-15 22:23:38.156] [debug] [info] Axis map
+[2023-06-15 22:23:38.156] [debug] [info]   linear=1 id=1
+[2023-06-15 22:23:38.156] [debug] [info]   linear=2 id=2
+[2023-06-15 22:23:38.156] [debug] [info]   linear=3 id=3
+[2023-06-15 22:23:38.156] [debug] [info]   linear=4 id=4
+[2023-06-15 22:23:38.156] [debug] [info]   linear=5 id=5
+[2023-06-15 22:23:38.156] [debug] [info]   linear=6 id=6
+[2023-06-15 22:23:38.156] [debug] [info]   linear=7 id=7
+[2023-06-15 22:23:38.156] [debug] [info]   linear=8 id=8
+[2023-06-15 22:23:38.159] [debug] [error] {643C4030-90C5-11EC-8003-444553540000}: Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
+[2023-06-15 22:23:38.159] [debug] [error] {643C4030-90C5-11EC-8003-444553540000} Failed reading device in buffered mode, falling back to polling, Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
+[2023-06-15 22:23:38.159] [debug] [error] {4B1FEAB0-90C6-11EC-8003-444553540000}: Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
+[2023-06-15 22:23:38.159] [debug] [error] {4B1FEAB0-90C6-11EC-8003-444553540000} Failed reading device in buffered mode, falling back to polling, Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
+[2023-06-15 22:23:38.159] [debug] [error] {C9DB8AE0-FCB2-11ED-8009-444553540000}: Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)
+[2023-06-15 22:23:38.159] [debug] [error] {C9DB8AE0-FCB2-11ED-8009-444553540000} Failed reading device in buffered mode, falling back to polling, Attempted to read buffered device data from a device that is not buffered. (DIERR_NOTBUFFERED)

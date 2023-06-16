@@ -657,7 +657,8 @@ class StateChangeRegistry():
 
 
 class GremlinServer(socketserver.ThreadingMixIn,socketserver.UDPServer):
-    pass
+    _proxy = joystick_handling.VJoyProxy()
+    _mouse = gremlin.sendinput.MouseController()
 
 
 class GremlinSocketHandler(socketserver.BaseRequestHandler):
@@ -666,6 +667,8 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
         received network events are processed here
     
     '''
+
+
     def handle(self):
         
       
@@ -710,7 +713,8 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
             elif subtype == "axis":
                 dx = data["dx"]
                 dy = data["dy"]
-                mouse_controller = gremlin.sendinput.MouseController()
+                mouse_controller = GremlinServer._mouse
+                
                 mouse_controller.set_absolute_motion(dx, dy)
             elif subtype == "amotion":
                 # accelerated motion
@@ -727,7 +731,14 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
             device = data["device"]
             target = data["target"]
             value = data["value"]
-            proxy = joystick_handling.VJoyProxy()
+            proxy = GremlinServer._proxy
+            if device == 2:
+                pass
+            if not device in proxy.vjoy_devices:
+                try:
+                    device = proxy.vjoy_devices[device]
+                except:
+                    syslog.debug(f"Proxy error: unable to find vjoy device {device}")
             if device in proxy.vjoy_devices:
                 # valid device
                 vjoy = proxy[device]

@@ -212,6 +212,8 @@ class MouseButton(enum.Enum):
 
     @staticmethod
     def to_enum(value):
+        if isinstance(value, int):
+            return MouseButton(value)
         try:
             return _MouseButton_to_enum_lookup[value]
         except KeyError:
