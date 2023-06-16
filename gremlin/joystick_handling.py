@@ -55,27 +55,23 @@ class VJoyProxy:
             try:
                 device = vjoy.VJoy(key)
                 VJoyProxy.vjoy_devices[key] = device
+                msg = f"Registering vJoy id={key}"
+                logging.getLogger("system").debug(msg)
                 return device
             except error.VJoyError as e:
-                logging.getLogger("system").error(
-                    "Failed accessing vJoy id={}, error is: {}".format(
-                        key,
-                        e
-                    )
-                )
+                msg = f"Failed accessing vJoy id={key}, error is: {e}"
+                logging.getLogger("system").debug(msg)
+                logging.getLogger("system").error(msg)
                 raise e
 
     @classmethod
-    def reset(cls):
+    def reset(self):
         """Relinquishes control over all held VJoy devices."""
         for device in VJoyProxy.vjoy_devices.values():
             device.invalidate()
         VJoyProxy.vjoy_devices = {}
 
-
-        
-
-
+      
 def joystick_devices():
     """Returns the list of joystick like devices.
 

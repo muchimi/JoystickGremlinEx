@@ -657,9 +657,7 @@ class StateChangeRegistry():
 
 
 class GremlinServer(socketserver.ThreadingMixIn,socketserver.UDPServer):
-    _proxy = joystick_handling.VJoyProxy()
-    _mouse = gremlin.sendinput.MouseController()
-
+    pass
 
 class GremlinSocketHandler(socketserver.BaseRequestHandler):
     ''' handles remote input from a gremlin client on the network 
@@ -713,9 +711,9 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
             elif subtype == "axis":
                 dx = data["dx"]
                 dy = data["dy"]
-                mouse_controller = GremlinServer._mouse
-                
+                mouse_controller = gremlin.sendinput.MouseController()
                 mouse_controller.set_absolute_motion(dx, dy)
+
             elif subtype == "amotion":
                 # accelerated motion
                 a = data["acc"]
@@ -731,7 +729,7 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
             device = data["device"]
             target = data["target"]
             value = data["value"]
-            proxy = GremlinServer._proxy
+            proxy = joystick_handling.VJoyProxy()
             if device == 2:
                 pass
             if not device in proxy.vjoy_devices:
@@ -801,6 +799,10 @@ class RPCGremlin():
         self._server.server_close()
         self._running = False
         syslog.debug("Gremlin listener stopped.")
+        proxy = joystick_handling.VJoyProxy()
+        # release any locks on devices
+        proxy.reset()
+
         
     @property
     def running(self):
