@@ -730,13 +730,6 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
             target = data["target"]
             value = data["value"]
             proxy = joystick_handling.VJoyProxy()
-            if device == 2:
-                pass
-            if not device in proxy.vjoy_devices:
-                try:
-                    device = proxy.vjoy_devices[device]
-                except:
-                    syslog.debug(f"Proxy error: unable to find vjoy device {device}")
             if device in proxy.vjoy_devices:
                 # valid device
                 vjoy = proxy[device]
@@ -818,6 +811,15 @@ class RPCGremlin():
         if self._running:
             # already running
             return
+        
+        # register the devices we will need
+        vjoyid_list = [dev.vjoy_id for dev in joystick_handling.joystick_devices() if dev.is_virtual]
+        for key in vjoyid_list:
+            try:
+                device = joystick_handling.VJoyProxy()[key]
+                syslog.debug(f"Remote proxy VJOY [{key}] ok")
+            except:
+                pass
         self._thread = threading.Thread(target=self._run)
         self._thread.start()
 
