@@ -796,7 +796,7 @@ class MacroListModel(QtCore.QAbstractListModel):
                 raise gremlin.error.GremlinError("Unknown macro action")
             
             
-            syslog.debug(display)
+            #syslog.debug(display)
             return display
         elif role == QtCore.Qt.FontRole:
             font = QtGui.QFont()

@@ -762,7 +762,7 @@ class RPCGremlin():
 
     MULTICAST_GROUP = '224.3.29.72' # multicast group
     # multicast time to live
-    MULTICAST_TTL = 1
+    MULTICAST_TTL = 2
 
     def __init__(self):
         # self._address = "0.0.0.0"
