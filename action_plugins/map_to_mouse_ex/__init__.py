@@ -22,7 +22,60 @@ import enum, threading,time, random
 
 syslog = logging.getLogger("system")
 
+class MouseClickMode(enum.Enum):
+    Normal = 0 # click on/off
+    Press = 1 # press only
+    Release = 2 # release only
 
+    @staticmethod
+    def to_string(mode):
+        return mode.name
+    
+    def __str__(self):
+        return str(self.value)
+    
+    @classmethod
+    def _missing_(cls, name):
+        for item in cls:
+            if item.name.lower() == name.lower():
+                return item
+            return cls.Normal
+        
+    @staticmethod
+    def from_string(str):
+        ''' converts from a string representation (text or numeric) to the enum, not case sensitive'''
+        str = str.lower().strip()
+        if str.isnumeric():
+            mode = int(str)
+            return MouseClickMode(mode)
+        for item in MouseClickMode:
+            if item.name.lower() == str:
+                return item
+
+        return None
+    
+    @staticmethod
+    def to_description(action):
+        ''' returns a descriptive string for the action '''
+        if action == MouseClickMode.Normal:
+            return "Normal Click"
+        elif action == MouseClickMode.Press:
+            return "Mouse button press"
+        elif action == MouseClickMode.Release:
+            return "Mouse button release"
+        return f"Unknown {action}"
+    
+    @staticmethod
+    def to_name(action):
+        ''' returns the name from the action '''
+        if action == MouseClickMode.Normal:
+            return "Normal Click"
+        elif action == MouseClickMode.Press:
+            return "Mouse button press"
+        elif action == MouseClickMode.Release:
+            return "Mouse button release"
+        return f"Unknown {action}"
+    
 class MouseAction(enum.Enum):
     MouseButton = 0 # output a mouse button
     MouseMotion = 1 # output a mouse motion
@@ -44,7 +97,7 @@ class MouseAction(enum.Enum):
         for item in cls:
             if item.name.lower() == name.lower():
                 return item
-            return cls.MouseAction
+            return cls.MouseButton
         
     @staticmethod
     def from_string(str):
@@ -122,6 +175,8 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.release_widget = QtWidgets.QWidget() 
         self.options_layout = QtWidgets.QHBoxLayout(self.release_widget)
 
+        self.click_widget = QtWidgets.QWidget() 
+        self.click_options_layout = QtWidgets.QHBoxLayout(self.click_widget)
 
 
         self.mode_widget = gremlin.ui.common.NoWheelComboBox()
@@ -147,6 +202,26 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self.chkb_exec_on_release = QtWidgets.QCheckBox("Exec on release")
         self.chkb_exec_on_release.clicked.connect(self._exec_on_release_changed)
+        
+        
+        self.mode_group = QtWidgets.QButtonGroup()
+        self.mode_normal = QtWidgets.QRadioButton("Click")
+        self.mode_press = QtWidgets.QRadioButton("Press Only")
+        self.mode_release = QtWidgets.QRadioButton("Release Only")
+
+        self.mode_normal.clicked.connect(self._click_change_mode)
+        self.mode_press.clicked.connect(self._click_change_mode)
+        self.mode_release.clicked.connect(self._click_change_mode)
+
+        self.mode_group.addButton(self.mode_normal)
+        self.mode_group.addButton(self.mode_press)
+        self.mode_group.addButton(self.mode_release)
+
+        self.click_options_layout.addWidget(self.mode_normal)
+        self.click_options_layout.addWidget(self.mode_press)
+        self.click_options_layout.addWidget(self.mode_release)
+        self.click_options_layout.addStretch()
+
         
         
         self.options_layout.addWidget(self.chkb_exec_on_release)
@@ -181,7 +256,9 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.main_layout.addLayout(self.mode_layout)
         self.main_layout.addWidget(self.release_widget)
         self.main_layout.addWidget(self.button_widget)
+        self.main_layout.addWidget(self.click_widget)
         self.main_layout.addWidget(self.motion_widget)
+        
 
 
         # Create the different UI elements
@@ -192,6 +269,13 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
             self._create_button_hat_ui()
 
 
+    def _click_change_mode(self):
+        if self.mode_normal.isChecked():
+            self.action_data.click_mode = MouseClickMode.Normal
+        elif self.mode_press.isChecked():
+            self.action_data.click_mode = MouseClickMode.Press
+        elif self.mode_release.isChecked():
+            self.action_data.click_mode = MouseClickMode.Release
 
     def _create_axis_ui(self):
         """Creates the UI for axis setups."""
@@ -291,7 +375,19 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         
         self.mode_label.setText(MouseAction.to_description(action_mode))
 
+        click_mode = self.action_data.click_mode
+        if click_mode == MouseClickMode.Normal:
+            with QtCore.QSignalBlocker(self.mode_normal):
+                self.mode_normal.setChecked(True)
+        elif click_mode == MouseClickMode.Press:
+            with QtCore.QSignalBlocker(self.mode_press):
+                self.mode_press.setChecked(True)
+        elif click_mode == MouseClickMode.Release:
+            with QtCore.QSignalBlocker(self.mode_release):
+                self.mode_release.setChecked(True)
+
         self._change_mode()
+
 
     def _populate_axis_ui(self):
         """Populates axis UI elements with data."""
@@ -422,6 +518,7 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         show_button = False
         show_motion = False
         show_release = False
+        show_click_mode = False
 
         if self.action_data.get_input_type() == InputType.JoystickButton:
             show_release = True
@@ -429,6 +526,8 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         action_mode = self.action_data.action_mode
         if action_mode == MouseAction.MouseButton:
             show_button = True
+            if not self.action_data.button_id in [MouseButton.WheelDown, MouseButton.WheelUp]:
+                show_click_mode = True
         elif action_mode == MouseAction.MouseMotion:
             show_motion = True
 
@@ -438,6 +537,7 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         #show_motion = self.action_data.motion_input
         self.motion_widget.setVisible(show_motion)
         self.button_widget.setVisible(show_button)
+        self.click_widget.setVisible(show_click_mode)
         self.chkb_exec_on_release.setVisible(show_release)
 
         # Emit modification signal to ensure virtual button settings
@@ -536,16 +636,18 @@ class MapToMouseExFunctor(AbstractFunctor):
                 elif not self.exec_on_release and event.is_pressed:
                     self._wiggle_stop(is_remote=True)
             
-        elif self.action_mode == MouseAction.MouseMotion:
-            if event.event_type == InputType.JoystickAxis:
-                self._perform_axis_motion(event, value)
-            elif event.event_type == InputType.JoystickHat:
-                self._perform_hat_motion(event, value)
-            else:
-                self._perform_button_motion(event, value)
-        elif self.action_mode == MouseAction.MouseButton:
-            self._perform_mouse_button(event, value)
-
+            elif self.action_mode == MouseAction.MouseMotion:
+                if event.event_type == InputType.JoystickAxis:
+                    self._perform_axis_motion(event, value)
+                elif event.event_type == InputType.JoystickHat:
+                    self._perform_hat_motion(event, value)
+                else:
+                    self._perform_button_motion(event, value)
+            elif self.action_mode == MouseAction.MouseButton:
+                if self.exec_on_release and not event.is_pressed:
+                    self._perform_mouse_button(event, value)
+                elif not self.exec_on_release and event.is_pressed:
+                    self._perform_mouse_button(event, value)
         return True
     
     def get_state(self):
@@ -571,16 +673,28 @@ class MapToMouseExFunctor(AbstractFunctor):
                 if is_remote:
                     input_devices.remote_client.send_mouse_wheel(direction)
         else:
-            if value.current:
+            if self.action.click_mode == MouseClickMode.Normal:
+                if value.current:
+                    if is_local:
+                        gremlin.sendinput.mouse_press(self.action.button_id)
+                    if is_remote:
+                        input_devices.remote_client.send_mouse_button(self.action.button_id.value, True)
+                else:
+                    if is_local:
+                        gremlin.sendinput.mouse_release(self.action.button_id)
+                    if is_remote:
+                        input_devices.remote_client.send_mouse_button(self.action.button_id.value, False)
+            elif self.action.click_mode == MouseClickMode.Press:
                 if is_local:
                     gremlin.sendinput.mouse_press(self.action.button_id)
                 if is_remote:
                     input_devices.remote_client.send_mouse_button(self.action.button_id.value, True)
-            else:
+            elif self.action.click_mode == MouseClickMode.Release:
                 if is_local:
                     gremlin.sendinput.mouse_release(self.action.button_id)
                 if is_remote:
                     input_devices.remote_client.send_mouse_button(self.action.button_id.value, False)
+
 
         
 
@@ -777,6 +891,8 @@ class MapToMouseEx(AbstractAction):
 
         self.input_type = InputType.JoystickButton
 
+        self.click_mode = MouseClickMode.Normal
+
 
     def icon(self):
         """Returns the icon to use for this action.
@@ -832,6 +948,9 @@ class MapToMouseEx(AbstractAction):
         if "remote_only" in node.attrib:
             self.force_remote_output_only = safe_read(node,"force_remote_output_only",bool, False)
 
+        if "click_mode" in node.attrib:
+            self.click_mode = MouseClickMode.from_string(safe_read(node,"click_mode", str, "normal"))
+
 
     def _generate_xml(self):
         """Returns an XML node containing this instance's information.
@@ -850,6 +969,7 @@ class MapToMouseEx(AbstractAction):
         node.set("exec_on_release", safe_format(self.exec_on_release, bool))
         node.set("force_remote_output", safe_format(self.force_remote_output, bool))
         node.set("force_remote_output_only", safe_format(self.force_remote_output_only, bool))
+        node.set("click_mode", self.click_mode.name)
 
         return node
 
