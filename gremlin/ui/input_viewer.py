@@ -67,17 +67,17 @@ class VisualizationSelector(QtWidgets.QWidget):
                 box = QtWidgets.QGroupBox(dev.name)
 
             at_cb = QtWidgets.QCheckBox("Axes - Temporal")
-            at_cb.stateChanged.connect(
-                self._create_callback(dev, VisualizationType.AxisTemporal)
+            at_cb.clicked.connect(
+                self._create_callback(dev, VisualizationType.AxisTemporal, at_cb)
             )
 
             ac_cb = QtWidgets.QCheckBox("Axes - Current")
-            ac_cb.stateChanged.connect(
-                self._create_callback(dev, VisualizationType.AxisCurrent)
+            ac_cb.clicked.connect(
+                self._create_callback(dev, VisualizationType.AxisCurrent, ac_cb)
             )
             bh_cb = QtWidgets.QCheckBox("Buttons + Hats")
-            bh_cb.stateChanged.connect(
-                self._create_callback(dev, VisualizationType.ButtonHat)
+            bh_cb.clicked.connect(
+                self._create_callback(dev, VisualizationType.ButtonHat, bh_cb)
             )
 
             layout = QtWidgets.QVBoxLayout()
@@ -89,7 +89,7 @@ class VisualizationSelector(QtWidgets.QWidget):
 
             self.main_layout.addWidget(box)
 
-    def _create_callback(self, device, vis_type):
+    def _create_callback(self, device, vis_type, cb):
         """Creates the callback to trigger visualization updates.
 
         :param device the device being updated
@@ -98,7 +98,7 @@ class VisualizationSelector(QtWidgets.QWidget):
         return lambda state: self.changed.emit(
                 device,
                 vis_type,
-                state == QtCore.Qt.Checked
+                cb.isChecked() #state == QtCore.Qt.Checked
             )
 
 
@@ -135,6 +135,7 @@ class InputViewerUi(common.BaseDialogUi):
             removed
         """
         key = device, vis_type
+        
         widget = JoystickDeviceWidget(device, vis_type)
         if is_active:
             self.views.add_widget(widget)
@@ -209,6 +210,10 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
         self.vis_type = vis_type
         self.widgets = []
         self.setLayout(QtWidgets.QHBoxLayout())
+
+        # self.setMinimumSize(QtCore.QSize(200, 200))
+        # self.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding,
+        #                                          QtWidgets.QSizePolicy.MinimumExpanding))
 
         el = gremlin.event_handler.EventListener()
         if vis_type == VisualizationType.AxisCurrent:
@@ -592,10 +597,7 @@ class HatWidget(QtWidgets.QWidget):
 
         # Prepare painter instance
         painter = QtGui.QPainter(self)
-        painter.setRenderHint(int(
-            QtGui.QPainter.Antialiasing |
-            QtGui.QPainter.SmoothPixmapTransform
-        ))
+        painter.setRenderHint(QtGui.QPainter.Antialiasing | QtGui.QPainter.SmoothPixmapTransform)
         painter.setPen(pen_default)
         painter.setBrush(brush_default)
 
@@ -647,10 +649,7 @@ class TimeLinePlotWidget(QtWidgets.QWidget):
         """
         super().__init__(parent)
 
-        self._render_flags = int(
-            QtGui.QPainter.Antialiasing |
-            QtGui.QPainter.SmoothPixmapTransform
-        )
+        self._render_flags = QtGui.QPainter.Antialiasing |  QtGui.QPainter.SmoothPixmapTransform
 
         # Plotting canvas
         self._pixmap = QtGui.QPixmap(1000, 200)

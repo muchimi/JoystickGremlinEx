@@ -232,7 +232,7 @@ def create_document():
             "UpgradeCode": "0464914b-97da-4889-8699-bcde4e767517",
             "Language": "1033",
             "Codepage": "1252",
-            "Version": "13.38ex"
+            "Version": "13.39ex"
         })
     mug = create_node("MajorUpgrade",
         {
