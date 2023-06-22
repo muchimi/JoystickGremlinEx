@@ -12,17 +12,23 @@ This custom version adds to release 13.3 of Gremlin:
 - Update to Python 11.x (improved execution speed over Python 10)
 - Improved stability when loading a plugin that has an error on load
 - Remote data control of another GremlinEx client on the local network
-- OSC message handling
+- OSC message handling (for touch screen support going to Gremlin via TouchOSC for example)
 - VjoyRemap plugin for control  
 - MouseButtonEx plugin for enhanced mouse control  
 
 # There be dragons ahead!  
 
-I updated this code repository for my own purpose a I ran across my hardware cockpit needs and thought to myself - hey - would love if this did [that]!  
+I updated this code repository for my own purpose as I ran across my hardware cockpit needs for my PC based simulators and thought to myself - hey - would love if this did [that]!  I was quickly confined though to the base functionality and realized soon that some deeper surgery was needed.  I also wanted the code to use current platform tools as there is for example a significant boost in performance just by using a new Python environment.
 
-As such, the code may have some bugs and other things I'm missed in my own testing, so please report issues you encounter as you find them and I'll do my best to fix them.  
+As such, the code may have some bugs and other things I'm missed in my own testing, so please report issues you encounter as you find them and I'll do my best to fix them.
+
+The core repository was substantially modified in some areas to support remote control, including some new events, adding improved support for user scripts (so they are aware of state information for example).   Some UI elements were also modified a bit to improve the visuals and to simplify certain aspects of Gremlin.  For example, all buttons support a release action without going through more complex hoops for setup, as a check box is simpler to setup in this use-case.   This made it much simpler for me to map physical switches on throttles that have a single state to multi-state and do what used to be complex mappings essentially a checkbox affair.
+
+I have attempted to use the base project as much as possible, and I am grateful to WhiteMagic and his excellent ideas as Gremlin is simply the best mapping utility I have every seen or used in decades of simulation and hardware input mapping to games.  The architecture is also excellent and made my modifications very simple.
+
   
-I am using this code daily for my simulation needs but that's not a guarantee everything works as expected.  Feedback welcome!
+I am using this code daily for my simulation needs but that's not a guarantee everything works as expected.  Feedback welcome!  
+
 
 
 
