@@ -52,6 +52,18 @@ There are three options that control this behavior in the GremlinEx options pane
 | Highlight currently used buttons | Detects button changes only (axis movement is ignored but can be overriden - see below (this is recommended) | 
 | Highlight swaps device tabs | Changes input tabs automatically (this is a recommended) |
 
+A pair of modifiers can be used to modify how input is detected.  
+
+| Option      | Description |
+| ----------- | ----------- |
+| Left shift | If you hold the left shift key, GremlinEx will track axes instead of just buttons regardless of the options selected .|
+| Left control | If you hold the left control key, GremlinEx will only track axes  regardless of the options selected .|
+
+Recommend that you set the default behavior is to track buttons only as it's very easy to trigger an axis by pressing a button because many hardware devices are very sensitive. Use the  left shift or control key to modify that behavior on the fly.
+
+Note that whatever is first detected will go to that item (axis or button) if nothing is selected.  This is on purpose to pick a starting point.
+
+
 ### Button detect only overrides
 
 Holding the left-shift key down when in button detect mode temporarily enables axis detection as well as button detection.  This is the same as the first option in the table above.
