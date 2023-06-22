@@ -13,7 +13,17 @@ This custom version adds to release 13.3 of Gremlin:
 - Improved stability when loading a plugin that has an error on load
 - Remote data control of another GremlinEx client on the local network
 - OSC message handling
-- VjoyRemap plugin for control
+- VjoyRemap plugin for control  
+- MouseButtonEx plugin for enhanced mouse control  
+
+# There be dragons ahead!  
+
+I updated this code repository for my own purpose a I ran across my hardware cockpit needs and thought to myself - hey - would love if this did [that]!  
+
+As such, the code may have some bugs and other things I'm missed in my own testing, so please report issues you encounter as you find them and I'll do my best to fix them.  
+  
+I am using this code daily for my simulation needs but that's not a guarantee everything works as expected.  Feedback welcome!
+
 
 
 # Automatic Input detection
@@ -176,7 +186,7 @@ The commands are only available to button bindings at this time.
 
 # Map to mouse EX plugin
 
-This plugin is identical to the Map to Mouse plugin but adds a wiggle function. When wiggle is enabled, the mouse will move slightly by itself every 10 to 40 seconds and move back.  It will do that until wiggle mode is turned off.  
+This plugin is identical to the Map to Mouse plugin but adds a wiggle function, easy execute on release and button hold functionality. When wiggle is enabled, the mouse will move slightly by itself every 10 to 40 seconds and move back.  It will do that until wiggle mode is turned off.  
   
 The purpose of wiggle is to keep an application alive.   Wiggle is turned on/off separately for remote/local clients.
 
@@ -188,6 +198,7 @@ The purpose of wiggle is to keep an application alive.   Wiggle is turned on/off
 | Wiggle Disable (local) | Stops the mouse wiggling if it was turned on.  |
 | Wiggle Enable (remote) | Jolts the mouse every few seconds on remote clients  |
 | Wiggle Disable (remote) | Stops the mouse wiggling if it was turned on for remote clients  |
+
 
 Mouse commands can forced to be sent to remote hosts only, or to send them concurrently to the remote host regardless of the remote control state.
 
