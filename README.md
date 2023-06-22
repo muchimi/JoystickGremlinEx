@@ -14,7 +14,13 @@ This custom version adds to release 13.3 of Gremlin:
 - Remote data control of another GremlinEx client on the local network
 - OSC message handling (for touch screen support going to Gremlin via TouchOSC for example)
 - VjoyRemap plugin for control  
-- MouseButtonEx plugin for enhanced mouse control  
+- MapToMouseEx plugin for enhanced mouse control  
+
+
+I suggest you make VjoyRemap the default action in the options panel as this plugin is what provides many enhancements over the default Remap plugin.  Same for mouse output - MapToMouseEx provides enhanced options for the mouse macro functions.
+
+This said, the default plugins are all functional but they won't be aware of the new features in GremlinEx.
+
 
 # There be dragons ahead!  
 
@@ -52,6 +58,11 @@ There are three options that control this behavior in the GremlinEx options pane
 | Highlight currently used buttons | Detects button changes only (axis movement is ignored but can be overriden - see below (this is recommended) | 
 | Highlight swaps device tabs | Changes input tabs automatically (this is a recommended) |
 
+
+
+
+### Button detect only overrides
+
 A pair of modifiers can be used to modify how input is detected.  
 
 | Option      | Description |
@@ -62,9 +73,6 @@ A pair of modifiers can be used to modify how input is detected.
 Recommend that you set the default behavior is to track buttons only as it's very easy to trigger an axis by pressing a button because many hardware devices are very sensitive. Use the  left shift or control key to modify that behavior on the fly.
 
 Note that whatever is first detected will go to that item (axis or button) if nothing is selected.  This is on purpose to pick a starting point.
-
-
-### Button detect only overrides
 
 Holding the left-shift key down when in button detect mode temporarily enables axis detection as well as button detection.  This is the same as the first option in the table above.
 
@@ -82,7 +90,9 @@ Events sent over the network include all GremlinEX output functions:
 - mouse output events (pres/release mice button 1 to 5, mouse wheel events, and mouse motion events)
 - Gremlin macro outputs
 
-By output events, we mean that inputs into GremlinEx are not broadcast to clients, only events that GremlinEx outputs are synchronized with clients.
+By output events, we mean that inputs into GremlinEx are not broadcast to clients, only events that GremlinEx outputs are synchronized with clients.  
+
+To use the remote control features, it is intended you use the new plugins VjoyRemap and MapToMouseEx
 
 
 ### Master machine setup
@@ -100,6 +110,7 @@ While more than one master machine can broadcast, it's recommended to only have 
 The enable speech checkbox can be selected for GremlinEx to send a verbal mode change event whenever local/remote mode control is changed in case the GremlinEx window is not visible.
 
 GremlinEx shows what output mode is active in the status bar.
+
 
 <sup>GremlinEx options setup for a broadcast machine:</sup>
 
