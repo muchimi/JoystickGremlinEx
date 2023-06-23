@@ -83,6 +83,8 @@ Holding the left-shift key and the left-control key when in button detect mode t
 
 GremlinEx adds a feature to link multiple GremlinEx instances running on separate computers.  This is helpful to share a single set of controls and a single profile on a master machine to one or more client machines on the local network.
 
+The use-case for this need came up in a couple of scenarios in my own setup:  I wanted to be able to share my hardware panels and input controllers with another machine without having to duplicate them.
+
 Events sent over the network include all GremlinEX output functions:
 - VJOY joystick axis events (when an axis is moved)
 - VJOY joystick button events
