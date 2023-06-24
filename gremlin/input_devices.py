@@ -196,7 +196,7 @@ class VjoyAction(enum.Enum):
         VjoyAction.VJoyEnableRemote,
         VjoyAction.VJoyToggleRemote,
         VjoyAction.VJoyEnablePairedRemote,
-        VjoyAction.VJoyDisablePairedRemote
+        VjoyAction.VJoyDisablePairedRemote,
         )
 
 

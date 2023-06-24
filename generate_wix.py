@@ -232,7 +232,7 @@ def create_document():
             "UpgradeCode": "0464914b-97da-4889-8699-bcde4e767517",
             "Language": "1033",
             "Codepage": "1252",
-            "Version": "13.39ex"
+            "Version": "13.40ex"
         })
     mug = create_node("MajorUpgrade",
         {
@@ -245,7 +245,7 @@ def create_document():
         {
             "Id": "*",
             "Keywords": "Installer",
-            "Description": "Joystick Gremlin R13.1.3 Installer",
+            "Description": "Joystick Gremlin Ex R13.40ex Installer",
             "Manufacturer": "H2IK",
             "InstallerVersion": "100",
             "Languages": "1033",
