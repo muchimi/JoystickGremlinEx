@@ -10,6 +10,7 @@ This custom version adds to release 13.3 of Gremlin:
 
 - Update to x64 bit from x32 bit
 - Update to Python 11.x (improved execution speed over Python 10)
+- Update to QT6 UI framework
 - Improved stability when loading a plugin that has an error on load
 - Remote data control of another GremlinEx client on the local network
 - OSC message handling (for touch screen support going to Gremlin via TouchOSC for example)
