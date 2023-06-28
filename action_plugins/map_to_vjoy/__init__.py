@@ -973,8 +973,6 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
                 # various button modes
                 actions = ( VjoyAction.VJoyButton,
                             VjoyAction.VJoyPulse,
-                            VjoyAction.VJoyButton,
-                            VjoyAction.VJoyPulse,
                             VjoyAction.VJoyToggle,
                             VjoyAction.VJoyInvertAxis,
                             VjoyAction.VJoySetAxis,
