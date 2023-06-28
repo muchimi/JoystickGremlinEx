@@ -276,8 +276,8 @@ def joystick_devices_initialization():
             vjoy_lookup[hash_value].set_vjoy_id(i)
             syslog.debug(f"vjoy id {i:d}: {hash_value} - MATCH")
         else:
-            should_terminate = True
-            syslog.debug(f"vjoy id {i:d}: {hash_value} - ERROR - vJoy device exists but DILL does not see it")
+            # should_terminate = True
+            syslog.debug(f"vjoy id {i:d}: {hash_value} - ERROR - vJoy device exists but DILL does not see it - check HIDHide config if enabled and process is whitelisted")
 
         # If the device can be acquired, configure the mapping from
         # vJoy axis id, which may not be sequential, to the
