@@ -136,10 +136,18 @@ class VjoyAction(enum.Enum):
             return "Enables paired remote output mode - remote will echo local"
         elif action == VjoyAction.VJoyDisablePairedRemote:
             return "Disables paired remote output mode"
+        elif action == VjoyAction.VJoyEnableRemote:
+            return "Enables remote control (remote clients will get inputs)"
+        elif action == VjoyAction.VJoyDisableLocal:
+            return "Disables local control mode (local input will be disabled)"
+        elif action == VjoyAction.VJoyDisableRemote:
+            return "Disables remote control mode (remote clients will not get inputs except for paired commands)"
         # elif action == VjoyAction.VjoyMergeAxis:
         #     return "Merges two axes into one"
         
-        return f"Unknown {action}"
+        msg  = f"Unknown [{action}]"
+        syslog.debug(f"Warning: missing action description mapping: {msg}")
+        return msg
         
     @staticmethod
     def to_name(action):
@@ -178,10 +186,16 @@ class VjoyAction(enum.Enum):
             return "Enable remote pairing"
         elif action == VjoyAction.VJoyDisablePairedRemote:
             return "Disable remote pairing"
-        # elif action == VjoyAction.VjoyMergeAxis:
-        #     return "Merge Axis"
+        elif action == VjoyAction.VJoyEnableRemote:
+            return "Enable remote control"
+        elif action == VjoyAction.VJoyDisableLocal:
+            return "Disable local control"
+        elif action == VjoyAction.VJoyDisableRemote:
+            return "Disable remote control"
         
-        return "Unknown"        
+        msg  = f"Unknown [{action}]"
+        syslog.debug(f"Warning: missing action name mapping: {msg}")
+        return msg
     
 
     @staticmethod
