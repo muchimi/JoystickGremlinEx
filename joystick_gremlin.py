@@ -57,7 +57,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.2"
+APPLICATION_VERSION = "13.40.3"
 
 
 class GremlinUi(QtWidgets.QMainWindow):
@@ -873,11 +873,12 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         :param new_mode the name of the new current mode
         """
+        
         if self._current_mode != new_mode:
-            self._current_mode = new_mode
-
-            for tab in self.tabs.values():
-                tab.mode_changed_cb(new_mode)
+            with QtCore.QSignalBlocker(self.mode_selector):
+                self._current_mode = new_mode
+                for tab in self.tabs.values():
+                    tab.set_mode(new_mode)
 
     def _process_changed_cb(self, path):
         """Handles changes in the active process.

@@ -449,15 +449,16 @@ class JoystickDeviceTabWidget(QtWidgets.QWidget):
 
             self.main_layout.addWidget(widget)
             
+    def set_mode(self, mode):
+        ''' changes the mode of the tab '''
 
-    def mode_changed_cb(self, mode):
-        """Handles mode change.
-
-        :param mode the new mode
-        """
+        if self.current_mode == mode:
+            # nothing to do
+            return 
+            
         self.current_mode = mode
         self.device_profile.ensure_mode_exists(self.current_mode, self.device)
-        self.input_item_list_model.mode = mode
+        
 
         # Remove the existing widget, if there is one
         item = self.main_layout.takeAt(1)
@@ -467,9 +468,20 @@ class JoystickDeviceTabWidget(QtWidgets.QWidget):
         if item:
             self.main_layout.removeItem(item)
 
-        # Select the first input item
-        self.input_item_list_view.select_item(0)
 
+        self.input_item_list_model.mode = mode            
+
+        # Select the first input item
+        self.input_item_list_view.select_item(0, emit_signal=False)
+
+
+    def mode_changed_cb(self, mode):
+        """Handles mode change.
+
+        :param mode the new mode
+        """
+        self.set_mode(mode)
+        
     def refresh(self):
         """Refreshes the current selection, ensuring proper synchronization."""
         if self.input_item_list_view.current_index is not None:
