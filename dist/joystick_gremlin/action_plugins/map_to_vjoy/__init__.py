@@ -1226,6 +1226,9 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             h_box.setAlignment(QtCore.Qt.AlignCenter)
             cb = QtWidgets.QRadioButton()
 
+            # wire the radio check
+            #cb.clicked.connect(self._select_changed)
+
             self.button_group.addButton(cb)
             self.button_group.setId(cb, id)
             # if id == input_id:
@@ -1266,8 +1269,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self.main_layout.addWidget(self.button_grid_widget)
    
-        
-
+    
             
     def _grid_button_clicked(self):
         sender = self.sender()
@@ -1307,6 +1309,9 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         # update the selector
         with QtCore.QSignalBlocker(self.cb_vjoy_input_selector):
             self.cb_vjoy_input_selector.setCurrentIndex(id-1)
+
+        # update the grid icons
+        self._populate_grid(self.action_data.vjoy_device_id,id)
         
         # update the UI when a state change occurs
         el = gremlin.event_handler.EventListener()
