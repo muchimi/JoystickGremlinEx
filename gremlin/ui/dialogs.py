@@ -655,7 +655,7 @@ If this option is on, the last active profile will remain active until a differe
 
     def _update_hg_device(self, state, device):
         hg = gremlin.hid_guardian.HidGuardian()
-        if state == QtCore.Qt.Checked:
+        if state == QtCore.Qt.Checked.value:
             hg.add_device(device.vendor_id, device.product_id)
         else:
             hg.remove_device(device.vendor_id, device.product_id)

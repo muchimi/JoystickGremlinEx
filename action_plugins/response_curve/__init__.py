@@ -1199,7 +1199,7 @@ class ResponseCurveWidget(gremlin.ui.input_item.AbstractActionWidget):
             )
             return
 
-        self.curve_model.set_handle_symmetry(state == QtCore.Qt.Checked)
+        self.curve_model.set_handle_symmetry(state == QtCore.Qt.Checked.value)
 
     def _configure_response_curve_view(self):
         """Initializes the response curve view components."""

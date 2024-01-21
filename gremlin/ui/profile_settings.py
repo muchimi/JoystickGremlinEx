@@ -338,7 +338,7 @@ class VJoyAsInputWidget(QtWidgets.QGroupBox):
         :param vid the id of the vJoy device being modified
         :param state the state of the checkbox
         """
-        self.profile_data.vjoy_as_input[vid] = state == QtCore.Qt.Checked
+        self.profile_data.vjoy_as_input[vid] = state == QtCore.Qt.Checked.value
         self.changed.emit()
 
     def _create_update_state_cb(self, vid):
