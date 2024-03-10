@@ -295,10 +295,12 @@ class InputItemListView(common.AbstractView):
             return
 
         data = self.model.data(index)
-        widget = self.scroll_layout.itemAt(index).widget()
-        if widget is not None:
-            widget.create_action_icons(data)
-            widget.update_description(data.description)
+        item = self.scroll_layout.itemAt(index)
+        if item is not None:
+            widget = self.scroll_layout.itemAt(index).widget()
+            if widget is not None:
+                widget.create_action_icons(data)
+                widget.update_description(data.description)
 
     def _create_selection_callback(self, index):
         """Creates a callback handling the selection of items.
