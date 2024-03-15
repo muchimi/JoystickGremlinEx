@@ -229,10 +229,10 @@ def create_document():
             # "Id": "6019660b-26bd-430b-9b95-ca6a55201060",  # 13.0.0
             # "Id": "0dad4221-c8cf-4424-8dcd-3886274e89ef", # 13.1.0
             "Id": "6472cca8-d352-4186-8a98-ca6ba33d083c", # gremlinEx
-            "UpgradeCode": "081aa915-f3bf-4b46-9bbd-5b1e3df31306",
+            "UpgradeCode": "7c0ea893-a98b-4aba-83f6-70218ea217d9",
             "Language": "1033",
             "Codepage": "1252",
-            "Version": "13.40.5ex"
+            "Version": "13.40.6ex"
         })
     mug = create_node("MajorUpgrade",
         {
@@ -338,7 +338,7 @@ def create_shortcuts(doc, root):
                 {
                     "Id": "startmenu_joystick_gremlin",
                     "Directory": "ProgramMenuDir",
-                    "Name": "Joystick Gremlin Ex,
+                    "Name": "Joystick Gremlin Ex",
                     "WorkingDirectory": "INSTALLDIR",
                     "Advertise": "yes",
                     "Icon": "icon.ico"

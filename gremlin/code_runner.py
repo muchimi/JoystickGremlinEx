@@ -276,9 +276,6 @@ class CodeRunner:
             
             #evt_listener.remote_event.connect(self.event_handler.process_event)
 
-            # call start functions
-            input_devices.start_registry.start()
-            input_devices.periodic_registry.start()
 
             # hook mode change callbacks
             self.event_handler.mode_changed.connect(
@@ -303,6 +300,11 @@ class CodeRunner:
             # tell listener profiles are starting
             el = gremlin.event_handler.EventListener()
             el.profile_start.emit()
+
+
+            # call start functions
+            input_devices.start_registry.start()
+            input_devices.periodic_registry.start()            
 
         except Exception as e:
             msg = f"Unable to launch user plugin due to an error: {e}"
