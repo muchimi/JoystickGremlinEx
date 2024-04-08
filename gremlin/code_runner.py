@@ -301,6 +301,7 @@ class CodeRunner:
             el = gremlin.event_handler.EventListener()
             el.profile_start.emit()
 
+            # contribution: Jeff Cain 4/8/24 - fix action start logic
 
             # call start functions
             input_devices.start_registry.start()
