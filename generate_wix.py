@@ -235,6 +235,9 @@ def create_document():
             "Codepage": "1252",
             "Version": "13.40.7ex"
         })
+    
+    # also change version number in joystick_gremlin.py line 60 APPLICATION_VERSION
+    
     mug = create_node("MajorUpgrade",
         {
             "DowngradeErrorMessage":
