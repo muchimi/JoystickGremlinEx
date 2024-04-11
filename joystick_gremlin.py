@@ -27,6 +27,7 @@ import os
 import sys
 import time
 import traceback
+import threading
 
 
 # Import QtMultimedia so pyinstaller doesn't miss it
@@ -53,11 +54,13 @@ import gremlin.ui.user_plugin_management
 import gremlin.ui.profile_creator
 import gremlin.ui.profile_settings
 
+from PySide6 import QtCore
+
 from gremlin.ui.ui_gremlin import Ui_Gremlin
 from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.4"
+APPLICATION_VERSION = "13.40.7ex"
 
 
 class GremlinUi(QtWidgets.QMainWindow):
@@ -67,6 +70,8 @@ class GremlinUi(QtWidgets.QMainWindow):
 
 
     ui = None
+    
+    # input_lock =  threading.Lock() # critical code operations - prevents reentry
 
 
     def __init__(self, parent=None):
@@ -77,7 +82,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         QtWidgets.QMainWindow.__init__(self, parent)
         self.ui = Ui_Gremlin()
         self.ui.setupUi(self)
-
+        self.locked = False
         self._resize_count = 0
 
         # Process monitor
@@ -806,11 +811,16 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.ui.actionActivate.setChecked(False)
         self.activate(False)
 
+    
+
     def _process_joystick_input_selection(self, event, buttons_only = False):
         """Handles joystick events to select the appropriate input item for device highligthing in the UI
 
         :param event the event to process
         """
+
+
+
         if event.event_type == gremlin.common.InputType.Keyboard:
             return
         if self.runner.is_running() or self._current_mode is None:
@@ -821,13 +831,19 @@ class GremlinUi(QtWidgets.QMainWindow):
         if event.device_guid not in self.tabs:
             return
 
+        # enter critical section
+        if self.locked:
+            return
+        
+        self.locked = True
+    
         # Switch to the tab corresponding to the event's device if the option
         tab_switch_needed = self.ui.devices.currentWidget() != self.tabs[event.device_guid] 
         if self.config.highlight_device and tab_switch_needed:
             self.ui.devices.setCurrentWidget(self.tabs[event.device_guid])
             self.refresh()
 
-
+        self.locked = False
 
         
         # get the widget for the tab corresponding to the device

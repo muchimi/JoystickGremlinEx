@@ -2285,8 +2285,6 @@ class VjoyRemap(gremlin.base_classes.AbstractAction):
             
             node.set("paired", safe_format(self.paired, bool))
             
-        elif self.action_mode == VjoyAction.VJoyPulse:
-            node.set("pulse_delay", safe_format(self.pulse_delay, int))
         elif self.action_mode == VjoyAction.VJoySetAxis:
             node.set("target_value", safe_format(self.target_value, float))
         # elif self.action_mode == VjoyAction.VjoyMergeAxis:
@@ -2294,6 +2292,9 @@ class VjoyRemap(gremlin.base_classes.AbstractAction):
 
             # value = str(self.merge_device_b_axis)
             # node.set("merge_device_axis", value )
+
+        if self.action_mode == VjoyAction.VJoyPulse:
+            node.set("pulse_delay", safe_format(self.pulse_delay, int))            
 
         if save_exec_on_release:
             node.set("exec_on_release", safe_format(self.exec_on_release, bool))
