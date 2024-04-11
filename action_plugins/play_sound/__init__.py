@@ -72,20 +72,22 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 
 class PlaySoundFunctor(AbstractFunctor):
+    ''' fixed for QT6 media player changes '''
 
     player = QtMultimedia.QMediaPlayer()
+    audio = QtMultimedia.QAudioOutput()
 
     def __init__(self, action):
         super().__init__(action)
         self.sound_file = action.sound_file
         self.volume = action.volume
+        PlaySoundFunctor.player.setAudioOutput(PlaySoundFunctor.audio)
+
 
     def process_event(self, event, value):
-        PlaySoundFunctor.player.setMedia(
-            QtMultimedia.QMediaContent(
-                QtCore.QUrl.fromLocalFile(self.sound_file)
-            ))
-        PlaySoundFunctor.player.setVolume(self.volume)
+        media = QtCore.QUrl(self.sound_file)
+        PlaySoundFunctor.player.setSource(media)
+        PlaySoundFunctor.audio.setVolume(self.volume/100) # 0 to 1
         PlaySoundFunctor.player.play()
         return True
 
