@@ -44,6 +44,8 @@ class MacroActionEditor(QtWidgets.QWidget):
         ["name", "create_ui", "action_type"]
     )
 
+    locked = False
+
     def __init__(self, model, index, parent=None):
         """Creates a new editor widget.
 
@@ -385,9 +387,12 @@ class MacroActionEditor(QtWidgets.QWidget):
         action = self.model.get_entry(self.index.row())
         if action is None:
             return
+        
+        if MacroActionEditor.locked:
+            return
 
-        if not "vjoy_selector" in self.ui_elements.keys():
-
+        MacroActionEditor.locked = True
+        if not "vjoy_selector" in self.ui_elements:
             # vJoy input selection
             self.ui_elements["vjoy_selector"] = gremlin.ui.common.VJoySelector(
                 self._modify_vjoy,
@@ -399,13 +404,19 @@ class MacroActionEditor(QtWidgets.QWidget):
             )
 
 
-            self.action_layout.addWidget(self.ui_elements["vjoy_selector"])
+        self.action_layout.addWidget(self.ui_elements["vjoy_selector"])
+
+
+        
 
         self.ui_elements["vjoy_selector"].set_selection(
             action.input_type,
             action.vjoy_id,
             action.input_id
         )
+
+
+        MacroActionEditor.locked = False
 
         # Axis mode configuration
         if action.input_type == gremlin.common.InputType.JoystickAxis:

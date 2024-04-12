@@ -429,3 +429,13 @@ OSC is a topic by itself, and if you're wondering what this has to do with gamin
 I'm using the same concept to take OSC messages in GremlinEx, which are nothing more but text (string) messages and values, and duplicate functionality found in tools like GameGlass or some other game specific controls using OSC software to send input to games.  OSC is very powerful and customizable, and because OSC knows about faders and buttons and touch surfaces, it becomes easy to map to an axis, buttons, and do sophisticated things like 2D touch surface for shield mapping for example.  Very powerful indeed.
 
 If you use the OSC plugins for StreamDeck or LoupeDeck, it enables these more esoteric devices to be used by GremlinEx, and the networking function means that these devices can be used anywhere on your local network so they don't need to be attached to your local gaming computer.
+
+
+## Python dependencies
+
+If you want to run from the source code, you will need the following python packages for the 64 bit version of python your are running (3.11+)
+
+	pyside6
+	pywin32
+	msgpack
+	reportlab

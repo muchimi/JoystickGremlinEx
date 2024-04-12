@@ -31,9 +31,23 @@ class Configuration:
 
     """Responsible for loading and saving configuration data."""
 
+    def get_config(sef):
+        fname = os.path.join(util.userprofile_path(), "config.json")
+        return fname
+
     def __init__(self):
         """Creates a new instance, loading the current configuration."""
+
+
         self._data = {}
+        
+        fname = self.get_config()
+        if not os.path.isfile(fname):
+            # create a stub - first time run
+            self.save()
+
+
+        
         self._last_reload = None
         self.reload()
 
@@ -48,7 +62,7 @@ class Configuration:
                 time.time() - self._last_reload < 1:
             return
 
-        fname = os.path.join(util.userprofile_path(), "config.json")
+        fname = self.get_config()
         # Attempt to load the configuration file if this fails set
         # default empty values.
         load_successful = False
@@ -79,7 +93,7 @@ class Configuration:
 
     def save(self):
         """Writes the configuration file to disk."""
-        fname = os.path.join(util.userprofile_path(), "config.json")
+        fname = self.get_config()
         with open(fname, "w") as hdl:
             encoder = json.JSONEncoder(
                 sort_keys=True,
