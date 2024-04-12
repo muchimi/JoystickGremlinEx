@@ -5,6 +5,8 @@ Joystick Gremlin EX
 
 4/8/24 - added troubleshooting guide and sample scripts for advanced GremlinEx scripting via plugins
 
+4/12/24 - bug fixes (see release notes on issues resolved)
+
 Introduction
 ------------
 
@@ -309,7 +311,7 @@ Transforms any touch screen into a game control surface, similar to GameGlass.
 
 This tool hides raw hardware only exposing the VJOY devices.  Essential to not confuse games or simulators.
 
-https://github.com/ViGEm/HidHide
+https://github.com/nefarius/HidHide
 
 #### Hexler TouchOSC
 
