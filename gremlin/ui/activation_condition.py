@@ -471,6 +471,8 @@ class VJoyConditionWidget(AbstractConditionWidget):
 
     """Widget allowing the configuration of a vJoy based condition."""
 
+    locked = False
+
     def __init__(self, condition_data, parent=None):
         """Creates a new widget.
 
@@ -490,37 +492,47 @@ class VJoyConditionWidget(AbstractConditionWidget):
 
     def _create_ui(self):
         """Creates the configuration UI for this widget."""
-        common.clear_layout(self.main_layout)
+        if VJoyConditionWidget.locked:
+            return
+        
+        VJoyConditionWidget.locked = True
+        
+        try:
 
-        self.vjoy_selector = common.VJoySelector(
-            self._modify_vjoy,
-            [
-                InputType.JoystickAxis,
-                InputType.JoystickButton,
-                InputType.JoystickHat
-            ]
-        )
-        self.vjoy_selector.set_selection(
-            self.condition_data.input_type,
-            self.condition_data.vjoy_id,
-            self.condition_data.input_id
-        )
-        self.delete_button = QtWidgets.QPushButton(
-            QtGui.QIcon("gfx/button_delete.png"), ""
-        )
-        self.delete_button.clicked.connect(
-            lambda: self.deleted.emit(self.condition_data)
-        )
+            common.clear_layout(self.main_layout)
 
-        self.main_layout.addWidget(QtWidgets.QLabel("Activate if"), 0, 0)
-        if self.condition_data.input_type == InputType.JoystickAxis:
-            self._axis_ui()
-        elif self.condition_data.input_type == InputType.JoystickButton:
-            self._button_ui()
-        elif self.condition_data.input_type == InputType.JoystickHat:
-            self._hat_ui()
-        self.main_layout.addWidget(self.vjoy_selector, 0, 4)
-        self.main_layout.addWidget(self.delete_button, 0, 5)
+            self.vjoy_selector = common.VJoySelector(
+                self._modify_vjoy,
+                [
+                    InputType.JoystickAxis,
+                    InputType.JoystickButton,
+                    InputType.JoystickHat
+                ]
+            )
+            self.vjoy_selector.set_selection(
+                self.condition_data.input_type,
+                self.condition_data.vjoy_id,
+                self.condition_data.input_id
+            )
+            self.delete_button = QtWidgets.QPushButton(
+                QtGui.QIcon("gfx/button_delete.png"), ""
+            )
+            self.delete_button.clicked.connect(
+                lambda: self.deleted.emit(self.condition_data)
+            )
+
+            self.main_layout.addWidget(QtWidgets.QLabel("Activate if"), 0, 0)
+            if self.condition_data.input_type == InputType.JoystickAxis:
+                self._axis_ui()
+            elif self.condition_data.input_type == InputType.JoystickButton:
+                self._button_ui()
+            elif self.condition_data.input_type == InputType.JoystickHat:
+                self._hat_ui()
+            self.main_layout.addWidget(self.vjoy_selector, 0, 4)
+            self.main_layout.addWidget(self.delete_button, 0, 5)
+
+        finally:
+            VJoyConditionWidget.locked = False
 
     def _axis_ui(self):
         """Creates the UI needed to configure an axis based condition."""
