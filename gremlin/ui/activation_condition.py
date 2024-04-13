@@ -20,6 +20,7 @@ from PySide6 import QtCore, QtGui, QtWidgets
 
 import logging
 
+from gremlin.theme import ThemeQIcon
 from gremlin import base_classes, hints, input_devices, macro, util
 from gremlin.common import InputType
 from . import common
@@ -31,6 +32,8 @@ class ActivationConditionWidget(QtWidgets.QWidget):
 
     # Signal which is emitted whenever the widget's contents change
     activation_condition_modified = QtCore.Signal()
+
+    locked = False
 
     # Maps activation type name to index
     activation_type_to_index = {
@@ -52,41 +55,49 @@ class ActivationConditionWidget(QtWidgets.QWidget):
 
     def _create_ui(self):
         """Creates the configuration UI."""
-        self.granularity_selector = QtWidgets.QComboBox()
-        self.granularity_selector.addItem("None")
-        self.granularity_selector.addItem("Action")
-        self.granularity_selector.addItem("Container")
-        self.granularity_selector.setCurrentIndex(
-            ActivationConditionWidget.activation_type_to_index[
-                self.profile_data.activation_condition_type
-            ]
-        )
-        self.granularity_selector.currentIndexChanged.connect(
-            self._granularity_changed_cb
-        )
 
-        self.help_button = QtWidgets.QPushButton(QtGui.QIcon("gfx/help"), "")
-        self.help_button.clicked.connect(self._show_hint)
+        if ActivationConditionWidget.locked:
+            return
 
-        self.controls_layout = QtWidgets.QHBoxLayout()
-        self.controls_layout.addWidget(QtWidgets.QLabel("Apply conditions to"))
-        self.controls_layout.addWidget(self.granularity_selector)
-        self.controls_layout.addWidget(self.help_button)
-
-        self.controls_layout.addStretch()
-
-        self.main_layout.addLayout(self.controls_layout)
-        if self.profile_data.activation_condition_type == "container":
-            self.condition_model = ConditionModel(
-                self.profile_data.activation_condition
+        try:
+            ActivationConditionWidget.locked = True
+            self.granularity_selector = QtWidgets.QComboBox()
+            self.granularity_selector.addItem("None")
+            self.granularity_selector.addItem("Action")
+            self.granularity_selector.addItem("Container")
+            self.granularity_selector.setCurrentIndex(
+                ActivationConditionWidget.activation_type_to_index[
+                    self.profile_data.activation_condition_type
+                ]
             )
-            self.condition_view = ConditionView()
-            self.condition_view.set_model(self.condition_model)
-            self.condition_view.redraw()
+            self.granularity_selector.currentIndexChanged.connect(
+                self._granularity_changed_cb
+            )
 
-            self.main_layout.addWidget(self.condition_view)
+            self.help_button = QtWidgets.QPushButton(ThemeQIcon("gfx/help"), "")
+            self.help_button.clicked.connect(self._show_hint)
 
-        self.main_layout.addStretch()
+            self.controls_layout = QtWidgets.QHBoxLayout()
+            self.controls_layout.addWidget(QtWidgets.QLabel("Apply conditions to"))
+            self.controls_layout.addWidget(self.granularity_selector)
+            self.controls_layout.addWidget(self.help_button)
+
+            self.controls_layout.addStretch()
+
+            self.main_layout.addLayout(self.controls_layout)
+            if self.profile_data.activation_condition_type == "container":
+                self.condition_model = ConditionModel(
+                    self.profile_data.activation_condition
+                )
+                self.condition_view = ConditionView()
+                self.condition_view.set_model(self.condition_model)
+                self.condition_view.redraw()
+
+                self.main_layout.addWidget(self.condition_view)
+
+            self.main_layout.addStretch()
+        finally:
+            ActivationConditionWidget.locked = False
 
     def _granularity_changed_cb(self, index):
         """Updates whether conditions are on actions or containers.
@@ -154,6 +165,8 @@ class KeyboardConditionWidget(AbstractConditionWidget):
 
     """Widget allowing the configuration of a keyboard based condition."""
 
+    locked = False
+
     def __init__(self, condition_data, parent=None):
         """Creates a new widget.
 
@@ -165,44 +178,52 @@ class KeyboardConditionWidget(AbstractConditionWidget):
 
     def _create_ui(self):
         """Creates the configuration UI for this widget."""
-        self.key_label = QtWidgets.QLabel("")
-        if self.condition_data.scan_code is not None:
-            self.key_label.setText("<b>{}</b>".format(
-                macro.key_from_code(
-                    self.condition_data.scan_code,
-                    self.condition_data.is_extended
-                ).name
-            ))
-        self.record_button = common.NoKeyboardPushButton(
-            QtGui.QIcon("gfx/button_edit.png"), ""
-        )
-        self.record_button.clicked.connect(self._request_user_input)
-        self.delete_button = QtWidgets.QPushButton(
-            QtGui.QIcon("gfx/button_delete.png"), ""
-        )
-        self.delete_button.clicked.connect(
-            lambda: self.deleted.emit(self.condition_data)
-        )
+        if KeyboardConditionWidget.locked:
+            return
+        
+        try:
+            KeyboardConditionWidget.locked = True
 
-        self.comparison_dropdown = QtWidgets.QComboBox()
-        self.comparison_dropdown.addItem("Pressed")
-        self.comparison_dropdown.addItem("Released")
-        if self.condition_data.comparison:
-            self.comparison_dropdown.setCurrentText(
-                self.condition_data.comparison.capitalize()
+            self.key_label = QtWidgets.QLabel("")
+            if self.condition_data.scan_code is not None:
+                self.key_label.setText("<b>{}</b>".format(
+                    macro.key_from_code(
+                        self.condition_data.scan_code,
+                        self.condition_data.is_extended
+                    ).name
+                ))
+            self.record_button = common.NoKeyboardPushButton(
+                ThemeQIcon("gfx/button_edit.png"), ""
             )
-        self.comparison_dropdown.currentTextChanged.connect(
-            self._comparison_changed_cb
-        )
+            self.record_button.clicked.connect(self._request_user_input)
+            self.delete_button = QtWidgets.QPushButton(
+                ThemeQIcon("gfx/button_delete.png"), ""
+            )
+            self.delete_button.clicked.connect(
+                lambda: self.deleted.emit(self.condition_data)
+            )
 
-        self.main_layout.addWidget(QtWidgets.QLabel("Activate if"), 0, 0)
-        self.main_layout.addWidget(self.key_label, 0, 1)
-        self.main_layout.addWidget(QtWidgets.QLabel("is"), 0, 2)
-        self.main_layout.addWidget(
-            self.comparison_dropdown, 0, 3, alignment=QtCore.Qt.AlignLeft
-        )
-        self.main_layout.addWidget(self.record_button, 0, 4)
-        self.main_layout.addWidget(self.delete_button, 0, 5)
+            self.comparison_dropdown = QtWidgets.QComboBox()
+            self.comparison_dropdown.addItem("Pressed")
+            self.comparison_dropdown.addItem("Released")
+            if self.condition_data.comparison:
+                self.comparison_dropdown.setCurrentText(
+                    self.condition_data.comparison.capitalize()
+                )
+            self.comparison_dropdown.currentTextChanged.connect(
+                self._comparison_changed_cb
+            )
+
+            self.main_layout.addWidget(QtWidgets.QLabel("Activate if"), 0, 0)
+            self.main_layout.addWidget(self.key_label, 0, 1)
+            self.main_layout.addWidget(QtWidgets.QLabel("is"), 0, 2)
+            self.main_layout.addWidget(
+                self.comparison_dropdown, 0, 3, alignment=QtCore.Qt.AlignLeft
+            )
+            self.main_layout.addWidget(self.record_button, 0, 4)
+            self.main_layout.addWidget(self.delete_button, 0, 5)
+        finally:
+            KeyboardConditionWidget.locked = False
 
     def _key_pressed_cb(self, key):
         """Updates the UI and model with the newly pressed key information.
@@ -255,6 +276,8 @@ class JoystickConditionWidget(AbstractConditionWidget):
 
     """Widget allowing the configuration of a joystick based condition."""
 
+    locked = False
+
     def __init__(self, condition_data, parent=None):
         """Creates a new widget.
 
@@ -267,28 +290,39 @@ class JoystickConditionWidget(AbstractConditionWidget):
 
     def _create_ui(self):
         """Creates the configuration UI for this widget."""
-        common.clear_layout(self.main_layout)
 
-        self.record_button = QtWidgets.QPushButton(
-            QtGui.QIcon("gfx/button_edit.png"), ""
-        )
-        self.record_button.clicked.connect(self._request_user_input)
-        self.delete_button = QtWidgets.QPushButton(
-            QtGui.QIcon("gfx/button_delete.png"), ""
-        )
-        self.delete_button.clicked.connect(
-            lambda: self.deleted.emit(self.condition_data)
-        )
 
-        self.main_layout.addWidget(QtWidgets.QLabel("Activate if"), 0, 0)
-        if self.condition_data.input_type == InputType.JoystickAxis:
-            self._axis_ui()
-        elif self.condition_data.input_type == InputType.JoystickButton:
-            self._button_ui()
-        elif self.condition_data.input_type == InputType.JoystickHat:
-            self._hat_ui()
-        self.main_layout.addWidget(self.record_button, 0, 4)
-        self.main_layout.addWidget(self.delete_button, 0, 5)
+        if JoystickConditionWidget.locked:
+            return
+        
+        try:
+
+            JoystickConditionWidget.locked = True
+
+            common.clear_layout(self.main_layout)
+
+            self.record_button = QtWidgets.QPushButton(
+                ThemeQIcon("gfx/button_edit.png"), ""
+            )
+            self.record_button.clicked.connect(self._request_user_input)
+            self.delete_button = QtWidgets.QPushButton(
+                ThemeQIcon("gfx/button_delete.png"), ""
+            )
+            self.delete_button.clicked.connect(
+                lambda: self.deleted.emit(self.condition_data)
+            )
+
+            self.main_layout.addWidget(QtWidgets.QLabel("Activate if"), 0, 0)
+            if self.condition_data.input_type == InputType.JoystickAxis:
+                self._axis_ui()
+            elif self.condition_data.input_type == InputType.JoystickButton:
+                self._button_ui()
+            elif self.condition_data.input_type == InputType.JoystickHat:
+                self._hat_ui()
+            self.main_layout.addWidget(self.record_button, 0, 4)
+            self.main_layout.addWidget(self.delete_button, 0, 5)
+        finally:
+            JoystickConditionWidget.locked = False
 
     def _axis_ui(self):
         """Creates the UI needed to configure an axis based condition."""
@@ -471,6 +505,8 @@ class VJoyConditionWidget(AbstractConditionWidget):
 
     """Widget allowing the configuration of a vJoy based condition."""
 
+    locked = False
+
     def __init__(self, condition_data, parent=None):
         """Creates a new widget.
 
@@ -490,37 +526,47 @@ class VJoyConditionWidget(AbstractConditionWidget):
 
     def _create_ui(self):
         """Creates the configuration UI for this widget."""
-        common.clear_layout(self.main_layout)
+        if VJoyConditionWidget.locked:
+            return
+        
+        VJoyConditionWidget.locked = True
+        
+        try:
 
-        self.vjoy_selector = common.VJoySelector(
-            self._modify_vjoy,
-            [
-                InputType.JoystickAxis,
-                InputType.JoystickButton,
-                InputType.JoystickHat
-            ]
-        )
-        self.vjoy_selector.set_selection(
-            self.condition_data.input_type,
-            self.condition_data.vjoy_id,
-            self.condition_data.input_id
-        )
-        self.delete_button = QtWidgets.QPushButton(
-            QtGui.QIcon("gfx/button_delete.png"), ""
-        )
-        self.delete_button.clicked.connect(
-            lambda: self.deleted.emit(self.condition_data)
-        )
+            common.clear_layout(self.main_layout)
 
-        self.main_layout.addWidget(QtWidgets.QLabel("Activate if"), 0, 0)
-        if self.condition_data.input_type == InputType.JoystickAxis:
-            self._axis_ui()
-        elif self.condition_data.input_type == InputType.JoystickButton:
-            self._button_ui()
-        elif self.condition_data.input_type == InputType.JoystickHat:
-            self._hat_ui()
-        self.main_layout.addWidget(self.vjoy_selector, 0, 4)
-        self.main_layout.addWidget(self.delete_button, 0, 5)
+            self.vjoy_selector = common.VJoySelector(
+                self._modify_vjoy,
+                [
+                    InputType.JoystickAxis,
+                    InputType.JoystickButton,
+                    InputType.JoystickHat
+                ]
+            )
+            self.vjoy_selector.set_selection(
+                self.condition_data.input_type,
+                self.condition_data.vjoy_id,
+                self.condition_data.input_id
+            )
+            self.delete_button = QtWidgets.QPushButton(
+                ThemeQIcon("gfx/button_delete.png"), ""
+            )
+            self.delete_button.clicked.connect(
+                lambda: self.deleted.emit(self.condition_data)
+            )
+
+            self.main_layout.addWidget(QtWidgets.QLabel("Activate if"), 0, 0)
+            if self.condition_data.input_type == InputType.JoystickAxis:
+                self._axis_ui()
+            elif self.condition_data.input_type == InputType.JoystickButton:
+                self._button_ui()
+            elif self.condition_data.input_type == InputType.JoystickHat:
+                self._hat_ui()
+            self.main_layout.addWidget(self.vjoy_selector, 0, 4)
+            self.main_layout.addWidget(self.delete_button, 0, 5)
+
+        finally:
+            VJoyConditionWidget.locked = False
 
     def _axis_ui(self):
         """Creates the UI needed to configure an axis based condition."""
@@ -671,6 +717,8 @@ class InputActionConditionWidget(AbstractConditionWidget):
 
     """Creates the UI needed to configure an input action based condition."""
 
+    locked = False
+
     def __init__(self, condition_data, parent=None):
         """Creates a new widget.
 
@@ -682,36 +730,45 @@ class InputActionConditionWidget(AbstractConditionWidget):
 
     def _create_ui(self):
         """Creates the configuration UI for this widget."""
-        self.state_dropdown = QtWidgets.QComboBox()
-        self.state_dropdown.addItem("Pressed")
-        self.state_dropdown.addItem("Released")
-        if self.condition_data.comparison:
-            self.state_dropdown.setCurrentText(
-                self.condition_data.comparison.capitalize()
-            )
-        else:
-            self.condition_data.comparison = "pressed"
-        self.state_dropdown.currentTextChanged.connect(
-            self._state_selection_changed
-        )
-        self.delete_button = QtWidgets.QPushButton(
-            QtGui.QIcon("gfx/button_delete.png"), ""
-        )
-        self.delete_button.clicked.connect(
-            lambda: self.deleted.emit(self.condition_data)
-        )
 
-        self.main_layout.addWidget(QtWidgets.QLabel("Activate when"), 0, 0)
-        self.main_layout.addWidget(
-            QtWidgets.QLabel("<b>this (virtual) button</b>"),
-            0,
-            1
-        )
-        self.main_layout.addWidget(QtWidgets.QLabel("is"), 0, 2)
-        self.main_layout.addWidget(
-            self.state_dropdown, 0, 3, alignment=QtCore.Qt.AlignLeft
-        )
-        self.main_layout.addWidget(self.delete_button, 0, 5)
+        if InputActionConditionWidget.locked:
+            return
+
+        try:
+            InputActionConditionWidget.locked = True
+
+            self.state_dropdown = QtWidgets.QComboBox()
+            self.state_dropdown.addItem("Pressed")
+            self.state_dropdown.addItem("Released")
+            if self.condition_data.comparison:
+                self.state_dropdown.setCurrentText(
+                    self.condition_data.comparison.capitalize()
+                )
+            else:
+                self.condition_data.comparison = "pressed"
+            self.state_dropdown.currentTextChanged.connect(
+                self._state_selection_changed
+            )
+            self.delete_button = QtWidgets.QPushButton(
+                ThemeQIcon("gfx/button_delete.png"), ""
+            )
+            self.delete_button.clicked.connect(
+                lambda: self.deleted.emit(self.condition_data)
+            )
+
+            self.main_layout.addWidget(QtWidgets.QLabel("Activate when"), 0, 0)
+            self.main_layout.addWidget(
+                QtWidgets.QLabel("<b>this (virtual) button</b>"),
+                0,
+                1
+            )
+            self.main_layout.addWidget(QtWidgets.QLabel("is"), 0, 2)
+            self.main_layout.addWidget(
+                self.state_dropdown, 0, 3, alignment=QtCore.Qt.AlignLeft
+            )
+            self.main_layout.addWidget(self.delete_button, 0, 5)
+        finally:
+            InputActionConditionWidget.locked = False
 
     def _state_selection_changed(self, label):
         """Updates the activation state of the condition.

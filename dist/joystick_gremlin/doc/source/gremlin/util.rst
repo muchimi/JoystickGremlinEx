@@ -1,3 +1,0 @@
-util
-----
-.. automodule:: gremlin.util

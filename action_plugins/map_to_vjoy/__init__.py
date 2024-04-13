@@ -23,6 +23,7 @@ from xml.etree import ElementTree
 
 from PySide6 import QtWidgets, QtCore, QtGui
 
+from gremlin.theme import ThemeQIcon
 from gremlin.base_classes import InputActionCondition
 from gremlin.common import InputType
 from gremlin import input_devices, joystick_handling, util
@@ -473,6 +474,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
     """Dialog which allows the selection of a vJoy output to use as
     as the remapping for the currently selected input.
     """
+    locked = False
 
     # Mapping from types to display names
     type_to_name_map = {
@@ -498,49 +500,58 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _create_ui(self):
         """Creates the UI components."""
-        input_types = {
-            InputType.Keyboard: [
-                InputType.JoystickButton
-            ],
-            InputType.JoystickAxis: [
-                InputType.JoystickAxis,
-                InputType.JoystickButton
-            ],
-            InputType.JoystickButton: [
-                InputType.JoystickButton
-            ],
-            InputType.JoystickHat: [
-                InputType.JoystickButton,
-                InputType.JoystickHat
-            ]
-        }
 
-        self.valid_types = [
-                InputType.JoystickAxis,
-                InputType.JoystickButton,
-                InputType.JoystickHat
-            ]
-
-
-        self.usage_state = VJoyUsageState()
-
-        self.main_layout.setSpacing(0)
-
-
-        # Create UI widgets for absolute / relative axis modes if the remap
-        # action is being added to an axis input type
-        self.input_type = self.action_data.input_type
-       
-        #self.main_layout.addWidget(self.vjoy_selector)
+        if VJoyWidget.locked:
+            return
         
+        try:
+            VJoyWidget.locked = True    
 
-        # add the selector
-        self._create_selector()
-        self._create_input_axis()
-        self._create_input_grid()
-        self._create_info()
+            input_types = {
+                InputType.Keyboard: [
+                    InputType.JoystickButton
+                ],
+                InputType.JoystickAxis: [
+                    InputType.JoystickAxis,
+                    InputType.JoystickButton
+                ],
+                InputType.JoystickButton: [
+                    InputType.JoystickButton
+                ],
+                InputType.JoystickHat: [
+                    InputType.JoystickButton,
+                    InputType.JoystickHat
+                ]
+            }
 
-        self.main_layout.setContentsMargins(0, 0, 0, 0)
+            self.valid_types = [
+                    InputType.JoystickAxis,
+                    InputType.JoystickButton,
+                    InputType.JoystickHat
+                ]
+
+
+            self.usage_state = VJoyUsageState()
+
+            self.main_layout.setSpacing(0)
+
+
+            # Create UI widgets for absolute / relative axis modes if the remap
+            # action is being added to an axis input type
+            self.input_type = self.action_data.input_type
+        
+            #self.main_layout.addWidget(self.vjoy_selector)
+            
+
+            # add the selector
+            self._create_selector()
+            self._create_input_axis()
+            self._create_input_grid()
+            self._create_info()
+
+            self.main_layout.setContentsMargins(0, 0, 0, 0)
+        finally:
+            VJoyWidget.locked = False
 
     def _get_selector_input_type(self):
         ''' gets a modified input type based on the current mode '''
@@ -1537,8 +1548,8 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         icon_path = os.path.join("action_plugins","map_to_vjoy")
         unused_path = os.path.join(icon_path, "unused.png")
         used_path = os.path.join(icon_path, "used.png")
-        used_icon = QtGui.QIcon(used_path)
-        unused_icon = QtGui.QIcon(unused_path)
+        used_icon = ThemeQIcon(used_path)
+        unused_icon = ThemeQIcon(unused_path)
         used_pixmap = QtGui.QPixmap(used_path)
         unused_pixmap = QtGui.QPixmap(unused_path)
 

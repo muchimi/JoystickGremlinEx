@@ -601,20 +601,32 @@ class AbstractInputSelector(QtWidgets.QWidget):
         entry_id = self.input_item_dropdowns[dev_id].findText(input_name)
 
         # Select and display correct combo boxes and entries within
-        self.device_dropdown.setCurrentIndex(dev_id)
-        for entry in self.input_item_dropdowns:
-            entry.setVisible(False)
-        self.input_item_dropdowns[dev_id].setVisible(True)
-        self.input_item_dropdowns[dev_id].setCurrentIndex(entry_id)
+        with QtCore.QSignalBlocker(self.device_dropdown):
+            self.device_dropdown.setCurrentIndex(dev_id)
+
+            
+            for entry in self.input_item_dropdowns:
+                with QtCore.QSignalBlocker(entry):
+                    entry.setVisible(False)
+
+            entry = self.input_item_dropdowns[dev_id]
+            with QtCore.QSignalBlocker(entry):
+                entry.setVisible(True)
+                entry.setCurrentIndex(entry_id)
 
     def _update_device(self, index):
         # Hide all selection dropdowns
-        for entry in self.input_item_dropdowns:
-            entry.setVisible(False)
 
-        # Show correct dropdown
-        self.input_item_dropdowns[index].setVisible(True)
-        self.input_item_dropdowns[index].setCurrentIndex(0)
+        with QtCore.QSignalBlocker(self.input_item_dropdowns):
+            for entry in self.input_item_dropdowns:
+                with QtCore.QSignalBlocker(entry):
+                    entry.setVisible(False)
+
+            # Show correct dropdown
+            entry = self.input_item_dropdowns[index]
+            with QtCore.QSignalBlocker(entry):
+                entry.setVisible(True)
+                entry.setCurrentIndex(0)
         self._execute_callback()
 
     def _initialize(self):

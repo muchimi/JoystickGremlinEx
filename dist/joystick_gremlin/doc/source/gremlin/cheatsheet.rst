@@ -1,3 +1,0 @@
-cheatsheet
-----------
-.. automodule:: gremlin.cheatsheet

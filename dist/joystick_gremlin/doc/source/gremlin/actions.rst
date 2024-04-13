@@ -1,3 +1,0 @@
-actions
--------
-.. automodule:: gremlin.actions

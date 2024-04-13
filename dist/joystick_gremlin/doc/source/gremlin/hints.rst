@@ -1,3 +1,0 @@
-hints
------
-.. automodule:: gremlin.hints

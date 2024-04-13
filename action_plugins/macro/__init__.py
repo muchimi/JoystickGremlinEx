@@ -24,6 +24,7 @@ import time
 from PySide6 import QtCore, QtGui, QtWidgets
 from xml.etree import ElementTree
 
+from gremlin.theme import ThemeQIcon
 from gremlin.base_classes import AbstractAction, AbstractFunctor
 from gremlin.common import InputType
 import gremlin.macro
@@ -113,22 +114,29 @@ class MacroActionEditor(QtWidgets.QWidget):
     def _create_ui(self):
         """Creates the editor UI."""
 
+        if MacroActionEditor.locked:
+            return
+        
+        try:
+            MacroActionEditor.locked = True
 
-        self.action_selector = QtWidgets.QComboBox()
-        for action_name in sorted(self.action_types):
-            self.action_selector.addItem(action_name)
-        self.action_selector.currentTextChanged.connect(self._change_action)
+            self.action_selector = QtWidgets.QComboBox()
+            for action_name in sorted(self.action_types):
+                self.action_selector.addItem(action_name)
+            self.action_selector.currentTextChanged.connect(self._change_action)
 
-        self.group_layout.addWidget(self.action_selector)
+            self.group_layout.addWidget(self.action_selector)
 
-        self.action_layout = QtWidgets.QVBoxLayout()
-        self.group_layout.addLayout(self.action_layout)
-        self.group_layout.addStretch(1)
+            self.action_layout = QtWidgets.QVBoxLayout()
+            self.group_layout.addLayout(self.action_layout)
+            self.group_layout.addStretch(1)
+        finally:
+            MacroActionEditor.locked = False
 
     def _populate_ui(self):
         """Populate the UI elements with data from the model."""
 
-
+        
         # ensure there's a selected item in the model
         if self.model.rowCount() == 0:
             # no entries in the list
@@ -383,71 +391,76 @@ class MacroActionEditor(QtWidgets.QWidget):
 
     def _vjoy_ui(self):
         """Creates and populates the vJoyAction editor UI."""
+
+        if MacroActionEditor.locked:
+            return
         
         action = self.model.get_entry(self.index.row())
         if action is None:
             return
         
-        if MacroActionEditor.locked:
-            return
+        try:
 
-        MacroActionEditor.locked = True
-        if not "vjoy_selector" in self.ui_elements:
-            # vJoy input selection
-            self.ui_elements["vjoy_selector"] = gremlin.ui.common.VJoySelector(
-                self._modify_vjoy,
-                [
-                    gremlin.common.InputType.JoystickAxis,
-                    gremlin.common.InputType.JoystickButton,
-                    gremlin.common.InputType.JoystickHat
-                ]
-            )
-
-
-        self.action_layout.addWidget(self.ui_elements["vjoy_selector"])
-
-
-        
-
-        self.ui_elements["vjoy_selector"].set_selection(
-            action.input_type,
-            action.vjoy_id,
-            action.input_id
-        )
-
-
-        MacroActionEditor.locked = False
-
-        # Axis mode configuration
-        if action.input_type == gremlin.common.InputType.JoystickAxis:
-            if not "axis_type_layout" in self.ui_elements.keys():
-                self.ui_elements["axis_type_layout"] = QtWidgets.QHBoxLayout()
-                self.ui_elements["axis_reverse"] = QtWidgets.QCheckBox("Reverse")
-                self.ui_elements["axis_absolute"] = QtWidgets.QRadioButton("Absolute")
-                self.ui_elements["axis_relative"] = QtWidgets.QRadioButton("Relative")
-                if action.axis_type == "absolute":
-                    self.ui_elements["axis_absolute"].setChecked(True)
-                    self.ui_elements["axis_relative"].setChecked(False)
-                elif action.axis_type == "relative":
-                    self.ui_elements["axis_absolute"].setChecked(False)
-                    self.ui_elements["axis_relative"].setChecked(True)
-                self.ui_elements["axis_absolute"].clicked.connect(
-                    self._modify_vjoy_axis
-                )
-                self.ui_elements["axis_relative"].clicked.connect(
-                    self._modify_vjoy_axis
+            MacroActionEditor.locked = True
+            
+            if not "vjoy_selector" in self.ui_elements:
+                # vJoy input selection
+                self.ui_elements["vjoy_selector"] = gremlin.ui.common.VJoySelector(
+                    self._modify_vjoy,
+                    [
+                        gremlin.common.InputType.JoystickAxis,
+                        gremlin.common.InputType.JoystickButton,
+                        gremlin.common.InputType.JoystickHat
+                    ]
                 )
 
-                self.ui_elements["axis_type_layout"].addWidget(self.ui_elements["axis_reverse"])
-                self.ui_elements["axis_type_layout"].addWidget(self.ui_elements["axis_absolute"])
-                self.ui_elements["axis_type_layout"].addWidget(self.ui_elements["axis_relative"])
-                
-                self.action_layout.addLayout(self.ui_elements["axis_type_layout"])
-                
+
+            self.action_layout.addWidget(self.ui_elements["vjoy_selector"])
+
 
             
 
-        self._create_joystick_inputs_ui(action)
+            self.ui_elements["vjoy_selector"].set_selection(
+                action.input_type,
+                action.vjoy_id,
+                action.input_id
+            )
+
+
+
+
+            # Axis mode configuration
+            if action.input_type == gremlin.common.InputType.JoystickAxis:
+                if not "axis_type_layout" in self.ui_elements.keys():
+                    self.ui_elements["axis_type_layout"] = QtWidgets.QHBoxLayout()
+                    self.ui_elements["axis_reverse"] = QtWidgets.QCheckBox("Reverse")
+                    self.ui_elements["axis_absolute"] = QtWidgets.QRadioButton("Absolute")
+                    self.ui_elements["axis_relative"] = QtWidgets.QRadioButton("Relative")
+                    if action.axis_type == "absolute":
+                        self.ui_elements["axis_absolute"].setChecked(True)
+                        self.ui_elements["axis_relative"].setChecked(False)
+                    elif action.axis_type == "relative":
+                        self.ui_elements["axis_absolute"].setChecked(False)
+                        self.ui_elements["axis_relative"].setChecked(True)
+                    self.ui_elements["axis_absolute"].clicked.connect(
+                        self._modify_vjoy_axis
+                    )
+                    self.ui_elements["axis_relative"].clicked.connect(
+                        self._modify_vjoy_axis
+                    )
+
+                    self.ui_elements["axis_type_layout"].addWidget(self.ui_elements["axis_reverse"])
+                    self.ui_elements["axis_type_layout"].addWidget(self.ui_elements["axis_absolute"])
+                    self.ui_elements["axis_type_layout"].addWidget(self.ui_elements["axis_relative"])
+                    
+                    self.action_layout.addLayout(self.ui_elements["axis_type_layout"])
+                    
+
+                
+
+            self._create_joystick_inputs_ui(action)
+        finally:
+            MacroActionEditor.locked = False
 
 
     def _create_joystick_inputs_ui(self, action):
@@ -707,9 +720,9 @@ class MacroListModel(QtCore.QAbstractListModel):
         "gfx"
     )
     icon_lookup = {
-        "press": QtGui.QIcon("{}/press".format(gfx_path)),
-        "release": QtGui.QIcon("{}/release".format(gfx_path)),
-        "pause": QtGui.QIcon("{}/pause".format(gfx_path))
+        "press": ThemeQIcon(f"{gfx_path}/press"),
+        "release": ThemeQIcon(f"{gfx_path}/release"),
+        "pause": ThemeQIcon(f"{gfx_path}/pause")
     }
 
     value_format = {
@@ -1252,6 +1265,8 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     """Widget which allows creating and editing of macros."""
 
+    locked = False
+
     # Path to graphics
     gfx_path = os.path.join(
         os.path.dirname(os.path.realpath(__file__)),
@@ -1280,161 +1295,170 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _create_ui(self):
         """Creates the UI of this widget."""
-        self.model = MacroListModel(self.action_data.sequence)
+        if MacroWidget.locked:
+            return
+        
+        try:
 
-        # Replace the default vertical with a horizontal layout
-        QtWidgets.QWidget().setLayout(self.layout())
-        self.main_layout = QtWidgets.QHBoxLayout(self)
+            MacroWidget.locked = True
 
-        self.editor_settings_layout = QtWidgets.QVBoxLayout()
-        self.buttons_layout = QtWidgets.QVBoxLayout()
+            self.model = MacroListModel(self.action_data.sequence)
 
-        #self.delegate = MacroItemDelegate(self)
+            # Replace the default vertical with a horizontal layout
+            QtWidgets.QWidget().setLayout(self.layout())
+            self.main_layout = QtWidgets.QHBoxLayout(self)
 
-        # Create list view for macro actions and setup drag & drop support
-        self.list_view = MacroListView()
-        self.list_view.setDragDropMode(QtWidgets.QAbstractItemView.InternalMove)
-        self.list_view.setDefaultDropAction(QtCore.Qt.MoveAction)
-        self.list_view.setModel(self.model)
-        self.list_view.setModelColumn(0)
-        #self.list_view.setCurrentIndex(self.model.index(0, 0))
-        self.list_view.clicked.connect(self._edit_action)
-        #self.list_view.setItemDelegate(self.delegate)
+            self.editor_settings_layout = QtWidgets.QVBoxLayout()
+            self.buttons_layout = QtWidgets.QVBoxLayout()
 
+            #self.delegate = MacroItemDelegate(self)
 
-        # Create editor as well as settings place holder widgets
-        self.editor_widget = QtWidgets.QWidget()
-        self.settings_widget = MacroSettingsWidget(self.action_data)
-        self.editor_settings_layout.addWidget(self.editor_widget)
-        self.editor_settings_layout.addWidget(self.settings_widget)
-        self.editor_settings_layout.addStretch()
-
-        # Create buttons used to modify and interact with the macro actions
-        self.button_new_entry = self._create_toolbutton(
-            "gfx/list_add",
-            "Add a new action",
-            False
-        )
-        self.button_new_entry.clicked.connect(self._add_entry)
-
-        self.button_delete = self._create_toolbutton(
-            "gfx/list_delete",
-            "Delete currently selected entry",
-            False
-        )
-        self.button_delete.clicked.connect(self._delete_cb)
-
-        self.button_pause = self._create_toolbutton(
-            "{}/pause".format(MacroWidget.gfx_path),
-            "Add pause after the currently selected entry",
-            False
-        )
-        self.button_pause.clicked.connect(self._pause_cb)
-
-        self.button_record = self._create_toolbutton(
-            [
-                "{}/macro_record".format(MacroWidget.gfx_path),
-                "{}/macro_record_on".format(MacroWidget.gfx_path)
-            ],
-            "Record keyboard and joystick inputs",
-            True,
-            False
-        )
-        self.button_record.clicked.connect(self._record_cb)
-
-        self.record_time = self._create_toolbutton(
-            [
-                "{}/time".format(MacroWidget.gfx_path),
-                "{}/time_on".format(MacroWidget.gfx_path)
-            ],
-            "Record pauses between actions",
-            True,
-            False
-        )
-
-        # Input type recording buttons
-        cfg = gremlin.config.Configuration()
-        self.record_axis = self._create_toolbutton(
-            [
-                "{}/record_axis".format(MacroWidget.gfx_path),
-                "{}/record_axis_on".format(MacroWidget.gfx_path)
-            ],
-            "Record joystick axis events",
-            True,
-            cfg.macro_record_axis
-        )
-        self.record_axis.clicked.connect(self._update_record_settings)
-        self.record_button = self._create_toolbutton(
-            [
-                "{}/record_button".format(MacroWidget.gfx_path),
-                "{}/record_button_on".format(MacroWidget.gfx_path)
-            ],
-            "Record joystick button events",
-            True,
-            cfg.macro_record_button
-        )
-        self.record_button.clicked.connect(self._update_record_settings)
-        self.record_hat = self._create_toolbutton(
-            [
-                "{}/record_hat".format(MacroWidget.gfx_path),
-                "{}/record_hat_on".format(MacroWidget.gfx_path)
-            ],
-            "Record joystick hat events",
-            True,
-            cfg.macro_record_hat
-        )
-        self.record_hat.clicked.connect(self._update_record_settings)
-        self.record_key = self._create_toolbutton(
-            [
-                "{}/record_key".format(MacroWidget.gfx_path),
-                "{}/record_key_on".format(MacroWidget.gfx_path)
-            ],
-            "Record keyboard events",
-            True,
-            cfg.macro_record_keyboard
-        )
-        self.record_key.clicked.connect(self._update_record_settings)
-        self.record_mouse = self._create_toolbutton(
-            [
-                "{}/record_mouse".format(MacroWidget.gfx_path),
-                "{}/record_mouse_on".format(MacroWidget.gfx_path)
-            ],
-            "Record mouse events",
-            True,
-            cfg.macro_record_mouse
-        )
-        self.record_mouse.clicked.connect(self._update_record_settings)
-
-        # Toolbar
-        self.toolbar = QtWidgets.QToolBar()
-        self.toolbar.setStyleSheet(
-            "QToolBar { border: 1px solid #949494; background-color: #dadada; }"
-        )
-        self.toolbar.setIconSize(QtCore.QSize(16, 16))
-        self.toolbar.setOrientation(QtCore.Qt.Vertical)
-        self.toolbar.addWidget(self.button_new_entry)
-        self.toolbar.addWidget(self.button_delete)
-        self.toolbar.addWidget(self.button_pause)
-        self.toolbar.addSeparator()
-        self.toolbar.addWidget(self.button_record)
-        self.toolbar.addWidget(self.record_time)
-        self.toolbar.addWidget(self.record_axis)
-        self.toolbar.addWidget(self.record_button)
-        self.toolbar.addWidget(self.record_hat)
-        self.toolbar.addWidget(self.record_key)
-        self.toolbar.addWidget(self.record_mouse)
-        self.toolbar.setMinimumHeight(230)
-
-        # Assemble the entire widget
+            # Create list view for macro actions and setup drag & drop support
+            self.list_view = MacroListView()
+            self.list_view.setDragDropMode(QtWidgets.QAbstractItemView.InternalMove)
+            self.list_view.setDefaultDropAction(QtCore.Qt.MoveAction)
+            self.list_view.setModel(self.model)
+            self.list_view.setModelColumn(0)
+            #self.list_view.setCurrentIndex(self.model.index(0, 0))
+            self.list_view.clicked.connect(self._edit_action)
+            #self.list_view.setItemDelegate(self.delegate)
 
 
-        self.main_layout.addWidget(self.list_view)
-        self.main_layout.addWidget(self.toolbar)
+            # Create editor as well as settings place holder widgets
+            self.editor_widget = QtWidgets.QWidget()
+            self.settings_widget = MacroSettingsWidget(self.action_data)
+            self.editor_settings_layout.addWidget(self.editor_widget)
+            self.editor_settings_layout.addWidget(self.settings_widget)
+            self.editor_settings_layout.addStretch()
 
-        self.main_layout.addWidget(self.toolbar)
-        self.main_layout.addLayout(self.editor_settings_layout)
+            # Create buttons used to modify and interact with the macro actions
+            self.button_new_entry = self._create_toolbutton(
+                "gfx/list_add",
+                "Add a new action",
+                False
+            )
+            self.button_new_entry.clicked.connect(self._add_entry)
 
-        self.main_layout.setContentsMargins(0, 0, 0, 0)
+            self.button_delete = self._create_toolbutton(
+                "gfx/list_delete",
+                "Delete currently selected entry",
+                False
+            )
+            self.button_delete.clicked.connect(self._delete_cb)
+
+            self.button_pause = self._create_toolbutton(
+                "{}/pause".format(MacroWidget.gfx_path),
+                "Add pause after the currently selected entry",
+                False
+            )
+            self.button_pause.clicked.connect(self._pause_cb)
+
+            self.button_record = self._create_toolbutton(
+                [
+                    "{}/macro_record".format(MacroWidget.gfx_path),
+                    "{}/macro_record_on".format(MacroWidget.gfx_path)
+                ],
+                "Record keyboard and joystick inputs",
+                True,
+                False
+            )
+            self.button_record.clicked.connect(self._record_cb)
+
+            self.record_time = self._create_toolbutton(
+                [
+                    "{}/time".format(MacroWidget.gfx_path),
+                    "{}/time_on".format(MacroWidget.gfx_path)
+                ],
+                "Record pauses between actions",
+                True,
+                False
+            )
+
+            # Input type recording buttons
+            cfg = gremlin.config.Configuration()
+            self.record_axis = self._create_toolbutton(
+                [
+                    "{}/record_axis".format(MacroWidget.gfx_path),
+                    "{}/record_axis_on".format(MacroWidget.gfx_path)
+                ],
+                "Record joystick axis events",
+                True,
+                cfg.macro_record_axis
+            )
+            self.record_axis.clicked.connect(self._update_record_settings)
+            self.record_button = self._create_toolbutton(
+                [
+                    "{}/record_button".format(MacroWidget.gfx_path),
+                    "{}/record_button_on".format(MacroWidget.gfx_path)
+                ],
+                "Record joystick button events",
+                True,
+                cfg.macro_record_button
+            )
+            self.record_button.clicked.connect(self._update_record_settings)
+            self.record_hat = self._create_toolbutton(
+                [
+                    "{}/record_hat".format(MacroWidget.gfx_path),
+                    "{}/record_hat_on".format(MacroWidget.gfx_path)
+                ],
+                "Record joystick hat events",
+                True,
+                cfg.macro_record_hat
+            )
+            self.record_hat.clicked.connect(self._update_record_settings)
+            self.record_key = self._create_toolbutton(
+                [
+                    "{}/record_key".format(MacroWidget.gfx_path),
+                    "{}/record_key_on".format(MacroWidget.gfx_path)
+                ],
+                "Record keyboard events",
+                True,
+                cfg.macro_record_keyboard
+            )
+            self.record_key.clicked.connect(self._update_record_settings)
+            self.record_mouse = self._create_toolbutton(
+                [
+                    "{}/record_mouse".format(MacroWidget.gfx_path),
+                    "{}/record_mouse_on".format(MacroWidget.gfx_path)
+                ],
+                "Record mouse events",
+                True,
+                cfg.macro_record_mouse
+            )
+            self.record_mouse.clicked.connect(self._update_record_settings)
+
+            # Toolbar
+            self.toolbar = QtWidgets.QToolBar()
+            self.toolbar.setStyleSheet(
+                "QToolBar { border: 1px solid #949494; background-color: #dadada; }"
+            )
+            self.toolbar.setIconSize(QtCore.QSize(16, 16))
+            self.toolbar.setOrientation(QtCore.Qt.Vertical)
+            self.toolbar.addWidget(self.button_new_entry)
+            self.toolbar.addWidget(self.button_delete)
+            self.toolbar.addWidget(self.button_pause)
+            self.toolbar.addSeparator()
+            self.toolbar.addWidget(self.button_record)
+            self.toolbar.addWidget(self.record_time)
+            self.toolbar.addWidget(self.record_axis)
+            self.toolbar.addWidget(self.record_button)
+            self.toolbar.addWidget(self.record_hat)
+            self.toolbar.addWidget(self.record_key)
+            self.toolbar.addWidget(self.record_mouse)
+            self.toolbar.setMinimumHeight(230)
+
+            # Assemble the entire widget
+
+
+            self.main_layout.addWidget(self.list_view)
+            self.main_layout.addWidget(self.toolbar)
+
+            self.main_layout.addWidget(self.toolbar)
+            self.main_layout.addLayout(self.editor_settings_layout)
+
+            self.main_layout.setContentsMargins(0, 0, 0, 0)
+        finally:
+            MacroWidget.locked = False
 
     def _create_toolbutton(self, icon_path, tooltip, is_checkable, default_on=True):
         """Creates a new toolbutton with the provided options.
@@ -1446,7 +1470,7 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
         """
         button = QtWidgets.QToolButton()
         if isinstance(icon_path, list):
-            icon = QtGui.QIcon()
+            icon = ThemeQIcon()
             icon.addPixmap(QtGui.QPixmap(icon_path[0]), QtGui.QIcon.Normal)
             icon.addPixmap(
                 QtGui.QPixmap(icon_path[1]),
@@ -1455,7 +1479,7 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             )
             button.setIcon(icon)
         else:
-            button.setIcon(QtGui.QIcon(icon_path))
+            button.setIcon(ThemeQIcon(icon_path))
         button.setToolTip(tooltip)
         button.setCheckable(is_checkable)
         button.setChecked(is_checkable and default_on)

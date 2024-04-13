@@ -1,3 +1,0 @@
-config
-------
-.. automodule:: gremlin.config

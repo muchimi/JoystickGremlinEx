@@ -20,6 +20,7 @@ import os
 from PySide6 import QtCore, QtGui, QtWidgets
 from xml.etree import ElementTree
 
+from gremlin.theme import ThemeQIcon
 from gremlin.base_classes import AbstractAction, AbstractFunctor
 from gremlin.common import InputType
 import gremlin.ui.input_item
@@ -29,47 +30,57 @@ class CycleModesWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     """Widget allowing the configuration of a list of modes to cycle."""
 
+    locked = False
+
     def __init__(self, action_data, parent=None):
         super().__init__(action_data, parent=parent)
         assert(isinstance(action_data, CycleModes))
 
     def _create_ui(self):
-        self.model = QtCore.QStringListModel()
-        self.view = QtWidgets.QListView()
-        self.view.setModel(self.model)
-        self.view.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
 
-        # Add widgets which allow modifying the mode list
-        self.mode_list = QtWidgets.QComboBox()
-        for entry in gremlin.profile.mode_list(self.action_data):
-            self.mode_list.addItem(entry)
-        self.add = QtWidgets.QPushButton(
-            QtGui.QIcon("gfx/list_add.svg"), "Add"
-        )
-        self.add.clicked.connect(self._add_cb)
-        self.delete = QtWidgets.QPushButton(
-            QtGui.QIcon("gfx/list_delete.svg"), "Delete"
-        )
-        self.delete.clicked.connect(self._remove_cb)
-        self.up = QtWidgets.QPushButton(
-            QtGui.QIcon("gfx/list_up.svg"), "Up"
-        )
-        self.up.clicked.connect(self._up_cb)
-        self.down = QtWidgets.QPushButton(
-            QtGui.QIcon("gfx/list_down.svg"), "Down"
-        )
-        self.down.clicked.connect(self._down_cb)
+        if CycleModesWidget.locked:
+            return
+        try:
+            CycleModesWidget.locked = True
+            self.model = QtCore.QStringListModel()
+            self.view = QtWidgets.QListView()
+            self.view.setModel(self.model)
+            self.view.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
 
-        self.actions_layout = QtWidgets.QGridLayout()
-        self.actions_layout.addWidget(self.mode_list, 0, 0)
-        self.actions_layout.addWidget(self.add, 0, 1)
-        self.actions_layout.addWidget(self.delete, 0, 2)
-        self.actions_layout.addWidget(self.up, 1, 1)
-        self.actions_layout.addWidget(self.down, 1, 2)
+            # Add widgets which allow modifying the mode list
+            self.mode_list = QtWidgets.QComboBox()
+            for entry in gremlin.profile.mode_list(self.action_data):
+                self.mode_list.addItem(entry)
+            self.add = QtWidgets.QPushButton(
+                ThemeQIcon("gfx/list_add.svg"), "Add"
+            )
+            self.add.clicked.connect(self._add_cb)
+            self.delete = QtWidgets.QPushButton(
+                ThemeQIcon("gfx/list_delete.svg"), "Delete"
+            )
+            self.delete.clicked.connect(self._remove_cb)
+            self.up = QtWidgets.QPushButton(
+                ThemeQIcon("gfx/list_up.svg"), "Up"
+            )
+            self.up.clicked.connect(self._up_cb)
+            self.down = QtWidgets.QPushButton(
+                ThemeQIcon("gfx/list_down.svg"), "Down"
+            )
+            self.down.clicked.connect(self._down_cb)
 
-        self.main_layout.addWidget(self.view)
-        self.main_layout.addLayout(self.actions_layout)
-        self.main_layout.setContentsMargins(0, 0, 0, 0)
+            self.actions_layout = QtWidgets.QGridLayout()
+            self.actions_layout.addWidget(self.mode_list, 0, 0)
+            self.actions_layout.addWidget(self.add, 0, 1)
+            self.actions_layout.addWidget(self.delete, 0, 2)
+            self.actions_layout.addWidget(self.up, 1, 1)
+            self.actions_layout.addWidget(self.down, 1, 2)
+
+            self.main_layout.addWidget(self.view)
+            self.main_layout.addLayout(self.actions_layout)
+            self.main_layout.setContentsMargins(0, 0, 0, 0)
+            
+        finally:
+            CycleModesWidget.locked = False
 
     def _populate_ui(self):
         self.model.setStringList(self.action_data.mode_list)

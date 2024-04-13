@@ -19,6 +19,7 @@ import enum
 from PySide6 import QtWidgets, QtCore, QtGui
 
 import gremlin
+from gremlin.theme import ThemeQIcon
 from gremlin.common import DeviceType, InputType
 from . import activation_condition, common, virtual_button
 from functools import partial 
@@ -519,7 +520,7 @@ class ActionSetView(common.AbstractView):
         self.controls_layout = QtWidgets.QVBoxLayout()
         if ActionSetView.Interactions.Up in self.allowed_interactions:
             self.control_move_up = QtWidgets.QPushButton(
-                QtGui.QIcon("gfx/button_up"), ""
+                ThemeQIcon("gfx/button_up"), ""
             )
             self.control_move_up.clicked.connect(
                 lambda: self.interacted.emit(ActionSetView.Interactions.Up)
@@ -527,7 +528,7 @@ class ActionSetView(common.AbstractView):
             self.controls_layout.addWidget(self.control_move_up)
         if ActionSetView.Interactions.Down in self.allowed_interactions:
             self.control_move_down = QtWidgets.QPushButton(
-                QtGui.QIcon("gfx/button_down"), ""
+                ThemeQIcon("gfx/button_down"), ""
             )
             self.control_move_down.clicked.connect(
                 lambda: self.interacted.emit(ActionSetView.Interactions.Down)
@@ -535,7 +536,7 @@ class ActionSetView(common.AbstractView):
             self.controls_layout.addWidget(self.control_move_down)
         if ActionSetView.Interactions.Delete in self.allowed_interactions:
             self.control_delete = QtWidgets.QPushButton(
-                QtGui.QIcon("gfx/button_delete"), ""
+                ThemeQIcon("gfx/button_delete"), ""
             )
             self.control_delete.clicked.connect(
                 lambda: self.interacted.emit(ActionSetView.Interactions.Delete)
@@ -543,7 +544,7 @@ class ActionSetView(common.AbstractView):
             self.controls_layout.addWidget(self.control_delete)
         if ActionSetView.Interactions.Edit in self.allowed_interactions:
             self.control_edit = QtWidgets.QPushButton(
-                QtGui.QIcon("gfx/button_edit"), ""
+                ThemeQIcon("gfx/button_edit"), ""
             )
             self.control_edit.clicked.connect(
                 lambda: self.interacted.emit(ActionSetView.Interactions.Edit)
@@ -1105,10 +1106,10 @@ class TitleBar(QtWidgets.QFrame):
         self.hint = hint
         self.label = QtWidgets.QLabel(label)
         self.help_button = TitleBarButton()
-        self.help_button.setIcon(QtGui.QIcon("gfx/help"))
+        self.help_button.setIcon(ThemeQIcon("gfx/help"))
         self.help_button.clicked.connect(self._show_hint)
         self.close_button = TitleBarButton()
-        self.close_button.setIcon(QtGui.QIcon("gfx/close"))
+        self.close_button.setIcon(ThemeQIcon("gfx/close"))
         self.close_button.clicked.connect(close_cb)
         self.layout = QtWidgets.QHBoxLayout()
         self.layout.setSpacing(0)

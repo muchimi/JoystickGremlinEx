@@ -1,3 +1,0 @@
-spline
-------
-.. automodule:: gremlin.spline

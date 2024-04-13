@@ -1,3 +1,0 @@
-sendinput
----------
-.. automodule:: gremlin.sendinput

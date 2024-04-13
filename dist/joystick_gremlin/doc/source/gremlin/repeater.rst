@@ -1,3 +1,0 @@
-repeater
---------
-.. automodule:: gremlin.repeater

@@ -20,6 +20,7 @@ import os
 from PySide6 import QtCore, QtGui, QtMultimedia, QtWidgets
 from xml.etree import ElementTree
 
+from gremlin.theme import ThemeQIcon
 from gremlin.base_classes import AbstractAction, AbstractFunctor
 from gremlin.common import InputType
 import gremlin.ui.input_item
@@ -37,7 +38,7 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.layout = QtWidgets.QHBoxLayout()
         self.file_path = QtWidgets.QLineEdit()
         self.edit_path = QtWidgets.QPushButton()
-        self.edit_path.setIcon(QtGui.QIcon("gfx/button_edit.png"))
+        self.edit_path.setIcon(ThemeQIcon("gfx/button_edit.png"))
         self.edit_path.clicked.connect(self._new_executable)
         self.volume = QtWidgets.QSpinBox()
         self.volume.setRange(0, 100)
