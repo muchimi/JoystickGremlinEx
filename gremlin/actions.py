@@ -227,7 +227,7 @@ class JoystickCondition(AbstractCondition):
                    util.hat_direction_to_tuple(self.comparison)
         else:
             logging.getLogger("system").warning(
-                "Invalid input_type {} received".format(self.input_type)
+                f"Invalid input_type {self.input_type} received"
             )
             return False
 
@@ -267,7 +267,7 @@ class VJoyCondition(AbstractCondition):
         """
         if self.device_guid is None:
             logging.getLogger("system").warning(
-                "GUID for vJoy {} not found".format(self.vjoy_id)
+                f"GUID for vJoy {self.vjoy_id} not found"
             )
             return False
         joy = input_devices.JoystickProxy()[self.device_guid]
@@ -291,7 +291,7 @@ class VJoyCondition(AbstractCondition):
                    util.hat_direction_to_tuple(self.comparison)
         else:
             logging.getLogger("system").warning(
-                "Invalid input_type {} received".format(self.input_type)
+                f"Invalid input_type {self.input_type} received"
             )
             return False
 

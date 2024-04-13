@@ -720,10 +720,7 @@ def input_item_index_lookup(index, input_items):
         if not input_items.has_data(InputType.Keyboard, index):
             logging.getLogger("system").error(
                 "Attempting to retrieve non existent input, "
-                "type={} index={}".format(
-                    InputType.to_string(InputType.Keyboard),
-                    index
-                )
+                f"type={InputType.to_string(InputType.Keyboard)} index={index}"
             )
         return input_items.get_data(InputType.Keyboard, index)
     else:
@@ -733,10 +730,7 @@ def input_item_index_lookup(index, input_items):
             if not input_items.has_data(InputType.JoystickAxis, axis_keys[index]):
                 logging.getLogger("system").error(
                     "Attempting to retrieve non existent input, "
-                    "type={} index={}".format(
-                        InputType.to_string(InputType.JoystickAxis),
-                        axis_keys[index]
-                    )
+                    f"type={InputType.to_string(InputType.JoystickAxis)} index={axis_keys[index]}"
                 )
 
             return input_items.get_data(
@@ -750,10 +744,7 @@ def input_item_index_lookup(index, input_items):
             ):
                 logging.getLogger("system").error(
                     "Attempting to retrieve non existent input, "
-                    "type={} index={}".format(
-                        InputType.to_string(InputType.JoystickButton),
-                        index - axis_count + 1
-                    )
+                    f"type={InputType.to_string(InputType.JoystickButton)} index={index - axis_count + 1}"
                 )
 
             return input_items.get_data(
@@ -767,10 +758,7 @@ def input_item_index_lookup(index, input_items):
             ):
                 logging.getLogger("system").error(
                     "Attempting to retrieve non existent input, "
-                    "type={} index={}".format(
-                        InputType.to_string(InputType.JoystickHat),
-                        index - axis_count - button_count + 1
-                    )
+                    f"type={ InputType.to_string(InputType.JoystickHat)} index={index - axis_count - button_count + 1}"
                 )
 
             return input_items.get_data(

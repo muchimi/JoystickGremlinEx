@@ -492,8 +492,7 @@ class EventHandler(QtCore.QObject):
                 mode_exists = True
         if not mode_exists:
             logging.getLogger("system").error(
-                "The mode \"{}\" does not exist or has no"
-                " associated callbacks".format(new_mode)
+                f"The mode \"{new_mode}\" does not exist or has no associated callbacks"
             )
 
         if mode_exists:
@@ -540,7 +539,7 @@ class EventHandler(QtCore.QObject):
             except error.VJoyError as e:
                 util.display_error(str(e))
                 logging.getLogger("system").exception(
-                    "VJoy related error: {}".format(e)
+                    f"VJoy related error: {e}"
                 )
                 self.pause()
 

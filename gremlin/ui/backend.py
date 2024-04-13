@@ -351,7 +351,7 @@ class Backend(QtCore.QObject):
             # An error occurred while parsing an existing profile,
             # creating an empty profile instead
             logging.getLogger("system").exception(
-                "Invalid profile content:\n{}".format(e)
+                f"Invalid profile content:\n{e}"
             )
             self.newProfile()
         except error.ProfileError as e:

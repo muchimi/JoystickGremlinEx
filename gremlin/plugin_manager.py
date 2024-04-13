@@ -62,7 +62,7 @@ class ContainerPlugins:
         """
         if name not in self._name_to_type_map:
             raise error.GremlinError(
-                "No container with name '{}' exists".format(name)
+                f"No container with name '{name}' exists"
             )
         return self._name_to_type_map[name]
 
@@ -78,12 +78,12 @@ class ContainerPlugins:
                     # Attempt to load the file and if it looks like a proper
                     # action_plugins store it in the registry
                     plugin = importlib.import_module(
-                        "container_plugins.{}".format(module)
+                        f"container_plugins.{module}"
                     )
                     if "version" in plugin.__dict__:
                         self._plugins[plugin.name] = plugin.create
                         logging.getLogger("system").debug(
-                            "Loaded: {}".format(plugin.name)
+                            f"Loaded: {plugin.name}"
                         )
                     else:
                         del plugin
@@ -91,10 +91,7 @@ class ContainerPlugins:
                     # Log an error and ignore the action_plugins if
                     # anything is wrong with it
                     logging.getLogger("system").warning(
-                        "Loading container_plugins '{}' failed due to: {}".format(
-                            fname,
-                            e
-                        )
+                        f"Loading container_plugins '{fname}' failed due to: {e}"
                     )
 
     def _create_maps(self):
@@ -155,7 +152,7 @@ class ActionPlugins:
         """
         if name not in self._name_to_type_map:
             raise error.GremlinError(
-                "No action with name '{}' exists".format(name)
+                f"No action with name '{name}' exists"
             )
         return self._name_to_type_map[name]
 
@@ -198,12 +195,12 @@ class ActionPlugins:
                     # Attempt to load the file and if it looks like a proper
                     # action_plugins store it in the registry
                     plugin = importlib.import_module(
-                        "action_plugins.{}".format(module)
+                        f"action_plugins.{module}"
                     )
                     if "version" in plugin.__dict__:
                         self._plugins[plugin.name] = plugin.create
                         logging.getLogger("system").debug(
-                            "Loaded: {}".format(plugin.name)
+                            f"Loaded: {plugin.name}"
                         )
                     else:
                         del plugin
@@ -211,8 +208,5 @@ class ActionPlugins:
                     # Log an error and ignore the action_plugins if
                     # anything is wrong with it
                     logging.getLogger("system").warning(
-                        "Loading action_plugins '{}' failed due to: {}".format(
-                            root.split("\\")[-1],
-                            e
-                        )
+                        f"Loading action_plugins '{root.split("\\")[-1]}' failed due to: {e}"
                     )

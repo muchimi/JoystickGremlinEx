@@ -170,7 +170,7 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.save_changes()
         except gremlin.error.GremlinError as e:
             util.display_error(
-                "A needed vJoy device is not accessible: {}\n\n".format(e) +
+                f"A needed vJoy device is not accessible: {e}\n\n" +
                 "Default values have been set for the input, but they are "
                 "not what has been specified."
             )
@@ -351,10 +351,7 @@ class Remap(gremlin.base_classes.AbstractAction):
             input_string = "button"
         elif self.input_type == InputType.JoystickHat:
             input_string = "hat"
-        return "action_plugins/remap/gfx/icon_{}_{:03d}.png".format(
-                input_string,
-                self.vjoy_input_id
-            )
+        return f"action_plugins/remap/gfx/icon_{input_string}_{self.vjoy_input_id:03d}.png"
 
     def requires_virtual_button(self):
         """Returns whether or not the action requires an activation condition.
@@ -396,7 +393,7 @@ class Remap(gremlin.base_classes.AbstractAction):
                 self.vjoy_input_id = safe_read(node, "button", int)
             else:
                 raise gremlin.error.GremlinError(
-                    "Invalid remap type provided: {}".format(node.attrib)
+                    f"Invalid remap type provided: {node.attrib}"
                 )
 
             self.vjoy_device_id = safe_read(node, "vjoy", int)

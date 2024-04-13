@@ -149,7 +149,7 @@ def vjoy_id_from_guid(guid):
             return dev.vjoy_id
 
     logging.getLogger("system").error(
-        "Could not find vJoy matching guid {}".format(str(guid))
+        f"Could not find vJoy matching guid {str(guid)}"
     )
     return 1
 
@@ -192,7 +192,7 @@ def joystick_devices_initialization():
     syslog = logging.getLogger("system")
     syslog.info("Initializing joystick devices")
     syslog.debug(
-        "{:d} joysticks detected".format(dill.DILL.get_device_count())
+        f"{dill.DILL.get_device_count():d} joysticks detected"
     )
 
     # Process all connected devices in order to properly initialize the

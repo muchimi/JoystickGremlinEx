@@ -191,7 +191,7 @@ class VirtualHatButtonWidget(AbstractVirtualButtonWidget):
             for direction in directions:
                 self._widgets[direction] = QtWidgets.QCheckBox()
                 self._widgets[direction].setIcon(
-                    ThemeQIcon("gfx/hat_{}.png".format(direction))
+                    ThemeQIcon(f"gfx/hat_{direction}.png")
                 )
                 self._widgets[direction].toggled.connect(
                     self._create_state_changed_cb(direction)

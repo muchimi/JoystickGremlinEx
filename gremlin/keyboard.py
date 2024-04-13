@@ -213,7 +213,7 @@ def _virtual_input_to_unicode(virtual_code):
 
     if state == 0:
         logging.getLogger("system").error(
-            "No translation for key {} available".format(hex(virtual_code))
+            f"No translation for key {hex(virtual_code)} available"
         )
         return str(hex(virtual_code))
     return output_buffer.value.upper()
@@ -290,10 +290,10 @@ def key_from_name(name):
     key = _unicode_to_key(name)
     if key is None:
         logging.getLogger("system").warning(
-            "Invalid key name specified \"{}\"".format(name)
+            f"Invalid key name specified \"{name}\""
         )
         raise gremlin.error.KeyboardError(
-            "Invalid key specified, {}".format(name)
+            f"Invalid key specified, {name}"
         )
     else:
         g_scan_code_to_key[(key.scan_code, key.is_extended)] = key
@@ -326,14 +326,10 @@ def key_from_code(scan_code: int, is_extended: bool) -> Key:
 
     if virtual_code == 0xFF or name is None:
         logging.getLogger("system").warning(
-            "Invalid scan code specified ({}, {})".format(
-                scan_code, is_extended
-            )
+            f"Invalid scan code specified ({scan_code}, {is_extended})"
         )
         raise gremlin.error.KeyboardError(
-            "Invalid scan code specified ({}, {})".format(
-                    scan_code, is_extended
-            )
+            f"Invalid scan code specified ({scan_code}, {is_extended})"
         )
     else:
         key = Key(name, scan_code, is_extended, virtual_code)

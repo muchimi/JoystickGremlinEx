@@ -92,18 +92,14 @@ class AxisNames(enum.Enum):
         try:
             return _AxisNames_to_string_lookup[value]
         except KeyError:
-            raise gremlin.error.GremlinError(
-                "Invalid AxisName lookup, {}".format(value)
-            )
+            raise gremlin.error.GremlinError(f"Invalid AxisName lookup, {value}")
 
     @staticmethod
     def to_enum(value):
         try:
             return _AxisNames_to_enum_lookup[value]
         except KeyError:
-            raise gremlin.error.GremlinError(
-                "Invalid AxisName lookup, {}".format(value)
-            )
+            raise gremlin.error.GremlinError(f"Invalid AxisName lookup, {value}")
 
 
 _AxisNames_to_string_lookup = {
@@ -143,7 +139,7 @@ class AxisButtonDirection(enum.Enum):
             return _AxisButtonDirection_to_string_lookup[value]
         except KeyError:
             raise gremlin.error.GremlinError(
-                "Invalid AxisButtonDirection lookup, {}".format(value)
+                f"Invalid AxisButtonDirection lookup, {value}"
             )
 
     @staticmethod
@@ -152,7 +148,7 @@ class AxisButtonDirection(enum.Enum):
             return _AxisButtonDirection_to_enum_lookup[value]
         except KeyError:
             raise gremlin.error.GremlinError(
-                "Invalid AxisButtonDirection lookup, {}".format(value)
+                f"Invalid AxisButtonDirection lookup, {value}"
             )
 
 
@@ -181,14 +177,11 @@ def input_to_ui_string(input_type, input_id):
         try:
             return AxisNames.to_string(AxisNames(input_id))
         except gremlin.error.GremlinError:
-            return "Axis {:d}".format(input_id)
+            return f"Axis {input_id:d}"
     elif input_type == InputType.Keyboard:
         return gremlin.macro.key_from_code(*input_id).name
     else:
-        return "{} {}".format(
-            InputType.to_string(input_type).capitalize(),
-            input_id
-        )
+        return f"{InputType.to_string(input_type).capitalize()} {input_id}"
 
 
 class MouseButton(enum.Enum):

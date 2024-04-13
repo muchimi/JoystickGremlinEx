@@ -117,7 +117,7 @@ class Configuration:
         for i, limit in enumerate(limits):
             if limit[2] - limit[0] == 0:
                 continue
-            axis_name = "axis_{}".format(i+1)
+            axis_name = f"axis_{i+1}"
             self._data["calibration"][identifier][axis_name] = [
                 limit[0], limit[1], limit[2]
             ]
@@ -131,7 +131,7 @@ class Configuration:
         :return the calibration data for the desired axis
         """
         identifier = str(dev_id)
-        axis_name = "axis_{}".format(axis_id)
+        axis_name = f"axis_{axis_id}"
         if identifier not in self._data["calibration"]:
             return [-32768, 0, 32767]
         if axis_name not in self._data["calibration"][identifier]:
@@ -182,10 +182,7 @@ class Configuration:
         profile_path = self.get_profile(exec_path)
         if profile_path is not None:
             logging.getLogger("system").info(
-                "Found exact match for {}, returning {}".format(
-                    exec_path,
-                    profile_path
-                )
+                f"Found exact match for {exec_path}, returning {profile_path}"
             )
             return profile_path
 
@@ -203,11 +200,7 @@ class Configuration:
             # provided executable path
             if re.search(key, exec_path) is not None:
                 logging.getLogger("system").info(
-                    "Found regex match in {} for {}, returning {}".format(
-                        key,
-                        exec_path,
-                        value
-                    )
+                    f"Found regex match in {key} for {exec_path}, returning {value}"
                 )
                 return value
 

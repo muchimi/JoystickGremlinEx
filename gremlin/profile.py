@@ -97,7 +97,7 @@ def parse_bool(value, default_value=False):
                 return int_value == 1
             else:
                 raise error.ProfileError(
-                    "Invalid bool value used: {}".format(value)
+                    f"Invalid bool value used: {value}"
                 )
         else:
             value = value.lower()
@@ -105,7 +105,7 @@ def parse_bool(value, default_value=False):
                 return value == "true"
             else: 
                 raise error.ProfileError(
-                    "Invalid bool value used: {}".format(value)
+                    f"Invalid bool value used: {value}"
                 )
     except ValueError:
         value = value.lower()
@@ -113,11 +113,11 @@ def parse_bool(value, default_value=False):
             return value == "true"
         else:
             raise error.ProfileError(
-                "Invalid bool value used: {}".format(value)
+                f"Invalid bool value used: {value}"
             )
     except TypeError:
         raise error.ProfileError(
-            "Invalid type provided: {}".format(type(value))
+            f"Invalid type provided: {type(value)}"
         )
 
 
@@ -142,7 +142,7 @@ def parse_guid(value):
         return dill.GUID(raw_guid)
     except (ValueError, AttributeError) as e:
         raise error.ProfileError(
-            "Failed parsing GUID from value {}".format(value)
+            f"Failed parsing GUID from value {value}"
         )
 
 
@@ -172,7 +172,7 @@ def safe_read(node, key, type_cast=None, default_value=None):
     value = default_value
     if key not in node.keys():
         if default_value is None:
-            msg = "Attempted to read attribute '{}' which does not exist.".format(key)
+            msg = f"Attempted to read attribute '{key}' which does not exist."
             logging.getLogger("system").error(msg)
             raise error.ProfileError(msg)
     else:
@@ -186,9 +186,7 @@ def safe_read(node, key, type_cast=None, default_value=None):
             else:
                 value = type_cast(value)
         except ValueError:
-            msg = "Failed casting '{}' to type '{}'".format(
-                value, str(type_cast)
-            )
+            msg = f"Failed casting '{value}' to type '{str(type_cast)}'"
             logging.getLogger("system").error(msg)
             raise error.ProfileError(msg)
     return value
@@ -209,11 +207,9 @@ def safe_format(value, data_type, formatter=str):
     if isinstance(value, data_type):
         return formatter(value)
     else:
-        raise error.ProfileError("Value \"{}\" has type {} when {} is expected".format(
-            value,
-            type(value),
-            data_type
-        ))
+        raise error.ProfileError(
+            f"Value \"{value}\" has type {type(value)} when {data_type} is expected"
+        )
 
 
 def extract_remap_actions(action_sets):
@@ -276,7 +272,7 @@ class ProfileConverter:
 
         # Create a backup of the outdated profile
         old_version = self._determine_version(root)
-        shutil.copyfile(fname, "{}.v{:d}".format(fname, old_version))
+        shutil.copyfile(fname, f"{fname}.v{old_version:d}")
 
         # Convert the profile
         new_root = None
@@ -360,8 +356,7 @@ class ProfileConverter:
                     device.set("id", str(device_name_map[device.get("name")]))
                 else:
                     logging.getLogger("system").warning(
-                        "Device '{}' missing, no conversion performed, ID"
-                        " will be incorrect.".format(device.get("name"))
+                        f"Device '{device.get("name")}' missing, no conversion performed, ID will be incorrect."
                     )
         return new_root
 
@@ -589,10 +584,7 @@ class ProfileConverter:
 
         root.attrib["version"] = "7"
         for module in root.findall("import/module"):
-            module.attrib["name"] = os.path.normpath("{}\{}.py".format(
-                base_path,
-                module.attrib["name"]
-            ))
+            module.attrib["name"] = os.path.normpath(f"{base_path}\{module.attrib["name"]}.py")
 
         return root
 
@@ -715,10 +707,7 @@ class ProfileConverter:
                 device = self.dev_info[device_guid]
                 if linear_id > device.axis_count or linear_id >= len(device.axis_map):
                     logging.getLogger("system").error(
-                        "Invalid linear axis id received, {} id = {}".format(
-                            device.name,
-                            linear_id
-                        )
+                        f"Invalid linear axis id received, {device.name} id = {linear_id}"
                     )
                     return linear_id
 
@@ -738,21 +727,15 @@ class ProfileConverter:
                     hardware_id = int(hardware_id)
                 except (ValueError, TypeError):
                     syslog.warn(
-                        "Cannot convert {} into a valid hardware id".format(
-                            hardware_id
-                        )
+                        f"Cannot convert {hardware_id} into a valid hardware id"
                     )
-                    return "{{{}}}".format(uuid.uuid4())
+                    return f"{{{uuid.uuid4()}}}"
 
                 if hardware_id not in self.hwid_to_guid:
                     syslog.warn(
-                        "GUID for device {} with hardware_id {} is "
-                        "unknown.".format(
-                            "" if name is None else name,
-                            hardware_id
-                        )
+                        f"GUID for device {"" if name is None else name} with hardware_id {hardware_id} is unknown."
                     )
-                    self.hwid_to_guid[hardware_id] = "{{{}}}".format(uuid.uuid4())
+                    self.hwid_to_guid[hardware_id] = f"{{{uuid.uuid4()}}}"
 
                 return self.hwid_to_guid[hardware_id]
 
@@ -769,15 +752,15 @@ class ProfileConverter:
                     vjoy_id = int(vjoy_id)
                 except (ValueError, TypeError):
                     syslog.warn(
-                        "Cannot convert {} into a valid vjoy id".format(vjoy_id)
+                        f"Cannot convert {vjoy_id} into a valid vjoy id"
                     )
-                    return "{{{}}}".format(uuid.uuid4())
+                    return f"{{{uuid.uuid4()}}}"
 
                 if vjoy_id not in self.vjoy_to_guid:
                     syslog.warn(
-                        "GUID for vjoy {} is unknown".format(vjoy_id)
+                        f"GUID for vjoy {vjoy_id} is unknown"
                     )
-                    self.vjoy_to_guid[vjoy_id] = "{{{}}}".format(uuid.uuid4())
+                    self.vjoy_to_guid[vjoy_id] = f"{{{uuid.uuid4()}}}"
 
                 return self.vjoy_to_guid[vjoy_id]
 
@@ -1351,11 +1334,7 @@ class Profile():
             for i in range(device.axis_count):
                 if i >= len(device.axis_map):
                     logging.getLogger("system").error(
-                        "{} invalid axis request {} < {}".format(
-                            device.name,
-                            device.axis_count,
-                            i
-                        )
+                        f"{device.name,} invalid axis request { device.axis_count} < {i}"
                     )
                 else:
                     new_mode.get_data(
@@ -1725,11 +1704,7 @@ class Device:
             for i in range(device.axis_count):
                 if i >= len(device.axis_map):
                     logging.getLogger("system").error(
-                        "{} invalid axis request {} < {}".format(
-                            device.name,
-                            device.axis_count,
-                            i
-                        )
+                        f"{device.name} invalid axis request {device.axis_count} < {i}"
                     )
                 else:
                     mode.get_data(
@@ -1925,7 +1900,7 @@ class InputItem:
             container_type = child.attrib["type"]
             if container_type not in container_name_map:
                 logging.getLogger("system").warning(
-                    "Unknown container type used: {}".format(container_type)
+                    f"Unknown container type used: {container_type}"
                 )
                 continue
             entry = container_name_map[container_type](self)

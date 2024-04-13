@@ -93,7 +93,7 @@ class ProfileSettingsWidget(QtWidgets.QWidget):
             if self.profile_settings.vjoy_as_input.get(dev.vjoy_id) is True:
                 continue
 
-            widget = QtWidgets.QGroupBox("{} #{}".format(dev.name, dev.vjoy_id))
+            widget = QtWidgets.QGroupBox(f"{dev.name} #{dev.vjoy_id}")
             box_layout = QtWidgets.QVBoxLayout()
             widget.setLayout(box_layout)
             box_layout.addWidget(VJoyAxisDefaultsWidget(
@@ -234,7 +234,7 @@ class VJoyAxisDefaultsWidget(QtWidgets.QWidget):
             # FIXME: This is a workaround to not being able to read a vJoy
             #   device's axes names when it is grabbed by another process
             #   and the inability of SDL to provide canonical axis names
-            axis_name = "Axis {:d}".format(i+1)
+            axis_name = f"Axis {i+1:d}"
             try:
                 axis_name = vjoy_proxy[self.joy_data.vjoy_id]\
                     .axis_name(linear_index=i+1)
@@ -309,7 +309,7 @@ class VJoyAsInputWidget(QtWidgets.QGroupBox):
                 gremlin.joystick_handling.vjoy_devices(),
                 key=lambda x: x.vjoy_id
         ):
-            check_box = QtWidgets.QCheckBox("vJoy {:d}".format(dev.vjoy_id))
+            check_box = QtWidgets.QCheckBox(f"vJoy {dev.vjoy_id:d}")
             if self.profile_data.vjoy_as_input.get(dev.vjoy_id, False):
                 check_box.setChecked(True)
             check_box.stateChanged.connect(

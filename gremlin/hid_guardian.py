@@ -38,7 +38,7 @@ def _open_key(sub_key, access=winreg.KEY_READ):
         )
     except OSError:
         raise HidGuardianError(
-            "Unable to open sub key \"{}\"".format(sub_key)
+            f"Unable to open sub key \"{sub_key}\""
         )
 
 
@@ -74,10 +74,7 @@ def _read_value(handle, value_name, value_type):
         data = winreg.QueryValueEx(handle, value_name)
         if data[1] != value_type:
             raise HidGuardianError(
-                "Read invalid data type, {} expected {}".format(
-                    data[1],
-                    value_type
-                )
+                f"Read invalid data type, {data[1]} expected {value_type}"
             )
         return data
     except FileNotFoundError:
@@ -85,9 +82,7 @@ def _read_value(handle, value_name, value_type):
         return [None, value_type]
     except PermissionError:
         raise HidGuardianError(
-            "Unable to read value \"{}\", insufficient permissions".format(
-                value_name
-            )
+            f"Unable to read value \"{value_name}\", insufficient permissions"
         )
 
 
@@ -102,9 +97,7 @@ def _write_value(handle, value_name, data):
         winreg.SetValueEx(handle, value_name, 0, data[1], data[0])
     except PermissionError:
         raise HidGuardianError(
-            "Unable to write value \"{}\", insufficient permissions".format(
-                value_name
-            )
+            f"Unable to write value \"{value_name}\", insufficient permissions"
         )
 
 
@@ -235,8 +228,7 @@ class HidGuardian:
                     ))
                 except ValueError:
                     gremlin.util.display_error(
-                        "Failed to extract vendor and product id for HidGuardian entry:\n\n{}"
-                            .format(entry)
+                        f"Failed to extract vendor and product id for HidGuardian entry:\n\n{entry}"
                     )
 
 
@@ -257,7 +249,7 @@ class HidGuardian:
         # Ensure the process key exists and write the identifying value
         handle = winreg.CreateKey(
             winreg.HKEY_LOCAL_MACHINE,
-            "{}\{}".format(HidGuardian.process_path, process_id)
+            f"{HidGuardian.process_path}\{process_id}"
         )
         winreg.SetValueEx(handle, "Joystick Gremlin", 0, winreg.REG_DWORD, 1)
         self._synchronize_process(process_id)
@@ -296,10 +288,7 @@ class HidGuardian:
         :param product_id the USB product id
         :return string corresponding to this vendor and product id combination
         """
-        return "HID\\VID_{:0>4s}&PID_{:0>4s}".format(
-            hex(vendor_id)[2:],
-            hex(product_id)[2:]
-        )
+        return f"HID\\VID_{hex(vendor_id)[2:]:0>4s}&PID_{hex(product_id)[2:]:0>4s}"
 
     def _get_gremlin_process_ids(self):
         """Returns all handles of processes associated with Gremlin.
@@ -320,10 +309,7 @@ class HidGuardian:
             gremlin_pids = []
             for i in range(info[0]):
                 sub_key = winreg.EnumKey(handle, i)
-                sub_handle = _open_key("{}\{}".format(
-                    HidGuardian.process_path,
-                    sub_key
-                ))
+                sub_handle = _open_key(f"{HidGuardian.process_path}\{sub_key}")
                 winreg.OpenKey(handle, sub_key)
                 sub_info = winreg.QueryInfoKey(sub_handle)
                 # Check each sub key value
@@ -354,7 +340,7 @@ class HidGuardian:
 
         # Write the same data to the process exemption list
         handle = _open_key(
-            "{}\{}".format(HidGuardian.process_path, process_id),
+            f"{HidGuardian.process_path}\{process_id}",
             access=winreg.KEY_WRITE
         )
         _write_value(handle, HidGuardian.storage_value, data)

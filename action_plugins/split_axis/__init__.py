@@ -112,7 +112,7 @@ class SplitAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
             #        vJoy selector attempting to acquire a vJoy device, this
             #        should no longer occur, check if this here is still needed
             util.display_error(
-                "A needed vJoy device is not accessible: {}\n\n".format(e) +
+                f"A needed vJoy device is not accessible: {e}\n\n" +
                 "Default values have been set for the input, but they are "
                 "not what has been specified."
             )
@@ -219,7 +219,7 @@ class SplitAxis(AbstractAction):
         self.device_high_vjoy_id = None
 
     def icon(self):
-        return "{}/icon.png".format(os.path.dirname(os.path.realpath(__file__)))
+        return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
 
     def requires_virtual_button(self):
         return False

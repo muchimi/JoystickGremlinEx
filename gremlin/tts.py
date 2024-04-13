@@ -45,7 +45,7 @@ class TextToSpeech:
             self._speaker.Speak(text, 1)
         except Exception as e:
             logging.getLogger("system").error(
-                "TTS encountered a problem: {}".format(e)
+                f"TTS encountered a problem: {e}"
             )
 
     def set_volume(self, value):

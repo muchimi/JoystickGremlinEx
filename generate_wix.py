@@ -56,8 +56,8 @@ def create_data_for_file(path):
     """
     return {
         "component_guid": uuid.uuid4(),
-        "component_id": "component_{}".format(sanitize_path(path)),
-        "file_id": "file_{}".format(sanitize_path(path)),
+        "component_id": f"component_{sanitize_path(path)}",
+        "file_id": f"file_{sanitize_path(path)}",
         "file_source": path
     }
 

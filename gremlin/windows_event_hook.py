@@ -234,12 +234,7 @@ class KeyEvent:
 
         :return string representation of the event
         """
-        return "({} {}) {}, {}".format(
-            hex(self._scan_code),
-            self._is_extended,
-            "down" if self._is_pressed else "up",
-            "injected" if self.is_injected else ""
-        )
+        return f"({hex(self._scan_code)} {self._is_extended}) {"down" if self._is_pressed else "up"}, {"injected" if self.is_injected else ""}"
 
     @property
     def scan_code(self):

@@ -70,7 +70,7 @@ class ResumeAction(AbstractAction):
     widget = ResumeActionWidget
 
     def icon(self):
-        return "{}/icon.png".format(os.path.dirname(os.path.realpath(__file__)))
+        return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
 
     def __init__(self, parent):
         super().__init__(parent)

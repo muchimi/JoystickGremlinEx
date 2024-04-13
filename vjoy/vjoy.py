@@ -37,7 +37,7 @@ def _error_string(vid, iid, value):
     :param value input value
     :return string representing the error
     """
-    return "vjoy: {} input: {} value: {}".format(vid, iid, value)
+    return f"vjoy: {vid} input: {iid} value: {value}"
 
 
 class AxisName(enum.Enum):
@@ -178,9 +178,8 @@ class Axis:
 
         # If this is not the case our value setter needs to change
         if self._min_value != 0:
-            raise VJoyError("vJoy axis minimum value is not 0  - {}".format(
-                    _error_string(self.vjoy_id, self.axis_id, self._min_value)
-            ))
+            raise VJoyError(
+                f"vJoy axis minimum value is not 0  - {_error_string(self.vjoy_id, self.axis_id, self._min_value)}")
 
     def set_response_curve(self, spline_type, control_points):
         """Sets the response curve to use for the axis.
@@ -231,7 +230,7 @@ class Axis:
         if 1.0 - abs(value) < -0.001:
             logging.getLogger("system").warning(
                 "Wrong data type provided, has to be float in [-1, 1],"
-                " provided value was {:.2f}".format(value)
+                f" provided value was {value:.2f}"
             )
 
         # Normalize value to [-1, 1] and apply response curve and deadzone
@@ -246,9 +245,7 @@ class Axis:
                 self.axis_id
         ):
             raise VJoyError(
-                "Failed setting axis value - {}".format(
-                    _error_string(self.vjoy_id, self.axis_id, self._value)
-                )
+                f"Failed setting axis value - {_error_string(self.vjoy_id, self.axis_id, self._value)}"
             )
         self.vjoy_dev.used()
 
@@ -265,7 +262,7 @@ class Axis:
         if 1.0 - abs(value) < -0.001:
             logging.getLogger("system").warning(
                 "Wrong data type provided, has to be float in [-1, 1],"
-                " provided value was {:.2f}".format(value)
+                f" provided value was {value:.2f}"
             )
 
         # Normalize value to [-1, 1] and apply response curve and deadzone
@@ -278,9 +275,7 @@ class Axis:
                 self.axis_id
         ):
             raise VJoyError(
-                "Failed setting axis value - {}".format(
-                    _error_string(self.vjoy_id, self.axis_id, self._value)
-                )
+                f"Failed setting axis value - { _error_string(self.vjoy_id, self.axis_id, self._value)}"
             )
         self.vjoy_dev.used()
 
@@ -324,9 +319,7 @@ class Button:
                 self.button_id
         ):
             raise VJoyError(
-                "Failed setting button value - {}".format(
-                    _error_string(self.vjoy_id, self.button_id, self._is_pressed)
-                )
+                f"Failed setting button value - {_error_string(self.vjoy_id, self.button_id, self._is_pressed)}"
             )
         self.vjoy_dev.used()
 
@@ -393,9 +386,8 @@ class Hat:
         elif self.hat_type == HatType.Continuous:
             self._set_continuous_direction(direction)
         else:
-            raise VJoyError("Invalid hat type specified - {}".format(
-                _error_string(self.vjoy_id, self.axis_id, self.direction)
-            ))
+            raise VJoyError(
+                f"Invalid hat type specified - {_error_string(self.vjoy_id, self.axis_id, self.direction)}")
         self.vjoy_dev.used()
 
     def _set_discrete_direction(self, direction):
@@ -405,9 +397,7 @@ class Hat:
         """
         if direction not in Hat.to_discrete_direction:
             raise VJoyError(
-                "Invalid direction specified - {}".format(
-                    _error_string(self.vjoy_id, self.axis_id, self._direction)
-                )
+                f"Invalid direction specified - {_error_string(self.vjoy_id, self.axis_id, self._direction)}"
             )
 
         self._direction = direction
@@ -417,9 +407,7 @@ class Hat:
                 self.hat_id
         ):
             raise VJoyError(
-                "Failed to set hat direction - {}".format(
-                    _error_string(self.vjoy_id, self.axis_id, self._direction)
-                )
+               f"Failed to set hat direction - {_error_string(self.vjoy_id, self.axis_id, self._direction)}"
             )
 
     def _set_continuous_direction(self, direction):
@@ -429,9 +417,7 @@ class Hat:
         """
         if direction not in Hat.to_continuous_direction:
             raise VJoyError(
-                "Invalid direction specified - {}".format(
-                    _error_string(self.vjoy_id, self.axis_id, direction)
-                )
+                f"Invalid direction specified - {_error_string(self.vjoy_id, self.axis_id, direction)}"
             )
 
         self._direction = direction
@@ -441,9 +427,7 @@ class Hat:
                 self.hat_id
         ):
             raise VJoyError(
-                "Failed to set hat direction - {}".format(
-                    _error_string(self.vjoy_id, self.axis_id, self._direction)
-                )
+                f"Failed to set hat direction - {_error_string(self.vjoy_id, self.axis_id, self._direction)}"
             )
 
 
@@ -483,17 +467,17 @@ class VJoy:
             raise VJoyError("Running incompatible vJoy version, 2.1.8  or later required")
         elif VJoyInterface.GetVJDStatus(vjoy_id) != VJoyState.Free.value:
             logging.getLogger("system").error(
-                "Requested vJoy device is not available - vid: {}".format(vjoy_id)
+                f"Requested vJoy device is not available - vid: {vjoy_id}"
             )
             raise VJoyError(
-                "Requested vJoy device is not available - vid: {}".format(vjoy_id)
+                f"Requested vJoy device is not available - vid: {vjoy_id}"
             )
         elif not VJoyInterface.AcquireVJD(vjoy_id):
             logging.getLogger("system").error(
-                "Failed to acquire the vJoy device - vid: {}".format(vjoy_id)
+                f"Failed to acquire the vJoy device - vid: {vjoy_id}"
             )
             raise VJoyError(
-                "Failed to acquire the vJoy device - vid: {}".format(vjoy_id)
+                f"Failed to acquire the vJoy device - vid: {vjoy_id}"
             )
 
         self.vjoy_id = vjoy_id
@@ -533,13 +517,10 @@ class VJoy:
         if self.pid != VJoyInterface.GetOwnerPid(self.vjoy_id):
             if not VJoyInterface.AcquireVJD(self.vjoy_id):
                 logging.getLogger("system").error(
-                    "Failed to re-acquire the vJoy device - vid: {}".format(
-                        self.vjoy_id
-                ))
+                    f"Failed to re-acquire the vJoy device - vid: {self.vjoy_id}")
                 raise VJoyError(
-                    "Failed to re-acquire the vJoy device - vid: {}".format(
-                        self.vjoy_id
-                ))
+                    f"Failed to re-acquire the vJoy device - vid: {self.vjoy_id}"
+                )
 
     @property
     def axis_count(self):
@@ -581,17 +562,13 @@ class VJoy:
             axis_id = VJoy.axis_equivalence.get(axis_id, axis_id)
             if not self.is_axis_valid(axis_id=axis_id):
                 raise VJoyError(
-                    "Invalid axis index requested - {}".format(
-                        _error_string(self.vjoy_id, axis_id, "")
-                    )
+                    f"Invalid axis index requested - {_error_string(self.vjoy_id, axis_id, "")}"
                 )
             return self._axis_names[axis_id]
         elif linear_index is not None:
             if not self.is_axis_valid(linear_index=linear_index):
                 raise VJoyError(
-                    "Invalid linear index for axis lookup provided - {}".format(
-                        _error_string(self.vjoy_id, linear_index, "")
-                    )
+                    f"Invalid linear index for axis lookup provided - {_error_string(self.vjoy_id, linear_index, "")}"
                 )
             return self._axis_names[self._axis_lookup[linear_index]]
         else:
@@ -605,9 +582,7 @@ class VJoy:
         """
         if not self.is_axis_valid(linear_index=linear_index):
             raise VJoyError(
-                "Invalid linear index for axis lookup provided - {}".format(
-                    _error_string(self.vjoy_id, linear_index, "")
-                )
+                f"Invalid linear index for axis lookup provided - {_error_string(self.vjoy_id, linear_index, "")}"
             )
 
         return self._axis_lookup[linear_index]
@@ -623,17 +598,13 @@ class VJoy:
             axis_id = VJoy.axis_equivalence.get(axis_id, axis_id)
             if not self.is_axis_valid(axis_id=axis_id):
                 raise VJoyError(
-                    "Invalid axis index requested - {}".format(
-                        _error_string(self.vjoy_id, axis_id, "")
-                    )
+                    f"Invalid axis index requested - {_error_string(self.vjoy_id, axis_id, "")}"
                 )
             return self._axis[axis_id]
         elif linear_index is not None:
             if not self.is_axis_valid(linear_index=linear_index):
                 raise VJoyError(
-                    "Invalid linear index for axis lookup provided - {}".format(
-                        _error_string(self.vjoy_id, linear_index, "")
-                    )
+                    f"Invalid linear index for axis lookup provided - {_error_string(self.vjoy_id, linear_index, "")}"
                 )
             return self._axis[self._axis_lookup[linear_index]]
         else:
@@ -647,9 +618,7 @@ class VJoy:
         """
         if index not in self._button:
             raise VJoyError(
-                "Invalid button index requested - {}".format(
-                    _error_string(self.vjoy_id, index, "")
-                )
+                f"Invalid button index requested - {_error_string(self.vjoy_id, index, "")}"
             )
         return self._button[index]
 
@@ -661,9 +630,7 @@ class VJoy:
         """
         if index not in self._hat:
             raise VJoyError(
-                "Invalid hat index requested - {}".format(
-                    _error_string(self.vjoy_id, index, "")
-                )
+                f"Invalid hat index requested - {_error_string(self.vjoy_id, index, "")}"
             )
         return self._hat[index]
 
@@ -814,12 +781,7 @@ class VJoy:
 
         :returns string representation of the vJoy device information
         """
-        return "vJoyId={0:d} axis={1:d} buttons={2:d} hats={3:d}".format(
-            self.vjoy_id,
-            len(self.axis),
-            len(self.button),
-            len(self.hat)
-        )
+        return f"vJoyId={self.vjoy_id:d} axis={len(self.axis):d} buttons={len(self.button):d} hats={len(self.hat):d}"
 
 
 def deadzone(value, low, low_center, high_center, high):

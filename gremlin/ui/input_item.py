@@ -598,7 +598,7 @@ class InputItemButton(QtWidgets.QFrame):
 
         :param description the description to use
         """
-        self._description_widget.setText("<i>{}</i>".format(description))
+        self._description_widget.setText(f"<i>{description}</i>")
 
     def create_action_icons(self, profile_data):
         """Creates the label of this instance.

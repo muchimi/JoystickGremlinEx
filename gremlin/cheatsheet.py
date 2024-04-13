@@ -72,9 +72,7 @@ class InputItemData:
             self.input_item.input_id
         )
         inherited = Paragraph(
-            "<span color='#c0c0c0'><i>{}</i></span>".format(
-                "" if self.inherited_from is None else self.inherited_from
-            ),
+            f"<span color='#c0c0c0'><i>{"" if self.inherited_from is None else self.inherited_from}</i></span>",
             InputItemData.style
         )
 
@@ -86,7 +84,7 @@ class InputItemData:
             additional_desc = ""
             for c_descs in container_desc:
                 for a_desc in c_descs:
-                    additional_desc += "\n{}".format(a_desc)
+                    additional_desc += f"\n{a_desc}"
 
             description = global_desc
             if len(additional_desc) > 0:
@@ -114,7 +112,7 @@ class InputItemData:
                     for i, action_set in enumerate(container.action_sets):
                         if len(action_set) > 0:
                             hat_outputs.append((
-                                "{} {}".format(input_name, direction_lookup[i]),
+                                f"{input_name} {direction_lookup[i]}",
                                 self.extract_action_set_descriptions(action_set),
                                 inherited
                             ))
@@ -123,10 +121,7 @@ class InputItemData:
                 elif container.virtual_button is not None:
                     c_dirs = []
                     for direction in container.virtual_button.directions:
-                        c_dirs.append("{} {}".format(
-                            input_name,
-                            hat_direction_abbrev[direction]
-                        ))
+                        c_dirs.append(f"{input_name} {hat_direction_abbrev[direction]}")
                     c_input_name = "\n".join(c_dirs)
 
                     hat_outputs.append((
@@ -409,4 +404,4 @@ def format_input_name(input_type, identifier):
     if input_type == gremlin.common.InputType.Keyboard:
         return gremlin.macro.key_from_code(identifier[0], identifier[1]).name
     else:
-        return "{} {}".format(type_map[input_type], identifier)
+        return f"{type_map[input_type]} {identifier}"

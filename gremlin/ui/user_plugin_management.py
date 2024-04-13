@@ -148,10 +148,7 @@ class ModuleManagementController(QtCore.QObject):
             else:
                 logging.getLogger("system").error(
                     "Invalid variable type encountered in user "
-                    "plugin {} : {}".format(
-                        instance.parent.file_name,
-                        var.label
-                    )
+                    f"plugin {instance.parent.file_name} : {var.label}"
                 )
                 layout.addWidget(QtWidgets.QLabel(var.label))
         layout.addStretch()
@@ -171,18 +168,14 @@ class ModuleManagementController(QtCore.QObject):
         elif variable.type == PluginVariableType.PhysicalInput:
             variable.value = data
             button = widget.itemAtPosition(0, 1).widget()
-            input_id = "{:d}".format(data["input_id"])
+            input_id = f"{data["input_id"]:d}"
             if data["input_type"] == gremlin.common.InputType.JoystickAxis:
                 input_id = gremlin.common.AxisNames.to_string(
                     gremlin.common.AxisNames(data["input_id"])
                 )
-            button.setText("{} {} {}".format(
-                data["device_name"],
-                gremlin.common.InputType.to_string(
-                    data["input_type"]
-                ).capitalize(),
-                input_id
-            ))
+            button.setText(
+                f"{data["device_name"]} {gremlin.common.InputType.to_string(data["input_type"]).capitalize()} {input_id}"
+                )
 
         variable.is_valid = True
 
