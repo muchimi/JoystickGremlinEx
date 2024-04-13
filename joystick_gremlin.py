@@ -39,10 +39,13 @@ import gremlin.event_handler
 
 import dill
 
+
 # Figure out the location of the code / executable and change the working
 # directory accordingly
 install_path = os.path.normcase(os.path.dirname(os.path.abspath(sys.argv[0])))
 os.chdir(install_path)
+
+from gremlin.theme import ThemeQIcon
 
 import gremlin.ui.axis_calibration
 import gremlin.ui.common
@@ -365,7 +368,8 @@ class GremlinUi(QtWidgets.QMainWindow):
                 self._last_active_mode(),
                 self._profile
             )
-            self.ui.tray_icon.setIcon(QtGui.QIcon("gfx/icon_active.ico"))
+            self.ui.tray_icon.setIcon(ThemeQIcon("gfx/icon_active.ico"))
+            #self.ui.tray_icon.setIcon(QtGui.QIcon("gfx/icon_active.ico"))
             
             
 
@@ -380,7 +384,8 @@ class GremlinUi(QtWidgets.QMainWindow):
                 gremlin.ui.device_tab.KeyboardDeviceTabWidget
             ]:
                 self.ui.devices.currentWidget().refresh()
-            self.ui.tray_icon.setIcon(QtGui.QIcon("gfx/icon.ico"))
+            #self.ui.tray_icon.setIcon(QtGui.QIcon("gfx/icon.ico"))
+            self.ui.tray_icon.setIcon(ThemeQIcon("gfx/icon.ico"))
             
 
     def create_1to1_mapping(self):
@@ -743,47 +748,47 @@ class GremlinUi(QtWidgets.QMainWindow):
         """Sets the icons of all QAction items."""
         # Menu actions
         self.ui.actionLoadProfile.setIcon(
-            QtGui.QIcon("gfx/profile_open.svg")
+            ThemeQIcon("gfx/profile_open.svg")
         )
         self.ui.actionNewProfile.setIcon(
-            QtGui.QIcon("gfx/profile_new.svg")
+            ThemeQIcon("gfx/profile_new.svg")
         )
         self.ui.actionSaveProfile.setIcon(
-            QtGui.QIcon("gfx/profile_save.svg")
+            ThemeQIcon("gfx/profile_save.svg")
         )
         self.ui.actionSaveProfileAs.setIcon(
-            QtGui.QIcon("gfx/profile_save_as.svg")
+            ThemeQIcon("gfx/profile_save_as.svg")
         )
         self.ui.actionDeviceInformation.setIcon(
-            QtGui.QIcon("gfx/device_information.svg")
+            ThemeQIcon("gfx/device_information.svg")
         )
         self.ui.actionManageCustomModules.setIcon(
-            QtGui.QIcon("gfx/manage_modules.svg")
+            ThemeQIcon("gfx/manage_modules.svg")
         )
         self.ui.actionManageModes.setIcon(
-            QtGui.QIcon("gfx/manage_modes.svg")
+            ThemeQIcon("gfx/manage_modes.svg")
         )
         self.ui.actionInputRepeater.setIcon(
-            QtGui.QIcon("gfx/input_repeater.svg")
+            ThemeQIcon("gfx/input_repeater.svg")
         )
         self.ui.actionCalibration.setIcon(
-            QtGui.QIcon("gfx/calibration.svg")
+            ThemeQIcon("gfx/calibration.svg")
         )
         self.ui.actionInputViewer.setIcon(
-            QtGui.QIcon("gfx/input_viewer.svg")
+            ThemeQIcon("gfx/input_viewer.svg")
         )
         self.ui.actionLogDisplay.setIcon(
-            QtGui.QIcon("gfx/logview.png")
+            ThemeQIcon("gfx/logview.png")
         )
         self.ui.actionOptions.setIcon(
-            QtGui.QIcon("gfx/options.svg")
+            ThemeQIcon("gfx/options.svg")
         )
         self.ui.actionAbout.setIcon(
-            QtGui.QIcon("gfx/about.svg")
+            ThemeQIcon("gfx/about.svg")
         )
 
         # Toolbar actions
-        activate_icon = QtGui.QIcon()
+        activate_icon = ThemeQIcon()
         activate_icon.addPixmap(
             QtGui.QPixmap("gfx/activate.svg"),
             QtGui.QIcon.Normal
@@ -795,7 +800,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         )
         self.ui.actionActivate.setIcon(activate_icon)
         self.ui.actionOpen.setIcon(
-            QtGui.QIcon("gfx/profile_open.svg")
+            ThemeQIcon("gfx/profile_open.svg")
         )
 
     # +---------------------------------------------------------------
@@ -1504,10 +1509,18 @@ if __name__ == "__main__":
     # Create user interface
     app_id = u"joystick.gremlin"
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(app_id)
+
+
+    # disable dark mode for now while we sort icons in a future version
+    os.environ["QT_QPA_PLATFORM"] = "windows:darkmode=0"
+
     app = QtWidgets.QApplication(sys.argv)
     app.setWindowIcon(QtGui.QIcon("gfx/icon.png"))
     app.setApplicationDisplayName(APPLICATION_NAME + " " + APPLICATION_VERSION)
     app.setApplicationVersion(APPLICATION_VERSION)
+    
+    # handle windows themes better
+    #app.setStyle('Fusion')
 
     # Ensure joystick devices are correctly setup
     dill.DILL.init()

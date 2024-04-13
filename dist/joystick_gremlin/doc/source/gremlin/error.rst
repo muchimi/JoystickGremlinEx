@@ -1,3 +1,0 @@
-error
------
-.. automodule:: gremlin.error

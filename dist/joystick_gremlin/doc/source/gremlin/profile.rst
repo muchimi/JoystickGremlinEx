@@ -1,3 +1,0 @@
-profile
--------
-.. automodule:: gremlin.profile

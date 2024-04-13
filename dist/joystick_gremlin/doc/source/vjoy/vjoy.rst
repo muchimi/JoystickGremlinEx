@@ -1,3 +1,0 @@
-vjoy
-----
-.. automodule:: vjoy.vjoy

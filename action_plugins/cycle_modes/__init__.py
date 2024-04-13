@@ -20,6 +20,7 @@ import os
 from PySide6 import QtCore, QtGui, QtWidgets
 from xml.etree import ElementTree
 
+from gremlin.theme import ThemeQIcon
 from gremlin.base_classes import AbstractAction, AbstractFunctor
 from gremlin.common import InputType
 import gremlin.ui.input_item
@@ -51,19 +52,19 @@ class CycleModesWidget(gremlin.ui.input_item.AbstractActionWidget):
             for entry in gremlin.profile.mode_list(self.action_data):
                 self.mode_list.addItem(entry)
             self.add = QtWidgets.QPushButton(
-                QtGui.QIcon("gfx/list_add.svg"), "Add"
+                ThemeQIcon("gfx/list_add.svg"), "Add"
             )
             self.add.clicked.connect(self._add_cb)
             self.delete = QtWidgets.QPushButton(
-                QtGui.QIcon("gfx/list_delete.svg"), "Delete"
+                ThemeQIcon("gfx/list_delete.svg"), "Delete"
             )
             self.delete.clicked.connect(self._remove_cb)
             self.up = QtWidgets.QPushButton(
-                QtGui.QIcon("gfx/list_up.svg"), "Up"
+                ThemeQIcon("gfx/list_up.svg"), "Up"
             )
             self.up.clicked.connect(self._up_cb)
             self.down = QtWidgets.QPushButton(
-                QtGui.QIcon("gfx/list_down.svg"), "Down"
+                ThemeQIcon("gfx/list_down.svg"), "Down"
             )
             self.down.clicked.connect(self._down_cb)
 

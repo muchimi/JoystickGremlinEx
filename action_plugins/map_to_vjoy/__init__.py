@@ -23,6 +23,7 @@ from xml.etree import ElementTree
 
 from PySide6 import QtWidgets, QtCore, QtGui
 
+from gremlin.theme import ThemeQIcon
 from gremlin.base_classes import InputActionCondition
 from gremlin.common import InputType
 from gremlin import input_devices, joystick_handling, util
@@ -1547,8 +1548,8 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         icon_path = os.path.join("action_plugins","map_to_vjoy")
         unused_path = os.path.join(icon_path, "unused.png")
         used_path = os.path.join(icon_path, "used.png")
-        used_icon = QtGui.QIcon(used_path)
-        unused_icon = QtGui.QIcon(unused_path)
+        used_icon = ThemeQIcon(used_path)
+        unused_icon = ThemeQIcon(unused_path)
         used_pixmap = QtGui.QPixmap(used_path)
         unused_pixmap = QtGui.QPixmap(unused_path)
 

@@ -1,3 +1,0 @@
-common
-------
-.. automodule:: gremlin.common

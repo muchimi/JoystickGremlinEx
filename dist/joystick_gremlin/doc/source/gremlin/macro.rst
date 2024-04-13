@@ -1,3 +1,0 @@
-macro
------
-.. automodule:: gremlin.macro

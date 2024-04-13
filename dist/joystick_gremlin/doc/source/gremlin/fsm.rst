@@ -1,3 +1,0 @@
-fsm
----
-.. automodule:: gremlin.fsm
