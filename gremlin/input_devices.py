@@ -382,7 +382,7 @@ class CallbackRegistry:
             is paused
         """
         self._current_id += 1
-        function_name = "{}_{:d}".format(callback.__name__, self._current_id)
+        function_name = f"{callback.__name__}_{self._current_id:d}"
 
         if event.device_guid not in self._registry:
             self._registry[event.device_guid] = {}
@@ -1236,7 +1236,7 @@ class JoystickWrapper:
         """
         if DILL.device_exists(device_guid) is False:
             raise error.GremlinError(
-                "No device with the provided GUID {} exist".format(device_guid)
+                f"No device with the provided GUID {device_guid} exist"
             )
         self._device_guid = device_guid
         self._info = DILL.get_device_information_by_guid(self._device_guid)
@@ -1281,10 +1281,8 @@ class JoystickWrapper:
         """
         if index not in self._axis:
             raise error.GremlinError(
-                "Invalid axis {} specified for device {}".format(
-                    index,
-                    self._device_guid
-            ))
+                f"Invalid axis {index} specified for device {self._device_guid}"
+                )
         return self._axis[index]
 
     def button(self, index):
@@ -1297,10 +1295,7 @@ class JoystickWrapper:
         """
         if not (0 < index < len(self._buttons)):
             raise error.GremlinError(
-                "Invalid button {} specified for device {}".format(
-                    index,
-                    self._device_guid
-                )
+                f"Invalid button {index} specified for device {self._device_guid}"
             )
         return self._buttons[index]
 
@@ -1314,10 +1309,7 @@ class JoystickWrapper:
         """
         if not (0 < index < len(self._hats)):
             raise error.GremlinError(
-                "Invalid hat {} specified for device {}".format(
-                    index,
-                    self._device_guid
-                )
+                f"Invalid hat {index} specified for device {self._device_guid}"
             )
         return self._hats[index]
 
@@ -1401,7 +1393,7 @@ class JoystickProxy:
                 JoystickProxy.joystick_devices[device_guid] = joy
             else:
                 raise error.GremlinError(
-                    "No device with guid {} exists".format(device_guid)
+                    f"No device with guid {device_guid} exists"
                 )
 
         return JoystickProxy.joystick_devices[device_guid]
@@ -1539,7 +1531,7 @@ class JoystickDecorator:
             self.device_guid = gremlin.profile.parse_guid(device_guid)
         except error.ProfileError:
             logging.getLogger("system").error(
-                "Invalid guid value '' received".format(device_guid)
+                f"Invalid guid value '{device_guid}' received"
             )
             self.device_guid = GUID_Invalid
 

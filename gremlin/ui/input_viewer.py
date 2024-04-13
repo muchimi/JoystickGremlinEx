@@ -59,10 +59,7 @@ class VisualizationSelector(QtWidgets.QWidget):
         self.main_layout = QtWidgets.QVBoxLayout(self)
         for dev in sorted(devices, key=lambda x: (x.name, x.vjoy_id)):
             if dev.is_virtual:
-                box = QtWidgets.QGroupBox("{} #{:d}".format(
-                    dev.name,
-                    dev.vjoy_id
-                ))
+                box = QtWidgets.QGroupBox(f"{dev.name} #{dev.vjoy_id:d}")
             else:
                 box = QtWidgets.QGroupBox(dev.name)
 
@@ -335,9 +332,9 @@ class ButtonState(QtWidgets.QGroupBox):
         self._event_times = {}
 
         if device.is_virtual:
-            self.setTitle("{} #{:d} - Buttons".format(device.name, device.vjoy_id))
+            self.setTitle(f"{device.name} #{device.vjoy_id:d} - Buttons")
         else:
-            self.setTitle("{} - Buttons".format(device.name))
+            self.setTitle(f"{device.name} - Buttons")
 
         self.buttons = [None]
         button_layout = QtWidgets.QGridLayout()
@@ -376,9 +373,9 @@ class HatState(QtWidgets.QGroupBox):
         self._event_times = {}
 
         if device.is_virtual:
-            self.setTitle("{} #{:d} - Hats".format(device.name, device.vjoy_id))
+            self.setTitle(f"{device.name} #{device.vjoy_id:d} - Hats")
         else:
-            self.setTitle("{} - Hats".format(device.name))
+            self.setTitle(f"{device.name} - Hats")
 
         self.hats = [None]
         hat_layout = QtWidgets.QGridLayout()
@@ -423,25 +420,18 @@ class AxesTimeline(QtWidgets.QGroupBox):
         super().__init__(parent)
 
         if device.is_virtual:
-            self.setTitle("{} #{:d} - Axes".format(device.name, device.vjoy_id))
+            self.setTitle(f"{device.name} #{device.vjoy_id:d} - Axes")
         else:
-            self.setTitle("{} - Axes".format(device.name))
+            self.setTitle(f"{device.name} - Axes")
 
         self.setLayout(QtWidgets.QVBoxLayout())
         self.plot_widget = TimeLinePlotWidget()
         self.legend_layout = QtWidgets.QHBoxLayout()
         self.legend_layout.addStretch()
         for i in range(device.axis_count):
-            label = QtWidgets.QLabel(
-                "Axis {:d}".format(device.axis_map[i].axis_index)
-            )
+            label = QtWidgets.QLabel(f"Axis {device.axis_map[i].axis_index:d}")
             label.setStyleSheet(
-                "QLabel {{ color: {}; font-weight: bold }}".format(
-                    AxesTimeline.color_list.get(
-                        device.axis_map[i].axis_index,
-                        "#000000"
-                    )
-                )
+                f"QLabel {{ color: {AxesTimeline.color_list.get(device.axis_map[i].axis_index,"#000000")}; font-weight: bold }}"
             )
             self.legend_layout.addWidget(label)
         self.layout().addWidget(self.plot_widget)
@@ -470,9 +460,9 @@ class AxesCurrentState(QtWidgets.QGroupBox):
 
         self.device = device
         if device.is_virtual:
-            self.setTitle("{} #{:d} - Axes".format(device.name, device.vjoy_id))
+            self.setTitle(f"{device.name} #{device.vjoy_id:d} - Axes")
         else:
-            self.setTitle("{} - Axes".format(device.name))
+            self.setTitle(f"{device.name} - Axes")
 
         self.axes = [None]
         axes_layout = QtWidgets.QHBoxLayout()
@@ -521,7 +511,7 @@ class AxisStateWidget(QtWidgets.QWidget):
         self.progress.setOrientation(QtCore.Qt.Vertical)
 
         self.readout = QtWidgets.QLabel()
-        self.label = QtWidgets.QLabel("Axis {}".format(axis_id))
+        self.label = QtWidgets.QLabel(f"Axis {axis_id}")
 
         self.main_layout.addWidget(self.label)
         self.main_layout.addWidget(self.progress)
@@ -533,7 +523,7 @@ class AxisStateWidget(QtWidgets.QWidget):
         :param value new value to show
         """
         self.progress.setValue(AxisStateWidget.scale_factor * value)
-        self.readout.setText("{:d} %".format(int(round(100 * value))))
+        self.readout.setText(f"{int(round(100 * value)):d} %")
 
 
 class HatWidget(QtWidgets.QWidget):

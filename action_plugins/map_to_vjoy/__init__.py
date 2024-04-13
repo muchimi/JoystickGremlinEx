@@ -1469,7 +1469,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         except gremlin.error.GremlinError as e:
             util.display_error(
-                "A needed vJoy device is not accessible: {}\n\n".format(e) +
+                f"A needed vJoy device is not accessible: {e}\n\n" +
                 "Default values have been set for the input, but they are "
                 "not what has been specified."
             )
@@ -2174,7 +2174,7 @@ class VjoyRemap(gremlin.base_classes.AbstractAction):
                 self.vjoy_input_id = safe_read(node, "button", int)
             else:
                 raise gremlin.error.GremlinError(
-                    "Invalid remap type provided: {}".format(node.attrib)
+                    f"Invalid remap type provided: {node.attrib}"
                 )
 
             self.vjoy_device_id = safe_read(node, "vjoy", int)

@@ -175,9 +175,7 @@ class SmartToggleContainerFunctor(gremlin.base_classes.AbstractFunctor):
         #       virtual buttons created on those inputs is supported
         if not isinstance(value.current, bool):
             logging.getLogger("system").warning(
-                "Invalid data type received in Smart Toggle container: {}".format(
-                    type(event.value)
-                )
+                f"Invalid data type received in Smart Toggle container: {type(event.value)}"
             )
             return False
 

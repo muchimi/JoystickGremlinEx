@@ -73,8 +73,8 @@ class DeviceListModel(QtCore.QAbstractListModel):
         "axes": lambda dev: dev.axis_count,
         "buttons": lambda dev: dev.button_count,
         "hats": lambda dev: dev.hat_count,
-        "pid": lambda dev: "{:04X}".format(dev.product_id),
-        "vid": lambda dev: "{:04X}".format(dev.vendor_id),
+        "pid": lambda dev: f"{dev.product_id:04X}",
+        "vid": lambda dev: f"{dev.vendor_id:04X}",
         "guid": lambda dev: str(dev.device_guid),
         "joy_id": lambda dev: dev.joystick_id,
     }
@@ -204,10 +204,7 @@ class Device(QtCore.QAbstractListModel):
         return identifier
 
     def _name(self, identifier: typing.Tuple[InputType, int]) -> str:
-        return "{} {:d}".format(
-            InputType.to_string(identifier[0]).capitalize(),
-            identifier[1]
-        )
+        return f"{InputType.to_string(identifier[0]).capitalize()} {identifier[1]:d}"
 
     def _convert_index(self, index: int) -> typing.Tuple[InputType, int]:
         axis_count = self._device.axis_count
@@ -291,7 +288,7 @@ class VJoyDevices(QtCore.QObject):
         pass
 
     def _device_name(self, device) -> str:
-        return "vJoy Device {:d}".format(device.vjoy_id)
+        return f"vJoy Device {device.vjoy_id:d}"
 
     def _is_state_valid(self) -> bool:
         """Returns if the state of the object is valid.

@@ -452,9 +452,7 @@ class MergeAxis:
             )
         else:
             raise gremlin.error.GremlinError(
-                "Invalid merge axis operation detected, \"{}\"".format(
-                    str(self.operation)
-                )
+                f"Invalid merge axis operation detected, \"{str(self.operation)}\""
             )
 
         gremlin.joystick_handling.VJoyProxy()[self.vjoy_id]\

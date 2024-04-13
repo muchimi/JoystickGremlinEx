@@ -69,7 +69,7 @@ def _fire_pulse(vjoy, unit, button, repeat = 1, duration = 0.2):
 			time.sleep(duration)
 	else:
 		if repeat <= 1: 
-			gremlin.util.log("Pulsing vjoy {} button {} on".format(unit, button))  
+			gremlin.util.log(f"Pulsing vjoy {unit} button {button} on")  
 			vjoy[unit].button(button).is_pressed = True
 			time.sleep(duration)
 			vjoy[unit].button(button).is_pressed = False
@@ -82,7 +82,7 @@ def _fire_pulse(vjoy, unit, button, repeat = 1, duration = 0.2):
 
 # pulses a button - unit is the vjoy output device number, button is the number of the button on the device to pulse
 def pulse(vjoy, unit, button, duration = 0.2, repeat = 1):
-	gremlin.util.log("pulsing: unit {} button {}".format(unit, button))
+	gremlin.util.log(f"pulsing: unit {unit} button {button}")
 	threading.Timer(0.01, _fire_pulse, [vjoy, unit, button, repeat, duration]).start()
 
 
@@ -647,7 +647,7 @@ def write_string(val: str) -> bytes:
     try:
         dgram = val.encode('utf-8')  # Default, but better be explicit.
     except (UnicodeEncodeError, AttributeError) as e:
-        raise BuildError('Incorrect string, could not encode {}'.format(e))
+        raise BuildError(f'Incorrect string, could not encode {e}')
     diff = _STRING_DGRAM_PAD - (len(dgram) % _STRING_DGRAM_PAD)
     dgram += (b'\x00' * diff)
     return dgram
@@ -706,7 +706,7 @@ def write_int(val: int) -> bytes:
     try:
         return struct.pack('>i', val)
     except struct.error as e:
-        raise BuildError('Wrong argument value passed: {}'.format(e))
+        raise BuildError(f'Wrong argument value passed: {e}')
 
 
 def get_int(dgram: bytes, start_index: int) -> Tuple[int, int]:
@@ -742,7 +742,7 @@ def write_int64(val: int) -> bytes:
     try:
         return struct.pack('>q', val)
     except struct.error as e:
-        raise BuildError('Wrong argument value passed: {}'.format(e))
+        raise BuildError(f'Wrong argument value passed: {e}')
 
 
 def get_int64(dgram: bytes, start_index: int) -> Tuple[int, int]:
@@ -834,7 +834,7 @@ def write_float(val: float) -> bytes:
     try:
         return struct.pack('>f', val)
     except struct.error as e:
-        raise BuildError('Wrong argument value passed: {}'.format(e))
+        raise BuildError(f'Wrong argument value passed: {e}')
 
 
 def get_float(dgram: bytes, start_index: int) -> Tuple[float, int]:
@@ -873,7 +873,7 @@ def write_double(val: float) -> bytes:
     try:
         return struct.pack('>d', val)
     except struct.error as e:
-        raise BuildError('Wrong argument value passed: {}'.format(e))
+        raise BuildError(f'Wrong argument value passed: {e}')
 
 
 def get_double(dgram: bytes, start_index: int) -> Tuple[float, int]:
@@ -897,7 +897,7 @@ def get_double(dgram: bytes, start_index: int) -> Tuple[float, int]:
                           dgram[start_index:start_index + _DOUBLE_DGRAM_LEN])[0],
             start_index + _DOUBLE_DGRAM_LEN)
     except (struct.error, TypeError) as e:
-        raise ParseError('Could not parse datagram {}'.format(e))
+        raise ParseError(f'Could not parse datagram {e}')
 
 
 def get_blob(dgram: bytes, start_index: int) -> Tuple[bytes, int]:
@@ -990,7 +990,7 @@ def write_rgba(val: bytes) -> bytes:
     try:
         return struct.pack('>I', val)
     except struct.error as e:
-        raise BuildError('Wrong argument value passed: {}'.format(e))
+        raise BuildError(f'Wrong argument value passed: {e}')
 
 
 def get_rgba(dgram: bytes, start_index: int) -> Tuple[bytes, int]:
@@ -1032,7 +1032,7 @@ def write_midi(val: MidiPacket) -> bytes:
         value = sum((value & 0xFF) << 8 * (3 - pos) for pos, value in enumerate(val))
         return struct.pack('>I', value)
     except struct.error as e:
-        raise BuildError('Wrong argument value passed: {}'.format(e))
+        raise BuildError(f'Wrong argument value passed: {e}')
 
 
 def get_midi(dgram: bytes, start_index: int) -> Tuple[MidiPacket, int]:
@@ -1131,16 +1131,16 @@ class OscMessage(object):
                     param_stack.append(array)
                 elif param == "]":  # Array stop.
                     if len(param_stack) < 2:
-                        raise ParseError('Unexpected closing bracket in type tag: {0}'.format(type_tag))
+                        raise ParseError(f'Unexpected closing bracket in type tag: {type_tag}')
                     param_stack.pop()
                 # TODO: Support more exotic types as described in the specification.
                 else:
-                    logging.warning('Unhandled parameter type: {0}'.format(param))
+                    logging.warning(f'Unhandled parameter type: {param}')
                     continue
                 if param not in "[]":
                     param_stack[-1].append(val)
             if len(param_stack) != 1:
-                raise ParseError('Missing closing bracket in type tag: {0}'.format(type_tag))
+                raise ParseError(f'Missing closing bracket in type tag: {type_tag}')
             self._parameters = params
         except ParseError as pe:
             raise ParseError('Found incorrect datagram, ignoring it', pe)
@@ -1397,10 +1397,10 @@ class OscBundleBuilder(object):
                 else:
                     raise BuildError(
                         "Content must be either OscBundle or OscMessage"
-                        "found {}".format(type(content)))
+                        f"found {type(content)}")
             return OscBundle(dgram)
         except BuildError as be:
-            raise BuildError('Could not build the bundle {}'.format(be))
+            raise BuildError(f'Could not build the bundle {be}')
 
 
 
@@ -1483,8 +1483,8 @@ class OscMessageBuilder(object):
         """
         if arg_type and not self._valid_type(arg_type):
             raise ValueError(
-                'arg_type must be one of {}, or an array of valid types'
-                    .format(self._SUPPORTED_ARG_TYPES))
+                f'arg_type must be one of {self._SUPPORTED_ARG_TYPES}, or an array of valid types'
+                )
         if not arg_type:
             arg_type = self._get_arg_type(arg_value)
         if isinstance(arg_type, list):
@@ -1577,12 +1577,11 @@ class OscMessageBuilder(object):
                                   self.ARG_TYPE_NIL):
                     continue
                 else:
-                    raise BuildError('Incorrect parameter type found {}'.format(
-                        arg_type))
+                    raise BuildError(f'Incorrect parameter type found {arg_type}')
 
             return OscMessage(dgram)
         except BuildError as be:
-            raise BuildError('Could not build the message: {}'.format(be))
+            raise BuildError(f'Could not build the message: {be}')
 
 
 

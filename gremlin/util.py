@@ -138,7 +138,7 @@ def truncate(text, left_size, right_size):
     if len(text) < left_size + right_size:
         return text
 
-    return "{}...{}".format(text[:left_size], text[-right_size:])
+    return f"{text[:left_size]}...{text[-right_size:]}"
 
 
 def script_path():
@@ -216,7 +216,7 @@ def valid_python_identifier(name):
     :param name the name to check for validity
     :return True if the name is a valid identifier, False otherwise
     """
-    return re.match("^[^\d\W]\w*\Z", name) is not None
+    return re.match(r"^[^\d\W]\w*\Z", name) is not None
 
 
 def clamp(value, min_val, max_val):
@@ -280,7 +280,7 @@ def setup_userprofile():
             os.mkdir(folder)
         except Exception as e:
             raise error.GremlinError(
-                "Unable to create data folder: {}".format(str(e))
+                f"Unable to create data folder: {str(e)}"
             )
     elif not os.path.isdir(folder):
         raise error.GremlinError(

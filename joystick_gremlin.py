@@ -685,7 +685,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             )
             self.tabs[device.device_guid] = widget
             tab_label = device.name.strip()
-            tab_label += " #{:d}".format(device.vjoy_id)
+            tab_label += f" #{device.vjoy_id:d}"
             self.ui.devices.addTab(widget, tab_label)
 
         # Create keyboard tab
@@ -719,10 +719,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                 self._current_mode
             )
             self.tabs[device.device_guid] = widget
-            self.ui.devices.addTab(
-                widget,
-                "{} #{:d}".format(device.name, device.vjoy_id)
-            )
+            self.ui.devices.addTab(widget,f"{device.name} #{device.vjoy_id:d}")
 
         # Add profile configuration tab
         widget = gremlin.ui.profile_settings.ProfileSettingsWidget(
@@ -973,14 +970,9 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         :param mode the now current mode
         """
-        self.status_bar_mode.setText("<b>Mode:</b> {}".format(mode))
+        self.status_bar_mode.setText(f"<b>Mode:</b> {mode}")
         if self.config.mode_change_message:
-            self.ui.tray_icon.showMessage(
-                "Mode: {}".format(mode),
-                "",
-                0,
-                250
-            )
+            self.ui.tray_icon.showMessage(f"Mode: {mode}","",0,250)
 
     def _kb_event_cb(self, event):
         ''' listen for keyboard modifiers '''
@@ -1136,9 +1128,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         except (KeyError, TypeError) as error:
             # An error occurred while parsing an existing profile,
             # creating an empty profile instead
-            logging.getLogger("system").exception(
-                "Invalid profile content:\n{}".format(error)
-            )
+            logging.getLogger("system").exception(f"Invalid profile content:\n{error}")
             self.new_profile()
         except gremlin.error.ProfileError as error:
             # Parsing the profile went wrong, stop loading and start with an
@@ -1146,11 +1136,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             cfg = gremlin.config.Configuration()
             cfg.last_profile = None
             self.new_profile()
-            gremlin.util.display_error(
-                "Failed to load the profile {} due to:\n\n{}".format(
-                    fname, error
-                )
-            )
+            gremlin.util.display_error(f"Failed to load the profile {fname} due to:\n\n{error}")
 
     def _force_close(self):
         """Forces the closure of the program."""
@@ -1520,7 +1506,7 @@ if __name__ == "__main__":
     app.setApplicationVersion(APPLICATION_VERSION)
     
     # handle windows themes better
-    #app.setStyle('Fusion')
+    app.setStyle('Fusion')
 
     # Ensure joystick devices are correctly setup
     dill.DILL.init()

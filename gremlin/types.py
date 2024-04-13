@@ -96,7 +96,7 @@ class AxisNames(enum.Enum):
             return _AxisNames_to_string_lookup[value]
         except KeyError:
             raise gremlin.error.GremlinError(
-                "Invalid AxisName lookup, {}".format(value)
+                f"Invalid AxisName lookup, {value}"
             )
 
     @staticmethod
@@ -105,7 +105,7 @@ class AxisNames(enum.Enum):
             return _AxisNames_to_enum_lookup[value]
         except KeyError:
             raise gremlin.error.GremlinError(
-                "Invalid AxisName lookup, {}".format(value)
+                f"Invalid AxisName lookup, {value}"
             )
 
 
@@ -145,7 +145,7 @@ class AxisButtonDirection(enum.Enum):
             return _AxisButtonDirection_to_string_lookup[value]
         except KeyError:
             raise gremlin.error.GremlinError(
-                "Invalid AxisButtonDirection lookup, {}".format(value)
+                f"Invalid AxisButtonDirection lookup, {value}"
             )
 
     @staticmethod
@@ -154,7 +154,7 @@ class AxisButtonDirection(enum.Enum):
             return _AxisButtonDirection_to_enum_lookup[value]
         except KeyError:
             raise gremlin.error.GremlinError(
-                "Invalid AxisButtonDirection lookup, {}".format(value)
+                f"Invalid AxisButtonDirection lookup, {value}"
             )
 
 

@@ -262,18 +262,9 @@ class ModeBindings(QtWidgets.QWidget):
                 bound_input.input_id[0],
                 bound_input.input_id[1]
             ).name
-            return "{} - {}".format(
-                self.device_names[bound_input.parent.parent.device_guid],
-                key_name
-            )
+            return f"{self.device_names[bound_input.parent.parent.device_guid]} - {key_name}"
         else:
-            return "{} - {} {}".format(
-                self.device_names[bound_input.parent.parent.device_guid],
-                gremlin.common.InputType.to_string(
-                    bound_input.input_type
-                ).capitalize(),
-                bound_input.input_id
-            )
+            return f"{self.device_names[bound_input.parent.parent.device_guid]} - {gremlin.common.InputType.to_string(bound_input.input_type).capitalize()} {bound_input.input_id}"
 
     def _create_input_cb(self, input_item):
         """Creates a callback function for the provided input item.

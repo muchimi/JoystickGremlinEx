@@ -131,9 +131,7 @@ class MergeAxisUi(common.BaseDialogUi):
             ):
                 entries_to_remove.append(entry)
                 gremlin.util.display_error(
-                    "vJoy device {} used as physical input".format(
-                        entry["vjoy"]["vjoy_id"]
-                    )
+                    f"vJoy device {entry["vjoy"]["vjoy_id"]} used as physical input"
                 )
             else:
                 self._add_entry(True)
@@ -262,7 +260,7 @@ class MergeAxisEntry(QtWidgets.QDockWidget):
             )
         except gremlin.error.GremlinError as e:
             gremlin.util.display_error(
-                "A needed vJoy device is not accessible: {}\n\n".format(e) +
+                f"A needed vJoy device is not accessible: {e}\n\n" +
                 "Default values have been set for the input, but they are "
                 "not what has been specified."
             )

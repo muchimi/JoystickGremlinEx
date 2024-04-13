@@ -223,7 +223,7 @@ class AxisCalibrationWidget(QtWidgets.QWidget):
 
     def _update_labels(self):
         """Updates the axis limit values."""
-        self.current.setText("{: 5d}".format(self.slider.value()))
-        self.minimum.setText("{: 5d}".format(self.limits[0]))
-        self.center.setText("{: 5d}".format(self.limits[1]))
-        self.maximum.setText("{: 5d}".format(self.limits[2]))
+        self.current.setText(f"{self.slider.value(): 5d}")
+        self.minimum.setText(f"{self.limits[0]: 5d}")
+        self.center.setText(f"{self.limits[1]: 5d}")
+        self.maximum.setText(f"{self.limits[2]: 5d}")

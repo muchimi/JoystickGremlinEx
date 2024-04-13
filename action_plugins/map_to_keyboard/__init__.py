@@ -158,7 +158,7 @@ class MapToKeyboard(AbstractAction):
 
         :return icon representing this action
         """
-        return "{}/icon.png".format(os.path.dirname(os.path.realpath(__file__)))
+        return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
 
     def requires_virtual_button(self):
         """Returns whether or not an activation condition is needed.

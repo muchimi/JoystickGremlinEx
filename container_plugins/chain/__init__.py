@@ -66,7 +66,7 @@ class ChainContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
         for i, action in enumerate(self.profile_data.action_sets):
             widget = self._create_action_set_widget(
                 self.profile_data.action_sets[i],
-                "Action {:d}".format(i),
+                f"Action {i:d}",
                 gremlin.ui.common.ContainerViewTypes.Action
             )
             self.action_layout.addWidget(widget)
@@ -78,7 +78,7 @@ class ChainContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
             for i, action in enumerate(self.profile_data.action_sets):
                 widget = self._create_action_set_widget(
                     self.profile_data.action_sets[i],
-                    "Action {:d}".format(i),
+                    f"Action {i:d}",
                     gremlin.ui.common.ContainerViewTypes.Condition
                 )
                 self.activation_condition_layout.addWidget(widget)
@@ -141,10 +141,7 @@ class ChainContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
 
         :return title to use for the container
         """
-        return "Chain: {}".format(" -> ".join(
-            [", ".join([a.name for a in actions])
-                for actions in self.profile_data.action_sets])
-        )
+        return f"Chain: {" -> ".join([", ".join([a.name for a in actions]) for actions in self.profile_data.action_sets])}"
 
 
 class ChainContainerFunctor(gremlin.base_classes.AbstractFunctor):

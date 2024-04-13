@@ -152,12 +152,9 @@ class Repeater(QtCore.QObject):
             else:
                 el.joystick_event.emit(self._events[index])
 
-            self._update_func("{} {}".format(
-                common.InputType.to_string(
-                    self._events[index].event_type
-                ).capitalize(),
-                str(self._events[index].identifier)
-            ))
+            self._update_func(
+                f"{common.InputType.to_string(self._events[index].event_type).capitalize()} {str(self._events[index].identifier)}"
+                )
 
             index = (index + 1) % len(self._events)
             time.sleep(0.25)

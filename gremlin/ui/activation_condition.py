@@ -186,12 +186,12 @@ class KeyboardConditionWidget(AbstractConditionWidget):
 
             self.key_label = QtWidgets.QLabel("")
             if self.condition_data.scan_code is not None:
-                self.key_label.setText("<b>{}</b>".format(
-                    macro.key_from_code(
+                self.key_label.setText(
+                    f"<b>{macro.key_from_code(
                         self.condition_data.scan_code,
                         self.condition_data.is_extended
-                    ).name
-                ))
+                    ).name}</b>"
+                    )
             self.record_button = common.NoKeyboardPushButton(
                 ThemeQIcon("gfx/button_edit.png"), ""
             )
@@ -234,12 +234,9 @@ class KeyboardConditionWidget(AbstractConditionWidget):
         self.condition_data.is_extended = key.identifier[1]
         self.condition_data.comparison = \
             self.comparison_dropdown.currentText().lower()
-        self.key_label.setText("<b>{}</b>".format(
-            macro.key_from_code(
-                self.condition_data.scan_code,
-                self.condition_data.is_extended
-            ).name
-        ))
+        self.key_label.setText(
+            f"<b>{macro.key_from_code(self.condition_data.scan_code,self.condition_data.is_extended).name}</b>"
+        )
 
     def _comparison_changed_cb(self, text):
         """Updates the comparison operation to use.
@@ -357,10 +354,9 @@ class JoystickConditionWidget(AbstractConditionWidget):
         range_layout.addWidget(QtWidgets.QLabel("and"))
         range_layout.addWidget(self.upper)
 
-        input_label = QtWidgets.QLabel("<b>{} Axis {:d}</b>".format(
-                self.condition_data.device_name,
-                self.condition_data.input_id
-            ))
+        input_label = QtWidgets.QLabel(
+            f"<b>{self.condition_data.device_name} Axis {self.condition_data.input_id:d}</b>"
+            )
         input_label.setWordWrap(True)
         self.main_layout.addWidget(input_label, 0, 1)
         self.main_layout.addWidget(QtWidgets.QLabel("is"), 0, 2)
@@ -381,10 +377,9 @@ class JoystickConditionWidget(AbstractConditionWidget):
         )
 
         self.main_layout.addWidget(
-            QtWidgets.QLabel("<b>{} Button {:d}</b>".format(
-                self.condition_data.device_name,
-                self.condition_data.input_id
-            )),
+            QtWidgets.QLabel(
+                f"<b>{self.condition_data.device_name} Button {self.condition_data.input_id:d}</b>"
+                ),
             0,
             1
         )
@@ -410,10 +405,9 @@ class JoystickConditionWidget(AbstractConditionWidget):
         )
 
         self.main_layout.addWidget(
-            QtWidgets.QLabel("<b>{} Hat {:d}</b>".format(
-                self.condition_data.device_name,
-                self.condition_data.input_id
-            )),
+            QtWidgets.QLabel(
+                f"<b>{self.condition_data.device_name} Hat {self.condition_data.input_id:d}</b>"
+                ),
             0,
             1
         )
@@ -495,9 +489,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
             self.condition_data.comparison = text.lower()
         else:
             logging.getLogger("system").warning(
-                "Invalid input type encountered: {}".format(
-                    self.condition_data.input_type
-                )
+                f"Invalid input type encountered: {self.condition_data.input_type}"
             )
 
 
@@ -601,10 +593,9 @@ class VJoyConditionWidget(AbstractConditionWidget):
         range_layout.addWidget(QtWidgets.QLabel("and"))
         range_layout.addWidget(self.upper)
 
-        input_label = QtWidgets.QLabel("<b>vJoy {:d} Axis {:d}</b>".format(
-                self.condition_data.vjoy_id,
-                self.condition_data.input_id
-            ))
+        input_label = QtWidgets.QLabel(
+            f"<b>vJoy {self.condition_data.vjoy_id:d} Axis {self.condition_data.input_id:d}</b>"
+            )
         input_label.setWordWrap(True)
         self.main_layout.addWidget(input_label, 0, 1)
         self.main_layout.addWidget(QtWidgets.QLabel("is"), 0, 2)
@@ -625,10 +616,9 @@ class VJoyConditionWidget(AbstractConditionWidget):
         )
 
         self.main_layout.addWidget(
-            QtWidgets.QLabel("<b>vJoy {:d} Button {:d}</b>".format(
-                self.condition_data.vjoy_id,
-                self.condition_data.input_id
-            )),
+            QtWidgets.QLabel(
+                f"<b>vJoy {self.condition_data.vjoy_id:d} Button {self.condition_data.input_id:d}</b>"
+                ),
             0,
             1
         )
@@ -654,10 +644,9 @@ class VJoyConditionWidget(AbstractConditionWidget):
         )
 
         self.main_layout.addWidget(
-            QtWidgets.QLabel("<b>vJoy {:d} Hat {:d}</b>".format(
-                self.condition_data.vjoy_id,
-                self.condition_data.input_id
-            )),
+            QtWidgets.QLabel(
+                f"<b>vJoy {self.condition_data.vjoy_id:d} Hat {self.condition_data.input_id:d}</b>"
+                ),
             0,
             1
         )
@@ -707,9 +696,7 @@ class VJoyConditionWidget(AbstractConditionWidget):
             self.condition_data.comparison = text.lower()
         else:
             logging.getLogger("system").warning(
-                "Invalid input type encountered: {}".format(
-                    self.condition_data.input_type
-                )
+                f"Invalid input type encountered: {self.condition_data.input_type}"
             )
 
 

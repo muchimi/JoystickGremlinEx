@@ -60,7 +60,7 @@ class Point2D:
         return Point2D(self.x - other.x, self.y - other.y)
 
     def __str__(self):
-        return "[{:.2f}, {:.2f}]".format(self.x, self.y)
+        return f"[{self.x:.2f}, {self.y:.2f}]"
 
 
 class ControlPoint:
@@ -692,7 +692,7 @@ class CurveView(QtWidgets.QGraphicsScene):
         self.point_editor = point_editor
 
         self.background_image = QtGui.QImage(
-            "{}/grid.svg".format(os.path.dirname(os.path.realpath(__file__)))
+            f"{os.path.dirname(os.path.realpath(__file__))}/grid.svg"
         )
 
         # Connect editor widget signals
@@ -1278,7 +1278,7 @@ class ResponseCurve(AbstractAction):
 
     def icon(self):
         """Returns the icon representing the action."""
-        return "{}/icon.png".format(os.path.dirname(os.path.realpath(__file__)))
+        return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
 
     def requires_virtual_button(self):
         """Returns whether or not an activation condition is needed.

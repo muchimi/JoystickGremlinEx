@@ -57,12 +57,7 @@ class RepeatedTimer(object):
 		self.args       = args
 		self.kwargs     = kwargs
 		self.is_running = False
-		# gremlin.util.log("init")
-		# for n,arg in enumerate(args):
-			# gremlin.util.log("arg: {}: {}".format(n,arg))
-		# for n,arg in kwargs.items():
-			# gremlin.util.log("kwarg: {}: {}".format(n,arg))			
-			
+
 		self.start()
 
 	def _run(self):
@@ -99,7 +94,7 @@ def _fire_pulse(vjoy, unit, button, repeat = 1, duration = 0.2):
 			time.sleep(duration)
 	else:
 		if repeat <= 1: 
-			gremlin.util.log("Pulsing vjoy {} button {} on".format(unit, button) )  
+			gremlin.util.log(f"Pulsing vjoy {unit} button {button} on" )  
 			vjoy[unit].button(button).is_pressed = True
 			time.sleep(duration)
 			vjoy[unit].button(button).is_pressed = False
@@ -112,7 +107,7 @@ def _fire_pulse(vjoy, unit, button, repeat = 1, duration = 0.2):
 
 # pulses a button - unit is the vjoy output device number, button is the number of the button on the device to pulse
 def pulse(vjoy, unit, button, duration = 0.2, repeat = 1):
-	gremlin.util.log("pulsing: unit {} button {}".format(unit, button))
+	gremlin.util.log(f"pulsing: unit {unit} button {button}")
 	threading.Timer(0.01, _fire_pulse, [vjoy, unit, button, repeat, duration]).start()
 
 	
@@ -190,21 +185,21 @@ def pulseButton(event, vjoy, unit, on_button, off_button = None, pulse_duration 
 
 
 def repeat_pulse(vjoy, unit, button, repeat, duration):
-	gremlin.util.log("pulsing: unit {} button {}".format(unit, button))
+	gremlin.util.log(f"pulsing: unit {unit} button {button}")
 	
 	#threading.Timer(0.01, fire_pulse, [vjoy, unit, button, repeat, duration]).start()
 	
 def repeat_fire(name, vjoy, unit, button, repeat=1, interval = 0.5, duration = 0.2):
 	global timer_threads
 	repeat_fire_cancel(name)
-	gremlin.util.log("repeat {} unit {} button {} repeat {} interval {} duration {}".format(name, unit, button, repeat, interval, duration))
+	gremlin.util.log(f"repeat {name} unit {unit} button {button} repeat {repeat} interval {interval} duration {duration}")
 	#args = (vjoy, unit, button, repeat, duration)
 	rt = RepeatedTimer(interval, pulse, vjoy, unit, button, repeat, duration )
 	timer_threads[name] = rt
 	
 def repeat_fire_cancel(name):
 	global timer_threads
-	gremlin.util.log("cancel {}".format(name))	
+	gremlin.util.log(f"cancel {name}")	
 	if name in timer_threads:
 		rt = timer_threads[name]
 		rt.stop()

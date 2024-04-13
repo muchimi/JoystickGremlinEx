@@ -61,10 +61,7 @@ def get_variable_definitions(fname):
         if isinstance(value, AbstractVariable):
             if value.label in variables:
                 logging.getLogger("system").error(
-                    "Plugin: Duplicate label {} present in {} ".format(
-                        value.label,
-                        fname
-                    )
+                    f"Plugin: Duplicate label {value.label} present in {fname}"
                 )
             variables[value.label] = value
     return variables.values()
@@ -606,11 +603,7 @@ class VirtualInputVariable(AbstractVariable):
     def set(self, vjoy, event):
         if event.event_type != self.value["input_type"]:
             logging.getLogger("system").warning(
-                "Invalid types for vJoy set action for vjoy {} {} {:d}".format(
-                    str(self.value["device_id"]),
-                    gremlin.common.InputType.to_string(self.value["input_type"]),
-                    self.value["input_id"]
-                )
+                f"Invalid types for vJoy set action for vjoy {str(self.value["device_id"]),} {gremlin.common.InputType.to_string(self.value["input_type"])} {self.value["input_id"]:d}"
             )
             return
 
@@ -707,16 +700,14 @@ class PhysicalInputVariable(AbstractVariable):
 
         value_widget = QtWidgets.QPushButton("Press")
         if value is not None:
-            input_id = "{:d}".format(value["input_id"])
+            input_id = f"{value["input_id"]:d}"
             if value["input_type"] == gremlin.common.InputType.JoystickAxis:
                 input_id = gremlin.common.AxisNames.to_string(
                     gremlin.common.AxisNames(value["input_id"])
                 )
-            value_widget.setText("{} {} {}".format(
-                value["device_name"],
-                gremlin.common.InputType.to_string(value["input_type"]).capitalize(),
-                input_id
-            ))
+            value_widget.setText(
+                f"{value["device_name"]} {gremlin.common.InputType.to_string(value["input_type"]).capitalize()} {input_id}"
+                )
         value_widget.clicked.connect(self._record_user_input)
 
         layout.addWidget(value_widget, 0, 1)

@@ -727,7 +727,7 @@ class MacroListModel(QtCore.QAbstractListModel):
 
     value_format = {
         gremlin.common.InputType.JoystickAxis:
-            lambda entry: "{:.3f}".format(entry.value),
+            lambda entry: f"{entry.value:.3f}",
         gremlin.common.InputType.JoystickButton:
             lambda entry: "pressed" if entry.value else "released",
         gremlin.common.InputType.JoystickHat:
@@ -1347,7 +1347,7 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.button_delete.clicked.connect(self._delete_cb)
 
             self.button_pause = self._create_toolbutton(
-                "{}/pause".format(MacroWidget.gfx_path),
+                f"{MacroWidget.gfx_path}/pause",
                 "Add pause after the currently selected entry",
                 False
             )
@@ -1355,8 +1355,8 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
 
             self.button_record = self._create_toolbutton(
                 [
-                    "{}/macro_record".format(MacroWidget.gfx_path),
-                    "{}/macro_record_on".format(MacroWidget.gfx_path)
+                    f"{MacroWidget.gfx_path}/macro_record",
+                    f"{MacroWidget.gfx_path}/macro_record_on"
                 ],
                 "Record keyboard and joystick inputs",
                 True,
@@ -1366,8 +1366,8 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
 
             self.record_time = self._create_toolbutton(
                 [
-                    "{}/time".format(MacroWidget.gfx_path),
-                    "{}/time_on".format(MacroWidget.gfx_path)
+                    f"{MacroWidget.gfx_path}/time",
+                    f"{MacroWidget.gfx_path}/time_on"
                 ],
                 "Record pauses between actions",
                 True,
@@ -1378,8 +1378,8 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             cfg = gremlin.config.Configuration()
             self.record_axis = self._create_toolbutton(
                 [
-                    "{}/record_axis".format(MacroWidget.gfx_path),
-                    "{}/record_axis_on".format(MacroWidget.gfx_path)
+                    f"{MacroWidget.gfx_path}/record_axis",
+                    f"{MacroWidget.gfx_path}/record_axis_on"
                 ],
                 "Record joystick axis events",
                 True,
@@ -1388,8 +1388,8 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.record_axis.clicked.connect(self._update_record_settings)
             self.record_button = self._create_toolbutton(
                 [
-                    "{}/record_button".format(MacroWidget.gfx_path),
-                    "{}/record_button_on".format(MacroWidget.gfx_path)
+                    f"{MacroWidget.gfx_path}/record_button",
+                    f"{MacroWidget.gfx_path}/record_button_on"
                 ],
                 "Record joystick button events",
                 True,
@@ -1398,8 +1398,8 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.record_button.clicked.connect(self._update_record_settings)
             self.record_hat = self._create_toolbutton(
                 [
-                    "{}/record_hat".format(MacroWidget.gfx_path),
-                    "{}/record_hat_on".format(MacroWidget.gfx_path)
+                    f"{MacroWidget.gfx_path}/record_hat",
+                    f"{MacroWidget.gfx_path}/record_hat_on"
                 ],
                 "Record joystick hat events",
                 True,
@@ -1408,8 +1408,8 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.record_hat.clicked.connect(self._update_record_settings)
             self.record_key = self._create_toolbutton(
                 [
-                    "{}/record_key".format(MacroWidget.gfx_path),
-                    "{}/record_key_on".format(MacroWidget.gfx_path)
+                    f"{MacroWidget.gfx_path}/record_key",
+                    f"{MacroWidget.gfx_path}/record_key_on"
                 ],
                 "Record keyboard events",
                 True,
@@ -1418,8 +1418,8 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.record_key.clicked.connect(self._update_record_settings)
             self.record_mouse = self._create_toolbutton(
                 [
-                    "{}/record_mouse".format(MacroWidget.gfx_path),
-                    "{}/record_mouse_on".format(MacroWidget.gfx_path)
+                    f"{MacroWidget.gfx_path}/record_mouse",
+                    f"{MacroWidget.gfx_path}/record_mouse_on"
                 ],
                 "Record mouse events",
                 True,
@@ -1715,7 +1715,7 @@ class Macro(AbstractAction):
         self.force_remote = False
 
     def icon(self):
-        return "{}/icon.png".format(os.path.dirname(os.path.realpath(__file__)))
+        return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
 
     def requires_virtual_button(self):
         return self.get_input_type() in [
@@ -1750,7 +1750,7 @@ class Macro(AbstractAction):
                     self.repeat = gremlin.macro.HoldRepeat()
                 else:
                     logging.getLogger("system").warning(
-                        "Invalid macro repeat type: {}".format(repeat_type)
+                        f"Invalid macro repeat type: {repeat_type}"
                     )
 
                 if self.repeat:

@@ -166,13 +166,7 @@ class GUID:
         str
             GUID string representation in hexadecimal
         """
-        return "{{{:08X}-{:04X}-{:04X}-{:04X}-{:012X}}}".format(
-            self.guid[0],
-            self.guid[1],
-            self.guid[2],
-            self.guid[3],
-            self.guid[4]
-        )
+        return f"{{{self.guid[0]:08X}-{self.guid[1]:04X}-{self.guid[2]:04X}-{self.guid[3]:04X}-{self.guid[4]:012X}}}"
 
     def __eq__(self, other):
         """Returns whether or not two GUID instances are identical.
@@ -261,7 +255,7 @@ class InputType(Enum):
         elif value == 3:
             return InputType.Hat
         else:
-            raise DILLError("Invalid input type value {:d}".format(value))
+            raise DILLError(f"Invalid input type value {value:d}")
 
 
 class DeviceActionType(Enum):
@@ -290,7 +284,7 @@ class DeviceActionType(Enum):
         elif value == 2:
             return DeviceActionType.Disconnected
         else:
-            raise DILLError("Invalid device action type {:d}".format)
+            raise DILLError(f"Invalid device action type {value:d}")
 
 
 class InputEvent:
@@ -394,6 +388,9 @@ C_EVENT_CALLBACK = ctypes.CFUNCTYPE(None, _JoystickInputData)
 C_DEVICE_CHANGE_CALLBACK = ctypes.CFUNCTYPE(None, _DeviceSummary, ctypes.c_uint8)
 
 _dll_path = os.path.join(os.path.dirname(__file__), "dill.dll")
+if not os.path.isfile(_dll_path):
+    raise ImportError(f"Error: Missing dil.dll: {_dll_path}")
+
 _di_listener_dll = ctypes.cdll.LoadLibrary(_dll_path)
 
 _di_listener_dll.get_device_information_by_index.argtypes = [ctypes.c_uint]
@@ -407,7 +404,7 @@ class DILL:
     # Attempt to find the correct location of the dll for development
     # and installed use cases.
     _dev_path = os.path.join(os.path.dirname(__file__), "dill.dll")
-    if os.path.isfile("dill.dll"):
+    if os.path.isfile("dill.dll"):  
         _dll_path = "dill.dll"
     elif os.path.isfile(_dev_path):
         _dll_path = _dev_path

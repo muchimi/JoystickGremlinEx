@@ -201,10 +201,7 @@ class DoubleTapContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
         :return title to use for the container
         """
         if self.profile_data.is_valid():
-            return "Double Tap: ({}) / ({})".format(
-                ", ".join([a.name for a in self.profile_data.action_sets[0]]),
-                ", ".join([a.name for a in self.profile_data.action_sets[1]])
-            )
+            return f"Double Tap: ({", ".join([a.name for a in self.profile_data.action_sets[0]])}) / ({", ".join([a.name for a in self.profile_data.action_sets[1]])})"
         else:
             return "DoubleTap"
 
@@ -235,9 +232,7 @@ class DoubleTapContainerFunctor(gremlin.base_classes.AbstractFunctor):
         #       virtual buttons created on those inputs is supported
         if not isinstance(value.current, bool):
             logging.getLogger("system").warning(
-                "Invalid data type received in DoubleTap container: {}".format(
-                    type(event.value)
-                )
+                f"Invalid data type received in DoubleTap container: {type(event.value)}"
             )
             return False
 
