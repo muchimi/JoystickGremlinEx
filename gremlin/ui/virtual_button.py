@@ -26,6 +26,7 @@ class AbstractVirtualButtonWidget(QtWidgets.QGroupBox):
     """Base class for activation condition widgets."""
 
     virtual_button_modified = QtCore.Signal()
+    
 
     def __init__(self, condition_data, parent=None, layout_direction="vertical"):
         """Creates a new activation condition widget.
@@ -64,6 +65,8 @@ class VirtualAxisButtonWidget(AbstractVirtualButtonWidget):
 
     """Condition widget for axis, turning an axis area into a button."""
 
+    locked = False
+
     def __init__(self, condition_data, parent=None):
         """Creates a new axis activation condition widget.
 
@@ -74,41 +77,48 @@ class VirtualAxisButtonWidget(AbstractVirtualButtonWidget):
 
     def _create_ui(self):
         """Creates all required UI elements."""
-        self.range_layout = QtWidgets.QHBoxLayout()
-        self.lower_limit = gremlin.ui.common.DynamicDoubleSpinBox()
-        self.lower_limit.setRange(-1.0, 1.0)
-        self.lower_limit.setSingleStep(0.05)
-        self.upper_limit = gremlin.ui.common.DynamicDoubleSpinBox()
-        self.upper_limit.setRange(-1.0, 1.0)
-        self.upper_limit.setSingleStep(0.05)
-        self.direction = QtWidgets.QComboBox()
-        self.direction.addItem("Anywhere")
-        self.direction.addItem("Above")
-        self.direction.addItem("Below")
+        if VirtualAxisButtonWidget.locked:
+            return
+        
+        try:
+            VirtualAxisButtonWidget.locked = True
+            self.range_layout = QtWidgets.QHBoxLayout()
+            self.lower_limit = gremlin.ui.common.DynamicDoubleSpinBox()
+            self.lower_limit.setRange(-1.0, 1.0)
+            self.lower_limit.setSingleStep(0.05)
+            self.upper_limit = gremlin.ui.common.DynamicDoubleSpinBox()
+            self.upper_limit.setRange(-1.0, 1.0)
+            self.upper_limit.setSingleStep(0.05)
+            self.direction = QtWidgets.QComboBox()
+            self.direction.addItem("Anywhere")
+            self.direction.addItem("Above")
+            self.direction.addItem("Below")
 
-        self.setTitle("Virtual Button")
-        self.range_layout.addWidget(
-            QtWidgets.QLabel("Activate when axis is between: ")
-        )
-        self.range_layout.addWidget(self.lower_limit)
-        self.range_layout.addWidget(QtWidgets.QLabel("and"))
-        self.range_layout.addWidget(self.upper_limit)
-        self.range_layout.addWidget(
-            QtWidgets.QLabel("when entering the range from")
-        )
-        self.range_layout.addWidget(self.direction)
+            self.setTitle("Virtual Button")
+            self.range_layout.addWidget(
+                QtWidgets.QLabel("Activate when axis is between: ")
+            )
+            self.range_layout.addWidget(self.lower_limit)
+            self.range_layout.addWidget(QtWidgets.QLabel("and"))
+            self.range_layout.addWidget(self.upper_limit)
+            self.range_layout.addWidget(
+                QtWidgets.QLabel("when entering the range from")
+            )
+            self.range_layout.addWidget(self.direction)
 
-        self.range_layout.addStretch(1)
+            self.range_layout.addStretch(1)
 
-        self.help_button = QtWidgets.QPushButton(QtGui.QIcon("gfx/help"), "")
-        self.help_button.clicked.connect(self._show_hint)
-        self.range_layout.addWidget(self.help_button)
+            self.help_button = QtWidgets.QPushButton(QtGui.QIcon("gfx/help"), "")
+            self.help_button.clicked.connect(self._show_hint)
+            self.range_layout.addWidget(self.help_button)
 
-        self.main_layout.addLayout(self.range_layout)
+            self.main_layout.addLayout(self.range_layout)
 
-        self.lower_limit.valueChanged.connect(self._lower_limit_cb)
-        self.upper_limit.valueChanged.connect(self._upper_limit_cb)
-        self.direction.currentTextChanged.connect(self._direction_changed_cb)
+            self.lower_limit.valueChanged.connect(self._lower_limit_cb)
+            self.upper_limit.valueChanged.connect(self._upper_limit_cb)
+            self.direction.currentTextChanged.connect(self._direction_changed_cb)
+        finally:
+            VirtualAxisButtonWidget.locked = False
 
     def _populate_ui(self):
         """Populates the UI elements with data."""
@@ -153,6 +163,8 @@ class VirtualHatButtonWidget(AbstractVirtualButtonWidget):
 
     """Condition widget for hats, turning a set of directions into a button."""
 
+    locked = False
+
     def __init__(self, condition_data, parent=None):
         """Creates a new hat activation condition widget.
 
@@ -164,25 +176,35 @@ class VirtualHatButtonWidget(AbstractVirtualButtonWidget):
 
     def _create_ui(self):
         """Creates all required UI elements."""
-        self.setTitle("Virtual Button")
 
-        directions = ["n", "ne", "e", "se", "s", "sw", "w", "nw"]
+        if VirtualHatButtonWidget.locked:
+            return
+        
+        try:
 
-        for direction in directions:
-            self._widgets[direction] = QtWidgets.QCheckBox()
-            self._widgets[direction].setIcon(
-                QtGui.QIcon("gfx/hat_{}.png".format(direction))
-            )
-            self._widgets[direction].toggled.connect(
-                self._create_state_changed_cb(direction)
-            )
-            self.main_layout.addWidget(self._widgets[direction])
+            VirtualHatButtonWidget.locked = True
 
-        self.main_layout.addStretch(1)
+            self.setTitle("Virtual Button")
 
-        self.help_button = QtWidgets.QPushButton(QtGui.QIcon("gfx/help"), "")
-        self.help_button.clicked.connect(self._show_hint)
-        self.main_layout.addWidget(self.help_button)
+            directions = ["n", "ne", "e", "se", "s", "sw", "w", "nw"]
+
+            for direction in directions:
+                self._widgets[direction] = QtWidgets.QCheckBox()
+                self._widgets[direction].setIcon(
+                    QtGui.QIcon("gfx/hat_{}.png".format(direction))
+                )
+                self._widgets[direction].toggled.connect(
+                    self._create_state_changed_cb(direction)
+                )
+                self.main_layout.addWidget(self._widgets[direction])
+
+            self.main_layout.addStretch(1)
+
+            self.help_button = QtWidgets.QPushButton(QtGui.QIcon("gfx/help"), "")
+            self.help_button.clicked.connect(self._show_hint)
+            self.main_layout.addWidget(self.help_button)
+        finally:
+            VirtualHatButtonWidget.locked = False
 
     def _populate_ui(self):
         """Populates the UI elements with data."""

@@ -60,7 +60,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.8ex"
+APPLICATION_VERSION = "13.40.9ex"
 
 
 class GremlinUi(QtWidgets.QMainWindow):
@@ -736,7 +736,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         if activate_tab is not None:
             for i in range(self.ui.devices.count()):
                 if self.ui.devices.tabText(i) == activate_tab:
-                    self.ui.devices.setCurrentIndex(i)
+                    with QtCore.QSignalBlocker(self.ui.devices):
+                        self.ui.devices.setCurrentIndex(i)
 
     def _setup_icons(self):
         """Sets the icons of all QAction items."""

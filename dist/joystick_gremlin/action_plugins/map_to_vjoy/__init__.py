@@ -473,6 +473,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
     """Dialog which allows the selection of a vJoy output to use as
     as the remapping for the currently selected input.
     """
+    locked = False
 
     # Mapping from types to display names
     type_to_name_map = {
@@ -498,49 +499,58 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _create_ui(self):
         """Creates the UI components."""
-        input_types = {
-            InputType.Keyboard: [
-                InputType.JoystickButton
-            ],
-            InputType.JoystickAxis: [
-                InputType.JoystickAxis,
-                InputType.JoystickButton
-            ],
-            InputType.JoystickButton: [
-                InputType.JoystickButton
-            ],
-            InputType.JoystickHat: [
-                InputType.JoystickButton,
-                InputType.JoystickHat
-            ]
-        }
 
-        self.valid_types = [
-                InputType.JoystickAxis,
-                InputType.JoystickButton,
-                InputType.JoystickHat
-            ]
-
-
-        self.usage_state = VJoyUsageState()
-
-        self.main_layout.setSpacing(0)
-
-
-        # Create UI widgets for absolute / relative axis modes if the remap
-        # action is being added to an axis input type
-        self.input_type = self.action_data.input_type
-       
-        #self.main_layout.addWidget(self.vjoy_selector)
+        if VJoyWidget.locked:
+            return
         
+        try:
+            VJoyWidget.locked = True    
 
-        # add the selector
-        self._create_selector()
-        self._create_input_axis()
-        self._create_input_grid()
-        self._create_info()
+            input_types = {
+                InputType.Keyboard: [
+                    InputType.JoystickButton
+                ],
+                InputType.JoystickAxis: [
+                    InputType.JoystickAxis,
+                    InputType.JoystickButton
+                ],
+                InputType.JoystickButton: [
+                    InputType.JoystickButton
+                ],
+                InputType.JoystickHat: [
+                    InputType.JoystickButton,
+                    InputType.JoystickHat
+                ]
+            }
 
-        self.main_layout.setContentsMargins(0, 0, 0, 0)
+            self.valid_types = [
+                    InputType.JoystickAxis,
+                    InputType.JoystickButton,
+                    InputType.JoystickHat
+                ]
+
+
+            self.usage_state = VJoyUsageState()
+
+            self.main_layout.setSpacing(0)
+
+
+            # Create UI widgets for absolute / relative axis modes if the remap
+            # action is being added to an axis input type
+            self.input_type = self.action_data.input_type
+        
+            #self.main_layout.addWidget(self.vjoy_selector)
+            
+
+            # add the selector
+            self._create_selector()
+            self._create_input_axis()
+            self._create_input_grid()
+            self._create_info()
+
+            self.main_layout.setContentsMargins(0, 0, 0, 0)
+        finally:
+            VJoyWidget.locked = False
 
     def _get_selector_input_type(self):
         ''' gets a modified input type based on the current mode '''
