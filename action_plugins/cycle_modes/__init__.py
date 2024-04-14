@@ -20,7 +20,7 @@ import os
 from PySide6 import QtCore, QtGui, QtWidgets
 from xml.etree import ElementTree
 
-from gremlin.theme import ThemeQIcon
+from PySide6.QtGui import QIcon
 from gremlin.base_classes import AbstractAction, AbstractFunctor
 from gremlin.common import InputType
 import gremlin.ui.input_item
@@ -38,6 +38,8 @@ class CycleModesWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _create_ui(self):
 
+        from gremlin.common import load_icon
+
         if CycleModesWidget.locked:
             return
         try:
@@ -51,21 +53,16 @@ class CycleModesWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.mode_list = QtWidgets.QComboBox()
             for entry in gremlin.profile.mode_list(self.action_data):
                 self.mode_list.addItem(entry)
-            self.add = QtWidgets.QPushButton(
-                ThemeQIcon("gfx/list_add.svg"), "Add"
-            )
+            self.add = QtWidgets.QPushButton(load_icon("list_add.svg"),  "Add") 
             self.add.clicked.connect(self._add_cb)
-            self.delete = QtWidgets.QPushButton(
-                ThemeQIcon("gfx/list_delete.svg"), "Delete"
-            )
+            self.delete = QtWidgets.QPushButton(load_icon("list_delete.svg"), "Delete")
+            
             self.delete.clicked.connect(self._remove_cb)
-            self.up = QtWidgets.QPushButton(
-                ThemeQIcon("gfx/list_up.svg"), "Up"
-            )
+            self.up = QtWidgets.QPushButton(load_icon("list_up.svg"), "Up")
+            
             self.up.clicked.connect(self._up_cb)
-            self.down = QtWidgets.QPushButton(
-                ThemeQIcon("gfx/list_down.svg"), "Down"
-            )
+            self.down = QtWidgets.QPushButton(load_icon("list_down.svg"), "Down")
+
             self.down.clicked.connect(self._down_cb)
 
             self.actions_layout = QtWidgets.QGridLayout()

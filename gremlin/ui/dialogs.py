@@ -25,7 +25,7 @@ from PySide6 import QtCore, QtGui, QtWidgets
 import dill
 
 import gremlin
-from gremlin.theme import ThemeQIcon
+from PySide6.QtGui import QIcon as ThemeQIcon
 from joystick_gremlin import GremlinUi
 from . import common, ui_about
 
@@ -445,11 +445,11 @@ If this option is on, the last active profile will remain active until a differe
         if clicked:
             path = os.path.abspath(sys.argv[0])
             subprocess.run(
-                f'reg add "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run" /V "Joystick Gremlin" /t REG_SZ /F /D "{path}"'
+                f'reg add "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run" /V "Joystick Gremlin" /t REG_SZ /F /D "{path}"'
             )
         else:
             subprocess.run(
-                'reg delete "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run" /F /V "Joystick Gremlin"'
+                'reg delete "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run" /F /V "Joystick Gremlin"'
             )
         self.activateWindow()
 
@@ -460,7 +460,7 @@ If this option is on, the last active profile will remain active until a differe
         """
         key_handle = winreg.OpenKey(
                 winreg.HKEY_CURRENT_USER,
-                r"Software\Microsoft\Windows\CurrentVersion\Run"
+                "Software\\Microsoft\\Windows\\CurrentVersion\\Run"
             )
         key_info = winreg.QueryInfoKey(key_handle)
 

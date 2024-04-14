@@ -23,7 +23,7 @@ from xml.etree import ElementTree
 
 from PySide6 import QtWidgets, QtCore, QtGui
 
-from gremlin.theme import ThemeQIcon
+from PySide6.QtGui import QIcon as ThemeQIcon
 from gremlin.base_classes import InputActionCondition
 from gremlin.common import InputType
 from gremlin import input_devices, joystick_handling, util

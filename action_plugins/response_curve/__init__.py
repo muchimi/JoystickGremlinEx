@@ -690,10 +690,9 @@ class CurveView(QtWidgets.QGraphicsScene):
         self.model.content_modified.connect(self.redraw_scene)
         self.model.content_added.connect(self._populate_from_model)
         self.point_editor = point_editor
+        from gremlin.common import load_icon
 
-        self.background_image = QtGui.QImage(
-            f"{os.path.dirname(os.path.realpath(__file__))}/grid.svg"
-        )
+        self.background_image = QtGui.QImage(load_icon("grid.svg", as_path=True))
 
         # Connect editor widget signals
         self.point_editor.x_input.valueChanged.connect(self._editor_update)

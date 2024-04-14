@@ -19,7 +19,7 @@ import enum
 from PySide6 import QtWidgets, QtCore, QtGui
 
 import gremlin
-from gremlin.theme import ThemeQIcon
+from PySide6.QtGui import QIcon as ThemeQIcon
 from gremlin.common import DeviceType, InputType
 from . import activation_condition, common, virtual_button
 from functools import partial 

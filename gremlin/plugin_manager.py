@@ -21,7 +21,7 @@ import logging
 import os
 
 from . import common, error
-
+from gremlin.util import *
 
 @common.SingletonDecorator
 class ContainerPlugins:
@@ -68,11 +68,21 @@ class ContainerPlugins:
 
     def _discover_plugins(self):
         """Processes known plugin folders for action plugins."""
-        for root, dirs, files in os.walk("container_plugins"):
+        from gremlin.common import get_root_path
+        
+        plugin_folder = "container_plugins"
+        root_path = get_root_path()
+        walk_path = os.path.join(root_path, plugin_folder)
+        log_sys(f"Container plugin folder: {walk_path}")
+        if not os.path.isdir(walk_path):
+            raise error(f"Unable to find container plugins: {walk_path}")
+        
+        for root, dirs, files in os.walk(walk_path):
             for fname in [v for v in files if v == "__init__.py"]:
                 try:
                     folder, module = os.path.split(root)
-                    if folder != "container_plugins":
+
+                    if not folder.lower().endswith(plugin_folder):
                         continue
 
                     # Attempt to load the file and if it looks like a proper
@@ -82,8 +92,7 @@ class ContainerPlugins:
                     )
                     if "version" in plugin.__dict__:
                         self._plugins[plugin.name] = plugin.create
-                        logging.getLogger("system").debug(
-                            f"Loaded: {plugin.name}"
+                        log_sys(f"Loaded container plugin: {plugin.name}"
                         )
                     else:
                         del plugin
@@ -185,11 +194,21 @@ class ActionPlugins:
 
     def _discover_plugins(self):
         """Processes known plugin folders for action plugins."""
-        for root, dirs, files in os.walk("action_plugins"):
+        from gremlin.common import get_root_path
+        
+
+        plugin_folder = "action_plugins"
+        root_path = get_root_path()
+        walk_path = os.path.join(root_path, plugin_folder)
+        log_sys(f"Action plugin folder: {walk_path}")
+        if not os.path.isdir(walk_path):
+            raise error(f"Unable to find action_plugins: {walk_path}")
+        
+        for root, dirs, files in os.walk(walk_path):
             for _ in [v for v in files if v == "__init__.py"]:
                 try:
                     folder, module = os.path.split(root)
-                    if folder != "action_plugins":
+                    if not folder.lower().endswith(plugin_folder):
                         continue
 
                     # Attempt to load the file and if it looks like a proper
@@ -199,14 +218,10 @@ class ActionPlugins:
                     )
                     if "version" in plugin.__dict__:
                         self._plugins[plugin.name] = plugin.create
-                        logging.getLogger("system").debug(
-                            f"Loaded: {plugin.name}"
-                        )
+                        log_sys(f"Loaded action plugin: {plugin.name}")
                     else:
                         del plugin
                 except Exception as e:
                     # Log an error and ignore the action_plugins if
                     # anything is wrong with it
-                    logging.getLogger("system").warning(
-                        f"Loading action_plugins '{root.split("\\")[-1]}' failed due to: {e}"
-                    )
+                    log_sys_warn(f"Loading action_plugins '{root.split("\\")[-1]}' failed due to: {e}")

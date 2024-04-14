@@ -38,6 +38,7 @@ from gremlin.common import InputType
 import gremlin.event_handler 
 
 import dill
+from gremlin.common import load_icon
 
 
 # Figure out the location of the code / executable and change the working
@@ -45,7 +46,6 @@ import dill
 install_path = os.path.normcase(os.path.dirname(os.path.abspath(sys.argv[0])))
 os.chdir(install_path)
 
-from gremlin.theme import ThemeQIcon
 
 import gremlin.ui.axis_calibration
 import gremlin.ui.common
@@ -64,6 +64,7 @@ from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
 APPLICATION_VERSION = "13.40.9ex"
+
 
 
 class GremlinUi(QtWidgets.QMainWindow):
@@ -166,6 +167,11 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.apply_window_settings()
 
         GremlinUi.ui = self
+
+
+
+    
+
 
     @property
     def current_profile(self):
@@ -368,7 +374,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                 self._last_active_mode(),
                 self._profile
             )
-            self.ui.tray_icon.setIcon(ThemeQIcon("gfx/icon_active.ico"))
+            self.ui.tray_icon.setIcon(QtGui.QIcon("gfx/icon_active.ico"))
             #self.ui.tray_icon.setIcon(QtGui.QIcon("gfx/icon_active.ico"))
             
             
@@ -385,7 +391,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             ]:
                 self.ui.devices.currentWidget().refresh()
             #self.ui.tray_icon.setIcon(QtGui.QIcon("gfx/icon.ico"))
-            self.ui.tray_icon.setIcon(ThemeQIcon("gfx/icon.ico"))
+            self.ui.tray_icon.setIcon(QtGui.QIcon("gfx/icon.ico"))
             
 
     def create_1to1_mapping(self):
@@ -741,64 +747,77 @@ class GremlinUi(QtWidgets.QMainWindow):
                     with QtCore.QSignalBlocker(self.ui.devices):
                         self.ui.devices.setCurrentIndex(i)
 
+                      
+
     def _setup_icons(self):
         """Sets the icons of all QAction items."""
         # Menu actions
-        self.ui.actionLoadProfile.setIcon(
-            ThemeQIcon("gfx/profile_open.svg")
-        )
-        self.ui.actionNewProfile.setIcon(
-            ThemeQIcon("gfx/profile_new.svg")
-        )
-        self.ui.actionSaveProfile.setIcon(
-            ThemeQIcon("gfx/profile_save.svg")
-        )
-        self.ui.actionSaveProfileAs.setIcon(
-            ThemeQIcon("gfx/profile_save_as.svg")
-        )
-        self.ui.actionDeviceInformation.setIcon(
-            ThemeQIcon("gfx/device_information.svg")
-        )
-        self.ui.actionManageCustomModules.setIcon(
-            ThemeQIcon("gfx/manage_modules.svg")
-        )
-        self.ui.actionManageModes.setIcon(
-            ThemeQIcon("gfx/manage_modes.svg")
-        )
-        self.ui.actionInputRepeater.setIcon(
-            ThemeQIcon("gfx/input_repeater.svg")
-        )
-        self.ui.actionCalibration.setIcon(
-            ThemeQIcon("gfx/calibration.svg")
-        )
-        self.ui.actionInputViewer.setIcon(
-            ThemeQIcon("gfx/input_viewer.svg")
-        )
-        self.ui.actionLogDisplay.setIcon(
-            ThemeQIcon("gfx/logview.png")
-        )
-        self.ui.actionOptions.setIcon(
-            ThemeQIcon("gfx/options.svg")
-        )
-        self.ui.actionAbout.setIcon(
-            ThemeQIcon("gfx/about.svg")
-        )
+        from pathlib import Path
+
+        folder = os.path.dirname(__file__)
+        gfx_folder = os.path.join(folder, "gfx")
+        if not os.path.isdir(gfx_folder):
+            # look for parent
+            parent = Path(folder).parent
+            gfx_folder = os.path.join(parent, "gfx")
+            if not os.path.isdir(gfx_folder):
+                raise gremlin.error.GremlinError(f"Unable to find icons: {folder}")
+
+        icon = load_icon("profile_open.svg")
+        #icon = self.load_icon("profile_open.svg"))
+        self.ui.actionLoadProfile.setIcon(icon)           
+        
+        icon = load_icon("profile_new.svg")
+        self.ui.actionNewProfile.setIcon(icon)
+
+        icon = load_icon("profile_save.svg")
+        self.ui.actionSaveProfile.setIcon(icon)          
+        
+        icon = load_icon("profile_save_as.svg")
+        self.ui.actionSaveProfileAs.setIcon(icon)
+            
+        icon = load_icon("device_information.svg")
+        self.ui.actionDeviceInformation.setIcon(icon)
+
+        icon = load_icon("manage_modules.svg")
+        self.ui.actionManageCustomModules.setIcon(icon)
+
+        icon = load_icon("manage_modes.svg")
+        self.ui.actionManageModes.setIcon(icon)           
+        
+        icon = load_icon("input_repeater.svg")
+        self.ui.actionInputRepeater.setIcon(icon)
+
+        icon = load_icon("calibration.svg")
+        self.ui.actionCalibration.setIcon(icon)
+            
+        icon = load_icon("input_viewer.svg")
+        self.ui.actionInputViewer.setIcon(icon)
+            
+        icon = load_icon("logview.png")
+        self.ui.actionLogDisplay.setIcon(icon)
+
+        icon = load_icon("options.svg")
+        self.ui.actionOptions.setIcon(icon)
+
+        icon = load_icon("about.svg")
+        self.ui.actionAbout.setIcon(icon)
+        
 
         # Toolbar actions
-        activate_icon = ThemeQIcon()
+        activate_icon = QtGui.QIcon()
         activate_icon.addPixmap(
-            QtGui.QPixmap("gfx/activate.svg"),
+            QtGui.QPixmap(load_icon("activate.svg", as_path=True)),
             QtGui.QIcon.Normal
         )
         activate_icon.addPixmap(
-            QtGui.QPixmap("gfx/activate_on.svg"),
+            QtGui.QPixmap(load_icon("activate_on.svg", as_path=True)),
             QtGui.QIcon.Active,
             QtGui.QIcon.On
         )
         self.ui.actionActivate.setIcon(activate_icon)
-        self.ui.actionOpen.setIcon(
-            ThemeQIcon("gfx/profile_open.svg")
-        )
+        self.ui.actionOpen.setIcon(load_icon("profile_open.svg"))
+        
 
     # +---------------------------------------------------------------
     # | Signal handlers

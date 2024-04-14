@@ -24,7 +24,8 @@ import time
 from PySide6 import QtCore, QtGui, QtWidgets
 from xml.etree import ElementTree
 
-from gremlin.theme import ThemeQIcon
+from PySide6.QtGui import QIcon as QtGui.QIcon
+
 from gremlin.base_classes import AbstractAction, AbstractFunctor
 from gremlin.common import InputType
 import gremlin.macro
@@ -719,11 +720,8 @@ class MacroListModel(QtCore.QAbstractListModel):
         os.path.dirname(os.path.realpath(__file__)),
         "gfx"
     )
-    icon_lookup = {
-        "press": ThemeQIcon(f"{gfx_path}/press"),
-        "release": ThemeQIcon(f"{gfx_path}/release"),
-        "pause": ThemeQIcon(f"{gfx_path}/pause")
-    }
+    icon_lookup = {}
+    
 
     value_format = {
         gremlin.common.InputType.JoystickAxis:
@@ -740,6 +738,14 @@ class MacroListModel(QtCore.QAbstractListModel):
         :param parent parent widget
         """
         QtCore.QAbstractListModel.__init__(self, parent)
+        from gremlin.common import load_icon
+
+                  
+        MacroListModel.icon_lookup =  {
+            "press": load_icon("press.svg"),
+            "release": load_icon("release.svg"),
+            "pause": load_icon("pause.svg")
+        }
 
         self._data = data_storage
 
@@ -1470,7 +1476,7 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
         """
         button = QtWidgets.QToolButton()
         if isinstance(icon_path, list):
-            icon = ThemeQIcon()
+            icon = QtGui.QIcon()
             icon.addPixmap(QtGui.QPixmap(icon_path[0]), QtGui.QIcon.Normal)
             icon.addPixmap(
                 QtGui.QPixmap(icon_path[1]),
@@ -1479,7 +1485,7 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             )
             button.setIcon(icon)
         else:
-            button.setIcon(ThemeQIcon(icon_path))
+            button.setIcon(QtGui.QIcon(icon_path))
         button.setToolTip(tooltip)
         button.setCheckable(is_checkable)
         button.setChecked(is_checkable and default_on)
