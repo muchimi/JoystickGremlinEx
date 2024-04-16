@@ -53,6 +53,7 @@ class InputType(enum.Enum):
 
     """Enumeration of possible input types."""
 
+    NotSet = 0
     Keyboard = 1
     JoystickAxis = 2
     JoystickButton = 3
@@ -76,6 +77,7 @@ class InputType(enum.Enum):
 
 
 _InputType_to_string_lookup = {
+    InputType.NotSet: "none",
     InputType.JoystickAxis: "axis",
     InputType.JoystickButton: "button",
     InputType.JoystickHat: "hat",
@@ -83,6 +85,7 @@ _InputType_to_string_lookup = {
 }
 
 _InputType_to_enum_lookup = {
+    "none": InputType.NotSet,
     "axis": InputType.JoystickAxis,
     "button": InputType.JoystickButton,
     "hat": InputType.JoystickHat,

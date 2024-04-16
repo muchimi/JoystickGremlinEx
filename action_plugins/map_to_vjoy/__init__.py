@@ -1775,7 +1775,7 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
                 r_min, r_max = usage_data.get_range(self.vjoy_device_id, self.vjoy_input_id)
                 if self.reverse:
                     target = -target
-                    syslog.debug(f"reversed: {target}")
+                    # syslog.debug(f"reversed: {target}")
                     
 
                 value = r_min + (target + 1.0)*((r_max - r_min)/2.0)

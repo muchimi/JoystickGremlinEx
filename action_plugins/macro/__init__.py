@@ -24,7 +24,7 @@ import time
 from PySide6 import QtCore, QtGui, QtWidgets
 from xml.etree import ElementTree
 
-from PySide6.QtGui import QIcon as QtGui.QIcon
+from PySide6.QtGui import QIcon
 
 from gremlin.base_classes import AbstractAction, AbstractFunctor
 from gremlin.common import InputType

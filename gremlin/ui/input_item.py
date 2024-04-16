@@ -928,6 +928,7 @@ class AbstractActionWidget(QtWidgets.QFrame):
         self.action_data = action_data
 
         self.main_layout = layout_type(self)
+
         self._create_ui()
         self._populate_ui()
 
@@ -1199,3 +1200,6 @@ class ConditionActionWrapper(AbstractActionWrapper):
             self.main_layout.addWidget(self.condition_view)
         else:
             action_data.activation_condition = None
+
+
+    
