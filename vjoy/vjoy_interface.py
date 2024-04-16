@@ -38,17 +38,8 @@ class VJoyInterface:
 
     """Allows low level interaction with VJoy devices via ctypes."""
 
-    # Attempt to find the correct location of the dll for development
-    # and installed use cases.
-    dev_path = os.path.join(os.path.dirname(__file__), "vJoyInterface.dll")
-    if os.path.isfile("vJoyInterface.dll"):
-        dll_path = "vJoyInterface.dll"
-    elif os.path.isfile(dev_path):
-        dll_path = dev_path
-    else:
-        raise GremlinError("Unable to locate vjoy dll")
+    vjoy_dll = None
 
-    vjoy_dll = ctypes.cdll.LoadLibrary(dll_path)
 
     # Declare argument and return types for all the functions
     # exposed by the dll
@@ -164,15 +155,34 @@ class VJoyInterface:
     }
 
     @classmethod
-    def initialize(cls):
+    def initialize(self):
         """Initializes the functions as class methods."""
-        for fn_name, params in cls.api_functions.items():
-            dll_fn = getattr(cls.vjoy_dll, fn_name)
+        from pathlib import Path
+
+        if VJoyInterface.vjoy_dll is None:
+
+            dll_folder = os.path.dirname(__file__)
+            dll_file = "vJoyInterface.dll"
+            _dll_path = os.path.join(dll_folder, dll_file )
+            if not os.path.isfile(_dll_path):
+
+                # look one level up for packaging in 3.12
+                parent = Path(dll_folder).parent
+                _dll_path = os.path.join(parent, dll_file)
+                if not os.path.isfile(_dll_path):
+                    raise GremlinError(f"Error: Missing vjoyinterface.dll: {_dll_path}")
+
+            VJoyInterface.vjoy_dll = ctypes.cdll.LoadLibrary(_dll_path)
+
+
+
+        for fn_name, params in self.api_functions.items():
+            dll_fn = getattr(self.vjoy_dll, fn_name)
             if "arguments" in params:
                 dll_fn.argtypes = params["arguments"]
             if "returns" in params:
                 dll_fn.restype = params["returns"]
-            setattr(cls, fn_name, dll_fn)
+            setattr(self, fn_name, dll_fn)
 
 
 # Initialize the class

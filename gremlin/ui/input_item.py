@@ -19,7 +19,7 @@ import enum
 from PySide6 import QtWidgets, QtCore, QtGui
 
 import gremlin
-from gremlin.theme import ThemeQIcon
+from PySide6.QtGui import QIcon as ThemeQIcon
 from gremlin.common import DeviceType, InputType
 from . import activation_condition, common, virtual_button
 from functools import partial 
@@ -928,6 +928,7 @@ class AbstractActionWidget(QtWidgets.QFrame):
         self.action_data = action_data
 
         self.main_layout = layout_type(self)
+
         self._create_ui()
         self._populate_ui()
 
@@ -1199,3 +1200,6 @@ class ConditionActionWrapper(AbstractActionWrapper):
             self.main_layout.addWidget(self.condition_view)
         else:
             action_data.activation_condition = None
+
+
+    

@@ -17,8 +17,22 @@
 
 import enum
 import logging
-
 import gremlin.error
+import os
+import sys
+
+from PySide6 import QtGui
+from pathlib import Path
+
+def get_root_path():
+    ''' gets the root path of the application '''    
+    if getattr(sys, 'frozen', False):
+        # as exe via pyinstallaler
+        application_path = sys._MEIPASS
+    else:
+        # as script (because common is a subfolder, return the parent folder)
+        application_path = Path(os.path.dirname(os.path.abspath(__file__))).parent
+    return application_path
 
 
 class SingletonDecorator:
@@ -39,6 +53,7 @@ class InputType(enum.Enum):
 
     """Enumeration of possible input types."""
 
+    NotSet = 0
     Keyboard = 1
     JoystickAxis = 2
     JoystickButton = 3
@@ -62,6 +77,7 @@ class InputType(enum.Enum):
 
 
 _InputType_to_string_lookup = {
+    InputType.NotSet: "none",
     InputType.JoystickAxis: "axis",
     InputType.JoystickButton: "button",
     InputType.JoystickHat: "hat",
@@ -69,6 +85,7 @@ _InputType_to_string_lookup = {
 }
 
 _InputType_to_enum_lookup = {
+    "none": InputType.NotSet,
     "axis": InputType.JoystickAxis,
     "button": InputType.JoystickButton,
     "hat": InputType.JoystickHat,
@@ -421,3 +438,58 @@ def get_guid(strip=True):
         return guid.replace("-",'')
     return guid
     
+
+
+def find_file(icon_path):
+    ''' finds a file '''
+
+
+    from pathlib import Path
+    icon_path = icon_path.lower()
+
+    #folder = os.path.dirname(__file__)
+    #root_folder = Path(folder).parent
+    root_folder = get_root_path()
+
+    files = []
+    if not os.path.isfile(icon_path):
+        # path not found 
+        _, ext = os.path.splitext(icon_path)
+        for dirpath, _, filenames in os.walk(root_folder):
+            for filename in [f for f in filenames if f.endswith(ext)]:
+                if filename.lower() == icon_path:
+                    files.append(os.path.join(dirpath, filename))
+                    
+    if files:
+        files.sort(key = lambda x: len(x)) # shortest to largest
+        icon_path = files.pop(0) # grab the first one
+        return icon_path
+    
+    return None
+
+
+
+
+def load_icon(icon_path, as_path = False):
+        ''' loads an icon located in the file structure
+         
+          if the icon is provided without a path, the first matching file is loaded
+           
+        '''
+        
+        path = find_file(icon_path)
+            
+        if path and os.path.isfile(path):
+            if as_path:
+                return path
+            
+            return QtGui.QIcon(path)
+        
+        else:
+            path = find_file("generic.svg")
+            if path and os.path.isfile(path):
+                if as_path:
+                    return path
+                return QtGui.QIcon(path)
+    
+        return None

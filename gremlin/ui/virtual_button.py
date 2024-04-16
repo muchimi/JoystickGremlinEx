@@ -19,7 +19,8 @@
 from PySide6 import QtWidgets, QtCore, QtGui
 
 import gremlin
-from gremlin.theme import ThemeQIcon
+from PySide6.QtGui import QIcon as ThemeQIcon
+
 
 class AbstractVirtualButtonWidget(QtWidgets.QGroupBox):
 

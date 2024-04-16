@@ -9,3 +9,4 @@ cd joystick_gremlin
 
 "C:\Program Files\7-Zip\7z" a -r ../joystick_gremlin.zip *
 cd ..\..
+pause

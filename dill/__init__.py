@@ -387,14 +387,6 @@ class DeviceSummary:
 C_EVENT_CALLBACK = ctypes.CFUNCTYPE(None, _JoystickInputData)
 C_DEVICE_CHANGE_CALLBACK = ctypes.CFUNCTYPE(None, _DeviceSummary, ctypes.c_uint8)
 
-_dll_path = os.path.join(os.path.dirname(__file__), "dill.dll")
-if not os.path.isfile(_dll_path):
-    raise ImportError(f"Error: Missing dil.dll: {_dll_path}")
-
-_di_listener_dll = ctypes.cdll.LoadLibrary(_dll_path)
-
-_di_listener_dll.get_device_information_by_index.argtypes = [ctypes.c_uint]
-_di_listener_dll.get_device_information_by_index.restype = _DeviceSummary
 
 
 class DILL:
@@ -403,15 +395,9 @@ class DILL:
 
     # Attempt to find the correct location of the dll for development
     # and installed use cases.
-    _dev_path = os.path.join(os.path.dirname(__file__), "dill.dll")
-    if os.path.isfile("dill.dll"):  
-        _dll_path = "dill.dll"
-    elif os.path.isfile(_dev_path):
-        _dll_path = _dev_path
-    else:
-        raise DILLError("Unable to locate di_listener dll")
+    _dll = None
 
-    _dll = ctypes.cdll.LoadLibrary(_dll_path)
+
 
     # Storage for the callback functions
     device_change_callback_fn = None
@@ -468,7 +454,29 @@ class DILL:
 
         This has to be called before any other DILL interactions can take place.
         """
-        DILL._dll.init()
+        from pathlib import Path
+
+        if DILL._dll is None:
+
+            dll_folder = os.path.dirname(__file__)
+            dll_file = "dill.dll"
+            _dll_path = os.path.join(dll_folder, dll_file )
+            if not os.path.isfile(_dll_path):
+
+                # look one level up for packaging in 3.12
+                parent = Path(dll_folder).parent
+                _dll_path = os.path.join(parent, dll_file)
+                if not os.path.isfile(_dll_path):
+                    raise DILLError(f"Error: Missing dil.dll: {_dll_path}")
+                
+
+
+            _di_listener_dll = ctypes.cdll.LoadLibrary(_dll_path)
+
+            _di_listener_dll.get_device_information_by_index.argtypes = [ctypes.c_uint]
+            _di_listener_dll.get_device_information_by_index.restype = _DeviceSummary
+            DILL._dll = _di_listener_dll
+            DILL._dll.init()
 
     @staticmethod
     def set_input_event_callback(callback):
@@ -654,4 +662,5 @@ class DILL:
 
 
 # Initialize the class
+DILL.init()
 DILL.initialize_capi()

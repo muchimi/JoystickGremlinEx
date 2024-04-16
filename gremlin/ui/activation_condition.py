@@ -20,7 +20,7 @@ from PySide6 import QtCore, QtGui, QtWidgets
 
 import logging
 
-from gremlin.theme import ThemeQIcon
+from PySide6.QtGui import QIcon as ThemeQIcon
 from gremlin import base_classes, hints, input_devices, macro, util
 from gremlin.common import InputType
 from . import common

@@ -584,7 +584,7 @@ class ProfileConverter:
 
         root.attrib["version"] = "7"
         for module in root.findall("import/module"):
-            module.attrib["name"] = os.path.normpath(f"{base_path}\{module.attrib["name"]}.py")
+            module.attrib["name"] = os.path.normpath(f"{base_path}\\{module.attrib["name"]}.py")
 
         return root
 

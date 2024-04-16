@@ -199,6 +199,14 @@ def log(msg):
     """
     logging.getLogger("user").debug(str(msg))
 
+def log_sys(msg):
+    ''' logs to the system log '''
+    logging.getLogger("system").debug(str(msg))
+
+def log_sys_warn(msg):
+    ''' logs to the system log '''
+    logging.getLogger("system").warning(str(msg))
+
 
 def format_name(name):
     """Returns the name formatted as valid python variable name.
