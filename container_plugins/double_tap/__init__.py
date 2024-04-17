@@ -226,6 +226,7 @@ class DoubleTapContainerFunctor(gremlin.base_classes.AbstractFunctor):
         self.tap_type = None
         self.value_press = None
         self.event_press = None
+        self.processed_single_tap = True
 
     def process_event(self, event, value):
         # TODO: Currently this does not handle hat or axis events, however
@@ -236,54 +237,61 @@ class DoubleTapContainerFunctor(gremlin.base_classes.AbstractFunctor):
             )
             return False
 
-        # Copy state when input is pressed
-        if value.current:
-            self.value_press = copy.deepcopy(value)
-            self.event_press = event.clone()
+        if self.processed_single_tap:
+                
+                # Copy state when input is pressed
+                if value.current:
+                    self.value_press = copy.deepcopy(value)
+                    self.event_press = event.clone()
 
-        # Execute double tap logic
-        if value.current:
-            # Second activation within the delay, i.e. second tap
-            if (self.start_time + self.delay) > time.time():
-                # Prevent repeated double taps from repeated button presses
-                self.start_time = 0
-                self.tap_type = "double"
-                if self.activate_on == "exclusive":
+                # Execute double tap logic
+                if value.current:
+                    # Second activation within the delay, i.e. second tap
+                    if (self.start_time + self.delay) > time.time():
+                        # Prevent repeated double taps from repeated button presses
+                        self.start_time = 0
+                        self.tap_type = "double"
+                        if self.activate_on == "exclusive":
+                            self.double_action_timer.cancel()
+                    # First acitvation within the delay, i.e. first tap
+                    else:
+                        self.start_time = time.time()
+                        self.tap_type = "single"
+                        if self.activate_on == "exclusive":
+                            self.double_action_timer = \
+                                threading.Timer(self.delay, self._single_tap)
+                            self.double_action_timer.start()
+
+                # Input is being released at this point
+                elif self.double_action_timer and self.double_action_timer.is_alive():
+                    # if releasing single tap before delay
+                    # we will want to send a short press and release
                     self.double_action_timer.cancel()
-            # First acitvation within the delay, i.e. first tap
-            else:
-                self.start_time = time.time()
-                self.tap_type = "single"
-                if self.activate_on == "exclusive":
-                    self.double_action_timer = \
-                        threading.Timer(self.delay, self._single_tap)
+                    self.double_action_timer = threading.Timer(
+                        (self.start_time + self.delay) - time.time(),
+                        lambda: self._single_tap(event, value)
+                    )
                     self.double_action_timer.start()
 
-        # Input is being released at this point
-        elif self.double_action_timer and self.double_action_timer.is_alive():
-            # if releasing single tap before delay
-            # we will want to send a short press and release
-            self.double_action_timer.cancel()
-            self.double_action_timer = threading.Timer(
-                (self.start_time + self.delay) - time.time(),
-                lambda: self._single_tap(event, value)
-            )
-            self.double_action_timer.start()
-
-        if self.tap_type == "double":
-            self.double_tap.process_event(event, value)
-            if self.activate_on == "combined":
-                self.single_tap.process_event(event, value)
-        elif self.activate_on != "exclusive":
+                if self.tap_type == "double":
+                    self.double_tap.process_event(event, value)
+                    if self.activate_on == "combined":
+                        self.single_tap.process_event(event, value)
+                elif self.activate_on != "exclusive":
+                    self.single_tap.process_event(event, value)
+        
+        else:
             self.single_tap.process_event(event, value)
+            self.processed_single_tap = True
 
     def _single_tap(self, event_release=None, value_release=None):
         """Callback executed, when the delay expires."""
+        self.processed_single_tap = False
         self.single_tap.process_event(self.event_press, self.value_press)
         if event_release:
             time.sleep(0.05)
             self.single_tap.process_event(event_release, value_release)
-
+            self.processed_single_tap = True
 
 class DoubleTapContainer(gremlin.base_classes.AbstractContainer):
 
@@ -349,7 +357,7 @@ class DoubleTapContainer(gremlin.base_classes.AbstractContainer):
 
         :return True if the container is configured properly, False otherwise
         """
-        return any(len(action_set) for action_set in self.action_sets)
+        return len(self.action_sets) == 2 and None not in self.action_sets
 
 
 # Plugin definitions
