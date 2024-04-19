@@ -6,6 +6,7 @@ Joystick Gremlin EX
 4/8/24 - added troubleshooting guide and sample scripts for advanced GremlinEx scripting via plugins
 
 4/12/24 - bug fixes (see release notes on issues resolved)
+4/18/24 - adding range container and keyboard mapper EX (wip - may break!)
 
 Introduction
 ------------
@@ -441,3 +442,45 @@ If you want to run from the source code, you will need the following python pack
 	pywin32
 	msgpack
 	reportlab
+
+
+## Range container
+
+The range container is a new container designed to handle axis input ranges more easily than with conditions. 
+
+The idea of a range container is to setup a range of axis values that will trigger one or more actions.   As many actions as needed can be added.
+
+The range container has a minimum and a maximum and each boundary and be included or excluded to define the range.
+
+There is a convenience button that will add a number of ranges to an axis, you specify how many axis "brackets" you need, and you can give it a default action.
+
+The Add button adds containers.  The add and replace button replaces all the range containers with the new range value (use with care as it will blitz any prior range containers).
+
+The range container is designed to work with joystick buttons or the enhanced keyboard mapper (map to keyboard ex)
+
+### Latching
+
+The range container is latched - meaning that this special container is aware of other range containers in the execution graph.
+
+### Dragons
+
+This container is an experimental feature.
+
+The range mapper is not designed to work with the default keyboard mapper as that will cause stuck keys, because of how the default keyboard mapper works when conditions are not used.  Use the enhanced keyboard mapper.
+
+The latching feature (awareness of other range containers) may introduce some strange behaviors.
+
+
+
+## Enhanced keyboard mapper (map to keyboard Ex)
+
+This is identical to the base keyboard mapper but adds a few functions I thought were missing.
+
+### Enhancements:
+The mapper can now press (make) a key and release (break) a key separately. 
+
+The mapper can press an release a key with a specified delay in milliseconds.
+
+### Dragons
+
+This is an experimental feature.

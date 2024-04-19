@@ -744,8 +744,10 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         # Create the individual tabs
         self._create_action_tab()
         if self.profile_data.get_device_type() != DeviceType.VJoy:
-            self._create_activation_condition_tab()
-            self._create_virtual_button_tab()
+            if self.profile_data.condition_enabled:
+                self._create_activation_condition_tab()
+            if self.profile_data.virtual_button_enabled:
+                self._create_virtual_button_tab()
 
         self.dock_tabs.currentChanged.connect(self._tab_changed)
 

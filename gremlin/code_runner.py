@@ -28,6 +28,7 @@ import dill
 import gremlin
 from gremlin import event_handler, input_devices, \
     joystick_handling, macro, sendinput, user_plugin, util
+import gremlin.plugin_manager
 import vjoy as vjoy_module
 
 
@@ -157,6 +158,11 @@ class CodeRunner:
                     lambda x: x,
                     False
                 )
+
+
+            # reset functor latching
+            container_plugins = gremlin.plugin_manager.ContainerPlugins()
+            container_plugins.reset_functors()
 
             # Create input callbacks based on the profile's content
             for device in profile.devices.values():
@@ -328,7 +334,10 @@ class CodeRunner:
         input_devices.stop_registry.stop()
         input_devices.stop_registry.clear()
         input_devices.mode_registry.clear()
-
+        
+        # reset functor latching
+        container_plugins = gremlin.plugin_manager.ContainerPlugins()
+        container_plugins.reset_functors()        
 
         # Disconnect all signals
         if self._running:

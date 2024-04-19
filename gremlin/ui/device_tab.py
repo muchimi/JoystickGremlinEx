@@ -62,6 +62,11 @@ class InputItemConfiguration(QtWidgets.QFrame):
 
         self.main_layout.addWidget(self.action_view)
 
+        # setup the container widget reference
+        plugin_manager = gremlin.plugin_manager.ContainerPlugins()
+        plugin_manager.set_widget(self.item_data, self)
+        
+
     def _add_action(self, action_name):
         """Adds a new action to the input item.
 
@@ -89,9 +94,12 @@ class InputItemConfiguration(QtWidgets.QFrame):
         :param container_name name of the container to be added
         """
         plugin_manager = gremlin.plugin_manager.ContainerPlugins()
-        self.action_model.add_container(
-            plugin_manager.get_class(container_name)(self.item_data)
-        )
+        container = plugin_manager.get_class(container_name)(self.item_data)
+        if hasattr(container, "action_model"):
+            container.action_model = self.action_model
+        self.action_model.add_container(container)
+        plugin_manager.set_container_data(self.item_data, container)
+        return container
 
     def _remove_container(self, container):
         """Removes an existing container from the InputItem.

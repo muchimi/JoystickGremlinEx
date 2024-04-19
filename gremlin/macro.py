@@ -24,6 +24,8 @@ import time
 from threading import Event, Lock, Thread
 from xml.etree import ElementTree
 
+from PySide6 import QtCore
+
 import win32con
 import win32api
 
@@ -381,6 +383,7 @@ class MacroManager:
         # if not is_remote:
         #     is_remote = macro.is_remote
 
+
         (state_is_local, state_is_remote) = gremlin.input_devices.remote_state.state
         if not is_remote:
             is_remote = state_is_remote
@@ -418,6 +421,9 @@ class MacroManager:
         else:
             for action in macro.sequence:
                 action(is_local, is_remote, macro.force_remote)
+            # indicate the macro is done
+            if macro.completed_callback:
+                macro.completed_callback()
 
         # Remove macro from active set, notify manager, and remove any
         # potential callbacks
@@ -445,6 +451,8 @@ class Macro:
 
     """Represents a macro which can be executed."""
 
+    
+
     # Unique identifier for each macro
     _next_macro_id = 0
 
@@ -461,6 +469,8 @@ class Macro:
         Macro._next_macro_id += 1
         self.repeat = None
         self.exclusive = False
+        self.completed_callback = None # callback called when macro completes
+        
 
         # flag set if we're forcing remote mode execution
         if force_remote:

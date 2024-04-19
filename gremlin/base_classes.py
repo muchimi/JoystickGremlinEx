@@ -600,6 +600,8 @@ class AbstractContainer(profile.ProfileData):
         """
         super().__init__(parent)
         self.action_sets = []
+        self._condition_enabled = True
+        self._virtual_button_enabled = True # determines if the callbacks can be virtualized or not - if not - the callback is "raw" to the functor
         self.activation_condition_type = None
         self.activation_condition = None
         self.virtual_button = None
@@ -628,6 +630,25 @@ class AbstractContainer(profile.ProfileData):
             return parent
         return None
     
+    @property
+    def condition_enabled(self):
+        ''' determines if condition tab is enabled '''
+        return self._condition_enabled
+    @condition_enabled.setter
+    def condition_enabled(self, value):
+        ''' determines if condition tab is enabled '''
+        self._condition_enabled = value
+
+    @property
+    def virtual_button_enabled(self):
+        ''' determines if virtual button tab is enabled and virtual buttons is enabled for functor callbacks'''
+        return self._virtual_button_enabled
+    @virtual_button_enabled.setter
+    def virtual_button_enabled(self, value):
+        ''' determines if virtual button tab is enabled and virtual buttons is enabled for functor callbacks'''
+        self._virtual_button_enabled = value
+
+
     @property
     def hardware_device(self):
         ''' gets the hardware device attached to this '''
@@ -698,7 +719,7 @@ class AbstractContainer(profile.ProfileData):
         # For a virtual button create a callback that sends VirtualButton
         # events and another callback that triggers of these events
         # like a button would.
-        if self.virtual_button is not None:
+        if self._virtual_button_enabled and self.virtual_button is not None:
             callbacks.append(execution_graph.CallbackData(
                 execution_graph.VirtualButtonProcess(self.virtual_button),
                 None
