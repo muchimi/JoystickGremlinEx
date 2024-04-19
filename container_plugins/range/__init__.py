@@ -99,6 +99,31 @@ class RangeContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
         min_box.setDecimals(3)
         min_box.setValue(profile.range_min)
 
+        # holds the mode change data when in trigger by value change mode
+        mode_widget = QtWidgets.QWidget()
+        mode_container = QtWidgets.QHBoxLayout() 
+        mode_widget.setLayout(mode_container)
+        self.ui_mode_widget = mode_widget
+
+        # holds the range data when triggered by range
+        range_widget = QtWidgets.QWidget()
+        range_container = QtWidgets.QHBoxLayout() # holds the range data
+        range_widget.setLayout(range_container)
+        self.ui_range_widget = range_widget
+
+        any_change_mode =  QtWidgets.QCheckBox("Any Change") # trigger on any change mode
+        self.ui_any_change_mode = any_change_mode
+        any_change_mode.setChecked(profile.any_change_mode)
+        any_change_mode.clicked.connect(self._any_change_mode_changed)
+        
+
+
+        any_change_label = QtWidgets.QLabel("Delta %")
+        any_change_delta = QtWidgets.QSpinBox()
+        self.ui_any_change_delta = any_change_delta
+        any_change_delta.setRange(0,100) 
+        any_change_delta.setValue(profile.any_change_delta)
+        
         min_box_included = QtWidgets.QCheckBox("[")
         min_box_included.setChecked(profile.range_min_included)
 
@@ -116,6 +141,7 @@ class RangeContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
 
         cfg = gremlin.config.Configuration()
         self.ui_action_dropdown.setCurrentText(cfg.default_action)
+
         self.add_button = QtWidgets.QPushButton("Add")
         self.add_button.clicked.connect(self._add_action)
 
@@ -140,17 +166,30 @@ class RangeContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
         max_box.setDecimals(3)
         max_box.setValue(profile.range_max)
 
+
+
         symmetrical_box = QtWidgets.QCheckBox("Symmetrical")
         symmetrical_box.setChecked(profile.symmetrical)
+
+
+        mode_container.addWidget(any_change_label)
+        mode_container.addWidget(any_change_delta)
         
-        toolbar1.addWidget(QtWidgets.QLabel("Start:"))
-        toolbar1.addWidget(min_box_included)
-        toolbar1.addWidget(min_box)
-        toolbar1.addWidget(QtWidgets.QLabel("End:"))
-        toolbar1.addWidget(max_box)
-        toolbar1.addWidget(max_box_included)
-        toolbar1.addWidget(symmetrical_box)
-        toolbar1.addStretch(1)
+
+        range_container.addWidget(QtWidgets.QLabel("Start:"))
+        range_container.addWidget(min_box_included)
+        range_container.addWidget(min_box)
+        range_container.addWidget(QtWidgets.QLabel("End:"))
+        range_container.addWidget(max_box)
+        range_container.addWidget(max_box_included)
+        range_container.addWidget(symmetrical_box)
+
+
+
+        toolbar1.addWidget(any_change_mode)
+        toolbar1.addWidget(mode_widget)
+        toolbar1.addWidget(range_widget)
+        range_container.addStretch(1)
 
         toolbar2.addWidget(add_button_top_90)
         toolbar2.addWidget(action_label)
@@ -160,6 +199,8 @@ class RangeContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
         toolbar2.addWidget(add_range)
         toolbar2.addWidget(replace_range)
         toolbar2.addStretch(1)
+
+
         
         self.widget_layout.addWidget(toolbar_widget)        
         self.widget_layout.addWidget(self.action_selector)
@@ -169,6 +210,7 @@ class RangeContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
         self.ui_max_box = max_box
         self.ui_max_box_included = min_box_included
         self.ui_symmetrical = symmetrical_box
+        self.ui_range_options = toolbar2_widget
 
         self.action_selector.action_added.connect(self._add_action)
 
@@ -180,6 +222,12 @@ class RangeContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
 
         self.action_layout.addLayout(self.widget_layout)
 
+        mode = self.profile_data.any_change_mode
+        mode_widget.setEnabled(mode)
+        range_widget.setEnabled(not mode)
+        toolbar2_widget.setEnabled(not mode)
+                
+
         # Insert action widgets
         for i, action in enumerate(self.profile_data.action_sets):
             widget = self._create_action_set_widget(
@@ -190,6 +238,8 @@ class RangeContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
             self.action_layout.addWidget(widget)
             widget.redraw()
             widget.model.data_changed.connect(self.container_modified.emit)
+
+
 
 
     def _create_condition_ui(self):
@@ -256,6 +306,14 @@ class RangeContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
         :return title to use for the container
         """
         return f"Range: {" -> ".join([", ".join([a.name for a in actions]) for actions in self.profile_data.action_sets])}"
+    
+    def _any_change_mode_changed(self):
+        mode = self.ui_any_change_mode.isChecked()
+        self.ui_range_widget.setEnabled(not mode)
+        self.ui_range_options.setEnabled(not mode)
+        self.ui_mode_widget.setEnabled(mode)
+        self.profile_data.any_change_mode = mode
+
     
     ''' event handlers for the UI elements in this action '''
     def _range_min_changed(self):
@@ -331,12 +389,23 @@ class RangeContainerFunctor(gremlin.base_classes.AbstractFunctor):
             self.action_sets.append(
                 gremlin.execution_graph.ActionSetExecutionGraph(action_set)
             )
-        self.container = container
+
+        self.any_change_mode = container.any_change_mode
         self.reset_range()
+
+        self.any_change_delta =  container.any_change_delta / 200 # 2 * 100 because the range is -1 to +1, so 2 total, to actual range value
+        self.range_min = container.range_min
+        self.range_max = container.range_max
+        if self.range_min > self.range_max:
+            # swap
+            tmp = self.range_min
+            self.range_min = self.range_max
+            self.range_max = tmp
 
         # latch all the range containers
         self.latched_functors = []
         self.latched_loaded = False
+        self.last_target = -2.0
 
 
     def reset_range(self):
@@ -354,16 +423,9 @@ class RangeContainerFunctor(gremlin.base_classes.AbstractFunctor):
 
         if event.event_type != InputType.JoystickAxis:
             return
+        
 
-        target = value.current
-
-
-        # verify the event is in the correct range
-        container : RangeContainer
-        container = self.container
-
-        range_min = container.range_min
-        range_max = container.range_max
+        trigger = False
 
         # latch all other functors
         if not self.latched_loaded:
@@ -374,53 +436,72 @@ class RangeContainerFunctor(gremlin.base_classes.AbstractFunctor):
 
             self.latched_loaded = True
 
-        ranges = [(range_min, range_max)]
 
-        if container.symmetrical:
-            # duplicate the ranges for symmetrical
-            sym_min = -range_min
-            sym_max = -range_max
-            if sim_max < sim_min:
-                tmp = sim_max
-                sim_max = sim_min
-                sim_min = tmp
-
-            ranges.append((sym_min, sym_max))
-
+        target = value.current
         in_range = False
-        
-        for (range_min, range_max) in ranges:
-            if target < range_min or target > range_max: 
-                continue
-            if not container.range_min_included:
-                if target == range_min:
-                    continue
-            if not container.range_max_included:
-                if target == range_max:
-                    continue
 
-            #syslog.info(f"{target:0.3f} range {range_min:0.3f} {range_max:0.3f} bracket {self.last_range_min:0.3f} {self.last_range_max:0.3f}")    
-            in_range = True
-                
-            break
+        if self.any_change_mode:
+            # trigger if change meets the deflection delta
+            trigger = abs(target - self.last_target) >= self.any_change_delta
+        else:
 
-        if in_range:
-            # axis value is in a bracket range - make sure it hasn't been processed already
-            range_changed = self.last_range_min != range_min and self.last_range_max != range_max
-            if range_changed:
-                #syslog.info("trigger!")
-                for action in self.action_sets:
-                    action.process_event(event, value)
+            # verify the event is in the correct range
+            container : RangeContainer
+            container = self.container
+
+            range_min = self.range_min
+            range_max = self.range_max
+
+
+            ranges = [(range_min, range_max)]
+
+            if container.symmetrical:
+                # duplicate the ranges for symmetrical
+                sym_min = -range_min
+                sym_max = -range_max
+                if sim_max < sim_min:
+                    tmp = sim_max
+                    sim_max = sim_min
+                    sim_min = tmp
+
+                ranges.append((sym_min, sym_max))
+
+
+            
+            for (range_min, range_max) in ranges:
+                if target < range_min or target > range_max: 
+                    continue
+                if not container.range_min_included:
+                    if target == range_min:
+                        continue
+                if not container.range_max_included:
+                    if target == range_max:
+                        continue
+
+                #syslog.info(f"{target:0.3f} range {range_min:0.3f} {range_max:0.3f} bracket {self.last_range_min:0.3f} {self.last_range_max:0.3f}")    
+                in_range = True
+                    
+                break
+
+            if in_range:
+                # axis value is in a bracket range - make sure it hasn't been processed already
+                trigger = self.last_range_min != range_min and self.last_range_max != range_max
+
+        if trigger:
+            #syslog.info("trigger!")
+
+            for action in self.action_sets:
+                action.process_event(event, value)
+            if in_range:
                 self.last_range_min = range_min
                 self.last_range_max = range_max
-
 
             if self.latched_functors:
                 # reset the other latched functors of their range trigger to indicate we got our own range
                 for functor in self.latched_functors:
                     functor.reset_range()
 
-   
+            self.last_target = target
                 
 
             return True
@@ -466,7 +547,8 @@ class RangeContainer(gremlin.base_classes.AbstractContainer):
         self.action_model = None # set at creation by the parent of this container
         self._widget = None # will be populated by the widget attached to this container
         self._functor = None # will be populated when the functor is created for this container
-
+        self.any_change_mode = False # trigger on any change mode
+        self.any_change_delta = 10 # percentage move that must be detected before the action is triggered 0 to 100
         self.condition_enabled = False
         self.virtual_button_enabled = False
 
@@ -483,6 +565,10 @@ class RangeContainer(gremlin.base_classes.AbstractContainer):
     def _parse_xml(self, node):
         ''' reads configuration '''
         try:
+            if "any" in node.attrib:
+                self.any_change_mode = safe_read(node, "any", bool)
+            if "delta" in node.attrib:
+                self.any_change_delta = safe_read(node, "delta", int)
             if "min" in node.attrib:
                 self.range_min = safe_read(node, "min", float)
             if "max" in node.attrib:
@@ -503,6 +589,8 @@ class RangeContainer(gremlin.base_classes.AbstractContainer):
         ''' returns an xml node encoding this action's data '''
         node = ElementTree.Element("container")
         node.set("type", RangeContainer.tag)
+        node.set("any", safe_format(self.any_change_mode, bool))
+        node.set("delta", safe_format(self.any_change_delta, int))
         node.set("min", safe_format(self.range_min, float))
         node.set("max", safe_format(self.range_max, float))
         node.set("min_inc", safe_format(self.range_min_included, bool))

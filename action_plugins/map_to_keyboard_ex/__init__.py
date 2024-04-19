@@ -338,7 +338,7 @@ class MapToKeyboardEx(AbstractAction):
 
         :return XML node containing the information of this  instance
         """
-        node = ElementTree.Element("map-to-keyboard")
+        node = ElementTree.Element(MapToKeyboardEx.tag)
         if self.mode == MapToKeyboardExMode.Both:
             mode = "both"
         elif self.mode == MapToKeyboardExMode.Press:
