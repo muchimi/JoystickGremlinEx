@@ -983,6 +983,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             elif self.action_data.input_type == InputType.JoystickButton:
                 # various button modes
                 actions = ( VjoyAction.VJoyButton,
+                            VjoyAction.VjoyButtonRelease,
                             VjoyAction.VJoyPulse,
                             VjoyAction.VJoyToggle,
                             VjoyAction.VJoyInvertAxis,
@@ -1115,8 +1116,8 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         elif input_type == InputType.JoystickButton:
             pulse_visible = action == VjoyAction.VJoyPulse
-            start_visible = action == VjoyAction.VJoyButton
-            grid_visible = action in (VjoyAction.VJoyPulse, VjoyAction.VJoyButton, VjoyAction.VJoyToggle)
+            start_visible = action in (VjoyAction.VJoyButton, VjoyAction.VjoyButtonRelease)
+            grid_visible = action in (VjoyAction.VJoyPulse, VjoyAction.VJoyButton, VjoyAction.VJoyToggle, VjoyAction.VjoyButtonRelease)
             paired_visible = action == VjoyAction.VJoyButton
             target_value_visible = action == VjoyAction.VJoyButton
             exec_on_release_visible =  action_data.input_type == InputType.JoystickButton # or is_command
@@ -1830,6 +1831,17 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
                         if is_remote or is_paired:
                             self.remote_client.send_button(self.vjoy_device_id, self.vjoy_input_id, value.current, force_remote = is_paired )
                     
+            
+            elif self.action_mode == VjoyAction.VjoyButtonRelease:
+                # normal default behavior
+                if event.is_pressed:
+                    if is_local:    
+                        joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = False                        
+                    if is_remote or is_paired:
+                        self.remote_client.send_button(self.vjoy_device_id, self.vjoy_input_id, False, force_remote = is_paired )
+                    
+            
+            
             
             elif self.action_mode == VjoyAction.VJoyToggle:
                 # toggle action
