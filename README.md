@@ -1,16 +1,75 @@
 Joystick Gremlin EX
 ================
 
+
+
+## Contents
+
+<!-- TOC start (generated with https://github.com/derlin/bitdowntoc) -->
+
+   * [Changelog](#changelog)
+- [There be dragons ahead!  ](#there-be-dragons-ahead)
+   * [Support](#support)
+   * [History](#history)
+- [Automatic Input detection](#automatic-input-detection)
+      + [Button detect only overrides](#button-detect-only-overrides)
+- [Remote control feature](#remote-control-feature)
+      + [Master machine setup](#master-machine-setup)
+         - [Local mode](#local-mode)
+         - [Broadcast mode](#broadcast-mode)
+         - [Concurrent mode](#concurrent-mode)
+      + [Client machine setup](#client-machine-setup)
+   * [Master remote control functions](#master-remote-control-functions)
+   * [VJoyRemap button press actions](#vjoyremap-button-press-actions)
+   * [VJoyRemap axis mapping actions](#vjoyremap-axis-mapping-actions)
+- [Map to mouse EX plugin](#map-to-mouse-ex-plugin)
+- [Map to keyboard EX plugin](#map-to-keyboard-ex-plugin)
+      + [Dragons](#dragons)
+- [Range container](#range-container)
+      + [Ranges](#ranges)
+      + [Include/exclude flag](#includeexclude-flag)
+      + [Symmetry](#symmetry)
+      + [Latching](#latching)
+      + [Dragons](#dragons-1)
+- [Plugin Script enhancements](#plugin-script-enhancements)
+      + [@gremlin.input_devices.gremlin_start](#gremlininput_devicesgremlin_start)
+      + [@gremlin.input_devices.gremlin_stop](#gremlininput_devicesgremlin_stop)
+      + [@gremlin.input_devices.gremlin_mode](#gremlininput_devicesgremlin_mode)
+      + [@gremlin.input_devices.gremlin_state](#gremlininput_devicesgremlin_state)
+- [Recipes](#recipes)
+   * [One way or two way switch to two way switch / three way switch](#one-way-or-two-way-switch-to-two-way-switch-three-way-switch)
+   * [Long/short press - buttons or keyboard](#longshort-press-buttons-or-keyboard)
+      + [To setup concurrent button presses (hold the short press while long press is active)](#to-setup-concurrent-button-presses-hold-the-short-press-while-long-press-is-active)
+      + [To setup a latched short, then long button press with only one button active](#to-setup-a-latched-short-then-long-button-press-with-only-one-button-active)
+   * [Scripting logic](#scripting-logic)
+      + [Attaching a function to a hardware event](#attaching-a-function-to-a-hardware-event)
+   * [Recommended Resources](#recommended-resources)
+         - [VJOY virtual joystick driver ](#vjoy-virtual-joystick-driver)
+         - [OSC support in Joystick Gremlin from TouchOSC](#osc-support-in-joystick-gremlin-from-touchosc)
+         - [HIDHIDE](#hidhide)
+         - [Hexler TouchOSC](#hexler-touchosc)
+- [Troubleshooting guide ](#troubleshooting-guide)
+   * [HID devices - detection / random disconnects](#hid-devices-detection-random-disconnects)
+   * [HID troubleshooting tips ](#hid-troubleshooting-tips)
+   * [HIDHide troubleshooting](#hidhide-troubleshooting)
+   * [Checking your mappings](#checking-your-mappings)
+   * [GremlinEx has been tested with ](#gremlinex-has-been-tested-with)
+   * [Sample scripts](#sample-scripts)
+   * [OSC (open stage control) info](#osc-open-stage-control-info)
+   * [Python dependencies](#python-dependencies)
+      + [Enhancements:](#enhancements)
+      + [Dragons](#dragons-2)
+
+<!-- TOC end -->
+
 ## Changelog
 
 4/8/24 - added troubleshooting guide and sample scripts for advanced GremlinEx scripting via plugins
 
 4/12/24 - bug fixes (see release notes on issues resolved)
 4/18/24 - adding range container and keyboard mapper EX (wip - may break!)
-
-
-
 Introduction
+
 ------------
 
 For general Joystick Gremlin documentation - consult https://whitemagic.github.io/JoystickGremlin/
@@ -281,7 +340,7 @@ Make sure that if you use a press action, there is a companion release action so
 When a key is pulsed, the release will occur regardless of input state or conditions.
 
 
-## Range container
+# Range container
 
 The range container is a container designed to break up an axis input ranges into  one or more actions tied to a particular range.  While something like this can be done with conditions, the range container is much easier to setup than using conditions. 
 
