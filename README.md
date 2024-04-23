@@ -8,26 +8,32 @@ Joystick Gremlin EX
 4/12/24 - bug fixes (see release notes on issues resolved)
 4/18/24 - adding range container and keyboard mapper EX (wip - may break!)
 
+
+
 Introduction
 ------------
 
 For general Joystick Gremlin documentation - consult https://whitemagic.github.io/JoystickGremlin/
 
-This custom version adds to release 13.3 of Gremlin:
+The EX version adds to release 13.3 of Gremlin:
 
 - Update to x64 bit from x32 bit
-- Update to Python 11.x (improved execution speed over Python 10)
+- Update to Python 12.x (improved execution speed over Python 10)
 - Update to QT6 UI framework
 - Improved stability when loading a plugin that has an error on load
-- Remote data control of another GremlinEx client on the local network
-- OSC message handling (for touch screen support going to Gremlin via TouchOSC for example)
-- VjoyRemap plugin for control  
-- MapToMouseEx plugin for enhanced mouse control  
+- Remote data control of another GremlinEx client on the local network (this lets you send input from one box from hardware connected to a different box on the network) with low latency (typically 20ms or so)
+- OSC message handling (for touch screen support going to Gremlin via TouchOSC for example) - this lets you implement "game glass" functionality easily while working around Windows' limitation with touch screen control surfaces on the same box
+- VjoyRemap plugin for enhanced button/axis Vjoy mapping  
+- MapToMouseEx action plugin for enhanced mouse control  
+- Range container for mapping axis ranges to actions easily
+- MapToKeyboardEx action plugin for enhanced keyboard control with separate make/break and delay functionality
 
 
 I suggest you make VjoyRemap the default action in the options panel as this plugin is what provides many enhancements over the default Remap plugin.  Same for mouse output - MapToMouseEx provides enhanced options for the mouse macro functions.
 
 This said, the default plugins are all functional but they won't be aware of the new features in GremlinEx.
+
+
 
 
 # There be dragons ahead!  
@@ -36,11 +42,22 @@ I updated this code repository for my own purpose as I ran across my hardware co
 
 As such, the code may have some bugs and other things I'm missed in my own testing, so please report issues you encounter as you find them and I'll do my best to fix them.
 
-The core repository was substantially modified in some areas to support remote control, including some new events, adding improved support for user scripts (so they are aware of state information for example).   Some UI elements were also modified a bit to improve the visuals and to simplify certain aspects of Gremlin.  For example, all buttons support a release action without going through more complex hoops for setup, as a check box is simpler to setup in this use-case.   This made it much simpler for me to map physical switches on throttles that have a single state to multi-state and do what used to be complex mappings essentially a checkbox affair.
+## Support
 
-I have attempted to use the base project as much as possible, and I am grateful to WhiteMagic and his excellent ideas as Gremlin is simply the best mapping utility I have ever seen or used in decades of simulation and hardware input mapping to games.  The architecture is also excellent and made my modifications very simple.
+As this is on my free time, support is on a best effort basis.  To help that, please create and/or update an existing GitHub issue and do include screenshots, describe what you're trying to do, any steps to reproduce, and attach an example  profile as that will help a lot.   
 
-  
+ 
+I am using this tool daily for all my flight sims so I know the parts I'm using are working - but Gremlin's premise is to be very flexible and that will definitely lead to situations I haven't tried yet, or that the code just blows up on because it never came up.  My goal however is to get it fixed.
+
+
+
+## History
+
+
+The core Gremlin repository was substantially modified in some areas to support remote control, including some new events, adding improved support for user plugin  scripts (so they are aware of state information for example). Some UI elements were also modified a bit to improve the visuals and to simplify certain aspects of Gremlin. For example, all buttons support a release action without going through more complex conditions, as in my book a check box is simpler to setup in this use-case than to go through an additional three screens. This made it much simpler for me to map physical switches on throttles that have a single state to multi-state and do what used to be complex mappings essentially a checkbox affair.
+
+I have attempted to use the base project as much as possible, and I am grateful to WhiteMagic and his excellent ideas and structure as Gremlin is simply the best mapping utility I have ever seen or used in decades of simulation and hardware input mapping to games.  The architecture is also excellent and made my modifications very simple.
+
 I am using this code daily for my simulation needs but that's not a guarantee everything works as expected.  Feedback welcome!  
 
 
@@ -196,6 +213,7 @@ The commands are only available to button bindings at this time.
 | Command      | Description |
 | ----------- | ----------- |
 | Button Press     | Outputs a single button to the given VJOY device.  The exec on release option sends the output when the physical button is released.  Start mode sets the output status on profile start.   |
+| Button Release | Releases a single button on the given VJOY device.  This is the opposite of press.  This is usually not required but is helpful in some scenarios such as using the tempo container or toggle behaviors.  |
 | Pulse     | Outputs a single button to the given VJOY device momentarily.  The default pulse duration is 250 milliseconds, which can be adjusted.  The exec on release option sends the output when the physical button is released.  Start mode sets the output status on profile start.   |
 | Toggle     | Toggles (flips) the button output on the given VJOY device. If it was on, it's off, if it was off, it toggles on.  Useful for on/off type activites.    |
 | Invert Axis     |  Inverts the specified output axis on the VJOY device.  This flips the direction of output of the axis on the fly by mapping it to a button.  This is specific to games that map the same axis but they are inverted (example in Star Citizen is ship throttle vs vehicle throttle).  When mapped to a physical switch on the throttle, converts from ship mode to vehicle mode for the throttle.  |
@@ -241,6 +259,68 @@ The purpose of wiggle is to keep an application alive.   Wiggle is turned on/off
 
 Mouse commands can forced to be sent to remote hosts only, or to send them concurrently to the remote host regardless of the remote control state.
 
+
+# Map to keyboard EX plugin
+
+This is identical to the base keyboard mapper but adds a few functions I thought were missing.
+
+The updated keyboard mapper adds separate press (make), release (break) functionality so keys can stay pressed, or just released separately.
+
+It also adds a delay (pulse) function to hold a key down for a preset period of time (default is 250 milliseconds or 1/4 of a second which is the typical game "detect" range as some games cannot detect key presses under 250ms in my experience.
+
+The make/break/pulse behavior applies to all keys in the action, and the keys are released in the reverse order they were pressed.
+
+
+
+### Dragons
+
+This action is an experimental feature.
+
+Make sure that if you use a press action, there is a companion release action somewhere.  If that doesn't happen, you can press the key on your keyboard and it will release the key.
+
+When a key is pulsed, the release will occur regardless of input state or conditions.
+
+
+## Range container
+
+The range container is a container designed to break up an axis input ranges into  one or more actions tied to a particular range.  While something like this can be done with conditions, the range container is much easier to setup than using conditions. 
+
+The idea of a range container is to setup a range of axis values that will trigger one or more actions.   As many actions as needed can be added.  An example of this is mapping a flaps axis to distinct keys, or setting up button presses based on the value of an input axis, which is helpful for example, for throttle setups on some flight simulators to setup detents.
+
+The range container has a minimum and a maximum and each boundary and be included or excluded to define the range.
+
+There is a convenience button that will create automatic ranges to an axis: you specify how many axis "brackets" you need, and you can give it a default action.  This will create range containers for the axis automatically and compute the correct bracket values for the count provided.
+
+The Add button adds containers.  The add and replace button replaces all the range containers with the new range value (use with care as it will blitz any prior range containers).
+
+The range container is designed to work with joystick buttons or the enhanced keyboard mapper (map to keyboard ex)
+
+### Ranges
+
+All joystick axis values in JGex are -1.0 to +1.0 regardless of the device, with 0.0 being the center position.
+
+### Include/exclude flag
+
+Each bracket can include or exclude the value.  Think of it as greater than, versus greater or equal to.   This is use to include or exclude the boundary value when JGex is determining if the action should trigger or not.
+
+### Symmetry
+
+The symmetry option applies the opposite bracket as the trigger.  So if the bracket is (0.9 to 1.0), in symmetry mode the bracket (-1, -0.9) will also trigger if the axis is in that range.
+
+
+### Latching
+
+The range container is latched - meaning that this special container is aware of other range containers in the execution graph.  The latching is automatic and ensures that when the axis is moved to a different position, prior active ranges reset so can re-trigger when the axis moves into their range again, so the container has to be aware of other ranges.
+
+### Dragons
+
+This container is an experimental feature.
+
+The range mapper is not designed to work with the default keyboard mapper as that will cause stuck keys, because of how the default keyboard mapper works when conditions are not used.  Use the enhanced keyboard mapper.
+
+The latching feature (awareness of other range containers) may introduce some strange behaviors and applies to all ranges attached to a single axis, so it's not aware of nesting for example.  The latching applies to all ranges in the mapping tree regardless of their level.
+
+
 # Plugin Script enhancements
  
 
@@ -280,6 +360,44 @@ One responds to button presses on the raw hardware, the other responds to a butt
 | Send VJOY output (on release)   | Sends a button press to VJOY device and button when the position of the button is no longer active.  The checkbox "execute on release" is selected in this case.  |
 
 The equivalent pulse commands can be send to send a momentary pulse rather than having the button on all the time if that is needed.
+
+## Long/short press - buttons or keyboard
+
+You'll use the tempo container sets up two action blocks, one for short press, the other for long press.  The tempo container lets you select a long press delay, so if the input is held long enough, the long action is triggered.
+
+The relevant behaviors of the Vjoyremap action are Button Press, Button Release and Toggle.
+
+Note: this applies to keyboard actions as well, and you can just as easily use this for keyboard presses using the enhanced keyboard action's ability to separate out key presses from key releases.
+
+### To setup concurrent button presses (hold the short press while long press is active)
+
+In this scenario, both outputs will be active if the input button is held long enough to trigger the long press.
+
+The vjoyremap action in the short action block should be set to *button press*.  The vjoyremap action in the long action block should also be set to *button press*.  The resulting behavior is the short and long buttons will both be pressed if the input button is held long enough, and both will release when the input is released.
+
+
+| Mapping     | Description |
+| ----------- | ----------- |
+| Short action block   | VjoyRemap set to *button press* and/or MaptoKeyboardEx set to "press" for the output on short hold      |
+| Long action block   | VjoyRemap set to *button press* and/or MaptoKeyboardEx set to "press" for the output on long hold |
+
+
+### To setup a latched short, then long button press with only one button active
+
+In this scenario, either short or long will be active if the input button is held long enough to trigger the long action.  If you hold the input long enough, the short button will release, and the long button will stay pressed as long as you hold the input.  Only one button will be output at a time.
+
+Add a vjoyremap in the short action block set to *button press*.
+
+Add two vjoyremaps in the long action block.  The first will map to the long press output button and the mode is set to *button press*.
+
+The second vjoyremap will be set to *button release* and map to the same output button in the short action block. 
+
+| Mapping     | Description |
+| ----------- | ----------- |
+| Short action block   | VjoyRemap set to *button press* and/or MaptoKeyboardEx set to "press" for the output on short hold      |
+| Long action block   | VjoyRemap #1 set to *button press* and/or MaptoKeyboardEx set to "press" for the output on long hold |
+| Long action block   | VjoyRemap #2 set to *button release* and/or MaptoKeyboardEx set to *release* to release the short press action |
+
 
 ## Scripting logic
 
@@ -444,37 +562,7 @@ If you want to run from the source code, you will need the following python pack
 	reportlab
 
 
-## Range container
 
-The range container is a new container designed to handle axis input ranges more easily than with conditions. 
-
-The idea of a range container is to setup a range of axis values that will trigger one or more actions.   As many actions as needed can be added.
-
-The range container has a minimum and a maximum and each boundary and be included or excluded to define the range.
-
-There is a convenience button that will add a number of ranges to an axis, you specify how many axis "brackets" you need, and you can give it a default action.
-
-The Add button adds containers.  The add and replace button replaces all the range containers with the new range value (use with care as it will blitz any prior range containers).
-
-The range container is designed to work with joystick buttons or the enhanced keyboard mapper (map to keyboard ex)
-
-### Latching
-
-The range container is latched - meaning that this special container is aware of other range containers in the execution graph.
-
-### Dragons
-
-This container is an experimental feature.
-
-The range mapper is not designed to work with the default keyboard mapper as that will cause stuck keys, because of how the default keyboard mapper works when conditions are not used.  Use the enhanced keyboard mapper.
-
-The latching feature (awareness of other range containers) may introduce some strange behaviors.
-
-
-
-## Enhanced keyboard mapper (map to keyboard Ex)
-
-This is identical to the base keyboard mapper but adds a few functions I thought were missing.
 
 ### Enhancements:
 The mapper can now press (make) a key and release (break) a key separately. 
