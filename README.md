@@ -23,8 +23,8 @@ Joystick Gremlin EX
 - [VJoyRemap action ](#vjoyremap-action)
    * [VJoyRemap button press actions](#vjoyremap-button-press-actions)
    * [VJoyRemap axis mapping actions](#vjoyremap-axis-mapping-actions)
-- [Map to mouse EX plugin](#map-to-mouse-ex-plugin)
-- [Map to keyboard EX plugin](#map-to-keyboard-ex-plugin)
+- [Map to mouse EX action](#map-to-mouse-ex-action)
+- [Map to keyboard EX action](#map-to-keyboard-ex-action)
       + [Dragons](#dragons)
 - [Range container](#range-container)
       + [Ranges](#ranges)
@@ -319,8 +319,8 @@ The commands are only available to button bindings at this time.
 | ----------- | ----------- |
 | Axis To Button     | Maps a raw input range to a specific button.  While the raw input is in that range, the button will be output.  Combine multiples of those to create more than one trigger.  Use-case: detent programming based on axis position.  | |
 
-<!-- TOC --><a name="map-to-mouse-ex-plugin"></a>
-# Map to mouse EX plugin
+<!-- TOC --><a name="map-to-mouse-ex-action"></a>
+# Map to mouse EX action
 
 This plugin is identical to the Map to Mouse plugin but adds a wiggle function, easy execute on release and button hold functionality. When wiggle is enabled, the mouse will move slightly by itself every 10 to 40 seconds and move back.  It will do that until wiggle mode is turned off.  
   
@@ -339,10 +339,10 @@ The purpose of wiggle is to keep an application alive.   Wiggle is turned on/off
 Mouse commands can forced to be sent to remote hosts only, or to send them concurrently to the remote host regardless of the remote control state.
 
 
-<!-- TOC --><a name="map-to-keyboard-ex-plugin"></a>
-# Map to keyboard EX plugin
+<!-- TOC --><a name="map-to-keyboard-ex-action"></a>
+# Map to keyboard EX action
 
-This is identical to the base keyboard mapper but adds a few functions I thought were missing.
+This is identical to the base keyboard mapper but adds a few functions I thought would be handy.
 
 The updated keyboard mapper adds separate press (make), release (break) functionality so keys can stay pressed, or just released separately.
 
