@@ -20,6 +20,7 @@ Joystick Gremlin EX
          - [Concurrent mode](#concurrent-mode)
       + [Client machine setup](#client-machine-setup)
    * [Master remote control functions](#master-remote-control-functions)
+- [VJoyRemap action ](#vjoyremap-action)
    * [VJoyRemap button press actions](#vjoyremap-button-press-actions)
    * [VJoyRemap axis mapping actions](#vjoyremap-axis-mapping-actions)
 - [Map to mouse EX plugin](#map-to-mouse-ex-plugin)
@@ -57,11 +58,10 @@ Joystick Gremlin EX
    * [Sample scripts](#sample-scripts)
    * [OSC (open stage control) info](#osc-open-stage-control-info)
    * [Python dependencies](#python-dependencies)
-      + [Enhancements:](#enhancements)
-      + [Dragons](#dragons-2)
 
 <!-- TOC end -->
 
+<!-- TOC --><a name="changelog"></a>
 ## Changelog
 
 4/8/24 - added troubleshooting guide and sample scripts for advanced GremlinEx scripting via plugins
@@ -95,12 +95,14 @@ This said, the default plugins are all functional but they won't be aware of the
 
 
 
+<!-- TOC --><a name="there-be-dragons-ahead"></a>
 # There be dragons ahead!  
 
 I updated this code repository for my own purpose as I ran across my hardware cockpit needs for my PC based simulators and thought to myself - hey - would love if this did [that]!  I was quickly confined though to the base functionality and realized soon that some deeper surgery was needed.  I also wanted the code to use current platform tools as there is for example a significant boost in performance just by using a new Python environment.
 
 As such, the code may have some bugs and other things I'm missed in my own testing, so please report issues you encounter as you find them and I'll do my best to fix them.
 
+<!-- TOC --><a name="support"></a>
 ## Support
 
 As this is on my free time, support is on a best effort basis.  To help that, please create and/or update an existing GitHub issue and do include screenshots, describe what you're trying to do, any steps to reproduce, and attach an example  profile as that will help a lot.   
@@ -110,6 +112,7 @@ I am using this tool daily for all my flight sims so I know the parts I'm using 
 
 
 
+<!-- TOC --><a name="history"></a>
 ## History
 
 
@@ -122,6 +125,7 @@ I am using this code daily for my simulation needs but that's not a guarantee ev
 
 
 
+<!-- TOC --><a name="automatic-input-detection"></a>
 # Automatic Input detection
 
 GremlinEx can auto-highlight hardware joystick input devices by clicking a button or moving an axis on them.   This eliminates the guesswork on how the hardware maps to buttons or axes.
@@ -145,6 +149,7 @@ There are three options that control this behavior in the GremlinEx options pane
 
 
 
+<!-- TOC --><a name="button-detect-only-overrides"></a>
 ### Button detect only overrides
 
 A pair of modifiers can be used to modify how input is detected.  
@@ -163,6 +168,7 @@ Holding the left-shift key down when in button detect mode temporarily enables a
 Holding the left-shift key and the left-control key when in button detect mode temporarily enables exclusive axis detection and ignores button presses.  This is helpful when you have a hardware axis that also has detents along the way that send button inputs.  In this mode, these buttons will be ignored. 
 
 
+<!-- TOC --><a name="remote-control-feature"></a>
 # Remote control feature
 
 GremlinEx adds a feature to link multiple GremlinEx instances running on separate computers.  This is helpful to share a single set of controls and a single profile on a master machine to one or more client machines on the local network.
@@ -181,6 +187,7 @@ By output events, we mean that inputs into GremlinEx are not broadcast to client
 To use the remote control features, it is intended you use the new plugins VjoyRemap and MapToMouseEx
 
 
+<!-- TOC --><a name="master-machine-setup"></a>
 ### Master machine setup
 
 The master machine is the machine responsible for broadcasting control events to clients on the local network.  Thus it will typically be the primary system with all the physical hardware managed by GremlinEx.
@@ -203,6 +210,7 @@ GremlinEx shows what output mode is active in the status bar.
 ![](img/server_options.jpg)
 
 
+<!-- TOC --><a name="local-mode"></a>
 #### Local mode
 
 In this mode, GremlinEx sends VJOY, keyboard and mouse events to the local machine.
@@ -212,6 +220,7 @@ The status bar displays
 ![](img/local_control.jpg)
 
 
+<!-- TOC --><a name="broadcast-mode"></a>
 #### Broadcast mode
 
 In this mode, GremlinEx sends VJOY, keyboard and mouse events to clients on the network.    The clients must have the remote control checkbox enabled, match the port number, and have a profile running (empty profile is fine) to respond to the broadcast events.
@@ -221,12 +230,14 @@ The status bar displays
 
 ![](img/remote_control.jpg)
 
+<!-- TOC --><a name="concurrent-mode"></a>
 #### Concurrent mode
 
 GremlinEx can send to the local and remote clients at the same time (concurrent mode) by sending the Concurrent command. 
 
 
 
+<!-- TOC --><a name="client-machine-setup"></a>
 ### Client machine setup
 
 Each GremlinEx client needs to have the remote control option enabled in options to be able to receive events from the master machine.   The master machine must also be setup to broadcast these events.
@@ -243,11 +254,17 @@ Clients will ignore events for devices that do not exist on the client (such as 
 
 The enable remote control checkbox is checked, and the port (default 6012) must match the broadcast machine's port.
 
+<!-- TOC --><a name="master-remote-control-functions"></a>
 ## Master remote control functions
 
 Local and broadcast (sending output to remote GremlinEx instances on network machines) control can be enabled or disabled via GremlinEx commands bound to a joystick button (or in script).
 
 Commands are available in the VjoyRemap plugin when bound to a joystick button and available from the drop down of actions for that button.
+
+<!-- TOC --><a name="vjoyremap-action"></a>
+# VJoyRemap action 
+
+This mapper is an enhancement to the default remap action. The main enhancements are to show a visual representation of all buttons used, support remote control, eliminate the need to setup many conditions, and to support one-click typical mapping needs directly from the UI.
 
 
 The VjoyRemap commands are:
@@ -266,6 +283,7 @@ The VjoyRemap commands are:
 
 The commands are only available to button bindings at this time.
 
+<!-- TOC --><a name="vjoyremap-button-press-actions"></a>
 ## VJoyRemap button press actions
 
 
@@ -282,6 +300,7 @@ The commands are only available to button bindings at this time.
 | Disable remote pairing | Turns off remote pairing mode
 
 
+<!-- TOC --><a name="vjoyremap-axis-mapping-actions"></a>
 ## VJoyRemap axis mapping actions
 
 | Command      | Description | |
@@ -300,6 +319,7 @@ The commands are only available to button bindings at this time.
 | ----------- | ----------- |
 | Axis To Button     | Maps a raw input range to a specific button.  While the raw input is in that range, the button will be output.  Combine multiples of those to create more than one trigger.  Use-case: detent programming based on axis position.  | |
 
+<!-- TOC --><a name="map-to-mouse-ex-plugin"></a>
 # Map to mouse EX plugin
 
 This plugin is identical to the Map to Mouse plugin but adds a wiggle function, easy execute on release and button hold functionality. When wiggle is enabled, the mouse will move slightly by itself every 10 to 40 seconds and move back.  It will do that until wiggle mode is turned off.  
@@ -319,6 +339,7 @@ The purpose of wiggle is to keep an application alive.   Wiggle is turned on/off
 Mouse commands can forced to be sent to remote hosts only, or to send them concurrently to the remote host regardless of the remote control state.
 
 
+<!-- TOC --><a name="map-to-keyboard-ex-plugin"></a>
 # Map to keyboard EX plugin
 
 This is identical to the base keyboard mapper but adds a few functions I thought were missing.
@@ -331,6 +352,7 @@ The make/break/pulse behavior applies to all keys in the action, and the keys ar
 
 
 
+<!-- TOC --><a name="dragons"></a>
 ### Dragons
 
 This action is an experimental feature.
@@ -340,6 +362,8 @@ Make sure that if you use a press action, there is a companion release action so
 When a key is pulsed, the release will occur regardless of input state or conditions.
 
 
+
+<!-- TOC --><a name="range-container"></a>
 # Range container
 
 The range container is a container designed to break up an axis input ranges into  one or more actions tied to a particular range.  While something like this can be done with conditions, the range container is much easier to setup than using conditions. 
@@ -354,23 +378,28 @@ The Add button adds containers.  The add and replace button replaces all the ran
 
 The range container is designed to work with joystick buttons or the enhanced keyboard mapper (map to keyboard ex)
 
+<!-- TOC --><a name="ranges"></a>
 ### Ranges
 
 All joystick axis values in JGex are -1.0 to +1.0 regardless of the device, with 0.0 being the center position.
 
+<!-- TOC --><a name="includeexclude-flag"></a>
 ### Include/exclude flag
 
 Each bracket can include or exclude the value.  Think of it as greater than, versus greater or equal to.   This is use to include or exclude the boundary value when JGex is determining if the action should trigger or not.
 
+<!-- TOC --><a name="symmetry"></a>
 ### Symmetry
 
 The symmetry option applies the opposite bracket as the trigger.  So if the bracket is (0.9 to 1.0), in symmetry mode the bracket (-1, -0.9) will also trigger if the axis is in that range.
 
 
+<!-- TOC --><a name="latching"></a>
 ### Latching
 
 The range container is latched - meaning that this special container is aware of other range containers in the execution graph.  The latching is automatic and ensures that when the axis is moved to a different position, prior active ranges reset so can re-trigger when the axis moves into their range again, so the container has to be aware of other ranges.
 
+<!-- TOC --><a name="dragons-1"></a>
 ### Dragons
 
 This container is an experimental feature.
@@ -380,31 +409,38 @@ The range mapper is not designed to work with the default keyboard mapper as tha
 The latching feature (awareness of other range containers) may introduce some strange behaviors and applies to all ranges attached to a single axis, so it's not aware of nesting for example.  The latching applies to all ranges in the mapping tree regardless of their level.
 
 
+<!-- TOC --><a name="plugin-script-enhancements"></a>
 # Plugin Script enhancements
  
 
 GremlinEx adds a few custom Gremlin script decorators to facilitate custom scripting and control from Python.
 
+<!-- TOC --><a name="gremlininput_devicesgremlin_start"></a>
 ### @gremlin.input_devices.gremlin_start
 
 Called when a profile is started - lets a script to initialization when a profile starts to run
 
+<!-- TOC --><a name="gremlininput_devicesgremlin_stop"></a>
 ### @gremlin.input_devices.gremlin_stop
 
 Called when a profile is stopped - lets a script cleanup when the profile stops running
 
+<!-- TOC --><a name="gremlininput_devicesgremlin_mode"></a>
 ### @gremlin.input_devices.gremlin_mode
 
 Called when the mode is changed (use def mode_change(mode) - mode will be a string) - lets a script get a notification when there is a profile mode change somewhere in GremlinEx.
 
 
+<!-- TOC --><a name="gremlininput_devicesgremlin_state"></a>
 ### @gremlin.input_devices.gremlin_state
 
 Called when the state information is changed (local, remote or broadcast mode). The event properties is_local, is_remote and is_broadcast are flags that contain the current state of GremlinEx.
 
 
+<!-- TOC --><a name="recipes"></a>
 # Recipes
 
+<!-- TOC --><a name="one-way-or-two-way-switch-to-two-way-switch-three-way-switch"></a>
 ## One way or two way switch to two way switch / three way switch
 
 Some hardware controllers only have a trigger on one (two) positions out of two (three).  Usually the center doesn't have a button mapped.  
@@ -420,6 +456,7 @@ One responds to button presses on the raw hardware, the other responds to a butt
 
 The equivalent pulse commands can be send to send a momentary pulse rather than having the button on all the time if that is needed.
 
+<!-- TOC --><a name="longshort-press-buttons-or-keyboard"></a>
 ## Long/short press - buttons or keyboard
 
 You'll use the tempo container sets up two action blocks, one for short press, the other for long press.  The tempo container lets you select a long press delay, so if the input is held long enough, the long action is triggered.
@@ -428,6 +465,7 @@ The relevant behaviors of the Vjoyremap action are Button Press, Button Release 
 
 Note: this applies to keyboard actions as well, and you can just as easily use this for keyboard presses using the enhanced keyboard action's ability to separate out key presses from key releases.
 
+<!-- TOC --><a name="to-setup-concurrent-button-presses-hold-the-short-press-while-long-press-is-active"></a>
 ### To setup concurrent button presses (hold the short press while long press is active)
 
 In this scenario, both outputs will be active if the input button is held long enough to trigger the long press.
@@ -441,6 +479,7 @@ The vjoyremap action in the short action block should be set to *button press*. 
 | Long action block   | VjoyRemap set to *button press* and/or MaptoKeyboardEx set to "press" for the output on long hold |
 
 
+<!-- TOC --><a name="to-setup-a-latched-short-then-long-button-press-with-only-one-button-active"></a>
 ### To setup a latched short, then long button press with only one button active
 
 In this scenario, either short or long will be active if the input button is held long enough to trigger the long action.  If you hold the input long enough, the short button will release, and the long button will stay pressed as long as you hold the input.  Only one button will be output at a time.
@@ -458,10 +497,12 @@ The second vjoyremap will be set to *button release* and map to the same output 
 | Long action block   | VjoyRemap #2 set to *button release* and/or MaptoKeyboardEx set to *release* to release the short press action |
 
 
+<!-- TOC --><a name="scripting-logic"></a>
 ## Scripting logic
 
 Any logic that depends on reading more than one hardware value is best done as a plugin.  Plugins are Python files "attached" to a GremlinEx profile and the script enhancements make it possible to run a function when a hardware event occurs.
 
+<!-- TOC --><a name="attaching-a-function-to-a-hardware-event"></a>
 ### Attaching a function to a hardware event
 
 You use a Python decorator to map a function to a hardware event.  The decorator starts with the @ sign and tells GremlinEx what hardware and input you are mapping to.
@@ -470,14 +511,17 @@ GremlinEx adds a Script Generator button to the Device Information dialog that c
 
 
 
+<!-- TOC --><a name="recommended-resources"></a>
 ## Recommended Resources
 
+<!-- TOC --><a name="vjoy-virtual-joystick-driver"></a>
 #### VJOY virtual joystick driver 
  
 https://github.com/shauleiz/vJoy
 
 Installs one or more virtual programmable HID joysticks on Windows with up to 8 axes, 4 hats and 128 buttons per the DirectInput specification.
 
+<!-- TOC --><a name="osc-support-in-joystick-gremlin-from-touchosc"></a>
 #### OSC support in Joystick Gremlin from TouchOSC
 
 https://github.com/muchimi/TouchOsc
@@ -485,12 +529,14 @@ https://github.com/muchimi/TouchOsc
 Transforms any touch screen into a game control surface, similar to GameGlass.
 
 
+<!-- TOC --><a name="hidhide"></a>
 #### HIDHIDE
 
 This tool hides raw hardware only exposing the VJOY devices.  Essential to not confuse games or simulators.
 
 https://github.com/nefarius/HidHide
 
+<!-- TOC --><a name="hexler-touchosc"></a>
 #### Hexler TouchOSC
 
 A touch enabled surface designer initially setup for the OSC (open sound control) and MIDI protocols to control musical instruments, DAWs and live performances.  Supports multiple platforms.  Has a free version but the license is well worth the price.  Simple set of controls, but very powerful because of the available LUA based scripting and works on any platform, thus making your phone, tablet or touch-enabled desktop function as an input device.
@@ -501,8 +547,10 @@ I also recommend the Protokol tool to diagnose any OSC issues.
 
 
 
+<!-- TOC --><a name="troubleshooting-guide"></a>
 # Troubleshooting guide 
 
+<!-- TOC --><a name="hid-devices-detection-random-disconnects"></a>
 ## HID devices - detection / random disconnects
 
 Random disconnections of HID devices or not detecting devices are typically caused by these root causes in my experience, these are unrelated to GremlinEx:
@@ -515,6 +563,7 @@ Random disconnections of HID devices or not detecting devices are typically caus
 	(6) if using a wireless USB device - make sure the batteries are ok. I don't recommend using wireless devices for anything but a mouse or a headset - neither is going to be used by GremlinEx. Wireless is convenient but can also be a source of headaches for game controllers.
 	
 	
+<!-- TOC --><a name="hid-troubleshooting-tips"></a>
 ## HID troubleshooting tips 
 
 Your HID devices should function without GremlinEx installed and be stable using whatever tools came with them to diagnose/test them. Just make sure that HIDHide is not hiding the devices from these utilities when testing. If the HID devices are not stable in Windows - they won't be in GremlinEx either.
@@ -542,6 +591,7 @@ Some tests you can attempt to see if it makes a difference (and yes, it can be t
 - If you connect/disconnect controllers like joysticks, wheels, pedals - anything with an axis or button that isn't a keyboard type device - windows will invariably re-order these things. A reboot will usually get you the final order of things, but the order can change whenever you add or remove one of these devices. In general, if you have to constantly connect/disconnect devices, look into using profiles and ways for you not constantly to have to connect/disconnect devices. Doing this can wear out the connectors. Also, it's really asking for trouble because you are effectively making a hardware change every time you do this. Should it work? Absolutely. The question is more about how much you value your sanity and like doing troubleshooting. Avoid disconnecting/reconnecting things if you can, and I get it's not always possible. My experience with HID controllers, especially if you have a lot of them, is set it up once, and then it will work all the time.
 
 
+<!-- TOC --><a name="hidhide-troubleshooting"></a>
 ## HIDHide troubleshooting
 
 HIDHide is a key layer that hides the raw hardware that you are mapping to a game to VJOY via GremlinEx.
@@ -554,6 +604,7 @@ How can you tell HIDHide is working or not? Use joy.cpl - the windows control pa
 
 What does it look like when HIDHIde is set up correctly? vjoy.cpl only shows your VJOY devices, all your actual "raw" controllers will not work there.
 
+<!-- TOC --><a name="checking-your-mappings"></a>
 ## Checking your mappings
 
 Vjoy comes with an excellent Vjoymonitor utility that will display what outputs you have. Test your scripts and Vjoy output before you jump in the game to make sure that all looks good there.  
@@ -568,6 +619,7 @@ In nearly all cases - what I found usually happens:
 - there's some sort of hardware issue and confusion linked to disconnect/reconnect
 - you're using a controller that isn't a DirectInput HID game controller as classified by windows - so a device with axis/button definitions  - this happens a lot with gamepads although most can be setup as a regular (non gamepad) controller.
 
+<!-- TOC --><a name="gremlinex-has-been-tested-with"></a>
 ## GremlinEx has been tested with 
 - Virpil
 - Thrustmaster
@@ -582,6 +634,7 @@ In nearly all cases - what I found usually happens:
 - AxisAndOhs
 
 
+<!-- TOC --><a name="sample-scripts"></a>
 ## Sample scripts
 
 I'm including some of my Python scripts for GremlinEx as reference because these are my primary way to do advanced mapping when the UI elements are limited, including one that handles OSC inputs.  The comments are in the files.
@@ -602,6 +655,7 @@ Note: because of how Python works, if you change dependencies like config.py or 
 
 The sample scripts includes one for Star Citizen, Microsoft Flight Simulator and OSC.
 
+<!-- TOC --><a name="osc-open-stage-control-info"></a>
 ## OSC (open stage control) info
 
 OSC is a topic by itself, and if you're wondering what this has to do with gaming and controllers, OSC is heavily used in the music industry to drive touch surfaces like a tablet, phone or a touchscreen (connected to a different box from your main gaming machine), and send commands to music software (usually a DAW or VST) or live on-stage equipment including things like stage lights.  
@@ -611,6 +665,7 @@ I'm using the same concept to take OSC messages in GremlinEx, which are nothing 
 If you use the OSC plugins for StreamDeck or LoupeDeck, it enables these more esoteric devices to be used by GremlinEx, and the networking function means that these devices can be used anywhere on your local network so they don't need to be attached to your local gaming computer.
 
 
+<!-- TOC --><a name="python-dependencies"></a>
 ## Python dependencies
 
 If you want to run from the source code, you will need the following python packages for the 64 bit version of python your are running (3.11+)
@@ -622,12 +677,3 @@ If you want to run from the source code, you will need the following python pack
 
 
 
-
-### Enhancements:
-The mapper can now press (make) a key and release (break) a key separately. 
-
-The mapper can press an release a key with a specified delay in milliseconds.
-
-### Dragons
-
-This is an experimental feature.
