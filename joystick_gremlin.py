@@ -375,7 +375,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                 self._profile
             )
             self.ui.tray_icon.setIcon(QtGui.QIcon("gfx/icon_active.ico"))
-            #self.ui.tray_icon.setIcon(QtGui.QIcon("gfx/icon_active.ico"))
+            
             
             
 
@@ -1420,6 +1420,8 @@ class GremlinUi(QtWidgets.QMainWindow):
             self.setWindowTitle(f"{os.path.basename(self._profile_fname)}")
         else:
             self.setWindowTitle("")
+
+
 
 
 def configure_logger(config):

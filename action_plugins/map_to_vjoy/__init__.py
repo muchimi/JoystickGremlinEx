@@ -35,10 +35,10 @@ import os
 import action_plugins
 import enum
 from gremlin.input_devices import VjoyAction, remote_state
-
+from gremlin.util import *
 
 IdMapToButton = -2 # map to button special ID
-syslog = logging.getLogger("system")
+
 
 
 
@@ -221,7 +221,7 @@ class VJoyUsageState():
     def toggle_inverted(self, device_id, input_id):
         ''' toggles inversion state of specified device/axis is inverted '''
         VJoyUsageState._axis_invert_map[device_id][input_id] = not VJoyUsageState._axis_invert_map[device_id][input_id]
-        syslog.debug(f"Vjoy Axis {device_id} {input_id} inverted state: {VJoyUsageState._axis_invert_map[device_id][input_id]}")
+        log_sys(f"Vjoy Axis {device_id} {input_id} inverted state: {VJoyUsageState._axis_invert_map[device_id][input_id]}")
 
     def set_range(self, device_id, input_id, min_range = -1.0, max_range = 1.0):
         ''' sets the axis min/max range for the active range computation '''
@@ -744,8 +744,6 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         
         
         box.addWidget(QtWidgets.QLabel(name))
-        # if syslog.isEnabledFor(logging.DEBUG):
-        #     box.addWidget(QtWidgets.QLabel(f"Id: {self.action_data.action_id}"))
         box.addStretch()
 
         self.main_layout.addWidget(header)
@@ -1345,7 +1343,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         # if self.action_data.action_id == "0cf2394a99bd4383a6d17129a57e35d4":
         #     pass
 
-        #syslog.debug(f"populate vjoy data for action id: {self.action_data.action_id}  action mode: {self.action_data.action_mode}  vjoy: {self.action_data.vjoy_device_id}")
+        #log_sys(f"populate vjoy data for action id: {self.action_data.action_id}  action mode: {self.action_data.action_mode}  vjoy: {self.action_data.vjoy_device_id}")
         if self.action_data.vjoy_device_id not in [0, None]:
             vjoy_dev_id = self.action_data.vjoy_device_id
 
@@ -1395,7 +1393,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
             index = self.cb_action_list.findData(self.action_data.action_mode)
             if index == -1:
-                syslog.warning(f"Mode not found in drop down: {self.action_data.action_mode.name} - resetting to default mode")
+                log_sys_warn(f"Mode not found in drop down: {self.action_data.action_mode.name} - resetting to default mode")
                 self.action_data.action_mode = self.cb_action_list.itemData(0)
                 index = 0
             else:
@@ -1679,7 +1677,7 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
         # toggles reverse mode for the axis
         value = usage_data.is_inverted(self.vjoy_device_id, self.vjoy_input_id)
         usage_data.set_inverted(self.vjoy_device_id, self.vjoy_input_id, not value)
-        syslog.debug(f"toggle reverse: {self.vjoy_device_id} {self.vjoy_input_id} new state: {self.reverse}")
+        log_sys(f"toggle reverse: {self.vjoy_device_id} {self.vjoy_input_id} new state: {self.reverse}")
 
 
     def _profile_start(self):
@@ -1776,7 +1774,7 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
                 r_min, r_max = usage_data.get_range(self.vjoy_device_id, self.vjoy_input_id)
                 if self.reverse:
                     target = -target
-                    # syslog.debug(f"reversed: {target}")
+                    # log_sys(f"reversed: {target}")
                     
 
                 value = r_min + (target + 1.0)*((r_max - r_min)/2.0)
@@ -2112,10 +2110,16 @@ class VjoyRemap(gremlin.base_classes.AbstractAction):
             input_string = "axis"
         elif self.action_mode == VjoyAction.VJoyHat:
             input_string = "hat"
-        else:
+        elif self.action_mode == VjoyAction.VJoyButton:
             input_string = "button"
-        
-        return f"action_plugins/map_to_vjoy/gfx/icon_{input_string}_{self.vjoy_input_id:03d}.png"
+        else:
+            input_string = None
+
+        if input_string:
+            icon_file = f"action_plugins/map_to_vjoy/gfx/icon_{input_string}_{self.vjoy_input_id:03d}.png"
+            if os.path.isfile(icon_file):
+                return icon_file
+        return super().icon()
             
     
 
@@ -2256,7 +2260,7 @@ class VjoyRemap(gremlin.base_classes.AbstractAction):
             #     self.merge_device_b_axis = safe_read(node,"merge_device_axis",int)
 
             # if self.reverse:
-            #     syslog.debug(f"reverse TRUE for: input_id: {self.vjoy_input_id} device id: {self.vjoy_device_id} axis id: {self.vjoy_axis_id}")
+            #     log_sys(f"reverse TRUE for: input_id: {self.vjoy_input_id} device id: {self.vjoy_device_id} axis id: {self.vjoy_axis_id}")
 
         except ProfileError:
             self.vjoy_input_id = None

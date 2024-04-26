@@ -22,6 +22,7 @@ import logging
 from xml.etree import ElementTree
 
 import dill
+import os
 
 import gremlin
 from . import common, error, execution_graph, plugin_manager, profile
@@ -563,14 +564,14 @@ class AbstractAction(profile.ProfileData):
         node.set("action_id", self.action_id)
         return node
 
-    def icon(self):
-        """Returns the icon to use when representing the action.
+    # def icon(self):
+    #     """Returns the icon to use when representing the action.
 
-        :return icon to use
-        """
-        raise error.MissingImplementationError(
-            "AbstractAction.icon not implemented in subclass"
-        )
+    #     :return icon to use
+    #     """
+    #     # raise error.MissingImplementationError(
+    #     #     "AbstractAction.icon not implemented in subclass"
+    #     # )
 
     def requires_virtual_button(self):
         """Returns whether or not the action requires the use of a
@@ -620,6 +621,8 @@ class AbstractContainer(profile.ProfileData):
             self.device_guid = None
             self.device_input_id = None
             self.device_input_type = None
+
+
 
 
     def _get_hardware_device(self, parent):

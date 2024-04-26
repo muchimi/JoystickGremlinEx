@@ -27,10 +27,12 @@ from gremlin.base_classes import InputActionCondition
 from gremlin.common import InputType
 from gremlin import input_devices, joystick_handling, util
 from gremlin.error import ProfileError
+import gremlin.plugin_manager
 from gremlin.profile import safe_format, safe_read
 import gremlin.ui.common
 import gremlin.ui.input_item
-
+import os
+from gremlin.util import *
 
 class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
@@ -128,7 +130,7 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         # input_type information
         if input_type is None:
             input_type = InputType.JoystickButton
-            logging.getLogger("system").warning("None as input type encountered")
+            log_sys_warn("None as input type encountered")
 
         # If no valid input item is selected get the next unused one
         if self.action_data.vjoy_input_id in [0, None]:
@@ -174,7 +176,7 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
                 "Default values have been set for the input, but they are "
                 "not what has been specified."
             )
-            logging.getLogger("system").error(str(e))
+            log_sys_error(e)
 
     def save_changes(self):
         """Saves UI contents to the profile data storage."""
@@ -197,7 +199,7 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             if input_type_changed:
                 self.action_modified.emit()
         except gremlin.error.GremlinError as e:
-            logging.getLogger("system").error(str(e))
+            log_sys_error(e)
 
 
 class RemapFunctor(gremlin.base_classes.AbstractFunctor):
@@ -344,14 +346,22 @@ class Remap(gremlin.base_classes.AbstractAction):
         """
         # Do not return a valid icon if the input id itself is invalid
         if self.vjoy_input_id is None:
-            return None
-
-        input_string = "axis"
-        if self.input_type == InputType.JoystickButton:
-            input_string = "button"
-        elif self.input_type == InputType.JoystickHat:
-            input_string = "hat"
-        return f"action_plugins/remap/gfx/icon_{input_string}_{self.vjoy_input_id:03d}.png"
+            input_string = None
+        else:
+            input_string = "axis"
+            if self.input_type == InputType.JoystickButton:
+                input_string = "button"
+            elif self.input_type == InputType.JoystickHat:
+                input_string = "hat"
+        if input_string:
+            icon_file = f"action_plugins/remap/gfx/icon_{input_string}_{self.vjoy_input_id:03d}.png"
+            if os.path.isfile(icon_file):
+                return icon_file
+        
+        log_sys(f"Warning: unable to determine icon type: {self.input_type} for id {self.vjoy_input_id}")
+        return super().icon()
+        
+        
 
     def requires_virtual_button(self):
         """Returns whether or not the action requires an activation condition.

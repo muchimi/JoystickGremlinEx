@@ -23,6 +23,8 @@ import os
 from . import common, error
 from gremlin.util import *
 
+
+
 @common.SingletonDecorator
 class ContainerPlugins:
 
@@ -43,6 +45,7 @@ class ContainerPlugins:
         self._parent_widget_map = {} # map of item data to QT widget main UI container widget
         self._input_data_container_map = {} # map of item data to the actual containers created for it
 
+        
     def reset_functors(self):
         ''' clears functor tracking '''
         self._functors = []
@@ -93,7 +96,6 @@ class ContainerPlugins:
                     return self.get_widget(item_data)
         # not found for this container
         return None
-
 
 
     @property
@@ -158,6 +160,7 @@ class ContainerPlugins:
         for entry in self._plugins.values():
             self._tag_to_type_map[entry.tag] = entry
             self._name_to_type_map[entry.name] = entry
+       
 
 
 @common.SingletonDecorator
@@ -173,7 +176,6 @@ class ActionPlugins:
         self._name_to_type_map = {}
         self._tag_to_type_map = {}
         self._parameter_requirements = {}
-        
 
         self._discover_plugins()
 

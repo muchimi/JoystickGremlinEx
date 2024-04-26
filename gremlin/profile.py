@@ -1996,6 +1996,15 @@ class ProfileData(metaclass=ABCMeta):
         self.code = None
         self._id = None  # unique ID for this entry
 
+        generic_icon = os.path.join(os.path.dirname(__file__),"generic.png")
+        if os.path.isfile(generic_icon):
+            self._generic_icon = generic_icon
+        else:
+            self._generic_icon = None            
+
+    def icon(self):
+        ''' gets the default icon'''
+        return self._generic_icon
 
 
     def from_xml(self, node):
