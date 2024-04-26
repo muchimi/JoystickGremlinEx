@@ -39,6 +39,7 @@ import gremlin.event_handler
 
 import dill
 from gremlin.common import load_icon
+from gremlin.util import log_sys_error, log_sys_warn, log_sys
 
 
 # Figure out the location of the code / executable and change the working
@@ -963,35 +964,43 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         :param is_active True if the system is active, False otherwise
         """
-        if self._is_active:
-            text_active = "<font color=\"green\">Active</font>"
-        else:
-            text_active = "<font color=\"red\">Paused</font>"
-        if self.ui.actionActivate.isChecked():
-            text_running = f"Running and {text_active}"
-        else:
-            text_running = "Not Running"
-        
-        # remote control status
-        if event.is_local:
-            local_msg = "<font color=\"green\">Active</font>"
-        else:
-            local_msg = "<font color=\"red\">Disabled</font>"
-        if event.is_remote:
-            remote_msg = "<font color=\"green\">Active</font>"
-        else:
-            remote_msg = "<font color=\"red\">Disabled</font>"
+        try:
+            if self._is_active:
+                text_active = "<font color=\"green\">Active</font>"
+            else:
+                text_active = "<font color=\"red\">Paused</font>"
+            if self.ui.actionActivate.isChecked():
+                text_running = f"Running and {text_active}"
+            else:
+                text_running = "Not Running"
+            
+            # remote control status
+            if event.is_local:
+                local_msg = "<font color=\"green\">Active</font>"
+            else:
+                local_msg = "<font color=\"red\">Disabled</font>"
+            if event.is_remote:
+                remote_msg = "<font color=\"green\">Active</font>"
+            else:
+                remote_msg = "<font color=\"red\">Disabled</font>"
 
-        self.status_bar_is_active.setText(f"<b>Status:</b> {text_running} <b>Local Control</b> {local_msg} <b>Broadcast:</b> {remote_msg}")
+            self.status_bar_is_active.setText(f"<b>Status:</b> {text_running} <b>Local Control</b> {local_msg} <b>Broadcast:</b> {remote_msg}")
+        except e:
+            log_sys_error(f"Unable to update status bar event: {event}")
+            log_sys_error(e)
 
     def _update_statusbar_mode(self, mode):
         """Updates the status bar display of the current mode.
 
         :param mode the now current mode
         """
-        self.status_bar_mode.setText(f"<b>Mode:</b> {mode}")
-        if self.config.mode_change_message:
-            self.ui.tray_icon.showMessage(f"Mode: {mode}","",0,250)
+        try:
+            self.status_bar_mode.setText(f"<b>Mode:</b> {mode}")
+            if self.config.mode_change_message:
+                self.ui.tray_icon.showMessage(f"Mode: {mode}","",0,250)
+        except e:
+            log_sys_error(f"Unable to update status bar mode: {mode}")
+            log_sys_error(e)
 
     def _kb_event_cb(self, event):
         ''' listen for keyboard modifiers '''
