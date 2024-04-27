@@ -20,11 +20,12 @@ import logging
 from PySide6 import QtCore, QtGui, QtWidgets
 
 
-from gremlin.common import PluginVariableType
+from gremlin.common import PluginVariableType, load_icon
 import gremlin.profile
 import gremlin.user_plugin
 import gremlin.ui.common
 import os
+
 
 class ModuleManagementController(QtCore.QObject):
 
@@ -252,7 +253,7 @@ class ModuleManagementView(QtWidgets.QSplitter):
 
 
         # Button to add a new module
-        self.btn_add_module = QtWidgets.QPushButton(load_icon("list_add.svg"), "Add Plugin")
+        self.btn_add_module = QtWidgets.QPushButton(load_icon("gfx/list_add.svg"), "Add Plugin")
         
         self.btn_add_module.clicked.connect(self._prompt_user_for_module)
 
@@ -343,13 +344,13 @@ class ModuleWidget(QtWidgets.QFrame):
 
         if self.has_variables:
             self.btn_add_instance = QtWidgets.QPushButton(
-                QtGui.QIcon("gfx/button_add"),
+                load_icon("gfx/button_add"),
                 ""
             )
             header_layout.addWidget(self.btn_add_instance)
 
         self.btn_delete = QtWidgets.QPushButton(
-            QtGui.QIcon("gfx/button_delete"),
+            load_icon("gfx/button_delete"),
             ""
         )
         header_layout.addWidget(self.btn_delete)
@@ -390,14 +391,14 @@ class InstanceWidget(QtWidgets.QWidget):
         self.label_name = QtWidgets.QLabel(self.name)
 
         self.btn_rename = QtWidgets.QPushButton(
-            QtGui.QIcon("gfx/button_edit"), ""
+            load_icon("gfx/button_edit"), ""
         )
         self.btn_rename.clicked.connect(self.rename_instance)
         self.btn_configure = QtWidgets.QPushButton(
-            QtGui.QIcon("gfx/options"), ""
+            load_icon("gfx/options"), ""
         )
         self.btn_delete = QtWidgets.QPushButton(
-            QtGui.QIcon("gfx/button_delete"), ""
+            load_icon("gfx/button_delete"), ""
         )
 
         self.main_layout.addWidget(self.label_name)

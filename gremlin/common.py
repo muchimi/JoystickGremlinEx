@@ -461,26 +461,33 @@ def find_file(icon_path):
 
 
 
-def load_icon(icon_path, as_path = False):
-        ''' loads an icon located in the file structure
-         
-          if the icon is provided without a path, the first matching file is loaded
+def get_icon_path(*paths):
+        ''' 
+        gets an icon path
            
         '''
-        
-        path = find_file(icon_path)
-            
-        if path and os.path.isfile(path):
-            if as_path:
-                return path
-            
-            return QtGui.QIcon(path)
-        
-        else:
-            path = find_file("generic.svg")
-            if path and os.path.isfile(path):
-                if as_path:
-                    return path
-                return QtGui.QIcon(path)
+
+
+
+        # be aware of runtime environment
+        root_path = get_root_path()
+        the_path = os.path.join(*paths)
+        icon_file = os.path.join(root_path, the_path)
+        if icon_file and os.path.isfile(icon_file):
+            return icon_file
     
         return None
+
+def load_icon(*paths):
+    ''' gets an icon '''
+    the_path = get_icon_path(*paths)
+    if the_path:
+         return QtGui.QIcon(the_path)
+    return get_generic_icon()
+
+def get_generic_icon():
+    ''' gets a generic icon'''
+    root_path = get_root_path()
+    generic_icon = os.path.join(root_path,"generic.png")
+    if os.path.isfile(generic_icon):
+        return QtGui.qicon(generic_icon)

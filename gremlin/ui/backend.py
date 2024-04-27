@@ -32,6 +32,8 @@ from gremlin.ui.device import InputIdentifier
 from gremlin.ui.profile import ActionNodeModel, InputItemBindingModel, \
     InputItemModel
 
+from gremlin.common import load_icon
+
 
 config.Configuration().register(
     "global",
@@ -92,7 +94,7 @@ class Backend(QtCore.QObject):
                 self.profile,
                 "Default"
             )
-            #self.ui.tray_icon.setIcon(QtGui.QIcon("gfx/icon_active.ico"))
+            #self.ui.tray_icon.setIcon(load_icon("gfx/icon_active.ico"))
         else:
             # Stop running the code
             self.runner.stop()
@@ -104,7 +106,7 @@ class Backend(QtCore.QObject):
             #     gremlin.ui.device_tab.KeyboardDeviceTabWidget
             # ]:
             #     self.ui.devices.currentWidget().refresh()
-            # self.ui.tray_icon.setIcon(QtGui.QIcon("gfx/icon.ico"))
+            # self.ui.tray_icon.setIcon(load_icon("gfx/icon.ico"))
         self.activityChanged.emit()
 
     @Slot(InputIdentifier, result=int)

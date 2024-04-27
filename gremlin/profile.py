@@ -2004,7 +2004,8 @@ class ProfileData(metaclass=ABCMeta):
 
     def icon(self):
         ''' gets the default icon'''
-        return self._generic_icon
+        from gremlin.common import get_generic_icon
+        return get_generic_icon()
 
 
     def from_xml(self, node):

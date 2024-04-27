@@ -25,9 +25,11 @@ from PySide6 import QtCore, QtGui, QtWidgets
 import dill
 
 import gremlin
-from PySide6.QtGui import QIcon as ThemeQIcon
+from PySide6.QtGui import QIcon as load_icon
+from PySide6.QtWidgets import QMessageBox
 from joystick_gremlin import GremlinUi
 from . import common, ui_about
+from gremlin.common import load_icon
 
 
 class OptionsUi(common.BaseDialogUi):
@@ -257,16 +259,16 @@ If this option is on, the last active profile will remain active until a differe
             self._show_executable
         )
         self.executable_add = QtWidgets.QPushButton()
-        self.executable_add.setIcon(ThemeQIcon("gfx/button_add.png"))
+        self.executable_add.setIcon(load_icon("gfx/button_add.png"))
         self.executable_add.clicked.connect(self._new_executable)
         self.executable_remove = QtWidgets.QPushButton()
-        self.executable_remove.setIcon(ThemeQIcon("gfx/button_delete.png"))
+        self.executable_remove.setIcon(load_icon("gfx/button_delete.png"))
         self.executable_remove.clicked.connect(self._remove_executable)
         self.executable_edit = QtWidgets.QPushButton()
-        self.executable_edit.setIcon(ThemeQIcon("gfx/button_edit.png"))
+        self.executable_edit.setIcon(load_icon("gfx/button_edit.png"))
         self.executable_edit.clicked.connect(self._edit_executable)
         self.executable_list = QtWidgets.QPushButton()
-        self.executable_list.setIcon(ThemeQIcon("gfx/list_show.png"))
+        self.executable_list.setIcon(load_icon("gfx/list_show.png"))
         self.executable_list.clicked.connect(self._list_executables)
 
         self.executable_layout.addWidget(self.executable_label)
@@ -282,7 +284,7 @@ If this option is on, the last active profile will remain active until a differe
         self.profile_field.textChanged.connect(self._update_profile)
         self.profile_field.editingFinished.connect(self._update_profile)
         self.profile_select = QtWidgets.QPushButton()
-        self.profile_select.setIcon(ThemeQIcon("gfx/button_edit.png"))
+        self.profile_select.setIcon(load_icon("gfx/button_edit.png"))
         self.profile_select.clicked.connect(self._select_profile)
 
         self.profile_layout.addWidget(self.profile_field)
@@ -894,6 +896,16 @@ class ModeManagerUi(common.BaseDialogUi):
 
         self._populate_mode_layout()
 
+    def _get_mode_list(self):
+        mode_list = {}
+        for device in self._profile.devices.values():
+            for mode in device.modes.values():
+                if mode.name not in mode_list:
+                    if mode.name:
+                        mode_list[mode.name] = mode.inherit
+        return mode_list
+
+
     def _populate_mode_layout(self):
         """Generates the mode layout UI displaying the different modes."""
         # Clear potentially existing content
@@ -904,14 +916,7 @@ class ModeManagerUi(common.BaseDialogUi):
         self.mode_callbacks = {}
 
         # Obtain mode names and the mode they inherit from
-        mode_list = {}
-        for device in self._profile.devices.values():
-            for mode in device.modes.values():
-                if mode.name not in mode_list:
-                    # FIXME: somewhere a mode's name is not set
-                    if mode.name is None:
-                        continue
-                    mode_list[mode.name] = mode.inherit
+        mode_list = self._get_mode_list()
 
         # Add header information
         self.mode_layout.addWidget(QtWidgets.QLabel("<b>Name</b>"), 0, 0)
@@ -936,7 +941,7 @@ class ModeManagerUi(common.BaseDialogUi):
 
             # Rename mode button
             self.mode_rename[mode] = QtWidgets.QPushButton(
-                ThemeQIcon("gfx/button_edit.png"), ""
+                load_icon("gfx","button_edit.png"), ""
             )
             self.mode_layout.addWidget(self.mode_rename[mode], row, 2)
             self.mode_rename[mode].clicked.connect(
@@ -944,7 +949,7 @@ class ModeManagerUi(common.BaseDialogUi):
             )
             # Delete mode button
             self.mode_delete[mode] = QtWidgets.QPushButton(
-                ThemeQIcon("gfx/mode_delete"), ""
+                load_icon("gfx","mode_delete.svg"), ""
             )
             self.mode_layout.addWidget(self.mode_delete[mode], row, 3)
             self.mode_delete[mode].clicked.connect(
@@ -986,7 +991,11 @@ class ModeManagerUi(common.BaseDialogUi):
         :param mode the mode to remove
         :return lambda function to perform the removal
         """
+
+        # modes can be deleted except the last one
         return lambda: self._delete_mode(mode)
+        
+
 
     def _change_mode_inheritance(self, mode, inherit):
         """Updates the inheritance information of a given mode.
@@ -1061,6 +1070,12 @@ class ModeManagerUi(common.BaseDialogUi):
         :param mode_name the name of the mode to delete
         """
         # Obtain mode from which the mode we want to delete inherits
+
+        mode_list = self._get_mode_list()
+        if len(mode_list.keys()) == 1:
+            QMessageBox.warning(self, "Warning","Cannot delete last mode - one mode must exist")
+            return
+
         parent_of_deleted = None
         for mode in list(self._profile.devices.values())[0].modes.values():
             if mode.name == mode_name:

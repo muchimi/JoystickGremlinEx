@@ -564,15 +564,6 @@ class AbstractAction(profile.ProfileData):
         node.set("action_id", self.action_id)
         return node
 
-    # def icon(self):
-    #     """Returns the icon to use when representing the action.
-
-    #     :return icon to use
-    #     """
-    #     # raise error.MissingImplementationError(
-    #     #     "AbstractAction.icon not implemented in subclass"
-    #     # )
-
     def requires_virtual_button(self):
         """Returns whether or not the action requires the use of a
         virtual button.

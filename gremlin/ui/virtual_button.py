@@ -19,6 +19,7 @@
 from PySide6 import QtWidgets, QtCore, QtGui
 
 import gremlin
+from gremlin.common import load_icon
 from PySide6.QtGui import QIcon as ThemeQIcon
 
 
@@ -109,7 +110,7 @@ class VirtualAxisButtonWidget(AbstractVirtualButtonWidget):
 
             self.range_layout.addStretch(1)
 
-            self.help_button = QtWidgets.QPushButton(ThemeQIcon("gfx/help"), "")
+            self.help_button = QtWidgets.QPushButton(load_icon("gfx/help"), "")
             self.help_button.clicked.connect(self._show_hint)
             self.range_layout.addWidget(self.help_button)
 
@@ -192,7 +193,7 @@ class VirtualHatButtonWidget(AbstractVirtualButtonWidget):
             for direction in directions:
                 self._widgets[direction] = QtWidgets.QCheckBox()
                 self._widgets[direction].setIcon(
-                    ThemeQIcon(f"gfx/hat_{direction}.png")
+                    load_icon(f"gfx/hat_{direction}.png")
                 )
                 self._widgets[direction].toggled.connect(
                     self._create_state_changed_cb(direction)
@@ -201,7 +202,7 @@ class VirtualHatButtonWidget(AbstractVirtualButtonWidget):
 
             self.main_layout.addStretch(1)
 
-            self.help_button = QtWidgets.QPushButton(ThemeQIcon("gfx/help"), "")
+            self.help_button = QtWidgets.QPushButton(load_icon("gfx/help"), "")
             self.help_button.clicked.connect(self._show_hint)
             self.main_layout.addWidget(self.help_button)
         finally:

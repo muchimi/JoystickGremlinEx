@@ -22,7 +22,7 @@ from xml.etree import ElementTree
 
 from PySide6.QtGui import QIcon as ThemeQIcon
 from gremlin.base_classes import AbstractAction, AbstractFunctor
-from gremlin.common import InputType
+from gremlin.common import InputType, load_icon
 import gremlin.ui.input_item
 
 
@@ -38,7 +38,7 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.layout = QtWidgets.QHBoxLayout()
         self.file_path = QtWidgets.QLineEdit()
         self.edit_path = QtWidgets.QPushButton()
-        self.edit_path.setIcon(ThemeQIcon("gfx/button_edit.png"))
+        self.edit_path.setIcon(load_icon("gfx/button_edit.png"))
         self.edit_path.clicked.connect(self._new_executable)
         self.volume = QtWidgets.QSpinBox()
         self.volume.setRange(0, 100)
