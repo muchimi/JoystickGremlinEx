@@ -488,6 +488,6 @@ def load_icon(*paths):
 def get_generic_icon():
     ''' gets a generic icon'''
     root_path = get_root_path()
-    generic_icon = os.path.join(root_path,"generic.png")
+    generic_icon = os.path.join(root_path, "gfx/generic.png")
     if os.path.isfile(generic_icon):
-        return QtGui.qicon(generic_icon)
+        return QtGui.QIcon(generic_icon)

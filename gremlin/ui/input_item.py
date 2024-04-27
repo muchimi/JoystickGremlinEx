@@ -640,7 +640,11 @@ class ActionLabel(QtWidgets.QLabel):
         :param parent the parent
         """
         QtWidgets.QLabel.__init__(self, parent)
-        self.setPixmap(QtGui.QPixmap(action_entry.icon()))
+        icon = action_entry.icon()
+        if isinstance(icon, QtGui.QIcon):
+            self.setPixmap(QtGui.QPixmap(icon.pixmap(20)))
+        else:
+            self.setPixmap(QtGui.QPixmap(icon))
 
         self.action_entry = action_entry
 
