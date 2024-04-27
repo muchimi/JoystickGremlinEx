@@ -2116,7 +2116,6 @@ class VjoyRemap(gremlin.base_classes.AbstractAction):
             input_string = None
             log_sys_warn(f"VjoyRemap: don't know how to handle action mode: {self.action_mode}")
 
-        return super().icon()            
 
         root_path = get_root_path()
         folder = os.path.join(root_path, "action_plugins", "remap")
