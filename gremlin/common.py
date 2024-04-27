@@ -22,17 +22,8 @@ import os
 import sys
 
 from PySide6 import QtGui
-from pathlib import Path
+from gremlin.util import get_root_path
 
-def get_root_path():
-    ''' gets the root path of the application '''    
-    if getattr(sys, 'frozen', False):
-        # as exe via pyinstallaler
-        application_path = sys._MEIPASS
-    else:
-        # as script (because common is a subfolder, return the parent folder)
-        application_path = Path(os.path.dirname(os.path.abspath(__file__))).parent
-    return application_path
 
 
 class SingletonDecorator:

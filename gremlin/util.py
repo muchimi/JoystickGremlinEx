@@ -177,6 +177,18 @@ def resource_path(relative_path):
 
     return os.path.normcase(os.path.join(base_path, relative_path))
 
+def get_root_path():
+    ''' gets the root path of the application '''    
+    from pathlib import Path
+    if getattr(sys, 'frozen', False):
+        # as exe via pyinstallaler
+        application_path = sys._MEIPASS
+    else:
+        # as script (because common is a subfolder, return the parent folder)
+        application_path = Path(os.path.dirname(os.path.abspath(__file__))).parent
+    return application_path
+
+
 
 def display_error(msg):
     """Displays the provided error message to the user.
@@ -190,6 +202,7 @@ def display_error(msg):
         QtWidgets.QMessageBox.Ok
     )
     box.exec()
+
 
 
 def log(msg):

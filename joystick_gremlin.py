@@ -1438,6 +1438,14 @@ def configure_logger(config):
 
     :param config configuration information for the new logger
     """
+
+    # blitz the log file
+    log_file = config["logfile"]
+    try:
+        if os.path.isfile(log_file):
+            os.unlink(log_file)
+    except:
+        pass
     logger = logging.getLogger(config["name"])
     logger.setLevel(config["level"])
     handler = logging.FileHandler(config["logfile"])
@@ -1448,7 +1456,7 @@ def configure_logger(config):
 
     logger.debug("-" * 80)
     logger.debug(time.strftime("%Y-%m-%d %H:%M"))
-    logger.debug("Starting Joystick Gremlin R13.3")
+    logger.debug(f"Starting {APPLICATION_NAME} {APPLICATION_VERSION}")
     logger.debug("-" * 80)
 
     console = logging.StreamHandler()

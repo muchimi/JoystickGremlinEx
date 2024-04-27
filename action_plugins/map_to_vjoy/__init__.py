@@ -2101,8 +2101,8 @@ class VjoyRemap(gremlin.base_classes.AbstractAction):
         :return icon representing the remap action
         """
         # Do not return a valid icon if the input id itself is invalid
-        if self.vjoy_input_id is None:
-            return None
+        # if self.vjoy_input_id is None:
+        #     return None
 
         if self.input_type == InputType.JoystickAxis:
             input_string = "axis"
@@ -2110,15 +2110,21 @@ class VjoyRemap(gremlin.base_classes.AbstractAction):
             input_string = "axis"
         elif self.action_mode == VjoyAction.VJoyHat:
             input_string = "hat"
-        elif self.action_mode == VjoyAction.VJoyButton:
+        elif self.action_mode in (VjoyAction.VJoyButton, VjoyAction.VjoyButtonRelease):
             input_string = "button"
         else:
             input_string = None
+            log_sys_warn(f"VjoyRemap: don't know how to handle action mode: {self.action_mode}")
 
         if input_string:
-            icon_file = f"action_plugins/map_to_vjoy/gfx/icon_{input_string}_{self.vjoy_input_id:03d}.png"
+            root_path = get_root_path()
+            folder = os.path.join(root_path, "action_plugins", "remap")
+            icon_file = os.path.join(folder, "gfx", f"icon_{input_string}_{self.vjoy_input_id:03d}.png")
             if os.path.isfile(icon_file):
                 return icon_file
+        log_sys_warn(f"Icon folder: {folder}")
+        log_sys_warn(f"Icon file: {icon_file}")
+        log_sys_warn(f"Warning: unable to determine icon type: {self.input_type} for id {self.vjoy_input_id}")
         return super().icon()
             
     

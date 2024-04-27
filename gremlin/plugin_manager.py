@@ -120,8 +120,6 @@ class ContainerPlugins:
 
     def _discover_plugins(self):
         """Processes known plugin folders for action plugins."""
-        from gremlin.common import get_root_path
-        
         plugin_folder = "container_plugins"
         root_path = get_root_path()
         walk_path = os.path.join(root_path, plugin_folder)
@@ -247,9 +245,6 @@ class ActionPlugins:
 
     def _discover_plugins(self):
         """Processes known plugin folders for action plugins."""
-        from gremlin.common import get_root_path
-        
-
         plugin_folder = "action_plugins"
         root_path = get_root_path()
         walk_path = os.path.join(root_path, plugin_folder)
