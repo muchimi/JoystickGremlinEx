@@ -652,7 +652,11 @@ class ActionLabel(QtWidgets.QLabel):
         el.icon_changed.connect(self._icon_change)
 
     def _icon_change(self, event):
-        self.setPixmap(QtGui.QPixmap(self.action_entry.icon()))
+        icon = self.action_entry.icon()
+        if isinstance(icon, QtGui.QIcon):
+            self.setPixmap(QtGui.QPixmap(icon.pixmap(20)))
+        else:
+            self.setPixmap(QtGui.QPixmap(icon))
 
 
 class ContainerSelector(QtWidgets.QWidget):
