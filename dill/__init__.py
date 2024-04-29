@@ -22,6 +22,8 @@ import ctypes.wintypes as ctwt
 from enum import Enum
 import os
 import time
+import uuid
+
 
 
 class DILLError(Exception):
@@ -135,6 +137,12 @@ class GUID:
         guid : _GUID
             Mapping of a C struct representing a device GUID
         """
+
+
+        
+        if isinstance(guid, uuid.UUID):
+            # convert to ctypes structure using the integer value if the class is given a regular python UUID
+            guid = _GUID(guid.int)
         assert isinstance(guid, _GUID)
         self._ctypes_guid = copy.deepcopy(guid)
         self.guid = (
@@ -146,6 +154,16 @@ class GUID:
             (guid.Data4[4] << 24) + (guid.Data4[5] << 16) +
             (guid.Data4[6] << 8) + guid.Data4[7]
         )
+
+    
+    @property
+    def valid(self):
+        ''' true if the GUID is valid '''
+        return not (self._ctypes_guid.Data1 == 0 and \
+               self._ctypes_guid.Data2 == 0 and \
+               self._ctypes_guid.Data3 == 0 and \
+               self._ctypes_guid.Data4 == 0)
+
 
     @property
     def ctypes(self):
@@ -248,14 +266,18 @@ class InputType(Enum):
         InputType
             Enum value representing the correct InputType
         """
+
+        from gremlin.util import log_sys_error
+        
         if value == 1:
             return InputType.Axis
         elif value == 2:
             return InputType.Button
         elif value == 3:
             return InputType.Hat
-        else:
-            raise DILLError(f"Invalid input type value {value:d}")
+        
+        log_sys_error(f"Invalid DLL input type value received: {value:d}")
+        return None
 
 
 class DeviceActionType(Enum):
@@ -301,12 +323,24 @@ class InputEvent:
         Parameters
         ==========
         data : _JoystickInputData
-            The data received from DILL and to be held by this isntance
+            The data received from DILL and to be held by this instance
+
+        fix: if the type is not recognized, use a 0 Guid and handle nicely instead of throwing an error
+        
         """
-        self.device_guid = GUID(data.device_guid)
-        self.input_type = InputType.from_ctype(data.input_type)
-        self.input_index = int(data.input_index)
-        self.value = int(data.value)
+        
+        input_type = InputType.from_ctype(data.input_type)
+        if input_type:
+            self.device_guid = GUID(data.device_guid)
+            self.input_type = input_type
+            self.input_index = int(data.input_index)
+            self.value = int(data.value)
+        else:
+            self.device_guid = GUID.InvalidGuid()
+            self.input_type = InputType.Button
+            self.input_index = 0
+            self.value = 0
+
 
 
 class AxisMap:

@@ -27,7 +27,7 @@ import time
 
 from PySide6 import QtCore, QtWidgets
 
-from . import common, error, joystick_handling
+from . import error 
 
 
 # Table storing which modules have been imported already

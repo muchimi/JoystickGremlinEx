@@ -22,7 +22,7 @@ import os
 import sys
 
 from PySide6 import QtGui
-from gremlin.util import get_root_path
+
 
 
 
@@ -436,6 +436,7 @@ def find_file(icon_path):
 
 
     from pathlib import Path
+    from gremlin.util import get_root_path
     icon_path = icon_path.lower()
 
     #folder = os.path.dirname(__file__)
@@ -467,7 +468,7 @@ def get_icon_path(*paths):
            
         '''
 
-
+        from gremlin.util import get_root_path
 
         # be aware of runtime environment
         root_path = get_root_path()
@@ -487,6 +488,7 @@ def load_icon(*paths):
 
 def get_generic_icon():
     ''' gets a generic icon'''
+    from gremlin.util import get_root_path
     root_path = get_root_path()
     generic_icon = os.path.join(root_path, "gfx/generic.png")
     if os.path.isfile(generic_icon):

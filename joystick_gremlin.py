@@ -34,6 +34,7 @@ import threading
 import PySide6
 from PySide6 import QtCore, QtGui, QtMultimedia, QtWidgets
 
+
 from gremlin.common import InputType
 import gremlin.event_handler 
 
@@ -358,7 +359,7 @@ class GremlinUi(QtWidgets.QMainWindow):
     # | Action implementations
     # +---------------------------------------------------------------
 
-    def activate(self, checked):
+    def activate(self, set_active):
         """Activates and deactivates the code runner.
 
         :param checked True when the runner is to be activated, False
@@ -366,21 +367,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         """
 
 
-        if checked:
-            # Generate the code for the profile and run it
-            self._profile_auto_activated = False
-            self.runner.start(
-                self._profile.build_inheritance_tree(),
-                self._profile.settings,
-                self._last_active_mode(),
-                self._profile
-            )
-            self.ui.tray_icon.setIcon(load_icon("gfx/icon_active.ico"))
-            
-            
-            
-
-        else:
+        if not set_active:
             # Stop running the code
             self.runner.stop()
             self._update_statusbar_active(False)
@@ -392,6 +379,17 @@ class GremlinUi(QtWidgets.QMainWindow):
             ]:
                 self.ui.devices.currentWidget().refresh()
             self.ui.tray_icon.setIcon(load_icon("gfx/icon.ico"))
+        else:
+            # Generate the code for the profile and run it
+            self._profile_auto_activated = False
+            self.runner.start(
+                self._profile.build_inheritance_tree(),
+                self._profile.settings,
+                self._last_active_mode(),
+                self._profile
+            )
+            self.ui.tray_icon.setIcon(load_icon("gfx/icon_active.ico"))
+            
             
 
     def create_1to1_mapping(self):
@@ -831,7 +829,12 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         # Stop Gremlin execution
         self.ui.actionActivate.setChecked(False)
-        self.activate(False)
+        restart = self.runner.is_running()
+        self.activate(False, restart)
+            
+            
+        
+            
 
     
 
@@ -996,7 +999,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         try:
             self.status_bar_mode.setText(f"<b>Mode:</b> {mode}")
             if self.config.mode_change_message:
-                self.ui.tray_icon.showMessage(f"Mode: {mode}","",0,250)
+                self.ui.tray_icon.showMessage(f"Mode: {mode}","",QtWidgets.QSystemTrayIcon.MessageIcon.NoIcon,250)
         except e:
             log_sys_error(f"Unable to update status bar mode: {mode}")
             log_sys_error(e)

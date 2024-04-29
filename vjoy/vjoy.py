@@ -29,6 +29,7 @@ import gremlin.common
 import gremlin.spline
 
 
+
 def _error_string(vid, iid, value):
     """Creates an error string for the given inputs.
 
@@ -141,6 +142,8 @@ def hat_configuration_valid(vjoy_id):
     return continuous_count >= discrete_count
 
 
+
+
 class Axis:
 
     """Represents an analog axis in vJoy, allows setting the value
@@ -223,6 +226,8 @@ class Axis:
 
         :param value the position of the axis in the range [-1, 1]
         """
+        
+
         self.vjoy_dev.ensure_ownership()
 
         # Log an error on invalid data but continue processing by clamping
@@ -244,9 +249,10 @@ class Axis:
                 self.vjoy_id,
                 self.axis_id
         ):
-            raise VJoyError(
-                f"Failed setting axis value - {_error_string(self.vjoy_id, self.axis_id, self._value)}"
-            )
+            from gremlin.ui import backend
+            from gremlin.util import log_sys_warn
+            log_sys_warn(f"Failed setting axis value - {_error_string(self.vjoy_id, self.axis_id, self._value)}")
+           
         self.vjoy_dev.used()
 
     def set_absolute_value(self, value):

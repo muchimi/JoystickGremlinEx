@@ -32,8 +32,6 @@ from gremlin.ui.device import InputIdentifier
 from gremlin.ui.profile import ActionNodeModel, InputItemBindingModel, \
     InputItemModel
 
-from gremlin.common import load_icon
-
 
 config.Configuration().register(
     "global",
@@ -79,6 +77,8 @@ class Backend(QtCore.QObject):
     def toggleActiveState(self):
         """Toggles Gremlin between active and inactive."""
         self.activate_gremlin(not self.runner.is_running())
+
+    
 
     def activate_gremlin(self, activate: bool):
         """Sets the activity state of Gremlin.
