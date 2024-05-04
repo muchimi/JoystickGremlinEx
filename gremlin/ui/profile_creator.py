@@ -83,7 +83,7 @@ class ProfileCreator(gremlin.ui.common.BaseDialogUi):
             item.always_execute = input_item.always_execute
             item.description = input_item.description
 
-            self.new_profile.devices[event.device_id].modes[mode].set_data(
+            self.new_profile.devices[event.device_guid].modes[mode].set_data(
                 item.input_type,
                 item.input_id,
                 item
@@ -111,6 +111,7 @@ class ProfileCreator(gremlin.ui.common.BaseDialogUi):
 
         # Create the drawers for each of the modes
         self.toolbox = QtWidgets.QToolBox()
+        self.main_layout.addWidget(self.toolbox)
         for i, mode in enumerate(self._mode_list()):
             self.mode_index[mode] = i
             self.toolbox.addItem(
@@ -119,11 +120,12 @@ class ProfileCreator(gremlin.ui.common.BaseDialogUi):
                     self.new_profile,
                     self._binding_registry,
                     mode,
-                    self.update_binding
+                    self.update_binding,
+                    self.toolbox
                 ),
                 mode
             )
-        self.main_layout.addWidget(self.toolbox)
+
 
         # Create the help text indicating how to use the template tool
         self.help_text = QtWidgets.QLabel(
@@ -357,10 +359,7 @@ class BindableAction(QtWidgets.QWidget):
         )
 
         # Display the dialog centered in the middle of the UI
-        root = self
-        while root.parent():
-            root = root.parent()
-        geom = root.geometry()
+        geom = self.topLevelWidget().geometry()
 
         self.button_press_dialog.setGeometry(
             int(geom.x() + geom.width() / 2 - 150),
