@@ -344,15 +344,12 @@ class ModuleWidget(QtWidgets.QFrame):
 
         if self.has_variables:
             self.btn_add_instance = QtWidgets.QPushButton(
-                load_icon("gfx/button_add"),
-                ""
+                load_icon("gfx/button_add"),""
             )
             header_layout.addWidget(self.btn_add_instance)
 
         self.btn_delete = QtWidgets.QPushButton(
-            load_icon("gfx/button_delete"),
-            ""
-        )
+            load_icon("gfx/button_delete"),"")
         header_layout.addWidget(self.btn_delete)
 
         self.instance_layout = QtWidgets.QVBoxLayout()
@@ -398,7 +395,7 @@ class InstanceWidget(QtWidgets.QWidget):
             load_icon("gfx/options"), ""
         )
         self.btn_delete = QtWidgets.QPushButton(
-            load_icon("gfx/button_delete"), ""
+             load_icon("gfx/button_delete"), ""
         )
 
         self.main_layout.addWidget(self.label_name)

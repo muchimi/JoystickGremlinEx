@@ -473,18 +473,47 @@ def get_icon_path(*paths):
         # be aware of runtime environment
         root_path = get_root_path()
         the_path = os.path.join(*paths)
-        icon_file = os.path.join(root_path, the_path)
-        if icon_file and os.path.isfile(icon_file):
-            return icon_file
+        icon_file = os.path.join(root_path, the_path).replace("/",os.sep).lower()
+        if icon_file:
+            if os.path.isfile(icon_file):
+                #logging.getLogger("system").info(f"Icon file (straight) found: {icon_file}")        
+                return icon_file
+            if not icon_file.endswith(".png"):
+                icon_file_png = icon_file + ".png"
+                if os.path.isfile(icon_file_png):
+                    #logging.getLogger("system").info(f"Icon file (png) found: {icon_file_png}")        
+                    return icon_file_png
+            if not icon_file.endswith(".svg"):
+                icon_file_svg = icon_file + ".svg"
+                if os.path.isfile(icon_file_svg):
+                    #logging.getLogger("system").info(f"Icon file (svg) found: {icon_file_svg}")        
+                    return icon_file_svg
+        logging.getLogger("system").warning(f"Icon file not found: {icon_file}")
     
         return None
 
-def load_icon(*paths):
-    ''' gets an icon '''
+def load_pixmap(*paths):
+    ''' gets a pixmap from the path '''
     the_path = get_icon_path(*paths)
     if the_path:
-         return QtGui.QIcon(the_path)
-    return get_generic_icon()
+        pixmap = QtGui.QPixmap(the_path)
+        if pixmap.isNull():
+            logging.getLogger("system").warning(f"load_pixmap(): pixmap failed: {the_path}")
+            return None
+        return pixmap
+    
+    logging.getLogger("system").warning(f"load_pixmap(): invalid path")
+    return None
+
+def load_icon(*paths):
+    ''' gets an icon (returns a QIcon) '''
+    pixmap = load_pixmap(*paths)
+    if not pixmap or pixmap.isNull():
+        return get_generic_icon()
+    icon = QtGui.QIcon()
+    icon.addPixmap(pixmap, QtGui.QIcon.Normal)
+    return icon
+    
 
 def get_generic_icon():
     ''' gets a generic icon'''
@@ -492,4 +521,12 @@ def get_generic_icon():
     root_path = get_root_path()
     generic_icon = os.path.join(root_path, "gfx/generic.png")
     if os.path.isfile(generic_icon):
-        return QtGui.QIcon(generic_icon)
+        pixmap = QtGui.QPixmap(generic_icon)
+        if pixmap.isNull():
+            logging.getLogger("system").warning(f"load_icon(): generic pixmap failed: {generic_icon}")
+            return None
+        icon = QtGui.QIcon()
+        icon.addPixmap(pixmap, QtGui.QIcon.Normal)
+        return icon
+    logging.getLogger("system").warning(f"load_icon(): generic icon file not found: {generic_icon}")
+    return None

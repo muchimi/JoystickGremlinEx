@@ -22,8 +22,8 @@ import time
 from xml.etree import ElementTree
 
 from PySide6 import QtWidgets, QtCore, QtGui
+from gremlin.common import load_icon
 
-from PySide6.QtGui import QIcon as ThemeQIcon
 from gremlin.base_classes import InputActionCondition
 from gremlin.common import InputType
 from gremlin import input_devices, joystick_handling, util
@@ -1547,8 +1547,8 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         icon_path = os.path.join("action_plugins","map_to_vjoy")
         unused_path = os.path.join(icon_path, "unused.png")
         used_path = os.path.join(icon_path, "used.png")
-        used_icon = ThemeQIcon(used_path)
-        unused_icon = ThemeQIcon(unused_path)
+        used_icon = load_icon(used_path)
+        unused_icon = load_icon(unused_path)
         used_pixmap = QtGui.QPixmap(used_path)
         unused_pixmap = QtGui.QPixmap(unused_path)
 
@@ -2114,7 +2114,7 @@ class VjoyRemap(gremlin.base_classes.AbstractAction):
             input_string = "button"
         else:
             input_string = None
-            log_sys_warn(f"VjoyRemap: don't know how to handle action mode: {self.action_mode}")
+            #log_sys_warn(f"VjoyRemap: don't know how to handle action mode: {self.action_mode}")
 
 
         root_path = get_root_path()
@@ -2123,9 +2123,9 @@ class VjoyRemap(gremlin.base_classes.AbstractAction):
         if input_string and os.path.isfile(icon_file):
             return icon_file
             
-        log_sys_warn(f"Icon folder: {folder}")
-        log_sys_warn(f"Icon file: {icon_file}")
-        log_sys_warn(f"Warning: unable to determine icon type: {self.input_type} for id {self.vjoy_input_id}")
+        # log_sys_warn(f"Icon folder: {folder}")
+        # log_sys_warn(f"Icon file: {icon_file}")
+        # log_sys_warn(f"Warning: unable to determine icon type: {self.input_type} for id {self.vjoy_input_id}")
         return super().icon()
             
     

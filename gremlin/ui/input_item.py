@@ -19,8 +19,7 @@ import enum
 from PySide6 import QtWidgets, QtCore, QtGui
 
 import gremlin
-from PySide6.QtGui import QIcon as load_icon
-from gremlin.common import DeviceType, InputType
+from gremlin.common import DeviceType, InputType, load_icon, load_pixmap
 from . import activation_condition, common, virtual_button
 from functools import partial 
 
@@ -538,6 +537,7 @@ class ActionSetView(common.AbstractView):
             self.control_delete = QtWidgets.QPushButton(
                 load_icon("gfx/button_delete"), ""
             )
+            logging.getLogger("system").info(f"action: delete allowed")
             self.control_delete.clicked.connect(
                 lambda: self.interacted.emit(ActionSetView.Interactions.Delete)
             )
@@ -1025,6 +1025,8 @@ class TitleBarButton(QtWidgets.QAbstractButton):
         size = 2 * self.style().pixelMetric(
             QtWidgets.QStyle.PM_DockWidgetTitleBarButtonMargin
         )
+        
+        
 
         if not self.icon().isNull():
             icon_size = self.style().pixelMetric(
@@ -1032,6 +1034,8 @@ class TitleBarButton(QtWidgets.QAbstractButton):
             )
             sz = self.icon().actualSize(QtCore.QSize(icon_size, icon_size))
             size += max(sz.width(), sz.height())
+
+        if size < 12: size = 12            
 
         return QtCore.QSize(size, size)
 
@@ -1089,6 +1093,7 @@ class TitleBarButton(QtWidgets.QAbstractButton):
         size = self.style().pixelMetric(
             QtWidgets.QStyle.PM_SmallIconSize
         )
+        if size < 12: size = 12
         options.iconSize = QtCore.QSize(size, size)
         self.style().drawComplexControl(
             QtWidgets.QStyle.CC_ToolButton, options, p, self
@@ -1116,12 +1121,32 @@ class TitleBar(QtWidgets.QFrame):
 
         self.hint = hint
         self.label = QtWidgets.QLabel(label)
+
+        # help button
         self.help_button = TitleBarButton()
-        self.help_button.setIcon(load_icon("gfx/help"))
+        pixmap_help = load_pixmap("gfx/help")
+        if not pixmap_help or pixmap_help.isNull():
+            self.help_button.setText("?")
+        else:
+            icon = QtGui.QIcon()
+            icon.addPixmap(pixmap_help, QtGui.QIcon.Normal)
+            self.help_button.setIcon(icon)
+        
+            
         self.help_button.clicked.connect(self._show_hint)
+
+        # close button
         self.close_button = TitleBarButton()
-        self.close_button.setIcon(load_icon("gfx/close"))
+        pixmap_close = load_pixmap("gfx/close")
+        if not pixmap_close or pixmap_close.isNull():
+            self.close_button.setText("X")
+        else:
+            icon = QtGui.QIcon()
+            icon.addPixmap(pixmap_close, QtGui.QIcon.Normal)
+            self.close_button.setIcon(icon)
+            
         self.close_button.clicked.connect(close_cb)
+
         self.layout = QtWidgets.QHBoxLayout()
         self.layout.setSpacing(0)
         self.layout.setContentsMargins(5, 0, 5, 0)

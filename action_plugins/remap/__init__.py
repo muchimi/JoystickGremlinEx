@@ -21,6 +21,7 @@ import threading
 import time
 from xml.etree import ElementTree
 
+from gremlin.common import load_icon
 from PySide6 import QtWidgets
 
 from gremlin.base_classes import InputActionCondition
@@ -362,7 +363,7 @@ class Remap(gremlin.base_classes.AbstractAction):
         log_sys_warn(f"Icon folder: {folder}")
         log_sys_warn(f"Icon file: {icon_file}")
         log_sys_warn(f"Warning: unable to determine icon type: {self.input_type} for id {self.vjoy_input_id}")
-        return super().icon()
+        return None
         
         
 

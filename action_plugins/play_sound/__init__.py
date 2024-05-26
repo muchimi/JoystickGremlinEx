@@ -20,7 +20,7 @@ import os
 from PySide6 import QtCore, QtGui, QtMultimedia, QtWidgets
 from xml.etree import ElementTree
 
-from PySide6.QtGui import QIcon as ThemeQIcon
+
 from gremlin.base_classes import AbstractAction, AbstractFunctor
 from gremlin.common import InputType, load_icon
 import gremlin.ui.input_item
