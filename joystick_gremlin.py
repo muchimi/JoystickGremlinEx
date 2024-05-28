@@ -36,6 +36,7 @@ from PySide6 import QtCore, QtGui, QtMultimedia, QtWidgets
 
 
 from gremlin.common import InputType
+import gremlin.config
 import gremlin.event_handler 
 
 import dill
@@ -65,7 +66,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.11ex"
+APPLICATION_VERSION = "13.40.12ex"
 
 
 
@@ -844,51 +845,73 @@ class GremlinUi(QtWidgets.QMainWindow):
         :param event the event to process
         """
 
-
-
-        if event.event_type == gremlin.common.InputType.Keyboard:
-            return
-        if self.runner.is_running() or self._current_mode is None:
-            return
-        if gremlin.shared_state.suspend_input_highlighting():
-            return
-        # Get device id of the event and check if this matches the currently
-        if event.device_guid not in self.tabs:
+        
+        if self.locked:
             return
 
         # enter critical section
-        if self.locked:
-            return
+        try:
+
+            self.locked = True
+
+            if event.event_type == gremlin.common.InputType.Keyboard:
+                # ignore keyboard inputs
+                return
+            if self.runner.is_running() or self._current_mode is None:
+                return
+            if gremlin.shared_state.suspend_input_highlighting():
+                return
+            
+
+            # Get device id of the event and check if this matches the currently
+            if event.device_guid not in self.tabs:
+                return
+
+            config = self.config # gremlin.config.Configuration()
+            
         
-        self.locked = True
-    
-        # Switch to the tab corresponding to the event's device if the option
-        tab_switch_needed = self.ui.devices.currentWidget() != self.tabs[event.device_guid] 
-        if self.config.highlight_device and tab_switch_needed:
-            self.ui.devices.setCurrentWidget(self.tabs[event.device_guid])
-            self.refresh()
-
-        self.locked = False
-
-        
-        # get the widget for the tab corresponding to the device
-        widget = self.tabs[event.device_guid] 
-        if not isinstance(widget, gremlin.ui.device_tab.JoystickDeviceTabWidget):
-            return
-
-        process_input = tab_switch_needed or self._should_process_input(event, widget, buttons_only)
-        
-        if not process_input:
-            return
+            # Switch to the tab corresponding to the event's device if the option
+            tab_switch_needed = self.ui.devices.currentWidget() != self.tabs[event.device_guid] 
+                        
+            # get the widget for the tab corresponding to the device
+            widget = self.tabs[event.device_guid] 
+            if not isinstance(widget, gremlin.ui.device_tab.JoystickDeviceTabWidget):
+                return
 
 
-        # If we want to act on the given event figure out which button
-        # needs to be pressed and press ii
-        widget.input_item_list_view.select_item(event)
-        #syslog.debug(f"selecting input") # {event.input_type} {event.action_id}")
-        index = widget.input_item_list_view.current_index
-        widget.input_item_list_view.redraw_index(index)
+            # prevent switching based on user options
+            if not config.highlight_input and event.event_type == gremlin.common.InputType.JoystickAxis:
+                # ignore axis input
+                return
+            if not config.highlight_input_buttons and event.event_type == gremlin.common.InputType.JoystickButton:
+                # ignore button input
+                return        
 
+
+            process_input = tab_switch_needed or self._should_process_input(event, widget, buttons_only)
+
+
+            
+            if not process_input:
+                return
+
+
+            if config.highlight_device and tab_switch_needed:
+                self.ui.devices.setCurrentWidget(self.tabs[event.device_guid])
+                self.refresh()
+
+
+            
+
+            # If we want to act on the given event figure out which button
+            # needs to be pressed and press ii
+            widget.input_item_list_view.select_item(event)
+            #syslog.debug(f"selecting input") # {event.input_type} {event.action_id}")
+            index = widget.input_item_list_view.current_index
+            widget.input_item_list_view.redraw_index(index)
+
+        finally:
+            self.locked = False
     
 
 

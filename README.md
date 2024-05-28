@@ -32,6 +32,10 @@ Joystick Gremlin EX
       + [Symmetry](#symmetry)
       + [Latching](#latching)
       + [Dragons](#dragons-1)
+- [Button Container](#button-container)
+      + [Usage tips](#usage-tips)
+      + [Pressed block](#pressed-block)
+      + [Release block](#release-block)
 - [Plugin Script enhancements](#plugin-script-enhancements)
       + [@gremlin.input_devices.gremlin_start](#gremlininput_devicesgremlin_start)
       + [@gremlin.input_devices.gremlin_stop](#gremlininput_devicesgremlin_stop)
@@ -63,7 +67,7 @@ Joystick Gremlin EX
 
 <!-- TOC --><a name="changelog"></a>
 ## Changelog
-
+5/27/24 - added Button container and improved handling of automatic switching
 4/8/24 - added troubleshooting guide and sample scripts for advanced GremlinEx scripting via plugins
 
 4/12/24 - bug fixes (see release notes on issues resolved)
@@ -86,6 +90,7 @@ The EX version adds to release 13.3 of Gremlin:
 - MapToMouseEx action plugin for enhanced mouse control  
 - Range container for mapping axis ranges to actions easily
 - MapToKeyboardEx action plugin for enhanced keyboard control with separate make/break and delay functionality
+- Button container - provides a direct way perform actions on a raw button press or release, which is helpful for on/off and three-way buttons
 
 
 I suggest you make VjoyRemap the default action in the options panel as this plugin is what provides many enhancements over the default Remap plugin.  Same for mouse output - MapToMouseEx provides enhanced options for the mouse macro functions.
@@ -407,6 +412,27 @@ This container is an experimental feature.
 The range mapper is not designed to work with the default keyboard mapper as that will cause stuck keys, because of how the default keyboard mapper works when conditions are not used.  Use the enhanced keyboard mapper.
 
 The latching feature (awareness of other range containers) may introduce some strange behaviors and applies to all ranges attached to a single axis, so it's not aware of nesting for example.  The latching applies to all ranges in the mapping tree regardless of their level.
+
+<!-- TOC --><a name="button-container"></a>
+# Button Container
+
+This experimental container simplifies the mapping of actions when an input button is pressed or released.  While this can be done with conditions, this is a simpler and easier way to map a button to a set of actions when a button is pressed or released.
+
+<!-- TOC --><a name="usage-tips"></a>
+### Usage tips
+
+This container is best used to handle an on/off function (the input only triggers when in one of two possible positions), or a three way function (the input triggers in two out of three positions - the middle position usually being the one that doesn't trigger)
+
+<!-- TOC --><a name="pressed-block"></a>
+### Pressed block
+
+In this section, add the container or actions you want to execute on button press.  Leave blank for no action.
+
+<!-- TOC --><a name="release-block"></a>
+### Release block
+
+In this section, add the container of actions you want to execute on button release.  Leave blank for no action.
+
 
 
 <!-- TOC --><a name="plugin-script-enhancements"></a>
