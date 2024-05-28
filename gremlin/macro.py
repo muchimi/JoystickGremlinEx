@@ -593,6 +593,18 @@ class AbstractAction:
         raise gremlin.error.MissingImplementationError(
             "AbstractAction.__call__ not implemented in derived class."
         )
+    
+    def _update_flags(self, is_local = None, is_remote = None, force_remote = None):
+        # updates flags based on local/remote overrides
+        (state_is_local, state_is_remote) = gremlin.input_devices.remote_state.state
+        if is_local is None:
+            is_local = state_is_local
+        if is_remote is None:
+            is_remote = state_is_remote
+        if force_remote is not None and force_remote:
+            is_local = False
+            is_remote = True  
+        return (is_local, is_remote)
 
 
 class JoystickAction(AbstractAction):
@@ -614,7 +626,7 @@ class JoystickAction(AbstractAction):
         self.value = value
         self.axis_type = axis_type
 
-    def __call__(self, is_local = True, is_remote = False, force_remote = False):
+    def __call__(self, is_local = None, is_remote = None, force_remote = None):
         """Emits an Event instance through the EventListener system."""
         el = gremlin.event_handler.EventListener()
         if self.input_type == gremlin.common.InputType.JoystickAxis:
@@ -662,12 +674,9 @@ class KeyAction(AbstractAction):
         self.key = key
         self.is_pressed = is_pressed
 
-    def __call__(self, is_local = True, is_remote = False, force_remote = False):
+    def __call__(self, is_local = None, is_remote = None, force_remote = None):
         # ignore passed local/remote states
-        (is_local, is_remote) = gremlin.input_devices.remote_state.state
-        if force_remote:
-            is_local = False
-            is_remote = True
+        is_local, is_remote = self._update_flags(is_local, is_remote, force_remote)
         if self.is_pressed:
             _send_key_down(self.key, is_local, is_remote, force_remote)
         else:
@@ -691,12 +700,9 @@ class MouseButtonAction(AbstractAction):
         self.button = button
         self.is_pressed = is_pressed
 
-    def __call__(self, is_local = True, is_remote = False, force_remote = False):
+    def __call__(self, is_local = None, is_remote = None, force_remote = None):
         # ignore passed local/remote states
-        (is_local, is_remote) = gremlin.input_devices.remote_state.state
-        if force_remote:
-            is_local = False
-            is_remote = True
+        is_local, is_remote = self._update_flags(is_local, is_remote, force_remote)
         if self.button == gremlin.common.MouseButton.WheelDown:
             if is_local:
                 gremlin.sendinput.mouse_wheel(1)
@@ -732,12 +738,9 @@ class MouseMotionAction(AbstractAction):
         self.dx = int(dx)
         self.dy = int(dy)
 
-    def __call__(self, is_local = True, is_remote = False, force_remote = False):
+    def __call__(self, is_local = None, is_remote = None, force_remote = None):
         # ignore passed local/remote states
-        (is_local, is_remote) = gremlin.input_devices.remote_state.state
-        if force_remote:
-            is_local = False
-            is_remote = True        
+        is_local, is_remote = self._update_flags(is_local, is_remote, force_remote)
         if is_local:
             gremlin.sendinput.mouse_relative_motion(self.dx, self.dy)
         if is_remote:
@@ -757,8 +760,9 @@ class PauseAction(AbstractAction):
         self.duration_max = duration_max
         self.is_random = is_random
 
-    def __call__(self, is_local = True, is_remote = False, force_remote = False):
+    def __call__(self, is_local = None, is_remote = None, force_remote = None):
         import random
+        # is_local, is_remote = self._update_flags(is_local, is_remote, force_remote)
         if self.is_random:
             # random pause
             duration_min = self.duration
@@ -794,12 +798,10 @@ class VJoyMacroAction(AbstractAction):
         self.value = value
         self.axis_type = axis_type
 
-    def __call__(self, is_local = True, is_remote = False, force_remote = False):
+    def __call__(self, is_local = None, is_remote = None, force_remote = None):
         # ignore passed local/remote states
-        (is_local, is_remote) = gremlin.input_devices.remote_state.state
-        if force_remote:
-            is_local = False
-            is_remote = True        
+        
+        is_local, is_remote = self._update_flags(is_local, is_remote, force_remote)
         vjoy = gremlin.joystick_handling.VJoyProxy()[self.vjoy_id]
         if self.input_type == gremlin.common.InputType.JoystickAxis:
             if self.axis_type == "absolute":
