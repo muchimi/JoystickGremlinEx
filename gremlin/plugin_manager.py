@@ -23,6 +23,8 @@ import os
 from . import common, error
 from gremlin.util import *
 
+
+
 @common.SingletonDecorator
 class ContainerPlugins:
 
@@ -35,8 +37,27 @@ class ContainerPlugins:
 
         self._tag_to_type_map = {}
         self._name_to_type_map = {}
+        # tracks all functors
+        self._functors = []
 
         self._create_maps()
+
+        self._parent_widget_map = {} # map of item data to QT widget main UI container widget
+        self._input_data_container_map = {} # map of item data to the actual containers created for it
+
+        
+    def reset_functors(self):
+        ''' clears functor tracking '''
+        self._functors = []
+
+    def register_functor(self, functor):
+        ''' registers a functor for latching purposes'''
+        if not functor in self._functors:
+            self._functors.append(functor)
+
+    @property
+    def functors(self):
+        return self._functors
 
     @property
     def repository(self):
@@ -45,6 +66,37 @@ class ContainerPlugins:
         :return dictionary containing all plugins found
         """
         return self._plugins
+    
+    def set_widget(self, item_data, widget):
+        ''' sets the associated parent widget of a container for the specific input type'''
+        self._parent_widget_map[item_data] = widget
+
+    def get_widget(self, item_data):
+        ''' gets the associated parent widget of a container for the specific input type '''
+        if item_data in self._parent_widget_map.keys():
+            return self._parent_widget_map[item_data]
+        return None
+    
+    def set_container_data(self, item_data, container):
+        if not item_data in self._input_data_container_map.keys():
+            self._input_data_container_map[item_data] = []
+        if not container in self._input_data_container_map[item_data]:
+            self._input_data_container_map[item_data].append(container)
+
+    def get_container(self, item_data):
+        if not item_data in self._input_data_container_map.keys():
+            return []
+        return self._input_data_container_map[item_data]
+    
+    def get_parent_widget(self, container):
+        ''' gets the parent widget of the given container '''
+        for item_data, containers in self._input_data_container_map.items():
+            for container_item in containers:
+                if container == container_item:
+                    return self.get_widget(item_data)
+        # not found for this container
+        return None
+
 
     @property
     def tag_map(self):
@@ -68,8 +120,6 @@ class ContainerPlugins:
 
     def _discover_plugins(self):
         """Processes known plugin folders for action plugins."""
-        from gremlin.common import get_root_path
-        
         plugin_folder = "container_plugins"
         root_path = get_root_path()
         walk_path = os.path.join(root_path, plugin_folder)
@@ -108,6 +158,7 @@ class ContainerPlugins:
         for entry in self._plugins.values():
             self._tag_to_type_map[entry.tag] = entry
             self._name_to_type_map[entry.name] = entry
+       
 
 
 @common.SingletonDecorator
@@ -194,9 +245,6 @@ class ActionPlugins:
 
     def _discover_plugins(self):
         """Processes known plugin folders for action plugins."""
-        from gremlin.common import get_root_path
-        
-
         plugin_folder = "action_plugins"
         root_path = get_root_path()
         walk_path = os.path.join(root_path, plugin_folder)

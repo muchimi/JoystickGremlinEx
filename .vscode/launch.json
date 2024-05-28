@@ -11,6 +11,7 @@
             "program": "${workspaceFolder}/joystick_gremlin.py",
             "console": "integratedTerminal",
             "env": {"PYTHONPATH": "${workspaceFolder};${env:PYTHONPATH}"},
+            "restart": true
         }
     ]
 }

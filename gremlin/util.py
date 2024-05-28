@@ -27,7 +27,7 @@ import time
 
 from PySide6 import QtCore, QtWidgets
 
-from . import common, error, joystick_handling
+from . import error 
 
 
 # Table storing which modules have been imported already
@@ -177,6 +177,18 @@ def resource_path(relative_path):
 
     return os.path.normcase(os.path.join(base_path, relative_path))
 
+def get_root_path():
+    ''' gets the root path of the application '''    
+    from pathlib import Path
+    if getattr(sys, 'frozen', False):
+        # as exe via pyinstallaler
+        application_path = sys._MEIPASS
+    else:
+        # as script (because common is a subfolder, return the parent folder)
+        application_path = Path(os.path.dirname(os.path.abspath(__file__))).parent
+    return application_path
+
+
 
 def display_error(msg):
     """Displays the provided error message to the user.
@@ -190,6 +202,7 @@ def display_error(msg):
         QtWidgets.QMessageBox.Ok
     )
     box.exec()
+
 
 
 def log(msg):
@@ -207,6 +220,9 @@ def log_sys_warn(msg):
     ''' logs to the system log '''
     logging.getLogger("system").warning(str(msg))
 
+def log_sys_error(msg):
+    ''' logs to the system error log'''
+    logging.getLogger("system").error(str(msg))
 
 def format_name(name):
     """Returns the name formatted as valid python variable name.

@@ -34,11 +34,14 @@ import threading
 import PySide6
 from PySide6 import QtCore, QtGui, QtMultimedia, QtWidgets
 
+
 from gremlin.common import InputType
+import gremlin.config
 import gremlin.event_handler 
 
 import dill
-from gremlin.common import load_icon
+from gremlin.common import load_icon, get_icon_path
+from gremlin.util import log_sys_error, log_sys_warn, log_sys, get_root_path
 
 
 # Figure out the location of the code / executable and change the working
@@ -63,7 +66,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.9ex"
+APPLICATION_VERSION = "13.40.12ex"
 
 
 
@@ -357,7 +360,7 @@ class GremlinUi(QtWidgets.QMainWindow):
     # | Action implementations
     # +---------------------------------------------------------------
 
-    def activate(self, checked):
+    def activate(self, set_active):
         """Activates and deactivates the code runner.
 
         :param checked True when the runner is to be activated, False
@@ -365,21 +368,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         """
 
 
-        if checked:
-            # Generate the code for the profile and run it
-            self._profile_auto_activated = False
-            self.runner.start(
-                self._profile.build_inheritance_tree(),
-                self._profile.settings,
-                self._last_active_mode(),
-                self._profile
-            )
-            self.ui.tray_icon.setIcon(QtGui.QIcon("gfx/icon_active.ico"))
-            #self.ui.tray_icon.setIcon(QtGui.QIcon("gfx/icon_active.ico"))
-            
-            
-
-        else:
+        if not set_active:
             # Stop running the code
             self.runner.stop()
             self._update_statusbar_active(False)
@@ -390,8 +379,18 @@ class GremlinUi(QtWidgets.QMainWindow):
                 gremlin.ui.device_tab.KeyboardDeviceTabWidget
             ]:
                 self.ui.devices.currentWidget().refresh()
-            #self.ui.tray_icon.setIcon(QtGui.QIcon("gfx/icon.ico"))
-            self.ui.tray_icon.setIcon(QtGui.QIcon("gfx/icon.ico"))
+            self.ui.tray_icon.setIcon(load_icon("gfx/icon.ico"))
+        else:
+            # Generate the code for the profile and run it
+            self._profile_auto_activated = False
+            self.runner.start(
+                self._profile.build_inheritance_tree(),
+                self._profile.settings,
+                self._last_active_mode(),
+                self._profile
+            )
+            self.ui.tray_icon.setIcon(load_icon("gfx/icon_active.ico"))
+            
             
 
     def create_1to1_mapping(self):
@@ -640,7 +639,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         )
 
         self.ui.tray_icon = QtWidgets.QSystemTrayIcon()
-        self.ui.tray_icon.setIcon(QtGui.QIcon("gfx/icon.ico"))
+        self.ui.tray_icon.setIcon(load_icon("gfx/icon.ico"))
         self.ui.tray_icon.setContextMenu(self.ui.tray_menu)
         self.ui.tray_icon.show()
 
@@ -754,7 +753,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         # Menu actions
         from pathlib import Path
 
-        folder = os.path.dirname(__file__)
+        folder = get_root_path()
         gfx_folder = os.path.join(folder, "gfx")
         if not os.path.isdir(gfx_folder):
             # look for parent
@@ -763,60 +762,60 @@ class GremlinUi(QtWidgets.QMainWindow):
             if not os.path.isdir(gfx_folder):
                 raise gremlin.error.GremlinError(f"Unable to find icons: {folder}")
 
-        icon = load_icon("profile_open.svg")
+        icon = load_icon("gfx/profile_open.svg")
         #icon = self.load_icon("profile_open.svg"))
         self.ui.actionLoadProfile.setIcon(icon)           
         
-        icon = load_icon("profile_new.svg")
+        icon = load_icon("gfx/profile_new.svg")
         self.ui.actionNewProfile.setIcon(icon)
 
-        icon = load_icon("profile_save.svg")
+        icon = load_icon("gfx/profile_save.svg")
         self.ui.actionSaveProfile.setIcon(icon)          
         
-        icon = load_icon("profile_save_as.svg")
+        icon = load_icon("gfx/profile_save_as.svg")
         self.ui.actionSaveProfileAs.setIcon(icon)
             
-        icon = load_icon("device_information.svg")
+        icon = load_icon("gfx/device_information.svg")
         self.ui.actionDeviceInformation.setIcon(icon)
 
-        icon = load_icon("manage_modules.svg")
+        icon = load_icon("gfx/manage_modules.svg")
         self.ui.actionManageCustomModules.setIcon(icon)
 
-        icon = load_icon("manage_modes.svg")
+        icon = load_icon("gfx/manage_modes.svg")
         self.ui.actionManageModes.setIcon(icon)           
         
-        icon = load_icon("input_repeater.svg")
+        icon = load_icon("gfx/input_repeater.svg")
         self.ui.actionInputRepeater.setIcon(icon)
 
-        icon = load_icon("calibration.svg")
+        icon = load_icon("gfx/calibration.svg")
         self.ui.actionCalibration.setIcon(icon)
             
-        icon = load_icon("input_viewer.svg")
+        icon = load_icon("gfx/input_viewer.svg")
         self.ui.actionInputViewer.setIcon(icon)
             
-        icon = load_icon("logview.png")
+        icon = load_icon("gfx/logview.png")
         self.ui.actionLogDisplay.setIcon(icon)
 
-        icon = load_icon("options.svg")
+        icon = load_icon("gfx/options.svg")
         self.ui.actionOptions.setIcon(icon)
 
-        icon = load_icon("about.svg")
+        icon = load_icon("gfx/about.svg")
         self.ui.actionAbout.setIcon(icon)
         
 
         # Toolbar actions
         activate_icon = QtGui.QIcon()
         activate_icon.addPixmap(
-            QtGui.QPixmap(load_icon("activate.svg", as_path=True)),
+            QtGui.QPixmap(get_icon_path("gfx/activate.svg")),
             QtGui.QIcon.Normal
         )
         activate_icon.addPixmap(
-            QtGui.QPixmap(load_icon("activate_on.svg", as_path=True)),
+            QtGui.QPixmap(get_icon_path("gfx/activate_on.svg")),
             QtGui.QIcon.Active,
             QtGui.QIcon.On
         )
         self.ui.actionActivate.setIcon(activate_icon)
-        self.ui.actionOpen.setIcon(load_icon("profile_open.svg"))
+        self.ui.actionOpen.setIcon(load_icon("gfx/profile_open.svg"))
         
 
     # +---------------------------------------------------------------
@@ -831,7 +830,12 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         # Stop Gremlin execution
         self.ui.actionActivate.setChecked(False)
-        self.activate(False)
+        restart = self.runner.is_running()
+        self.activate(False, restart)
+            
+            
+        
+            
 
     
 
@@ -841,51 +845,73 @@ class GremlinUi(QtWidgets.QMainWindow):
         :param event the event to process
         """
 
-
-
-        if event.event_type == gremlin.common.InputType.Keyboard:
-            return
-        if self.runner.is_running() or self._current_mode is None:
-            return
-        if gremlin.shared_state.suspend_input_highlighting():
-            return
-        # Get device id of the event and check if this matches the currently
-        if event.device_guid not in self.tabs:
+        
+        if self.locked:
             return
 
         # enter critical section
-        if self.locked:
-            return
+        try:
+
+            self.locked = True
+
+            if event.event_type == gremlin.common.InputType.Keyboard:
+                # ignore keyboard inputs
+                return
+            if self.runner.is_running() or self._current_mode is None:
+                return
+            if gremlin.shared_state.suspend_input_highlighting():
+                return
+            
+
+            # Get device id of the event and check if this matches the currently
+            if event.device_guid not in self.tabs:
+                return
+
+            config = self.config # gremlin.config.Configuration()
+            
         
-        self.locked = True
-    
-        # Switch to the tab corresponding to the event's device if the option
-        tab_switch_needed = self.ui.devices.currentWidget() != self.tabs[event.device_guid] 
-        if self.config.highlight_device and tab_switch_needed:
-            self.ui.devices.setCurrentWidget(self.tabs[event.device_guid])
-            self.refresh()
-
-        self.locked = False
-
-        
-        # get the widget for the tab corresponding to the device
-        widget = self.tabs[event.device_guid] 
-        if not isinstance(widget, gremlin.ui.device_tab.JoystickDeviceTabWidget):
-            return
-
-        process_input = tab_switch_needed or self._should_process_input(event, widget, buttons_only)
-        
-        if not process_input:
-            return
+            # Switch to the tab corresponding to the event's device if the option
+            tab_switch_needed = self.ui.devices.currentWidget() != self.tabs[event.device_guid] 
+                        
+            # get the widget for the tab corresponding to the device
+            widget = self.tabs[event.device_guid] 
+            if not isinstance(widget, gremlin.ui.device_tab.JoystickDeviceTabWidget):
+                return
 
 
-        # If we want to act on the given event figure out which button
-        # needs to be pressed and press ii
-        widget.input_item_list_view.select_item(event)
-        #syslog.debug(f"selecting input") # {event.input_type} {event.action_id}")
-        index = widget.input_item_list_view.current_index
-        widget.input_item_list_view.redraw_index(index)
+            # prevent switching based on user options
+            if not config.highlight_input and event.event_type == gremlin.common.InputType.JoystickAxis:
+                # ignore axis input
+                return
+            if not config.highlight_input_buttons and event.event_type == gremlin.common.InputType.JoystickButton:
+                # ignore button input
+                return        
 
+
+            process_input = tab_switch_needed or self._should_process_input(event, widget, buttons_only)
+
+
+            
+            if not process_input:
+                return
+
+
+            if config.highlight_device and tab_switch_needed:
+                self.ui.devices.setCurrentWidget(self.tabs[event.device_guid])
+                self.refresh()
+
+
+            
+
+            # If we want to act on the given event figure out which button
+            # needs to be pressed and press ii
+            widget.input_item_list_view.select_item(event)
+            #syslog.debug(f"selecting input") # {event.input_type} {event.action_id}")
+            index = widget.input_item_list_view.current_index
+            widget.input_item_list_view.redraw_index(index)
+
+        finally:
+            self.locked = False
     
 
 
@@ -963,35 +989,43 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         :param is_active True if the system is active, False otherwise
         """
-        if self._is_active:
-            text_active = "<font color=\"green\">Active</font>"
-        else:
-            text_active = "<font color=\"red\">Paused</font>"
-        if self.ui.actionActivate.isChecked():
-            text_running = f"Running and {text_active}"
-        else:
-            text_running = "Not Running"
-        
-        # remote control status
-        if event.is_local:
-            local_msg = "<font color=\"green\">Active</font>"
-        else:
-            local_msg = "<font color=\"red\">Disabled</font>"
-        if event.is_remote:
-            remote_msg = "<font color=\"green\">Active</font>"
-        else:
-            remote_msg = "<font color=\"red\">Disabled</font>"
+        try:
+            if self._is_active:
+                text_active = "<font color=\"green\">Active</font>"
+            else:
+                text_active = "<font color=\"red\">Paused</font>"
+            if self.ui.actionActivate.isChecked():
+                text_running = f"Running and {text_active}"
+            else:
+                text_running = "Not Running"
+            
+            # remote control status
+            if event.is_local:
+                local_msg = "<font color=\"green\">Active</font>"
+            else:
+                local_msg = "<font color=\"red\">Disabled</font>"
+            if event.is_remote:
+                remote_msg = "<font color=\"green\">Active</font>"
+            else:
+                remote_msg = "<font color=\"red\">Disabled</font>"
 
-        self.status_bar_is_active.setText(f"<b>Status:</b> {text_running} <b>Local Control</b> {local_msg} <b>Broadcast:</b> {remote_msg}")
+            self.status_bar_is_active.setText(f"<b>Status:</b> {text_running} <b>Local Control</b> {local_msg} <b>Broadcast:</b> {remote_msg}")
+        except e:
+            log_sys_error(f"Unable to update status bar event: {event}")
+            log_sys_error(e)
 
     def _update_statusbar_mode(self, mode):
         """Updates the status bar display of the current mode.
 
         :param mode the now current mode
         """
-        self.status_bar_mode.setText(f"<b>Mode:</b> {mode}")
-        if self.config.mode_change_message:
-            self.ui.tray_icon.showMessage(f"Mode: {mode}","",0,250)
+        try:
+            self.status_bar_mode.setText(f"<b>Mode:</b> {mode}")
+            if self.config.mode_change_message:
+                self.ui.tray_icon.showMessage(f"Mode: {mode}","",QtWidgets.QSystemTrayIcon.MessageIcon.NoIcon,250)
+        except e:
+            log_sys_error(f"Unable to update status bar mode: {mode}")
+            log_sys_error(e)
 
     def _kb_event_cb(self, event):
         ''' listen for keyboard modifiers '''
@@ -1422,11 +1456,21 @@ class GremlinUi(QtWidgets.QMainWindow):
             self.setWindowTitle("")
 
 
+
+
 def configure_logger(config):
     """Creates a new logger instance.
 
     :param config configuration information for the new logger
     """
+
+    # blitz the log file
+    log_file = config["logfile"]
+    try:
+        if os.path.isfile(log_file):
+            os.unlink(log_file)
+    except:
+        pass
     logger = logging.getLogger(config["name"])
     logger.setLevel(config["level"])
     handler = logging.FileHandler(config["logfile"])
@@ -1437,7 +1481,7 @@ def configure_logger(config):
 
     logger.debug("-" * 80)
     logger.debug(time.strftime("%Y-%m-%d %H:%M"))
-    logger.debug("Starting Joystick Gremlin R13.3")
+    logger.debug(f"Starting {APPLICATION_NAME} {APPLICATION_VERSION}")
     logger.debug("-" * 80)
 
     console = logging.StreamHandler()
@@ -1520,7 +1564,7 @@ if __name__ == "__main__":
     os.environ["QT_QPA_PLATFORM"] = "windows:darkmode=0"
 
     app = QtWidgets.QApplication(sys.argv)
-    app.setWindowIcon(QtGui.QIcon("gfx/icon.png"))
+    app.setWindowIcon(load_icon("gfx/icon.png"))
     app.setApplicationDisplayName(APPLICATION_NAME + " " + APPLICATION_VERSION)
     app.setApplicationVersion(APPLICATION_VERSION)
     

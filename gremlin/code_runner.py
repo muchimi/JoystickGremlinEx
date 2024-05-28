@@ -28,6 +28,7 @@ import dill
 import gremlin
 from gremlin import event_handler, input_devices, \
     joystick_handling, macro, sendinput, user_plugin, util
+import gremlin.plugin_manager
 import vjoy as vjoy_module
 
 
@@ -48,6 +49,7 @@ class CodeRunner:
         self._vjoy_curves = VJoyCurves()
         self._merge_axes = []
         self._running = False
+        
 
     def is_running(self):
         """Returns whether or not the code runner is executing code.
@@ -55,6 +57,8 @@ class CodeRunner:
         :return True if code is being executed, False otherwise
         """
         return self._running
+    
+
 
     def start(self, inheritance_tree, settings, start_mode, profile):
         """Starts listening to events and loads all existing callbacks.
@@ -157,6 +161,11 @@ class CodeRunner:
                     lambda x: x,
                     False
                 )
+
+
+            # reset functor latching
+            container_plugins = gremlin.plugin_manager.ContainerPlugins()
+            container_plugins.reset_functors()
 
             # Create input callbacks based on the profile's content
             for device in profile.devices.values():
@@ -328,10 +337,15 @@ class CodeRunner:
         input_devices.stop_registry.stop()
         input_devices.stop_registry.clear()
         input_devices.mode_registry.clear()
-
+        
+        # reset functor latching
+        container_plugins = gremlin.plugin_manager.ContainerPlugins()
+        container_plugins.reset_functors()        
 
         # Disconnect all signals
-        if self._running:
+
+        is_running = self._running
+        if is_running:
             evt_lst = event_handler.EventListener()
 
             # tell listeners profile is stopping
@@ -346,15 +360,11 @@ class CodeRunner:
             self.event_handler.mode_changed.disconnect(
                 self._vjoy_curves.mode_changed
             )
-
-
+            
 
 
         self._running = False
 
-
-
-                
 
         # Empty callback registry
         input_devices.callback_registry.clear()
@@ -374,6 +384,7 @@ class CodeRunner:
 
         # Remove all claims on VJoy devices
         joystick_handling.VJoyProxy.reset()
+
 
     def _reset_state(self):
         """Resets all states to their default values."""

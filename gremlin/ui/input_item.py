@@ -19,8 +19,7 @@ import enum
 from PySide6 import QtWidgets, QtCore, QtGui
 
 import gremlin
-from PySide6.QtGui import QIcon as ThemeQIcon
-from gremlin.common import DeviceType, InputType
+from gremlin.common import DeviceType, InputType, load_icon, load_pixmap
 from . import activation_condition, common, virtual_button
 from functools import partial 
 
@@ -381,8 +380,8 @@ class InputItemListView(common.AbstractView):
                         data = self.model.data(index)
                         event.device_guid = self.model._device_data.device_guid
                         event.device_name = self.model._device_data.name
-                        event.device_input_type = data.input_type
-                        event.device_input_id = data.input_id
+                        event.device_input_type = data.input_type if data else None
+                        event.device_input_id = data.input_id if data else None
                         el.profile_device_changed.emit(event)
 
             if emit_signal and valid_index:
@@ -520,7 +519,7 @@ class ActionSetView(common.AbstractView):
         self.controls_layout = QtWidgets.QVBoxLayout()
         if ActionSetView.Interactions.Up in self.allowed_interactions:
             self.control_move_up = QtWidgets.QPushButton(
-                ThemeQIcon("gfx/button_up"), ""
+                load_icon("gfx/button_up"), ""
             )
             self.control_move_up.clicked.connect(
                 lambda: self.interacted.emit(ActionSetView.Interactions.Up)
@@ -528,7 +527,7 @@ class ActionSetView(common.AbstractView):
             self.controls_layout.addWidget(self.control_move_up)
         if ActionSetView.Interactions.Down in self.allowed_interactions:
             self.control_move_down = QtWidgets.QPushButton(
-                ThemeQIcon("gfx/button_down"), ""
+                load_icon("gfx/button_down"), ""
             )
             self.control_move_down.clicked.connect(
                 lambda: self.interacted.emit(ActionSetView.Interactions.Down)
@@ -536,15 +535,16 @@ class ActionSetView(common.AbstractView):
             self.controls_layout.addWidget(self.control_move_down)
         if ActionSetView.Interactions.Delete in self.allowed_interactions:
             self.control_delete = QtWidgets.QPushButton(
-                ThemeQIcon("gfx/button_delete"), ""
+                load_icon("gfx/button_delete"), ""
             )
+            logging.getLogger("system").info(f"action: delete allowed")
             self.control_delete.clicked.connect(
                 lambda: self.interacted.emit(ActionSetView.Interactions.Delete)
             )
             self.controls_layout.addWidget(self.control_delete)
         if ActionSetView.Interactions.Edit in self.allowed_interactions:
             self.control_edit = QtWidgets.QPushButton(
-                ThemeQIcon("gfx/button_edit"), ""
+                load_icon("gfx/button_edit"), ""
             )
             self.control_edit.clicked.connect(
                 lambda: self.interacted.emit(ActionSetView.Interactions.Edit)
@@ -640,7 +640,11 @@ class ActionLabel(QtWidgets.QLabel):
         :param parent the parent
         """
         QtWidgets.QLabel.__init__(self, parent)
-        self.setPixmap(QtGui.QPixmap(action_entry.icon()))
+        icon = action_entry.icon()
+        if isinstance(icon, QtGui.QIcon):
+            self.setPixmap(QtGui.QPixmap(icon.pixmap(20)))
+        else:
+            self.setPixmap(QtGui.QPixmap(icon))
 
         self.action_entry = action_entry
 
@@ -648,7 +652,11 @@ class ActionLabel(QtWidgets.QLabel):
         el.icon_changed.connect(self._icon_change)
 
     def _icon_change(self, event):
-        self.setPixmap(QtGui.QPixmap(self.action_entry.icon()))
+        icon = self.action_entry.icon()
+        if isinstance(icon, QtGui.QIcon):
+            self.setPixmap(QtGui.QPixmap(icon.pixmap(20)))
+        else:
+            self.setPixmap(QtGui.QPixmap(icon))
 
 
 class ContainerSelector(QtWidgets.QWidget):
@@ -744,8 +752,10 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         # Create the individual tabs
         self._create_action_tab()
         if self.profile_data.get_device_type() != DeviceType.VJoy:
-            self._create_activation_condition_tab()
-            self._create_virtual_button_tab()
+            if self.profile_data.condition_enabled:
+                self._create_activation_condition_tab()
+            if self.profile_data.virtual_button_enabled:
+                self._create_virtual_button_tab()
 
         self.dock_tabs.currentChanged.connect(self._tab_changed)
 
@@ -1015,6 +1025,8 @@ class TitleBarButton(QtWidgets.QAbstractButton):
         size = 2 * self.style().pixelMetric(
             QtWidgets.QStyle.PM_DockWidgetTitleBarButtonMargin
         )
+        
+        
 
         if not self.icon().isNull():
             icon_size = self.style().pixelMetric(
@@ -1022,6 +1034,8 @@ class TitleBarButton(QtWidgets.QAbstractButton):
             )
             sz = self.icon().actualSize(QtCore.QSize(icon_size, icon_size))
             size += max(sz.width(), sz.height())
+
+        if size < 12: size = 12            
 
         return QtCore.QSize(size, size)
 
@@ -1079,6 +1093,7 @@ class TitleBarButton(QtWidgets.QAbstractButton):
         size = self.style().pixelMetric(
             QtWidgets.QStyle.PM_SmallIconSize
         )
+        if size < 12: size = 12
         options.iconSize = QtCore.QSize(size, size)
         self.style().drawComplexControl(
             QtWidgets.QStyle.CC_ToolButton, options, p, self
@@ -1106,12 +1121,32 @@ class TitleBar(QtWidgets.QFrame):
 
         self.hint = hint
         self.label = QtWidgets.QLabel(label)
+
+        # help button
         self.help_button = TitleBarButton()
-        self.help_button.setIcon(ThemeQIcon("gfx/help"))
+        pixmap_help = load_pixmap("gfx/help")
+        if not pixmap_help or pixmap_help.isNull():
+            self.help_button.setText("?")
+        else:
+            icon = QtGui.QIcon()
+            icon.addPixmap(pixmap_help, QtGui.QIcon.Normal)
+            self.help_button.setIcon(icon)
+        
+            
         self.help_button.clicked.connect(self._show_hint)
+
+        # close button
         self.close_button = TitleBarButton()
-        self.close_button.setIcon(ThemeQIcon("gfx/close"))
+        pixmap_close = load_pixmap("gfx/close")
+        if not pixmap_close or pixmap_close.isNull():
+            self.close_button.setText("X")
+        else:
+            icon = QtGui.QIcon()
+            icon.addPixmap(pixmap_close, QtGui.QIcon.Normal)
+            self.close_button.setIcon(icon)
+            
         self.close_button.clicked.connect(close_cb)
+
         self.layout = QtWidgets.QHBoxLayout()
         self.layout.setSpacing(0)
         self.layout.setContentsMargins(5, 0, 5, 0)

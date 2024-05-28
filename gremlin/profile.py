@@ -1889,13 +1889,15 @@ class InputItem:
 
         :param node XML node to parse
         """
-        container_name_map = plugin_manager.ContainerPlugins().tag_map
+        container_plugins = plugin_manager.ContainerPlugins()
+        container_name_map = container_plugins.tag_map
         self.input_type = InputType.to_enum(node.tag)
         self.input_id = safe_read(node, "id", int)
         self.description = safe_read(node, "description", str)
         self.always_execute = read_bool(node, "always-execute", False)
         if self.input_type == InputType.Keyboard:
             self.input_id = (self.input_id, read_bool(node, "extended"))
+        
         for child in node:
             container_type = child.attrib["type"]
             if container_type not in container_name_map:
@@ -1906,6 +1908,10 @@ class InputItem:
             entry = container_name_map[container_type](self)
             entry.from_xml(child)
             self.containers.append(entry)
+            if hasattr(entry, "action_model"):
+                entry.action_model = self.containers
+            container_plugins.set_container_data(self, entry)
+
 
     def to_xml(self):
         """Generates a XML node representing this object's data.
@@ -1990,6 +1996,16 @@ class ProfileData(metaclass=ABCMeta):
         self.code = None
         self._id = None  # unique ID for this entry
 
+        generic_icon = os.path.join(os.path.dirname(__file__),"generic.png")
+        if os.path.isfile(generic_icon):
+            self._generic_icon = generic_icon
+        else:
+            self._generic_icon = None            
+
+    def icon(self):
+        ''' gets the default icon'''
+        from gremlin.common import get_generic_icon
+        return get_generic_icon()
 
 
     def from_xml(self, node):

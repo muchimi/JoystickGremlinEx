@@ -22,6 +22,7 @@ import logging
 from xml.etree import ElementTree
 
 import dill
+import os
 
 import gremlin
 from . import common, error, execution_graph, plugin_manager, profile
@@ -563,15 +564,6 @@ class AbstractAction(profile.ProfileData):
         node.set("action_id", self.action_id)
         return node
 
-    def icon(self):
-        """Returns the icon to use when representing the action.
-
-        :return icon to use
-        """
-        raise error.MissingImplementationError(
-            "AbstractAction.icon not implemented in subclass"
-        )
-
     def requires_virtual_button(self):
         """Returns whether or not the action requires the use of a
         virtual button.
@@ -600,6 +592,8 @@ class AbstractContainer(profile.ProfileData):
         """
         super().__init__(parent)
         self.action_sets = []
+        self._condition_enabled = True
+        self._virtual_button_enabled = True # determines if the callbacks can be virtualized or not - if not - the callback is "raw" to the functor
         self.activation_condition_type = None
         self.activation_condition = None
         self.virtual_button = None
@@ -620,6 +614,8 @@ class AbstractContainer(profile.ProfileData):
             self.device_input_type = None
 
 
+
+
     def _get_hardware_device(self, parent):
         ''' gets the hardware device attached to this action '''
         while parent and not isinstance(parent, Device):
@@ -628,6 +624,25 @@ class AbstractContainer(profile.ProfileData):
             return parent
         return None
     
+    @property
+    def condition_enabled(self):
+        ''' determines if condition tab is enabled '''
+        return self._condition_enabled
+    @condition_enabled.setter
+    def condition_enabled(self, value):
+        ''' determines if condition tab is enabled '''
+        self._condition_enabled = value
+
+    @property
+    def virtual_button_enabled(self):
+        ''' determines if virtual button tab is enabled and virtual buttons is enabled for functor callbacks'''
+        return self._virtual_button_enabled
+    @virtual_button_enabled.setter
+    def virtual_button_enabled(self, value):
+        ''' determines if virtual button tab is enabled and virtual buttons is enabled for functor callbacks'''
+        self._virtual_button_enabled = value
+
+
     @property
     def hardware_device(self):
         ''' gets the hardware device attached to this '''
@@ -698,7 +713,7 @@ class AbstractContainer(profile.ProfileData):
         # For a virtual button create a callback that sends VirtualButton
         # events and another callback that triggers of these events
         # like a button would.
-        if self.virtual_button is not None:
+        if self._virtual_button_enabled and self.virtual_button is not None:
             callbacks.append(execution_graph.CallbackData(
                 execution_graph.VirtualButtonProcess(self.virtual_button),
                 None

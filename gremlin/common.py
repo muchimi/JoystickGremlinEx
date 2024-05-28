@@ -22,17 +22,8 @@ import os
 import sys
 
 from PySide6 import QtGui
-from pathlib import Path
 
-def get_root_path():
-    ''' gets the root path of the application '''    
-    if getattr(sys, 'frozen', False):
-        # as exe via pyinstallaler
-        application_path = sys._MEIPASS
-    else:
-        # as script (because common is a subfolder, return the parent folder)
-        application_path = Path(os.path.dirname(os.path.abspath(__file__))).parent
-    return application_path
+
 
 
 class SingletonDecorator:
@@ -445,7 +436,16 @@ def find_file(icon_path):
 
 
     from pathlib import Path
-    icon_path = icon_path.lower()
+    from gremlin.util import get_root_path
+    icon_path = icon_path.lower().replace("/",os.sep)
+    sub_folders = None
+    if os.sep in icon_path:
+        # we have folders
+        splits = icon_path.split(os.sep)
+        folders = splits[:-1]
+        icon_path = splits[-1]
+        sub_folders = os.path.join("", *folders)
+    
 
     #folder = os.path.dirname(__file__)
     #root_folder = Path(folder).parent
@@ -455,7 +455,12 @@ def find_file(icon_path):
     if not os.path.isfile(icon_path):
         # path not found 
         _, ext = os.path.splitext(icon_path)
+        source_folder = root_folder
         for dirpath, _, filenames in os.walk(root_folder):
+            if sub_folders and not dirpath.endswith(sub_folders):
+                # not in the subfolder requested
+                continue
+        
             for filename in [f for f in filenames if f.endswith(ext)]:
                 if filename.lower() == icon_path:
                     files.append(os.path.join(dirpath, filename))
@@ -470,26 +475,83 @@ def find_file(icon_path):
 
 
 
-def load_icon(icon_path, as_path = False):
-        ''' loads an icon located in the file structure
-         
-          if the icon is provided without a path, the first matching file is loaded
+def get_icon_path(*paths):
+        ''' 
+        gets an icon path
            
         '''
-        
-        path = find_file(icon_path)
-            
-        if path and os.path.isfile(path):
-            if as_path:
-                return path
-            
-            return QtGui.QIcon(path)
-        
-        else:
-            path = find_file("generic.svg")
-            if path and os.path.isfile(path):
-                if as_path:
-                    return path
-                return QtGui.QIcon(path)
+
+        from gremlin.util import get_root_path
+
+        # be aware of runtime environment
+        root_path = get_root_path()
+        the_path = os.path.join(*paths)
+        icon_file = os.path.join(root_path, the_path).replace("/",os.sep).lower()
+        if icon_file:
+            if os.path.isfile(icon_file):
+                #logging.getLogger("system").info(f"Icon file (straight) found: {icon_file}")        
+                return icon_file
+            if not icon_file.endswith(".png"):
+                icon_file_png = icon_file + ".png"
+                if os.path.isfile(icon_file_png):
+                    #logging.getLogger("system").info(f"Icon file (png) found: {icon_file_png}")        
+                    return icon_file_png
+            if not icon_file.endswith(".svg"):
+                icon_file_svg = icon_file + ".svg"
+                if os.path.isfile(icon_file_svg):
+                    #logging.getLogger("system").info(f"Icon file (svg) found: {icon_file_svg}")        
+                    return icon_file_svg
+            brute_force = find_file(the_path)
+            if os.path.isfile(brute_force):
+                return brute_force
+        logging.getLogger("system").warning(f"Icon file not found: {icon_file}")
     
         return None
+
+def load_pixmap(*paths):
+    ''' gets a pixmap from the path '''
+    the_path = get_icon_path(*paths)
+    if the_path:
+        pixmap = QtGui.QPixmap(the_path)
+        if pixmap.isNull():
+            logging.getLogger("system").warning(f"load_pixmap(): pixmap failed: {the_path}")
+            return None
+        return pixmap
+    
+    logging.getLogger("system").warning(f"load_pixmap(): invalid path")
+    return None
+
+def load_icon(*paths):
+    ''' gets an icon (returns a QIcon) '''
+    pixmap = load_pixmap(*paths)
+    if not pixmap or pixmap.isNull():
+        return get_generic_icon()
+    icon = QtGui.QIcon()
+    icon.addPixmap(pixmap, QtGui.QIcon.Normal)
+    return icon
+
+def load_image(*paths):
+    ''' loads an image '''
+    the_path = get_icon_path(*paths)
+    if the_path:
+        return QtGui.QImage(the_path)
+    return None
+        
+    
+        
+
+def get_generic_icon():
+    ''' gets a generic icon'''
+    from gremlin.util import get_root_path
+    root_path = get_root_path()
+    generic_icon = os.path.join(root_path, "gfx/generic.png")
+    if os.path.isfile(generic_icon):
+        pixmap = QtGui.QPixmap(generic_icon)
+        if pixmap.isNull():
+            logging.getLogger("system").warning(f"load_icon(): generic pixmap failed: {generic_icon}")
+            return None
+        icon = QtGui.QIcon()
+        icon.addPixmap(pixmap, QtGui.QIcon.Normal)
+        return icon
+    logging.getLogger("system").warning(f"load_icon(): generic icon file not found: {generic_icon}")
+    return None

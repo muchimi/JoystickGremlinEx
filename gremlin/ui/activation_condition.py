@@ -20,9 +20,9 @@ from PySide6 import QtCore, QtGui, QtWidgets
 
 import logging
 
-from PySide6.QtGui import QIcon as ThemeQIcon
+
 from gremlin import base_classes, hints, input_devices, macro, util
-from gremlin.common import InputType
+from gremlin.common import InputType, load_icon
 from . import common
 
 
@@ -74,7 +74,7 @@ class ActivationConditionWidget(QtWidgets.QWidget):
                 self._granularity_changed_cb
             )
 
-            self.help_button = QtWidgets.QPushButton(ThemeQIcon("gfx/help"), "")
+            self.help_button = QtWidgets.QPushButton(load_icon("gfx/help"), "")
             self.help_button.clicked.connect(self._show_hint)
 
             self.controls_layout = QtWidgets.QHBoxLayout()
@@ -193,11 +193,11 @@ class KeyboardConditionWidget(AbstractConditionWidget):
                     ).name}</b>"
                     )
             self.record_button = common.NoKeyboardPushButton(
-                ThemeQIcon("gfx/button_edit.png"), ""
+                load_icon("gfx/button_edit.png"), ""
             )
             self.record_button.clicked.connect(self._request_user_input)
             self.delete_button = QtWidgets.QPushButton(
-                ThemeQIcon("gfx/button_delete.png"), ""
+                load_icon("gfx/button_delete.png"), ""
             )
             self.delete_button.clicked.connect(
                 lambda: self.deleted.emit(self.condition_data)
@@ -299,12 +299,12 @@ class JoystickConditionWidget(AbstractConditionWidget):
             common.clear_layout(self.main_layout)
 
             self.record_button = QtWidgets.QPushButton(
-                ThemeQIcon("gfx/button_edit.png"), ""
+                load_icon("gfx/button_edit.png"), ""
             )
             self.record_button.clicked.connect(self._request_user_input)
             self.delete_button = QtWidgets.QPushButton(
-                ThemeQIcon("gfx/button_delete.png"), ""
-            )
+                load_icon("gfx/button_delete.png"), "")
+            
             self.delete_button.clicked.connect(
                 lambda: self.deleted.emit(self.condition_data)
             )
@@ -541,8 +541,7 @@ class VJoyConditionWidget(AbstractConditionWidget):
                 self.condition_data.input_id
             )
             self.delete_button = QtWidgets.QPushButton(
-                ThemeQIcon("gfx/button_delete.png"), ""
-            )
+                load_icon("gfx/button_delete.png"), "")
             self.delete_button.clicked.connect(
                 lambda: self.deleted.emit(self.condition_data)
             )
@@ -737,8 +736,8 @@ class InputActionConditionWidget(AbstractConditionWidget):
                 self._state_selection_changed
             )
             self.delete_button = QtWidgets.QPushButton(
-                ThemeQIcon("gfx/button_delete.png"), ""
-            )
+                load_icon("gfx/button_delete.png"), "")
+            
             self.delete_button.clicked.connect(
                 lambda: self.deleted.emit(self.condition_data)
             )
@@ -893,7 +892,7 @@ class ConditionView(common.AbstractView):
         self.controls_layout.addWidget(self.condition_selector)
         self.controls_layout.addWidget(self.condition_add_button)
 
-        self.help_button = QtWidgets.QPushButton(QtGui.QIcon("gfx/help"), "")
+        self.help_button = QtWidgets.QPushButton(load_icon("gfx/help"), "")
         self.help_button.clicked.connect(self._show_hint)
         self.controls_layout.addWidget(self.help_button)
 

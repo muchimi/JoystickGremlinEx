@@ -21,7 +21,7 @@ import copy
 import logging
 import time
 
-from gremlin import actions, base_classes, common, error
+from gremlin import actions, base_classes, common, error, plugin_manager
 
 
 CallbackData = namedtuple("ContainerCallback", ["callback", "event"])
@@ -304,7 +304,11 @@ class ContainerExecutionGraph(AbstractExecutionGraph):
             )
             sequence.append("Condition")
 
-        self.functors.append(container.functor(container))
+        functor = container.functor(container)
+        container_plugins = plugin_manager.ContainerPlugins()
+        container_plugins.register_functor(functor)
+        self.functors.append(functor)
+        
         sequence.append("Action")
 
         self._create_transitions(sequence)
