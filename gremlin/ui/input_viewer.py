@@ -111,17 +111,42 @@ class InputViewerUi(common.BaseDialogUi):
         super().__init__(parent)
 
         self._widget_storage = {}
+        self.setMinimumHeight(800)
 
         self.devices = gremlin.joystick_handling.joystick_devices()
-        self.setLayout(QtWidgets.QHBoxLayout())
+        self.main_layout = QtWidgets.QHBoxLayout()
+        self.setLayout(self.main_layout)
 
         self.vis_selector = VisualizationSelector()
         self.vis_selector.changed.connect(self._add_remove_visualization_widget)
 
         self.views = InputViewerArea()
 
-        self.layout().addWidget(self.vis_selector)
-        self.layout().addWidget(self.views)
+        # configure the scroll area for the selectors
+        self.scroll_selector_layout = QtWidgets.QHBoxLayout()
+        self.scroll_selector_area = QtWidgets.QScrollArea()
+        self.scroll_selector_widget = QtWidgets.QWidget()
+
+        # Configure the widget holding the layout with all the buttons
+        self.scroll_selector_widget.setLayout(self.scroll_selector_layout)
+        self.scroll_selector_widget.setSizePolicy(
+            QtWidgets.QSizePolicy.Expanding,
+            QtWidgets.QSizePolicy.Expanding
+        )
+        self.scroll_selector_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
+        self.scroll_selector_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+
+        
+        self.scroll_selector_area.setMinimumWidth(300)
+        self.scroll_selector_area.setWidgetResizable(True)
+        self.scroll_selector_area.setWidget(self.scroll_selector_widget)
+
+        self.scroll_selector_layout.addWidget(self.vis_selector)
+
+        # Add the scroll area to the main layout
+        self.main_layout.addWidget(self.scroll_selector_area)
+        self.main_layout.addWidget(self.views)
+
 
     def _add_remove_visualization_widget(self, device, vis_type, is_active):
         """Adds or removes a visualization widget.
