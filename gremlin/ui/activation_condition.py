@@ -516,6 +516,7 @@ class VJoyConditionWidget(AbstractConditionWidget):
         # Initialize UI fully
         self._modify_vjoy(self.vjoy_selector.get_selection())
 
+
     def _create_ui(self):
         """Creates the configuration UI for this widget."""
         if VJoyConditionWidget.locked:
@@ -655,17 +656,21 @@ class VJoyConditionWidget(AbstractConditionWidget):
         )
 
     def _modify_vjoy(self, data):
+        # fix: 5/29/24 EMCS don't override prior value if already a valid value to prevent a condition reset
         self.condition_data.vjoy_id = data["device_id"]
         self.condition_data.input_type = data["input_type"]
         self.condition_data.input_id = data["input_id"]
 
         if data["input_type"] == InputType.JoystickAxis:
-            self.condition_data.comparison = "inside"
+            if not self.condition_data.comparison in ("inside","outside"):
+                self.condition_data.comparison = "inside"
         elif data["input_type"] == InputType.JoystickButton:
-            self.condition_data.comparison = "pressed"
+            if not self.condition_data.comparison in ("pressed","released"):
+                self.condition_data.comparison = "pressed"
         elif data["input_type"] == InputType.JoystickHat:
-            self.condition_data.comparison = \
-                util.hat_tuple_to_direction((0, 0))
+            directions = ("center", "north", "north-east", "east", "south-east","south", "south-west", "west", "north-west")
+            if not self.condition_data.comparison in directions:
+                self.condition_data.comparison = util.hat_tuple_to_direction((0, 0))
         self._create_ui()
 
     def _range_lower_changed_cb(self, value):

@@ -2167,6 +2167,7 @@ class VjoyRemap(gremlin.base_classes.AbstractAction):
             return self.vjoy_hat_id
         else:
             return self.vjoy_button_id
+ 
 
 
     def _parse_xml(self, node):

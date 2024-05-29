@@ -47,7 +47,16 @@ class AbstractCondition(metaclass=ABCMeta):
 
     def __init__(self):
         """Creates a new condition."""
-        self.comparison = ""
+        self._comparison = ""
+
+
+    @property
+    def comparison(self):
+        return self._comparison
+    
+    @comparison.setter
+    def comparison(self, value):
+        self._comparison = value
 
     @abstractmethod
     def from_xml(self, node):
@@ -70,7 +79,7 @@ class AbstractCondition(metaclass=ABCMeta):
 
         :return True if the condition is properly specified, False otherwise
         """
-        return self.comparison != ""
+        return self._comparison != ""
 
 
 class KeyboardCondition(AbstractCondition):
