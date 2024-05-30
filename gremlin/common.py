@@ -437,33 +437,35 @@ def find_file(icon_path):
 
     from pathlib import Path
     from gremlin.util import get_root_path
+
     icon_path = icon_path.lower().replace("/",os.sep)
     sub_folders = None
+    folders = []
+
+    root_folder = get_root_path()
     if os.sep in icon_path:
         # we have folders
         splits = icon_path.split(os.sep)
         folders = splits[:-1]
         icon_path = splits[-1]
         sub_folders = os.path.join("", *folders)
-    
-
-    #folder = os.path.dirname(__file__)
-    #root_folder = Path(folder).parent
-    root_folder = get_root_path()
 
     files = []
     if not os.path.isfile(icon_path):
         # path not found 
-        _, ext = os.path.splitext(icon_path)
-        source_folder = root_folder
+        file_root, ext = os.path.splitext(icon_path)
+        if ext:
+            extensions = [ext]
+        else:
+            extensions = [".svg",".png"]
+       
         for dirpath, _, filenames in os.walk(root_folder):
             if sub_folders and not dirpath.endswith(sub_folders):
-                # not in the subfolder requested
                 continue
-        
-            for filename in [f for f in filenames if f.endswith(ext)]:
-                if filename.lower() == icon_path:
-                    files.append(os.path.join(dirpath, filename))
+            for filename in [f.lower() for f in filenames]:
+                for ext in extensions:
+                    if filename.endswith(ext) and filename.startswith(file_root):
+                        files.append(os.path.join(dirpath, filename))
                     
     if files:
         files.sort(key = lambda x: len(x)) # shortest to largest
@@ -502,7 +504,7 @@ def get_icon_path(*paths):
                     #logging.getLogger("system").info(f"Icon file (svg) found: {icon_file_svg}")        
                     return icon_file_svg
             brute_force = find_file(the_path)
-            if os.path.isfile(brute_force):
+            if brute_force and os.path.isfile(brute_force):
                 return brute_force
         logging.getLogger("system").warning(f"Icon file not found: {icon_file}")
     

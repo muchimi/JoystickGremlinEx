@@ -1271,6 +1271,8 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     """Widget which allows creating and editing of macros."""
 
+    from gremlin.common import get_icon_path
+
     locked = False
 
     # Path to graphics
@@ -1339,21 +1341,21 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
 
             # Create buttons used to modify and interact with the macro actions
             self.button_new_entry = self._create_toolbutton(
-                "gfx/list_add",
+                "list_add",
                 "Add a new action",
                 False
             )
             self.button_new_entry.clicked.connect(self._add_entry)
 
             self.button_delete = self._create_toolbutton(
-                "gfx/list_delete",
+                "list_delete",
                 "Delete currently selected entry",
                 False
             )
             self.button_delete.clicked.connect(self._delete_cb)
 
             self.button_pause = self._create_toolbutton(
-                f"{MacroWidget.gfx_path}/pause",
+                "pause",
                 "Add pause after the currently selected entry",
                 False
             )
@@ -1361,8 +1363,8 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
 
             self.button_record = self._create_toolbutton(
                 [
-                    f"{MacroWidget.gfx_path}/macro_record",
-                    f"{MacroWidget.gfx_path}/macro_record_on"
+                    "macro_record",
+                    "macro_record_on"
                 ],
                 "Record keyboard and joystick inputs",
                 True,
@@ -1372,8 +1374,8 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
 
             self.record_time = self._create_toolbutton(
                 [
-                    f"{MacroWidget.gfx_path}/time",
-                    f"{MacroWidget.gfx_path}/time_on"
+                    "time",
+                    "time_on"
                 ],
                 "Record pauses between actions",
                 True,
@@ -1384,8 +1386,8 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             cfg = gremlin.config.Configuration()
             self.record_axis = self._create_toolbutton(
                 [
-                    f"{MacroWidget.gfx_path}/record_axis",
-                    f"{MacroWidget.gfx_path}/record_axis_on"
+                    "record_axis",
+                    "record_axis_on"
                 ],
                 "Record joystick axis events",
                 True,
@@ -1394,8 +1396,8 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.record_axis.clicked.connect(self._update_record_settings)
             self.record_button = self._create_toolbutton(
                 [
-                    f"{MacroWidget.gfx_path}/record_button",
-                    f"{MacroWidget.gfx_path}/record_button_on"
+                    "record_button",
+                    "record_button_on"
                 ],
                 "Record joystick button events",
                 True,
@@ -1404,8 +1406,8 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.record_button.clicked.connect(self._update_record_settings)
             self.record_hat = self._create_toolbutton(
                 [
-                    f"{MacroWidget.gfx_path}/record_hat",
-                    f"{MacroWidget.gfx_path}/record_hat_on"
+                    "record_hat",
+                    "record_hat_on"
                 ],
                 "Record joystick hat events",
                 True,
@@ -1414,8 +1416,8 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.record_hat.clicked.connect(self._update_record_settings)
             self.record_key = self._create_toolbutton(
                 [
-                    f"{MacroWidget.gfx_path}/record_key",
-                    f"{MacroWidget.gfx_path}/record_key_on"
+                    "record_key",
+                    "record_key_on"
                 ],
                 "Record keyboard events",
                 True,
@@ -1424,8 +1426,8 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.record_key.clicked.connect(self._update_record_settings)
             self.record_mouse = self._create_toolbutton(
                 [
-                    f"{MacroWidget.gfx_path}/record_mouse",
-                    f"{MacroWidget.gfx_path}/record_mouse_on"
+                    "record_mouse",
+                    "record_mouse_on"
                 ],
                 "Record mouse events",
                 True,
@@ -1474,18 +1476,22 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
         :param is_checkable whether or not the button can be toggled
         :param default_on whether or not to toggle the button by default
         """
+        from gremlin.common import load_pixmap, load_icon
         button = QtWidgets.QToolButton()
+        
         if isinstance(icon_path, list):
+            pixmap_0 = load_pixmap(icon_path[0])
+            pixmap_1 = load_pixmap(icon_path[1])
             icon = QtGui.QIcon()
-            icon.addPixmap(QtGui.QPixmap(icon_path[0]), QtGui.QIcon.Normal)
+            icon.addPixmap(pixmap_0, QtGui.QIcon.Normal)
             icon.addPixmap(
-                QtGui.QPixmap(icon_path[1]),
+                pixmap_1,
                 QtGui.QIcon.Active,
                 QtGui.QIcon.On
             )
             button.setIcon(icon)
         else:
-            button.setIcon(QtGui.QIcon(icon_path))
+            button.setIcon(load_icon(icon_path))
         button.setToolTip(tooltip)
         button.setCheckable(is_checkable)
         button.setChecked(is_checkable and default_on)

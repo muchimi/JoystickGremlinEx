@@ -238,7 +238,7 @@ def create_document():
             "UpgradeCode": "f8c58daf-bbcd-443e-b762-acc0a9ef8e5c",
             "Language": "1033",
             "Codepage": "1252",
-            "Version": "13.40.12ex"
+            "Version": "13.40.12ex (e)"
         })
     
     # also change version number in joystick_gremlin.py line 60 APPLICATION_VERSION
