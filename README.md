@@ -36,6 +36,7 @@ Joystick Gremlin EX
       + [Usage tips](#usage-tips)
       + [Pressed block](#pressed-block)
       + [Release block](#release-block)
+- [TempoEx Container (tempo with chain)](#tempoex-container-tempo-with-chain)
 - [Plugin Script enhancements](#plugin-script-enhancements)
       + [@gremlin.input_devices.gremlin_start](#gremlininput_devicesgremlin_start)
       + [@gremlin.input_devices.gremlin_stop](#gremlininput_devicesgremlin_stop)
@@ -67,6 +68,7 @@ Joystick Gremlin EX
 
 <!-- TOC --><a name="changelog"></a>
 ## Changelog
+5/31/24 - added TempoEx container and resolved a macro call bug
 5/27/24 - added Button container and improved handling of automatic switching
 4/8/24 - added troubleshooting guide and sample scripts for advanced GremlinEx scripting via plugins
 
@@ -432,6 +434,24 @@ In this section, add the container or actions you want to execute on button pres
 ### Release block
 
 In this section, add the container of actions you want to execute on button release.  Leave blank for no action.
+
+<!-- TOC --><a name="tempoex-container-tempo-with-chain"></a>
+# TempoEx Container (tempo with chain)
+
+This experimental container combines the Tempo and Chain containers together.  The container has two main sections, a short press action set, and a long press action set.  The delay box indicates how long the (real) button has to be held before selecting either a short or long set.
+
+Each action set contains one or more chain groups.
+
+Each chain group contains one or more actions.  A group will execute all the actions in that group.
+
+Chaining means that at every short press, or long press, the container will sequence through the chain groups for that action set in round robin fashion.
+
+The chaining behavior can be prevented if needed (although that's really the point of the container).
+
+The chain delay is included although it will conflict with long press.  I may remove it later because the value may be limited in most use-cases that would benefit from this container.
+
+Within each action set, the chain group entries can be re-ordered, or can be removed.
+
 
 
 

@@ -783,10 +783,11 @@ class AbstractContainer(profile.ProfileData):
                 action_set = []
                 self._parse_action_xml(child, action_set)
                 self.action_sets.append(action_set)
-            else:
-                logging.getLogger("system").warning(
-                    f"Unknown node present: {child.tag}"
-                )
+            # update 5/30/24 - EMCS remove warning as custom action sets won't be read here
+            # else:
+            #     logging.getLogger("system").warning(
+            #         f"Unknown node present: {child.tag}"
+            #     )
 
     def _parse_action_xml(self, node, action_set):
         """Parses the XML content related to actions in an action-set.
@@ -847,20 +848,6 @@ class AbstractContainer(profile.ProfileData):
             for action in actions:
                 state = state & action.is_valid()
         return state
-
-        # # Check that no action set is empty
-        # for actions in [a for a in self.action_sets if a is not None]:
-        #     if len(actions) == 0:
-        #         state = False
-
-        # # Check state of all linked actions
-        # for actions in [a for a in self.action_sets if a is not None]:
-        #     for action in actions:
-        #         if action is None:
-        #             state = False
-        #         else:
-        #             state = state & action.is_valid()
-        # return state
 
     @abstractmethod
     def _is_container_valid(self):

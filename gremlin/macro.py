@@ -296,7 +296,7 @@ class MacroManager:
 
         :param macro the macro to terminate
         """
-        self._queue.append(MacroEntry(macro, False))
+        self._queue.append(MacroEntry(macro, False, macro.is_local, macro.is_remote))
         self._schedule_event.set()
 
     def _run_scheduler(self):

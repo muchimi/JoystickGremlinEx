@@ -395,6 +395,7 @@ class ActionSetModel(common.AbstractModel):
 
     def __init__(self, action_set=[]):
         super().__init__()
+        assert isinstance(action_set, list),"Invalid action set provided"
         self._action_set = action_set
 
     def rows(self):

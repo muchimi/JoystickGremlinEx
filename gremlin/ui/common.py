@@ -816,7 +816,8 @@ class ActionSelector(QtWidgets.QWidget):
         self.input_type = input_type
 
         self.main_layout = QtWidgets.QHBoxLayout(self)
-        self.main_layout.addWidget(QtWidgets.QLabel("Action"))
+        self.action_label = QtWidgets.QLabel("Action")
+        self.main_layout.addWidget(self.action_label)
 
         self.action_dropdown = QtWidgets.QComboBox()
 
