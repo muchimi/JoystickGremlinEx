@@ -4,3 +4,4 @@ PyInstaller
 pywin32
 pytest
 msgpack
+dill
