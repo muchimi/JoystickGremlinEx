@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott
+# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -77,7 +77,8 @@ class DoubleTapContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
         if self.profile_data.action_sets[0] is None:
             self._add_action_selector(
                 lambda x: self._add_action(0, x),
-                "Single Tap"
+                "Single Tap",
+                lambda x: self._paste_action(0, x),
             )
         else:
             self._create_action_widget(
@@ -90,7 +91,8 @@ class DoubleTapContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
         if self.profile_data.action_sets[1] is None:
             self._add_action_selector(
                 lambda x: self._add_action(1, x),
-                "Double Tap"
+                "Double Tap",
+                lambda x: self._paste_action(1, x),
             )
         else:
             self._create_action_widget(
@@ -118,7 +120,7 @@ class DoubleTapContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
                     gremlin.ui.common.ContainerViewTypes.Condition
                 )
 
-    def _add_action_selector(self, add_action_cb, label):
+    def _add_action_selector(self, add_action_cb, label, paste_action_cb):
         """Adds an action selection UI widget.
 
         :param add_action_cb function to call when an action is added
@@ -128,6 +130,7 @@ class DoubleTapContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
             self.profile_data.get_input_type()
         )
         action_selector.action_added.connect(add_action_cb)
+        action_selector.action_paste.connect(paste_action_cb)
 
         group_layout = QtWidgets.QVBoxLayout()
         group_layout.addWidget(action_selector)
@@ -164,6 +167,18 @@ class DoubleTapContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
         self.profile_data.action_sets[index].append(action_item)
         self.profile_data.create_or_delete_virtual_button()
         self.container_modified.emit()
+
+
+    def _paste_action(self, index, action):
+        ''' pastes an action '''
+        plugin_manager = gremlin.plugin_manager.ActionPlugins()
+        action_item = plugin_manager.duplicate(action)
+        if self.profile_data.action_sets[index] is None:
+            self.profile_data.action_sets[index] = []
+        self.profile_data.action_sets[index].append(action_item)
+        self.profile_data.create_or_delete_virtual_button()
+        self.container_modified.emit()
+
 
     def _delay_changed_cb(self, value):
         """Updates the activation delay value.

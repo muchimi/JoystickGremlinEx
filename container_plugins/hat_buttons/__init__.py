@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott
+# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@ from xml.etree import ElementTree
 
 from PySide6 import QtWidgets
 
-import dill
+import dinput
 
 import gremlin
 import gremlin.ui.common
@@ -300,7 +300,7 @@ class HatButtonsContainer(gremlin.base_classes.AbstractContainer):
                 gremlin.event_handler.Event(
                     gremlin.common.InputType.VirtualButton,
                     callbacks[-1].callback.virtual_button.identifier,
-                    device_guid=dill.GUID_Virtual,
+                    device_guid=dinput.GUID_Virtual,
                     is_pressed=True,
                     raw_value=True
                 )

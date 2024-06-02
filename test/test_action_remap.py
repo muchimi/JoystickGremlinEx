@@ -22,7 +22,7 @@ import pytest
 import uuid
 from xml.etree import ElementTree
 
-import dill
+import dinput
 import gremlin.error as error
 import gremlin.joystick_handling
 import gremlin.types as types

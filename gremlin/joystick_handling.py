@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott
+# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 import logging
 import threading
 
-import dill
+import dinput
 
 from . import common, error, util
 from vjoy import vjoy
@@ -159,7 +159,7 @@ def linear_axis_index(axis_map, axis_index):
 
     Parameters
     ==========
-    axis_map : dill.AxisMap
+    axis_map : dinput.AxisMap
         AxisMap instance which contains the mapping between linear and
         axis indices
     axis_index : int
@@ -192,15 +192,15 @@ def joystick_devices_initialization():
     syslog = logging.getLogger("system")
     syslog.info("Initializing joystick devices")
     syslog.debug(
-        f"{dill.DILL.get_device_count():d} joysticks detected"
+        f"{dinput.DILL.get_device_count():d} joysticks detected"
     )
 
     # Process all connected devices in order to properly initialize the
     # device registry
     devices = []
-    device_count = dill.DILL.get_device_count()
+    device_count = dinput.DILL.get_device_count()
     for i in range(device_count):
-        info = dill.DILL.get_device_information_by_index(i)
+        info = dinput.DILL.get_device_information_by_index(i)
         devices.append(info)
 
     # Process all devices again to detect those that have been added and those

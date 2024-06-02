@@ -3,7 +3,7 @@ sys.path.append(".")
 
 import pytest
 
-import dill
+import dinput
 
 import gremlin.event_handler
 import gremlin.joystick_handling
@@ -11,7 +11,7 @@ import gremlin.joystick_handling
 
 @pytest.fixture(scope="session", autouse=True)
 def joystick_init():
-    dill.DILL.init()
+    dinput.DILL.init()
     gremlin.joystick_handling.joystick_devices_initialization()
 
 

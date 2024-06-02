@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott
+# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -47,6 +47,8 @@ class ChainContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
             self.profile_data.get_input_type()
         )
         self.action_selector.action_added.connect(self._add_action)
+        self.action_selector.action_paste.connect(self._paste_action)
+
         self.widget_layout.addWidget(self.action_selector)
 
         self.widget_layout.addStretch(1)
@@ -92,6 +94,13 @@ class ChainContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
         """
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
         action_item = plugin_manager.get_class(action_name)(self.profile_data)
+        self.profile_data.add_action(action_item)
+        self.container_modified.emit()
+
+    def _paste_action(self, action):
+        ''' pastes an action '''
+        plugin_manager = gremlin.plugin_manager.ActionPlugins()
+        action_item = plugin_manager.duplicate(action)
         self.profile_data.add_action(action_item)
         self.container_modified.emit()
 

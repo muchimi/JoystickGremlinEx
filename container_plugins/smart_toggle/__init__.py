@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott
+# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -78,6 +78,7 @@ class SmartToggleContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
                 self.profile_data.get_input_type()
             )
             action_selector.action_added.connect(self._add_action)
+            action_selector.action_paste.connect(self._paste_action)
             self.action_layout.addWidget(action_selector)
 
     def _create_condition_ui(self):
@@ -106,6 +107,19 @@ class SmartToggleContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
         self.profile_data.action_sets[0].append(action_item)
         self.profile_data.create_or_delete_virtual_button()
         self.container_modified.emit()
+
+    def _paste_action(self, action):
+        """Adds a new action to the container.
+
+        :param action_name the name of the action to add
+        """
+        plugin_manager = gremlin.plugin_manager.ActionPlugins()
+        action_item = plugin_manager.duplicate(action)
+        if self.profile_data.action_sets[0] is None:
+            self.profile_data.action_sets[0] = []
+        self.profile_data.action_sets[0].append(action_item)
+        self.profile_data.create_or_delete_virtual_button()
+        self.container_modified.emit()        
 
     def _delay_changed_cb(self, value):
         """Updates the activation delay value.

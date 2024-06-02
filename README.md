@@ -20,6 +20,7 @@ Joystick Gremlin EX
          - [Concurrent mode](#concurrent-mode)
       + [Client machine setup](#client-machine-setup)
    * [Master remote control functions](#master-remote-control-functions)
+- [Copy/Paste operations](#copypaste-operations)
 - [VJoyRemap action ](#vjoyremap-action)
    * [VJoyRemap button press actions](#vjoyremap-button-press-actions)
    * [VJoyRemap axis mapping actions](#vjoyremap-axis-mapping-actions)
@@ -36,6 +37,7 @@ Joystick Gremlin EX
       + [Usage tips](#usage-tips)
       + [Pressed block](#pressed-block)
       + [Release block](#release-block)
+- [TempoEx Container (tempo with chain)](#tempoex-container-tempo-with-chain)
 - [Plugin Script enhancements](#plugin-script-enhancements)
       + [@gremlin.input_devices.gremlin_start](#gremlininput_devicesgremlin_start)
       + [@gremlin.input_devices.gremlin_stop](#gremlininput_devicesgremlin_stop)
@@ -67,7 +69,15 @@ Joystick Gremlin EX
 
 <!-- TOC --><a name="changelog"></a>
 ## Changelog
+
+6/2/24 - 13.40.13ex added copy/paste for actions and containers (experimental) - actions can be copied (new button on title bar) and can be pasted via a new button wherever actions can be added).  Containers can also be copied and pasted where containers can be added.  New option to persist clipboard data between sessions.
+
+Because the name "dill" conflicts with the Python module "dill", renamed to "dinput".
+
+5/31/24 - added TempoEx container and resolved a macro call bug
+
 5/27/24 - added Button container and improved handling of automatic switching
+
 4/8/24 - added troubleshooting guide and sample scripts for advanced GremlinEx scripting via plugins
 
 4/12/24 - bug fixes (see release notes on issues resolved)
@@ -266,6 +276,25 @@ Local and broadcast (sending output to remote GremlinEx instances on network mac
 
 Commands are available in the VjoyRemap plugin when bound to a joystick button and available from the drop down of actions for that button.
 
+
+<!-- TOC --><a name="copypaste-operations"></a>
+# Copy/Paste operations
+
+Starting with GremlinEx 13.40.13ex, copy/paste operations are supported on actions and containers.
+
+To copy an action or container, click the copy button in the title bar.
+
+To paste and action or container, click on the paste button next to the add action or add container.
+
+Pasting is not possible if the container or action is not permitted for the type of input being mapped.
+
+You can persist a copy operation between GremlinEx sessions by checking the option in the options dialog.  This will save the data to the profile folder, and it will be available at the next session.
+
+If the persist option is not checked, GremlinEx will use whatever data is in the Windows clipboard from the last copy operation in GremlinEx.
+
+![](copy_paste_operations.png)
+
+
 <!-- TOC --><a name="vjoyremap-action"></a>
 # VJoyRemap action 
 
@@ -432,6 +461,24 @@ In this section, add the container or actions you want to execute on button pres
 ### Release block
 
 In this section, add the container of actions you want to execute on button release.  Leave blank for no action.
+
+<!-- TOC --><a name="tempoex-container-tempo-with-chain"></a>
+# TempoEx Container (tempo with chain)
+
+This experimental container combines the Tempo and Chain containers together.  The container has two main sections, a short press action set, and a long press action set.  The delay box indicates how long the (real) button has to be held before selecting either a short or long set.
+
+Each action set contains one or more chain groups.
+
+Each chain group contains one or more actions.  A group will execute all the actions in that group.
+
+Chaining means that at every short press, or long press, the container will sequence through the chain groups for that action set in round robin fashion.
+
+The chaining behavior can be prevented if needed (although that's really the point of the container).
+
+The chain delay is included although it will conflict with long press.  I may remove it later because the value may be limited in most use-cases that would benefit from this container.
+
+Within each action set, the chain group entries can be re-ordered, or can be removed.
+
 
 
 
@@ -700,6 +747,6 @@ If you want to run from the source code, you will need the following python pack
 	pywin32
 	msgpack
 	reportlab
-
+	dill
 
 

@@ -23,7 +23,7 @@ import typing
 from PySide6 import QtCharts, QtCore, QtQml
 from PySide6.QtCore import Property, Signal, Slot
 
-import dill
+import dinput
 
 from gremlin import common
 from gremlin import error
@@ -153,7 +153,7 @@ class Device(QtCore.QAbstractListModel):
         if self._device is not None and guid == str(self._device.device_guid):
             return
 
-        self._device = dill.DILL.get_device_information_by_guid(
+        self._device = dinput.DILL.get_device_information_by_guid(
             parse_guid(guid)
         )
         self.deviceChanged.emit()
@@ -524,7 +524,7 @@ class AbstractDeviceState(QtCore.QAbstractListModel):
         if self._device is not None and guid == str(self._device.device_guid):
             return
 
-        self._device = dill.DILL.get_device_information_by_guid(parse_guid(guid))
+        self._device = dinput.DILL.get_device_information_by_guid(parse_guid(guid))
         self._state = []
         self._initialize_state()
         self.deviceChanged.emit()
@@ -644,7 +644,7 @@ class DeviceAxisSeries(QtCore.QObject):
         if self._device is not None and guid == str(self._device.device_guid):
             return
 
-        self._device = dill.DILL.get_device_information_by_guid(parse_guid(guid))
+        self._device = dinput.DILL.get_device_information_by_guid(parse_guid(guid))
 
         self._state = []
         for i in range(self._device.axis_count):
