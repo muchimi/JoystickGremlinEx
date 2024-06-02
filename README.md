@@ -292,6 +292,8 @@ You can persist a copy operation between GremlinEx sessions by checking the opti
 
 If the persist option is not checked, GremlinEx will use whatever data is in the Windows clipboard from the last copy operation in GremlinEx.
 
+![](copy_paste_operations.png)
+
 
 <!-- TOC --><a name="vjoyremap-action"></a>
 # VJoyRemap action 
