@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott
+# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,6 +21,7 @@ import gremlin
 import gremlin.base_classes
 import gremlin.ui.common
 import gremlin.ui.input_item
+import gremlin.clipboard
 
 
 class BasicContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
@@ -88,7 +89,7 @@ class BasicContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
             action_name = action_data
             plugin_manager = gremlin.plugin_manager.ActionPlugins()
             action_item = plugin_manager.get_class(action_name)(self.profile_data)
-        elif isinstance(action_data, gremlin.base_classes.Clipboard):
+        elif isinstance(action_data, Clipboard):
             # paste operation
             if action_data.is_action:
                 # verify the action in the clipboard is appropriate for this input

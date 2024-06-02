@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott
+# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -23,7 +23,7 @@ import string
 import sys
 import time
 
-import dill
+import dinput
 
 import gremlin
 from gremlin import event_handler, input_devices, \
@@ -205,7 +205,7 @@ class CodeRunner:
                                     )
                                 else:
                                     self.event_handler.add_callback(
-                                        dill.GUID_Virtual,
+                                        dinput.GUID_Virtual,
                                         mode.name,
                                         cb_data.event,
                                         cb_data.callback,

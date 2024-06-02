@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott
+# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,7 +20,7 @@ import copy
 
 from PySide6 import QtWidgets
 
-import dill
+import dinput
 
 from gremlin import common, joystick_handling, macro, util
 import gremlin.ui.common
@@ -259,7 +259,7 @@ class ModeBindings(QtWidgets.QWidget):
         bound_input = self.bound_inputs[input_item]
 
         # Special handling of keyboards
-        if bound_input.parent.parent.device_guid == dill.GUID_Keyboard:
+        if bound_input.parent.parent.device_guid == dinput.GUID_Keyboard:
             key_name = macro.key_from_code(
                 bound_input.input_id[0],
                 bound_input.input_id[1]
@@ -285,7 +285,7 @@ class ModeBindings(QtWidgets.QWidget):
         device_lookup = {}
         for dev in devices:
             device_lookup[dev.device_guid] = dev.name
-        device_lookup[dill.GUID_Keyboard] = "Keyboard"
+        device_lookup[dinput.GUID_Keyboard] = "Keyboard"
         return device_lookup
 
 

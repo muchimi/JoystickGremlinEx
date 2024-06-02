@@ -30,7 +30,7 @@ from PySide6 import QtCore
 import gremlin.common
 import gremlin.keyboard
 import gremlin.types
-from dill import DILL, GUID, GUID_Invalid
+from dinput import DILL, GUID, GUID_Invalid
 
 from . import common, error, event_handler, joystick_handling, util
 from gremlin.common import InputType

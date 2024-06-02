@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott
+# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -22,7 +22,7 @@ import winreg
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
-import dill
+import dinput
 
 import gremlin
 from PySide6.QtGui import QIcon as load_icon
@@ -110,6 +110,13 @@ class OptionsUi(common.BaseDialogUi):
         )
         self.start_with_windows.clicked.connect(self._start_windows)
         self.start_with_windows.setChecked(self._start_windows_enabled())
+
+        # Persist clipboard to file (user profile)
+        self.persist_clipboard = QtWidgets.QCheckBox(
+            "Persist clipboard data between sessions"
+        )
+        self.persist_clipboard.clicked.connect(self._persist_clipboard)
+        self.persist_clipboard.setChecked(self._persist_clipboard_enabled())
 
         # Show message on mode change
         self.show_mode_change_message = QtWidgets.QCheckBox(
@@ -218,7 +225,9 @@ class OptionsUi(common.BaseDialogUi):
         self.general_layout.addWidget(self.activate_on_launch)
         self.general_layout.addWidget(self.start_minimized)
         self.general_layout.addWidget(self.start_with_windows)
+        self.general_layout.addWidget(self.persist_clipboard)
         self.general_layout.addWidget(self.show_mode_change_message)
+
         self.general_layout.addLayout(self.default_action_layout)
         self.general_layout.addLayout(self.macro_axis_polling_layout)
         self.general_layout.addLayout(self.macro_axis_minimum_change_layout)
@@ -439,6 +448,13 @@ If this option is on, the last active profile will remain active until a differe
         self.config.start_minimized = clicked
         self.config.save()
 
+    def _persist_clipboard(self, clicked):
+        self.config.persist_clipboard = clicked
+        self.config.save()
+
+    def _persist_clipboard_enabled(self):
+        return self.config.persist_clipboard
+
     def _start_windows(self, clicked):
         """Set registry entry to launch Joystick Gremlin on login.
 
@@ -471,6 +487,9 @@ If this option is on, the last active profile will remain active until a differe
             if value_info[0] == "Joystick Gremlin":
                 return True
         return False
+    
+
+
 
     def _highlight_input(self, clicked):
         """Stores preference for input highlighting.
@@ -1264,7 +1283,7 @@ class SwapDevicesUi(common.BaseDialogUi):
         device_layout = QtWidgets.QGridLayout()
         for i, data in enumerate(device_list):
             # Ignore the keyboard
-            if data.device_guid == dill.GUID_Keyboard:
+            if data.device_guid == dinput.GUID_Keyboard:
                 continue
 
             # Ignore devices with no remappable entries

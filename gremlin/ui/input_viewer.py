@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott
+# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,8 +20,7 @@ import enum
 import time
 
 from PySide6 import QtCore, QtGui, QtWidgets
-
-import dill
+import dinput
 
 import gremlin
 from . import common
@@ -42,7 +41,7 @@ class VisualizationSelector(QtWidgets.QWidget):
 
     # Event emitted when the visualization configuration changes
     changed = QtCore.Signal(
-        dill.DeviceSummary,
+        dinput.DeviceSummary,
         VisualizationType,
         bool
     )

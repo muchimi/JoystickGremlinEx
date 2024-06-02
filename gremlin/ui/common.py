@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott
+# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -25,7 +25,7 @@ import PySide6.QtWidgets
 
 import gremlin
 import gremlin.base_classes
-from gremlin.base_classes import Clipboard
+from  gremlin.clipboard import Clipboard
 import gremlin.common
 import gremlin.shared_state
 
@@ -839,10 +839,11 @@ class ActionSelector(QtWidgets.QWidget):
         self.paste_button.setIcon(icon)
         self.paste_button.clicked.connect(self._paste_action)
         self.paste_button.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Minimum)
-        self.paste_button.setToolTip("Paste Clibboard Action")
-        
-        
-        Clipboard().clipboard_changed.connect(self._clipboard_changed)
+        self.paste_button.setToolTip("Paste Action")
+
+        clipboard = Clipboard()
+        clipboard.clipboard_changed.connect(self._clipboard_changed)
+        self._clipboard_changed(clipboard)
 
         self.main_layout.addWidget(self.action_dropdown)
         self.main_layout.addWidget(self.add_button)
@@ -872,7 +873,7 @@ class ActionSelector(QtWidgets.QWidget):
 
     def _paste_action(self):
         ''' handle paste action '''
-        clipboard = gremlin.base_classes.Clipboard()
+        clipboard = Clipboard()
         # validate the clipboard data is an action and is of the correct type for the input/container
         if clipboard.is_action:
             action_name = clipboard.data.name
@@ -884,15 +885,20 @@ class ActionSelector(QtWidgets.QWidget):
                 # dish out a message
                 message_box = QtWidgets.QMessageBox(
                     QtWidgets.QSystemTrayIcon.MessageIcon.Warning,
-                    "Invalid Action type",
+                    f"Invalid Action type ({action_name})",
                     "Unable to paste action because it is not valid for the current input")
                 message_box.showNormal()
 
     def _clipboard_changed(self, clipboard):
         ''' handles paste button state based on clipboard data '''
         self.paste_button.setEnabled(clipboard.is_action)
-            
-
+        ''' updates the paste button tooltip with the current clipboard contents'''
+        if clipboard.is_action:
+            self.paste_button.setToolTip(f"Paste action ({clipboard.data.name})")
+        else:
+            self.paste_button.setToolTip(f"Paste action (not available)")
+    
+        
 
 class BaseDialogUi(QtWidgets.QWidget):
 

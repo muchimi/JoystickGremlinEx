@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott
+# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -28,7 +28,7 @@ from xml.etree import ElementTree
 
 from PySide6 import QtCore
 
-import dill
+import dinput
 
 import action_plugins
 from gremlin.common import DeviceType, InputType, MergeAxisOperation, PluginVariableType
@@ -128,18 +128,18 @@ def parse_guid(value):
     into the underlying raw and exposed objects used within Gremlin.
 
     :param value the string representation of the GUID
-    :param dill.GUID object representing the provided value
+    :param dinput.GUID object representing the provided value
     """
     try:
         tmp = uuid.UUID(value)
-        raw_guid = dill._GUID()
+        raw_guid = dinput._GUID()
         raw_guid.Data1 = int.from_bytes(tmp.bytes[0:4], "big")
         raw_guid.Data2 = int.from_bytes(tmp.bytes[4:6], "big")
         raw_guid.Data3 = int.from_bytes(tmp.bytes[6:8], "big")
         for i in range(8):
             raw_guid.Data4[i] = tmp.bytes[8 + i]
 
-        return dill.GUID(raw_guid)
+        return dinput.GUID(raw_guid)
     except (ValueError, AttributeError) as e:
         raise error.ProfileError(
             f"Failed parsing GUID from value {value}"
@@ -769,7 +769,7 @@ class ProfileConverter:
 
         for entry in root.findall("devices/device"):
             if entry.attrib.get("type", None) == "keyboard":
-                entry.set("device-guid", str(dill.GUID_Keyboard))
+                entry.set("device-guid", str(dinput.GUID_Keyboard))
             else:
                 entry.set(
                     "device-guid",
@@ -1783,7 +1783,7 @@ class Mode:
             # which case we'll simply save the action item without
             # verification.
             if item.input_type == InputType.JoystickAxis \
-                    and dill.DILL.device_exists(self.parent.device_guid):
+                    and dinput.DILL.device_exists(self.parent.device_guid):
                 joy = input_devices.JoystickProxy()[self.parent.device_guid]
                 store_item = joy.is_axis_valid(item.input_id)
 

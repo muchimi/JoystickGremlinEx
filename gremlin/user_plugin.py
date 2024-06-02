@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott
+# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -27,7 +27,7 @@ import uuid
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
-import dill
+import dinput
 from gremlin import common, error, input_devices, joystick_handling, profile, shared_state
 import gremlin.ui.common
 
@@ -683,7 +683,7 @@ class PhysicalInputVariable(AbstractVariable):
     def create_decorator(self, mode_name):
         if self.value is None:
             return gremlin.input_devices.JoystickDecorator(
-                "", str(dill.GUID_Invalid), ""
+                "", str(dinput.GUID_Invalid), ""
             )
         else:
             return gremlin.input_devices.JoystickDecorator(
@@ -737,7 +737,7 @@ class PhysicalInputVariable(AbstractVariable):
     def _user_input(self, event):
         self.value_changed.emit({
             "device_id": event.device_guid,
-            "device_name": dill.DILL.get_device_name(event.device_guid),
+            "device_name": dinput.DILL.get_device_name(event.device_guid),
             "input_id": event.identifier,
             "input_type": event.event_type,
         })

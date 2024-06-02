@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott
+# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -40,7 +40,7 @@ from gremlin.common import InputType
 import gremlin.config
 import gremlin.event_handler 
 
-import dill
+import dinput
 from gremlin.common import load_icon, get_icon_path
 from gremlin.util import log_sys_error, log_sys_warn, log_sys, get_root_path
 
@@ -67,7 +67,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.13ex"
+APPLICATION_VERSION = "13.40.13ex (a)"
 
 
 class GremlinUi(QtWidgets.QMainWindow):
@@ -502,9 +502,9 @@ class GremlinUi(QtWidgets.QMainWindow):
         # Create keyboard device entry
         keyboard_device = gremlin.profile.Device(self._profile)
         keyboard_device.name = "keyboard"
-        keyboard_device.device_guid = dill.GUID_Keyboard
+        keyboard_device.device_guid = dinput.GUID_Keyboard
         keyboard_device.type = gremlin.profile.DeviceType.Keyboard
-        self._profile.devices[dill.GUID_Keyboard] = keyboard_device
+        self._profile.devices[dinput.GUID_Keyboard] = keyboard_device
 
         # Update profile information
         self._profile_fname = None
@@ -696,7 +696,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         # Create keyboard tab
         device_profile = self._profile.get_device_modes(
-            dill.GUID_Keyboard,
+            dinput.GUID_Keyboard,
             gremlin.profile.DeviceType.Keyboard,
             "keyboard"
         )
@@ -704,7 +704,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             device_profile,
             self._current_mode
         )
-        self.tabs[dill.GUID_Keyboard] = widget
+        self.tabs[dinput.GUID_Keyboard] = widget
         self.ui.devices.addTab(widget, "Keyboard")
 
         # Create the vjoy as output device tab
@@ -1306,7 +1306,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         profile_devices = {}
         for device in profile_data.devices.values():
             # Ignore the keyboard
-            if device.device_guid == dill.GUID_Keyboard:
+            if device.device_guid == dinput.GUID_Keyboard:
                 continue
             profile_devices[device.device_guid] = device.name
 
@@ -1573,7 +1573,7 @@ if __name__ == "__main__":
     app.setStyle('Fusion')
 
     # Ensure joystick devices are correctly setup
-    dill.DILL.init()
+    dinput.DILL.init()
     time.sleep(0.25)
     gremlin.joystick_handling.joystick_devices_initialization()
 
@@ -1594,7 +1594,7 @@ if __name__ == "__main__":
                 "vJoy is not present or incorrectly setup."
             )
 
-    except (gremlin.error.GremlinError, dill.DILLError) as e:
+    except (gremlin.error.GremlinError, dinput.DILLError) as e:
         error_display = QtWidgets.QMessageBox(
             QtWidgets.QMessageBox.Critical,
             "Error",

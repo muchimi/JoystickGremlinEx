@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott
+# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,9 +21,8 @@ import enum
 import logging
 from xml.etree import ElementTree
 
-import dill
-import os
-from PySide6 import QtCore
+import dinput
+
 import gremlin
 import gremlin.plugin_manager
 import gremlin.shared_state
@@ -609,6 +608,7 @@ class AbstractContainer(profile.ProfileData):
         """
         super().__init__(parent)
         self.action_sets = []
+        self.custom_action_sets = False # true if the container uses custom action sets (need a converter to product action_sets)
         self._condition_enabled = True
         self._virtual_button_enabled = True # determines if the callbacks can be virtualized or not - if not - the callback is "raw" to the functor
         self.activation_condition_type = None
@@ -740,7 +740,7 @@ class AbstractContainer(profile.ProfileData):
                 gremlin.event_handler.Event(
                     gremlin.common.InputType.VirtualButton,
                     callbacks[-1].callback.virtual_button.identifier,
-                    device_guid=dill.GUID_Virtual,
+                    device_guid=dinput.GUID_Virtual,
                     is_pressed=True,
                     raw_value=True
                 )
@@ -865,59 +865,6 @@ class AbstractContainer(profile.ProfileData):
         """
         pass
 
-
-@common.SingletonDecorator
-class Clipboard(QtCore.QObject):
-    ''' clipboard data '''
-
-    # occurs on clipboard changes
-    clipboard_changed = QtCore.Signal(QtCore.QObject)
-
-    def __init__(self):
-        super().__init__()
-        self._data = None
-        self._enabled_count = 0
-
-    @property
-    def data(self):
-        return self._data
-    
-    @data.setter
-    def data(self, value):
-        if self.enabled:
-            self._data = value
-            # indicate the clipboard was changed so UI can be updated
-            self.clipboard_changed.emit(self)
-
-    @property
-    def enabled(self):
-        return self._enabled_count == 0
-    
-    def disable(self):
-        ''' pushess a disable on the stack '''
-        self._enabled_count += 1
-    
-    def enable(self, reset = False):
-        ''' enables the clipboard - pops the disabled stack'''
-        if reset:
-           self._enabled_count = 0
-        elif self._enabled_count > 0:
-            self._enabled_count -= 1
-
-        
-    
-    @property
-    def is_container(self):
-        ''' true if the data item is a container '''
-        return self.data is not None and isinstance(self.data, AbstractContainer)
-    
-    @property
-    def is_action(self):
-        ''' true if the data item is an action '''
-        return self.data is not None and isinstance(self.data, AbstractAction)
-    
-    @property
-    def is_valid(self):
-        ''' true if cliboard data is valid '''
-        return self.data is not None and self.is_action or self.is_container
-
+    def get_action_sets(self):
+        """ returns action sets - used for duplication (override if needed) """
+        return self.action_sets

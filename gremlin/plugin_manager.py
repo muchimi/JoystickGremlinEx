@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott
+# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -23,7 +23,6 @@ import copy
 
 from . import common, error
 from gremlin.util import *
-
 
 
 @common.SingletonDecorator
@@ -159,6 +158,26 @@ class ContainerPlugins:
         for entry in self._plugins.values():
             self._tag_to_type_map[entry.tag] = entry
             self._name_to_type_map[entry.name] = entry
+
+    def duplicate(self, container):
+        ''' duplicates a container '''
+        # because containers can be quite complex - we'll just generate the xml and change IDs as needed and reload
+        # into a new container of the same type
+        from gremlin.base_classes import AbstractContainer
+        assert isinstance(container, AbstractContainer),"Invalid container data for duplicate()"
+        container_item = copy.deepcopy(container)
+
+        for action_set in container_item.get_action_sets():
+            for action in action_set:
+                action.action_id = common.get_guid()
+        
+        return container_item
+
+
+
+
+    
+
        
 
 

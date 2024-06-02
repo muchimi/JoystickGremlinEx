@@ -20,6 +20,7 @@ Joystick Gremlin EX
          - [Concurrent mode](#concurrent-mode)
       + [Client machine setup](#client-machine-setup)
    * [Master remote control functions](#master-remote-control-functions)
+- [Copy/Paste operations](#copypaste-operations)
 - [VJoyRemap action ](#vjoyremap-action)
    * [VJoyRemap button press actions](#vjoyremap-button-press-actions)
    * [VJoyRemap axis mapping actions](#vjoyremap-axis-mapping-actions)
@@ -69,7 +70,9 @@ Joystick Gremlin EX
 <!-- TOC --><a name="changelog"></a>
 ## Changelog
 
-6/1/24 - 13.40.13ex added copy/paste for actions (experimental) - actions can be copied (new button on title bar) and can be pasted via a new button wherever actions can be added).
+6/2/24 - 13.40.13ex added copy/paste for actions and containers (experimental) - actions can be copied (new button on title bar) and can be pasted via a new button wherever actions can be added).  Containers can also be copied and pasted where containers can be added.  New option to persist clipboard data between sessions.
+
+Because the name "dill" conflicts with the Python module "dill", renamed to "dinput".
 
 5/31/24 - added TempoEx container and resolved a macro call bug
 
@@ -272,6 +275,23 @@ The enable remote control checkbox is checked, and the port (default 6012) must 
 Local and broadcast (sending output to remote GremlinEx instances on network machines) control can be enabled or disabled via GremlinEx commands bound to a joystick button (or in script).
 
 Commands are available in the VjoyRemap plugin when bound to a joystick button and available from the drop down of actions for that button.
+
+
+<!-- TOC --><a name="copypaste-operations"></a>
+# Copy/Paste operations
+
+Starting with GremlinEx 13.40.13ex, copy/paste operations are supported on actions and containers.
+
+To copy an action or container, click the copy button in the title bar.
+
+To paste and action or container, click on the paste button next to the add action or add container.
+
+Pasting is not possible if the container or action is not permitted for the type of input being mapped.
+
+You can persist a copy operation between GremlinEx sessions by checking the option in the options dialog.  This will save the data to the profile folder, and it will be available at the next session.
+
+If the persist option is not checked, GremlinEx will use whatever data is in the Windows clipboard from the last copy operation in GremlinEx.
+
 
 <!-- TOC --><a name="vjoyremap-action"></a>
 # VJoyRemap action 
@@ -725,6 +745,6 @@ If you want to run from the source code, you will need the following python pack
 	pywin32
 	msgpack
 	reportlab
-
+	dill
 
 

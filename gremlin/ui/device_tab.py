@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott
+# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -104,7 +104,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
         self.action_model.data_changed.emit()        
 
     def _add_container(self, container_name):
-        """Adds a new contained to the input item.
+        """Adds a new container to the input item.
 
         :param container_name name of the container to be added
         """
@@ -115,6 +115,20 @@ class InputItemConfiguration(QtWidgets.QFrame):
         self.action_model.add_container(container)
         plugin_manager.set_container_data(self.item_data, container)
         return container
+    
+
+    def _paste_container(self, container):
+        """Adds a new container to the input item.
+
+        :param container container to be added
+        """
+        plugin_manager = gremlin.plugin_manager.ContainerPlugins()
+        container_item = plugin_manager.duplicate(container)
+        if hasattr(container_item, "action_model"):
+            container_item.action_model = self.action_model
+        self.action_model.add_container(container_item)
+        plugin_manager.set_container_data(self.item_data, container_item)
+        return container_item    
 
     def _remove_container(self, container):
         """Removes an existing container from the InputItem.
@@ -152,6 +166,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
             self.item_data.input_type
         )
         self.container_selector.container_added.connect(self._add_container)
+        self.container_selector.container_paste.connect(self._paste_container)
         self.always_execute = QtWidgets.QCheckBox("Always execute")
         self.always_execute.setChecked(self.item_data.always_execute)
         self.always_execute.stateChanged.connect(self._always_execute_cb)

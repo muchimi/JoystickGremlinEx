@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott
+# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -24,7 +24,7 @@ from xml.etree import ElementTree
 from PySide6 import QtWidgets
 from PySide6.QtCore import Slot
 
-from gremlin.base_classes import Clipboard
+from  gremlin.clipboard import Clipboard
 import gremlin
 import gremlin.base_classes
 import gremlin.plugin_manager
@@ -608,6 +608,10 @@ class TempoExContainer(gremlin.base_classes.AbstractContainer):
         :return True if the container is configured properly, False otherwise
         """
         return len(self.short_action_sets) > 0 or len(self.long_action_sets) > 0
+    
+    def get_action_sets(self):
+        """ returns action sets - override because we have custom sets """
+        return self.short_action_sets + self.long_action_sets
 
 
 # Plugin definitions
