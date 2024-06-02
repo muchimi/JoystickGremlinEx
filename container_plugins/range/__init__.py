@@ -213,6 +213,7 @@ class RangeContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
         self.ui_range_options = toolbar2_widget
 
         self.action_selector.action_added.connect(self._add_action)
+        self.action_selector.action_paste.connect(self._paste_action)
 
         min_box.valueChanged.connect(self._range_min_changed)
         min_box_included.clicked.connect(self._range_min_included_changed)
@@ -264,7 +265,12 @@ class RangeContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
         self.profile_data.add_action(action_item)
         self.container_modified.emit()      
 
-
+    def _paste_action(self, action):
+        """ pastes an action into the container """
+        plugin_manager = gremlin.plugin_manager.ActionPlugins()
+        action_item = plugin_manager.duplicate(action)
+        self.profile_data.add_action(action_item)
+        self.container_modified.emit() 
 
     def _handle_interaction(self, widget, action):
         """Handles interaction icons being pressed on the individual actions.

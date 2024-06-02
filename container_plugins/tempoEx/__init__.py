@@ -22,8 +22,11 @@ import time
 from xml.etree import ElementTree
 
 from PySide6 import QtWidgets
+from PySide6.QtCore import Slot
 
+from gremlin.base_classes import Clipboard
 import gremlin
+import gremlin.base_classes
 import gremlin.plugin_manager
 import gremlin.ui.common
 import gremlin.ui.input_item
@@ -133,17 +136,22 @@ class TempoExContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
             self.profile_data.get_input_type()
         )
         self.short_action_selector.action_label.setText("Short Action")
-        self.short_action_selector.action_added.connect(self._add_short_action)
-
+        
 
         self.long_action_selector = gremlin.ui.common.ActionSelector(
             self.profile_data.get_input_type()
         )
         self.long_action_selector.action_label.setText("Long Action")
-        self.long_action_selector.action_added.connect(self._add_long_action)
+
 
         self.short_layout.addWidget(self.short_action_selector)        
         self.long_layout.addWidget(self.long_action_selector)        
+
+
+        self.short_action_selector.action_added.connect(self._add_short_action)
+        self.short_action_selector.action_paste.connect(self._paste_short_action)
+        self.long_action_selector.action_added.connect(self._add_long_action)
+        self.long_action_selector.action_paste.connect(self._paste_long_action)
 
         # remember what widget belongs to what list so we can find things by widget
         self.short_layout_widget_list = []
@@ -194,25 +202,6 @@ class TempoExContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
                     gremlin.ui.common.ContainerViewTypes.Condition
                 )
 
-    def _add_action_selector(self, add_action_cb, label):
-        """Adds an action selection UI widget.
-
-        :param add_action_cb function to call when an action is added
-        :param label the description of the action selector
-        """
-        action_selector = gremlin.ui.common.ActionSelector(
-            self.profile_data.get_input_type()
-        )
-        action_selector.action_added.connect(add_action_cb)
-
-        group_layout = QtWidgets.QVBoxLayout()
-        group_layout.addWidget(action_selector)
-        group_layout.addStretch(1)
-        group_box = QtWidgets.QGroupBox(label)
-        group_box.setLayout(group_layout)
-
-        self.action_layout.addWidget(group_box)
-
     def _create_action_widget(self, index, label, layout, view_type):
         """Creates a new action widget.
 
@@ -239,6 +228,15 @@ class TempoExContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
         self.profile_data.create_or_delete_virtual_button()
         self.container_modified.emit()                
 
+    def _paste_short_action(self, action):
+        ''' called when a paste occurs '''
+        logging.getLogger("system").info("Paste short action")
+        plugin_manager = gremlin.plugin_manager.ActionPlugins()
+        action_item = plugin_manager.duplicate(action)
+        self.profile_data.short_action_sets.append([action_item])
+        self.profile_data.create_or_delete_virtual_button()
+        self.container_modified.emit()                
+
     def _add_long_action(self, action_name):
         """Adds a new action to the long action list
 
@@ -249,7 +247,15 @@ class TempoExContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
         self.profile_data.long_action_sets.append([action_item])
         self.profile_data.create_or_delete_virtual_button()
         self.container_modified.emit()                
-
+    
+    def _paste_long_action(self, action):
+        ''' called when a paste occurs '''
+        logging.getLogger("system").info("Paste long action")
+        plugin_manager = gremlin.plugin_manager.ActionPlugins()
+        action_item = plugin_manager.duplicate(action)
+        self.profile_data.long_action_sets.append([action_item])
+        self.profile_data.create_or_delete_virtual_button()
+        self.container_modified.emit()                
 
     def _delay_changed_cb(self, value):
         """Updates the activation delay value.
@@ -328,7 +334,6 @@ class TempoExContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
             elif action ==  gremlin.ui.input_item.ActionSetView.Interactions.Down:
                 if index < len(action_sets) - 1:
                     action_sets[index], action_sets[index + 1] = action_sets[index + 1], action_sets[index]
-
 
             self.container_modified.emit()
 
@@ -521,6 +526,7 @@ class TempoExContainer(gremlin.base_classes.AbstractContainer):
         gremlin.ui.input_item.ActionSetView.Interactions.Up,
         gremlin.ui.input_item.ActionSetView.Interactions.Down,
         gremlin.ui.input_item.ActionSetView.Interactions.Edit,
+        
     ]
 
     def __init__(self, parent=None):

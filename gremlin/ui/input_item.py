@@ -17,8 +17,10 @@
 
 import enum
 from PySide6 import QtWidgets, QtCore, QtGui
+import copy
 
 import gremlin
+import gremlin.base_classes
 from gremlin.common import DeviceType, InputType, load_icon, load_pixmap
 from . import activation_condition, common, virtual_button
 from functools import partial 
@@ -426,6 +428,7 @@ class ActionSetView(common.AbstractView):
         Edit = 4
         Add = 5
         Count = 6
+        Copy = 7 # copy to clipboard
 
     # Signal emitted when an interaction is triggered on an action
     interacted = QtCore.Signal(Interactions)
@@ -471,6 +474,7 @@ class ActionSetView(common.AbstractView):
                 profile_data.parent.input_type
             )
             self.action_selector.action_added.connect(self._add_action)
+            self.action_selector.action_paste.connect(self._paste_action)
             self.group_layout.addWidget(self.action_selector, 1, 0)
 
     def redraw(self):
@@ -479,6 +483,8 @@ class ActionSetView(common.AbstractView):
         if self.model is None:
             return
 
+        clipboard = gremlin.base_classes.Clipboard()
+        clipboard.disable()
         if self.view_type == common.ContainerViewTypes.Action:
             for index in range(self.model.rows()):
                 data = self.model.data(index)
@@ -495,10 +501,19 @@ class ActionSetView(common.AbstractView):
                 wrapped_widget = ConditionActionWrapper(widget)
                 self.action_layout.addWidget(wrapped_widget)
 
+        clipboard.enable()
+
     def _add_action(self, action_name):
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
         action_item = plugin_manager.get_class(action_name)(self.profile_data)
         self.model.add_action(action_item)
+
+    def _paste_action(self, action):
+        ''' handles action paste operation '''
+        plugin_manager = gremlin.plugin_manager.ActionPlugins()
+        action_item = plugin_manager.duplicate(action)
+        self.model.add_action(action_item)
+        
 
     def _create_closed_cb(self, widget):
         """Create callbacks to remove individual containers from the model.
@@ -508,6 +523,7 @@ class ActionSetView(common.AbstractView):
             model
         """
         return lambda: self.model.remove_action(widget.action_data)
+    
 
     def _create_edit_controls(self):
         """Creates interaction controls based on the allowed interactions.
@@ -551,6 +567,15 @@ class ActionSetView(common.AbstractView):
                 lambda: self.interacted.emit(ActionSetView.Interactions.Edit)
             )
             self.controls_layout.addWidget(self.control_edit)
+        if ActionSetView.Interactions.Copy in self.allowed_interactions:
+            self.control_edit = QtWidgets.QPushButton(
+                load_icon("gfx/button_copy"), ""
+            )
+            self.control_edit.clicked.connect(
+                lambda: self.interacted.emit(ActionSetView.Interactions.Copy)
+            )
+            self.controls_layout.addWidget(self.control_edit)
+        
 
         self.controls_layout.addStretch(1)
 
@@ -1111,18 +1136,21 @@ class TitleBar(QtWidgets.QFrame):
     about the content of the widget.
     """
 
-    def __init__(self, label, hint, close_cb, parent=None):
+    def __init__(self, label, hint, close_cb, clipboard_cb = None, parent=None):
         """Creates a new instance.
 
         :param label the label of the title bar
         :param hint the hint to show if needed
         :param close_cb the function to call when closing the widget
+        :param clipboard_cb the function to call for clipboard operations (optional)
         :param parent the parent of this widget
         """
         super().__init__(parent)
 
         self.hint = hint
         self.label = QtWidgets.QLabel(label)
+
+        size = 12
 
         # help button
         self.help_button = TitleBarButton()
@@ -1131,9 +1159,10 @@ class TitleBar(QtWidgets.QFrame):
             self.help_button.setText("?")
         else:
             icon = QtGui.QIcon()
+            pixmap_help = pixmap_help.scaled(size, size, QtCore.Qt.KeepAspectRatio) 
             icon.addPixmap(pixmap_help, QtGui.QIcon.Normal)
             self.help_button.setIcon(icon)
-        
+        self.help_button.setToolTip("Help")
             
         self.help_button.clicked.connect(self._show_hint)
 
@@ -1144,10 +1173,23 @@ class TitleBar(QtWidgets.QFrame):
             self.close_button.setText("X")
         else:
             icon = QtGui.QIcon()
+            pixmap_close = pixmap_close.scaled(size, size, QtCore.Qt.KeepAspectRatio) 
             icon.addPixmap(pixmap_close, QtGui.QIcon.Normal)
             self.close_button.setIcon(icon)
+        self.close_button.setToolTip("Delete")
             
         self.close_button.clicked.connect(close_cb)
+
+        # clipboard copy button - only if a handler is given
+        if clipboard_cb:
+            self.copy_button = TitleBarButton()
+            pixmap_copy = load_pixmap("gfx/button_copy.svg")
+            icon = QtGui.QIcon()
+            pixmap_copy = pixmap_copy.scaled(size, size, QtCore.Qt.KeepAspectRatio) 
+            icon.addPixmap(pixmap_copy, QtGui.QIcon.Normal)
+            self.copy_button.setIcon(icon)
+            self.copy_button.clicked.connect(clipboard_cb)
+            self.copy_button.setToolTip("Copy")
 
         self.layout = QtWidgets.QHBoxLayout()
         self.layout.setSpacing(0)
@@ -1155,8 +1197,12 @@ class TitleBar(QtWidgets.QFrame):
 
         self.layout.addWidget(self.label)
         self.layout.addStretch()
+        if clipboard_cb:
+            self.layout.addWidget(self.copy_button)
+
         self.layout.addWidget(self.help_button)
         self.layout.addWidget(self.close_button)
+
 
         self.setFrameShape(QtWidgets.QFrame.Box)
         self.setObjectName("frame")
@@ -1172,6 +1218,7 @@ class TitleBar(QtWidgets.QFrame):
             self.help_button.mapToGlobal(QtCore.QPoint(0, 10)),
             self.hint
         )
+
 
 
 class BasicActionWrapper(AbstractActionWrapper):
@@ -1192,14 +1239,22 @@ class BasicActionWrapper(AbstractActionWrapper):
         self.setTitleBarWidget(TitleBar(
             action_widget.action_data.name,
             gremlin.hints.hint.get(self.action_widget.action_data.tag, ""),
-            self.remove
+            self._remove,
+            self._clipboard_copy,
         ))
 
         self.main_layout.addWidget(self.action_widget)
 
-    def remove(self, _):
+    def _remove(self, _):
         """Emits the closed event when this widget is being closed."""
         self.closed.emit(self)
+
+    def _clipboard_copy(self, _):
+        ''' clipboard copy event '''
+        clipboard = gremlin.base_classes.Clipboard()
+        action =  self.action_widget.action_data
+        clipboard.data = action
+        logging.getLogger("system").info(f"copy to clipboard: {action.name}")
 
 
 class ConditionActionWrapper(AbstractActionWrapper):

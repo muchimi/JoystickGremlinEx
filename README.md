@@ -68,8 +68,13 @@ Joystick Gremlin EX
 
 <!-- TOC --><a name="changelog"></a>
 ## Changelog
+
+6/1/24 - 13.40.13ex added copy/paste for actions (experimental) - actions can be copied (new button on title bar) and can be pasted via a new button wherever actions can be added).
+
 5/31/24 - added TempoEx container and resolved a macro call bug
+
 5/27/24 - added Button container and improved handling of automatic switching
+
 4/8/24 - added troubleshooting guide and sample scripts for advanced GremlinEx scripting via plugins
 
 4/12/24 - bug fixes (see release notes on issues resolved)

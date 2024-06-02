@@ -18,12 +18,16 @@
 import enum
 import threading
 from typing import Optional
-
+import logging
 from PySide6 import QtWidgets, QtCore, QtGui
 import PySide6.QtGui
 import PySide6.QtWidgets
 
 import gremlin
+import gremlin.base_classes
+from gremlin.base_classes import Clipboard
+import gremlin.common
+import gremlin.shared_state
 
 
 class ContainerViewTypes(enum.Enum):
@@ -803,6 +807,7 @@ class ActionSelector(QtWidgets.QWidget):
 
     # Signal emitted when an action is going to be added
     action_added = QtCore.Signal(str)
+    action_paste = QtCore.Signal(object)
 
     def __init__(self, input_type, parent=None):
         """Creates a new selector instance.
@@ -828,8 +833,20 @@ class ActionSelector(QtWidgets.QWidget):
         self.add_button = QtWidgets.QPushButton("Add")
         self.add_button.clicked.connect(self._add_action)
 
+        # clipboard
+        self.paste_button = QtWidgets.QPushButton()
+        icon = gremlin.common.load_icon("button_paste.svg")
+        self.paste_button.setIcon(icon)
+        self.paste_button.clicked.connect(self._paste_action)
+        self.paste_button.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Minimum)
+        self.paste_button.setToolTip("Paste Clibboard Action")
+        
+        
+        Clipboard().clipboard_changed.connect(self._clipboard_changed)
+
         self.main_layout.addWidget(self.action_dropdown)
         self.main_layout.addWidget(self.add_button)
+        self.main_layout.addWidget(self.paste_button)
 
     def _valid_action_list(self):
         """Returns a list of valid actions for this InputItemWidget.
@@ -852,6 +869,29 @@ class ActionSelector(QtWidgets.QWidget):
             a click
         """
         self.action_added.emit(self.action_dropdown.currentText())
+
+    def _paste_action(self):
+        ''' handle paste action '''
+        clipboard = gremlin.base_classes.Clipboard()
+        # validate the clipboard data is an action and is of the correct type for the input/container
+        if clipboard.is_action:
+            action_name = clipboard.data.name
+            if action_name in self._valid_action_list():
+                # valid action - clone it and add it
+                # logging.getLogger("system").info("Clipboard paste action trigger...")
+                self.action_paste.emit(clipboard.data)
+            else:
+                # dish out a message
+                message_box = QtWidgets.QMessageBox(
+                    QtWidgets.QSystemTrayIcon.MessageIcon.Warning,
+                    "Invalid Action type",
+                    "Unable to paste action because it is not valid for the current input")
+                message_box.showNormal()
+
+    def _clipboard_changed(self, clipboard):
+        ''' handles paste button state based on clipboard data '''
+        self.paste_button.setEnabled(clipboard.is_action)
+            
 
 
 class BaseDialogUi(QtWidgets.QWidget):

@@ -23,9 +23,12 @@ from xml.etree import ElementTree
 
 import dill
 import os
-
+from PySide6 import QtCore
 import gremlin
-from . import common, error, execution_graph, plugin_manager, profile
+import gremlin.plugin_manager
+import gremlin.shared_state
+import gremlin.ui
+from . import common, error, execution_graph, plugin_manager, profile, event_handler
 from gremlin.profile import parse_guid, safe_read, write_guid, Device
 
 
@@ -39,7 +42,6 @@ class ActivationRule(enum.Enum):
 
     All = 1
     Any = 2
-
 
 class AbstractCondition(metaclass=ABCMeta):
 
@@ -532,6 +534,10 @@ class AbstractAction(profile.ProfileData):
         ''' id setter'''
         self._id = value
 
+    @property
+    def action_type(self):
+        ''' type name of this action '''
+        return self._action_type
     
 
     def from_xml(self, node):
@@ -560,6 +566,9 @@ class AbstractAction(profile.ProfileData):
             if cond_node is not None:
                 self.activation_condition.from_xml(cond_node)
 
+        # record the type of this action
+        self._action_name = node.tag
+
     def to_xml(self):
         """Returns a XML node representing the instance's contents.
 
@@ -582,8 +591,7 @@ class AbstractAction(profile.ProfileData):
         raise error.MissingImplementationError(
             "AbstractAction.requires_virtual_button not implemented"
         )
-
-
+    
 class AbstractContainer(profile.ProfileData):
 
     """Base class for action container related information storage."""
@@ -856,3 +864,60 @@ class AbstractContainer(profile.ProfileData):
         :return True container data is valid, False otherwise
         """
         pass
+
+
+@common.SingletonDecorator
+class Clipboard(QtCore.QObject):
+    ''' clipboard data '''
+
+    # occurs on clipboard changes
+    clipboard_changed = QtCore.Signal(QtCore.QObject)
+
+    def __init__(self):
+        super().__init__()
+        self._data = None
+        self._enabled_count = 0
+
+    @property
+    def data(self):
+        return self._data
+    
+    @data.setter
+    def data(self, value):
+        if self.enabled:
+            self._data = value
+            # indicate the clipboard was changed so UI can be updated
+            self.clipboard_changed.emit(self)
+
+    @property
+    def enabled(self):
+        return self._enabled_count == 0
+    
+    def disable(self):
+        ''' pushess a disable on the stack '''
+        self._enabled_count += 1
+    
+    def enable(self, reset = False):
+        ''' enables the clipboard - pops the disabled stack'''
+        if reset:
+           self._enabled_count = 0
+        elif self._enabled_count > 0:
+            self._enabled_count -= 1
+
+        
+    
+    @property
+    def is_container(self):
+        ''' true if the data item is a container '''
+        return self.data is not None and isinstance(self.data, AbstractContainer)
+    
+    @property
+    def is_action(self):
+        ''' true if the data item is an action '''
+        return self.data is not None and isinstance(self.data, AbstractAction)
+    
+    @property
+    def is_valid(self):
+        ''' true if cliboard data is valid '''
+        return self.data is not None and self.is_action or self.is_container
+

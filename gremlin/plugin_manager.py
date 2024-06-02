@@ -19,6 +19,7 @@
 import importlib
 import logging
 import os
+import copy
 
 from . import common, error
 from gremlin.util import *
@@ -273,3 +274,11 @@ class ActionPlugins:
                     # Log an error and ignore the action_plugins if
                     # anything is wrong with it
                     log_sys_warn(f"Loading action_plugins '{root.split("\\")[-1]}' failed due to: {e}")
+
+
+    def duplicate(self, action):
+        ''' duplicates an action and gives it a unique ID '''
+        dup = copy.deepcopy(action)
+        dup.action_id = common.get_guid()
+        return dup
+    

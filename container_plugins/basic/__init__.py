@@ -18,6 +18,7 @@
 from xml.etree import ElementTree
 
 import gremlin
+import gremlin.base_classes
 import gremlin.ui.common
 import gremlin.ui.input_item
 
@@ -58,6 +59,8 @@ class BasicContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
                     self.profile_data.parent.input_type
                 )
             action_selector.action_added.connect(self._add_action)
+            action_selector.action_paste.connect(self._paste_action)
+
             self.action_layout.addWidget(action_selector)
 
     def _create_condition_ui(self):
@@ -74,13 +77,31 @@ class BasicContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
             widget.redraw()
             widget.model.data_changed.connect(self.container_modified.emit)
 
-    def _add_action(self, action_name):
+    def _add_action(self, action_data):
         """Adds a new action to the container.
 
         :param action_name the name of the action to add
         """
+        if action_data is None:
+            return
+        if isinstance(action_data, str):
+            action_name = action_data
+            plugin_manager = gremlin.plugin_manager.ActionPlugins()
+            action_item = plugin_manager.get_class(action_name)(self.profile_data)
+        elif isinstance(action_data, gremlin.base_classes.Clipboard):
+            # paste operation
+            if action_data.is_action:
+                # verify the action in the clipboard is appropriate for this input
+
+                action_item = plugin_manager.duplicate(action_data.data)
+
+        self.profile_data.add_action(action_item)
+        self.container_modified.emit()
+
+    def _paste_action(self, action):
+        ''' paste action'''
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.get_class(action_name)(self.profile_data)
+        action_item = plugin_manager.duplicate(action)
         self.profile_data.add_action(action_item)
         self.container_modified.emit()
 

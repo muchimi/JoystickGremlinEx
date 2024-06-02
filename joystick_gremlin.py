@@ -35,6 +35,7 @@ import PySide6
 from PySide6 import QtCore, QtGui, QtMultimedia, QtWidgets
 
 
+import gremlin.base_classes
 from gremlin.common import InputType
 import gremlin.config
 import gremlin.event_handler 
@@ -66,8 +67,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.12ex (f)"
-
+APPLICATION_VERSION = "13.40.13ex"
 
 
 class GremlinUi(QtWidgets.QMainWindow):
@@ -79,6 +79,7 @@ class GremlinUi(QtWidgets.QMainWindow):
     ui = None
     
     # input_lock =  threading.Lock() # critical code operations - prevents reentry
+
 
 
     def __init__(self, parent=None):

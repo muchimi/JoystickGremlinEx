@@ -24,7 +24,7 @@ from threading import Thread, Timer
 from PySide6 import QtCore
 
 import dill
-from . import common, config, error, joystick_handling, windows_event_hook, macro, util
+from . import common, config, error, joystick_handling, windows_event_hook, macro, util, shared_state
 
 
 class Event:
@@ -161,6 +161,7 @@ class StateChangeEvent:
         self.is_broadcast_enabled = is_broadcast_enabled
 
 
+
 @common.SingletonDecorator
 class EventListener(QtCore.QObject):
 
@@ -198,6 +199,7 @@ class EventListener(QtCore.QObject):
 
     # occurs on broadcast mode change
     broadcast_changed = QtCore.Signal(StateChangeEvent)
+
         
 
     def __init__(self):

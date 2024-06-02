@@ -88,6 +88,21 @@ class InputItemConfiguration(QtWidgets.QFrame):
             self.action_model.add_container(container)
         self.action_model.data_changed.emit()
 
+    def _paste_action(self, action):
+        """ paste action to the input item """
+        if self.item_data.get_device_type() == DeviceType.VJoy:
+            if len(self.item_data.containers) > 0:
+                return
+
+        plugin_manager = gremlin.plugin_manager.ActionPlugins()
+        action_item = plugin_manager.duplicate(action)
+        container = container_plugins.basic.BasicContainer(self.item_data)
+        container.add_action(action_item)
+        
+        if len(container.action_sets) > 0:
+            self.action_model.add_container(container)
+        self.action_model.data_changed.emit()        
+
     def _add_container(self, container_name):
         """Adds a new contained to the input item.
 
@@ -131,6 +146,8 @@ class InputItemConfiguration(QtWidgets.QFrame):
             self.item_data.input_type
         )
         self.action_selector.action_added.connect(self._add_action)
+        self.action_selector.action_paste.connect(self._paste_action)
+
         self.container_selector = input_item.ContainerSelector(
             self.item_data.input_type
         )
@@ -152,6 +169,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
             gremlin.common.DeviceType.VJoy
         )
         self.action_selector.action_added.connect(self._add_action)
+        self.action_selector.action_paste.connect(self._paste_action)
         self.action_layout.addWidget(self.action_selector)
         self.main_layout.addLayout(self.action_layout)
 
