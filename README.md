@@ -73,7 +73,7 @@ Joystick Gremlin EX
 
 6/2/24 - 13.40.13ex (a) **potentially breaking change**
 
-- Changed default profile folder to *Joystick Gremlin Ex* to use a different folder from the original *Joystick Gremlin* folder to avoid conflicts.  If the new profile folder does not exist, GremlinEx will, for convenience, make a copy of the original profile folder and move all its contents to the *Joystick Gremlin Ex* folder.
+- Changed default profile folder to *Joystick Gremlin Ex* to use a different folder from the original *Joystick Gremlin* folder to avoid conflicts.  If the new profile folder does not exist, GremlinEx will, for convenience, make copy the original profile folder  to the *Joystick Gremlin Ex* folder.  The path used is %userprofile%\Joystick Gremlin Ex
 
 6/2/24 - 13.40.13ex
 
@@ -153,6 +153,7 @@ The release includes a zip file that contains a packaged version of the Joystick
 On first run, starting with 13.40.13x, GremlinEx will create a profile folder called Joystick Gremlin Ex in the %userprofile% folder.   If this folder does not exist, it will be created, and if the original profile folder for Joystick Gremlin is found, a copy of that profile folder will be made to keep the files separate.  GremlinEx may include additional configuration, plugins, actions and scripting commands the original Joystick Gremlin will not understand.
 
 
+The profile path is *%userprofile%\Joystick Gremlin Ex*
 
 
 
