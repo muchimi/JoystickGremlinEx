@@ -24,8 +24,11 @@ import re
 import sys
 import threading
 import time
+import distutils
+import shutil
 
 from PySide6 import QtCore, QtWidgets
+
 
 from . import error 
 
@@ -153,10 +156,32 @@ def script_path():
 
 def userprofile_path():
     """Returns the path to the user's profile folder, %userprofile%."""
-    return os.path.normcase(os.path.abspath(os.path.join(
-        os.getenv("userprofile"),
-        "Joystick Gremlin")
-    ))
+    path = os.path.abspath(os.path.join(os.getenv("userprofile"),"Joystick Gremlin Ex"))
+    if not os.path.isdir(path):
+        # profile folder does not exist - see if we can create it from the original profile 
+        source_path = os.path.abspath(os.path.join(os.getenv("userprofile"),"Joystick Gremlin"))
+        if os.path.isdir(source_path):
+            try:
+                # copy from original profile
+                shutil.copytree(source_path, path)
+                logging.getLogger("system").info(f"First run - copied Joystick Gremlin profiles to to Joystick Gremlin Ex")                
+            except Exception as error:
+                logging.getLogger("system").error(f"Unable to copy profile from Joystick Gremlin to Joystick Gremlin Ex:\n{error}")
+        if not os.path.isdir(path):
+            try:
+                # just create it
+                os.mkdir(path)
+            except Exception as error:
+                logging.getLogger("system").error(f"Unable to create profile folder for Joystick Gremlin Ex:\n{error}")
+                
+        if not os.path.isdir(path):                
+                from gremlin.error import GremlinError
+                raise GremlinError(f"Critical error: Unable to create profile folder: {path}")
+            
+
+    return os.path.normcase(path)
+
+    
 
 
 def resource_path(relative_path):

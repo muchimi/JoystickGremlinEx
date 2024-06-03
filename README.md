@@ -11,6 +11,7 @@ Joystick Gremlin EX
 - [There be dragons ahead!  ](#there-be-dragons-ahead)
    * [Support](#support)
    * [History](#history)
+- [Installation](#installation)
 - [Automatic Input detection](#automatic-input-detection)
       + [Button detect only overrides](#button-detect-only-overrides)
 - [Remote control feature](#remote-control-feature)
@@ -70,7 +71,13 @@ Joystick Gremlin EX
 <!-- TOC --><a name="changelog"></a>
 ## Changelog
 
-6/2/24 - 13.40.13ex added copy/paste for actions and containers (experimental) - actions can be copied (new button on title bar) and can be pasted via a new button wherever actions can be added).  Containers can also be copied and pasted where containers can be added.  New option to persist clipboard data between sessions.
+6/2/24 - 13.40.13ex (a) **potentially breaking change**
+
+- Changed default profile folder to *Joystick Gremlin Ex* to use a different folder from the original *Joystick Gremlin* folder to avoid conflicts.  If the new profile folder does not exist, GremlinEx will, for convenience, make a copy of the original profile folder and move all its contents to the *Joystick Gremlin Ex* folder.
+
+6/2/24 - 13.40.13ex
+
+- added copy/paste for actions and containers (experimental) - actions can be copied (new button on title bar) and can be pasted via a new button wherever actions can be added).  Containers can also be copied and pasted where containers can be added.  New option to persist clipboard data between sessions.
 
 Because the name "dill" conflicts with the Python module "dill", renamed to "dinput".
 
@@ -81,6 +88,7 @@ Because the name "dill" conflicts with the Python module "dill", renamed to "din
 4/8/24 - added troubleshooting guide and sample scripts for advanced GremlinEx scripting via plugins
 
 4/12/24 - bug fixes (see release notes on issues resolved)
+
 4/18/24 - adding range container and keyboard mapper EX (wip - may break!)
 Introduction
 
@@ -136,6 +144,14 @@ The core Gremlin repository was substantially modified in some areas to support 
 I have attempted to use the base project as much as possible, and I am grateful to WhiteMagic and his excellent ideas and structure as Gremlin is simply the best mapping utility I have ever seen or used in decades of simulation and hardware input mapping to games.  The architecture is also excellent and made my modifications very simple.
 
 I am using this code daily for my simulation needs but that's not a guarantee everything works as expected.  Feedback welcome!  
+
+<!-- TOC --><a name="installation"></a>
+# Installation
+
+The release includes a zip file that contains a packaged version of the Joystick Gremlin Ex python scripts as a convenient .EXE.   Place the contents of the zip file in a folder, recommend C:\Joystick Gremlin Ex or other suitable location.  
+
+On first run, starting with 13.40.13x, GremlinEx will create a profile folder called Joystick Gremlin Ex in the %userprofile% folder.   If this folder does not exist, it will be created, and if the original profile folder for Joystick Gremlin is found, a copy of that profile folder will be made to keep the files separate.  GremlinEx may include additional configuration, plugins, actions and scripting commands the original Joystick Gremlin will not understand.
+
 
 
 
