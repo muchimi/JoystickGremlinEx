@@ -67,7 +67,14 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.13ex (b)"
+APPLICATION_VERSION = "13.40.13ex (c)"
+
+
+from gremlin.common import SingletonDecorator
+
+@SingletonDecorator
+class Version():
+    version = APPLICATION_VERSION
 
 
 class GremlinUi(QtWidgets.QMainWindow):
@@ -1545,6 +1552,20 @@ if __name__ == "__main__":
     })
 
     syslog = logging.getLogger("system")
+
+    syslog.info(F"Joystick Gremlin Ex version {Version().version}")
+
+        
+    # Initialize the vjoy interface 
+    from vjoy.vjoy_interface import VJoyInterface
+    VJoyInterface.initialize()
+
+    # Initialize the direct input interface class
+    from dinput import DILL
+    DILL.init()
+    DILL.initialize_capi()
+
+
 
     # Show unhandled exceptions to the user when running a compiled version
     # of Joystick Gremlin

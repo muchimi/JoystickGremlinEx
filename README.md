@@ -71,6 +71,24 @@ Joystick Gremlin EX
 <!-- TOC --><a name="changelog"></a>
 ## Changelog
 
+### 6/3/24 - 13.40.13ex (c) **potentially breaking change**
+
+- GremlinEx will now more gracefully handle DLL errors and check driver and DLL versions.  If the driver and DLL versions are not at minimum levels expected, an error box will be displayed and will exit the app to avoid further errors due to mismatched versions.
+
+GremlinEx requires vJoy device driver 12.53.21.621 (VJOY release 2.1.9.1 minimum).    The distribution includes the interface DLL for 2.1.9.1, but not the software which by licensing agreement cannot be included in the GremlinEx distribution.  The latest version can be found here:  
+  
+The vJoy version can be found here: https://sourceforge.net/projects/vjoystick/files/Beta%202.x/2.1.9.1-160719/
+
+The version of HIDHide can be found here: https://github.com/nefarius/HidHide/releases
+
+There are probably more hardening that can be done to validate the environment.
+
+
+When installing a new version of vJoy or HIDHide, uninstall the old versions first, and reboot between sessions to make sure files are removed and there will not be a conflict on installation.  There are documented issues when failing to reboot after uninstalling either HIDHide or vJoy.  
+  
+Sequence wise, install vJoy first, then HIDHide.
+  
+
 6/2/24 - 13.40.13ex (a) **potentially breaking change**
 
 - Changed default profile folder to *Joystick Gremlin Ex* to use a different folder from the original *Joystick Gremlin* folder to avoid conflicts.  If the new profile folder does not exist, GremlinEx will, for convenience, make copy the original profile folder  to the *Joystick Gremlin Ex* folder.  The path used is %userprofile%\Joystick Gremlin Ex
