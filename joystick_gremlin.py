@@ -67,7 +67,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.13ex (d)"
+APPLICATION_VERSION = "13.40.13ex (e)"
 
 
 from gremlin.singleton_decorator import SingletonDecorator
