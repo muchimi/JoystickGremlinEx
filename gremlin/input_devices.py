@@ -33,13 +33,14 @@ import gremlin.types
 from dinput import DILL, GUID, GUID_Invalid
 
 from . import common, error, event_handler, joystick_handling, util
-from gremlin.common import InputType
+
 import win32api
 import gremlin.sendinput, gremlin.tts
 
 import socketserver, socket, msgpack
 import enum
 
+from gremlin.singleton_decorator import SingletonDecorator
 
 
 syslog = logging.getLogger("system")
@@ -232,7 +233,7 @@ class InternalSpeech():
 			pass
 
 
-@common.SingletonDecorator
+@SingletonDecorator
 class RemoteControl():
     ''' holds remote control status information'''
 
@@ -851,7 +852,8 @@ class RPCGremlin():
         
         # stop the server loop
         self._keep_running = False
-        self._thread.join()
+        if self._thread.is_alive():
+            self._thread.join()
         self._thread = None
 
         syslog.debug("Gremlin RPC server stopped...")
@@ -899,7 +901,7 @@ class RemoteServer(QtCore.QObject):
 
 
 
-@common.SingletonDecorator
+@SingletonDecorator
 class RemoteClient(QtCore.QObject):
     """ Provides access to a remote Gremlin instance """
 
@@ -953,7 +955,8 @@ class RemoteClient(QtCore.QObject):
         if self._alive_thread:
             syslog.debug("Alive stop requested...")
             self._alive_thread_stop_requested = True
-            self._alive_thread.join()
+            if self._alive_thread.is_alive():
+                self._alive_thread.join()
             syslog.debug("Alive thread stopped")
             self._alive_thread = None
             
@@ -1458,7 +1461,7 @@ class JoystickPlugin:
         return partial_fn(callback, joy=JoystickPlugin.joystick)
 
 
-@common.SingletonDecorator
+@SingletonDecorator
 class Keyboard(QtCore.QObject):
 
     """Provides access to the keyboard state."""
@@ -1556,7 +1559,7 @@ ButtonReleaseEntry = collections.namedtuple(
 )
 
 
-@common.SingletonDecorator
+@SingletonDecorator
 class ButtonReleaseActions(QtCore.QObject):
 
     """Ensures a desired action is run when a button is released."""
@@ -1678,7 +1681,7 @@ class ButtonReleaseActions(QtCore.QObject):
         self._current_mode = mode
 
 
-@common.SingletonDecorator
+@SingletonDecorator
 class JoystickInputSignificant:
 
     """Checks whether or not joystick inputs are significant."""
@@ -1698,6 +1701,7 @@ class JoystickInputSignificant:
         Returns:
             True if the event should be processed, False otherwise
         """
+        from gremlin.common import InputType
         self._mre_registry[event] = event
 
         if event.event_type == InputType.JoystickAxis:

@@ -772,7 +772,8 @@ class Wiggle():
             syslog.debug("Wiggle stop local requested...")
             with self._lock:
                 self._wiggle_local_stop_requested.set()
-                self._wiggle_local_thread.join()
+                if self._wiggle_local_thread.is_alive():
+                    self._wiggle_local_thread.join()
                 syslog.debug("Wiggle thread local exited...")
                 self._wiggle_local_thread = None
                 self._wiggle_local_stop_requested = None
@@ -781,7 +782,8 @@ class Wiggle():
             syslog.debug("Wiggle stop local requested...")
             with self._lock:
                 self._wiggle_remote_stop_requested.set()
-                self._wiggle_remote_thread.join()
+                if self._wiggle_remote_thread.is_alive():
+                    self._wiggle_remote_thread.join()
                 syslog.debug("Wiggle thread remote exited...")
                 self._wiggle_remote_thread = None            
                 self._wiggle_remote_stop_requested = None

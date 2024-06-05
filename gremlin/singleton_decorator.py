@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2021 Lionel Ott
+# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,16 +16,16 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from PySide6 import QtCore
-from PySide6.QtCore import Signal
 
-from gremlin import common
-from gremlin.singleton_decorator import SingletonDecorator
+class SingletonDecorator:
 
-@SingletonDecorator
-class Signal(QtCore.QObject):
+    """Decorator turning a class into a singleton."""
 
-    reloadUi = Signal()
+    def __init__(self, klass):
+        self.klass = klass
+        self.instance = None
 
-
-signal = Signal()
+    def __call__(self, *args, **kwargs):
+        if self.instance is None:
+            self.instance = self.klass(*args, **kwargs)
+        return self.instance

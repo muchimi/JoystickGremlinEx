@@ -31,7 +31,7 @@ import win32api
 
 import gremlin
 import gremlin.input_devices
-
+from gremlin.singleton_decorator import SingletonDecorator
 
 
 
@@ -222,7 +222,7 @@ def _send_key_up(key, is_local = True, is_remote = False, force_remote = False):
         gremlin.input_devices.remote_client.send_key(key.virtual_code, key.scan_code, flags, force_remote )
 
 
-@gremlin.common.SingletonDecorator
+@SingletonDecorator
 class MacroManager:
 
     """Manages the proper dispatching and scheduling of macros."""

@@ -119,6 +119,11 @@ class OptionsUi(common.BaseDialogUi):
         self.persist_clipboard.clicked.connect(self._persist_clipboard)
         self.persist_clipboard.setChecked(self._persist_clipboard_enabled())
 
+        # verbose output
+        self.verbose = QtWidgets.QCheckBox("Verbose log")
+        self.verbose.clicked.connect(self._verbose)
+        self.verbose.setChecked(self.config.verbose)
+
         # Show message on mode change
         self.show_mode_change_message = QtWidgets.QCheckBox(
             "Show message when changing mode"
@@ -227,6 +232,7 @@ class OptionsUi(common.BaseDialogUi):
         self.general_layout.addWidget(self.start_minimized)
         self.general_layout.addWidget(self.start_with_windows)
         self.general_layout.addWidget(self.persist_clipboard)
+        self.general_layout.addWidget(self.verbose)
         self.general_layout.addWidget(self.show_mode_change_message)
 
         self.general_layout.addLayout(self.default_action_layout)
@@ -455,6 +461,12 @@ If this option is on, the last active profile will remain active until a differe
 
     def _persist_clipboard_enabled(self):
         return self.config.persist_clipboard
+    
+    def _verbose(self, clicked):
+        ''' stores verbose setting '''
+        self.config.verbose = clicked
+        self.config.save
+
 
     def _start_windows(self, clicked):
         """Set registry entry to launch Joystick Gremlin on login.

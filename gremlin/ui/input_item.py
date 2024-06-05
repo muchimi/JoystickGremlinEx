@@ -22,6 +22,7 @@ import copy
 import gremlin
 import gremlin.base_classes
 from gremlin.common import DeviceType, InputType, load_icon, load_pixmap
+import gremlin.config
 import gremlin.plugin_manager
 from . import activation_condition, common, virtual_button
 from functools import partial 
@@ -268,6 +269,9 @@ class InputItemListView(common.AbstractView):
 
     def redraw(self):
         """Redraws the entire model."""
+        verbose = gremlin.config.Configuration().verbose
+        if verbose:
+            logging.getLogger("system").info(f"device redraw begin") 
         common.clear_layout(self.scroll_layout)
 
         if self.model is None:
@@ -289,6 +293,9 @@ class InputItemListView(common.AbstractView):
             widget.selected.connect(self._create_selection_callback(index))
             self.scroll_layout.addWidget(widget)
         self.scroll_layout.addStretch()
+
+        if verbose:
+            logging.getLogger("system").info(f"device redraw end") 
 
     def redraw_index(self, index):
         """Redraws the view entry at the given index.
@@ -909,12 +916,18 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
             return
 
     def _tab_changed(self, index):
+        verbose = gremlin.config.Configuration().verbose
         try:
+            if verbose:
+                   logging.getLogger("system").info(f"Device change begin") 
             tab_text = self.dock_tabs.tabText(index)
             self.profile_data.current_view_type = \
                 common.ContainerViewTypes.to_enum(tab_text.lower())
         except gremlin.error.GremlinError:
             return
+        finally:
+            if verbose:
+                   logging.getLogger("system").info(f"Device change end") 
 
     def _get_widget_index(self, widget):
         """Returns the index of the provided widget.

@@ -25,7 +25,7 @@ from PySide6 import QtCore
 
 import dinput
 from . import common, config, error, joystick_handling, windows_event_hook, macro, util, shared_state
-
+from gremlin.singleton_decorator import SingletonDecorator
 
 class Event:
 
@@ -162,7 +162,7 @@ class StateChangeEvent:
 
 
 
-@common.SingletonDecorator
+@SingletonDecorator
 class EventListener(QtCore.QObject):
 
     """Listens for keyboard and joystick events and publishes them
@@ -387,7 +387,7 @@ class EventListener(QtCore.QObject):
                 )
 
 
-@common.SingletonDecorator
+@SingletonDecorator
 class EventHandler(QtCore.QObject):
 
     """Listens to the inputs from multiple different input devices."""

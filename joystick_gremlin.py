@@ -41,7 +41,7 @@ import gremlin.config
 import gremlin.event_handler 
 
 import dinput
-from gremlin.common import load_icon, get_icon_path
+from gremlin.common import load_icon, get_icon_path, load_pixmap
 from gremlin.util import log_sys_error, log_sys_warn, log_sys, get_root_path
 
 
@@ -67,10 +67,10 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.13ex (c)"
+APPLICATION_VERSION = "13.40.13ex (d)"
 
 
-from gremlin.common import SingletonDecorator
+from gremlin.singleton_decorator import SingletonDecorator
 
 @SingletonDecorator
 class Version():
@@ -814,17 +814,17 @@ class GremlinUi(QtWidgets.QMainWindow):
         
 
         # Toolbar actions
-        activate_icon = QtGui.QIcon()
-        activate_icon.addPixmap(
-            QtGui.QPixmap(get_icon_path("gfx/activate.svg")),
-            QtGui.QIcon.Normal
-        )
-        activate_icon.addPixmap(
-            QtGui.QPixmap(get_icon_path("gfx/activate_on.svg")),
-            QtGui.QIcon.Active,
-            QtGui.QIcon.On
-        )
-        self.ui.actionActivate.setIcon(activate_icon)
+        
+        pixmap_off = load_pixmap("gfx/activate.svg")
+        pixmap_on = load_pixmap("gfx/activate_on.svg")
+        if pixmap_off and pixmap_on:
+            activate_icon = QtGui.QIcon()
+            activate_icon.addPixmap(pixmap_off, QtGui.QIcon.Normal)
+            activate_icon.addPixmap(pixmap_on, QtGui.QIcon.Active, QtGui.QIcon.On)
+            self.ui.actionActivate.setIcon(activate_icon)
+        else:
+            self.ui.actionActivate.setText("Run")
+
         self.ui.actionOpen.setIcon(load_icon("gfx/profile_open.svg"))
         
 
@@ -836,9 +836,12 @@ class GremlinUi(QtWidgets.QMainWindow):
     def _device_change_cb(self):
         """Handles addition and removal of joystick devices."""
         # Update device tabs
-
+        
         if not self.device_change_locked:
+            verbose = gremlin.config.Configuration().verbose
             try:
+                if verbose:
+                   logging.getLogger("system").info(f"Device change begin") 
                 self.device_change_locked = True
                 self.devices = gremlin.joystick_handling.joystick_devices()
                 self._create_tabs()
@@ -848,6 +851,9 @@ class GremlinUi(QtWidgets.QMainWindow):
                 restart = self.runner.is_running()
                 self.activate(False, restart)
             finally:
+
+                if verbose:
+                   logging.getLogger("system").info(f"Device change end") 
                 self.device_change_locked = False
             
         

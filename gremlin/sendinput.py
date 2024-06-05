@@ -23,9 +23,10 @@ import math
 import threading
 import time
 
-from gremlin.common import MouseButton, SingletonDecorator
+from gremlin.common import MouseButton
 from gremlin.util import deg2rad
 
+from gremlin.singleton_decorator import SingletonDecorator
 
 """Defines flags used when specifying MOUSEINPUT structures.
 

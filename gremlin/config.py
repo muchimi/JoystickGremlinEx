@@ -22,10 +22,10 @@ import os
 import re
 
 from PySide6 import QtCore
-
+from gremlin.singleton_decorator import SingletonDecorator
 from . import common, util, event_handler
 
-@common.SingletonDecorator
+@SingletonDecorator
 class Configuration:
 
     """Responsible for loading and saving configuration data."""
@@ -661,3 +661,13 @@ class Configuration:
             from gremlin.clipboard import Clipboard
             clipboard = Clipboard()
             clipboard.clear_persisted()
+
+
+    @property
+    def verbose(self):
+        ''' determines loging level '''
+        return self._data.get("verbose", False)
+    @verbose.setter
+    def verbose(self, value):
+        self._data["verbose"] = value
+        self.save()

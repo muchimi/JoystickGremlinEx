@@ -8,7 +8,9 @@ from gremlin.base_classes import AbstractAction, AbstractContainer
 from gremlin.util import userprofile_path
 import gremlin.config
 
-@common.SingletonDecorator
+from gremlin.singleton_decorator import SingletonDecorator
+
+@SingletonDecorator
 class Clipboard(QtCore.QObject):
     ''' clipboard data '''
 
