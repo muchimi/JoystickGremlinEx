@@ -98,6 +98,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.ui = Ui_Gremlin()
         self.ui.setupUi(self)
         self.locked = False
+        self.device_change_locked = False
+
         self._resize_count = 0
 
         # Process monitor
@@ -830,17 +832,23 @@ class GremlinUi(QtWidgets.QMainWindow):
     # | Signal handlers
     # +---------------------------------------------------------------
 
+    
     def _device_change_cb(self):
         """Handles addition and removal of joystick devices."""
         # Update device tabs
-        self.devices = gremlin.joystick_handling.joystick_devices()
-        self._create_tabs()
 
-        # Stop Gremlin execution
-        self.ui.actionActivate.setChecked(False)
-        restart = self.runner.is_running()
-        self.activate(False, restart)
-            
+        if not self.device_change_locked:
+            try:
+                self.device_change_locked = True
+                self.devices = gremlin.joystick_handling.joystick_devices()
+                self._create_tabs()
+
+                # Stop Gremlin execution
+                self.ui.actionActivate.setChecked(False)
+                restart = self.runner.is_running()
+                self.activate(False, restart)
+            finally:
+                self.device_change_locked = False
             
         
             
@@ -1554,7 +1562,6 @@ if __name__ == "__main__":
     syslog = logging.getLogger("system")
 
     syslog.info(F"Joystick Gremlin Ex version {Version().version}")
-
         
     # Initialize the vjoy interface 
     from vjoy.vjoy_interface import VJoyInterface
@@ -1564,7 +1571,7 @@ if __name__ == "__main__":
     from dinput import DILL
     DILL.init()
     DILL.initialize_capi()
-
+    logging.getLogger("system").info(f"Found DirectInput Interface version {DILL.version}")
 
 
     # Show unhandled exceptions to the user when running a compiled version

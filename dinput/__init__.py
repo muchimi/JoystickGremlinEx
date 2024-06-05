@@ -431,6 +431,7 @@ class DILL:
     # Attempt to find the correct location of the dll for development
     # and installed use cases.
     _dll = None
+    version = None
 
 
     # true if initialized
@@ -511,7 +512,10 @@ class DILL:
                     logging.getLogger("system").critical(msg)
                     os._exit(1) 
 
-            
+            dll_version = get_dll_version(_dll_path)
+            DILL.version = dll_version
+
+
             try:
                 _di_listener_dll = ctypes.cdll.LoadLibrary(_dll_path)
 
@@ -533,7 +537,6 @@ class DILL:
                 os._exit(1)
 
             DILL.initalized = True
-
 
     @staticmethod
     def set_input_event_callback(callback):
@@ -634,6 +637,7 @@ class DILL:
         float
             Current value of the specific axis for the desired device.
         """
+        
         return DILL._dll.get_axis(guid.ctypes, index)
 
     @staticmethod

@@ -439,7 +439,9 @@ def get_vjoy_driver_version() -> str:
     import subprocess, sys
     p = subprocess.Popen(["powershell.exe", 
                 "Get-WmiObject Win32_PnPSignedDriver | select devicename, driverversion | ConvertTo-CSV"], 
-                stdout=subprocess.PIPE)
+                stdout=subprocess.PIPE,
+                startupinfo=subprocess.STARTUPINFO(dwFlags=subprocess.STARTF_USESHOWWINDOW, wShowWindow=subprocess.SW_HIDE,)
+    )
     p_out, p_err = p.communicate()
 
     if not p_out:
