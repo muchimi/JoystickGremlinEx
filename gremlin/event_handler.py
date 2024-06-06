@@ -27,6 +27,7 @@ import dinput
 from . import common, config, error, joystick_handling, windows_event_hook, macro, util, shared_state
 from gremlin.singleton_decorator import SingletonDecorator
 
+
 class Event:
 
     """Represents a single event captured by the system.
@@ -200,6 +201,7 @@ class EventListener(QtCore.QObject):
     # occurs on broadcast mode change
     broadcast_changed = QtCore.Signal(StateChangeEvent)
 
+    
         
 
     def __init__(self):
@@ -212,6 +214,7 @@ class EventListener(QtCore.QObject):
 
         # Calibration function for each axis of all devices
         self._calibrations = {}
+
 
         # Joystick device change update timeout timer
         self._device_update_timer = None
@@ -261,9 +264,12 @@ class EventListener(QtCore.QObject):
         :param data the joystick event
         """
 
+        verbose = config.Configuration().verbose
         
         event = dinput.InputEvent(data)
         if event.input_type == dinput.InputType.Axis:
+            if verbose:
+                logging.getLogger("system").info(event)
             self.joystick_event.emit(Event(
                 event_type=common.InputType.JoystickAxis,
                 device_guid=event.device_guid,

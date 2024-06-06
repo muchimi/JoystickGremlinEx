@@ -25,7 +25,7 @@ import time
 import uuid
 from gremlin.util import get_dll_version
 import logging
-
+from gremlin.singleton_decorator import SingletonDecorator
 
 class DILLError(Exception):
 
@@ -310,6 +310,23 @@ class DeviceActionType(Enum):
             raise DILLError(f"Invalid device action type {value:d}")
 
 
+# @SingletonDecorator
+# class DeviceNames:
+#     ''' holds a map of device names '''
+
+#     def __init__(self):
+#         self._map = {}
+
+#     def get_name(self, device_guid):
+#         ''' caches the device name '''
+#         if device_guid in self._map.keys():
+#             return self._map[device_guid]
+#         name = DILL.get_device_name(device_guid)
+#         self._map[device_guid] = name
+#         return name
+    
+
+
 class InputEvent:
 
     """Holds information about a single event.
@@ -339,8 +356,12 @@ class InputEvent:
         else:
             self.device_guid = GUID.InvalidGuid()
             self.input_type = InputType.Button
+            
             self.input_index = 0
             self.value = 0
+
+    def __str__(self) -> str:
+        return f"InputEvent: GUID {self.device_guid} type: {self.input_type} index: {self.input_index} value: {self.value}"
 
 
 

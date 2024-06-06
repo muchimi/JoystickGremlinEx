@@ -531,18 +531,30 @@ def load_pixmap(*paths):
 
 def load_icon(*paths):
     ''' gets an icon (returns a QIcon) '''
+    from gremlin.config import Configuration
+    verbose = Configuration().verbose
     pixmap = load_pixmap(*paths)
     if not pixmap or pixmap.isNull():
+        if verbose:
+            logging.getLogger("system").info(f"LoadIcon() using generic icon - failed to locate: {paths}")        
         return get_generic_icon()
     icon = QtGui.QIcon()
     icon.addPixmap(pixmap, QtGui.QIcon.Normal)
+    if verbose:
+        logging.getLogger("system").info(f"LoadIcon() found icon: {paths}") 
     return icon
 
 def load_image(*paths):
     ''' loads an image '''
+    from gremlin.config import Configuration
+    verbose = Configuration().verbose
     the_path = get_icon_path(*paths)
     if the_path:
+        if verbose:
+            logging.getLogger("system").info(f"LoadImage() found image: {paths}") 
         return QtGui.QImage(the_path)
+    if verbose:
+            logging.getLogger("system").info(f"LoadImage() failed to locate: {paths}")        
     return None
         
     

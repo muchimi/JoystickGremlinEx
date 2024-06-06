@@ -25,9 +25,9 @@ import dinput
 
 import gremlin
 import gremlin.plugin_manager
-import gremlin.shared_state
+
 import gremlin.ui
-from . import common, error, execution_graph, plugin_manager, profile, event_handler
+from . import common, error, execution_graph, plugin_manager, profile
 from gremlin.profile import parse_guid, safe_read, write_guid, Device
 
 

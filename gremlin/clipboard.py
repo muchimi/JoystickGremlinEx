@@ -2,7 +2,7 @@ import win32clipboard
 import dill
 import base64
 import os
-from . import common
+
 from PySide6 import QtCore
 from gremlin.base_classes import AbstractAction, AbstractContainer
 from gremlin.util import userprofile_path
