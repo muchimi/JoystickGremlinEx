@@ -71,7 +71,7 @@ Joystick Gremlin EX
 <!-- TOC --><a name="changelog"></a>
 ## Changelog
 
-### 6/3/24 - 13.40.13ex (c) **potentially breaking change**
+### 6/6/24 - 13.40.13ex (g) **potentially breaking change**
 
 - GremlinEx will now more gracefully handle DLL errors and check driver and DLL versions.  If the driver and DLL versions are not at minimum levels expected, an error box will be displayed and will exit the app to avoid further errors due to mismatched versions.
 
@@ -87,6 +87,8 @@ There are probably more hardening that can be done to validate the environment.
 When installing a new version of vJoy or HIDHide, uninstall the old versions first, and reboot between sessions to make sure files are removed and there will not be a conflict on installation.  There are documented issues when failing to reboot after uninstalling either HIDHide or vJoy.  
   
 Sequence wise, install vJoy first, then HIDHide.
+
+Updated Device Information dialog to use a table format that is user resizeable.  Right click on any cell to copy its contents to the clipboard.
   
 
 6/2/24 - 13.40.13ex (a) **potentially breaking change**

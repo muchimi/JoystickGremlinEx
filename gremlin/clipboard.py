@@ -88,11 +88,19 @@ class Clipboard(QtCore.QObject):
                 pickled = base64.b64encode(data).decode('ascii')
 
                 win32clipboard.OpenClipboard()
-                win32clipboard.SetClipboardText(pickled)
+                win32clipboard.EmptyClipboard()
+                win32clipboard.SetClipboardText(pickled, win32clipboard.CF_TEXT)
                 win32clipboard.CloseClipboard()
             except:
                 # unable to encode
                 pass
+
+    def set_windows_clipboard_text(self, value):
+        ''' sets the windows clipboard text '''
+        win32clipboard.OpenClipboard()
+        win32clipboard.EmptyClipboard()
+        win32clipboard.SetClipboardText(value, win32clipboard.CF_TEXT)
+        win32clipboard.CloseClipboard()
 
     @property
     def enabled(self):

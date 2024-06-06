@@ -67,7 +67,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.13ex (f)"
+APPLICATION_VERSION = "13.40.13ex (g)"
 
 
 from gremlin.singleton_decorator import SingletonDecorator
@@ -263,8 +263,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.modal_windows["device_information"] = \
             gremlin.ui.dialogs.DeviceInformationUi(self._profile)
         geom = self.geometry()
-        w = 500
-        h = 300
+        w = 600
+        h = 400
         self.modal_windows["device_information"].setGeometry(
             int(geom.x() + geom.width() / 2 - w/2),
             int(geom.y() + geom.height() / 2 - h/2),
