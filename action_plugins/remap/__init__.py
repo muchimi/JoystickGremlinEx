@@ -355,11 +355,13 @@ class Remap(gremlin.base_classes.AbstractAction):
             elif self.input_type == InputType.JoystickHat:
                 input_string = "hat"
         if input_string:
+            
             root_path = get_root_path()
             folder = os.path.join(root_path, "action_plugins", "remap")
             icon_file = os.path.join(folder, "gfx", f"icon_{input_string}_{self.vjoy_input_id:03d}.png")
             if os.path.isfile(icon_file):
                 return icon_file
+            
         log_sys_warn(f"Icon folder: {folder}")
         log_sys_warn(f"Icon file: {icon_file}")
         log_sys_warn(f"Warning: unable to determine icon type: {self.input_type} for id {self.vjoy_input_id}")

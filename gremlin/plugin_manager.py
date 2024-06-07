@@ -24,8 +24,10 @@ import copy
 from . import common, error
 from gremlin.util import *
 
+from gremlin.singleton_decorator import SingletonDecorator
 
-@common.SingletonDecorator
+
+@SingletonDecorator
 class ContainerPlugins:
 
     """Handles discovery and handling of container plugins."""
@@ -181,7 +183,7 @@ class ContainerPlugins:
        
 
 
-@common.SingletonDecorator
+@SingletonDecorator
 class ActionPlugins:
 
     """Handles discovery and handling of action plugins."""

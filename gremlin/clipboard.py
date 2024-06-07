@@ -2,13 +2,15 @@ import win32clipboard
 import dill
 import base64
 import os
-from . import common
+
 from PySide6 import QtCore
 from gremlin.base_classes import AbstractAction, AbstractContainer
 from gremlin.util import userprofile_path
 import gremlin.config
 
-@common.SingletonDecorator
+from gremlin.singleton_decorator import SingletonDecorator
+
+@SingletonDecorator
 class Clipboard(QtCore.QObject):
     ''' clipboard data '''
 
@@ -86,11 +88,19 @@ class Clipboard(QtCore.QObject):
                 pickled = base64.b64encode(data).decode('ascii')
 
                 win32clipboard.OpenClipboard()
-                win32clipboard.SetClipboardText(pickled)
+                win32clipboard.EmptyClipboard()
+                win32clipboard.SetClipboardText(pickled, win32clipboard.CF_TEXT)
                 win32clipboard.CloseClipboard()
             except:
                 # unable to encode
                 pass
+
+    def set_windows_clipboard_text(self, value):
+        ''' sets the windows clipboard text '''
+        win32clipboard.OpenClipboard()
+        win32clipboard.EmptyClipboard()
+        win32clipboard.SetClipboardText(value, win32clipboard.CF_TEXT)
+        win32clipboard.CloseClipboard()
 
     @property
     def enabled(self):

@@ -41,7 +41,7 @@ import gremlin.config
 import gremlin.event_handler 
 
 import dinput
-from gremlin.common import load_icon, get_icon_path
+from gremlin.common import load_icon, get_icon_path, load_pixmap
 from gremlin.util import log_sys_error, log_sys_warn, log_sys, get_root_path
 
 
@@ -67,7 +67,14 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.13ex (b)"
+APPLICATION_VERSION = "13.40.13ex (h)"
+
+
+from gremlin.singleton_decorator import SingletonDecorator
+
+@SingletonDecorator
+class Version():
+    version = APPLICATION_VERSION
 
 
 class GremlinUi(QtWidgets.QMainWindow):
@@ -91,6 +98,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.ui = Ui_Gremlin()
         self.ui.setupUi(self)
         self.locked = False
+        self.device_change_locked = False
+
         self._resize_count = 0
 
         # Process monitor
@@ -129,6 +138,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         # Input selection storage
         self._last_input_timestamp = time.time()
         self._last_input_event = None
+        self._last_tab_switch = None
         self._input_delay = 0.25
         self._event_process_registry = {}
         self._temp_input_axis_override = False # flag that tracks device swaps on axis
@@ -253,8 +263,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.modal_windows["device_information"] = \
             gremlin.ui.dialogs.DeviceInformationUi(self._profile)
         geom = self.geometry()
-        w = 500
-        h = 300
+        w = 600
+        h = 400
         self.modal_windows["device_information"].setGeometry(
             int(geom.x() + geom.width() / 2 - w/2),
             int(geom.y() + geom.height() / 2 - h/2),
@@ -368,9 +378,14 @@ class GremlinUi(QtWidgets.QMainWindow):
             otherwise
         """
 
+        from gremlin.config import Configuration
+        verbose = Configuration().verbose
+        
 
         if not set_active:
             # Stop running the code
+            if verbose:
+                logging.getLogger("system").info(f"Activate: deactivate profile")
             self.runner.stop()
             self._update_statusbar_active(False)
             self._profile_auto_activated = False
@@ -381,8 +396,11 @@ class GremlinUi(QtWidgets.QMainWindow):
             ]:
                 self.ui.devices.currentWidget().refresh()
             self.ui.tray_icon.setIcon(load_icon("gfx/icon.ico"))
+            
         else:
             # Generate the code for the profile and run it
+            if verbose:
+                logging.getLogger("system").info(f"Activate: activate profile")
             self._profile_auto_activated = False
             self.runner.start(
                 self._profile.build_inheritance_tree(),
@@ -391,6 +409,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                 self._profile
             )
             self.ui.tray_icon.setIcon(load_icon("gfx/icon_active.ico"))
+            
             
             
 
@@ -805,17 +824,17 @@ class GremlinUi(QtWidgets.QMainWindow):
         
 
         # Toolbar actions
-        activate_icon = QtGui.QIcon()
-        activate_icon.addPixmap(
-            QtGui.QPixmap(get_icon_path("gfx/activate.svg")),
-            QtGui.QIcon.Normal
-        )
-        activate_icon.addPixmap(
-            QtGui.QPixmap(get_icon_path("gfx/activate_on.svg")),
-            QtGui.QIcon.Active,
-            QtGui.QIcon.On
-        )
-        self.ui.actionActivate.setIcon(activate_icon)
+        
+        pixmap_off = load_pixmap("gfx/activate.svg")
+        pixmap_on = load_pixmap("gfx/activate_on.svg")
+        if pixmap_off and pixmap_on:
+            activate_icon = QtGui.QIcon()
+            activate_icon.addPixmap(pixmap_off, QtGui.QIcon.Normal)
+            activate_icon.addPixmap(pixmap_on, QtGui.QIcon.Active, QtGui.QIcon.On)
+            self.ui.actionActivate.setIcon(activate_icon)
+        else:
+            self.ui.actionActivate.setText("Run")
+
         self.ui.actionOpen.setIcon(load_icon("gfx/profile_open.svg"))
         
 
@@ -823,17 +842,29 @@ class GremlinUi(QtWidgets.QMainWindow):
     # | Signal handlers
     # +---------------------------------------------------------------
 
+    
     def _device_change_cb(self):
         """Handles addition and removal of joystick devices."""
         # Update device tabs
-        self.devices = gremlin.joystick_handling.joystick_devices()
-        self._create_tabs()
+        
+        if not self.device_change_locked:
+            verbose = gremlin.config.Configuration().verbose
+            try:
+                if verbose:
+                   logging.getLogger("system").info(f"Device change begin") 
+                self.device_change_locked = True
+                self.devices = gremlin.joystick_handling.joystick_devices()
+                self._create_tabs()
 
-        # Stop Gremlin execution
-        self.ui.actionActivate.setChecked(False)
-        restart = self.runner.is_running()
-        self.activate(False, restart)
-            
+                # Stop Gremlin execution
+                self.ui.actionActivate.setChecked(False)
+                restart = self.runner.is_running()
+                self.activate(restart)
+            finally:
+
+                if verbose:
+                   logging.getLogger("system").info(f"Device change end") 
+                self.device_change_locked = False
             
         
             
@@ -849,6 +880,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         
         if self.locked:
             return
+
+        verbose = gremlin.config.Configuration().verbose
 
         # enter critical section
         try:
@@ -873,33 +906,55 @@ class GremlinUi(QtWidgets.QMainWindow):
         
             # Switch to the tab corresponding to the event's device if the option
             tab_switch_needed = self.ui.devices.currentWidget() != self.tabs[event.device_guid] 
+            device_name = gremlin.joystick_handling.device_name_from_guid(event.device_guid)
+            if verbose and tab_switch_needed:
+                logging.getLogger("system").info(f"Event: tab switch requested to: {device_name}/{event.device_guid}")
+
+            # prevent spamming tab switches by constant varying inputs
+            if tab_switch_needed:
+                if self._last_tab_switch is not None and (self._last_tab_switch + self._input_delay) > time.time():
+                    if verbose:
+                        logging.getLogger("system").info(f"Event: tab switch ignored - events too close")
+                    return
+                # remember the switch time for next request            
+                self._last_tab_switch = time.time()
                         
             # get the widget for the tab corresponding to the device
             widget = self.tabs[event.device_guid] 
             if not isinstance(widget, gremlin.ui.device_tab.JoystickDeviceTabWidget):
+                if verbose:
+                    logging.getLogger("system").error(f"Event: unable to find tab widget for: {device_name}/{event.device_guid}")
                 return
 
 
             # prevent switching based on user options
             if not config.highlight_input and event.event_type == gremlin.common.InputType.JoystickAxis:
                 # ignore axis input
+                if verbose:
+                    logging.getLogger("system").info(f"Event: highlight axis input ignored (option off)")
                 return
             if not config.highlight_input_buttons and event.event_type == gremlin.common.InputType.JoystickButton:
                 # ignore button input
+                if verbose:
+                    logging.getLogger("system").info(f"Event: highlight button input ignored (option off)")
                 return        
 
 
             process_input = tab_switch_needed or self._should_process_input(event, widget, buttons_only)
-
-
+            if verbose:
+                logging.getLogger("system").info(f"Event: process input {'ok' if process_input else 'ignored'}")
             
             if not process_input:
                 return
 
 
             if config.highlight_device and tab_switch_needed:
+                if verbose:
+                    logging.getLogger("system").info(f"Event: execute tab switch begin")
                 self.ui.devices.setCurrentWidget(self.tabs[event.device_guid])
                 self.refresh()
+                if verbose:
+                    logging.getLogger("system").info(f"Event: execute tab switch complete ")
 
 
             
@@ -912,6 +967,8 @@ class GremlinUi(QtWidgets.QMainWindow):
             widget.input_item_list_view.redraw_index(index)
 
         finally:
+            if verbose:
+                logging.getLogger("system").info(f"Event: done")
             self.locked = False
     
 
@@ -1431,7 +1488,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             self._input_delay = 0.25
 
         if process_input:
-            
+            # remember when the last input was processed and what it was
             self._last_input_event = event
             self._last_input_timestamp = time.time()
 
@@ -1545,6 +1602,19 @@ if __name__ == "__main__":
     })
 
     syslog = logging.getLogger("system")
+
+    syslog.info(F"Joystick Gremlin Ex version {Version().version}")
+        
+    # Initialize the vjoy interface 
+    from vjoy.vjoy_interface import VJoyInterface
+    VJoyInterface.initialize()
+
+    # Initialize the direct input interface class
+    from dinput import DILL
+    DILL.init()
+    DILL.initialize_capi()
+    logging.getLogger("system").info(f"Found DirectInput Interface version {DILL.version}")
+
 
     # Show unhandled exceptions to the user when running a compiled version
     # of Joystick Gremlin

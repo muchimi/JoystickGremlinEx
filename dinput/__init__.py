@@ -23,8 +23,9 @@ from enum import Enum
 import os
 import time
 import uuid
-
-
+from gremlin.util import get_dll_version
+import logging
+from gremlin.singleton_decorator import SingletonDecorator
 
 class DILLError(Exception):
 
@@ -309,6 +310,23 @@ class DeviceActionType(Enum):
             raise DILLError(f"Invalid device action type {value:d}")
 
 
+# @SingletonDecorator
+# class DeviceNames:
+#     ''' holds a map of device names '''
+
+#     def __init__(self):
+#         self._map = {}
+
+#     def get_name(self, device_guid):
+#         ''' caches the device name '''
+#         if device_guid in self._map.keys():
+#             return self._map[device_guid]
+#         name = DILL.get_device_name(device_guid)
+#         self._map[device_guid] = name
+#         return name
+    
+
+
 class InputEvent:
 
     """Holds information about a single event.
@@ -338,8 +356,12 @@ class InputEvent:
         else:
             self.device_guid = GUID.InvalidGuid()
             self.input_type = InputType.Button
+            
             self.input_index = 0
             self.value = 0
+
+    def __str__(self) -> str:
+        return f"InputEvent: GUID {self.device_guid} type: {self.input_type} index: {self.input_index} value: {self.value}"
 
 
 
@@ -430,8 +452,12 @@ class DILL:
     # Attempt to find the correct location of the dll for development
     # and installed use cases.
     _dll = None
+    version = None
 
 
+    # true if initialized
+    
+    initalized = False
 
     # Storage for the callback functions
     device_change_callback_fn = None
@@ -489,6 +515,7 @@ class DILL:
         This has to be called before any other DILL interactions can take place.
         """
         from pathlib import Path
+        from gremlin.util import display_error
 
         if DILL._dll is None:
 
@@ -501,16 +528,36 @@ class DILL:
                 parent = Path(dll_folder).parent
                 _dll_path = os.path.join(parent, dll_file)
                 if not os.path.isfile(_dll_path):
-                    raise DILLError(f"Error: Missing dil.dll: {_dll_path}")
-                
+                    msg = f"Unable to continue - missing dll: {_dll_path}"
+                    display_error(msg)
+                    logging.getLogger("system").critical(msg)
+                    os._exit(1) 
+
+            dll_version = get_dll_version(_dll_path)
+            DILL.version = dll_version
 
 
-            _di_listener_dll = ctypes.cdll.LoadLibrary(_dll_path)
+            try:
+                _di_listener_dll = ctypes.cdll.LoadLibrary(_dll_path)
 
-            _di_listener_dll.get_device_information_by_index.argtypes = [ctypes.c_uint]
-            _di_listener_dll.get_device_information_by_index.restype = _DeviceSummary
-            DILL._dll = _di_listener_dll
-            DILL._dll.init()
+            except Exception as error:
+                msg = f"Unable to load DirectInput interface dll: {_dll_path}\n{error}"
+                display_error(msg)
+                logging.getLogger("system").critical(msg)
+                os._exit(1)
+
+            try:
+                _di_listener_dll.get_device_information_by_index.argtypes = [ctypes.c_uint]
+                _di_listener_dll.get_device_information_by_index.restype = _DeviceSummary
+                DILL._dll = _di_listener_dll
+                DILL._dll.init()
+            except Exception as error:
+                msg = f"Unable to initialize DirectInput: {_dll_path}\n{error}"
+                display_error(msg)
+                logging.getLogger("system").critical(msg)
+                os._exit(1)
+
+            DILL.initalized = True
 
     @staticmethod
     def set_input_event_callback(callback):
@@ -611,6 +658,7 @@ class DILL:
         float
             Current value of the specific axis for the desired device.
         """
+        
         return DILL._dll.get_axis(guid.ctypes, index)
 
     @staticmethod
@@ -694,7 +742,3 @@ class DILL:
             if "returns" in params:
                 dll_fn.restype = params["returns"]
 
-
-# Initialize the class
-DILL.init()
-DILL.initialize_capi()

@@ -23,10 +23,14 @@ import dinput
 
 from . import common, error, util
 from vjoy import vjoy
+from dinput import DeviceSummary
 
 
 # List of all joystick devices
 _joystick_devices = []
+
+# map of physical devices by their GUID
+_joystick_device_guid_map = {}
 
 # Joystick initialization lock
 _joystick_init_lock = threading.Lock()
@@ -152,6 +156,18 @@ def vjoy_id_from_guid(guid):
         f"Could not find vJoy matching guid {str(guid)}"
     )
     return 1
+
+def device_name_from_guid(guid) -> str:
+    ''' gets device name from GUID '''
+    if guid in _joystick_device_guid_map.keys():
+        return _joystick_device_guid_map[guid].name
+    return None
+    
+def device_info_from_guid(guid) -> DeviceSummary:
+    ''' gets physical device information '''
+    if guid in _joystick_device_guid_map.keys():
+        return _joystick_device_guid_map[guid]
+    return None
 
 
 def linear_axis_index(axis_map, axis_index):
@@ -299,5 +315,8 @@ def joystick_devices_initialization():
     # Update device list which will be used when queries for joystick devices
     # are made
     _joystick_devices = devices
+    # device: dinput.DILL.DeviceSummary
+    for device in devices:
+        _joystick_device_guid_map[device.device_guid] = device
 
     _joystick_init_lock.release()

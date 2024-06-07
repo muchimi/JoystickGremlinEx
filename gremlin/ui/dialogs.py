@@ -27,9 +27,13 @@ import dinput
 import gremlin
 from PySide6.QtGui import QIcon as load_icon
 from PySide6.QtWidgets import QMessageBox
+from gremlin.clipboard import Clipboard
+import gremlin.config
+import gremlin.joystick_handling
 from joystick_gremlin import GremlinUi
 from . import common, ui_about
 from gremlin.common import load_icon
+import logging
 
 
 class OptionsUi(common.BaseDialogUi):
@@ -117,6 +121,11 @@ class OptionsUi(common.BaseDialogUi):
         )
         self.persist_clipboard.clicked.connect(self._persist_clipboard)
         self.persist_clipboard.setChecked(self._persist_clipboard_enabled())
+
+        # verbose output
+        self.verbose = QtWidgets.QCheckBox("Verbose log")
+        self.verbose.clicked.connect(self._verbose)
+        self.verbose.setChecked(self.config.verbose)
 
         # Show message on mode change
         self.show_mode_change_message = QtWidgets.QCheckBox(
@@ -226,6 +235,7 @@ class OptionsUi(common.BaseDialogUi):
         self.general_layout.addWidget(self.start_minimized)
         self.general_layout.addWidget(self.start_with_windows)
         self.general_layout.addWidget(self.persist_clipboard)
+        self.general_layout.addWidget(self.verbose)
         self.general_layout.addWidget(self.show_mode_change_message)
 
         self.general_layout.addLayout(self.default_action_layout)
@@ -454,6 +464,12 @@ If this option is on, the last active profile will remain active until a differe
 
     def _persist_clipboard_enabled(self):
         return self.config.persist_clipboard
+    
+    def _verbose(self, clicked):
+        ''' stores verbose setting '''
+        self.config.verbose = clicked
+        self.config.save
+
 
     def _start_windows(self, clicked):
         """Set registry entry to launch Joystick Gremlin on login.
@@ -1156,55 +1172,137 @@ class DeviceInformationUi(common.BaseDialogUi):
         self.devices = gremlin.joystick_handling.joystick_devices()
 
         self.setWindowTitle("Device Information")
-        self.main_layout = QtWidgets.QGridLayout(self)
-        w = 230
 
-        self.main_layout.addWidget(QtWidgets.QLabel("<b>Name</b>"), 0, 0)
-        self.main_layout.addWidget(QtWidgets.QLabel("<b>Axes</b>"), 0, 1)
-        self.main_layout.addWidget(QtWidgets.QLabel("<b>Buttons</b>"), 0, 2)
-        self.main_layout.addWidget(QtWidgets.QLabel("<b>Hats</b>"), 0, 3)
-        self.main_layout.addWidget(QtWidgets.QLabel("<b>Vendor ID</b>"), 0, 4)
-        self.main_layout.addWidget(QtWidgets.QLabel("<b>Product ID</b>"), 0, 5)
-        self.main_layout.addWidget(QtWidgets.QLabel("<b>GUID"), 0, 6)
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+
+        self.scroll_area = QtWidgets.QScrollArea()
+        self.scroll_widget = QtWidgets.QWidget()
+        self.scroll_layout = QtWidgets.QVBoxLayout()
+        self.table = QtWidgets.QTableWidget()
+        self.table.setSortingEnabled(True)
+
+        self.scroll_widget.setLayout(self.scroll_layout)
+        self.scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
+        self.scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+
+        # Configure the scroll area
+        self.scroll_area.setMinimumWidth(400)
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setWidget(self.scroll_widget)  
+
+        self.scroll_layout.addWidget(self.table)     
+
+        self.main_layout.addWidget(self.scroll_area)
+        
+
+        # row headers
+
+        headers = [
+            "Device Name",
+            "Axis Count",
+            "Buttons Count",
+            "Hat Count",
+            "Vendor ID",
+            "Product ID",
+            "GUID",
+            "Device name (nocase)"
+        ]
+
+        # table data 
+
+
+        
+        self.table.setColumnCount(len(headers))
+        self.table.setRowCount(len(self.devices))
+        self.table.setSizeAdjustPolicy(QtWidgets.QAbstractScrollArea.AdjustToContents)
+        self.table.setHorizontalHeaderLabels(headers)
+        self.table.verticalHeader().setVisible(False)
+        self.table.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
+        self.table.customContextMenuRequested.connect(self._context_menu_cb)
+        self.table.viewport().installEventFilter(self)
+
+        self.menu = None # context menu for the table
+        self.menu_item = None # the cell item the menu applies to
 
         for i, entry in enumerate(self.devices):
-            w_name = QtWidgets.QLineEdit()
-            w_name.setText(entry.name)
-            w_name.setReadOnly(True)
-            w_name.setMinimumWidth(w)
-            w_name.setMaximumWidth(w)
-            self.main_layout.addWidget(
-                w_name, i+1, 0
-            )
-            self.main_layout.addWidget(
-                QtWidgets.QLabel(str(entry.axis_count)), i+1, 1
-            )
-            self.main_layout.addWidget(
-                QtWidgets.QLabel(str(entry.button_count)), i+1, 2
-            )
-            self.main_layout.addWidget(
-                QtWidgets.QLabel(str(entry.hat_count)), i+1, 3
-            )
-            self.main_layout.addWidget(
-                QtWidgets.QLabel(f"{entry.vendor_id:04X}"), i+1, 4
-            )
-            self.main_layout.addWidget(
-                QtWidgets.QLabel(f"{entry.product_id:04X}"), i+1, 5
-            )
-            guid_field = QtWidgets.QLineEdit()
-            guid_field.setText(str(entry.device_guid))
-            guid_field.setReadOnly(True)
-            guid_field.setMinimumWidth(w)
-            guid_field.setMaximumWidth(w)
-            self.main_layout.addWidget(guid_field, i+1, 6)
+            # w_name = QtWidgets.QLineEdit()
+            # w_name.setText(entry.name)
+            # w_name.setReadOnly(True)
+            # w_name.setMinimumWidth(w)
+            # w_name.setMaximumWidth(w)
+            self.table.setItem(i, 0, QtWidgets.QTableWidgetItem(entry.name))
+            self.table.setItem(i, 1, QtWidgets.QTableWidgetItem(str(entry.axis_count)))
+            self.table.setItem(i, 2, QtWidgets.QTableWidgetItem(str(entry.button_count)))
+            self.table.setItem(i, 3, QtWidgets.QTableWidgetItem(str(entry.hat_count)))
+            self.table.setItem(i, 4, QtWidgets.QTableWidgetItem(f"{entry.vendor_id:04X}"))
+            self.table.setItem(i, 5, QtWidgets.QTableWidgetItem(f"{entry.product_id:04X}"))
+
+
+            # guid_field = QtWidgets.QLineEdit()
+            # guid_field.setText(str(entry.device_guid))
+            # guid_field.setReadOnly(True)
+            # guid_field.setMinimumWidth(w)
+            # guid_field.setMaximumWidth(w)
+
+            self.table.setItem(i, 6, QtWidgets.QTableWidgetItem(str(entry.device_guid)))
+            self.table.setItem(i, 7, QtWidgets.QTableWidgetItem(entry.name.lower()))
+
+        # resize
+        self.table.resizeColumnsToContents()
+
+        # toolbar 
+        
+        self.tool_widget = QtWidgets.QWidget()
+        self.tool_layout = QtWidgets.QHBoxLayout()
+        self.tool_widget.setLayout(self.tool_layout)
 
         self.script_copy_button = QtWidgets.QPushButton("Generate plugin script header")
         self.script_copy_button.clicked.connect(self._copy_to_script)
-        self.main_layout.addWidget(self.script_copy_button, len(self.devices)+1, 1)
+        self.tool_layout.addWidget(self.script_copy_button)
 
         self.close_button = QtWidgets.QPushButton("Close")
         self.close_button.clicked.connect(lambda: self.close())
-        self.main_layout.addWidget(self.close_button, len(self.devices)+1, 3)
+        self.tool_layout.addWidget(self.close_button)
+
+        self.main_layout.addWidget(self.tool_widget)
+
+    def eventFilter(self, source, event):
+        ''' table event filter '''
+        if isinstance(event, QtGui.QSinglePointEvent) and event.type() == QtCore.QEvent.MouseButtonPress and source is self.table.viewport():
+            button = event.buttons()
+            if button == QtCore.Qt.RightButton:
+                pos = event.position().toPoint()
+                item = self.table.itemAt(pos)
+                if item is not None:
+                    verbose = gremlin.config.Configuration().verbose        
+                    if verbose:
+                        logging.getLogger("system").info(f"DeviceInfo: context click on: {item.row()} {item.column()} {item.text()}")
+                    self.menu = QtWidgets.QMenu(self)
+                    action = QtWidgets.QWidgetAction(self)
+                    label = QtWidgets.QLabel(self)
+                    label.setText("Copy")
+                    label.setMargin(4)
+                    action.setDefaultWidget(label)
+                    action.triggered.connect(self._menu_copy)
+                    self.menu.addAction(action)
+                    self.menu_item = item
+        return super().eventFilter(source, event)
+
+    def _menu_copy(self, widget):
+        ''' handles copy operation'''
+        item = self.menu_item
+        if item:
+            # copy the data to the clipboard
+            clipboard = Clipboard()
+            clipboard.set_windows_clipboard_text(item.text())
+            verbose = gremlin.config.Configuration().verbose
+            if verbose:
+                logging.getLogger("system").info(f"DeviceInfo: copy to clipboard Item: {item.row()} {item.column()} {item.text()}")
+
+    def _context_menu_cb(self, loc):
+        ''' context menu for the table '''
+        if self.menu:
+            self.menu.exec(self.table.mapToGlobal(loc))
 
     def _copy_to_script(self):
         ''' copies device entries to clipboard in script format '''
@@ -1249,8 +1347,10 @@ class DeviceInformationUi(common.BaseDialogUi):
             for line in a_map[mode_name]:
                 script += line + "\n"
 
-        app = QtWidgets.QApplication.instance()
-        app.clipboard().setText(script)
+        # set the clipboard data
+        clipboard = Clipboard()
+        clipboard.set_windows_clipboard_text(script)
+        
 
 
 

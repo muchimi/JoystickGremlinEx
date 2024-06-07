@@ -21,6 +21,7 @@ from ctypes import wintypes
 import threading
 
 import gremlin.common
+from gremlin.singleton_decorator import SingletonDecorator
 
 
 user32 = ctypes.WinDLL("user32")
@@ -275,7 +276,7 @@ class MouseEvent:
         return self._is_injected
 
 
-@gremlin.common.SingletonDecorator
+@SingletonDecorator
 class KeyboardHook:
 
     """Hooks into the event stream and grabs keyboard related events
@@ -330,7 +331,7 @@ class KeyboardHook:
             user32.DispatchMessageW(ctypes.byref(msg))
 
 
-@gremlin.common.SingletonDecorator
+@SingletonDecorator
 class MouseHook:
 
     """Hooks into the event stream and grabs mouse related events

@@ -27,8 +27,7 @@ from typing import List, Optional
 from PySide6 import QtCore, QtQml
 from PySide6.QtCore import Property, Signal, Slot
 
-from gremlin import event_handler, input_devices, keyboard, shared_state, \
-    windows_event_hook
+from gremlin import event_handler, input_devices, keyboard, shared_state,  windows_event_hook
 
 from gremlin.types import InputType
 

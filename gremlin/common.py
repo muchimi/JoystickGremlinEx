@@ -26,19 +26,6 @@ from PySide6 import QtGui
 
 
 
-class SingletonDecorator:
-
-    """Decorator turning a class into a singleton."""
-
-    def __init__(self, klass):
-        self.klass = klass
-        self.instance = None
-
-    def __call__(self, *args, **kwargs):
-        if self.instance is None:
-            self.instance = self.klass(*args, **kwargs)
-        return self.instance
-
 
 class InputType(enum.Enum):
 
@@ -437,6 +424,8 @@ def find_file(icon_path):
 
     from pathlib import Path
     from gremlin.util import get_root_path
+    from gremlin.config import Configuration
+    verbose = Configuration().verbose
 
     icon_path = icon_path.lower().replace("/",os.sep)
     sub_folders = None
@@ -458,8 +447,11 @@ def find_file(icon_path):
             extensions = [ext]
         else:
             extensions = [".svg",".png"]
-       
+        circuit_breaker = 1000
         for dirpath, _, filenames in os.walk(root_folder):
+            circuit_breaker-=1
+            if circuit_breaker == 0:
+                break
             if sub_folders and not dirpath.endswith(sub_folders):
                 continue
             for filename in [f.lower() for f in filenames]:
@@ -469,9 +461,16 @@ def find_file(icon_path):
                     
     if files:
         files.sort(key = lambda x: len(x)) # shortest to largest
-        icon_path = files.pop(0) # grab the first one
-        return icon_path
+        found_path = files.pop(0) # grab the first one
+        if verbose:
+            logging.getLogger("system").info(f"Find_files() - found : {found_path} for {icon_path}")
+        return found_path
     
+    if circuit_breaker == 0:
+        logging.getLogger("system").error(f"Find_files() - search exceeded maximum when searching for: {icon_path}")
+    
+    if verbose or circuit_breaker == 0:
+        logging.getLogger("system").error(f"Find_files() failed for: {icon_path}")
     return None
 
 
@@ -484,6 +483,9 @@ def get_icon_path(*paths):
         '''
 
         from gremlin.util import get_root_path
+        from gremlin.config import Configuration
+        verbose = Configuration().verbose
+        
 
         # be aware of runtime environment
         root_path = get_root_path()
@@ -491,22 +493,26 @@ def get_icon_path(*paths):
         icon_file = os.path.join(root_path, the_path).replace("/",os.sep).lower()
         if icon_file:
             if os.path.isfile(icon_file):
-                #logging.getLogger("system").info(f"Icon file (straight) found: {icon_file}")        
+                if verbose:
+                    logging.getLogger("system").info(f"Icon file (straight) found: {icon_file}")        
                 return icon_file
             if not icon_file.endswith(".png"):
                 icon_file_png = icon_file + ".png"
                 if os.path.isfile(icon_file_png):
-                    #logging.getLogger("system").info(f"Icon file (png) found: {icon_file_png}")        
+                    if verbose:
+                        logging.getLogger("system").info(f"Icon file (png) found: {icon_file_png}")        
                     return icon_file_png
             if not icon_file.endswith(".svg"):
                 icon_file_svg = icon_file + ".svg"
                 if os.path.isfile(icon_file_svg):
-                    #logging.getLogger("system").info(f"Icon file (svg) found: {icon_file_svg}")        
+                    if verbose:
+                        logging.getLogger("system").info(f"Icon file (svg) found: {icon_file_svg}")        
                     return icon_file_svg
             brute_force = find_file(the_path)
             if brute_force and os.path.isfile(brute_force):
                 return brute_force
-        logging.getLogger("system").warning(f"Icon file not found: {icon_file}")
+        
+        logging.getLogger("system").error(f"Icon file not found: {icon_file}")
     
         return None
 
@@ -520,23 +526,35 @@ def load_pixmap(*paths):
             return None
         return pixmap
     
-    logging.getLogger("system").warning(f"load_pixmap(): invalid path")
+    logging.getLogger("system").error(f"load_pixmap(): invalid path")
     return None
 
 def load_icon(*paths):
     ''' gets an icon (returns a QIcon) '''
+    from gremlin.config import Configuration
+    verbose = Configuration().verbose
     pixmap = load_pixmap(*paths)
     if not pixmap or pixmap.isNull():
+        if verbose:
+            logging.getLogger("system").info(f"LoadIcon() using generic icon - failed to locate: {paths}")        
         return get_generic_icon()
     icon = QtGui.QIcon()
     icon.addPixmap(pixmap, QtGui.QIcon.Normal)
+    if verbose:
+        logging.getLogger("system").info(f"LoadIcon() found icon: {paths}") 
     return icon
 
 def load_image(*paths):
     ''' loads an image '''
+    from gremlin.config import Configuration
+    verbose = Configuration().verbose
     the_path = get_icon_path(*paths)
     if the_path:
+        if verbose:
+            logging.getLogger("system").info(f"LoadImage() found image: {paths}") 
         return QtGui.QImage(the_path)
+    if verbose:
+            logging.getLogger("system").info(f"LoadImage() failed to locate: {paths}")        
     return None
         
     
@@ -547,7 +565,7 @@ def get_generic_icon():
     from gremlin.util import get_root_path
     root_path = get_root_path()
     generic_icon = os.path.join(root_path, "gfx/generic.png")
-    if os.path.isfile(generic_icon):
+    if generic_icon and os.path.isfile(generic_icon):
         pixmap = QtGui.QPixmap(generic_icon)
         if pixmap.isNull():
             logging.getLogger("system").warning(f"load_icon(): generic pixmap failed: {generic_icon}")

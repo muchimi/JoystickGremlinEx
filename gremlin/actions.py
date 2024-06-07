@@ -207,6 +207,9 @@ class JoystickCondition(AbstractCondition):
         :return True if the condition is satisfied, False otherwise
         """
         joy = input_devices.JoystickProxy()[self.device_guid]
+        if joy is None:
+            # device not found - ignore
+            return False
 
         if self.input_type == common.InputType.JoystickAxis:
             in_range = self.condition.range[0] <= \
@@ -271,6 +274,9 @@ class VJoyCondition(AbstractCondition):
             )
             return False
         joy = input_devices.JoystickProxy()[self.device_guid]
+        if joy is None:
+            # device not found - ignore
+            return False
 
         if self.input_type == common.InputType.JoystickAxis:
             in_range = self.condition.range[0] <= \

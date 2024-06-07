@@ -83,6 +83,7 @@ class BasicContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
 
         :param action_name the name of the action to add
         """
+        from gremlin.clipboard import Clipboard
         if action_data is None:
             return
         if isinstance(action_data, str):
