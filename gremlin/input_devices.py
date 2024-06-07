@@ -1400,9 +1400,9 @@ class JoystickProxy:
                 joy = JoystickWrapper(device_guid)
                 JoystickProxy.joystick_devices[device_guid] = joy
             else:
-                raise error.GremlinError(
-                    f"No device with guid {device_guid} exists"
-                )
+                syslog.warning(f"Requested device with guid {device_guid} not found in current hardware set")
+                return None
+
 
         return JoystickProxy.joystick_devices[device_guid]
 

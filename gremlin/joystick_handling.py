@@ -161,11 +161,13 @@ def device_name_from_guid(guid) -> str:
     ''' gets device name from GUID '''
     if guid in _joystick_device_guid_map.keys():
         return _joystick_device_guid_map[guid].name
+    return None
     
 def device_info_from_guid(guid) -> DeviceSummary:
     ''' gets physical device information '''
     if guid in _joystick_device_guid_map.keys():
         return _joystick_device_guid_map[guid]
+    return None
 
 
 def linear_axis_index(axis_map, axis_index):

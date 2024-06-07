@@ -67,7 +67,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.13ex (g)"
+APPLICATION_VERSION = "13.40.13ex (h)"
 
 
 from gremlin.singleton_decorator import SingletonDecorator
@@ -859,7 +859,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                 # Stop Gremlin execution
                 self.ui.actionActivate.setChecked(False)
                 restart = self.runner.is_running()
-                self.activate(False, restart)
+                self.activate(restart)
             finally:
 
                 if verbose:

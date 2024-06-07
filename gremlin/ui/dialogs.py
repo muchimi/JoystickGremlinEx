@@ -27,7 +27,7 @@ import dinput
 import gremlin
 from PySide6.QtGui import QIcon as load_icon
 from PySide6.QtWidgets import QMessageBox
-import gremlin.clipboard
+from gremlin.clipboard import Clipboard
 import gremlin.config
 import gremlin.joystick_handling
 from joystick_gremlin import GremlinUi
@@ -1293,7 +1293,7 @@ class DeviceInformationUi(common.BaseDialogUi):
         item = self.menu_item
         if item:
             # copy the data to the clipboard
-            clipboard = gremlin.clipboard.Clipboard()
+            clipboard = Clipboard()
             clipboard.set_windows_clipboard_text(item.text())
             verbose = gremlin.config.Configuration().verbose
             if verbose:
@@ -1347,8 +1347,10 @@ class DeviceInformationUi(common.BaseDialogUi):
             for line in a_map[mode_name]:
                 script += line + "\n"
 
-        app = QtWidgets.QApplication.instance()
-        app.clipboard().setText(script)
+        # set the clipboard data
+        clipboard = Clipboard()
+        clipboard.set_windows_clipboard_text(script)
+        
 
 
 

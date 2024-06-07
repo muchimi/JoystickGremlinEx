@@ -1486,6 +1486,7 @@ class Profile():
             if add_device:
                 new_device = Device(self)
                 new_device.name = dev.name
+                new_device.virtual = True
                 if dev.is_virtual:
                     new_device.type = DeviceType.VJoy
                     new_device.device_guid = dev.device_guid
@@ -1686,6 +1687,7 @@ class Device:
         self.device_guid = None
         self.modes = {}
         self.type = None
+        self.virtual = False # true if the device was found in the detected hardware list
 
     def ensure_mode_exists(self, mode_name, device=None):
         """Ensures that a specified mode exists, creating it if needed.
@@ -1785,7 +1787,9 @@ class Mode:
             if item.input_type == InputType.JoystickAxis \
                     and dinput.DILL.device_exists(self.parent.device_guid):
                 joy = input_devices.JoystickProxy()[self.parent.device_guid]
-                store_item = joy.is_axis_valid(item.input_id)
+                if joy is not None:
+                    store_item = joy.is_axis_valid(item.input_id)
+                    
 
             if store_item:
                 self.config[item.input_type][item.input_id] = item

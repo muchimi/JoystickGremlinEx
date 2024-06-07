@@ -71,7 +71,7 @@ Joystick Gremlin EX
 <!-- TOC --><a name="changelog"></a>
 ## Changelog
 
-### 6/6/24 - 13.40.13ex (g) **potentially breaking change**
+### 6/6/24 - 13.40.13ex (h) **potentially breaking change**
 
 - GremlinEx will now more gracefully handle DLL errors and check driver and DLL versions.  If the driver and DLL versions are not at minimum levels expected, an error box will be displayed and will exit the app to avoid further errors due to mismatched versions.
 
@@ -90,6 +90,11 @@ Sequence wise, install vJoy first, then HIDHide.
 
 Updated Device Information dialog to use a table format that is user resizeable.  Right click on any cell to copy its contents to the clipboard.
   
+Bug fix for device removal / addition while a profile is running.
+
+If a device is referenced by a script or profile and cannot be found as GremlinEx is running, or if it was added/removed dynamically while GremlinEx is running, this will no longer throw an exception.  The issue will be logged as a warning to the log file and calls using that device will just be ignored.  Plugin scripts should ensure they now check the return value of any proxy call when looking for a device as the call my return null (None) if the device cannot be found.  It is generally discouraged to change hardware configurations while GremlinEx is running, or change device hardware IDs as those are stored in profiles, and will be ignored if the ID is no longer found.  
+Missing IDs in profile will be logged to the log file and a message box displayed at load time.
+
 
 6/2/24 - 13.40.13ex (a) **potentially breaking change**
 
