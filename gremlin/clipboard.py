@@ -3,6 +3,7 @@ import dill
 import base64
 import os
 
+import logging
 from PySide6 import QtCore
 from gremlin.base_classes import AbstractAction, AbstractContainer
 from gremlin.util import userprofile_path
@@ -51,8 +52,16 @@ class Clipboard(QtCore.QObject):
             # see if the file exists
             if os.path.isfile(self._clipboard_file):
                 # load from that
+                read_ok = True
                 with open(self._clipboard_file,"rb") as f:
-                    data = dill.load(f)
+                    try:
+                        data = dill.load(f)
+                    except Exception as error:
+                        data = None
+                        read_ok = False
+                if not read_ok:
+                    os.unlink(self._clipboard_file)
+
         else:
             try:
                 win32clipboard.OpenClipboard()
@@ -78,9 +87,16 @@ class Clipboard(QtCore.QObject):
 
             # persist to a temporary file
             if self._persist_to_file:
-                 with open(self._clipboard_file,"wb") as f:
-                    dill.dump(value, f)
-                    f.flush()
+                write_ok = True
+                with open(self._clipboard_file,"wb") as f:
+                    try:
+                        dill.dump(value, f)
+                        f.flush()
+                    except Exception as error:
+                        write_ok = False
+                        logging.getLogger("system").error(f"Unable to store clipboard data: {error}")
+                if not write_ok and os.path.isfile(self._clipboard_file):
+                    os.unlink(self._clipboard_file)
 
             # update the windows clipboard too
             try:
