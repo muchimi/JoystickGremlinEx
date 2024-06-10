@@ -15,6 +15,76 @@ from .SimConnect.Enum import *
 from gremlin.singleton_decorator import SingletonDecorator
 import enum
 
+''' full axis range commands -16883 to + 16383 '''
+_simconnect_full_range = [
+                        "AXIS_THROTTLE_SET",
+                        "AXIS_THROTTLE1_SET",
+                        "AXIS_THROTTLE2_SET",
+                        "AXIS_THROTTLE3_SET",
+                        "AXIS_THROTTLE4_SET",
+                        "AXIS_LEFT_BRAKE_SET",
+                        "AXIS_RIGHT_BRAKE_SET",
+                        "AXIS_MIXTURE_SET",
+                        "AXIS_MIXTURE1_SET",
+                        "AXIS_MIXTURE2_SET",
+                        "AXIS_MIXTURE3_SET",
+                        "AXIS_MIXTURE4_SET",
+                        "AXIS_PROPELLER_SET",
+                        "AXIS_PROPELLER1_SET",
+                        "AXIS_PROPELLER2_SET",
+                        "AXIS_PROPELLER3_SET",
+                        "AXIS_PROPELLER4_SET",
+                        "AXIS_ELEVATOR_SET",
+                        "AXIS_AILERONS_SET",
+                        "AXIS_RUDDER_SET",
+                        "AXIS_ELEV_TRIM_SET",
+                        "AXIS_SPOILER_SET",
+                        "AXIS_FLAPS_SET",
+                        "AXIS_SLEW_AHEAD_SET",
+                        "AXIS_SLEW_SIDEWAYS_SET",
+                        "AXIS_SLEW_HEADING_SET",
+                        "AXIS_SLEW_ALT_SET",
+                        "AXIS_SLEW_BANK_SET",
+                        "AXIS_SLEW_PITCH_SET",
+                        "AXIS_PAN_PITCH",
+                        "AXIS_PAN_HEADING",
+                        "AXIS_PAN_TILT",
+]
+
+''' half axis range commands 0..16384'''
+_simconnect_half_range = ["THROTTLE1_SET",
+                      "THROTTLE2_SET",
+                      "THROTTLE3_SET",
+                      "THROTTLE4_SET",
+                      "AXIS_THROTTLE_SET",
+                      "THROTTLE_SET",
+                      "MIXTURE1_SET",
+                      "MIXTURE2_SET",
+                      "MIXTURE3_SET",
+                      "MIXTURE4_SET",
+                      "PROP_PITCH1_SET",
+                      "PROP_PITCH2_SET",
+                      "PROP_PITCH3_SET",
+                      "PROP_PITCH4_SET",
+                      "SPOILERS_SET",
+                      "FLAPS_SET",
+                      "ELEVATOR_TRIM_SET",
+                      ]
+
+''' angle range commands 0..360'''
+_simconnect_angle_range = ["VOR1_SET",
+                           "VOR2_SET",
+                           "ADF_CARD_SET",
+                           "KEY_TUG_HEADING",
+                           ]
+
+''' EGT range comamnds 0..32767 '''
+_simconnect_egt_range = ["EGT1_SET",
+                         "EGT2_SET",
+                         "EGT3_SET",
+                         "EGT4_SET",
+                         "EGT_SET"
+]
 
 class SimConnectEventCategory(enum.Enum):
     NotSet = 0,
@@ -85,7 +155,7 @@ _simconnect_event_category_to_string_lookup = {
     SimConnectEventCategory.FreezingPosition : "Freezing Position",
     SimConnectEventCategory.MissionKeys : "Mission Keys",
     SimConnectEventCategory.ATC : "ATC",
-    SimConnectEventCategory.Multiplayer :"Multiplayer"
+    SimConnectEventCategory.Multiplayer :"Multiplayer",
 }
 
 _simconnect_event_category_to_enum_lookup = {
@@ -113,6 +183,14 @@ _simconnect_event_category_to_enum_lookup = {
 }
 
 
+class SimConnectBlockType(enum.Enum):
+    NotSet = 0,
+    Event = 1,
+    Request = 2,
+
+
+    
+        
 
 @SingletonDecorator
 class SimConnectData():
@@ -214,40 +292,32 @@ class SimConnectData():
         return self._aircraft_events
     
     @property
-    def ok(self):
+    def ok(self) -> bool:
         ''' true if simconnect is ok '''
         return self._sm.ok
     
     @property
-    def running(self):
+    def running(self) -> bool:
         ''' true if sim is running '''
         return self._sm.running
     
     @property
-    def paused(self):
+    def paused(self) -> bool:
         ''' true if sim is paused '''
         return self._sm.paused
     
     @property
-    def sm(self):
+    def sm(self) -> SimConnect:
         ''' simconnect object'''
         return self._sm
-
-    # def get_flight_control_commands(self):
-    #     ''' gets flight control data '''
-    #     return self.get_command_list(SimConnectEventCategory.FlightControls)
-        
     
-    # def get_command_list(self, category : SimConnectEventCategory = None):
-    #     ''' gets the commands for a particular category'''
-    #     data = self._command_map.keys()
-    #     # if not category:
-    #     #     data = [item[1] for item in self._commands]
-    #     # else:
-    #     #     data = [item[1] for item in self._category_commands[category]]
-    #     data.sort()
-    #     return data
-
+    def ensure_running(self):
+        ''' ensure simconnect is connected '''
+        if self._sm.ok:
+            if not self._sm.running:
+                self._sm.connect()
+            return self._sm.running
+        return False
 
     def get_category_list(self):
         ''' returns the list of supported command categories '''
@@ -290,3 +360,190 @@ class SimConnectData():
         ''' gets request parameter data '''
         if request in self._requests:
             return self._aircraft_requests.find(request)
+
+
+
+class SimConnectBlock():
+    ''' holds simconnect block information '''
+    def __init__(self, command = None):
+        ''' creates a simconnect block object
+        
+        the block auto-configures itself based on the command, and determines
+        range, values and options, and what type of command it is.
+
+        :param command The simconnect command (event or request)
+        
+        '''
+        self._block_type = SimConnectBlockType.NotSet
+        self._description = None
+        self._value_type = None
+        self._category = SimConnectEventCategory.NotSet
+        self._command = None
+        self._set_value = False # true if the item can set a value
+        self._readonly = False # if readonly - the request cannot be triggered
+        self._data_type = None
+        self._is_angle = False # true if the value is an angle 0 360, if false use axis values
+        self._min_range = -16383
+        self._max_range = 16383
+        self._is_ranged = False # true if the command is ranged
+        self._command = command
+        if command:
+            self._update()
+
+    @property
+    def command(self):
+        ''' the block command'''
+        return self._command
+    
+    @command.setter
+    def command(self, value):
+        self._command = value
+        self._update()
+
+    @property
+    def is_request(self) -> bool:
+        ''' true if the block is a request '''
+        return self._block_type == SimConnectBlockType.Request
+    
+    @property
+    def is_event(self) -> bool:
+        ''' true if the block is an event '''
+        return self._block_type == SimConnectBlockType.Event
+    
+    @property
+    def block_type(self):
+        ''' returns the block type '''
+        return self._block_type
+    
+    @property
+    def display_block_type(self) -> str:
+        ''' returns the display string for the block type '''
+        if self._block_type == SimConnectBlockType.Request:
+            return "Request"
+        elif self._block_type == SimConnectBlockType.Event:
+            return "Event"
+        return ""
+    
+    @property
+    def category(self) -> str:
+        ''' command category '''
+        return self._category
+    
+    @property
+    def readonly(self) -> bool:
+        ''' true if readonly '''
+        return self._readonly
+    
+    @property
+    def data_type(self) -> str:
+        ''' Simconnect datatype '''
+        return self._data_type
+    
+    @property
+    def display_data_type(self) -> str:
+        ''' returns a displayable data type even if none is set '''
+        return self._data_type if self._data_type else 'N/A'
+    
+    @property
+    def min_range(self):
+        ''' current min range '''
+        return self._min_range
+    
+    @property
+    def max_range(self):
+        ''' current max range '''
+        return self._max_range
+    
+    @property
+    def is_ranged(self):
+        ''' true if the command is a ranged command '''
+        return self._is_ranged
+    
+    @property
+    def description(self):
+        ''' returns the command description'''
+        return self._description
+    
+    @property
+    def valid(self) -> bool:
+        return self._command is not None
+
+
+    
+    def _set_range(self):
+        ''' sets the data range from the current command '''
+        is_ranged = False
+        if self._command in _simconnect_half_range:
+            self._min_range = 0
+            self._max_range = 16383
+            is_ranged = True
+        elif self._command in _simconnect_angle_range:
+            self._min_range = 0
+            self._max_range = 360
+            is_ranged = True
+        elif self._command in _simconnect_egt_range:
+            self._min_range = 0
+            self._max_range = 32767
+            is_ranged = True
+        elif self.command in _simconnect_full_range:
+            self._min_range = -16383
+            self._max_range = 16383
+            is_ranged = True
+        else:
+            # default
+            self._min_range = -16383
+            self._max_range = 16383
+        self._is_ranged = is_ranged
+
+    def _update(self):
+        ''' updates on new command '''
+        smdata = SimConnectData()
+        command = self._command
+        data = smdata.get_command_data(command)   
+        if data:
+            self._data = data
+            if data[0] == "e":
+                self._block_type = SimConnectBlockType.Event
+                self._description = data[1][2]
+                self._value_type = ""
+                self._category = smdata.get_command_category(command)
+                self._readonly = False # can trigger events
+
+            elif data[0] == "r":
+                self._block_type = SimConnectBlockType.Event
+                self._description = data[1][0]
+                self._value_type = data[1][2].decode('ascii')
+                self._category = smdata.get_command_category(command)
+                self._readonly = data[1][3] != 'Y'
+
+            self._set_range()
+        
+    
+    @staticmethod
+    def from_command(self, command, smdata : SimConnectData):
+        ''' '''
+        block = SimConnectBlock(smdata, command)
+        return block
+    
+    def execute(self, value = None):
+        ''' executes the command '''
+        if self._command and self._sm_data.ensure_running():
+            if self._block_type == SimConnectBlockType.Event:
+                ae = AircraftEvents(self._sm_data.sm)
+                trigger = ae.find(self._command)
+                if trigger:
+                    if self._set_value:
+                        trigger(value)
+                    else:
+                        trigger()
+
+            elif self._block_type == SimConnectBlockType.Request and not self._readonly:
+                ar = AircraftRequests(self._sm_data.sm, _time=2000)
+                ar.set(self._command, value)
+
+            return True
+        return False
+                
+
+                
+

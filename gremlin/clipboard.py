@@ -5,6 +5,9 @@ import os
 
 import logging
 from PySide6 import QtCore
+from PySide6.QtWidgets import QApplication
+from PySide6.QtGui import QClipboard
+
 from gremlin.base_classes import AbstractAction, AbstractContainer
 from gremlin.util import userprofile_path
 import gremlin.config
@@ -64,9 +67,7 @@ class Clipboard(QtCore.QObject):
 
         else:
             try:
-                win32clipboard.OpenClipboard()
-                pickled = win32clipboard.GetClipboardData()
-                win32clipboard.CloseClipboard()
+                pickled = self.get_windows_clipboard_text()
                 if pickled and pickled.endswith("="):
                     # attempt to decode data into python object
                     data = dill.loads(base64.b64decode(pickled)).encode()
@@ -98,25 +99,42 @@ class Clipboard(QtCore.QObject):
                 if not write_ok and os.path.isfile(self._clipboard_file):
                     os.unlink(self._clipboard_file)
 
-            # update the windows clipboard too
-            try:
-                data = dill.dumps(value)
-                pickled = base64.b64encode(data).decode('ascii')
-
-                win32clipboard.OpenClipboard()
-                win32clipboard.EmptyClipboard()
-                win32clipboard.SetClipboardText(pickled, win32clipboard.CF_TEXT)
-                win32clipboard.CloseClipboard()
-            except:
-                # unable to encode
-                pass
+            
+            else:
+                # persist to windows clipboard
+                try:
+                    data = dill.dumps(value)
+                    pickled = base64.b64encode(data).decode('ascii')
+                    self.set_windows_clipboard_text(pickled)
+                    
+                except:
+                    # unable to encode
+                    pass
 
     def set_windows_clipboard_text(self, value):
         ''' sets the windows clipboard text '''
-        win32clipboard.OpenClipboard()
-        win32clipboard.EmptyClipboard()
-        win32clipboard.SetClipboardText(value, win32clipboard.CF_TEXT)
-        win32clipboard.CloseClipboard()
+        # method 1
+        clipboard = QApplication.clipboard()
+        clipboard.clear(mode = QClipboard.Mode.Clipboard)
+        clipboard.setText(value, mode = QClipboard.Mode.Clipboard)
+        
+        # method 2
+        # win32clipboard.OpenClipboard()
+        # win32clipboard.EmptyClipboard()
+        # win32clipboard.SetClipboardText(value, win32clipboard.CF_TEXT)
+        # win32clipboard.CloseClipboard()
+
+    def get_windows_clipboard_text(self):
+        ''' gets the windows clipboard text '''
+
+        try:
+            clipboard = QApplication.clipboard()
+            return clipboard.text(mode = QClipboard.Mode.Clipboard)
+        except:
+            return None
+
+        
+                
 
     @property
     def enabled(self):

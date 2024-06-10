@@ -84,8 +84,13 @@ class InputItemConfiguration(QtWidgets.QFrame):
         container.add_action(
             plugin_manager.get_class(action_name)(container)
         )
+
+        # add the container
+        #self.item_data.containers.append(container)
+
         if len(container.action_sets) > 0:
             self.action_model.add_container(container)
+        
         self.action_model.data_changed.emit()
 
     def _paste_action(self, action):

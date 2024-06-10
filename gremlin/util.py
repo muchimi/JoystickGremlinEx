@@ -449,8 +449,8 @@ def get_vjoy_driver_version() -> str:
     p_out = p_out.decode('ascii').lower() # binary string to regular string
     # convert to dict
     for line in p_out.split("\n"):
-        if "vjoy" in line:
-            pass
+        # if "vjoy" in line:
+        #     pass
         if  "vjoy device" in line:
             _, version = line.split(",")
             return version.replace("\r","").replace("\"","")

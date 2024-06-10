@@ -71,7 +71,16 @@ Joystick Gremlin EX
 <!-- TOC --><a name="changelog"></a>
 ## Changelog
 
-### 6/6/24 - 13.40.13ex (h) **potentially breaking change**
+
+13.40.14ex
+
+- New file menu for opening Explorer to the current profile folder
+- New file menu for opening the profile XML in a text editor (it will save the profile first)
+
+- New keystroke editor in map to keyboard ex - allows to select keys and sequence using the mouse and adds support for F13 to F24 keys.
+
+
+6/6/24 - 13.40.13ex (h) **potentially breaking change**
 
 - GremlinEx will now more gracefully handle DLL errors and check driver and DLL versions.  If the driver and DLL versions are not at minimum levels expected, an error box will be displayed and will exit the app to avoid further errors due to mismatched versions.
 

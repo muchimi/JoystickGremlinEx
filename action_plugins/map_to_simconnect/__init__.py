@@ -101,12 +101,29 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.output_layout.addWidget(QtWidgets.QLabel("Output data:"),0,0)
         self.output_layout.addWidget(self.output_mode_widget, 0, 1)
 
+        self.output_type_widget = QtWidgets.QLabel()
+        self.output_layout.addWidget(self.output_type_widget, 1, 0)
+
         self.output_data_type_widget = QtWidgets.QLabel()
-        self.output_layout.addWidget(self.output_data_type_widget, 1,0)
+        self.output_layout.addWidget(self.output_data_type_widget, 1,1)
 
         self.output_value_type_widget = QtWidgets.QLabel()
-        self.output_layout.addWidget(self.output_value_type_widget, 1,1)
+        self.output_layout.addWidget(self.output_value_type_widget, 1,2)
 
+        self.output_min_range_widget = QtWidgets.QSpinBox()
+        self.output_min_range_widget.setRange(-16383,16383)
+        self.output_min_range_widget.setEnabled(False)
+        self.output_layout.addWidget(self.output_min_range_widget, 2,0)
+
+        self.output_max_range_widget = QtWidgets.QSpinBox()
+        self.output_max_range_widget.setRange(-16383,16383)
+        self.output_max_range_widget.setEnabled(False)
+        self.output_layout.addWidget(self.output_max_range_widget, 2,1)
+
+        self.output_readonly_widget = QtWidgets.QCheckBox("Read only")
+        self.output_readonly_widget.clicked.connect(self._readonly_cb)
+        self.output_readonly_widget.setEnabled(False)
+        self.output_layout.addWidget(self.output_readonly_widget, 1,3)
 
         self.action_layout.addWidget(self.action_selector_widget)
         self.action_layout.addWidget(self.output_widget)
@@ -123,35 +140,31 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _command_changed_cb(self, index):
         ''' called when selected command changes '''
         command = self.command_widget.currentText()
-        category = SimConnectEventCategory.NotSet
         self.action_data.command = command
-        data = self._sm_data.get_command_data(command)
-        if not data:
-            # no data
-            self.output_widget.setVisible(False)
+        block = SimConnectBlock(command)
+        self.action_data.block= block
+        self.output_widget.setVisible(block.valid)
+        if block.valid:
+            self.output_type_widget.setText(block.display_block_type)
+            self.command_description_widget.setText(block.description)
+            self.output_data_type_widget.setText(block.display_data_type)
+            self.output_readonly_widget.setChecked(block.readonly)
+            index = self.category_widget.findData(block.category)
+            with QtCore.QSignalBlocker(self.category_widget):
+                self.category_widget.setCurrentIndex(index)  
+            is_ranged = block.is_ranged
+            if is_ranged:
+                self.output_min_range_widget.setValue(block.min_range)  
+                self.output_max_range_widget.setValue(block.max_range)  
+            self.output_min_range_widget.setVisible(is_ranged)
+            self.output_max_range_widget.setVisible(is_ranged)
 
-        else:
-            self.output_widget.setVisible(True)
-            if data[0] == "e":
-                # event type data
-                description = data[1][2]
-                request_type = "Event"
-                value = "N/A"
-                category = self._sm_data.get_command_category(command)
-            elif data[0] == "r":
-                # request type data  "NUMBER_OF_ENGINES": ["Number of engines (minimum 0, maximum 4)", b'NUMBER OF ENGINES', b'Number', 'N'],
-                description = data[1][0]
-                request_type = data[1][2].decode('ascii')
-                value = data[1][3]
-                
 
-            self.command_description_widget.setText(description)
-            self.output_data_type_widget.setText(request_type)
-            self.output_value_type_widget.setText(value)
+        
 
-        index = self.category_widget.findData(category)
-        with QtCore.QSignalBlocker(self.category_widget):
-            self.category_widget.setCurrentIndex(index)
+
+    def _readonly_cb(self):
+        self.output_readonly.setChecked(self.isChecked())  
 
     def _populate_ui(self):
         """Populates the UI components."""
@@ -168,14 +181,22 @@ class MapToSimConnectFunctor(AbstractFunctor):
 
     def __init__(self, action):
         super().__init__(action)
-        self.command = None # the command to execute
-        self.value = None # the value to send
+        self.sm = SimConnectData()
+        self.command = action.command # the command to execute
+        self.value = action.value # the value to send (None if no data to send)
+        self.block = SimConnectBlock.from_command(self.command, self.sm)
     
     def process_event(self, event, value):
 
-        if event.event_type == InputType.JoystickAxis or value.current:
-            # joystick values or virtual button
-            pass
+        if event.event_type == InputType.JoystickAxis:
+            # axis
+            min = 163
+            
+            
+        elif value.current:
+            # button
+            return self.block.execute(self.value)
+        
         return True
 
 
@@ -211,6 +232,7 @@ class MapToSimConnect(AbstractAction):
         self.category = SimConnectEventCategory.NotSet
         self.command = None
         self.value = None
+        self.block = None 
 
     def icon(self):
         """Returns the icon to use for this action.
@@ -264,6 +286,7 @@ class MapToSimConnect(AbstractAction):
 
         :return True if the action is configured correctly, False otherwise
         """
+        #return False
         return True
 
 

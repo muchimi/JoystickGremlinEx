@@ -231,7 +231,7 @@ class ProfileConverter:
     """Handle converting and checking profiles."""
 
     # Current profile version number
-    current_version = 9
+    current_version = 10
 
     def __init__(self):
         pass
@@ -244,7 +244,8 @@ class ProfileConverter:
         tree = ElementTree.parse(fname)
         root = tree.getroot()
 
-        return self._determine_version(root) == ProfileConverter.current_version
+        version = self._determine_version(root)
+        return version == ProfileConverter.current_version or version == 9
 
     def convert_profile(self, fname):
         """Converts the provided profile to the current version.
@@ -673,7 +674,7 @@ class ProfileConverter:
         ElementTree
             Modified XML root element
         """
-        root.attrib["version"] = "9"
+        root.attrib["version"] = "10"
         syslog = logging.getLogger("system")
 
         class GUIDConverter:
@@ -1674,7 +1675,7 @@ class Profile():
 
 class Device:
 
-    """Stores the information about a single device including it's modes."""
+    """Stores the information about a single device including its modes."""
 
     def __init__(self, parent):
         """Creates a new instance.
@@ -1882,11 +1883,40 @@ class InputItem:
         :param parent the parent mode of this input item
         """
         self.parent = parent
-        self.input_type = None
-        self.input_id = None
+        self._input_type = None
+        self._input_id = None
         self.always_execute = False
         self.description = ""
-        self.containers = []
+        #self._containers = base_classes.TraceableList(callback = self._container_change_cb) # container
+        self._containers = []
+        #self.id = common.get_guid()  # unique ID of this input item
+
+
+    # def _container_change_cb(self, *args, **kwargs):
+    #     pass
+
+    @property
+    def containers(self):
+        if self.input_type == InputType.JoystickButton and self.input_id in (2,3):
+            pass
+        return self._containers
+    
+    @property
+    def input_type(self):
+        return self._input_type
+    @input_type.setter
+    def input_type(self, value):
+        self._input_type = value
+
+    @property
+    def input_id(self):
+        return self._input_id
+    @input_id.setter
+    def input_id(self, value):
+        # if self._input_type == InputType.JoystickButton and value (2,3):
+        #     pass
+        self._input_id = value
+        
 
     def from_xml(self, node):
         """Parses an InputItem node.
@@ -1936,10 +1966,13 @@ class InputItem:
             node.set("description", safe_format(self.description, str))
         else:
             node.set("description", "")
-
+        
         for entry in self.containers:
-            if entry.is_valid():
+            valid = entry.is_valid()
+            if valid:
                 node.append(entry.to_xml())
+            else:
+                logging.getLogger("system").warning(f"SaveProfile: input: {self.input_type} input id: {self.input_id} container returned invalid configuration - won't save {entry.name}")
 
         return node
 

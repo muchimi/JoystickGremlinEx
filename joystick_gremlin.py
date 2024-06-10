@@ -28,7 +28,7 @@ import sys
 import time
 import traceback
 import threading
-
+import webbrowser
 
 # Import QtMultimedia so pyinstaller doesn't miss it
 import PySide6
@@ -67,7 +67,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.13ex (h)"
+APPLICATION_VERSION = "13.40.14ex"
 
 
 from gremlin.singleton_decorator import SingletonDecorator
@@ -569,6 +569,22 @@ class GremlinUi(QtWidgets.QMainWindow):
             self._create_recent_profiles()
         self._update_window_title()
 
+    def reveal_profile(self):
+        ''' opens the profile in explorer '''
+        if self._profile_fname and os.path.isfile(self._profile_fname):
+            path = os.path.dirname(self._profile_fname)
+            path = os.path.realpath(path)
+            webbrowser.open(path)
+
+    def open_profile_xml(self):
+        ''' views the profile as an xml in the default text editor '''
+        if self._profile_fname:
+            # save first
+            self._profile.to_xml(self._profile_fname)
+            if  os.path.isfile(self._profile_fname):
+                path = os.path.realpath(self._profile_fname)
+                webbrowser.open(path)
+
     # +---------------------------------------------------------------
     # | Create UI elements
     # +---------------------------------------------------------------
@@ -581,6 +597,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.ui.actionNewProfile.triggered.connect(self.new_profile)
         self.ui.actionSaveProfile.triggered.connect(self.save_profile)
         self.ui.actionSaveProfileAs.triggered.connect(self.save_profile_as)
+        self.ui.actionRevealProfile.triggered.connect(self.reveal_profile)
+        self.ui.actionOpenXmlProfile.triggered.connect(self.open_profile_xml)
         self.ui.actionModifyProfile.triggered.connect(self.profile_creator)
         self.ui.actionExit.triggered.connect(self._force_close)
         # Actions

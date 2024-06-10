@@ -383,7 +383,7 @@ class RangeContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
 
 class RangeContainerFunctor(gremlin.base_classes.AbstractFunctor):
 
-    """Executes the contents of the associated basic container."""
+    """Executes the contents of the associated range container."""
 
 
     def __init__(self, container):

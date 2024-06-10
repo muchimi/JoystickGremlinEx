@@ -177,6 +177,10 @@ def _virtual_input_to_unicode(virtual_code):
     :param virtual_code virtual code for which to return a unicode character
     :return unicode character corresponding to the given virtual code
     """
+
+    if virtual_code == 0x7c:
+        pass
+
     keyboard_layout = _get_keyboard_layout(0)
     output_buffer = ctypes.create_unicode_buffer(8)
     state_buffer = ctypes.create_string_buffer(256)
@@ -355,6 +359,20 @@ g_name_to_key = {
     "f10": Key("F10", 0x44, False, win32con.VK_F10),
     "f11": Key("F11", 0x57, False, win32con.VK_F11),
     "f12": Key("F12", 0x58, False, win32con.VK_F12),
+    "f13": Key("F13", 0x64, False, win32con.VK_F13),
+    "f14": Key("F14", 0x65, False, win32con.VK_F14),
+    "f15": Key("F15", 0x66, False, win32con.VK_F15),
+    "f16": Key("F16", 0x67, False, win32con.VK_F16),
+    "f17": Key("F17", 0x68, False, win32con.VK_F17),
+    "f18": Key("F18", 0x69, False, win32con.VK_F18),
+    "f19": Key("F19", 0x6a, False, win32con.VK_F19),    
+    "f20": Key("F20", 0x6b, False, win32con.VK_F20),    
+    "f21": Key("F21", 0x6c, False, win32con.VK_F21),    
+    "f22": Key("F22", 0x6d, False, win32con.VK_F22),    
+    "f23": Key("F23", 0x6e, False, win32con.VK_F23),    
+    "f24": Key("F24", 0x76, False, win32con.VK_F24),    
+
+
     # Control keys
     "printscreen": Key("Print Screen", 0x37, True, win32con.VK_PRINT),
     "scrolllock": Key("Scroll Lock", 0x46, False, win32con.VK_SCROLL),
