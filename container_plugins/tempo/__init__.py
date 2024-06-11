@@ -263,7 +263,8 @@ class TempoContainerFunctor(gremlin.base_classes.AbstractFunctor):
         else:
             # Short press
             if (self.start_time + self.delay) > time.time():
-                self.timer.cancel()
+                if self.timer:
+                    self.timer.cancel()
 
                 if self.activate_on == "release":
                     threading.Thread(target=lambda: self._short_press(

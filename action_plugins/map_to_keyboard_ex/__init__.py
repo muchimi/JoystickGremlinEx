@@ -112,6 +112,7 @@ class InputKeyboardDialog(QtWidgets.QDialog):
 
         self.clear_widget = QtWidgets.QPushButton("Clear")
         self.clear_widget.clicked.connect(self._clear_button_cb)
+        self.clear_widget.setToolTip("Clears the selection")
 
         self.ok_widget = QtWidgets.QPushButton("Ok")
         self.ok_widget.clicked.connect(self._ok_button_cb)
@@ -222,7 +223,7 @@ class InputKeyboardDialog(QtWidgets.QDialog):
         # list of scancodes  https://handmade.network/forums/articles/t/2823-keyboard_inputs_-_scancodes%252C_raw_input%252C_text_input%252C_key_names
 
         # first row = QUERTY object
-        row_0 = ["","","","","F13","F14","F15","F16","F17","F18","F19","F20","F21","F24"]
+        row_0 = ["","","F13","F14","F15","F16","F17","F18","F19","F20","F21","F22","F23","F24"]
         row_1 = ["Esc","","F1","F2","F3","F4","F5","F6","F7","F8","F9","F10","F11","F12","",["PrtSc","printscreen"],["Scrlck","scrolllock"],["Pause","pause"]]
         row_2 = ["`","1","2","3","4","5","6","7","8","9","0","-","=",["Back","backspace"],"",["Ins","insert"],["Home","home"],["PgUp","pageup"],"",["NumLck","numlock"],["/","npdivide"],["*","npmultiply"],["-","npminus"]]
         row_3 = [["Tab","tab"],"Q","W","E","R","T","Y","U","I","O","P","[","]","\\","",["Del","delete"],"End",["PgDn","pagedown"],"",["7","np7"],["8","np8"],["9","np9"],["+","npplus",1,2]]

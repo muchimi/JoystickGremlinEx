@@ -30,7 +30,26 @@ import gremlin.ui.input_item
 import enum
 from gremlin.profile import safe_format, safe_read
 from .SimConnectData import *
+import re
 
+
+class CommandValidator(QtGui.QValidator):
+    ''' validator for command selection '''
+    def __init__(self):
+        super().__init__()
+        self.commands = SimConnectData().get_command_name_list()
+        
+        
+    def validate(self, value, pos):
+        clean_value = value.upper().strip()
+        if not clean_value or clean_value in self.commands:
+            # blank is ok
+            return QtGui.QValidator.State.Acceptable
+        # match all values starting with the text given
+        r = re.compile(clean_value + "*")
+        for _ in filter(r.match, self.commands):
+            return QtGui.QValidator.State.Intermediate
+        return QtGui.QValidator.State.Invalid
 
 class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
@@ -42,8 +61,12 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         :param action_data the data managed by this widget
         :param parent the parent of this widget
         """
-        super().__init__(action_data, parent=parent)
+        
         self.action_data = action_data
+        self.block = None
+
+        # call super last because it will call create_ui and populate_ui so the vars must exist
+        super().__init__(action_data, parent=parent)
 
     def _create_ui(self):
         """Creates the UI components."""
@@ -72,6 +95,8 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.command_widget.currentIndexChanged.connect(self._command_changed_cb)
         self.command_description_widget = QtWidgets.QLabel()
 
+        self.command_widget.setValidator(CommandValidator())
+
         # setup auto-completer for the command 
         command_completer = QtWidgets.QCompleter(self.command_list, self)
         command_completer.setCaseSensitivity(QtGui.Qt.CaseSensitivity.CaseInsensitive)
@@ -85,108 +110,290 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         # output section
         self.output_widget = QtWidgets.QWidget()
-        self.output_layout = QtWidgets.QGridLayout()
+        self.output_layout = QtWidgets.QVBoxLayout()
         self.output_widget.setLayout(self.output_layout)
 
         self.output_mode_widget = QtWidgets.QWidget()
-        self.output_mode_layout = QtWidgets.QGridLayout()
+        self.output_mode_layout = QtWidgets.QHBoxLayout()
         self.output_mode_widget.setLayout(self.output_mode_layout)
 
+        # set range of values output mode (axis input only)
         self.output_mode_axis_widget = QtWidgets.QRadioButton("Axis")
-        self.output_mode_number_widget = QtWidgets.QRadioButton("Value")
+        self.output_mode_axis_widget.clicked.connect(self._mode_axis_cb)
+
+        # set value output mode (output value only)
+        self.output_mode_set_value_widget = QtWidgets.QRadioButton("Value")
+        self.output_mode_set_value_widget.clicked.connect(self._mode_value_cb)
+
+        # trigger output mode (event trigger only)
+        self.output_mode_trigger_widget = QtWidgets.QRadioButton("Trigger")
+        self.output_mode_trigger_widget.clicked.connect(self._mode_trigger_cb)
+
+        self.output_mode_description_widget = QtWidgets.QLabel()
+        self.output_mode_layout.addWidget(QtWidgets.QLabel("Output mode:"))
         self.output_mode_layout.addWidget(self.output_mode_axis_widget)
-        self.output_mode_layout.addWidget(self.output_mode_number_widget)
-
-
-        self.output_layout.addWidget(QtWidgets.QLabel("Output data:"),0,0)
-        self.output_layout.addWidget(self.output_mode_widget, 0, 1)
-
-        self.output_type_widget = QtWidgets.QLabel()
-        self.output_layout.addWidget(self.output_type_widget, 1, 0)
-
-        self.output_data_type_widget = QtWidgets.QLabel()
-        self.output_layout.addWidget(self.output_data_type_widget, 1,1)
-
-        self.output_value_type_widget = QtWidgets.QLabel()
-        self.output_layout.addWidget(self.output_value_type_widget, 1,2)
-
-        self.output_min_range_widget = QtWidgets.QSpinBox()
-        self.output_min_range_widget.setRange(-16383,16383)
-        self.output_min_range_widget.setEnabled(False)
-        self.output_layout.addWidget(self.output_min_range_widget, 2,0)
-
-        self.output_max_range_widget = QtWidgets.QSpinBox()
-        self.output_max_range_widget.setRange(-16383,16383)
-        self.output_max_range_widget.setEnabled(False)
-        self.output_layout.addWidget(self.output_max_range_widget, 2,1)
+        self.output_mode_layout.addWidget(self.output_mode_trigger_widget)
+        self.output_mode_layout.addWidget(self.output_mode_set_value_widget)
+        self.output_mode_layout.addWidget(self.output_mode_description_widget)
 
         self.output_readonly_widget = QtWidgets.QCheckBox("Read only")
         self.output_readonly_widget.clicked.connect(self._readonly_cb)
-        self.output_readonly_widget.setEnabled(False)
-        self.output_layout.addWidget(self.output_readonly_widget, 1,3)
+        self.output_mode_layout.addWidget(self.output_readonly_widget)
 
+        self.output_block_type_description_widget = QtWidgets.QLabel()
+        self.output_mode_layout.addWidget(self.output_block_type_description_widget)
+        self.output_mode_layout.addStretch(1)
+
+
+        self.output_layout.addWidget(QtWidgets.QLabel("Output data:"))
+        self.output_layout.addWidget(self.output_mode_widget)
+
+        # output data type UI 
+        self.output_data_type_widget = QtWidgets.QWidget()
+        self.output_data_type_layout = QtWidgets.QHBoxLayout()
+        self.output_data_type_widget.setLayout(self.output_data_type_layout)
+        self.output_data_type_label_widget = QtWidgets.QLabel("Not Set")
+
+        self.output_data_type_layout.addWidget(QtWidgets.QLabel("Output type:"))
+        self.output_data_type_layout.addWidget(self.output_data_type_label_widget)
+
+        
+        self.output_layout.addWidget(self.output_data_type_widget)
+
+        # output range UI
+        self.output_range_container_widget = QtWidgets.QWidget()
+        self.output_range_container_layout = QtWidgets.QHBoxLayout()
+        self.output_range_container_widget.setLayout(self.output_range_container_layout)
+
+        self.output_min_range_widget = QtWidgets.QSpinBox()
+        self.output_min_range_widget.setRange(-16383,16383)
+        self.output_min_range_widget.setReadOnly(True)
+
+        self.output_max_range_widget = QtWidgets.QSpinBox()
+        self.output_max_range_widget.setRange(-16383,16383)
+        self.output_max_range_widget.setReadOnly(True)
+
+        self.output_min_range_custom_widget = QtWidgets.QSpinBox()
+        self.output_min_range_custom_widget.setRange(-16383,16383)
+        self.output_min_range_custom_widget.valueChanged.connect(self._min_range_changed_cb)
+
+        self.output_max_range_custom_widget = QtWidgets.QSpinBox()
+        self.output_max_range_custom_widget.setRange(-16383,16383)
+        self.output_max_range_custom_widget.valueChanged.connect(self._max_range_changed_cb)
+
+        # holds the output value if the output value is a fixed value
+        self.output_value_container_widget =QtWidgets.QWidget()
+        self.output_value_container_layout = QtWidgets.QHBoxLayout()
+        self.output_value_widget = gremlin.ui.common.DynamicDoubleSpinBox()
+        self.output_value_widget.valueChanged.connect(self._output_value_changed_cb)
+        self.output_value_description_widget = QtWidgets.QLabel()
+
+        self.output_value_container_layout.addWidget(QtWidgets.QLabel("Output value:"))
+        self.output_value_container_layout.addWidget(self.output_value_widget)
+        self.output_value_container_layout.addWidget(self.output_value_description_widget)
+        self.output_value_container_layout.addStretch(1)
+
+        
+        self.output_range_container_layout.addWidget(QtWidgets.QLabel("Simconnect output range:"))
+        self.output_range_container_layout.addWidget(QtWidgets.QLabel("Command min:"))
+        self.output_range_container_layout.addWidget(self.output_min_range_widget)
+        self.output_range_container_layout.addWidget(QtWidgets.QLabel("max:"))
+        self.output_range_container_layout.addWidget(self.output_max_range_widget)
+        self.output_range_container_layout.addWidget(QtWidgets.QLabel("Custom range min:"))
+        self.output_range_container_layout.addWidget(self.output_min_range_custom_widget)
+        self.output_range_container_layout.addWidget(QtWidgets.QLabel("max:"))
+        self.output_range_container_layout.addWidget(self.output_max_range_custom_widget)
+        self.output_range_container_layout.addStretch(1)
+
+
+        self.output_layout.addWidget(self.output_range_container_widget)
+        self.output_layout.addWidget(self.output_value_container_widget)
+        self.output_layout.addStretch(1)
+
+        
         self.action_layout.addWidget(self.action_selector_widget)
-        self.action_layout.addWidget(self.output_widget)
+
 
         # hide output layout by default until we have a valid command
         self.output_widget.setVisible(False)
 
 
         self.main_layout.addWidget(self.action_widget)
+        self.main_layout.addWidget(self.output_widget)
 
         self.main_layout.addStretch(1)
 
 
+    def _output_value_changed_cb(self):
+        ''' occurs when the output value has changed '''
+        value = self.output_value_widget.value()
+        block: SimConnectBlock
+        block = self.block
+        if block:
+            block.disable_notifications()
+            block.value = value
+            block.enable_notifications()
+            # store to profile
+            self.action_data.value = value
+
+
+    def _min_range_changed_cb(self):
+        value = self.output_min_range_custom_widget.value()
+        block: SimConnectBlock
+        block = self.block
+        if block:
+            block.disable_notifications()
+            block.min_range_custom = value
+            block.enable_notifications()
+            # store to profile
+            self.action_data.min_range = block.max_range_custom
+
+    def _max_range_changed_cb(self):
+        value = self.output_max_range_custom_widget.value()
+        block: SimConnectBlock
+        block = self.block
+        if block:
+            block.disable_notifications()
+            block.max_range_custom = value
+            block.enable_notifications()
+            # store to profile
+            self.action_data.max_range = block.max_range_custom
+        
+
     def _command_changed_cb(self, index):
         ''' called when selected command changes '''
         command = self.command_widget.currentText()
-        self.action_data.command = command
+        
         block = SimConnectBlock(command)
-        self.action_data.block= block
-        self.output_widget.setVisible(block.valid)
-        if block.valid:
-            self.output_type_widget.setText(block.display_block_type)
+        self._update_block_ui(block)
+
+        # store command to profile
+        self.action_data.command = command
+
+    def _update_block_ui(self, block : SimConnectBlock):
+        ''' updates the UI with a data block '''
+        if self.block and self.block != block:
+            # unhook block events
+            self.block.range_changed.disconnect(self._range_changed_cb)
+
+        self.block = block
+
+        
+        if block and block.valid:
+            self.output_widget.setVisible(True)
+
+            # hook block events
+            block.range_changed.connect(self._range_changed_cb)   
+
+            # update UI based on block information 
+            self.output_block_type_description_widget.setText(block.display_block_type)
             self.command_description_widget.setText(block.description)
-            self.output_data_type_widget.setText(block.display_data_type)
-            self.output_readonly_widget.setChecked(block.readonly)
+            self.output_data_type_label_widget.setText(block.display_data_type)
+            self.output_readonly_widget.setChecked(block.is_readonly)
             index = self.category_widget.findData(block.category)
             with QtCore.QSignalBlocker(self.category_widget):
                 self.category_widget.setCurrentIndex(index)  
             is_ranged = block.is_ranged
             if is_ranged:
                 self.output_min_range_widget.setValue(block.min_range)  
-                self.output_max_range_widget.setValue(block.max_range)  
-            self.output_min_range_widget.setVisible(is_ranged)
-            self.output_max_range_widget.setVisible(is_ranged)
+                self.output_max_range_widget.setValue(block.max_range)
+                with QtCore.QSignalBlocker(self.output_min_range_custom_widget):
+                    self.output_min_range_custom_widget.setValue(block.min_range_custom)  
+                with QtCore.QSignalBlocker(self.output_max_range_custom_widget):
+                    self.output_max_range_custom_widget.setValue(block.max_range_custom)  
+
+            # only show range widget if the command supports it
+            self.output_range_container_widget.setVisible(is_ranged)
+
+            # update the output data type
+            if block.output_data_type == SimConnectBlock.OutputType.FloatNumber:
+                self.output_data_type_label_widget.setText("Number (float)")
+            elif block.output_data_type == SimConnectBlock.OutputType.IntNumber:
+                self.output_data_type_label_widget.setText("Number (int)")
+            else:
+                self.output_data_type_label_widget.setText("N/A")
 
 
+
+            return
         
+        # clear the data
+        self.output_widget.setVisible(False)
+        self.output_block_type_description_widget.setText("N/A")
+        self.command_description_widget.setText("N/A")
+        self.output_data_type_label_widget.setText("N/A")
+        self.output_readonly_widget.setChecked(True)
+        self.output_min_range_widget.setValue(0)  
+        self.output_max_range_widget.setValue(0)
 
+
+
+    def _range_changed_cb(self, event : SimConnectBlock.RangeEvent):
+        ''' called when range information changes on the current simconnect command block '''
+        self.output_min_range_widget.setValue(event.min)
+        self.output_max_range_widget.setValue(event.max)
+        self.output_min_range_custom_widget.setValue(event.min_custom)
+        self.output_max_range_custom_widget.setValue(event.max_custom)
+
+    def _mode_axis_cb(self):
+        value = self.output_mode_axis_widget.isChecked()
+        if value:
+            self.action_data.mode = SimConnectActionMode.Ranged
+
+    def _mode_value_cb(self):
+        value = self.output_mode_set_value_widget.isChecked()
+        if value:
+            self.action_data.mode = SimConnectActionMode.SetValue
+        
+    def _mode_trigger_cb(self):
+        value = self.output_mode_trigger_widget.isChecked()
+        if value:
+            self.action_data.mode = SimConnectActionMode.Trigger
 
     def _readonly_cb(self):
-        self.output_readonly.setChecked(self.isChecked())  
+        block : SimConnectBlock
+        block = self.block
+        
+        readonly = block is not None and block.is_readonly
+        checked = self.output_readonly_widget.isChecked() 
+        if readonly != checked:
+            with QtCore.QSignalBlocker(self.output_readonly_widget):
+                self.output_readonly_widget.setChecked(readonly)
+        
+        self.action_data.is_readonly = readonly
 
     def _populate_ui(self):
         """Populates the UI components."""
-
+        current_command = self.command_widget.currentText()
         command = self.action_data.command
-        index = self.command_widget.findText(command)
-        self.command_widget.setCurrentIndex(index)
-        
+        if current_command != command:
+            index = self.command_widget.findText(command)
+            self.command_widget.setCurrentIndex(index)
 
+        block = SimConnectBlock(command)
+        self._update_block_ui(block)
 
-    
+        if self.action_data.input_type == InputType.JoystickAxis:
+            # input drives the outputs
+            self.output_value_widget.setVisible(False)
+        else:
+            # button or event intput
+            self.output_value_widget.setVisible(block.is_value)
+
 
 class MapToSimConnectFunctor(AbstractFunctor):
 
     def __init__(self, action):
         super().__init__(action)
-        self.sm = SimConnectData()
         self.command = action.command # the command to execute
         self.value = action.value # the value to send (None if no data to send)
-        self.block = SimConnectBlock.from_command(self.command, self.sm)
+        self.block = SimConnectBlock(self.command)
     
     def process_event(self, event, value):
+
+        if not self.block.valid:
+            # invalid command
+            return False
 
         if event.event_type == InputType.JoystickAxis:
             # axis
@@ -229,10 +436,28 @@ class MapToSimConnect(AbstractAction):
         """
         super().__init__(parent)
         self.sm = SimConnectData()
+
+        # the current command category if the command is an event
         self.category = SimConnectEventCategory.NotSet
+
+        # the current command name
         self.command = None
+
+        # the value to output if any
         self.value = None
-        self.block = None 
+
+        # the block for the command
+        self.min_range = -16383
+        self.max_range = 16383
+
+        # output mode
+        self.mode = SimConnectActionMode.NotSet
+
+        # readonly mode
+        self.is_readonly = False
+
+        # mapped input type
+        self.input_type = self.get_input_type()
 
     def icon(self):
         """Returns the icon to use for this action.

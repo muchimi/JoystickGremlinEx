@@ -5,3 +5,4 @@ pywin32
 pytest
 msgpack
 dill
+lxml
