@@ -12,6 +12,7 @@ from PySide6 import QtCore, QtWidgets
 
 from gremlin.base_classes import AbstractAction, AbstractFunctor
 from gremlin.common import InputType, MouseButton
+import gremlin.common
 from gremlin.profile import read_bool, safe_read, safe_format
 from gremlin.util import rad2deg
 import gremlin.ui.common
@@ -348,8 +349,36 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         )
         self.mouse_button.clicked.connect(self._request_user_input)
 
-        self.button_layout.addWidget(QtWidgets.QLabel("Mouse Button"), 0, 0)
-        self.button_layout.addWidget(self.mouse_button, 0, 1)
+        self.mouse_container_widget = QtWidgets.QWidget()
+        self.mouse_container_layout = QtWidgets.QHBoxLayout()
+        self.mouse_container_widget.setLayout(self.mouse_container_layout)
+
+        self.mouse_container_layout.addWidget(QtWidgets.QLabel("Mouse Button"))
+        self.mouse_container_layout.addWidget(self.mouse_button)
+
+
+        self.mouse_button_widget = QtWidgets.QComboBox()
+        self.mouse_button_widget.addItem("Left (mouse 1)",gremlin.common.MouseButton.Left)
+        self.mouse_button_widget.addItem("Middle (mouse 2)",gremlin.common.MouseButton.Middle)
+        self.mouse_button_widget.addItem("Right (mouse 3)",gremlin.common.MouseButton.Right)
+        self.mouse_button_widget.addItem("Forward (mouse 4)",gremlin.common.MouseButton.Forward)
+        self.mouse_button_widget.addItem("Back (mouse 5)",gremlin.common.MouseButton.Back)
+        self.mouse_button_widget.addItem("Wheel up",gremlin.common.MouseButton.WheelUp)
+        self.mouse_button_widget.addItem("Wheel down",gremlin.common.MouseButton.WheelDown)
+
+
+        # update based on the current data
+        index = self.mouse_button_widget.findData(self.action_data.button_id)
+        self.mouse_button_widget.setCurrentIndex(index)
+
+        self.mouse_button_widget.currentTextChanged.connect(self._change_mouse_button_cb)
+
+        self.mouse_container_layout.addWidget(QtWidgets.QLabel("Selected action:"))
+        self.mouse_container_layout.addWidget(self.mouse_button_widget)
+        self.mouse_container_layout.addStretch(1)
+
+        # add to main layout
+        self.button_layout.addWidget(self.mouse_container_widget, 0,0)
 
     def _populate_ui(self):
         """Populates the UI components."""
@@ -414,6 +443,14 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.mouse_button.setText(
             gremlin.common.MouseButton.to_string(self.action_data.button_id)
         )
+
+    def _change_mouse_button_cb(self):
+        ''' mouse event drop down selected '''
+        self.action_data.button_id = self.mouse_button_widget.currentData()
+        self.mouse_button.setText(
+            gremlin.common.MouseButton.to_string(self.action_data.button_id)
+        )
+
 
     def _action_mode_changed(self, index):  
         ''' called when the action mode drop down value changes '''
@@ -484,6 +521,12 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.mouse_button.setText(
             gremlin.common.MouseButton.to_string(self.action_data.button_id)
         )
+        # update the drop down
+        with QtCore.QSignalBlocker(self.mouse_button_widget):
+            index = self.mouse_button_widget.findData(self.action_data.button_id)
+            self.mouse_button_widget.setCurrentIndex(index)
+
+
 
     def _connect_axis(self):
         """Connects all axis input elements to their callbacks."""

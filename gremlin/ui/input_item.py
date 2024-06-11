@@ -227,6 +227,11 @@ class InputItemListView(common.AbstractView):
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setWidget(self.scroll_widget)
 
+        # self.scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+        # self.scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+
+
+
         # Add the scroll area to the main layout
         self.main_layout.addWidget(self.scroll_area)
 

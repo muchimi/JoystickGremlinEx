@@ -77,7 +77,11 @@ Joystick Gremlin EX
 - New file menu for opening Explorer to the current profile folder
 - New file menu for opening the profile XML in a text editor (it will save the profile first)
 
-- New keystroke editor in map to keyboard ex - allows to select keys and sequence using the mouse and adds support for F13 to F24 keys.
+- New keystroke editor in map to keyboard ex: allows to select keys and sequence using the mouse and adds support for F13 to F24 keys.
+
+- New mouse event drop down selector in map to mouse ex: adds a mouse event selection drop down so mouse actions can be selected by name rather than mouse input only.  
+
+- Action container will now scroll horizontally if the action is too wide to fit based on windows size / UI scaling options.
 
 
 6/6/24 - 13.40.13ex (h) **potentially breaking change**

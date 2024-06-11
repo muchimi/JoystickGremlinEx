@@ -823,7 +823,7 @@ class ActionSelector(QtWidgets.QWidget):
         self.main_layout = QtWidgets.QHBoxLayout(self)
         self.action_label = QtWidgets.QLabel("Action")
         self.main_layout.addWidget(self.action_label)
-
+ 
         self.action_dropdown = QtWidgets.QComboBox()
 
         for name in self._valid_action_list():
@@ -848,6 +848,8 @@ class ActionSelector(QtWidgets.QWidget):
         self.main_layout.addWidget(self.action_dropdown)
         self.main_layout.addWidget(self.add_button)
         self.main_layout.addWidget(self.paste_button)
+        self.main_layout.addStretch(1)
+
 
     def _valid_action_list(self):
         """Returns a list of valid actions for this InputItemWidget.

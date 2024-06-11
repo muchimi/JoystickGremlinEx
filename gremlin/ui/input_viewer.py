@@ -183,6 +183,10 @@ class InputViewerArea(QtWidgets.QScrollArea):
         self.scroll_layout = QtWidgets.QVBoxLayout()
         self.scroll_layout.addStretch()
         self.scroll_widget.setLayout(self.scroll_layout)
+
+        self.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+        self.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+
         self.setWidget(self.scroll_widget)
 
     def add_widget(self, widget):

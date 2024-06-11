@@ -355,15 +355,19 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.record_button = QtWidgets.QPushButton("Record keys")
         self.record_button.clicked.connect(self._record_keys_cb)
 
-        options_widget = QtWidgets.QWidget()
-        options = QtWidgets.QHBoxLayout()
-        options_widget.setLayout(options)
+        self._options_widget = QtWidgets.QWidget()
+        self._options_layout = QtWidgets.QHBoxLayout()
+        self._options_widget.setLayout(self._options_layout)
 
 
         self.rb_press = QtWidgets.QRadioButton("Press")
         self.rb_release = QtWidgets.QRadioButton("Release")
         self.rb_both = QtWidgets.QRadioButton("Press/Release/Delay")
         self.rb_hold = QtWidgets.QRadioButton("Hold")
+
+        self.delay_container_widget = QtWidgets.QWidget()
+        self.delay_container_layout = QtWidgets.QHBoxLayout()
+        self.delay_container_widget.setLayout(self.delay_container_layout)
 
         delay_label = QtWidgets.QLabel("Delay(ms)")
         self.delay_box = QtWidgets.QSpinBox()
@@ -396,16 +400,21 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self.delay_box.valueChanged.connect(self._delay_changed)
 
-        options.addWidget(self.rb_hold)
-        options.addWidget(self.rb_both)
-        options.addWidget(self.rb_press)
-        options.addWidget(self.rb_release)
-        options.addWidget(delay_label)
-        options.addWidget(self.delay_box)
-        options.addWidget(quarter_sec_button)
-        options.addWidget(half_sec_button)
-        options.addWidget(sec_button)
-        options.addStretch(1)
+        self._options_layout.addWidget(QtWidgets.QLabel("Mode:"))
+        self._options_layout.addWidget(self.rb_hold)
+        self._options_layout.addWidget(self.rb_both)
+        self._options_layout.addWidget(self.rb_press)
+        self._options_layout.addWidget(self.rb_release)
+        
+        self._options_layout.addStretch(1)
+
+
+        self.delay_container_layout.addWidget(delay_label)
+        self.delay_container_layout.addWidget(self.delay_box)
+        self.delay_container_layout.addWidget(quarter_sec_button)
+        self.delay_container_layout.addWidget(half_sec_button)
+        self.delay_container_layout.addWidget(sec_button)
+        self.delay_container_layout.addStretch(1)
 
         self.show_keyboard_widget = QtWidgets.QPushButton("Select Keys")
         self.show_keyboard_widget.clicked.connect(self._select_keys_cb)
@@ -417,7 +426,8 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self.main_layout.addWidget(self.key_combination)
         self.main_layout.addWidget(self.action_widget)
-        self.main_layout.addWidget(options_widget)
+        self.main_layout.addWidget(self._options_widget)
+        self.main_layout.addWidget(self.delay_container_widget)
         
         
         self.main_layout.addStretch(1)

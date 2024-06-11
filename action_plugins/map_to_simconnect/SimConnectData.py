@@ -95,6 +95,36 @@ class SimConnectActionMode(enum.Enum):
     Trigger = 2, # output is a trigger (no value sent)
     SetValue = 3, # output sets a number value
 
+    @staticmethod
+    def to_string(value):
+        try:
+            return _simconnect_action_mode_to_string_lookup[value]
+        except KeyError:
+            raise gremlin.error.GremlinError(f"Invalid type in lookup: {value}")
+    @staticmethod
+    def to_enum(value, validate = True):
+        if value in _simconnect_action_mode_to_enum_lookup.keys():
+            return _simconnect_action_mode_to_enum_lookup[value]
+        if validate:
+            raise gremlin.error.GremlinError(f"Invalid type in lookup: {value}")
+        return SimConnectActionMode.NotSet
+                
+
+        
+_simconnect_action_mode_to_string_lookup = {
+    SimConnectActionMode.NotSet : "none",
+    SimConnectActionMode.Ranged : "ranged",
+    SimConnectActionMode.Trigger : "trigger",
+    SimConnectActionMode.SetValue : "value",
+}
+
+_simconnect_action_mode_to_enum_lookup = {
+    "none" : SimConnectActionMode.NotSet,
+    "ranged" : SimConnectActionMode.Ranged,
+    "trigger" : SimConnectActionMode.Trigger,
+    "value" :SimConnectActionMode.SetValue ,
+}
+
 class SimConnectEventCategory(enum.Enum):
     ''' command categories for events '''
     NotSet = 0,
@@ -124,7 +154,7 @@ class SimConnectEventCategory(enum.Enum):
         try:
             return _simconnect_event_category_to_string_lookup[value]
         except KeyError:
-            raise gremlin.error.GremlinError("Invalid type in lookup")
+            raise gremlin.error.GremlinError(f"Invalid type in lookup: {value}")
 
     @staticmethod
     def to_enum(value, validate = True):
@@ -210,37 +240,58 @@ class SimConnectData():
         self._simvars_xml =  os.path.join(gremlin.util.userprofile_path(), "simconnect_simvars.xml")
 
 
-        # list of aircraft names
-        self._aircraft_events_description_map = {}
-        self._aircraft_events_scope_map = {}
-
-        # map of categories to commands under this category as a tuple (binary command, command, description, scope)
-        self._category_commands = {}
 
         # list of all commands
         self._commands = [] 
 
-        # map of a command to its category
-        self._command_category_map = {}
-        self._command_map = {}
+        
 
         # list of command blocks
         self._block_map = {}
 
     
             
-        # if the data file doesn't exist, create it in the user's profile folder
+        # if the data file doesn't exist, create it in the user's profile folder from the built-in data
         if not os.path.isfile(self._simvars_xml):
             self._write_default_xml(self._simvars_xml)
 
 
-        # load the data
+        # load the data - including any user modifications/additions
         if os.path.isfile(self._simvars_xml):
             self._load_xml(self._simvars_xml)
+
+
+        if len(self._block_map) > 0:
+            # process lists
+            self._commands = list(self._block_map.keys())
+            self._commands.sort()
+
+    @property
+    def valid(self):
+        ''' true if block maps are valid '''
+        return len(self._block_map) > 0
+    
+    def block(self, command):
+        ''' gets the command block for a given Simconnect command '''
+        if command in self._commands:
+            return self._block_map[command]
+        return None
+
 
                     
     def _write_default_xml(self, xml_file):
         ''' writes a default XML file from the base data in the simconnect module '''
+
+        # list of aircraft names
+        aircraft_events_description_map = {}
+        aircraft_events_scope_map = {}
+
+        # map of categories to commands under this category as a tuple (binary command, command, description, scope)
+        category_commands = {}
+
+        # map of a command to its category
+        command_category_map = {}
+        command_map = {}        
 
         for category in SimConnectEventCategory.to_list():
             if category == SimConnectEventCategory.Engine:
@@ -286,17 +337,19 @@ class SimConnectData():
             else:
                 continue
 
-            self._category_commands[category] = []
+            
+ 
+            category_commands[category] = []
             for b_command, description, scope in source:
                 command = b_command.decode('ascii')
-                self._aircraft_events_description_map[command] = description
-                self._aircraft_events_scope_map[command] = scope
+                aircraft_events_description_map[command] = description
+                aircraft_events_scope_map[command] = scope
                 data = (b_command, command, description, scope)
-                self._category_commands[category].append(data)
-                self._commands.append(data)
-                self._aircraft_events_description_map[command] = description
-                self._command_category_map[command] = category
-                self._command_map[command] = ("e", data)
+                category_commands[category].append(data)
+                commands.append(data)
+                aircraft_events_description_map[command] = description
+                command_category_map[command] = category
+                command_map[command] = ("e", data)
 
 
             # build request commands
@@ -313,38 +366,77 @@ class SimConnectData():
             command_node = etree.SubElement(root,"command", value = command)
 
             value_types = ["(0","16383"]
-
+            units = ""
+            is_range = False # assume command has no range specified
+            is_toggle = False # true if range is a toggle range (either value of the range)
+            min_range = 0
+            max_range = 0
             if data[0] == "e":
                 simvar_type = "event"
                 description = data[1][2]
                 units = ""
-                for v in units:
-                    if v in command:
+                for v in value_types:
+                    if v in description:
                         units = "int"
+                        # get min and max range 
                         break
-                category = self.get_command_category(command)
-                units = ""
+                
+                if "(-16383" in description:
+                    min_range = -16383
+                    is_range = True
+                if "16383)" in description:
+                    max_range = 16383
+                    is_range = True
+                if "(1,0)" in description or "(0,1)" in description:
+                    min_range = 0
+                    max_range = 1
+                    is_toggle = True
+                    is_range = True
+                if "(1 or 2)" in description:
+                    min_range = 1
+                    max_range = 2
+                    is_toggle = True                    
+                    is_range = True
+                if "0 to 65535" in description:
+                    min_range = 0
+                    max_range = 65535
+                    is_range = True
+                if "0 to 4294967295" in description:
+                    min_range = 0
+                    max_range = 4294967295
+                    is_range = True
                 settable = True
 
             elif data[0] == "r":
                 simvar_type = "simvar"
                 description = data[1][0]
                 units = data[1][2].decode('ascii')
-                category = self.get_command_category(command)
-                settable = data[1][3] == 'Y'                        
+                settable = data[1][3] == 'Y'       
 
+
+            category =  SimConnectEventCategory.to_string(self.get_command_category(command))
             is_axis = "AXIS_" in command
+            if is_axis:
+                min_range = -16383
+                max_range = 16383
+                is_range = True
             is_indexed = ":index" in command
 
             # simvar index : https://docs.flightsimulator.com/html/Programming_Tools/SimVars/Simulation_Variables.htm#h
             
             command_node.attrib['type'] = simvar_type
+            command_node.attrib["datatype"] = "int"
             command_node.attrib["units"] = units
             command_node.attrib["category"] = category
             command_node.attrib["settable"] = str(settable)
             command_node.attrib["axis"] = str(is_axis)
             command_node.attrib["indexed"] = str(is_indexed)
             description_node = etree.SubElement(command_node,"description", value = description)
+            if is_range:
+                range_node = etree.SubElement(command_node,"range")
+                range_node.attrib["min"] = str(min_range)
+                range_node.attrib["max"] = str(max_range)
+                range_node.attrib["toggle"] = str(is_toggle)
 
         try:
             # save the file
@@ -356,11 +448,47 @@ class SimConnectData():
     def _load_xml(self, xml_source):
         ''' loads blocks from the XML file '''
 
-        def has_attribute(node : etree._Element, attr) -> bool:
-            ''' true if the element has the given attribute '''
-            if node is None:
+        def get_attribute(node : etree._Element, attr, default = '', throw_on_missing = False) -> bool:
+            ''' gets a node attribute checking for validity '''
+            try:
+                return node.attrib[attr]
+            except:
+                pass
+            return default
+        
+        def get_bool_attribute(node : etree._Element, attr, default = False, throw_on_missing = False) -> bool:
+            ''' gets a node attribute checking for validity '''
+            value = get_attribute(node, attr).lower()
+            if value in ("t","true","1","-1"):
+                return True
+            if value in ("f","false","0"):
                 return False
-            return attr in node.attrib.keys()
+            if throw_on_missing:
+                raise ValueError(f"Bad or missing boolean XML attribute {attr} on node {node}")
+            return default
+        
+        def get_int_attribute(node : etree._Element, attr, default = 0, throw_on_missing = False) -> int:
+            value = get_attribute(node, attr).lower()
+            if value != '':
+                try:
+                    return int(value)
+                except:
+                    if throw_on_missing:
+                        raise ValueError(f"Bad or missing int XML attribute {attr} on node {node}")
+                    
+            return default
+        
+        def get_float_attribute(node : etree._Element, attr, default = 0.0, throw_on_missing = False) -> float:
+            value = get_attribute(node, attr).lower()
+            if value != '':
+                try:
+                    return float(value)
+                except:
+                    if throw_on_missing:
+                        raise ValueError(f"Bad or missing float XML attribute {attr} on node {node}")
+                    
+            return default        
+        
 
         self._block_map = {}
         if not xml_source or not os.path.isfile(xml_source):
@@ -373,30 +501,56 @@ class SimConnectData():
 
             nodes = root.xpath('//command')
             for node in nodes:
-                simvar = node.value
-                simvar_type = node["type"] if has_attribute(node,"type") else ""
-                units = node["units"] if has_attribute(node,"units") else ""
-                category = node["category"] if has_attribute(node,"category") else ""
-                settable = bool(node["settable"]) if has_attribute(node,"settable") else False
-                axis = bool(node["axis"]) if has_attribute(node,"axis") else False
-                indexed = bool(node["indexed"]) if has_attribute(node,"indexed") else False
-                for child in node:
-                    if node.tag == "description":
-                        description = node.value
-                        break
+                is_ranged = False
+                max_range = 0
+                min_range = 0
+                is_toggle = False
+                value = get_attribute(node,"datatype")
+                if value == "int":
+                    data_type = SimConnectBlock.OutputType.IntNumber
+                elif value == "float":
+                    data_type = SimConnectBlock.OutputType.FloatNumber
+                else:
+                    data_type == SimConnectBlock.OutputType.NotSet
+                simvar = get_attribute(node,"value",throw_on_missing=True)
+                simvar_type = get_attribute(node,"type",throw_on_missing=True) 
+                units = get_attribute(node,"units",throw_on_missing=True)
+                category = get_attribute(node,"category")
+                settable = get_bool_attribute(node,"settable",throw_on_missing=True)
+                axis = get_bool_attribute(node,"axis",throw_on_missing=True)
+                indexed = get_bool_attribute(node,"indexed",throw_on_missing=True)
+                description = ""
+                for child in node.getchildren():
+                    if child.tag == "description":
+                        description = get_attribute(child,"value")
+                    elif child.tag == "range":
+                        is_ranged = True
+                        is_toggle = get_bool_attribute(child,"toggle",throw_on_missing=True)
+                        min_range = get_int_attribute(child,"min",throw_on_missing=True)
+                        max_range = get_int_attribute(child,"max",throw_on_missing=True)
 
                 block = SimConnectBlock()
                 block.command = simvar
                 block.command_type = simvar_type
-                block.output_data_type = units
+                block.output_data_type = data_type
                 block.category = category
                 block.units = units
                 block.is_readonly = not settable
                 block.is_axis = axis
                 block.is_indexed = indexed
                 block.description = description
+                block.is_ranged = is_ranged
+                block.min_range = min_range
+                block.max_range = max_range
+                block.is_toggle = is_toggle
 
+                if simvar in self._block_map.keys():
+                    logging.getLogger("system").error(f"SimconnectData: duplicate definition found: {simvar} in  {xml_source}")  
+                    self._block_map = {}
+                    return False
                 self._block_map[simvar] = block
+
+            logging.getLogger("system").info(f"SimconnectData: loaded {len(self._block_map):,} simvars")                 
 
         except Exception as err:
             logging.getLogger("system").error(f"SimconnectData: XML simvars read error: {xml_source}: {err}")  
@@ -445,47 +599,26 @@ class SimConnectData():
 
     def get_category_list(self):
         ''' returns the list of supported command categories '''
-        # TODO
-        pass
+        categories = self._command_category_map.keys()
+        categories.sort()
+        return categories
     
     def get_command_name_list(self):
         ''' gets all possible command names '''
-        #commands = [item[0] for item in self._commands]
-        commands = list(self._command_map.keys())
-        commands.sort()
-        return commands
+        return self._commands
     
-    def get_command_data(self, command):
-        ''' gets the data associated with the command '''
-        if command in self._command_map.keys():
-            return self._command_map[command]
-        return None
-
-        
     def get_default_command(self):
         ''' gets the default command '''
-        item = self._commands[0]
-        return item[1]
+        if self.valid:
+            return self._block_map[0].command
+        return None
     
     def get_command_category(self, command):
         ''' for a given command, find the category of that command '''
-        if command in self._command_category_map.keys():
-            return self._command_category_map[command]
+        if self.valid and command in self._block_map.keys():
+            block = self._block_map[command]
+            return block.category
         return SimConnectEventCategory.NotSet
-
-    def get_request_name_list(self):
-        ''' returns a list of all possible requests '''
-        request_names = []
-        for data in self._aircraft_requests.list:
-            request_names.extend(list(data.list.keys()))
-        request_names.sort()
-        return request_names
-    
-    def get_request_data(self, request):
-        ''' gets request parameter data '''
-        if request in self._requests:
-            return self._aircraft_requests.find(request)
-
 
 
 class SimConnectBlock(QtCore.QObject):
@@ -520,7 +653,7 @@ class SimConnectBlock(QtCore.QObject):
     range_changed = QtCore.Signal(RangeEvent) # fires when the block range values change
     value_changed = QtCore.Signal() # fires when the block output value changes
 
-    def __init__(self, command = None):
+    def __init__(self):
         ''' creates a simconnect block object
         
         the block auto-configures itself based on the command, and determines
@@ -534,6 +667,7 @@ class SimConnectBlock(QtCore.QObject):
         self._description = None
         self._value_type = SimConnectBlock.OutputType.NotSet
         self._category = SimConnectEventCategory.NotSet
+        self._output_data_type = SimConnectBlock.OutputType.NotSet
         self._command = None
         self._set_value = False # true if the item can set a value
         self._readonly = False # if readonly - the request cannot be triggered
@@ -541,16 +675,15 @@ class SimConnectBlock(QtCore.QObject):
         self._is_indexed = False # true if the output is indexed using the :index 
         self._min_range = -16383
         self._max_range = 16383
-        self._min_range_custom = -16383
-        self._max_range_custom = 16383
+        
         self._value = 0 # output value
         self._is_value = False # true if the command supports an output value
         self._is_ranged = False # true if the command is ranged
+        self._is_toggle = False # true if the range valuers are either mix or max
         self._notify_enabled_count = 0 # true if notifications are enabled
-        self._command = command
+        self._command = None
         self._units = ""
-        if command:
-            self._update()
+
 
     def enable_notifications(self, force = False):
         ''' enables data notifications from this block '''
@@ -576,8 +709,7 @@ class SimConnectBlock(QtCore.QObject):
     @command.setter
     def command(self, value):
         self._command = value
-        self._update()
-
+        
     @property
     def is_request(self) -> bool:
         ''' true if the block is a request '''
@@ -599,26 +731,38 @@ class SimConnectBlock(QtCore.QObject):
     def command_type(self):
         ''' returns the command type '''
         return self._command_type
+    @command_type.setter
+    def command_type(self, value):
+        self._command_type = value
     
     @property
     def display_block_type(self) -> str:
         ''' returns the display string for the block type '''
+        
         if self._command_type == SimConnectBlock.SimConnectCommandType.Request:
             return "Request"
         elif self._command_type == SimConnectBlock.SimConnectCommandType.Event:
             return "Event"
-        return ""
+        return F"Unknown command type: {self._command_type}"
     
     @property
     def output_data_type(self):
         ''' block output data type'''
-        return SimConnectBlock.OutputType.IntNumber
+        return self._output_data_type
+    
+    @output_data_type.setter
+    def output_data_type(self, value):
+        self._output_data_type = value
+
         
     
     @property
     def category(self) -> str:
         ''' command category '''
         return self._category
+    @category.setter
+    def category(self, value):
+        self._category = value
     
     @property
     def is_readonly(self) -> bool:
@@ -657,11 +801,6 @@ class SimConnectBlock(QtCore.QObject):
         self._units = value
     
     @property
-    def data_type(self) -> str:
-        ''' Simconnect datatype '''
-        return self._output_data_type
-    
-    @property
     def display_data_type(self) -> str:
         ''' returns a displayable data type even if none is set '''
         if self._value_type == SimConnectBlock.OutputType.IntNumber:
@@ -669,47 +808,32 @@ class SimConnectBlock(QtCore.QObject):
         elif self._value_type == SimConnectBlock.OutputType.FloatNumber:
             return "Number (float)"
         return "N/A"
-        
     
     @property
     def min_range(self):
         ''' current min range '''
         return self._min_range
     
+    @min_range.setter
+    def min_range(self, value):
+        self._min_range = value
+    
     @property
     def max_range(self):
         ''' current max range '''
         return self._max_range
     
-    @property
-    def min_range_custom(self):
-        ''' custom min range '''
+    @max_range.setter
+    def max_range(self, value):
+        self._max_range = value
 
-    @min_range_custom.setter
-    def min_range_custom(self, value):
-        if value < self._min_range:
-            value = self._min_range
-        if value > self._max_range_custom:
-            value = self._max_range_custom
-        if value != self._min_range_custom:
-            self._min_range_custom = value
-            self._notify_range_update()    
-        
-    
     @property
-    def max_range_custom(self):
-        ''' custom max range '''
-        return self._max_range_custom
-    
-    @max_range_custom.setter
-    def max_range_custom(self, value):
-        if value < self._min_range_custom:
-            value = self._min_range_custom
-        if value > self._max_range:
-            value = self._max_range
-        if value != self._max_range_custom:
-            self._max_range_custom = value
-            self._notify_range_update()
+    def is_toggle(self):
+        ''' true if the range output is only two values - min or max'''
+        return self._is_toggle
+    @is_toggle.setter
+    def is_toggle(self, value):
+        self._is_toggle = value
 
     def custom_range_sync(self):
         ''' makes custom range the same as the default range '''
@@ -745,6 +869,9 @@ class SimConnectBlock(QtCore.QObject):
     def is_ranged(self):
         ''' true if the command is a ranged command (suitable for a range of values)'''
         return self._is_ranged
+    @is_ranged.setter
+    def is_ranged(self, value):
+        self._is_ranged = value
     
     @property
     def description(self) -> str:
@@ -789,42 +916,12 @@ class SimConnectBlock(QtCore.QObject):
         if self._min_range != min_range: 
             self._min_range = min_range
             changed = True
-        if self._min_range_custom < min_range:
-            self._min_range_custom = min_range
-            changed = True
         if self._max_range != max_range:
             self._max_range = max_range
-            changed = True
-        if self._max_range_custom > max_range:
-            self._max_range_custom = max_range
             changed = True
         self._is_ranged = is_ranged
         if changed:
             self._notify_range_update()
-
-    # def _update(self):
-    #     ''' updates on new command '''
-    #     smdata = SimConnectData()
-    #     command = self._command
-    #     data = smdata.get_command_data(command)   
-    #     if data:
-    #         self._data = data
-    #         if data[0] == "e":
-    #             self._command_type = SimConnectBlockType.Event
-    #             self._description = data[1][2]
-    #             self._value_type = "AXIS_" in command
-    #             self._category = smdata.get_command_category(command)
-    #             self._readonly = False # can trigger events
-
-    #         elif data[0] == "r":
-    #             self._command_type = SimConnectBlockType.Event
-    #             self._description = data[1][0]
-    #             self._value_type = data[1][2].decode('ascii')
-    #             self._category = smdata.get_command_category(command)
-    #             self._readonly = data[1][3] != 'Y'
-
-    #         self._set_range()
-    #         self._is_value = self._value_type != ""
 
     def map_range(self, value: float) -> int:
         ''' maps the input float value -1 to +1 to the command's range '''
