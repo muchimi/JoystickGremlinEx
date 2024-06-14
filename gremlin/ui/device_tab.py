@@ -599,13 +599,56 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         self.left_panel_layout.addWidget(self.input_item_list_view)
         self.main_layout.addLayout(self.left_panel_layout)
 
+        button_container_widget = QtWidgets.QWidget()
+        button_container_layout = QtWidgets.QHBoxLayout()
+        button_container_widget.setLayout(button_container_layout)
+
+        # key clear button
+        
+        clear_keyboard_button = QtWidgets.QPushButton("Clear Keys")
+        clear_keyboard_button.clicked.connect(self._clear_keys_cb)
+        button_container_layout.addWidget(clear_keyboard_button)
+        button_container_layout.addStretch(1)
+
         # Key add button
         button = common.NoKeyboardPushButton("Add Key")
         button.clicked.connect(self._record_keyboard_key_cb)
-        self.left_panel_layout.addWidget(button)
+
+        button_container_layout.addWidget(button)
+        
+
+        virtual_keyboard_button = QtWidgets.QPushButton("Select Key")
+        virtual_keyboard_button.clicked.connect(self._select_keys_cb)
+        button_container_layout.addWidget(virtual_keyboard_button)
+        
+
+        self.left_panel_layout.addWidget(button_container_widget)
+        
 
         # Select first entry by default
         self.input_item_selected_cb(0)
+
+    def _clear_keys_cb(self):
+        ''' clears keyboard input keys '''
+        self.input_item_list_model.clear()
+        self.input_item_list_view.redraw()
+
+    def _select_keys_cb(self):
+        ''' display the keyboard input dialog '''
+        from gremlin.ui.virtual_keyboard import InputKeyboardDialog
+        self._keyboard_dialog = InputKeyboardDialog(parent = self, select_single = True)
+        self._keyboard_dialog.accepted.connect(self._keyboard_dialog_ok_cb)
+        self._keyboard_dialog.showNormal()  
+
+    def _keyboard_dialog_ok_cb(self):
+        ''' callled when the dialog completes '''
+
+        # grab the new data
+        keys = self._keyboard_dialog.keys
+        if keys:
+            key = keys.pop()
+            self._add_keyboard_key_cb(key)
+                  
 
     def input_item_selected_cb(self, index):
         """Handles the selection of an input item.
@@ -622,21 +665,21 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         index_key = sorted_keys[index]
         item_data = self.device_profile.modes[self.current_mode]. \
             config[InputType.Keyboard][index_key]
-
-        # Remove any, non selected, invalid input items
-        for i, key in enumerate(sorted_keys):
-            if i == index:
-                continue
-            data = self.device_profile.modes[self.current_mode]. \
-                config[InputType.Keyboard][key]
-            is_valid = False
-            for container in data.containers:
-                is_valid = True if container.is_valid() else is_valid
-            if not is_valid:
-                self.device_profile.modes[self.current_mode].delete_data(
-                    InputType.Keyboard,
-                    key
-                )
+        
+        # # Remove any, non selected, invalid input items
+        # for i, key in enumerate(sorted_keys):
+        #     if i == index:
+        #         continue
+        #     data = self.device_profile.modes[self.current_mode]. \
+        #         config[InputType.Keyboard][key]
+        #     is_valid = False
+        #     for container in data.containers:
+        #         is_valid = True if container.is_valid() else is_valid
+        #     if not is_valid:
+        #         self.device_profile.modes[self.current_mode].delete_data(
+        #             InputType.Keyboard,
+        #             key
+        #         )
 
         # Remove the existing widget, if there is one
         item = self.main_layout.takeAt(1)

@@ -134,6 +134,17 @@ class InputItemListModel(common.AbstractModel):
                     index - axis_count - button_count + 1
                 ]
             
+    def removeRow(self, index):
+        ''' removes the item at the specified index '''
+        input_items = self._device_data.modes[self._mode]
+        key_count = len(input_items.config[InputType.Keyboard])
+
+        if key_count > 0:
+            sorted_keys = sorted(input_items.config[InputType.Keyboard].keys())
+            item_index = sorted_keys[index]
+            del input_items.config[InputType.Keyboard][item_index]
+
+        # ignore other input types as we only allow deletion of input keyboard items    
     
     def action_id_to_index(self, action_id):
         ''' get the model index containing the action id'''
@@ -183,6 +194,12 @@ class InputItemListModel(common.AbstractModel):
                    axis_index_to_linear_index[event.identifier]
         else:
             return offset_map[event.event_type] + event.identifier - 1
+        
+    def clear(self):
+        ''' removes all data if keyboard '''
+        input_items = self._device_data.modes[self._mode]
+        #key_count = len(input_items.config[InputType.Keyboard])
+        input_items.config[InputType.Keyboard].clear()
 
 
 class InputItemListView(common.AbstractView):
@@ -227,10 +244,6 @@ class InputItemListView(common.AbstractView):
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setWidget(self.scroll_widget)
 
-        # self.scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
-        # self.scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
-
-
 
         # Add the scroll area to the main layout
         self.main_layout.addWidget(self.scroll_area)
@@ -273,10 +286,14 @@ class InputItemListView(common.AbstractView):
         self.redraw()
 
     def redraw(self):
-        """Redraws the entire model."""
-        verbose = gremlin.config.Configuration().verbose
-        if verbose:
-            logging.getLogger("system").info(f"device redraw begin") 
+        """Redraws the entire model.
+        
+        This creates a fake listview where a vertical container just has InputItemButton widgets
+        
+        """
+        #verbose = gremlin.config.Configuration().verbose
+        #if verbose:
+        #logging.getLogger("system").info(f"redraw()") 
         common.clear_layout(self.scroll_layout)
 
         if self.model is None:
@@ -295,12 +312,16 @@ class InputItemListView(common.AbstractView):
             widget = InputItemButton(identifier)
             widget.create_action_icons(data)
             widget.update_description(data.description)
-            widget.selected.connect(self._create_selection_callback(index))
+            widget.selected_changed.connect(self._create_selection_callback(index))
+            widget.closed.connect(self._create_close_callback(index))
+            widget.selected = index == self._current_index
+            if data.input_type == InputType.Keyboard:
+                widget.enable_close()
+            #logging.getLogger("system").info(f"create widget: index {index} selected: {widget.selected}")                 
             self.scroll_layout.addWidget(widget)
         self.scroll_layout.addStretch()
+        
 
-        if verbose:
-            logging.getLogger("system").info(f"device redraw end") 
 
     def redraw_index(self, index):
         """Redraws the view entry at the given index.
@@ -309,6 +330,9 @@ class InputItemListView(common.AbstractView):
         """
         if self.model is None:
             return
+        
+
+        logging.getLogger("system").info(f"redraw_index: {index}") 
 
         data = self.model.data(index)
         item = self.scroll_layout.itemAt(index)
@@ -326,6 +350,10 @@ class InputItemListView(common.AbstractView):
             is selected
         """
         return lambda x: self.select_item(index)
+    
+    def _create_close_callback(self, index):
+        ''' creates a callback to handle the closing of items '''
+        return lambda x: self.close_item(index)
     
 
     def select_input(self, input_type, identifier):
@@ -346,6 +374,22 @@ class InputItemListView(common.AbstractView):
             return None
         
         return self.model.data(index)
+    
+    def close_item(self, index, emit_signal = True):
+        ''' handles the closing of a specific item '''
+        self.model.removeRow(index)
+        self.redraw()
+        # for i in range(self.scroll_layout.count()):
+        #     item = self.scroll_layout.itemAt(i)
+
+        #     if item.widget():
+        #         widget = item.widget()
+        #         data = self.model.data(index)
+                
+        #     # self.device_profile.modes[self.current_mode].delete_data(
+        #     #     InputType.Keyboard,
+        #     #     key
+
 
 
 
@@ -377,15 +421,9 @@ class InputItemListView(common.AbstractView):
                 item = self.scroll_layout.itemAt(i)
                 if item.widget():
                     widget = item.widget()
-                    # height += widget.height
-                    widget.setAutoFillBackground(False)
                     if i == index:
-                        palette = QtGui.QPalette()
-                        palette.setColor(QtGui.QPalette.ColorRole.Window, QtGui.QColorConstants.DarkGray)
-                        widget.setAutoFillBackground(True)
-                        widget.setPalette(palette)
+                        widget.selected = True
                         valid_index = True
-
 
                         # self.scroll_area.ensureVisible(x,height)
                         QtCore.QTimer.singleShot(0, partial(self.scroll_area.ensureWidgetVisible, widget))
@@ -399,9 +437,15 @@ class InputItemListView(common.AbstractView):
                         event.device_input_type = data.input_type if data else None
                         event.device_input_id = data.input_id if data else None
                         el.profile_device_changed.emit(event)
+                    else:
+                        # deselect unselected
+                        if widget.selected:
+                            widget.selected = False
+                        
 
             if emit_signal and valid_index:
                 self.item_selected.emit(index)
+            
                 
 
 
@@ -603,7 +647,10 @@ class InputItemButton(QtWidgets.QFrame):
     """
 
     # Signal emitted whenever this button is pressed
-    selected = QtCore.Signal(InputIdentifier)
+    selected_changed = QtCore.Signal(InputIdentifier)
+    closed =  QtCore.Signal(InputIdentifier)
+
+
 
     def __init__(self, identifier, parent=None):
         """Creates a new instance.
@@ -612,7 +659,15 @@ class InputItemButton(QtWidgets.QFrame):
         :param parent the parent widget
         """
         QtWidgets.QFrame.__init__(self, parent)
+
+        self.container_widget = QtWidgets.QWidget(self)
+        self.container_layout = QtWidgets.QGridLayout()
+
+        self.container_widget.setLayout(self.container_layout)
+
         self.identifier = identifier
+        self._selected = False
+        
 
         self._label_widget = QtWidgets.QLabel(
             gremlin.common.input_to_ui_string(
@@ -620,18 +675,60 @@ class InputItemButton(QtWidgets.QFrame):
                 self.identifier.input_id
             )
         )
-        self._description_widget = QtWidgets.QLabel("")
+        self._description_widget = QtWidgets.QLabel()
         self._icon_layout = QtWidgets.QHBoxLayout()
         self._icons = []
 
         self.setFrameShape(QtWidgets.QFrame.Box)
-        self.main_layout = QtWidgets.QGridLayout(self)
-        self.main_layout.addWidget(self._label_widget, 0, 0)
-        self.main_layout.addWidget(self._description_widget, 0, 1)
-        self.main_layout.addLayout(self._icon_layout, 0, 2)
-        self.main_layout.setColumnMinimumWidth(0, 50)
+        self.label_selected = QtWidgets.QLabel()
+        self.container_layout.addWidget(self.label_selected, 0, 0, -1, -1)
+        self.label_selected.setMinimumHeight(30)
+        self.container_layout.addWidget(QtWidgets.QLabel(" "), 0, 0)
+        self.container_layout.addWidget(self._label_widget, 0, 1)
+        self.container_layout.addWidget(self._description_widget, 0, 2)
+        self.container_layout.addLayout(self._icon_layout, 0, 3)
+        self._close_button_widget = QtWidgets.QPushButton("X")
+        self._close_button_widget.setFixedWidth(24)
+        self._close_button_widget.clicked.connect(self._close_button_cb)
+        self._close_button_widget.setVisible(False) # not visible by default
+        self.container_layout.addWidget(self._close_button_widget, 0, 4)
+        self.container_layout.addWidget(QtWidgets.QLabel(" "), 0, 5)
 
+
+        #self.container_layout.setColumnMinimumWidth(0, 50)
         self.setMinimumWidth(300)
+
+        self.main_layout = QtWidgets.QHBoxLayout()
+        self.main_layout.setContentsMargins(0,0,0,0)
+        self.setContentsMargins(2,2,2,2)
+        self.setLayout(self.main_layout)
+        self.main_layout.addWidget(self.container_widget)
+    
+
+    @property
+    def selected(self) -> bool:
+        return self._selected
+    
+    @selected.setter
+    def selected(self, value):
+        if value != self._selected:
+            self._selected = value
+            if value:
+                style = "background-color:  #8FBC8F; border-width: 6px; border-color: #8FBC8F;" 
+            else:
+                style = "background-color: #E8E8E8; border-width: 6px; ; border-color: #E8E8E8;" 
+            
+            self.label_selected.setStyleSheet(style)   
+            
+
+
+    def enable_close(self):
+        ''' enables the close button on the input widget (keyboard only usually) '''
+        self._close_button_widget.setVisible(True)
+
+    def disable_close(self):
+        ''' enables the close button on the input widget (keyboard only usually) '''
+        self._close_button_widget.setVisible(False)        
 
     def update_description(self, description):
         """Updates the description of the button.
@@ -666,7 +763,11 @@ class InputItemButton(QtWidgets.QFrame):
 
         :param event the mouse event
         """
-        self.selected.emit(self.identifier)
+        self.selected_changed.emit(self.identifier)
+
+    def _close_button_cb(self):
+        ''' fires the closed event when the close button has been pressed '''
+        self.closed.emit(self.identifier)
 
 
 class ActionLabel(QtWidgets.QLabel):
