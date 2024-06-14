@@ -67,7 +67,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.14ex (a)"
+APPLICATION_VERSION = "13.40.14ex (b)"
 
 
 from gremlin.singleton_decorator import SingletonDecorator
@@ -1104,7 +1104,13 @@ class GremlinUi(QtWidgets.QMainWindow):
             log_sys_error(e)
 
     def _kb_event_cb(self, event):
-        ''' listen for keyboard modifiers '''
+        ''' listen for keyboard modifiers and keyboard events at runtime '''
+
+
+        key = gremlin.macro.key_from_code(
+                event.identifier[0],
+                event.identifier[1]
+        )
 
 
         # ignore if we're running
@@ -1112,10 +1118,6 @@ class GremlinUi(QtWidgets.QMainWindow):
             # not listening or not enabled for highlighting
             return
         
-        key = gremlin.macro.key_from_code(
-                event.identifier[0],
-                event.identifier[1]
-        )
 
 
         valid_key = False
@@ -1306,16 +1308,16 @@ class GremlinUi(QtWidgets.QMainWindow):
             message_box.setText("The profile has been modified.")
             message_box.setInformativeText("Do you want to save your changes?")
             message_box.setStandardButtons(
-                QtWidgets.QMessageBox.Save |
-                QtWidgets.QMessageBox.Discard |
-                QtWidgets.QMessageBox.Cancel
+                QtWidgets.QMessageBox.StandardButton.Save |
+                QtWidgets.QMessageBox.StandardButtonDiscard |
+                QtWidgets.QMessageBox.StandardButtonCancel
             )
-            message_box.setDefaultButton(QtWidgets.QMessageBox.Save)
+            message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Save)
 
             response = message_box.exec()
-            if response == QtWidgets.QMessageBox.Save:
+            if response == QtWidgets.QMessageBox.StandardButton.Save:
                 self.save_profile()
-            elif response == QtWidgets.QMessageBox.Cancel:
+            elif response == QtWidgets.QMessageBox.StandardButton.Cancel:
                 continue_process = False
         return continue_process
 

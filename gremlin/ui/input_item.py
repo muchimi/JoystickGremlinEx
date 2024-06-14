@@ -100,6 +100,13 @@ class InputItemListModel(common.AbstractModel):
             len(input_items.config[InputType.JoystickButton]) + \
             len(input_items.config[InputType.JoystickHat]) + \
             len(input_items.config[InputType.Keyboard])
+    
+    @property
+    def keyboard_rows(self):
+        ''' returns the number of keyboard items'''
+        input_items = self._device_data.modes[self._mode]
+        return len(input_items.config[InputType.Keyboard])
+
 
     def data(self, index):
         """Returns the data stored at the provided index.
@@ -196,10 +203,13 @@ class InputItemListModel(common.AbstractModel):
             return offset_map[event.event_type] + event.identifier - 1
         
     def clear(self):
-        ''' removes all data if keyboard '''
+        ''' removes all input items for keyboard items data if keyboard 
+            only keyboard inputs can be removed
+        
+        '''
         input_items = self._device_data.modes[self._mode]
-        #key_count = len(input_items.config[InputType.Keyboard])
-        input_items.config[InputType.Keyboard].clear()
+        if InputType.Keyboard in input_items.config:
+            input_items.config[InputType.Keyboard].clear()
 
 
 class InputItemListView(common.AbstractView):

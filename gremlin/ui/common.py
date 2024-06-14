@@ -1263,3 +1263,51 @@ class NoWheelComboBox (QtWidgets.QComboBox):
             return super().wheelEvent(event)
         
     
+class ConfirmPushButton(QtWidgets.QPushButton):
+    ''' confirmation push button '''
+
+    confirmed = QtCore.Signal(object)
+
+    def __init__(self, text = None, title = "Confirmation Required", prompt = "Are you sure?", show_callback = None, parent = None ) -> None:
+        ''' shows a confirm dialog box on click 
+        
+        :param text button text
+        :param title dialog title
+        :param prompt dialog body (question)
+        :param show_callback boolean callback that determines if the dialog should show (return true if it should)
+        '''
+        super().__init__(parent)
+
+        if text:
+            self.setText(text)
+
+        self.prompt = prompt
+        self.title = title
+        self.show_callback = show_callback
+
+        self.clicked.connect(self._clicked_cb)
+
+
+    def _clicked_cb(self):
+        if self.show_callback is not None:
+            result = self.show_callback()
+            if not result:
+                return
+            
+        message_box = QtWidgets.QMessageBox()
+        message_box.setText(self.title)
+        message_box.setInformativeText(self.prompt)
+        message_box.setStandardButtons(
+            QtWidgets.QMessageBox.StandardButton.Ok |
+            QtWidgets.QMessageBox.StandardButton.Cancel
+            )
+        message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
+        result = message_box.exec()
+        if result == QtWidgets.QMessageBox.StandardButton.Ok:
+            self.confirmed.emit(self)
+        
+
+
+
+
+        

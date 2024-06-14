@@ -300,8 +300,6 @@ class VJoyUsageState():
         ''' returns the current usage state of the input '''
         self.ensure_profile()
         unused_list = VJoyUsageState._free_inputs[device_id][input_type]
-        # if input_id == 3:
-        #     pass
         if input_id in unused_list:
             return False
         return True
@@ -1340,9 +1338,6 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         # Get the appropriate vjoy device identifier
         vjoy_dev_id = 0
 
-        # if self.action_data.action_id == "0cf2394a99bd4383a6d17129a57e35d4":
-        #     pass
-
         #log_sys(f"populate vjoy data for action id: {self.action_data.action_id}  action mode: {self.action_data.action_mode}  vjoy: {self.action_data.vjoy_device_id}")
         if self.action_data.vjoy_device_id not in [0, None]:
             vjoy_dev_id = self.action_data.vjoy_device_id
@@ -2029,8 +2024,6 @@ class VjoyRemap(gremlin.base_classes.AbstractAction):
         return self._merge_device_b_guid
     @merge_device_b_guid.setter
     def merge_device_b_guid(self, value):
-        if value:
-            pass
         self._merge_device_b_guid = value        
 
     @property
@@ -2079,9 +2072,6 @@ class VjoyRemap(gremlin.base_classes.AbstractAction):
         
     @reverse.setter
     def reverse(self,value):
-        # input_id: 5 device id: 1 axis id: 5
-        # if self.vjoy_input_id == 5 and self.vjoy_device_id == 1 and self.vjoy_axis_id == 5:
-        #     pass
         usage_data.set_inverted(self.vjoy_device_id, self.vjoy_axis_id, value)
         self._reverse = value
 
@@ -2175,9 +2165,6 @@ class VjoyRemap(gremlin.base_classes.AbstractAction):
 
         :param node XML node with which to populate the storage
         """
-
-        # if self.action_id == "0cf2394a99bd4383a6d17129a57e35d4":
-        #     pass
 
         try:
             

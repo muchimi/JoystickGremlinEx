@@ -605,8 +605,8 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
 
         # key clear button
         
-        clear_keyboard_button = QtWidgets.QPushButton("Clear Keys")
-        clear_keyboard_button.clicked.connect(self._clear_keys_cb)
+        clear_keyboard_button = common.ConfirmPushButton("Clear Keys", show_callback = self._show_clear_cb)
+        clear_keyboard_button.confirmed.connect(self._clear_keys_cb)
         button_container_layout.addWidget(clear_keyboard_button)
         button_container_layout.addStretch(1)
 
@@ -628,8 +628,12 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         # Select first entry by default
         self.input_item_selected_cb(0)
 
+    def _show_clear_cb(self):
+        return self.input_item_list_model.keyboard_rows > 0
+
     def _clear_keys_cb(self):
         ''' clears keyboard input keys '''
+
         self.input_item_list_model.clear()
         self.input_item_list_view.redraw()
 

@@ -1839,8 +1839,7 @@ class Mode:
             type and id
         """
         assert(input_type in self.config)
-        if input_id == 1 and input_type == InputType.JoystickAxis:
-            pass
+        
         if input_id not in self.config[input_type]:
             entry = InputItem(self)
             entry.input_type = input_type
@@ -1892,13 +1891,8 @@ class InputItem:
         #self.id = common.get_guid()  # unique ID of this input item
 
 
-    # def _container_change_cb(self, *args, **kwargs):
-    #     pass
-
     @property
     def containers(self):
-        if self.input_type == InputType.JoystickButton and self.input_id in (2,3):
-            pass
         return self._containers
     
     @property
@@ -1913,8 +1907,6 @@ class InputItem:
         return self._input_id
     @input_id.setter
     def input_id(self, value):
-        # if self._input_type == InputType.JoystickButton and value (2,3):
-        #     pass
         self._input_id = value
         
 
