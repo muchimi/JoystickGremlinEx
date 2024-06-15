@@ -34,6 +34,7 @@ from gremlin.ui.common import NoKeyboardPushButton
 import gremlin.ui.input_item
 import gremlin.input_devices
 from gremlin.input_devices import VjoyAction
+from gremlin.keyboard import key_from_code, key_from_name
 
 syslog = logging.getLogger("system")
 
@@ -183,7 +184,7 @@ class MacroActionEditor(QtWidgets.QWidget):
         elif value == "Keyboard":
             self.model.set_entry(
                 gremlin.macro.KeyAction(
-                    gremlin.macro.key_from_name("enter"),
+                    key_from_name("enter"),
                     True
                 ),
                 self.index.row()
@@ -670,7 +671,7 @@ class MacroActionEditor(QtWidgets.QWidget):
         :param event the event containing information about the key to use
         """
         self.model.get_entry(self.index.row()).key = \
-            gremlin.macro.key_from_code(*event.identifier)
+            key_from_code(*event.identifier)
         self._update_model()
         gremlin.ui.common.clear_layout(self.action_layout)
         self.ui_elements = {}
@@ -1586,7 +1587,7 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
                 time.time() - max(self._recording_times.values())
             ))
         action = gremlin.macro.KeyAction(
-            gremlin.macro.key_from_code(
+            key_from_code(
                 event.identifier[0],
                 event.identifier[1]
             ),
@@ -1783,7 +1784,7 @@ class Macro(AbstractAction):
                 self.sequence.append(joy_action)
             elif child.tag == "key":
                 key_action = gremlin.macro.KeyAction(
-                    gremlin.macro.key_from_code(
+                    key_from_code(
                         int(child.get("scan-code")),
                         gremlin.profile.parse_bool(child.get("extended"))
                     ),

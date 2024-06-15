@@ -28,7 +28,7 @@ import gremlin.base_classes
 from  gremlin.clipboard import Clipboard
 import gremlin.common
 import gremlin.shared_state
-
+from gremlin.keyboard import key_from_code, key_from_name
 
 class ContainerViewTypes(enum.Enum):
 
@@ -1150,7 +1150,7 @@ class InputListenerWidget(QtWidgets.QFrame):
 
         :param event the keypress event to be processed
         """
-        key = gremlin.macro.key_from_code(
+        key = key_from_code(
                 event.identifier[0],
                 event.identifier[1]
         )
@@ -1159,7 +1159,7 @@ class InputListenerWidget(QtWidgets.QFrame):
 
         # Return immediately once the first key press is detected
         if not self._multi_keys:
-            if event.is_pressed and key == gremlin.macro.key_from_name("esc"):
+            if event.is_pressed and key == key_from_name("esc"):
                 if not self._abort_timer.is_alive():
                     self._abort_timer.start()
             elif not event.is_pressed and \
@@ -1178,7 +1178,7 @@ class InputListenerWidget(QtWidgets.QFrame):
                         self._multi_key_storage.append(key)
                     else:
                         self._multi_key_storage.append(event)
-                if key == gremlin.macro.key_from_name("esc"):
+                if key == key_from_name("esc"):
                     # Start a timer and close if it expires, aborting the
                     # user input request
                     if not self._abort_timer.is_alive():
@@ -1190,7 +1190,7 @@ class InputListenerWidget(QtWidgets.QFrame):
 
         # Ensure the timer is cancelled and reset in case the ESC is released
         # and we're not looking to return keyboard events
-        if key == gremlin.macro.key_from_name("esc") and not event.is_pressed:
+        if key == key_from_name("esc") and not event.is_pressed:
             self._abort_timer.cancel()
             self._abort_timer = threading.Timer(1.0, self.close)
 

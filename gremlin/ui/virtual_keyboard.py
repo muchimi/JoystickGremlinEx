@@ -76,10 +76,11 @@ class InputKeyboardDialog(QtWidgets.QDialog):
     ''' dialog showing a virtual keyboard in which to select key combinations with the keyboard or mouse '''
 
 
-    def __init__(self, sequence = None, parent = None, select_single = False):
+    def __init__(self, sequence = None, parent = None, select_single = False, allow_modifiers = True):
         '''
         :param sequence - input keys to use
         :param select_single - if set, only can select a single key
+        :param allow_modifiers - if set - modifier keys along with regular keys are allowed
         '''
         super().__init__(parent)
         # self._sequence = InputKeyboardModel(sequence=sequence)
@@ -87,6 +88,9 @@ class InputKeyboardDialog(QtWidgets.QDialog):
         self.setWindowTitle("Keyboard Input Mapper")
 
         self._select_single = select_single
+        self._allow_modifiers = allow_modifiers
+
+        self._modifier_keys = ["leftshift","rightshift","leftalt","rightalt", "leftcontrol","rightcontrol", "leftwin", "rightwin"]
 
         self._key_map = {} # map of (scancode, extended) to keys  (scancode, extended) -> key
         self._key_widget_map = {} # map of keys to widgets  key -> widget
@@ -172,7 +176,7 @@ class InputKeyboardDialog(QtWidgets.QDialog):
         data = []
 
         modifier_map = {}
-        modifiers = ["leftshift","leftcontrol","leftalt","rightshift","rightcontrol","rightalt"]
+        modifiers = ["leftshift","leftcontrol","leftalt","rightshift","rightcontrol","rightalt","leftwin","rightwin"]
         for key_name in modifiers:
             modifier_map[key_name] = []
 
@@ -312,13 +316,19 @@ class InputKeyboardDialog(QtWidgets.QDialog):
 
     def _key_cb(self):
         ''' occurs when the widget is selected'''
+        current_widget = self.sender()
         if self._select_single:
             # single select mode
-            selected_widgets = [widget for widget in self._key_widget_map.values() if widget.selected]
-            for widget in selected_widgets:
-                widget.selected = False # deselect
+            source_modifier = False
+            if self._allow_modifiers and current_widget.key.lookup_name in self._modifier_keys:
+                source_modifier = True
+            if not source_modifier:
+                selected_widgets = [widget for widget in self._key_widget_map.values() if widget.selected]
+                for widget in selected_widgets:
+                    if self._allow_modifiers and widget.key.lookup_name in self._modifier_keys:
+                        continue
+                    widget.selected = False # deselect
 
-        widget = self.sender()
-        key = widget.key
-        widget.selected = not widget.selected # toggle
+        
+        current_widget.selected = not current_widget.selected # toggle
         

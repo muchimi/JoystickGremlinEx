@@ -27,6 +27,8 @@ import gremlin
 from gremlin import input_devices
 
 
+
+
 def _create_function(lib_name, fn_name, param_types, return_type):
     """Creates a handle to a windows dll library function.
 
@@ -89,6 +91,10 @@ _vk_key_scan_ex = _create_function(
     [ctypes.c_wchar, wintypes.HKL],
     ctypes.c_short
 )
+ 
+
+
+_keyboard_modifiers = ["leftshift","leftcontrol","leftalt","rightshift","rightcontrol","rightalt","leftwin","rightwin"]
 
 
 class Key:
@@ -97,7 +103,7 @@ class Key:
     different representations.
     """
 
-    def __init__(self, name, scan_code, is_extended, virtual_code):
+    def __init__(self, name, scan_code, is_extended, virtual_code = None):
         """Creates a new Key instance.
 
         :param name the name used to refer to this key
@@ -108,14 +114,36 @@ class Key:
         :param virtual_code the virtual key code assigned to this
             key by windows
         """
-        self._name = name
         self._scan_code = scan_code
         self._is_extended = is_extended
+        if not virtual_code:
+            virtual_code = _scan_code_to_virtual_code(scan_code, is_extended)
+        if not name:
+            k = key_from_code(scan_code, is_extended)
+            name = k.name
+            #name = _virtual_input_to_unicode(virtual_code)
+
+        self._name = name
+        
         self._virtual_code = virtual_code
         self._lookup_name = None
+        self._latched_keys = [] # list of keys latched to this keystroke (modifiers)
 
     @property
     def name(self):
+        ''' display name - can be a compound key '''
+        if self._latched_keys:
+            keys = [self]
+            keys.extend(self._latched_keys)
+            # order the key by modifier 
+            keys = sort_keys(keys)
+            result = ""
+            for key in keys:
+                if result:
+                    result += " + "
+                result += key._name
+            return result
+
         return self._name
 
     @property
@@ -154,7 +182,62 @@ class Key:
             return (0x0E << 8) + self._scan_code
         else:
             return self._scan_code
+    
+    @property
+    def latched_keys(self) -> list:
+        ''' list of key objects that are latched to this key (modifiers)'''
+        return self._latched_keys
+    @latched_keys.setter
+    def latched_keys(self, value):
+        self._latched_keys = value
+    
+    @property
+    def is_latched(self):
+        ''' true if this key is latched '''
+        return len(self._latched_keys) > 0
+    
+    @property
+    def is_modifier(self):
+        ''' true if the key is a modifier '''
+        return self._lookup_name in _keyboard_modifiers
+    
+    def modifier_order(self):
+        ''' returns the order of the modifier '''
+        lookup_name = self.lookup_name
+        if lookup_name in _keyboard_modifiers:
+            return _keyboard_modifiers.index(lookup_name)
+        return -1 # not found
+    
+    def key_order(self):
+        ''' gets a unique and predictable key index for ordering a key sequence
+         
+        Modifiers will be a lower index than normal character which will be lower than special keys
+           
+        '''
+        lookup_name = self.lookup_name
+        if lookup_name in _keyboard_modifiers:
+            return self.modifier_order()
+        
+        # bump to next index
+        start_index = 100
+        
+        if len(lookup_name) == 1:
+            # single keys - use the ascii sequence
+            value = ord(lookup_name)
+            return start_index + value
+        
+        start_index = 1000
+        # special keys
+        special_names = [g_name_to_key.keys()]
 
+        if self._lookup_name in special_names:
+            value = special_names.index(lookup_name)
+            return start_index + value
+        
+        # no clue
+        return -1
+    
+         
 
 def _scan_code_to_virtual_code(scan_code, is_extended):
     """Returns the virtual code corresponding to the given scan code.
@@ -274,7 +357,8 @@ def send_key_up(key):
     if is_remote:
         input_devices.remote_client.send_key(key.virtual_code, key.scan_code, flags )
 
-def key_from_name(name):
+
+def key_from_name(name, validate = False):
     """Returns the key corresponding to the provided name.
 
     If no key exists with the provided name None is returned.
@@ -293,6 +377,10 @@ def key_from_name(name):
     # Attempt to create the key to store and return if successful
     key = _unicode_to_key(name)
     if key is None:
+        if validate:
+            # skip error reporting on validation
+            return None
+        
         logging.getLogger("system").warning(
             f"Invalid key name specified \"{name}\""
         )
@@ -305,17 +393,29 @@ def key_from_name(name):
         return key
 
 
-def key_from_code(scan_code: int, is_extended: bool) -> Key:
+def sort_keys(keys):
+    ''' sorts a list of keys so the keys are in a predictable order '''
+    key: Key
+    sequence = []
+    for key in keys:
+        index = key.key_order()
+        sequence.append((key, index))
+    
+    sequence.sort(key = lambda x: x[1])
+    keys_list = [k for (k, _) in sequence]
+    return keys_list
+
+
+
+
+def key_from_code(scan_code, is_extended):
     """Returns the key corresponding to the provided scan code.
 
     If no key exists with the provided scan code None is returned.
 
-    Params:
-        scan_code the scan code of the desired key
-        is_extended flag indicating if the key is extended
-
-    Returns:
-        Key instance or None
+    :param scan_code the scan code of the desired key
+    :param is_extended flag indicating if the key is extended
+    :return Key instance or None
     """
     global g_scan_code_to_key, g_name_to_key
 
@@ -340,11 +440,12 @@ def key_from_code(scan_code: int, is_extended: bool) -> Key:
         g_scan_code_to_key[(scan_code, is_extended)] = key
         g_name_to_key[name.lower()] = key
         return key
+    
+
 
 
 # Storage for the various keys, prepopulated with non alphabetical keys
 g_scan_code_to_key = {}
-
 g_name_to_key = {
     # Function keys
     "f1": Key("F1", 0x3b, False, win32con.VK_F1),
@@ -370,9 +471,7 @@ g_name_to_key = {
     "f21": Key("F21", 0x6c, False, win32con.VK_F21),    
     "f22": Key("F22", 0x6d, False, win32con.VK_F22),    
     "f23": Key("F23", 0x6e, False, win32con.VK_F23),    
-    "f24": Key("F24", 0x76, False, win32con.VK_F24),    
-
-
+    "f24": Key("F24", 0x76, False, win32con.VK_F24),   
     # Control keys
     "printscreen": Key("Print Screen", 0x37, True, win32con.VK_PRINT),
     "scrolllock": Key("Scroll Lock", 0x46, False, win32con.VK_SCROLL),

@@ -1105,9 +1105,9 @@ class GremlinUi(QtWidgets.QMainWindow):
 
     def _kb_event_cb(self, event):
         ''' listen for keyboard modifiers and keyboard events at runtime '''
+        from gremlin.keyboard import key_from_code, key_from_name
 
-
-        key = gremlin.macro.key_from_code(
+        key = key_from_code(
                 event.identifier[0],
                 event.identifier[1]
         )
@@ -1122,7 +1122,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         valid_key = False
         was_on = self._temp_input_axis_override
-        if key == gremlin.macro.key_from_name("leftshift"):
+        if key == key_from_name("leftshift"):
             if event.is_pressed:
                 # temporarily force the listening to joystick axes changes
                 self._set_joystick_input_highlighting(True)
@@ -1134,7 +1134,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                 self._temp_input_axis_override = False
             valid_key = True
 
-        elif key == gremlin.macro.key_from_name("leftcontrol"):
+        elif key ==key_from_name("leftcontrol"):
             # temporarily force the listening to joystick axes changes
             self._temp_input_axis_only_override = event.is_pressed
             valid_key = True

@@ -121,8 +121,11 @@ class InputItemListModel(common.AbstractModel):
         key_count = len(input_items.config[InputType.Keyboard])
 
         if key_count > 0:
-            sorted_keys = sorted(input_items.config[InputType.Keyboard].keys())
+            #sorted_keys = sorted(input_items.config[InputType.Keyboard].keys())
+            sorted_keys = list(input_items.config[InputType.Keyboard].keys()) 
             return input_items.config[InputType.Keyboard][sorted_keys[index]]
+
+            
         else:
             if index < axis_count:
                 # Handle non continuous axis setups
@@ -147,7 +150,8 @@ class InputItemListModel(common.AbstractModel):
         key_count = len(input_items.config[InputType.Keyboard])
 
         if key_count > 0:
-            sorted_keys = sorted(input_items.config[InputType.Keyboard].keys())
+            #sorted_keys = sorted(input_items.config[InputType.Keyboard].keys())
+            sorted_keys = list(input_items.config[InputType.Keyboard].keys())
             item_index = sorted_keys[index]
             del input_items.config[InputType.Keyboard][item_index]
 
@@ -678,7 +682,6 @@ class InputItemButton(QtWidgets.QFrame):
         self.identifier = identifier
         self._selected = False
         
-
         self._label_widget = QtWidgets.QLabel(
             gremlin.common.input_to_ui_string(
                 self.identifier.input_type,

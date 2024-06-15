@@ -24,9 +24,6 @@ import sys
 from PySide6 import QtGui
 
 
-
-
-
 class InputType(enum.Enum):
 
     """Enumeration of possible input types."""
@@ -168,13 +165,23 @@ def input_to_ui_string(input_type, input_id):
     :param input_id the corresponding id
     :return string for UI usage of the given data
     """
+    from gremlin.util import grouped
+    from gremlin.keyboard import key_from_code, sort_keys, Key
     if input_type == InputType.JoystickAxis:
         try:
             return AxisNames.to_string(AxisNames(input_id))
         except gremlin.error.GremlinError:
             return f"Axis {input_id:d}"
     elif input_type == InputType.Keyboard:
-        return gremlin.macro.key_from_code(*input_id).name
+        # input id can be a multi tuple if it includes latched keys
+        if isinstance(input_id, Key):
+            # latched key (contains more than one key)
+            return input_id.name
+
+
+            
+        else:
+            return key_from_code(*input_id).name
     else:
         return f"{InputType.to_string(input_type).capitalize()} {input_id}"
 

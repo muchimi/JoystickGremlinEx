@@ -29,11 +29,11 @@ import gremlin.ui.common
 import gremlin.ui.input_item
 import enum
 from gremlin.profile import safe_format, safe_read
-from gremlin.keyboard import Key, key_from_name
+from gremlin.keyboard import Key, key_from_name, key_from_code
 from gremlin.ui.virtual_keyboard import *
 import logging
 
-      
+
         
 class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
@@ -158,7 +158,7 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
         text = "<b>Current key combination:</b> "
         names = []
         for key in self.action_data.keys:
-            names.append(gremlin.macro.key_from_code(*key).name)
+            names.append(key_from_code(*key).name)
         text += " + ".join(names)
 
         self.key_combination.setText(text)
@@ -238,22 +238,22 @@ class MapToKeyboardExFunctor(AbstractFunctor):
             self.delay = 0
 
         for key in action.keys:
-            self.press.press(gremlin.macro.key_from_code(key[0], key[1]))
+            self.press.press(key_from_code(key[0], key[1]))
 
         self.release = gremlin.macro.Macro()
         # Execute release in reverse order
         for key in reversed(action.keys):
-            self.release.release(gremlin.macro.key_from_code(key[0], key[1]))
+            self.release.release(key_from_code(key[0], key[1]))
             
 
         self.delay_press_release = gremlin.macro.Macro()
         # execute press/release with a delay before releasing
         for key in action.keys:
-            self.delay_press_release.press(gremlin.macro.key_from_code(key[0], key[1]))
+            self.delay_press_release.press(key_from_code(key[0], key[1]))
         if self.delay > 0:
             self.delay_press_release.pause(self.delay)
         for key in reversed(action.keys):
-            self.delay_press_release.release(gremlin.macro.key_from_code(key[0], key[1]))
+            self.delay_press_release.release(key_from_code(key[0], key[1]))
 
         # tell the time delay or release macros to inform us when they are done running
         self.release.completed_callback = self._macro_completed

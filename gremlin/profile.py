@@ -33,7 +33,7 @@ import dinput
 import action_plugins
 from gremlin.common import DeviceType, InputType, MergeAxisOperation, PluginVariableType
 from . import base_classes, common, error, input_devices, joystick_handling, plugin_manager, util
-
+from gremlin.keyboard import Key
 
 # Data struct representing profile information of a device
 ProfileDeviceInformation = collections.namedtuple(
@@ -1839,7 +1839,7 @@ class Mode:
             type and id
         """
         assert(input_type in self.config)
-        
+
         if input_id not in self.config[input_type]:
             entry = InputItem(self)
             entry.input_type = input_type
@@ -1922,9 +1922,18 @@ class InputItem:
         self.description = safe_read(node, "description", str)
         self.always_execute = read_bool(node, "always-execute", False)
         if self.input_type == InputType.Keyboard:
-            self.input_id = (self.input_id, read_bool(node, "extended"))
+            scan_code = self.input_id
+            is_extended = read_bool(node, "extended")
+            key = Key(None, scan_code, is_extended)
+            for child in node:
+                if child.tag == "latched":
+                    latched_key = Key(None, safe_read(child,"id",int),read_bool(child,"extended"))
+                    key.latched_keys.append(latched_key)
+            self.input_id = key
         
         for child in node:
+            if child.tag == "latched":
+                continue
             container_type = child.attrib["type"]
             if container_type not in container_name_map:
                 logging.getLogger("system").warning(
@@ -1946,8 +1955,22 @@ class InputItem:
         """
         node = ElementTree.Element(InputType.to_string(self.input_type))
         if self.input_type == InputType.Keyboard:
-            node.set("id", safe_format(self.input_id[0], int))
-            node.set("extended", safe_format(self.input_id[1], bool))
+            if isinstance(self.input_id, Key):
+                # keyboard key item
+                key : Key
+                key = self.input_id
+                node.set("id", safe_format(key.scan_code, int))
+                node.set("extended", safe_format(key.is_extended, bool))
+                for latched_key in key.latched_keys:
+                    # latched keys
+                    child = ElementTree.Element("latched")
+                    child.set("id", safe_format(latched_key.scan_code, int))
+                    child.set("extended", safe_format(latched_key.is_extended, bool))
+                    node.append(child)
+
+            else:
+                node.set("id", safe_format(self.input_id[0], int))
+                node.set("extended", safe_format(self.input_id[1], bool))
         else:
             node.set("id", safe_format(self.input_id, int))
 

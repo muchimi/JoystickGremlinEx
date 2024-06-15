@@ -23,7 +23,7 @@ from reportlab.platypus import BaseDocTemplate, Paragraph, \
     Spacer, Frame, PageTemplate, Table, Flowable, PageBreak
 
 import gremlin
-
+from gremlin.keyboard import key_from_code
 
 hat_direction_abbrev = {
     "center": "C",
@@ -402,6 +402,6 @@ def format_input_name(input_type, identifier):
     }
 
     if input_type == gremlin.common.InputType.Keyboard:
-        return gremlin.macro.key_from_code(identifier[0], identifier[1]).name
+        return key_from_code(identifier[0], identifier[1]).name
     else:
         return f"{type_map[input_type]} {identifier}"

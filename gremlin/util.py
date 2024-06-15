@@ -482,3 +482,7 @@ def version_valid(v, v_req):
 
     return compare_version(v, v_req) >= 0
 
+
+def grouped(iterable, n):
+    ''' returns n items for a given iterable item '''
+    return zip(*[iter(iterable)]*n)

@@ -24,6 +24,7 @@ import container_plugins.basic
 import gremlin
 from gremlin.common import DeviceType, InputType
 from . import common, input_item
+from gremlin.keyboard import Key
 
 
 class InputItemConfiguration(QtWidgets.QFrame):
@@ -650,8 +651,16 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         # grab the new data
         keys = self._keyboard_dialog.keys
         if keys:
-            key = keys.pop()
-            self._add_keyboard_key_cb(key)
+            modifiers = []
+            root_key = None
+            for key in keys:
+                if key.is_modifier:
+                    modifiers.append(key)
+                else:
+                    root_key = key
+            if modifiers:
+                root_key.latched_keys = modifiers
+            self._add_keyboard_key_cb(root_key)
                   
 
     def input_item_selected_cb(self, index):
@@ -661,30 +670,15 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         """
         # Assumption is that the entries are sorted by their scancode and
         # extended flag identification
-        sorted_keys = sorted(
-            self.device_profile.modes[self.current_mode].config[InputType.Keyboard]
-        )
+        # sorted_keys = sorted(self.device_profile.modes[self.current_mode].config[InputType.Keyboard])
+        sorted_keys = list(self.device_profile.modes[self.current_mode].config[InputType.Keyboard])
+
         if index is None or len(sorted_keys) <= index:
             return
         index_key = sorted_keys[index]
         item_data = self.device_profile.modes[self.current_mode]. \
             config[InputType.Keyboard][index_key]
         
-        # # Remove any, non selected, invalid input items
-        # for i, key in enumerate(sorted_keys):
-        #     if i == index:
-        #         continue
-        #     data = self.device_profile.modes[self.current_mode]. \
-        #         config[InputType.Keyboard][key]
-        #     is_valid = False
-        #     for container in data.containers:
-        #         is_valid = True if container.is_valid() else is_valid
-        #     if not is_valid:
-        #         self.device_profile.modes[self.current_mode].delete_data(
-        #             InputType.Keyboard,
-        #             key
-        #         )
-
         # Remove the existing widget, if there is one
         item = self.main_layout.takeAt(1)
         if item is not None and item.widget():
@@ -734,20 +728,17 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         )
         self.button_press_dialog.show()
 
-    def _add_keyboard_key_cb(self, key):
+    def _add_keyboard_key_cb(self, key : Key):
         """Adds the provided key to the list of keys.
 
-        :param key the new key to add
+        :param key the new key to add, either a single key or a combo-key
+
         """
-        self.device_profile.modes[self.current_mode].get_data(
-                gremlin.common.InputType.Keyboard,
-                (key.scan_code, key.is_extended)
-        )
+
+        # ensure there's an entry for the 
+        self.device_profile.modes[self.current_mode].get_data(gremlin.common.InputType.Keyboard,key)
         self.input_item_list_view.redraw()
-        self.input_item_list_view.select_item(
-            self._index_for_key((key.scan_code, key.is_extended)),
-            True
-        )
+        self.input_item_list_view.select_item(self._index_for_key(key),True)
 
     def _index_for_key(self, key):
         """Returns the index into the key list based on the key itself.
@@ -756,7 +747,8 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         :return index of the provided key
         """
         mode = self.device_profile.modes[self.current_mode]
-        sorted_keys = sorted(mode.config[InputType.Keyboard])
+        #sorted_keys = sorted(mode.config[InputType.Keyboard])
+        sorted_keys = list(mode.config[InputType.Keyboard])
         return sorted_keys.index(key)
 
     def _create_change_cb(self, index):
