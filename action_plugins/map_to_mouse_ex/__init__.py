@@ -897,12 +897,12 @@ class MapToMouseEx(AbstractAction):
     tag = "map_to_mouse_ex"
 
     default_button_activation = (True, True)
-    input_types = [
-        InputType.JoystickAxis,
-        InputType.JoystickButton,
-        InputType.JoystickHat,
-        InputType.Keyboard
-    ]
+    # input_types = [
+    #     InputType.JoystickAxis,
+    #     InputType.JoystickButton,
+    #     InputType.JoystickHat,
+    #     InputType.Keyboard
+    # ]
 
     functor = MapToMouseExFunctor
     widget = MapToMouseExWidget

@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
+# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -232,12 +232,13 @@ class SmartToggleContainer(gremlin.base_classes.AbstractContainer):
     name = "Smart Toggle"
     tag = "smart_toggle"
 
-    input_types = [
-        gremlin.common.InputType.JoystickAxis,
-        gremlin.common.InputType.JoystickButton,
-        gremlin.common.InputType.JoystickHat,
-        gremlin.common.InputType.Keyboard
-    ]
+    # override default allowed inputs here
+    # input_types = [
+    #     gremlin.common.InputType.JoystickAxis,
+    #     gremlin.common.InputType.JoystickButton,
+    #     gremlin.common.InputType.JoystickHat,
+    #     gremlin.common.InputType.Keyboard
+    # ]
     interaction_types = []
 
     functor = SmartToggleContainerFunctor

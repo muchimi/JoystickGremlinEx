@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
+# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -29,7 +29,7 @@ import gremlin.plugin_manager
 import gremlin.ui
 from . import common, error, execution_graph, plugin_manager, profile
 from gremlin.profile import parse_guid, safe_read, write_guid, Device
-
+from gremlin.common import InputType
 
 class ActivationRule(enum.Enum):
 
@@ -490,6 +490,9 @@ class AbstractAction(profile.ProfileData):
     """Base class for all actions that can be encoded via the XML and
     UI system."""
 
+    # allow all input types by default
+    input_types = InputType.to_list()
+
     def __init__(self, parent):
         """Creates a new instance.
 
@@ -598,8 +601,15 @@ class AbstractContainer(profile.ProfileData):
     virtual_button_lut = {
         common.InputType.JoystickAxis: VirtualAxisButton,
         common.InputType.JoystickButton: None,
-        common.InputType.JoystickHat: VirtualHatButton
+        common.InputType.JoystickHat: VirtualHatButton,
+        common.InputType.KeyboardLatched: None,
+        common.InputType.Keyboard: None,
+        common.InputType.OpenSoundControl: None,
+        common.InputType.Midi: None,
     }
+
+    # default allowed input types = all
+    input_types = common.InputType.to_list()
 
     def __init__(self, parent):
         """Creates a new instance.
@@ -709,12 +719,11 @@ class AbstractContainer(profile.ProfileData):
 
         if need_virtual_button:
             if self.virtual_button is None:
-                self.virtual_button = \
-                    AbstractContainer.virtual_button_lut[self.parent.input_type]()
-            elif not isinstance(
-                    self.virtual_button,
-                    AbstractContainer.virtual_button_lut[self.parent.input_type]
-            ):
+                input_type = self.parent.input_type
+                vb = AbstractContainer.virtual_button_lut.get(input_type, None)
+                if vb:
+                    self.virtual_button = vb()
+            elif not isinstance(self.virtual_button,AbstractContainer.virtual_button_lut[self.parent.input_type]):
                 self.virtual_button = \
                     AbstractContainer.virtual_button_lut[self.parent.input_type]()
         else:

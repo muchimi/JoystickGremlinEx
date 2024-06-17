@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
+# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -45,6 +45,7 @@ from gremlin.common import load_icon, get_icon_path, load_pixmap
 from gremlin.util import log_sys_error, log_sys_warn, log_sys, get_root_path
 
 
+
 # Figure out the location of the code / executable and change the working
 # directory accordingly
 install_path = os.path.normcase(os.path.dirname(os.path.abspath(sys.argv[0])))
@@ -65,6 +66,9 @@ from PySide6 import QtCore
 
 from gremlin.ui.ui_gremlin import Ui_Gremlin
 from gremlin.input_devices import remote_state
+
+from gremlin.ui.midi_device import MidiDeviceTabWidget
+from gremlin.ui.osc_device import OscDeviceTabWidget
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
 APPLICATION_VERSION = "13.40.14ex (b)"
@@ -744,6 +748,23 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.tabs[dinput.GUID_Keyboard] = widget
         self.ui.devices.addTab(widget, "Keyboard")
 
+        # Create MIDI tab
+        widget = MidiDeviceTabWidget(
+            device_profile,
+            self._current_mode
+        )
+        self.tabs[MidiDeviceTabWidget.device_guid] = widget
+        self.ui.devices.addTab(widget, "MIDI")
+
+        
+        # Create OSC tab
+        widget = OscDeviceTabWidget(
+            device_profile,
+            self._current_mode
+        )
+        self.tabs[OscDeviceTabWidget.device_guid] = widget
+        self.ui.devices.addTab(widget, "OSC")
+
         # Create the vjoy as output device tab
         for device in sorted(vjoy_devices, key=lambda x: x.vjoy_id):
             # Ignore vJoy as input devices
@@ -1122,7 +1143,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         valid_key = False
         was_on = self._temp_input_axis_override
-        if key == key_from_name("leftshift"):
+        if key.lookup_name == "leftshift":
             if event.is_pressed:
                 # temporarily force the listening to joystick axes changes
                 self._set_joystick_input_highlighting(True)
@@ -1134,7 +1155,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                 self._temp_input_axis_override = False
             valid_key = True
 
-        elif key ==key_from_name("leftcontrol"):
+        elif key.lookup_name == "leftcontrol":
             # temporarily force the listening to joystick axes changes
             self._temp_input_axis_only_override = event.is_pressed
             valid_key = True

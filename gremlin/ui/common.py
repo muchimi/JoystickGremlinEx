@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
+# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -1295,6 +1295,9 @@ class ConfirmPushButton(QtWidgets.QPushButton):
                 return
             
         message_box = QtWidgets.QMessageBox()
+        pixmap = gremlin.common.load_pixmap("warning.svg")
+        pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio) 
+        message_box.setIconPixmap(pixmap)
         message_box.setText(self.title)
         message_box.setInformativeText(self.prompt)
         message_box.setStandardButtons(

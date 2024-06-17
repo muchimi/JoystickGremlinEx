@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
+# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -202,6 +202,7 @@ class SplitAxis(AbstractAction):
     tag = "split-axis"
 
     default_button_activation = (True, True)
+    # override default allowed inputs here
     input_types = [
         InputType.JoystickAxis
     ]

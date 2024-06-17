@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
+# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -266,7 +266,7 @@ class CodeRunner:
 
             # Connect signals
             evt_listener = event_handler.EventListener()
-            kb = input_devices.Keyboard()
+            
             evt_listener.keyboard_event.connect(
                 self.event_handler.process_event
             )
@@ -276,7 +276,12 @@ class CodeRunner:
             evt_listener.virtual_event.connect(
                 self.event_handler.process_event
             )
+            
+            # monitor keyboard input state
+            kb = input_devices.Keyboard()
             evt_listener.keyboard_event.connect(kb.keyboard_event)
+
+            # mark active
             evt_listener.gremlin_active = True
 
             # connect remote gremlin client

@@ -148,11 +148,43 @@ class Key:
 
     @property
     def scan_code(self):
+        if self._scan_code == 20:
+            pass
         return self._scan_code
-
+    
     @property
     def is_extended(self):
         return self._is_extended
+    
+    def index_tuple(self):
+        ''' returns the gremlin index key for this key '''
+        return  (self._scan_code, self._is_extended)
+
+    @property
+    def latched(self):
+        ''' returns true if the current latch keys are pressed (runtime only) '''
+        from gremlin.event_handler import EventListener
+        el = EventListener()
+        # assume the current key is pressed
+        latched = True
+        if latched and self._latched_keys:
+            # check the latched keys
+            key_name = self.name
+            for key in self._latched_keys:
+                state = el.get_key_state(key)
+                latched = latched and state
+                logging.getLogger("system").info(f"latched key {key_name} check: key {key.name} pressed: {state}")
+
+        logging.getLogger("system").info(f"latch check: key {self.name} latched: {latched}")
+        return latched
+        
+        
+    @property
+    def data(self):
+        # unique key for this key
+        return self.__hash__()
+
+
 
     @property
     def virtual_code(self):
@@ -178,10 +210,36 @@ class Key:
         return not (self == other)
 
     def __hash__(self):
-        if self._is_extended:
-            return (0x0E << 8) + self._scan_code
-        else:
-            return self._scan_code
+        # computes the hash value for this key combination
+        #if self._latched_keys:
+        data = f"{self._scan_code:x}{1 if self._is_extended else 0}"
+        for key in self._latched_keys:
+            data += f"|{key._scan_code:x}{1 if key._is_extended else 0}"
+        return data.__hash__()
+
+        # if self._is_extended:
+        #     return (0x0E << 8) + self._scan_code
+        # else:
+        #     return self._scan_code
+        
+    def __lt__(self, other):
+        return self.name < other.name
+    
+    def __le__(self, other):
+        return self.name <= other.name
+    
+    def __gt__(self, other):
+        return self.name > other.name
+    
+    def __ge__(self, other):
+        return self.name > other.name
+    
+    def __str__(self):
+        return self.name
+    
+    
+    
+    
     
     @property
     def latched_keys(self) -> list:

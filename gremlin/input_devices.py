@@ -1469,7 +1469,7 @@ class Keyboard(QtCore.QObject):
     def __init__(self):
         """Initialises a new object."""
         QtCore.QObject.__init__(self)
-        self._keyboard_state = {}
+        self._keyboard_state = {} # holds the state of the keys
 
     @QtCore.Slot(event_handler.Event)
     def keyboard_event(self, event):

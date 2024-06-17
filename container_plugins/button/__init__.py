@@ -243,11 +243,12 @@ class ButtonContainer(gremlin.base_classes.AbstractContainer):
     tag = "button_container"
     functor = ButtonContainerFunctor
     widget = ButtonContainerWidget
-    input_types = [
-        gremlin.common.InputType.JoystickButton,
-        gremlin.common.InputType.JoystickHat,
-        gremlin.common.InputType.Keyboard
-    ]
+    # override default allowed inputs here
+    # input_types = [
+    #     gremlin.common.InputType.JoystickButton,
+    #     gremlin.common.InputType.JoystickHat,
+    #     gremlin.common.InputType.Keyboard
+    # ]
     interaction_types = [
         gremlin.ui.input_item.ActionSetView.Interactions.Edit,
     ]

@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
+# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -248,13 +248,10 @@ class ActionPlugins:
 
     def _create_type_action_map(self):
         """Creates a lookup table from input types to available actions."""
-        self._type_to_action_map = {
-            common.InputType.JoystickAxis: [],
-            common.InputType.JoystickButton: [],
-            common.InputType.JoystickHat: [],
-            common.InputType.Keyboard: []
-        }
-
+        self._type_to_action_map = {}
+        for input_type in common.InputType.to_list():
+            self._type_to_action_map[input_type] = []
+        
         for entry in self._plugins.values():
             for input_type in entry.input_types:
                 self._type_to_action_map[input_type].append(entry)

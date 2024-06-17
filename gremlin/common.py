@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
+# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -35,6 +35,10 @@ class InputType(enum.Enum):
     JoystickHat = 4
     Mouse = 5
     VirtualButton = 6
+    KeyboardLatched = 7 # latched keyboard input
+    OpenSoundControl = 8 # open sound control
+    Midi = 9 # midi input
+
 
     @staticmethod
     def to_string(value):
@@ -49,6 +53,17 @@ class InputType(enum.Enum):
             return _InputType_to_enum_lookup[value]
         except KeyError:
             raise gremlin.error.GremlinError("Invalid type in lookup")
+        
+    @staticmethod
+    def to_list(include_notset = False, include_mouse = False, include_virtualbutton = False) -> list:
+        data = [it for it in InputType]
+        if not include_notset:
+            data.remove(InputType.NotSet)
+        if not include_mouse:
+            data.remove(InputType.Mouse)
+        if not include_virtualbutton:
+            data.remove(InputType.VirtualButton)
+        return data
 
 
 _InputType_to_string_lookup = {
@@ -57,6 +72,9 @@ _InputType_to_string_lookup = {
     InputType.JoystickButton: "button",
     InputType.JoystickHat: "hat",
     InputType.Keyboard: "key",
+    InputType.KeyboardLatched: "keylatched",
+    InputType.OpenSoundControl: "osc",
+    InputType.Midi: "midi",
 }
 
 _InputType_to_enum_lookup = {
@@ -64,7 +82,10 @@ _InputType_to_enum_lookup = {
     "axis": InputType.JoystickAxis,
     "button": InputType.JoystickButton,
     "hat": InputType.JoystickHat,
-    "key": InputType.Keyboard
+    "key": InputType.Keyboard,
+    "keylatched": InputType.KeyboardLatched,
+    "osc": InputType.OpenSoundControl,
+    "midi": InputType.Midi
 }
 
 
@@ -95,25 +116,25 @@ class AxisNames(enum.Enum):
 
 
 _AxisNames_to_string_lookup = {
-    AxisNames.X: "X Axis",
-    AxisNames.Y: "Y Axis",
-    AxisNames.Z: "Z Axis",
-    AxisNames.RX: "X Rotation",
-    AxisNames.RY: "Y Rotation",
-    AxisNames.RZ: "Z Rotation",
-    AxisNames.SLIDER: "Slider",
-    AxisNames.DIAL: "Dial"
+    AxisNames.X: "X Axis (1)",
+    AxisNames.Y: "Y Axis (2)",
+    AxisNames.Z: "Z Axis (3)",
+    AxisNames.RX: "X Rotation (4)",
+    AxisNames.RY: "Y Rotation (5)",
+    AxisNames.RZ: "Z Rotation (6)",
+    AxisNames.SLIDER: "Slider (7)",
+    AxisNames.DIAL: "Dial (8)"
 }
 
 _AxisNames_to_enum_lookup = {
-    "X Axis": AxisNames.X,
-    "Y Axis": AxisNames.Y,
-    "Z Axis": AxisNames.Z,
-    "X Rotation": AxisNames.RX,
-    "Y Rotation": AxisNames.RY,
-    "Z Rotation": AxisNames.RZ,
-    "Slider": AxisNames.SLIDER,
-    "Dial": AxisNames.DIAL
+    "X Axis (1)": AxisNames.X,
+    "Y Axis (2)": AxisNames.Y,
+    "Z Axis (3)": AxisNames.Z,
+    "X Rotation (4)": AxisNames.RX,
+    "Y Rotation (5)": AxisNames.RY,
+    "Z Rotation (6)": AxisNames.RZ,
+    "Slider (7)": AxisNames.SLIDER,
+    "Dial (8)": AxisNames.DIAL
 }
 
 
@@ -172,16 +193,15 @@ def input_to_ui_string(input_type, input_id):
             return AxisNames.to_string(AxisNames(input_id))
         except gremlin.error.GremlinError:
             return f"Axis {input_id:d}"
+    elif input_type == InputType.KeyboardLatched:
+        # input ID contains a Key object
+        return input_id.name
     elif input_type == InputType.Keyboard:
-        # input id can be a multi tuple if it includes latched keys
-        if isinstance(input_id, Key):
-            # latched key (contains more than one key)
-            return input_id.name
-
-
-            
-        else:
-            return key_from_code(*input_id).name
+        return key_from_code(*input_id).name
+    elif input_type == InputType.OpenSoundControl:
+        return "OSC: not implemented yet"
+    elif input_type == InputType.Midi:
+        return "MIDI: not implemented yet"
     else:
         return f"{InputType.to_string(input_type).capitalize()} {input_id}"
 

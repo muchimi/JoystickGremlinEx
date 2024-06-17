@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
+# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -486,3 +486,8 @@ def version_valid(v, v_req):
 def grouped(iterable, n):
     ''' returns n items for a given iterable item '''
     return zip(*[iter(iterable)]*n)
+
+def get_guid():
+    ''' generates a GUID '''
+    import uuid
+    return uuid.uuid4()

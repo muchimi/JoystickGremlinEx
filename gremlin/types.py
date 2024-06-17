@@ -110,24 +110,24 @@ class AxisNames(enum.Enum):
 
 
 _AxisNames_to_string_lookup = {
-    AxisNames.X: "X Axis",
-    AxisNames.Y: "Y Axis",
-    AxisNames.Z: "Z Axis",
-    AxisNames.RX: "X Rotation",
-    AxisNames.RY: "Y Rotation",
-    AxisNames.RZ: "Z Rotation",
-    AxisNames.SLIDER: "Slider",
-    AxisNames.DIAL: "Dial"
+    AxisNames.X: "X Axis (1)",
+    AxisNames.Y: "Y Axis (2)",
+    AxisNames.Z: "Z Axis (3)",
+    AxisNames.RX: "X Rotation (4)",
+    AxisNames.RY: "Y Rotation (5)",
+    AxisNames.RZ: "Z Rotation (6)",
+    AxisNames.SLIDER: "Slider (7)",
+    AxisNames.DIAL: "Dial (8)"
 }
 _AxisNames_to_enum_lookup = {
-    "X Axis": AxisNames.X,
-    "Y Axis": AxisNames.Y,
-    "Z Axis": AxisNames.Z,
-    "X Rotation": AxisNames.RX,
-    "Y Rotation": AxisNames.RY,
-    "Z Rotation": AxisNames.RZ,
-    "Slider": AxisNames.SLIDER,
-    "Dial": AxisNames.DIAL
+    "X Axis (1)": AxisNames.X,
+    "Y Axis (2)": AxisNames.Y,
+    "Z Axis (3)": AxisNames.Z,
+    "X Rotation (4)": AxisNames.RX,
+    "Y Rotation (5)": AxisNames.RY,
+    "Z Rotation (6)": AxisNames.RZ,
+    "Slider (7)": AxisNames.SLIDER,
+    "Dial (9)": AxisNames.DIAL
 }
 
 

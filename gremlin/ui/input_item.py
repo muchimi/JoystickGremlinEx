@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
+# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -27,7 +27,8 @@ import gremlin.plugin_manager
 from . import activation_condition, common, virtual_button
 from functools import partial 
 from  gremlin.clipboard import Clipboard
-
+from gremlin.keyboard import Key
+from gremlin.util import get_guid
 import logging
 syslog = logging.getLogger("system")
 
@@ -45,6 +46,7 @@ class InputIdentifier:
         self._input_type = input_type
         self._input_id = input_id
         self._device_type = device_type
+        self._input_guid = get_guid() # unique internal GUID for this entry
 
     @property
     def device_type(self):
@@ -57,11 +59,17 @@ class InputIdentifier:
     @property
     def input_id(self):
         return self._input_id
+    
+    @property
+    def guid(self):
+        return self._input_guid
 
 
 class InputItemListModel(common.AbstractModel):
 
     """Model storing a device's input item list."""
+
+
 
     def __init__(self, device_data, mode):
         """Creates a new instance.
@@ -72,6 +80,21 @@ class InputItemListModel(common.AbstractModel):
         super().__init__()
         self._device_data = device_data
         self._mode = mode
+        self._index_map = {} # map of index to input item
+        self._allowed_input_types = gremlin.base_classes.TraceableList(InputType.to_list(), self._filter_change_cb)
+        self._update_data()
+
+
+    def _filter_change_cb(self):
+        ''' occurs when the input filter changes '''
+        self._update_data()
+
+
+    @property
+    def allowed_input_types(self):
+        ''' input type filter list '''
+        return self._allowed_input_types
+    
 
     @property
     def mode(self):
@@ -88,25 +111,43 @@ class InputItemListModel(common.AbstractModel):
         :param mode the mode handled by the model
         """
         self._mode = mode
-        self.data_changed.emit()
+        self._update_data()
+        
+
+    def _update_data(self):
+        ''' loads into the data model all the items for the current mode and device '''
+        # load the items for this mode
+        
+        input_items = self._device_data.modes[self._mode]
+        index = 0
+        self._index_map = {}
+        for input_type in self._allowed_input_types:
+            if input_type in input_items.config.keys():
+                sorted_keys = sorted(input_items.config[input_type].keys())
+                for data_key in sorted_keys:
+                    data = input_items.config[input_type][data_key]
+                    self._index_map[index] = data
+                    index += 1
+
+        self.data_changed.emit()                    
+
 
     def rows(self):
         """Returns the number of rows in the model.
 
         :return number of rows in the model
         """
-        input_items = self._device_data.modes[self._mode]
-        return len(input_items.config[InputType.JoystickAxis]) + \
-            len(input_items.config[InputType.JoystickButton]) + \
-            len(input_items.config[InputType.JoystickHat]) + \
-            len(input_items.config[InputType.Keyboard])
-    
-    @property
-    def keyboard_rows(self):
-        ''' returns the number of keyboard items'''
-        input_items = self._device_data.modes[self._mode]
-        return len(input_items.config[InputType.Keyboard])
 
+        return len(self._index_map)
+        # input_items = self._device_data.modes[self._mode]
+        # return len(input_items.config[InputType.JoystickAxis]) + \
+        #     len(input_items.config[InputType.JoystickButton]) + \
+        #     len(input_items.config[InputType.JoystickHat]) + \
+        #     len(input_items.config[InputType.Keyboard]) + \
+        #     len(input_items.config[InputType.KeyboardLatched]) + \
+        #     len(input_items.config[InputType.OpenSoundControl]) + \
+        #     len(input_items.config[InputType.Midi])
+    
 
     def data(self, index):
         """Returns the data stored at the provided index.
@@ -114,46 +155,74 @@ class InputItemListModel(common.AbstractModel):
         :param index the index for which to return the data
         :return data stored at the provided index
         """
-        input_items = self._device_data.modes[self._mode]
-        axis_count = len(input_items.config[InputType.JoystickAxis])
-        button_count = len(input_items.config[InputType.JoystickButton])
-        hat_count = len(input_items.config[InputType.JoystickHat])
-        key_count = len(input_items.config[InputType.Keyboard])
 
-        if key_count > 0:
-            #sorted_keys = sorted(input_items.config[InputType.Keyboard].keys())
-            sorted_keys = list(input_items.config[InputType.Keyboard].keys()) 
-            return input_items.config[InputType.Keyboard][sorted_keys[index]]
+        if not index in self._index_map.keys():
+            # bad index
+            logging.getLogger("system").error(f"InputItemListModel: bad index request {index} for mode: {self._mode} device: {self._device_data.name}") 
+            return None
+        
+        return self._index_map[index]
+
+        # input_items = self._device_data.modes[self._mode]
+        # axis_count = len(input_items.config[InputType.JoystickAxis])
+        # button_count = len(input_items.config[InputType.JoystickButton])
+        # hat_count = len(input_items.config[InputType.JoystickHat])
+        # key_count = len(input_items.config[InputType.Keyboard])
+        # latched_count = len(input_items.config[InputType.KeyboardLatched])
+
+        # if index < key_count:
+        #     sorted_keys =sorted(input_items.config[InputType.Keyboard].keys())
+        #     return input_items.config[InputType.Keyboard][sorted_keys[index]]
+        # elif index < key_count + latched_count:
+        #     sorted_keys =sorted(input_items.config[InputType.KeyboardLatched].keys())
+        #     return input_items.config[InputType.KeyboardLatched][sorted_keys[index - key_count]]
+        
 
             
-        else:
-            if index < axis_count:
-                # Handle non continuous axis setups
-                axis_keys = sorted(
-                    input_items.config[InputType.JoystickAxis].keys()
-                )
-                return input_items.config[InputType.JoystickAxis][
-                    axis_keys[index]
-                ]
-            elif index < axis_count + button_count:
-                return input_items.config[InputType.JoystickButton][
-                    index - axis_count + 1
-                ]
-            elif index < axis_count + button_count + hat_count:
-                return input_items.config[InputType.JoystickHat][
-                    index - axis_count - button_count + 1
-                ]
+        # else:
+        #     if index < axis_count:
+        #         # Handle non continuous axis setups
+        #         axis_keys = sorted(
+        #             input_items.config[InputType.JoystickAxis].keys()
+        #         )
+        #         return input_items.config[InputType.JoystickAxis][
+        #             axis_keys[index]
+        #         ]
+        #     elif index < axis_count + button_count:
+        #         return input_items.config[InputType.JoystickButton][
+        #             index - axis_count + 1
+        #         ]
+        #     elif index < axis_count + button_count + hat_count:
+        #         return input_items.config[InputType.JoystickHat][
+        #             index - axis_count - button_count + 1
+        #         ]
             
     def removeRow(self, index):
         ''' removes the item at the specified index '''
-        input_items = self._device_data.modes[self._mode]
-        key_count = len(input_items.config[InputType.Keyboard])
 
-        if key_count > 0:
-            #sorted_keys = sorted(input_items.config[InputType.Keyboard].keys())
-            sorted_keys = list(input_items.config[InputType.Keyboard].keys())
+        data = self.data(index)
+        if data:
+            input_type = data.input_type
+            if not input_type in (InputType.Keyboard, InputType.KeyboardLatched, InputType.OpenSoundControl, InputType.Midi):
+                # cannot remove other types
+                return
+
+            input_items = self._device_data.modes[self._mode]  
+            sorted_keys = sorted(input_items.config[input_type].keys())           
             item_index = sorted_keys[index]
-            del input_items.config[InputType.Keyboard][item_index]
+            del input_items.config[input_type][item_index]
+            # refresh the data post delete
+            self._update_data()
+
+
+
+        # input_items = self._device_data.modes[self._mode]
+        # key_count = len(input_items.config[InputType.Keyboard])
+
+        # if key_count > 0:
+        #     sorted_keys = sorted(input_items.config[InputType.Keyboard].keys())
+        #     item_index = sorted_keys[index]
+        #     del input_items.config[InputType.Keyboard][item_index]
 
         # ignore other input types as we only allow deletion of input keyboard items    
     
@@ -192,7 +261,20 @@ class InputItemListModel(common.AbstractModel):
             len(input_items.config[InputType.JoystickAxis])
         offset_map[InputType.JoystickHat] = \
             offset_map[InputType.JoystickButton] + \
-            len(input_items.config[InputType.JoystickButton])
+            len(input_items.config[InputType.JoystickButton]) 
+        offset_map[InputType.KeyboardLatched] = \
+            offset_map[InputType.JoystickHat] + \
+            len(input_items.config[InputType.JoystickHat])
+        offset_map[InputType.OpenSoundControl] = \
+            offset_map[InputType.KeyboardLatched] + \
+            len(input_items.config[InputType.KeyboardLatched
+            ])
+        offset_map[InputType.Midi] = \
+            offset_map[InputType.OpenSoundControl] + \
+            len(input_items.config[InputType.OpenSoundControl
+            ])
+            
+        
 
         if event.event_type == InputType.JoystickAxis:
             # Generate a mapping from axis index to linear axis index
@@ -214,6 +296,8 @@ class InputItemListModel(common.AbstractModel):
         input_items = self._device_data.modes[self._mode]
         if InputType.Keyboard in input_items.config:
             input_items.config[InputType.Keyboard].clear()
+        if InputType.KeyboardLatched in input_items.config:
+            input_items.config[InputType.KeyboardLatched].clear()
 
 
 class InputItemListView(common.AbstractView):
@@ -225,7 +309,10 @@ class InputItemListView(common.AbstractView):
         InputType.JoystickAxis: "Axis",
         InputType.JoystickButton: "Button",
         InputType.JoystickHat: "Hat",
-        InputType.Keyboard: ""
+        InputType.Keyboard: "",
+        InputType.KeyboardLatched: "(latched)",
+        InputType.OpenSoundControl: "OSC",
+        InputType.Midi: "Midi"
     }
 
     def __init__(self, parent=None, name = "Not set"):
@@ -235,15 +322,18 @@ class InputItemListView(common.AbstractView):
         """
         super().__init__(parent)
 
+        # default visible supported input types
         self.shown_input_types = [
             InputType.JoystickAxis,
             InputType.JoystickButton,
             InputType.JoystickHat,
-            InputType.Keyboard
+            InputType.Keyboard,
+            InputType.KeyboardLatched,
+            InputType.OpenSoundControl,
+            InputType.Midi
         ]
         self.name = name
         self.current_index = None
-        #syslog.debug("listview init")
 
         # Create required UI items
         self.main_layout = QtWidgets.QVBoxLayout(self)
@@ -270,10 +360,12 @@ class InputItemListView(common.AbstractView):
         return self._current_index
     @current_index.setter
     def current_index(self, value):
-        if value is None:
-            pass
-        #syslog.debug(f"listview index {self.name} set to {value}")
         self._current_index = value
+
+    @property
+    def current_device(self):
+        ''' gets the device associated with this list view '''
+        return self.model._device_data
 
 
     def _profile_device_mapping_changed(self, event):
@@ -305,18 +397,22 @@ class InputItemListView(common.AbstractView):
         This creates a fake listview where a vertical container just has InputItemButton widgets
         
         """
-        #verbose = gremlin.config.Configuration().verbose
-        #if verbose:
-        #logging.getLogger("system").info(f"redraw()") 
+        verbose = gremlin.config.Configuration().verbose
         common.clear_layout(self.scroll_layout)
 
         if self.model is None:
             return
+        
+        row_count = self.model.rows()
+        device_name = self.current_device.name
+        #if self.current_device.name == "keyboard":
+        if self._current_index is None and row_count > 0:
+            # select the first item by default
+            self._current_index = 0
 
-        for index in range(self.model.rows()):
+
+        for index in range(row_count):
             data = self.model.data(index)
-            if data.input_type not in self.shown_input_types:
-                continue
 
             identifier = InputIdentifier(
                 data.input_type,
@@ -328,11 +424,17 @@ class InputItemListView(common.AbstractView):
             widget.update_description(data.description)
             widget.selected_changed.connect(self._create_selection_callback(index))
             widget.closed.connect(self._create_close_callback(index))
+            widget.edit.connect(self._create_edit_callback(index))
+            
             widget.selected = index == self._current_index
-            if data.input_type == InputType.Keyboard:
+            if data.input_type in (InputType.Keyboard, InputType.KeyboardLatched):
                 widget.enable_close()
+                widget.enable_edit()
+            
             #logging.getLogger("system").info(f"create widget: index {index} selected: {widget.selected}")                 
             self.scroll_layout.addWidget(widget)
+            if verbose:
+                logging.getLogger("system").info(f"LV: {device_name} [{index:02d}] type: {InputType.to_string(data.input_type)} name: {data.input_id}")
         self.scroll_layout.addStretch()
         
 
@@ -369,6 +471,12 @@ class InputItemListView(common.AbstractView):
         ''' creates a callback to handle the closing of items '''
         return lambda x: self.close_item(index)
     
+    
+    def _create_edit_callback(self, index):
+        ''' creates a callback to handle the edit of items '''
+        return lambda x: self.edit_item(index)
+    
+
 
     def select_input(self, input_type, identifier):
         ''' selects an entry based on input type and ID'''
@@ -391,20 +499,80 @@ class InputItemListView(common.AbstractView):
     
     def close_item(self, index, emit_signal = True):
         ''' handles the closing of a specific item '''
+        data = self.model.data(index)
+        if data.containers:
+            # item includes containers, prompt
+            message_box = QtWidgets.QMessageBox()
+            message_box.setText("Delete confirmation")
+            message_box.setInformativeText("This will delete associated actions for this entry.\nAre you sure?")
+            pixmap = load_pixmap("warning.svg")
+            pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio) 
+            message_box.setIconPixmap(pixmap)
+            message_box.setStandardButtons(
+                QtWidgets.QMessageBox.StandardButton.Ok |
+                QtWidgets.QMessageBox.StandardButton.Cancel
+                )
+            message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
+            result = message_box.exec()
+            if result == QtWidgets.QMessageBox.StandardButton.Ok:
+                self._confirmed_close(index)
+        else:
+            self._confirmed_close(index)
+
+
+    def _confirmed_close(self, index):
         self.model.removeRow(index)
         self.redraw()
-        # for i in range(self.scroll_layout.count()):
-        #     item = self.scroll_layout.itemAt(i)
 
-        #     if item.widget():
-        #         widget = item.widget()
-        #         data = self.model.data(index)
-                
-        #     # self.device_profile.modes[self.current_mode].delete_data(
-        #     #     InputType.Keyboard,
-        #     #     key
+    def edit_item(self, index, emit_signal = True):
+        ''' handles the closing of a specific item '''
+        from gremlin.keyboard import Key
+        sequence = None
+        key: Key
+        key = None
+        data = self.model.data(index)
+        if data.input_type == InputType.KeyboardLatched:
+            key = data.input_id
+            sequence = [key.index_tuple()]
+            lk: Key
+            for lk in key.latched_keys:
+                sequence.append(lk.index_tuple())
+        elif data.input_type == InputType.Keyboard:
+            sequence = [data.input_id]
 
+        if sequence:
+            from gremlin.ui.virtual_keyboard import InputKeyboardDialog
+            self._keyboard_dialog = InputKeyboardDialog(sequence, parent = self, select_single = True)
+            self._keyboard_dialog.accepted.connect(self._keyboard_dialog_ok_cb)
+            self._keyboard_dialog.showNormal()
+            
 
+    def _keyboard_dialog_ok_cb(self):
+        ''' callled when the dialog completes '''
+
+        # grab the new data
+        keys = self._keyboard_dialog.keys
+        if keys:
+            data = self.model.data(self._current_index)
+            # convert to keyboard latch input if it's not already        
+            data.input_type = InputType.KeyboardLatched
+            modifiers = []
+            root_key = None
+            for key in keys:
+                if key.is_modifier:
+                    modifiers.append(key)
+                else:
+                    root_key = key
+            if modifiers:
+                root_key.latched_keys = modifiers
+            data.input_id = root_key
+            self.redraw()
+
+        
+            
+
+        # self.model.removeRow(index)
+        # self.redraw()        
 
 
     def select_item(self, index, emit_signal=True):
@@ -656,14 +824,20 @@ class InputItemButton(QtWidgets.QFrame):
 
     """Creates a button like widget which emits an event when pressed.
 
+    this widget is used to represent an input mapping
+
     This event can be used to display input item specific customization
     widgets. This button also shows icons of the associated actions.
     """
 
     # Signal emitted whenever this button is pressed
     selected_changed = QtCore.Signal(InputIdentifier)
+
+    # signal when button's close button is pressed
     closed =  QtCore.Signal(InputIdentifier)
 
+    # signal when button's edit button is pressed
+    edit =  QtCore.Signal(InputIdentifier)
 
 
     def __init__(self, identifier, parent=None):
@@ -700,12 +874,21 @@ class InputItemButton(QtWidgets.QFrame):
         self.container_layout.addWidget(self._label_widget, 0, 1)
         self.container_layout.addWidget(self._description_widget, 0, 2)
         self.container_layout.addLayout(self._icon_layout, 0, 3)
+
+        self._edit_button_widget = QtWidgets.QPushButton("...")
+        self._edit_button_widget.setFixedSize(24,16)
+        self._edit_button_widget.clicked.connect(self._edit_button_cb)
+        self._edit_button_widget.setVisible(False) # not visible by default
+        self.container_layout.addWidget(self._edit_button_widget, 0, 4)
+
         self._close_button_widget = QtWidgets.QPushButton("X")
-        self._close_button_widget.setFixedWidth(24)
+        self._close_button_widget.setFixedSize(16,16)
         self._close_button_widget.clicked.connect(self._close_button_cb)
         self._close_button_widget.setVisible(False) # not visible by default
-        self.container_layout.addWidget(self._close_button_widget, 0, 4)
-        self.container_layout.addWidget(QtWidgets.QLabel(" "), 0, 5)
+
+
+        self.container_layout.addWidget(self._close_button_widget, 0, 5)
+        self.container_layout.addWidget(QtWidgets.QLabel(" "), 0, 6)
 
 
         #self.container_layout.setColumnMinimumWidth(0, 50)
@@ -742,6 +925,17 @@ class InputItemButton(QtWidgets.QFrame):
     def disable_close(self):
         ''' enables the close button on the input widget (keyboard only usually) '''
         self._close_button_widget.setVisible(False)        
+
+
+    def enable_edit(self):
+        ''' enables the edit button on the input widget (keyboard only usually) '''
+        self._edit_button_widget.setVisible(True)
+
+    def disable_edit(self):
+        ''' enables the edit button on the input widget (keyboard only usually) '''
+        self._edit_button_widget.setVisible(False)
+
+                
 
     def update_description(self, description):
         """Updates the description of the button.
@@ -781,6 +975,10 @@ class InputItemButton(QtWidgets.QFrame):
     def _close_button_cb(self):
         ''' fires the closed event when the close button has been pressed '''
         self.closed.emit(self.identifier)
+
+    def _edit_button_cb(self):
+        ''' edit button clicked '''
+        self.edit.emit(self.identifier)
 
 
 class ActionLabel(QtWidgets.QLabel):

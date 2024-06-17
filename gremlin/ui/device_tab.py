@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
+# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -31,24 +31,35 @@ class InputItemConfiguration(QtWidgets.QFrame):
 
     """UI dialog responsible for the configuration of a single
     input item such as an axis, button, hat, or key.
+
+
+    this control is displayed whenever an input is selected to configure it.
+
     """
 
     # Signal emitted when the description changes
     description_changed = QtCore.Signal(str)
 
-    def __init__(self, item_data, parent=None):
+    def __init__(self, item_data = None, parent=None):
         """Creates a new object instance.
 
-        :param item_data profile data associated with the item
+        :param item_data profile data associated with the item, can be none to display an empty box
         :param parent the parent of this widget
         """
         super().__init__(parent)
 
         self.item_data = item_data
 
+
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.button_layout = QtWidgets.QHBoxLayout()
         self.widget_layout = QtWidgets.QVBoxLayout()
+
+        if not item_data:
+            label = QtWidgets.QLabel("Please select an input to configure")
+            label.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop | QtCore.Qt.AlignmentFlag.AlignLeft)
+            self.main_layout.addWidget(label)
+            return
 
         self._create_description()
         if self.item_data.parent.parent.type == gremlin.common.DeviceType.VJoy:
@@ -56,7 +67,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
         else:
             self._create_dropdowns()
 
-        self.action_model = ActionContainerModel(self.item_data.containers)
+        self.action_model = ActionContainerModel(self.item_data.containers, self.item_data)
         self.action_view = ActionContainerView()
         self.action_view.set_model(self.action_model)
         self.action_view.redraw()
@@ -237,7 +248,7 @@ class ActionContainerModel(common.AbstractModel):
 
     """Stores action containers for display using the corresponding view."""
 
-    def __init__(self, containers, parent=None):
+    def __init__(self, containers, item_data = None, parent=None):
         """Creates a new instance.
 
         :param containers the container instances of this model
@@ -245,7 +256,13 @@ class ActionContainerModel(common.AbstractModel):
         """
         super().__init__(parent)
         self._containers = containers
+        self._item_data = item_data
 
+    @property
+    def item_data(self):
+        ''' get the item data associated with this action container '''
+        return self._item_data
+    
     def rows(self):
         """Returns the number of rows in the model.
 
@@ -317,11 +334,17 @@ class ActionContainerView(common.AbstractView):
     def redraw(self):
         """Redraws the entire view."""
         common.clear_layout(self.scroll_layout)
-        for index in range(self.model.rows()):
-            widget = self.model.data(index).widget(self.model.data(index))
-            widget.closed.connect(self._create_closed_cb(widget))
-            widget.container_modified.connect(self.model.data_changed.emit)
-            self.scroll_layout.addWidget(widget)
+        container_count = self.model.rows()
+        if container_count:
+            for index in range(container_count):
+                widget = self.model.data(index).widget(self.model.data(index))
+                widget.closed.connect(self._create_closed_cb(widget))
+                widget.container_modified.connect(self.model.data_changed.emit)
+                self.scroll_layout.addWidget(widget)
+        else:
+            label = QtWidgets.QLabel(f"Please add an action or container for {self.model.item_data.display_name}")
+            label.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop | QtCore.Qt.AlignmentFlag.AlignLeft)
+            self.scroll_layout.addWidget(label)
         self.scroll_layout.addStretch(1)
 
     def _create_closed_cb(self, widget):
@@ -336,7 +359,7 @@ class ActionContainerView(common.AbstractView):
 
 class JoystickDeviceTabWidget(QtWidgets.QWidget):
 
-    """Widget used to configure a single device."""
+    """Widget used to configure a single joystick input device."""
 
     def __init__(
             self,
@@ -361,6 +384,8 @@ class JoystickDeviceTabWidget(QtWidgets.QWidget):
         self.device = device
         self.last_item_data = None
 
+
+        # the main layout has a left input selection panel and a right configuration panel, two widgets, the last one is always the configuration panel
         self.main_layout = QtWidgets.QHBoxLayout(self)
         self.left_panel_layout = QtWidgets.QVBoxLayout()
         self.device_profile.ensure_mode_exists(self.current_mode, self.device)
@@ -419,7 +444,17 @@ class JoystickDeviceTabWidget(QtWidgets.QWidget):
             label.setMargin(10)
             self.left_panel_layout.addWidget(label)
 
-        self.main_layout.addLayout(self.left_panel_layout)
+        self.main_layout.addLayout(self.left_panel_layout,1)
+
+        # add a list input view even if nothing is selected yet
+        right_panel = self.main_layout.takeAt(1)
+        if right_panel is not None and right_panel.widget():
+            right_panel.widget().hide()
+            right_panel.widget().deleteLater()
+        if right_panel:
+            self.main_layout.removeItem(right_panel)        
+        widget = InputItemConfiguration()     
+        self.main_layout.addWidget(widget,3)
 
 
         # listen to device changes
@@ -431,6 +466,11 @@ class JoystickDeviceTabWidget(QtWidgets.QWidget):
         self.running = False
         self.updating = False
         self.last_event = None
+
+        # update the selection if nothing is selected
+        selected_index = self.input_item_list_view.current_index
+        if selected_index is not None:
+            self.input_item_selected_cb(selected_index)
 
     def _device_update(self, event):
         if self.running:
@@ -476,8 +516,8 @@ class JoystickDeviceTabWidget(QtWidgets.QWidget):
             self.device_profile.modes[self.current_mode]
         )
 
-        if self.last_item_data == item_data:
-            return
+        # if self.last_item_data == item_data:
+        #     return
         self.last_item_data = item_data
 
         # Remove the existing widget, if there is one
@@ -488,13 +528,15 @@ class JoystickDeviceTabWidget(QtWidgets.QWidget):
         if item:
             self.main_layout.removeItem(item)
 
+        widget = InputItemConfiguration(item_data)            
+
         if item_data is not None:
-            widget = InputItemConfiguration(item_data)
+            
             change_cb = self._create_change_cb(index)
             widget.action_model.data_changed.connect(change_cb)
             widget.description_changed.connect(change_cb)
 
-            self.main_layout.addWidget(widget)
+        self.main_layout.addWidget(widget)
             
     def set_mode(self, mode):
         ''' changes the mode of the tab '''
@@ -552,7 +594,7 @@ class JoystickDeviceTabWidget(QtWidgets.QWidget):
 
 class KeyboardDeviceTabWidget(QtWidgets.QWidget):
 
-    """Widget used to configure a single device."""
+    """Widget used to configure keyboard inputs """
 
     def __init__(
             self,
@@ -598,7 +640,18 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         )
 
         self.left_panel_layout.addWidget(self.input_item_list_view)
-        self.main_layout.addLayout(self.left_panel_layout)
+        self.main_layout.addLayout(self.left_panel_layout,1)
+
+        # add a blank input configuration if nothing is selected - the configuration widget is always the second widget of the main layout
+        right_panel = self.main_layout.takeAt(1)
+        if right_panel is not None and right_panel.widget():
+            right_panel.widget().hide()
+            right_panel.widget().deleteLater()
+        if right_panel:
+            self.main_layout.removeItem(right_panel)
+
+        widget = InputItemConfiguration()     
+        self.main_layout.addWidget(widget,3)
 
         button_container_widget = QtWidgets.QWidget()
         button_container_layout = QtWidgets.QHBoxLayout()
@@ -626,8 +679,11 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         self.left_panel_layout.addWidget(button_container_widget)
         
 
-        # Select first entry by default
-        self.input_item_selected_cb(0)
+        # Select default entry
+        selected_index = self.input_item_list_view.current_index
+        if selected_index is not None:
+            self.input_item_selected_cb(selected_index)
+        
 
     def _show_clear_cb(self):
         return self.input_item_list_model.keyboard_rows > 0
@@ -671,36 +727,41 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         # Assumption is that the entries are sorted by their scancode and
         # extended flag identification
         # sorted_keys = sorted(self.device_profile.modes[self.current_mode].config[InputType.Keyboard])
-        sorted_keys = list(self.device_profile.modes[self.current_mode].config[InputType.Keyboard])
+        #sorted_keys = list(self.device_profile.modes[self.current_mode].config[InputType.Keyboard])
 
-        if index is None or len(sorted_keys) <= index:
-            return
-        index_key = sorted_keys[index]
-        item_data = self.device_profile.modes[self.current_mode]. \
-            config[InputType.Keyboard][index_key]
-        
-        # Remove the existing widget, if there is one
-        item = self.main_layout.takeAt(1)
-        if item is not None and item.widget():
-            item.widget().hide()
-            item.widget().deleteLater()
-        if item:
-            self.main_layout.removeItem(item)
+        item_data = self.input_item_list_model.data(index)
 
-        # Create new configuration widget
+
+        # if index is None or len(sorted_keys) <= index:
+        #     item_data = None
+        # else:
+        #     index_key = sorted_keys[index]
+        #     item_data = self.device_profile.modes[self.current_mode]. \
+        #         config[InputType.Keyboard][index_key]
+
+        right_panel = self.main_layout.takeAt(1)
+        if right_panel is not None and right_panel.widget():
+            right_panel.widget().hide()
+            right_panel.widget().deleteLater()
+        if right_panel:
+            self.main_layout.removeItem(right_panel)
+
         widget = InputItemConfiguration(item_data)
-        change_cb = self._create_change_cb(self._index_for_key(index_key))
-        widget.action_model.data_changed.connect(change_cb)
-        widget.description_changed.connect(change_cb)
+        self.main_layout.addWidget(widget,3)            
 
-        self.main_layout.addWidget(widget)
+        if item_data:
+            
+            # Create new configuration widget
+            
+            change_cb = self._create_change_cb(index)
+            widget.action_model.data_changed.connect(change_cb)
+            widget.description_changed.connect(change_cb)
 
-        # Refresh item list view and select correct entry
-        self.input_item_list_view.redraw()
-        self.input_item_list_view.select_item(
-            self._index_for_key(index_key),
-            False
-        )
+            
+
+            # Refresh item list view and select correct entry
+            #self.input_item_list_view.redraw()
+            #self.input_item_list_view.select_item(index,False)
 
     def _record_keyboard_key_cb(self):
         """Handles adding of new keyboard keys to the list.
@@ -736,20 +797,28 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         """
 
         # ensure there's an entry for the 
-        self.device_profile.modes[self.current_mode].get_data(gremlin.common.InputType.Keyboard,key)
+        input_type = InputType.KeyboardLatched if key.is_latched else InputType.Keyboard
+
+        self.device_profile.modes[self.current_mode].get_data(input_type,key)
         self.input_item_list_view.redraw()
         self.input_item_list_view.select_item(self._index_for_key(key),True)
 
-    def _index_for_key(self, key):
+    def _index_for_key(self, key_or_index):
         """Returns the index into the key list based on the key itself.
 
         :param key the keyboard key being queried
         :return index of the provided key
         """
+
         mode = self.device_profile.modes[self.current_mode]
-        #sorted_keys = sorted(mode.config[InputType.Keyboard])
+        if isinstance(key_or_index, Key):
+            key = key_or_index
+            if key.is_latched:
+                sorted_keys = list(mode.config[InputType.KeyboardLatched])
+                return sorted_keys.index(key)
         sorted_keys = list(mode.config[InputType.Keyboard])
-        return sorted_keys.index(key)
+        return sorted_keys.index(key_or_index)
+        
 
     def _create_change_cb(self, index):
         """Creates a callback handling content changes.

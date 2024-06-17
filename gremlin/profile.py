@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
+# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -1767,7 +1767,10 @@ class Mode:
             InputType.JoystickAxis: {},
             InputType.JoystickButton: {},
             InputType.JoystickHat: {},
-            InputType.Keyboard: {}
+            InputType.Keyboard: {},
+            InputType.KeyboardLatched: {},
+            InputType.OpenSoundControl: {},
+            InputType.Midi: {}
         }
 
     def from_xml(self, node):
@@ -1808,7 +1811,10 @@ class Mode:
             InputType.JoystickAxis,
             InputType.JoystickButton,
             InputType.JoystickHat,
-            InputType.Keyboard
+            InputType.Keyboard,
+            InputType.KeyboardLatched,
+            InputType.OpenSoundControl,
+            InputType.Midi
         ]
         for input_type in input_types:
             item_list = sorted(
@@ -1924,6 +1930,11 @@ class InputItem:
         if self.input_type == InputType.Keyboard:
             scan_code = self.input_id
             is_extended = read_bool(node, "extended")
+            self.input_id = (scan_code, is_extended)
+
+        elif self.input_type == InputType.KeyboardLatched:
+            scan_code = self.input_id
+            is_extended = read_bool(node, "extended")
             key = Key(None, scan_code, is_extended)
             for child in node:
                 if child.tag == "latched":
@@ -1933,6 +1944,7 @@ class InputItem:
         
         for child in node:
             if child.tag == "latched":
+                # ignore keyboard latched entries
                 continue
             container_type = child.attrib["type"]
             if container_type not in container_name_map:
@@ -1954,7 +1966,7 @@ class InputItem:
         :return XML node representing this object
         """
         node = ElementTree.Element(InputType.to_string(self.input_type))
-        if self.input_type == InputType.Keyboard:
+        if self.input_type in (InputType.Keyboard, InputType.KeyboardLatched):
             if isinstance(self.input_id, Key):
                 # keyboard key item
                 key : Key
@@ -2007,6 +2019,23 @@ class InputItem:
         :return Type of this input
         """
         return self.input_type
+
+    @property
+    def display_name(self):
+        ''' gets a display name for this input '''
+        if self._input_type == InputType.JoystickAxis:
+            return f"Axis {self._input_id}"
+        elif self._input_type == InputType.JoystickButton:
+            return f"Button {self._input_id}"
+        elif self._input_type == InputType.JoystickHat:
+            return f"Hat {self._input_id}"
+        elif self._input_type in (InputType.Keyboard, InputType.KeyboardLatched):
+            return f"Key {self._input_id}"
+        elif self._input_type == InputType.OpenSoundControl:
+            return f"OSC {self._input_id}"
+        elif self._input_type == InputType.Midi:
+            return f"Midi {self._input_id}"
+        return f"Unknown input: {self._input_type}"
 
     def __eq__(self, other):
         """Checks whether or not two InputItem instances are identical.
