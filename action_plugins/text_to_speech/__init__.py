@@ -20,8 +20,8 @@ import os
 from PySide6 import QtWidgets
 from xml.etree import ElementTree
 
-from gremlin.base_classes import AbstractAction, AbstractFunctor
-from gremlin.common import InputType
+import gremlin.base_profile
+from gremlin.input_types import InputType
 import gremlin.ui.input_item
 
 
@@ -48,7 +48,7 @@ class TextToSpeechWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.text_field.setPlainText(self.action_data.text)
 
 
-class TextToSpeechFunctor(AbstractFunctor):
+class TextToSpeechFunctor(gremlin.base_profile.AbstractFunctor):
 
     tts = gremlin.tts.TextToSpeech()
 
@@ -61,7 +61,7 @@ class TextToSpeechFunctor(AbstractFunctor):
         return True
 
 
-class TextToSpeech(AbstractAction):
+class TextToSpeech(gremlin.base_profile.AbstractAction):
 
     """Action representing a single TTS entry."""
 

@@ -1,4 +1,4 @@
-import win32clipboard
+
 import dill
 import base64
 import os
@@ -8,9 +8,6 @@ from PySide6 import QtCore
 from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QClipboard
 
-from gremlin.base_classes import AbstractAction, AbstractContainer
-from gremlin.util import userprofile_path
-import gremlin.config
 
 from gremlin.singleton_decorator import SingletonDecorator
 
@@ -22,11 +19,13 @@ class Clipboard(QtCore.QObject):
     clipboard_changed = QtCore.Signal(QtCore.QObject)
 
     def __init__(self):
+        from gremlin.util import userprofile_path
+        from gremlin.config import Configuration
         super().__init__()
         self._data = None
         self._enabled_count = 0
 
-        config = gremlin.config.Configuration()
+        config = Configuration()
         self._persist_to_file = config.persist_clipboard
         self._clipboard_file = os.path.join(userprofile_path(),"clipboard.data")
 
@@ -50,6 +49,7 @@ class Clipboard(QtCore.QObject):
     
     def _decode(self):
         # external clipboard
+        from gremlin.base_profile import AbstractContainer, AbstractAction
         data = None
         if self._persist_to_file:
             # see if the file exists
@@ -76,7 +76,8 @@ class Clipboard(QtCore.QObject):
                 # bad data - just ignore
                 pass
 
-        if data and isinstance(data, AbstractContainer) or isinstance(data,AbstractAction):
+        if data and isinstance(data, AbstractContainer) \
+            or isinstance(data, AbstractAction):
             self._data = data
     
     @data.setter
@@ -163,11 +164,13 @@ class Clipboard(QtCore.QObject):
     @property
     def is_container(self):
         ''' true if the data item is a container '''
+        from gremlin.base_profile import AbstractContainer
         return self.data is not None and isinstance(self.data, AbstractContainer)
     
     @property
     def is_action(self):
         ''' true if the data item is an action '''
+        from gremlin.base_profile import AbstractAction
         return self.data is not None and isinstance(self.data, AbstractAction)
     
     @property

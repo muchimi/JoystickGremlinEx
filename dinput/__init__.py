@@ -23,7 +23,6 @@ from enum import Enum
 import os
 import time
 import uuid
-from gremlin.util import get_dll_version
 import logging
 from gremlin.singleton_decorator import SingletonDecorator
 
@@ -515,7 +514,7 @@ class DILL:
         This has to be called before any other DILL interactions can take place.
         """
         from pathlib import Path
-        from gremlin.util import display_error
+        from gremlin.util import display_error, get_dll_version
 
         if DILL._dll is None:
 

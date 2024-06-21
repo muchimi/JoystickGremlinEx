@@ -24,8 +24,9 @@ from PySide6 import QtWidgets, QtCore
 
 import container_plugins.basic
 import gremlin
-from gremlin.common import DeviceType, InputType
-from . import common, input_item 
+from gremlin.types import DeviceType
+from gremlin.input_types import InputType
+from . import input_item, ui_common 
 from gremlin.keyboard import Key
 from .device_tab import InputItemConfiguration
 import uuid
@@ -107,7 +108,7 @@ class OscDeviceTabWidget(QtWidgets.QWidget):
 
         # key clear button
         
-        clear_keyboard_button = common.ConfirmPushButton("Clear Inputs", show_callback = self._show_clear_cb)
+        clear_keyboard_button = ui_common.ConfirmPushButton("Clear Inputs", show_callback = self._show_clear_cb)
         clear_keyboard_button.confirmed.connect(self._clear_inputs_cb)
         button_container_layout.addWidget(clear_keyboard_button)
         button_container_layout.addStretch(1)
@@ -128,7 +129,7 @@ class OscDeviceTabWidget(QtWidgets.QWidget):
         
 
     def _show_clear_cb(self):
-        return self.input_item_list_model.keyboard_rows > 0
+        return self.input_item_list_model.rows() > 0
 
     def _clear_inputs_cb(self):
         ''' clears all input keys '''

@@ -6,3 +6,5 @@ pytest
 msgpack
 dill
 lxml
+mido
+python-rtmidi

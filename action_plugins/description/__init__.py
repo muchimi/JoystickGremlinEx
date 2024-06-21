@@ -20,8 +20,8 @@ import os
 from PySide6 import QtWidgets
 from xml.etree import ElementTree
 
-from gremlin.base_classes import AbstractAction, AbstractFunctor
-from gremlin.common import InputType
+import gremlin.base_classes 
+from gremlin.input_types import InputType
 import gremlin.ui.input_item
 
 
@@ -49,7 +49,7 @@ class DescriptionActionWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.action_data.description = value
 
 
-class DescriptionActionFunctor(AbstractFunctor):
+class DescriptionActionFunctor(gremlin.base_profile.AbstractFunctor):
 
     def __init__(self, action):
         super().__init__(action)
@@ -58,7 +58,7 @@ class DescriptionActionFunctor(AbstractFunctor):
         return True
 
 
-class DescriptionAction(AbstractAction):
+class DescriptionAction(gremlin.base_profile.AbstractAction):
 
     """Action for adding a description to a set of actions."""
 

@@ -24,16 +24,20 @@ from xml.etree import ElementTree
 from PySide6 import QtWidgets
 from PySide6.QtCore import Slot
 
+import gremlin.base_conditions
 from  gremlin.clipboard import Clipboard
 import gremlin
 import gremlin.base_classes
 import gremlin.plugin_manager
-import gremlin.ui.common
+import gremlin.ui.ui_common
 import gremlin.ui.input_item
 from gremlin.profile import safe_format, safe_read
+from gremlin.ui.input_item import AbstractContainerWidget, AbstractActionWidget
+from gremlin.base_profile import AbstractContainer
 
 
-class TempoExContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
+
+class TempoExContainerWidget(AbstractContainerWidget):
 
     """Container with two actions, triggered based on activation duration."""
 
@@ -65,7 +69,7 @@ class TempoExContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
         self.options_layout.addWidget(
             QtWidgets.QLabel("<b>Long press delay: </b>")
         )
-        self.delay_input = gremlin.ui.common.DynamicDoubleSpinBox()
+        self.delay_input = gremlin.ui.ui_common.DynamicDoubleSpinBox()
         self.delay_input.setRange(0.1, 2.0)
         self.delay_input.setSingleStep(0.1)
         self.delay_input.setValue(0.5)
@@ -115,7 +119,7 @@ class TempoExContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
         
         # chain timeout
         self.options_layout.addWidget(QtWidgets.QLabel("<b>Chain Timeout:</b> "))
-        self.timeout_input = gremlin.ui.common.DynamicDoubleSpinBox()
+        self.timeout_input = gremlin.ui.ui_common.DynamicDoubleSpinBox()
         self.timeout_input.setRange(0.0, 3600.0)
         self.timeout_input.setSingleStep(0.5)
         self.timeout_input.setValue(0)
@@ -132,13 +136,13 @@ class TempoExContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
 
         
 
-        self.short_action_selector = gremlin.ui.common.ActionSelector(
+        self.short_action_selector = gremlin.ui.ui_common.ActionSelector(
             self.profile_data.get_input_type()
         )
         self.short_action_selector.action_label.setText("Short Action")
         
 
-        self.long_action_selector = gremlin.ui.common.ActionSelector(
+        self.long_action_selector = gremlin.ui.ui_common.ActionSelector(
             self.profile_data.get_input_type()
         )
         self.long_action_selector.action_label.setText("Long Action")
@@ -163,7 +167,7 @@ class TempoExContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
             widget = self._create_action_set_widget(
                 action_set if action_set is not None else [],
                 f"Chain Short Action {i:d}",
-                gremlin.ui.common.ContainerViewTypes.Action
+                gremlin.ui.ui_common.ContainerViewTypes.Action
             )
             self.short_layout.addWidget(widget)
             self.short_layout_widget_list.append(widget)
@@ -175,7 +179,7 @@ class TempoExContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
             widget = self._create_action_set_widget(
                 action_set if action_set is not None else [],
                 f"Chain Long Action {i:d}",
-                gremlin.ui.common.ContainerViewTypes.Action
+                gremlin.ui.ui_common.ContainerViewTypes.Action
             )
             self.long_layout.addWidget(widget)
             self.long_layout_widget_list.append(widget)
@@ -191,7 +195,7 @@ class TempoExContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
                     0,
                     "Short Press",
                     self.activation_condition_layout,
-                    gremlin.ui.common.ContainerViewTypes.Condition
+                    gremlin.ui.ui_common.ContainerViewTypes.Condition
                 )
 
             if self.profile_data.action_sets[1] is not None:
@@ -199,7 +203,7 @@ class TempoExContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
                     1,
                     "Long Press",
                     self.activation_condition_layout,
-                    gremlin.ui.common.ContainerViewTypes.Condition
+                    gremlin.ui.ui_common.ContainerViewTypes.Condition
                 )
 
     def _create_action_widget(self, index, label, layout, view_type):
@@ -387,7 +391,7 @@ class TempoExContainerFunctor(gremlin.base_classes.AbstractFunctor):
         self.switch_on_press = False
         if container.activation_condition_type == "container":
             for cond in container.activation_condition.conditions:
-                if isinstance(cond, gremlin.base_classes.InputActionCondition):
+                if isinstance(cond, gremlin.base_conditions.InputActionCondition):
                     if cond.comparison == "press":
                         self.switch_on_press = True        
 
@@ -503,7 +507,7 @@ class TempoExContainerFunctor(gremlin.base_classes.AbstractFunctor):
 
         self._trigger_long_press(self.event_press, self.value_press)
 
-class TempoExContainer(gremlin.base_classes.AbstractContainer):
+class TempoExContainer(AbstractContainer):
 
     """A container with two actions which are triggered based on the duration
     of the activation.
@@ -517,10 +521,10 @@ class TempoExContainer(gremlin.base_classes.AbstractContainer):
     functor = TempoExContainerFunctor
     widget = TempoExContainerWidget
     # input_types = [
-    #     gremlin.common.InputType.JoystickAxis,
-    #     gremlin.common.InputType.JoystickButton,
-    #     gremlin.common.InputType.JoystickHat,
-    #     gremlin.common.InputType.Keyboard
+    #     InputType.JoystickAxis,
+    #     InputType.JoystickButton,
+    #     InputType.JoystickHat,
+    #     InputType.Keyboard
     # ]
     interaction_types = [
         gremlin.ui.input_item.ActionSetView.Interactions.Up,

@@ -19,7 +19,7 @@
 from PySide6 import QtWidgets, QtCore, QtGui
 
 import gremlin
-from gremlin.common import load_icon
+from gremlin.util import load_icon
 
 class AbstractVirtualButtonWidget(QtWidgets.QGroupBox):
 
@@ -83,10 +83,10 @@ class VirtualAxisButtonWidget(AbstractVirtualButtonWidget):
         try:
             VirtualAxisButtonWidget.locked = True
             self.range_layout = QtWidgets.QHBoxLayout()
-            self.lower_limit = gremlin.ui.common.DynamicDoubleSpinBox()
+            self.lower_limit = gremlin.ui.ui_common.DynamicDoubleSpinBox()
             self.lower_limit.setRange(-1.0, 1.0)
             self.lower_limit.setSingleStep(0.05)
-            self.upper_limit = gremlin.ui.common.DynamicDoubleSpinBox()
+            self.upper_limit = gremlin.ui.ui_common.DynamicDoubleSpinBox()
             self.upper_limit.setRange(-1.0, 1.0)
             self.upper_limit.setSingleStep(0.05)
             self.direction = QtWidgets.QComboBox()

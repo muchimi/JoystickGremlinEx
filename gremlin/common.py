@@ -23,70 +23,7 @@ import sys
 
 from PySide6 import QtGui
 
-
-class InputType(enum.Enum):
-
-    """Enumeration of possible input types."""
-
-    NotSet = 0
-    Keyboard = 1
-    JoystickAxis = 2
-    JoystickButton = 3
-    JoystickHat = 4
-    Mouse = 5
-    VirtualButton = 6
-    KeyboardLatched = 7 # latched keyboard input
-    OpenSoundControl = 8 # open sound control
-    Midi = 9 # midi input
-
-
-    @staticmethod
-    def to_string(value):
-        try:
-            return _InputType_to_string_lookup[value]
-        except KeyError:
-            raise gremlin.error.GremlinError("Invalid type in lookup")
-
-    @staticmethod
-    def to_enum(value):
-        try:
-            return _InputType_to_enum_lookup[value]
-        except KeyError:
-            raise gremlin.error.GremlinError("Invalid type in lookup")
-        
-    @staticmethod
-    def to_list(include_notset = False, include_mouse = False, include_virtualbutton = False) -> list:
-        data = [it for it in InputType]
-        if not include_notset:
-            data.remove(InputType.NotSet)
-        if not include_mouse:
-            data.remove(InputType.Mouse)
-        if not include_virtualbutton:
-            data.remove(InputType.VirtualButton)
-        return data
-
-
-_InputType_to_string_lookup = {
-    InputType.NotSet: "none",
-    InputType.JoystickAxis: "axis",
-    InputType.JoystickButton: "button",
-    InputType.JoystickHat: "hat",
-    InputType.Keyboard: "key",
-    InputType.KeyboardLatched: "keylatched",
-    InputType.OpenSoundControl: "osc",
-    InputType.Midi: "midi",
-}
-
-_InputType_to_enum_lookup = {
-    "none": InputType.NotSet,
-    "axis": InputType.JoystickAxis,
-    "button": InputType.JoystickButton,
-    "hat": InputType.JoystickHat,
-    "key": InputType.Keyboard,
-    "keylatched": InputType.KeyboardLatched,
-    "osc": InputType.OpenSoundControl,
-    "midi": InputType.Midi
-}
+from gremlin.input_types import InputType
 
 
 class AxisNames(enum.Enum):
@@ -186,8 +123,15 @@ def input_to_ui_string(input_type, input_id):
     :param input_id the corresponding id
     :return string for UI usage of the given data
     """
-    from gremlin.util import grouped
-    from gremlin.keyboard import key_from_code, sort_keys, Key
+    
+    from gremlin.keyboard import key_from_code
+    
+
+    if hasattr(input_id, "display_name"):
+        # use the built-in function
+        return input_id.display_name
+
+
     if input_type == InputType.JoystickAxis:
         try:
             return AxisNames.to_string(AxisNames(input_id))
@@ -198,10 +142,6 @@ def input_to_ui_string(input_type, input_id):
         return input_id.name
     elif input_type == InputType.Keyboard:
         return key_from_code(*input_id).name
-    elif input_type == InputType.OpenSoundControl:
-        return "OSC: not implemented yet"
-    elif input_type == InputType.Midi:
-        return "MIDI: not implemented yet"
     else:
         return f"{InputType.to_string(input_type).capitalize()} {input_id}"
 
@@ -299,42 +239,6 @@ direction_tuple_lookup = {
 }
 
 
-class DeviceType(enum.Enum):
-
-    """Enumeration of the different possible input types."""
-
-    Keyboard = 1
-    Joystick = 2
-    VJoy = 3
-
-    @staticmethod
-    def to_string(value):
-        try:
-            return _DeviceType_to_string_lookup[value]
-        except KeyError:
-            raise gremlin.error.GremlinError("Invalid type in lookup")
-
-    @staticmethod
-    def to_enum(value):
-        try:
-            return _DeviceType_to_enum_lookup[value]
-        except KeyError:
-            raise gremlin.error.GremlinError("Invalid type in lookup")
-
-
-_DeviceType_to_string_lookup = {
-    DeviceType.Keyboard: "keyboard",
-    DeviceType.Joystick: "joystick",
-    DeviceType.VJoy: "vjoy"
-}
-
-
-_DeviceType_to_enum_lookup = {
-    "keyboard": DeviceType.Keyboard,
-    "joystick": DeviceType.Joystick,
-    "vjoy": DeviceType.VJoy
-}
-
 
 class PluginVariableType(enum.Enum):
 
@@ -390,215 +294,3 @@ _PluginVariableType_to_enum_lookup = {
     "Mode": PluginVariableType.Mode,
     "Selection": PluginVariableType.Selection
 }
-
-
-class MergeAxisOperation(enum.Enum):
-
-    """Possible merge axis operation modes."""
-
-    Average = 1
-    Minimum = 2
-    Maximum = 3
-    Sum = 4
-
-    @staticmethod
-    def to_string(value):
-        try:
-            return _MergeAxisOperation_to_string_lookup[value]
-        except KeyError:
-            raise gremlin.error.GremlinError(
-                "Invalid MergeAxisOperation in lookup"
-            )
-
-    @staticmethod
-    def to_enum(value):
-        try:
-            return _MergeAxisOperation_to_enum_lookup[value.lower()]
-        except KeyError:
-            raise gremlin.error.GremlinError(
-                "Invalid MergeAxisOperation in lookup"
-            )
-
-
-_MergeAxisOperation_to_string_lookup = {
-    MergeAxisOperation.Average: "average",
-    MergeAxisOperation.Minimum: "minimum",
-    MergeAxisOperation.Maximum: "maximum",
-    MergeAxisOperation.Sum: "sum"
-}
-
-_MergeAxisOperation_to_enum_lookup = {
-    "average": MergeAxisOperation.Average,
-    "minimum": MergeAxisOperation.Minimum,
-    "maximum": MergeAxisOperation.Maximum,
-    "sum": MergeAxisOperation.Sum
-}
-
-
-def get_guid(strip=True):
-    ''' generates a reasonably lowercase unique guid string '''
-    import uuid
-    guid = f"{uuid.uuid4()}"
-    if strip:
-        return guid.replace("-",'')
-    return guid
-    
-
-
-def find_file(icon_path):
-    ''' finds a file '''
-
-
-    from pathlib import Path
-    from gremlin.util import get_root_path
-    from gremlin.config import Configuration
-    verbose = Configuration().verbose
-
-    icon_path = icon_path.lower().replace("/",os.sep)
-    sub_folders = None
-    folders = []
-
-    root_folder = get_root_path()
-    if os.sep in icon_path:
-        # we have folders
-        splits = icon_path.split(os.sep)
-        folders = splits[:-1]
-        icon_path = splits[-1]
-        sub_folders = os.path.join("", *folders)
-
-    files = []
-    if not os.path.isfile(icon_path):
-        # path not found 
-        file_root, ext = os.path.splitext(icon_path)
-        if ext:
-            extensions = [ext]
-        else:
-            extensions = [".svg",".png"]
-        circuit_breaker = 1000
-        for dirpath, _, filenames in os.walk(root_folder):
-            circuit_breaker-=1
-            if circuit_breaker == 0:
-                break
-            if sub_folders and not dirpath.endswith(sub_folders):
-                continue
-            for filename in [f.lower() for f in filenames]:
-                for ext in extensions:
-                    if filename.endswith(ext) and filename.startswith(file_root):
-                        files.append(os.path.join(dirpath, filename))
-                    
-    if files:
-        files.sort(key = lambda x: len(x)) # shortest to largest
-        found_path = files.pop(0) # grab the first one
-        if verbose:
-            logging.getLogger("system").info(f"Find_files() - found : {found_path} for {icon_path}")
-        return found_path
-    
-    if circuit_breaker == 0:
-        logging.getLogger("system").error(f"Find_files() - search exceeded maximum when searching for: {icon_path}")
-    
-    if verbose or circuit_breaker == 0:
-        logging.getLogger("system").error(f"Find_files() failed for: {icon_path}")
-    return None
-
-
-
-
-def get_icon_path(*paths):
-        ''' 
-        gets an icon path
-           
-        '''
-
-        from gremlin.util import get_root_path
-        from gremlin.config import Configuration
-        verbose = Configuration().verbose
-        
-
-        # be aware of runtime environment
-        root_path = get_root_path()
-        the_path = os.path.join(*paths)
-        icon_file = os.path.join(root_path, the_path).replace("/",os.sep).lower()
-        if icon_file:
-            if os.path.isfile(icon_file):
-                if verbose:
-                    logging.getLogger("system").info(f"Icon file (straight) found: {icon_file}")        
-                return icon_file
-            if not icon_file.endswith(".png"):
-                icon_file_png = icon_file + ".png"
-                if os.path.isfile(icon_file_png):
-                    if verbose:
-                        logging.getLogger("system").info(f"Icon file (png) found: {icon_file_png}")        
-                    return icon_file_png
-            if not icon_file.endswith(".svg"):
-                icon_file_svg = icon_file + ".svg"
-                if os.path.isfile(icon_file_svg):
-                    if verbose:
-                        logging.getLogger("system").info(f"Icon file (svg) found: {icon_file_svg}")        
-                    return icon_file_svg
-            brute_force = find_file(the_path)
-            if brute_force and os.path.isfile(brute_force):
-                return brute_force
-        
-        logging.getLogger("system").error(f"Icon file not found: {icon_file}")
-    
-        return None
-
-def load_pixmap(*paths):
-    ''' gets a pixmap from the path '''
-    the_path = get_icon_path(*paths)
-    if the_path:
-        pixmap = QtGui.QPixmap(the_path)
-        if pixmap.isNull():
-            logging.getLogger("system").warning(f"load_pixmap(): pixmap failed: {the_path}")
-            return None
-        return pixmap
-    
-    logging.getLogger("system").error(f"load_pixmap(): invalid path")
-    return None
-
-def load_icon(*paths):
-    ''' gets an icon (returns a QIcon) '''
-    from gremlin.config import Configuration
-    verbose = Configuration().verbose
-    pixmap = load_pixmap(*paths)
-    if not pixmap or pixmap.isNull():
-        if verbose:
-            logging.getLogger("system").info(f"LoadIcon() using generic icon - failed to locate: {paths}")        
-        return get_generic_icon()
-    icon = QtGui.QIcon()
-    icon.addPixmap(pixmap, QtGui.QIcon.Normal)
-    if verbose:
-        logging.getLogger("system").info(f"LoadIcon() found icon: {paths}") 
-    return icon
-
-def load_image(*paths):
-    ''' loads an image '''
-    from gremlin.config import Configuration
-    verbose = Configuration().verbose
-    the_path = get_icon_path(*paths)
-    if the_path:
-        if verbose:
-            logging.getLogger("system").info(f"LoadImage() found image: {paths}") 
-        return QtGui.QImage(the_path)
-    if verbose:
-            logging.getLogger("system").info(f"LoadImage() failed to locate: {paths}")        
-    return None
-        
-    
-        
-
-def get_generic_icon():
-    ''' gets a generic icon'''
-    from gremlin.util import get_root_path
-    root_path = get_root_path()
-    generic_icon = os.path.join(root_path, "gfx/generic.png")
-    if generic_icon and os.path.isfile(generic_icon):
-        pixmap = QtGui.QPixmap(generic_icon)
-        if pixmap.isNull():
-            logging.getLogger("system").warning(f"load_icon(): generic pixmap failed: {generic_icon}")
-            return None
-        icon = QtGui.QIcon()
-        icon.addPixmap(pixmap, QtGui.QIcon.Normal)
-        return icon
-    logging.getLogger("system").warning(f"load_icon(): generic icon file not found: {generic_icon}")
-    return None

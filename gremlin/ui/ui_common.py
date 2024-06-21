@@ -22,13 +22,13 @@ import logging
 from PySide6 import QtWidgets, QtCore, QtGui
 import PySide6.QtGui
 import PySide6.QtWidgets
-
-import gremlin
-import gremlin.base_classes
+import gremlin.error
+import qtawesome as qta
+from gremlin.input_types import InputType
 from  gremlin.clipboard import Clipboard
-import gremlin.common
-import gremlin.shared_state
-from gremlin.keyboard import key_from_code, key_from_name
+import gremlin.types
+from gremlin.util import load_pixmap
+
 
 class ContainerViewTypes(enum.Enum):
 
@@ -105,7 +105,9 @@ class AbstractView(QtWidgets.QWidget):
     """Base class for MVC views."""
 
     # Signal emitted when a entry is selected
-    item_selected = QtCore.Signal(int)
+    item_selected = QtCore.Signal(int) # index of the item being selected
+    item_edit = QtCore.Signal(object, int, object)  # widget, index, model data object
+    item_closed = QtCore.Signal(object, int, object)  # widget, index, model data object
 
     def __init__(self, parent=None):
         """Creates a new view instance.
@@ -582,7 +584,7 @@ class AbstractInputSelector(QtWidgets.QWidget):
                 input_value = self.input_item_dropdowns[device_index].currentText()
             input_type = self._input_type_registry[device_index][input_index]
 
-            if input_type == gremlin.common.InputType.JoystickAxis:
+            if input_type == InputType.JoystickAxis:
                 input_id = gremlin.common.AxisNames.to_enum(input_value).value
             else:
                 input_id = int(input_value.split()[-1])
@@ -659,9 +661,9 @@ class AbstractInputSelector(QtWidgets.QWidget):
 
     def _create_input_dropdown(self):
         count_map = {
-            gremlin.common.InputType.JoystickAxis: lambda x: x.axis_count,
-            gremlin.common.InputType.JoystickButton: lambda x: x.button_count,
-            gremlin.common.InputType.JoystickHat: lambda x: x.hat_count
+            InputType.JoystickAxis: lambda x: x.axis_count,
+            InputType.JoystickButton: lambda x: x.button_count,
+            InputType.JoystickHat: lambda x: x.hat_count
         }
 
         self.input_item_dropdowns = []
@@ -683,7 +685,7 @@ class AbstractInputSelector(QtWidgets.QWidget):
             for input_type in self.valid_types:
                 for i in range(count_map[input_type](device)):
                     input_id = i+1
-                    if input_type == gremlin.common.InputType.JoystickAxis:
+                    if input_type == InputType.JoystickAxis:
                         input_id = device.axis_map[i].axis_index
 
                     s_ui = gremlin.common.input_to_ui_string(
@@ -734,9 +736,9 @@ class JoystickSelector(AbstractInputSelector):
         )
         for dev in potential_devices:
             input_counts = {
-                gremlin.common.InputType.JoystickAxis: dev.axis_count,
-                gremlin.common.InputType.JoystickButton: dev.button_count,
-                gremlin.common.InputType.JoystickHat: dev.hat_count
+                InputType.JoystickAxis: dev.axis_count,
+                InputType.JoystickButton: dev.button_count,
+                InputType.JoystickHat: dev.hat_count
             }
 
             has_inputs = False
@@ -780,9 +782,9 @@ class VJoySelector(AbstractInputSelector):
         )
         for dev in potential_devices:
             input_counts = {
-                gremlin.common.InputType.JoystickAxis: dev.axis_count,
-                gremlin.common.InputType.JoystickButton: dev.button_count,
-                gremlin.common.InputType.JoystickHat: dev.hat_count
+                InputType.JoystickAxis: dev.axis_count,
+                InputType.JoystickButton: dev.button_count,
+                InputType.JoystickHat: dev.hat_count
             }
 
             has_inputs = False
@@ -835,7 +837,7 @@ class ActionSelector(QtWidgets.QWidget):
 
         # clipboard
         self.paste_button = QtWidgets.QPushButton()
-        icon = gremlin.common.load_icon("button_paste.svg")
+        icon = gremlin.util.load_icon("button_paste.svg")
         self.paste_button.setIcon(icon)
         self.paste_button.clicked.connect(self._paste_action)
         self.paste_button.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Minimum)
@@ -857,7 +859,7 @@ class ActionSelector(QtWidgets.QWidget):
         :return list of valid action names
         """
         action_list = []
-        if self.input_type == gremlin.common.DeviceType.VJoy:
+        if self.input_type == gremlin.types.DeviceType.VJoy:
             action_list.append("Response Curve")
         else:
             for entry in gremlin.plugin_manager.ActionPlugins().repository.values():
@@ -1078,6 +1080,7 @@ class InputListenerWidget(QtWidgets.QFrame):
         :param parent the parent widget of this widget
         """
         super().__init__(parent)
+        from gremlin.shared_state import set_suspend_input_highlighting
 
         self.callback = callback
         self._event_types = event_types
@@ -1102,16 +1105,16 @@ class InputListenerWidget(QtWidgets.QFrame):
         self.setPalette(palette)
 
         # Disable ui input selection on joystick input
-        gremlin.shared_state.set_suspend_input_highlighting(True)
+        set_suspend_input_highlighting(True)
 
         # Start listening to user key presses
         event_listener = gremlin.event_handler.EventListener()
         event_listener.keyboard_event.connect(self._kb_event_cb)
-        if gremlin.common.InputType.JoystickAxis in self._event_types or \
-                gremlin.common.InputType.JoystickButton in self._event_types or \
-                gremlin.common.InputType.JoystickHat in self._event_types:
+        if InputType.JoystickAxis in self._event_types or \
+                InputType.JoystickButton in self._event_types or \
+                InputType.JoystickHat in self._event_types:
             event_listener.joystick_event.connect(self._joy_event_cb)
-        elif gremlin.common.InputType.Mouse in self._event_types:
+        elif InputType.Mouse in self._event_types:
             gremlin.windows_event_hook.MouseHook().start()
             event_listener.mouse_event.connect(self._mouse_event_cb)
 
@@ -1136,7 +1139,7 @@ class InputListenerWidget(QtWidgets.QFrame):
         # Ensure the event corresponds to a significant enough change in input
         process_event = gremlin.input_devices.JoystickInputSignificant() \
             .should_process(event)
-        if event.event_type == gremlin.common.InputType.JoystickButton:
+        if event.event_type == InputType.JoystickButton:
             process_event &= not event.is_pressed
 
         if process_event:
@@ -1148,8 +1151,11 @@ class InputListenerWidget(QtWidgets.QFrame):
         """Passes the pressed key to the provided callback and closes
         the overlay.
 
-        :param event the keypress event to be processed
+        :param event 
+        the keypress event to be processed
         """
+
+        from gremlin.keyboard import key_from_code, key_from_name
         key = key_from_code(
                 event.identifier[0],
                 event.identifier[1]
@@ -1163,7 +1169,7 @@ class InputListenerWidget(QtWidgets.QFrame):
                 if not self._abort_timer.is_alive():
                     self._abort_timer.start()
             elif not event.is_pressed and \
-                    gremlin.common.InputType.Keyboard in self._event_types:
+                    InputType.Keyboard in self._event_types:
                 if not self._return_kb_event:
                     self.callback(key)
                 else:
@@ -1173,7 +1179,7 @@ class InputListenerWidget(QtWidgets.QFrame):
         # Record all key presses and return on the first key release
         else:
             if event.is_pressed:
-                if gremlin.common.InputType.Keyboard in self._event_types:
+                if InputType.Keyboard in self._event_types:
                     if not self._return_kb_event:
                         self._multi_key_storage.append(key)
                     else:
@@ -1202,11 +1208,11 @@ class InputListenerWidget(QtWidgets.QFrame):
         """Closes the overlay window."""
         event_listener = gremlin.event_handler.EventListener()
         event_listener.keyboard_event.disconnect(self._kb_event_cb)
-        if gremlin.common.InputType.JoystickAxis in self._event_types or \
-                gremlin.common.InputType.JoystickButton in self._event_types or \
-                gremlin.common.InputType.JoystickHat in self._event_types:
+        if InputType.JoystickAxis in self._event_types or \
+                InputType.JoystickButton in self._event_types or \
+                InputType.JoystickHat in self._event_types:
             event_listener.joystick_event.disconnect(self._joy_event_cb)
-        elif gremlin.common.InputType.Mouse in self._event_types:
+        elif InputType.Mouse in self._event_types:
             event_listener.mouse_event.disconnect(self._mouse_event_cb)
 
         # Stop mouse hook in case it is running
@@ -1223,13 +1229,13 @@ class InputListenerWidget(QtWidgets.QFrame):
         :return string representing the valid event types
         """
         valid_str = []
-        if gremlin.common.InputType.JoystickAxis in self._event_types:
+        if InputType.JoystickAxis in self._event_types:
             valid_str.append("Axis")
-        if gremlin.common.InputType.JoystickButton in self._event_types:
+        if InputType.JoystickButton in self._event_types:
             valid_str.append("Button")
-        if gremlin.common.InputType.JoystickHat in self._event_types:
+        if InputType.JoystickHat in self._event_types:
             valid_str.append("Hat")
-        if gremlin.common.InputType.Keyboard in self._event_types:
+        if InputType.Keyboard in self._event_types:
             valid_str.append("Key")
 
         return ", ".join(valid_str)
@@ -1312,5 +1318,66 @@ class ConfirmPushButton(QtWidgets.QPushButton):
 
 
 
-
+class QHLine(QtWidgets.QFrame):
+    ''' horizontal line '''
+    def __init__(self, parent = None):
+        super().__init__(parent)
+        self.setFrameShape(QtWidgets.QFrame.Shape.HLine)
+        self.setFrameShadow(QtWidgets.QFrame.Shadow.Sunken)
         
+
+class QIconLabel(QtWidgets.QWidget):
+    ''' label with an icon using the QAWESEOME lib '''
+
+    IconSize = QtCore.QSize(16, 16)
+    HorizontalSpacing = 2
+
+    def __init__(self, icon_path = None, text = None, stretch=True, use_qta = False, parent = None):
+        super().__init__(parent)
+
+        layout = QtWidgets.QHBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        self.setLayout(layout)
+
+        self._icon_widget = QtWidgets.QLabel()
+        if icon_path:
+            self.setIcon(icon_path, use_qta)
+            
+        layout.addWidget(self._icon_widget)
+        layout.addSpacing(self.HorizontalSpacing)
+
+        self._label_widget = QtWidgets.QLabel(text)
+        layout.addWidget(self._label_widget)
+
+        if stretch:
+            layout.addStretch()   
+
+    def setIcon(self, icon_path = None, use_qta = False):
+        ''' sets the icon of the label '''
+        if use_qta:
+            pixmap = qta.icon(icon_path).pixmap(self.IconSize)
+        else:
+            pixmap = load_pixmap(icon_path) if icon_path else None
+        if pixmap:
+            pixmap = pixmap.scaled(QIconLabel.IconSize, QtCore.Qt.AspectRatioMode.KeepAspectRatio)
+            self._icon_widget.setPixmap(pixmap)
+        else:
+            # clear the pixmap
+            self._icon_widget.setPixmap(QtGui.QPixmap())
+        
+    def setText(self, text = None):
+        ''' sets the text of the label '''
+        if text:
+            self._label_widget.setText(text)
+        else: 
+            self._label_widget.setText("")
+
+    def showIcon(self):
+        ''' hides the icon '''
+        self._icon_widget.setVisible(True)
+
+    def hideIcon(self):
+        ''' shows the icon '''
+        self._icon_widget.setVisible(False)
+
+    

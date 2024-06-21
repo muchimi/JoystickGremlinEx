@@ -12,6 +12,7 @@ from threading import Timer
 from gremlin.spline import CubicSpline
 from vjoy.vjoy import AxisName
 from configuration import * # load constants from the configuration.py file
+import gremlin.input_devices
 
 ''' event handlers '''
 custom_handlers = []

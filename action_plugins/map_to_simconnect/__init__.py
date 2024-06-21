@@ -21,11 +21,11 @@ from xml.etree import ElementTree
 
 from PySide6 import QtWidgets, QtCore, QtGui
 
-from gremlin.base_classes import AbstractAction, AbstractFunctor
-from gremlin.common import InputType
+import gremlin.base_profile
+from gremlin.input_types import InputType
 from gremlin.input_devices import ButtonReleaseActions
 import gremlin.macro
-import gremlin.ui.common
+import gremlin.ui.ui_common
 import gremlin.ui.input_item
 import enum
 from gremlin.profile import safe_format, safe_read
@@ -197,7 +197,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         # holds the output value if the output value is a fixed value
         self.output_value_container_widget = QtWidgets.QWidget()
         self.output_value_container_layout = QtWidgets.QHBoxLayout()
-        self.output_value_widget = gremlin.ui.common.DynamicDoubleSpinBox()
+        self.output_value_widget = gremlin.ui.ui_common.DynamicDoubleSpinBox()
         self.output_value_widget.valueChanged.connect(self._output_value_changed_cb)
         self.output_value_description_widget = QtWidgets.QLabel()
 
@@ -452,7 +452,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 
 
-class MapToSimConnectFunctor(AbstractFunctor):
+class MapToSimConnectFunctor(gremlin.base_profile.AbstractFunctor):
 
     def __init__(self, action):
         super().__init__(action)
@@ -478,7 +478,7 @@ class MapToSimConnectFunctor(AbstractFunctor):
         return True
 
 
-class MapToSimConnect(AbstractAction):
+class MapToSimConnect(gremlin.base_profile.AbstractAction):
 
     """Action data for the map to keyboard action.
 

@@ -20,10 +20,11 @@ import logging
 from PySide6 import QtCore, QtGui, QtWidgets
 
 
-from gremlin.common import PluginVariableType, load_icon
+from gremlin.common import PluginVariableType
+from gremlin.util import load_icon
 import gremlin.profile
 import gremlin.user_plugin
-import gremlin.ui.common
+import gremlin.ui.ui_common
 import os
 
 
@@ -108,7 +109,7 @@ class ModuleManagementController(QtCore.QObject):
         )
 
         layout = self.view.right_panel.layout()
-        gremlin.ui.common.clear_layout(layout)
+        gremlin.ui.ui_common.clear_layout(layout)
         for var in variables:
             if type(var) in [
                 gremlin.user_plugin.BoolVariable,
@@ -170,12 +171,12 @@ class ModuleManagementController(QtCore.QObject):
             variable.value = data
             button = widget.itemAtPosition(0, 1).widget()
             input_id = f"{data["input_id"]:d}"
-            if data["input_type"] == gremlin.common.InputType.JoystickAxis:
+            if data["input_type"] == InputType.JoystickAxis:
                 input_id = gremlin.common.AxisNames.to_string(
                     gremlin.common.AxisNames(data["input_id"])
                 )
             button.setText(
-                f"{data["device_name"]} {gremlin.common.InputType.to_string(data["input_type"]).capitalize()} {input_id}"
+                f"{data["device_name"]} {InputType.to_string(data["input_type"]).capitalize()} {input_id}"
                 )
 
         variable.is_valid = True
@@ -242,7 +243,7 @@ class ModuleManagementView(QtWidgets.QSplitter):
         super().__init__(parent)
 
         self.controller = None
-        from gremlin.common import load_icon
+        
 
         # Create the left panel showing the modules and their instances
         self.left_panel = QtWidgets.QWidget()
@@ -319,7 +320,7 @@ class ModuleListWidget(QtWidgets.QScrollArea):
 
     def clear(self):
         self.widget_list = []
-        gremlin.ui.common.clear_layout(self.content_layout)
+        gremlin.ui.ui_common.clear_layout(self.content_layout)
         self.content.layout().addStretch()
 
 

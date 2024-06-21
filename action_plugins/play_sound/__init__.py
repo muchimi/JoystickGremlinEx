@@ -21,8 +21,9 @@ from PySide6 import QtCore, QtGui, QtMultimedia, QtWidgets
 from xml.etree import ElementTree
 
 
-from gremlin.base_classes import AbstractAction, AbstractFunctor
-from gremlin.common import InputType, load_icon
+import gremlin.base_profile
+from gremlin.input_types import InputType
+from gremlin.util import load_icon
 import gremlin.ui.input_item
 
 
@@ -72,7 +73,7 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
             self._populate_ui()
 
 
-class PlaySoundFunctor(AbstractFunctor):
+class PlaySoundFunctor(gremlin.base_profile.AbstractFunctor):
     ''' fixed for QT6 media player changes '''
 
     player = QtMultimedia.QMediaPlayer()
@@ -93,7 +94,7 @@ class PlaySoundFunctor(AbstractFunctor):
         return True
 
 
-class PlaySound(AbstractAction):
+class PlaySound(gremlin.base_profile.AbstractAction):
 
     """Action to resume callback execution."""
 

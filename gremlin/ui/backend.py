@@ -94,19 +94,11 @@ class Backend(QtCore.QObject):
                 self.profile,
                 "Default"
             )
-            #self.ui.tray_icon.setIcon(load_icon("gfx/icon_active.ico"))
+            
         else:
             # Stop running the code
             self.runner.stop()
-            # self._update_statusbar_active(False)
-            # self._profile_auto_activated = False
-            # current_tab = self.ui.devices.currentWidget()
-            # if type(current_tab) in [
-            #     gremlin.ui.device_tab.JoystickDeviceTabWidget,
-            #     gremlin.ui.device_tab.KeyboardDeviceTabWidget
-            # ]:
-            #     self.ui.devices.currentWidget().refresh()
-            # self.ui.tray_icon.setIcon(load_icon("gfx/icon.ico"))
+            
         self.activityChanged.emit()
 
     @Slot(InputIdentifier, result=int)

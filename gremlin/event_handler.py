@@ -24,10 +24,12 @@ from threading import Thread, Timer
 from PySide6 import QtCore
 
 import dinput
-from . import common, config, error, joystick_handling, windows_event_hook, macro, util, shared_state
+from gremlin.input_types import InputType
 from gremlin.singleton_decorator import SingletonDecorator
+from . import config, error, joystick_handling, windows_event_hook
+
 from gremlin.keyboard import Key
-from gremlin.common import InputType
+
 
 class Event:
 
@@ -113,7 +115,7 @@ class Event:
 
 		:return integer hash value of this event
 		"""
-		if self.event_type == common.InputType.Keyboard:
+		if self.event_type == InputType.Keyboard:
 			data = (self.identifier.scan_code, self.identifier.is_extended) if isinstance(self.identifier, Key) else self.identifier
 			return hash((
 				self.device_guid,
@@ -138,7 +140,7 @@ class Event:
 		"""
 		if hasattr(key,"scan_code") and hasattr(key,"is_extended"):
 			return Event(
-				event_type=common.InputType.Keyboard,
+				event_type= InputType.Keyboard,
 				identifier=(key.scan_code, key.is_extended),
 				device_guid=dinput.GUID_Keyboard
 			)
@@ -180,6 +182,13 @@ class EventListener(QtCore.QObject):
 	mouse_event = QtCore.Signal(Event)
 	# Signal emitted when virtual button events are received
 	virtual_event = QtCore.Signal(Event)
+
+	# signal emmitted when a MIDI input is received
+	midi_event = QtCore.Signal(Event)
+
+	# signal emitted when an OSC input is received
+	osc_event = QtCore.Signal(Event)
+
 	# Signal emitted when a joystick is attached or removed
 	device_change_event = QtCore.Signal()
 	# Signal emitted when the icon needs to be refreshed
@@ -237,11 +246,12 @@ class EventListener(QtCore.QObject):
 
 	def reload_calibrations(self):
 		"""Reloads the calibration data from the configuration file."""
+		from gremlin.ui.ui_util import create_calibration_function
 		cfg = config.Configuration()
 		for key in self._calibrations:
 			limits = cfg.get_calibration(key[0], key[1])
 			self._calibrations[key] = \
-				util.create_calibration_function(
+				create_calibration_function(
 					limits[0],
 					limits[1],
 					limits[2]
@@ -257,6 +267,7 @@ class EventListener(QtCore.QObject):
 			# Keep this thread alive until we are done
 			time.sleep(0.1)
 
+
 	def _joystick_event_handler(self, data):
 		"""Callback for joystick events.
 
@@ -266,6 +277,7 @@ class EventListener(QtCore.QObject):
 		:param data the joystick event
 		"""
 
+		from gremlin.util import dill_hat_lookup
 		verbose = config.Configuration().verbose
 		
 		event = dinput.InputEvent(data)
@@ -273,7 +285,7 @@ class EventListener(QtCore.QObject):
 			if verbose:
 				logging.getLogger("system").info(event)
 			self.joystick_event.emit(Event(
-				event_type=common.InputType.JoystickAxis,
+				event_type= InputType.JoystickAxis,
 				device_guid=event.device_guid,
 				identifier=event.input_index,
 				value=self._apply_calibration(event),
@@ -281,17 +293,17 @@ class EventListener(QtCore.QObject):
 			))
 		elif event.input_type == dinput.InputType.Button:
 			self.joystick_event.emit(Event(
-				event_type=common.InputType.JoystickButton,
+				event_type= InputType.JoystickButton,
 				device_guid=event.device_guid,
 				identifier=event.input_index,
 				is_pressed=event.value == 1
 			))
 		elif event.input_type == dinput.InputType.Hat:
 			self.joystick_event.emit(Event(
-				event_type=common.InputType.JoystickHat,
+				event_type= InputType.JoystickHat,
 				device_guid=event.device_guid,
 				identifier=event.input_index,
-				value=util.dill_hat_lookup[event.value]
+				value = dill_hat_lookup[event.value]
 			))
 
 	def _joystick_device_handler(self, data, action):
@@ -336,7 +348,7 @@ class EventListener(QtCore.QObject):
 		if not is_repeat:
 			self._keyboard_state[key_id] = is_pressed
 			self.keyboard_event.emit(Event(
-				event_type=common.InputType.Keyboard,
+				event_type= InputType.Keyboard,
 				device_guid=dinput.GUID_Keyboard,
 				identifier=key_id,
 				is_pressed=is_pressed,
@@ -361,7 +373,7 @@ class EventListener(QtCore.QObject):
 		# Ignore events we created via the macro system
 		if not event.is_injected:
 			self.mouse_event.emit(Event(
-				event_type=common.InputType.Mouse,
+				event_type= InputType.Mouse,
 				device_guid=dinput.GUID_Keyboard,
 				identifier=event.button_id,
 				is_pressed=event.is_pressed,
@@ -370,11 +382,12 @@ class EventListener(QtCore.QObject):
 		return True
 
 	def _apply_calibration(self, event):
+		from gremlin.util import axis_calibration
 		key = (event.device_guid, event.input_index)
 		if key in self._calibrations:
 			return self._calibrations[key](event.value)
 		else:
-			return util.axis_calibration(event.value, -32768, 0, 32767)
+			return axis_calibration(event.value, -32768, 0, 32767)
 
 	def _init_joysticks(self):
 		"""Initializes joystick devices."""
@@ -386,6 +399,7 @@ class EventListener(QtCore.QObject):
 
 		:param device_info information about the device
 		"""
+		from gremlin.util import create_calibration_function
 		cfg = config.Configuration()
 		for entry in device_info.axis_map:
 			limits = cfg.get_calibration(
@@ -393,7 +407,7 @@ class EventListener(QtCore.QObject):
 				entry.axis_index
 			)
 			self._calibrations[(device_info.device_guid, entry.axis_index)] = \
-				util.create_calibration_function(
+				create_calibration_function(
 					limits[0],
 					limits[1],
 					limits[2]
@@ -418,6 +432,8 @@ class EventHandler(QtCore.QObject):
 		self.callbacks = {}
 		self.latched_events = {}
 		self.latched_callbacks = {}
+		self.midi_callbacks = {}
+		self.osc_callbacks = {}
 		self._event_lookup = {}
 		self._active_mode = None
 		self._previous_mode = None
@@ -459,43 +475,71 @@ class EventHandler(QtCore.QObject):
 		:param permanent if True the callback is always active even
 			if the system is paused
 		"""
-		if event and event.event_type == InputType.KeyboardLatched:
-			key : Key = event.identifier
-			index = key.index_tuple()  # the events will arrive as keyboard events
-			if key.is_latched:
-				if device_guid not in self.latched_events.keys():
-					self.latched_events[device_guid] = {}
-				if mode not in self.latched_events[device_guid].keys():
-					self.latched_events[device_guid][mode] = {}
-				if index not in self.latched_events[device_guid][mode].keys():
-					self.latched_events[device_guid][mode][index] = []
-				self.latched_events[device_guid][mode][index].append(key)
-				#logging.getLogger("system").info(f"Key latch registered: {index} -> {key.name}")
+		if event:
+			if event.event_type == InputType.KeyboardLatched:
+				# keyboard latched event
+				key : Key = event.identifier
+				index = key.index_tuple()  # the events will arrive as keyboard events
+				if key.is_latched:
+					if device_guid not in self.latched_events.keys():
+						self.latched_events[device_guid] = {}
+					if mode not in self.latched_events[device_guid].keys():
+						self.latched_events[device_guid][mode] = {}
+					if index not in self.latched_events[device_guid][mode].keys():
+						self.latched_events[device_guid][mode][index] = []
+					self.latched_events[device_guid][mode][index].append(key)
+					#logging.getLogger("system").info(f"Key latch registered: {index} -> {key.name}")
 
-				if device_guid not in self.latched_callbacks.keys():
-					self.latched_callbacks[device_guid] = {}
-				if mode not in self.latched_callbacks[device_guid].keys():
-					self.latched_callbacks[device_guid][mode] = {}
-				try:
+					if device_guid not in self.latched_callbacks.keys():
+						self.latched_callbacks[device_guid] = {}
+					if mode not in self.latched_callbacks[device_guid].keys():
+						self.latched_callbacks[device_guid][mode] = {}
+					if not key in self.latched_callbacks[device_guid][mode]:
+						self.latched_callbacks[device_guid][mode][key] = []
 					data = self.latched_callbacks[device_guid][mode][key]
-				except KeyError:
-					self.latched_callbacks[device_guid][mode][key] = []
-					data = self.latched_callbacks[device_guid][mode][key]
+					data.append((self._install_plugins(callback),permanent))
+					#logging.getLogger("system").info(f"Key callback registered: {key.name}")
+					return
+				
+			elif event.event_type == InputType.Midi:
+				# MIDI event
+				midi_input = event.identifier
+				message = midi_input.message
+				bytes = message.hex() # hashable string
+				if device_guid not in self.midi_callbacks.keys():
+					self.midi_callbacks[device_guid] = {}
+				if mode not in self.midi_callbacks[device_guid].keys():
+					self.midi_callbacks[device_guid][mode] = {}
+				if not bytes in self.midi_callbacks[device_guid][mode]:
+					self.midi_callbacks[device_guid][mode][bytes] = []
+				data = self.midi_callbacks[device_guid][mode][bytes]
 				data.append((self._install_plugins(callback),permanent))
-				#logging.getLogger("system").info(f"Key callback registered: {key.name}")
-				return
 
+			elif event.event_type == InputType.OpenSoundControl:
+				# OSC event
+				osc_input = event.identifier
+				if device_guid not in self.osc_callbacks.keys():
+					self.osc_callbacks[device_guid] = {}
+				if mode not in self.midi_callbacks[device_guid].keys():
+					self.osc_callbacks[device_guid][mode] = {}
+				if not osc_input in self.osc_callbacks[device_guid][mode]:
+					self.osc_callbacks[device_guid][mode][osc_input] = []
+				data = self.osc_callbacks[device_guid][mode][osc_input]
+				data.append((self._install_plugins(callback),permanent))				
 			
-		if device_guid not in self.callbacks:
-			self.callbacks[device_guid] = {}
-		if mode not in self.callbacks[device_guid]:
-			self.callbacks[device_guid][mode] = {}
-		if event not in self.callbacks[device_guid][mode]:
-			self.callbacks[device_guid][mode][event] = []
-		self.callbacks[device_guid][mode][event].append((
-			self._install_plugins(callback),
-			permanent
-		))
+
+			else:
+				# regular event
+				if device_guid not in self.callbacks:
+					self.callbacks[device_guid] = {}
+				if mode not in self.callbacks[device_guid]:
+					self.callbacks[device_guid][mode] = {}
+				if event not in self.callbacks[device_guid][mode]:
+					self.callbacks[device_guid][mode][event] = []
+				self.callbacks[device_guid][mode][event].append((
+					self._install_plugins(callback),
+					permanent
+				))
 
 	def _matching_latched_keys(self, event):
 		''' gets the list of latched keys for this event '''
@@ -503,13 +547,13 @@ class EventHandler(QtCore.QObject):
 			# not a keyboard event
 			return []
 		if event.device_guid in self.latched_events:
-			
 			data = self.latched_events[event.device_guid].get(self._active_mode, {})
 			index = event.identifier
 			keys = data.get(index,[])
 			#logging.getLogger("system").info(f"event: {index} -> found {len(keys)} matching keys")
 			return keys
 		return []		
+	
 
 	def build_event_lookup(self, inheritance_tree):
 		"""Builds the lookup table linking event to callback.
@@ -583,6 +627,9 @@ class EventHandler(QtCore.QObject):
 	def clear(self):
 		"""Removes all attached callbacks."""
 		self.callbacks = {}
+		self.latched_callbacks = {}
+		self.midi_callbacks = {}
+		self.osc_callbacks = {}
 
 	@QtCore.Slot(Event)
 	def process_event(self, event):
@@ -592,44 +639,85 @@ class EventHandler(QtCore.QObject):
 		:param event the event to process
 		"""
 
+		from gremlin.util import display_error
+
 		# list of callbacks
 		m_list = []
 
 		# filter latched keyboard events
-		keys = self._matching_latched_keys(event)
-		if keys:
+		if event.event_type in (InputType.Keyboard, InputType.KeyboardLatched):
+			keys = self._matching_latched_keys(event)
+			if keys:
 
-			#logging.getLogger("system").info(f"Matched keys for event {event.identifier} keys: {len(keys)}")
-			# latched input
-			key : Key
-			latch_key = None
-			for key in keys:
+				#logging.getLogger("system").info(f"Matched keys for event {event.identifier} keys: {len(keys)}")
+				# latched input
+				key : Key
+				latch_key = None
+				for key in keys:
 
-				is_latched = key.latched
-				#logging.getLogger("system").info(f"Check key {key.name} -> latched {is_latched}")
-				if is_latched:
-					latch_key = key
-					break
-				
-			if latch_key:
-				logging.getLogger("system").info(f"Found latched key: Check key {latch_key.name}")
-				m_list = self._matching_latched_callbacks(event, key)
+					is_latched = key.latched
+					#logging.getLogger("system").info(f"Check key {key.name} -> latched {is_latched}")
+					if is_latched:
+						latch_key = key
+						break
+					
+				if latch_key:
+					logging.getLogger("system").info(f"Found latched key: Check key {latch_key.name}")
+					m_list = self._matching_latched_callbacks(event, key)
+		elif event.event_type ==InputType.Midi:
+			m_list = self._matching_midi_callbacks(event)
+		elif event.event_type == InputType.OpenSoundControl:
+			m_list = self._matching_osc_callbacks(event)
 		else:			 
-			# non latched input
+			# other inputs
 			m_list = self._matching_callbacks(event)
+
 		for cb in m_list:
 			try:
 				cb(event)
 			except error.VJoyError as e:
-				util.display_error(str(e))
+				display_error(str(e))
 				logging.getLogger("system").exception(
 					f"VJoy related error: {e}"
 				)
 				self.pause()
 
 
+	def _matching_midi_callbacks(self, event):
+		''' returns list of callbacks matching the event '''
+		callback_list = []
+		if event.event_type == InputType.Midi:
+			bytes = event.identifier.message.hex()
+			if event.device_guid in self.midi_callbacks:
+				callback_list = self.midi_callbacks[event.device_guid].get(
+					self._active_mode, {}
+				).get(bytes, [])
 
+		# Filter events when the system is paused
+		if not self.process_callbacks:
+			return [c[0] for c in callback_list if c[1]]
+		else:
+			return [c[0] for c in callback_list]
+			
+	def _matching_osc_callbacks(self, event):
+		''' returns list of callbacks matching the event '''
+		callback_list = []
+		if event.event_type == InputType.OpenSoundControl:
+			# TODO
+			pass
+			# bytes = event.identifier.message.hex()
+			# if event.device_guid in self.osc_callbacks:
+			# 	callback_list = self.osc_callbacks[event.device_guid].get(
+			# 		self._active_mode, {}
+			# 	).get(bytes, [])
 
+		# Filter events when the system is paused
+		if not self.process_callbacks:
+			return [c[0] for c in callback_list if c[1]]
+		else:
+			return [c[0] for c in callback_list]
+		
+			
 
 	def _matching_callbacks(self, event):
 		"""Returns the list of callbacks to execute in response to

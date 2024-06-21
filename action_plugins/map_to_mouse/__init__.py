@@ -23,11 +23,12 @@ from xml.etree import ElementTree
 
 from PySide6 import QtCore, QtWidgets
 
-from gremlin.base_classes import AbstractAction, AbstractFunctor
-from gremlin.common import InputType, MouseButton
+import gremlin.base_profile
+from gremlin.input_types import InputType
+from gremlin.common import MouseButton
 from gremlin.profile import read_bool, safe_read, safe_format
 from gremlin.util import rad2deg
-import gremlin.ui.common
+import gremlin.ui.ui_common
 import gremlin.ui.input_item
 import gremlin.sendinput
 from gremlin import input_devices
@@ -114,7 +115,7 @@ class MapToMouseWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.min_speed.setRange(0, 1e5)
         self.max_speed = QtWidgets.QSpinBox()
         self.max_speed.setRange(0, 1e5)
-        self.time_to_max_speed = gremlin.ui.common.DynamicDoubleSpinBox()
+        self.time_to_max_speed = gremlin.ui.ui_common.DynamicDoubleSpinBox()
         self.time_to_max_speed.setRange(0.0, 100.0)
         self.time_to_max_speed.setValue(0.0)
         self.time_to_max_speed.setDecimals(2)
@@ -144,7 +145,7 @@ class MapToMouseWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._connect_button_hat()
 
     def _create_mouse_button_ui(self):
-        self.mouse_button = gremlin.ui.common.NoKeyboardPushButton(
+        self.mouse_button = gremlin.ui.ui_common.NoKeyboardPushButton(
             gremlin.common.MouseButton.to_string(self.action_data.button_id)
         )
         self.mouse_button.clicked.connect(self._request_user_input)
@@ -286,7 +287,7 @@ class MapToMouseWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _request_user_input(self):
         """Prompts the user for the input to bind to this item."""
-        self.button_press_dialog = gremlin.ui.common.InputListenerWidget(
+        self.button_press_dialog = gremlin.ui.ui_common.InputListenerWidget(
             self._update_mouse_button,
             [InputType.Mouse],
             return_kb_event=False
@@ -307,7 +308,7 @@ class MapToMouseWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.button_press_dialog.show()
 
 
-class MapToMouseFunctor(AbstractFunctor):
+class MapToMouseFunctor(gremlin.base_profile.AbstractFunctor):
 
     """Implements the functionality required to move a mouse cursor.
 
@@ -426,7 +427,7 @@ class MapToMouseFunctor(AbstractFunctor):
                 input_devices.remote_client.send_mouse_acceleration(a, self.config.min_speed, self.config.max_speed, self.config.time_to_max_speed)
 
 
-class MapToMouse(AbstractAction):
+class MapToMouse(gremlin.base_profile.AbstractAction):
 
     """Action data for the map to mouse action.
 

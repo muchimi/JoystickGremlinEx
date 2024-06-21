@@ -30,7 +30,10 @@ import win32con
 import win32api
 
 import gremlin
+from gremlin.input_types import InputType
 import gremlin.input_devices
+import gremlin.error
+import gremlin.keyboard
 from gremlin.singleton_decorator import SingletonDecorator
 
 
@@ -195,7 +198,7 @@ def _unicode_to_key(character):
     is_extended = False
     if code_value << 8 & 0xE0 or code_value << 8 & 0xE1:
         is_extended = True
-    return Key(character, scan_code, is_extended, virtual_code)
+    return gremlin.keyboard.Key(character, scan_code, is_extended, virtual_code)
 
 
 def _send_key_down(key, is_local = True, is_remote = False, force_remote = False):
@@ -590,7 +593,7 @@ class Macro:
         self._sequence.append(KeyAction(key, is_pressed))
 
 
-class AbstractAction:
+class MacroAbstractAction:
 
     """Base class for all macro action."""
 
@@ -612,7 +615,7 @@ class AbstractAction:
         return (is_local, is_remote)
 
 
-class JoystickAction(AbstractAction):
+class JoystickAction(MacroAbstractAction):
 
     """Joystick input action for a macro."""
 
@@ -634,7 +637,7 @@ class JoystickAction(AbstractAction):
     def __call__(self, is_local = None, is_remote = None, force_remote = None):
         """Emits an Event instance through the EventListener system."""
         el = gremlin.event_handler.EventListener()
-        if self.input_type == gremlin.common.InputType.JoystickAxis:
+        if self.input_type == InputType.JoystickAxis:
             event = gremlin.event_handler.Event(
                 event_type=self.input_type,
                 device_guid=self.device_guid,
@@ -642,7 +645,7 @@ class JoystickAction(AbstractAction):
                 value=self.value,
                 force_remote = force_remote
             )
-        elif self.input_type == gremlin.common.InputType.JoystickButton:
+        elif self.input_type == InputType.JoystickButton:
             event = gremlin.event_handler.Event(
                 event_type=self.input_type,
                 device_guid=self.device_guid,
@@ -650,7 +653,7 @@ class JoystickAction(AbstractAction):
                 is_pressed=self.value,
                 force_remote = force_remote
             )
-        elif self.input_type == gremlin.common.InputType.JoystickHat:
+        elif self.input_type == InputType.JoystickHat:
             event = gremlin.event_handler.Event(
                 event_type=self.input_type,
                 device_guid=self.device_guid,
@@ -664,7 +667,7 @@ class JoystickAction(AbstractAction):
 
 
 
-class KeyAction(AbstractAction):
+class KeyAction(MacroAbstractAction):
 
     """Key to press or release by a macro."""
 
@@ -691,7 +694,7 @@ class KeyAction(AbstractAction):
         
 
 
-class MouseButtonAction(AbstractAction):
+class MouseButtonAction(MacroAbstractAction):
 
     """Mouse button action."""
 
@@ -732,7 +735,7 @@ class MouseButtonAction(AbstractAction):
                 gremlin.input_devices.remote_client.send_mouse_button(self.button, self.is_pressed, force_remote)
 
 
-class MouseMotionAction(AbstractAction):
+class MouseMotionAction(MacroAbstractAction):
 
     """Mouse motion action."""
 
@@ -754,7 +757,7 @@ class MouseMotionAction(AbstractAction):
             gremlin.input_devices.remote_client.send_mouse_motion(self.dx, self.dy, force_remote)
 
 
-class PauseAction(AbstractAction):
+class PauseAction(MacroAbstractAction):
 
     """Represents the pause in a macro between pressed."""
 
@@ -786,7 +789,7 @@ class PauseAction(AbstractAction):
         time.sleep(duration)
 
 
-class VJoyMacroAction(AbstractAction):
+class VJoyMacroAction(MacroAbstractAction):
 
     """VJoy input action for a macro."""
 
@@ -810,7 +813,7 @@ class VJoyMacroAction(AbstractAction):
         
         is_local, is_remote = self._update_flags(is_local, is_remote, force_remote)
         vjoy = gremlin.joystick_handling.VJoyProxy()[self.vjoy_id]
-        if self.input_type == gremlin.common.InputType.JoystickAxis:
+        if self.input_type == InputType.JoystickAxis:
             if self.axis_type == "absolute":
                 if is_local:
                     vjoy.axis(self.input_id).value = self.value
@@ -826,19 +829,19 @@ class VJoyMacroAction(AbstractAction):
                     )
                 if is_remote:
                     gremlin.input_devices.remote_client.send_relative_axis(self.vjoy_id, self.input_id, self.value, force_remote)
-        elif self.input_type == gremlin.common.InputType.JoystickButton:
+        elif self.input_type == InputType.JoystickButton:
             if is_local:
                 vjoy.button(self.input_id).is_pressed = self.value
             if is_remote:
                 gremlin.input_devices.remote_client.send_button(self.vjoy_id, self.input_id, self.value, force_remote)
-        elif self.input_type == gremlin.common.InputType.JoystickHat:
+        elif self.input_type == InputType.JoystickHat:
             if is_local:
                 vjoy.hat(self.input_id).direction = self.value
             if is_remote:
                 gremlin.input_devices.remote_client.send_hat(self.vjoy_id, self.input_id, self.value, force_remote)
 
 
-class RemoteControlAction(AbstractAction):
+class RemoteControlAction(MacroAbstractAction):
     ''' remote control actions for a macro '''
     
 

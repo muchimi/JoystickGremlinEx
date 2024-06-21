@@ -29,7 +29,7 @@ from PySide6 import QtCore, QtGui, QtWidgets
 
 import dinput
 from gremlin import common, error, input_devices, joystick_handling, profile, shared_state
-import gremlin.ui.common
+import gremlin.ui.ui_common
 
 
 def get_variable_definitions(fname):
@@ -542,7 +542,7 @@ class ModeVariable(AbstractVariable):
         label.setToolTip(self.description)
         layout.addWidget(label, 0, 0)
 
-        value_widget = gremlin.ui.common.ModeWidget()
+        value_widget = gremlin.ui.ui_common.ModeWidget()
         value_widget.populate_selector(shared_state.current_profile, value)
         value_widget.mode_changed.connect(
             lambda x: self.value_changed.emit({"value": x})
@@ -603,16 +603,16 @@ class VirtualInputVariable(AbstractVariable):
     def set(self, vjoy, event):
         if event.event_type != self.value["input_type"]:
             logging.getLogger("system").warning(
-                f"Invalid types for vJoy set action for vjoy {str(self.value["device_id"]),} {gremlin.common.InputType.to_string(self.value["input_type"])} {self.value["input_id"]:d}"
+                f"Invalid types for vJoy set action for vjoy {str(self.value["device_id"]),} {InputType.to_string(self.value["input_type"])} {self.value["input_id"]:d}"
             )
             return
 
         device = vjoy[self.value["device_id"]]
-        if self.value["input_type"] == gremlin.common.InputType.JoystickAxis:
+        if self.value["input_type"] == InputType.JoystickAxis:
             device.axis(self.value["input_id"]).value = event.value
-        elif self.value["input_type"] == gremlin.common.InputType.JoystickButton:
+        elif self.value["input_type"] == InputType.JoystickButton:
             device.button(self.value["input_id"]).is_pressed = event.is_pressed
-        elif self.value["input_type"] == gremlin.common.InputType.JoystickHat:
+        elif self.value["input_type"] == InputType.JoystickHat:
             device.hat(self.value["input_id"]).direction = event.value
 
     def create_ui_element(self, value):
@@ -621,7 +621,7 @@ class VirtualInputVariable(AbstractVariable):
         label.setToolTip(self.description)
         layout.addWidget(label, 0, 0)
 
-        value_widget = gremlin.ui.common.VJoySelector(
+        value_widget = gremlin.ui.ui_common.VJoySelector(
             lambda data: self.value_changed.emit(data),
             self.valid_types
         )
@@ -701,12 +701,12 @@ class PhysicalInputVariable(AbstractVariable):
         value_widget = QtWidgets.QPushButton("Press")
         if value is not None:
             input_id = f"{value["input_id"]:d}"
-            if value["input_type"] == gremlin.common.InputType.JoystickAxis:
+            if value["input_type"] == InputType.JoystickAxis:
                 input_id = gremlin.common.AxisNames.to_string(
                     gremlin.common.AxisNames(value["input_id"])
                 )
             value_widget.setText(
-                f"{value["device_name"]} {gremlin.common.InputType.to_string(value["input_type"]).capitalize()} {input_id}"
+                f"{value["device_name"]} {InputType.to_string(value["input_type"]).capitalize()} {input_id}"
                 )
         value_widget.clicked.connect(self._record_user_input)
 
@@ -718,7 +718,7 @@ class PhysicalInputVariable(AbstractVariable):
         return layout
 
     def _record_user_input(self):
-        widget = gremlin.ui.common.InputListenerWidget(
+        widget = gremlin.ui.ui_common.InputListenerWidget(
             self._user_input,
             self.valid_types
         )

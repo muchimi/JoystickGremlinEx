@@ -26,11 +26,10 @@ from xml.etree import ElementTree
 
 from PySide6.QtGui import QIcon
 
-from gremlin.base_classes import AbstractAction, AbstractFunctor
-from gremlin.common import InputType
+import gremlin.base_profile
+from gremlin.input_types import InputType
 import gremlin.macro
 from gremlin.profile import safe_format, safe_read, parse_guid, write_guid
-from gremlin.ui.common import NoKeyboardPushButton
 import gremlin.ui.input_item
 import gremlin.input_devices
 from gremlin.input_devices import VjoyAction
@@ -167,7 +166,7 @@ class MacroActionEditor(QtWidgets.QWidget):
             entry
         """
         # Clear the current editor widget ui components
-        gremlin.ui.common.clear_layout(self.action_layout)
+        gremlin.ui.ui_common.clear_layout(self.action_layout)
         self.ui_elements = {}
 
         # Update the model data to match the new type
@@ -175,7 +174,7 @@ class MacroActionEditor(QtWidgets.QWidget):
             self.model.set_entry(
                 gremlin.macro.JoystickAction(
                     0,
-                    gremlin.common.InputType.JoystickButton,
+                    InputType.JoystickButton,
                     1,
                     True
                 ),
@@ -211,7 +210,7 @@ class MacroActionEditor(QtWidgets.QWidget):
             self.model.set_entry(
                 gremlin.macro.VJoyMacroAction(
                     1,
-                    gremlin.common.InputType.JoystickButton,
+                    InputType.JoystickButton,
                     1,
                     True
                 ),
@@ -233,12 +232,12 @@ class MacroActionEditor(QtWidgets.QWidget):
 
         self.ui_elements["input_label"] = QtWidgets.QLabel("Input")
         self.ui_elements["input_button"] = \
-            gremlin.ui.common.NoKeyboardPushButton("Press Me")
+            gremlin.ui.ui_common.NoKeyboardPushButton("Press Me")
         self.ui_elements["input_button"].clicked.connect(
             lambda: self._request_user_input([
-                gremlin.common.InputType.JoystickAxis,
-                gremlin.common.InputType.JoystickButton,
-                gremlin.common.InputType.JoystickHat
+                InputType.JoystickAxis,
+                InputType.JoystickButton,
+                InputType.JoystickHat
             ])
         )
 
@@ -254,7 +253,7 @@ class MacroActionEditor(QtWidgets.QWidget):
             return
         self.ui_elements["key_label"] = QtWidgets.QLabel("Key")
         self.ui_elements["key_input"] = \
-            gremlin.ui.common.NoKeyboardPushButton(action.key.name)
+            gremlin.ui.ui_common.NoKeyboardPushButton(action.key.name)
         self.ui_elements["key_input"].clicked.connect(
             lambda: self._request_user_input([InputType.Keyboard])
         )
@@ -281,11 +280,11 @@ class MacroActionEditor(QtWidgets.QWidget):
 
         self.ui_elements["mouse_label"] = QtWidgets.QLabel("Button")
         self.ui_elements["mouse_input"] = \
-            gremlin.ui.common.NoKeyboardPushButton(
+            gremlin.ui.ui_common.NoKeyboardPushButton(
                 gremlin.common.MouseButton.to_string(action.button)
             )
         self.ui_elements["mouse_input"].clicked.connect(
-            lambda: self._request_user_input([gremlin.common.InputType.Mouse])
+            lambda: self._request_user_input([InputType.Mouse])
         )
         self.ui_elements["mouse_press"] = QtWidgets.QRadioButton("Press")
         self.ui_elements["mouse_release"] = QtWidgets.QRadioButton("Release")
@@ -353,7 +352,7 @@ class MacroActionEditor(QtWidgets.QWidget):
     def _pause_ui(self):
         """Creates and populates the PauseAction editor UI."""
         self.ui_elements["duration_label"] = QtWidgets.QLabel("Duration")
-        self.ui_elements["duration_spinbox"] = gremlin.ui.common.DynamicDoubleSpinBox()
+        self.ui_elements["duration_spinbox"] = gremlin.ui.ui_common.DynamicDoubleSpinBox()
         self.ui_elements["duration_spinbox"].setSingleStep(0.1)
         self.ui_elements["duration_spinbox"].setMaximum(3600)
 
@@ -361,7 +360,7 @@ class MacroActionEditor(QtWidgets.QWidget):
 
         self.ui_elements["duration_max_label"] = QtWidgets.QLabel("Max duration (0 to disable)")
 
-        self.ui_elements["duration_spinbox_max"] = gremlin.ui.common.DynamicDoubleSpinBox()
+        self.ui_elements["duration_spinbox_max"] = gremlin.ui.ui_common.DynamicDoubleSpinBox()
         self.ui_elements["duration_spinbox_max"].setSingleStep(0.1)
         self.ui_elements["duration_spinbox_max"].setMaximum(3600)
 
@@ -407,12 +406,12 @@ class MacroActionEditor(QtWidgets.QWidget):
             
             if not "vjoy_selector" in self.ui_elements:
                 # vJoy input selection
-                self.ui_elements["vjoy_selector"] = gremlin.ui.common.VJoySelector(
+                self.ui_elements["vjoy_selector"] = gremlin.ui.ui_common.VJoySelector(
                     self._modify_vjoy,
                     [
-                        gremlin.common.InputType.JoystickAxis,
-                        gremlin.common.InputType.JoystickButton,
-                        gremlin.common.InputType.JoystickHat
+                        InputType.JoystickAxis,
+                        InputType.JoystickButton,
+                        InputType.JoystickHat
                     ]
                 )
 
@@ -432,7 +431,7 @@ class MacroActionEditor(QtWidgets.QWidget):
 
 
             # Axis mode configuration
-            if action.input_type == gremlin.common.InputType.JoystickAxis:
+            if action.input_type == InputType.JoystickAxis:
                 if not "axis_type_layout" in self.ui_elements.keys():
                     self.ui_elements["axis_type_layout"] = QtWidgets.QHBoxLayout()
                     self.ui_elements["axis_reverse"] = QtWidgets.QCheckBox("Reverse")
@@ -467,10 +466,10 @@ class MacroActionEditor(QtWidgets.QWidget):
 
     def _create_joystick_inputs_ui(self, action):
         # Handle display of value based on the actual input type
-        if action.input_type == gremlin.common.InputType.JoystickAxis:
+        if action.input_type == InputType.JoystickAxis:
             if "axis_value" in self.ui_elements.keys():
                 self.ui_elements["axis_value"] = \
-                    gremlin.ui.common.DynamicDoubleSpinBox()
+                    gremlin.ui.ui_common.DynamicDoubleSpinBox()
                 self.ui_elements["axis_value"].setRange(-1.0, 1.0)
                 self.ui_elements["axis_value"].setSingleStep(0.1)
                 self.ui_elements["axis_value"].setDecimals(3)
@@ -481,7 +480,7 @@ class MacroActionEditor(QtWidgets.QWidget):
 
                 self.action_layout.addWidget(self.ui_elements["axis_value"])
 
-        elif action.input_type == gremlin.common.InputType.JoystickButton:
+        elif action.input_type == InputType.JoystickButton:
             if not "button_press" in self.ui_elements.keys():
                 self.ui_elements["button_press"] = QtWidgets.QRadioButton("Press")
                 self.ui_elements["button_release"] = QtWidgets.QRadioButton("Release")
@@ -499,7 +498,7 @@ class MacroActionEditor(QtWidgets.QWidget):
                 self.action_layout.addWidget(self.ui_elements["button_press"])
                 self.action_layout.addWidget(self.ui_elements["button_release"])
 
-        elif action.input_type == gremlin.common.InputType.JoystickHat:
+        elif action.input_type == InputType.JoystickHat:
             if not "hat_direction" in self.ui_elements.keys():
                 self.ui_elements["hat_direction"] = QtWidgets.QComboBox()
                 directions = [
@@ -620,14 +619,14 @@ class MacroActionEditor(QtWidgets.QWidget):
 
     def _request_user_input(self, input_types):
         """Prompts the user for the input to bind to this item."""
-        if gremlin.common.InputType.Keyboard in input_types:
+        if InputType.Keyboard in input_types:
             callback = self._modify_key
-        elif gremlin.common.InputType.Mouse in input_types:
+        elif InputType.Mouse in input_types:
             callback = self._modify_mouse
         else:
             callback = self._modify_joystick
 
-        self.button_press_dialog = gremlin.ui.common.InputListenerWidget(
+        self.button_press_dialog = gremlin.ui.ui_common.InputListenerWidget(
             callback,
             input_types,
             return_kb_event=True
@@ -661,7 +660,7 @@ class MacroActionEditor(QtWidgets.QWidget):
             self.index.row()
         )
         self._update_model()
-        gremlin.ui.common.clear_layout(self.action_layout)
+        gremlin.ui.ui_common.clear_layout(self.action_layout)
         self.ui_elements = {}
         self._joystick_ui()
 
@@ -673,14 +672,14 @@ class MacroActionEditor(QtWidgets.QWidget):
         self.model.get_entry(self.index.row()).key = \
             key_from_code(*event.identifier)
         self._update_model()
-        gremlin.ui.common.clear_layout(self.action_layout)
+        gremlin.ui.ui_common.clear_layout(self.action_layout)
         self.ui_elements = {}
         self._keyboard_ui()
 
     def _modify_mouse(self, event):
         self.model.get_entry(self.index.row()).button = event.identifier
         self._update_model()
-        gremlin.ui.common.clear_layout(self.action_layout)
+        gremlin.ui.ui_common.clear_layout(self.action_layout)
         self.ui_elements = {}
         self._mouse_button_ui()
 
@@ -698,7 +697,7 @@ class MacroActionEditor(QtWidgets.QWidget):
             action.value = (0, 0)
 
         self._update_model()
-        gremlin.ui.common.clear_layout(self.action_layout)
+        gremlin.ui.ui_common.clear_layout(self.action_layout)
         self.ui_elements = {}
         self._vjoy_ui()
 
@@ -725,11 +724,11 @@ class MacroListModel(QtCore.QAbstractListModel):
     
 
     value_format = {
-        gremlin.common.InputType.JoystickAxis:
+        InputType.JoystickAxis:
             lambda entry: f"{entry.value:.3f}",
-        gremlin.common.InputType.JoystickButton:
+        InputType.JoystickButton:
             lambda entry: "pressed" if entry.value else "released",
-        gremlin.common.InputType.JoystickHat:
+        InputType.JoystickHat:
             lambda entry: gremlin.common.direction_tuple_lookup[entry.value]
     }
 
@@ -739,7 +738,7 @@ class MacroListModel(QtCore.QAbstractListModel):
         :param parent parent widget
         """
         QtCore.QAbstractListModel.__init__(self, parent)
-        from gremlin.common import load_icon
+        from gremlin.util import load_icon
 
                   
         MacroListModel.icon_lookup =  {
@@ -1074,7 +1073,7 @@ class CountRepeatMacroWidget(AbstractRepeatMacroWidget):
         super().__init__(data, parent)
 
     def _create_ui(self):
-        self.delay = gremlin.ui.common.DynamicDoubleSpinBox()
+        self.delay = gremlin.ui.ui_common.DynamicDoubleSpinBox()
         self.delay.setMaximum(3600)
         self.delay.setSingleStep(0.1)
         self.delay.setValue(0.1)
@@ -1109,7 +1108,7 @@ class ToggleRepeatMacroWidget(AbstractRepeatMacroWidget):
         super().__init__(data, parent)
 
     def _create_ui(self):
-        self.delay = gremlin.ui.common.DynamicDoubleSpinBox()
+        self.delay = gremlin.ui.ui_common.DynamicDoubleSpinBox()
         self.delay.setMaximum(3600)
         self.delay.setSingleStep(0.1)
         self.delay.setValue(0.1)
@@ -1133,7 +1132,7 @@ class HoldRepeatMacroWidget(AbstractRepeatMacroWidget):
         super().__init__(data, parent)
 
     def _create_ui(self):
-        self.delay = gremlin.ui.common.DynamicDoubleSpinBox()
+        self.delay = gremlin.ui.ui_common.DynamicDoubleSpinBox()
         self.delay.setMaximum(3600)
         self.delay.setSingleStep(0.1)
         self.delay.setValue(0.1)
@@ -1272,7 +1271,7 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     """Widget which allows creating and editing of macros."""
 
-    from gremlin.common import get_icon_path
+    from gremlin.util import get_icon_path
 
     locked = False
 
@@ -1531,20 +1530,20 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _create_joystick_action(self, event):
         # Check whether or not to record a specific type of input
-        if event.event_type == gremlin.common.InputType.JoystickAxis and \
+        if event.event_type == InputType.JoystickAxis and \
                 not self.record_axis.isChecked():
             return
-        if event.event_type == gremlin.common.InputType.JoystickButton and \
+        if event.event_type == InputType.JoystickButton and \
                 not self.record_button.isChecked():
             return
-        if event.event_type == gremlin.common.InputType.JoystickHat and \
+        if event.event_type == InputType.JoystickHat and \
                 not self.record_hat.isChecked():
             return
 
         # If this is an axis motion do some checks such that we don't spam
         # the ui with entries
         add_new_entry = True
-        if event.event_type == gremlin.common.InputType.JoystickAxis:
+        if event.event_type == InputType.JoystickAxis:
             cur_index = self.list_view.currentIndex().row()
             entry = self.model.get_entry(cur_index)
 
@@ -1676,7 +1675,7 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._refresh_editor_ui()
 
 
-class MacroFunctor(AbstractFunctor):
+class MacroFunctor(gremlin.base_profile.AbstractFunctor):
 
     manager = gremlin.macro.MacroManager()
 
@@ -1698,7 +1697,7 @@ class MacroFunctor(AbstractFunctor):
         return True
 
 
-class Macro(AbstractAction):
+class Macro(gremlin.base_profile.AbstractAction):
 
     """Represents a macro action."""
 
@@ -1776,7 +1775,7 @@ class Macro(AbstractAction):
             if child.tag == "joystick":
                 joy_action = gremlin.macro.JoystickAction(
                     parse_guid(child.get("device-guid")),
-                    gremlin.common.InputType.to_enum(
+                    InputType.to_enum(
                         safe_read(child, "input-type")
                     ),
                     safe_read(child, "input-id", int),
@@ -1816,7 +1815,7 @@ class Macro(AbstractAction):
             elif child.tag == "vjoy":
                 vjoy_action = gremlin.macro.VJoyMacroAction(
                     safe_read(child, "vjoy-id", int),
-                    gremlin.common.InputType.to_enum(
+                    InputType.to_enum(
                         safe_read(child, "input-type")
                     ),
                     safe_read(child, "input-id", int),
@@ -1859,7 +1858,7 @@ class Macro(AbstractAction):
                 joy_node.set("device-guid", write_guid(entry.device_guid))
                 joy_node.set(
                     "input-type",
-                    gremlin.common.InputType.to_string(entry.input_type)
+                    InputType.to_string(entry.input_type)
                 )
                 joy_node.set("input-id", str(entry.input_id))
                 joy_node.set("value", self._joy_value_to_str(entry))
@@ -1891,7 +1890,7 @@ class Macro(AbstractAction):
                 vjoy_node.set("vjoy-id", str(entry.vjoy_id))
                 vjoy_node.set(
                     "input-type",
-                    gremlin.common.InputType.to_string(entry.input_type)
+                    InputType.to_string(entry.input_type)
                 )
                 vjoy_node.set("input-id", str(entry.input_id))
                 vjoy_node.set("value", self._joy_value_to_str(entry))

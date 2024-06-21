@@ -80,7 +80,7 @@ class InputItemData:
 
         # If it's not a hat we have one input name and each description element
         # on a line of its own
-        if self.input_item.input_type != gremlin.common.InputType.JoystickHat:
+        if self.input_item.input_type != InputType.JoystickHat:
             additional_desc = ""
             for c_descs in container_desc:
                 for a_desc in c_descs:
@@ -213,7 +213,7 @@ def sort_data(data):
     """
     sorted_data = []
 
-    for input_type in gremlin.common.InputType:
+    for input_type in InputType:
         for key, value in sorted(data.items(), key=lambda x: x[0][1]):
             if input_type == key[0]:
                 sorted_data.append(
@@ -395,13 +395,13 @@ def format_input_name(input_type, identifier):
     :return formatted string of the provided input
     """
     type_map = {
-        gremlin.common.InputType.JoystickAxis: "Axis",
-        gremlin.common.InputType.JoystickButton: "Button",
-        gremlin.common.InputType.JoystickHat: "Hat",
-        gremlin.common.InputType.Keyboard: "Key",
+        InputType.JoystickAxis: "Axis",
+        InputType.JoystickButton: "Button",
+        InputType.JoystickHat: "Hat",
+        InputType.Keyboard: "Key",
     }
 
-    if input_type == gremlin.common.InputType.Keyboard:
+    if input_type == InputType.Keyboard:
         return key_from_code(identifier[0], identifier[1]).name
     else:
         return f"{type_map[input_type]} {identifier}"

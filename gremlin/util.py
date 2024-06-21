@@ -26,8 +26,10 @@ import threading
 import time
 import distutils
 import shutil
+import uuid
+import dinput
 
-from PySide6 import QtCore, QtWidgets
+from PySide6 import QtCore, QtWidgets, QtGui
 from win32api import GetFileVersionInfo, LOWORD, HIWORD
 
 
@@ -487,7 +489,372 @@ def grouped(iterable, n):
     ''' returns n items for a given iterable item '''
     return zip(*[iter(iterable)]*n)
 
-def get_guid():
-    ''' generates a GUID '''
+def get_guid(strip=True):
+    ''' generates a reasonably lowercase unique guid string '''
     import uuid
-    return uuid.uuid4()
+    guid = f"{uuid.uuid4()}"
+    if strip:
+        return guid.replace("-",'')
+    return guid
+    
+
+
+def find_file(icon_path):
+    ''' finds a file '''
+
+
+    from pathlib import Path
+    from gremlin.util import get_root_path
+    from gremlin.config import Configuration
+    verbose = Configuration().verbose
+
+    icon_path = icon_path.lower().replace("/",os.sep)
+    sub_folders = None
+    folders = []
+
+    root_folder = get_root_path()
+    if os.sep in icon_path:
+        # we have folders
+        splits = icon_path.split(os.sep)
+        folders = splits[:-1]
+        icon_path = splits[-1]
+        sub_folders = os.path.join("", *folders)
+
+    files = []
+    if not os.path.isfile(icon_path):
+        # path not found 
+        file_root, ext = os.path.splitext(icon_path)
+        if ext:
+            extensions = [ext]
+        else:
+            extensions = [".svg",".png"]
+        circuit_breaker = 1000
+        for dirpath, _, filenames in os.walk(root_folder):
+            circuit_breaker-=1
+            if circuit_breaker == 0:
+                break
+            if sub_folders and not dirpath.endswith(sub_folders):
+                continue
+            for filename in [f.lower() for f in filenames]:
+                for ext in extensions:
+                    if filename.endswith(ext) and filename.startswith(file_root):
+                        files.append(os.path.join(dirpath, filename))
+                    
+    if files:
+        files.sort(key = lambda x: len(x)) # shortest to largest
+        found_path = files.pop(0) # grab the first one
+        if verbose:
+            logging.getLogger("system").info(f"Find_files() - found : {found_path} for {icon_path}")
+        return found_path
+    
+    if circuit_breaker == 0:
+        logging.getLogger("system").error(f"Find_files() - search exceeded maximum when searching for: {icon_path}")
+    
+    if verbose or circuit_breaker == 0:
+        logging.getLogger("system").error(f"Find_files() failed for: {icon_path}")
+    return None
+
+
+
+
+def get_icon_path(*paths):
+        ''' 
+        gets an icon path
+           
+        '''
+
+        from gremlin.util import get_root_path
+        from gremlin.config import Configuration
+        verbose = Configuration().verbose
+        
+
+
+        # be aware of runtime environment
+        root_path = get_root_path()
+        try:
+            the_path = os.path.join(*paths)
+        except:
+            # no path provided
+            return None
+        icon_file = os.path.join(root_path, the_path).replace("/",os.sep).lower()
+        if icon_file:
+            if os.path.isfile(icon_file):
+                if verbose:
+                    logging.getLogger("system").info(f"Icon file (straight) found: {icon_file}")        
+                return icon_file
+            if not icon_file.endswith(".png"):
+                icon_file_png = icon_file + ".png"
+                if os.path.isfile(icon_file_png):
+                    if verbose:
+                        logging.getLogger("system").info(f"Icon file (png) found: {icon_file_png}")        
+                    return icon_file_png
+            if not icon_file.endswith(".svg"):
+                icon_file_svg = icon_file + ".svg"
+                if os.path.isfile(icon_file_svg):
+                    if verbose:
+                        logging.getLogger("system").info(f"Icon file (svg) found: {icon_file_svg}")        
+                    return icon_file_svg
+            brute_force = find_file(the_path)
+            if brute_force and os.path.isfile(brute_force):
+                return brute_force
+        
+        logging.getLogger("system").error(f"Icon file not found: {icon_file}")
+    
+        return None
+
+def load_pixmap(*paths):
+    ''' gets a pixmap from the path '''
+    the_path = get_icon_path(*paths)
+    if the_path:
+        pixmap = QtGui.QPixmap(the_path)
+        if pixmap.isNull():
+            logging.getLogger("system").warning(f"load_pixmap(): pixmap failed: {the_path}")
+            return None
+        return pixmap
+    
+    logging.getLogger("system").error(f"load_pixmap(): invalid path")
+    return None
+
+def load_icon(*paths):
+    ''' gets an icon (returns a QIcon) '''
+    from gremlin.config import Configuration
+    verbose = Configuration().verbose
+    pixmap = load_pixmap(*paths)
+    if not pixmap or pixmap.isNull():
+        if verbose:
+            logging.getLogger("system").info(f"LoadIcon() using generic icon - failed to locate: {paths}")        
+        return get_generic_icon()
+    icon = QtGui.QIcon()
+    icon.addPixmap(pixmap, QtGui.QIcon.Normal)
+    if verbose:
+        logging.getLogger("system").info(f"LoadIcon() found icon: {paths}") 
+    return icon
+
+def load_image(*paths):
+    ''' loads an image '''
+    from gremlin.config import Configuration
+    verbose = Configuration().verbose
+    the_path = get_icon_path(*paths)
+    if the_path:
+        if verbose:
+            logging.getLogger("system").info(f"LoadImage() found image: {paths}") 
+        return QtGui.QImage(the_path)
+    if verbose:
+            logging.getLogger("system").info(f"LoadImage() failed to locate: {paths}")        
+    return None
+        
+    
+        
+
+def get_generic_icon():
+    ''' gets a generic icon'''
+    from gremlin.util import get_root_path
+    root_path = get_root_path()
+    generic_icon = os.path.join(root_path, "gfx/generic.png")
+    if generic_icon and os.path.isfile(generic_icon):
+        pixmap = QtGui.QPixmap(generic_icon)
+        if pixmap.isNull():
+            logging.getLogger("system").warning(f"load_icon(): generic pixmap failed: {generic_icon}")
+            return None
+        icon = QtGui.QIcon()
+        icon.addPixmap(pixmap, QtGui.QIcon.Normal)
+        return icon
+    logging.getLogger("system").warning(f"load_icon(): generic icon file not found: {generic_icon}")
+    return None
+
+
+
+def write_guid(guid):
+    """Returns the string representation of a GUID object.
+
+    :param guid the GUID object to turn into a string
+    :return string representation of the guid object
+    """
+    return str(guid)
+
+
+def safe_read(node, key, type_cast=None, default_value=None):
+    """Safely reads an attribute from an XML node.
+
+    If the attempt at reading the attribute fails, due to the attribute not
+    being present, an exception will be thrown.
+
+    :param node the XML node from which to read an attribute
+    :param key the attribute to read
+    :param type_cast the type to which to cast the read value, if specified
+    :param default_value value to return in case the key is not present
+    :return the value stored in the node with the given key
+    """
+    # Attempt to read the value and if present use the provided default value
+    # in case reading fails
+    value = default_value
+    if key not in node.keys():
+        if default_value is None:
+            msg = f"Attempted to read attribute '{key}' which does not exist."
+            logging.getLogger("system").error(msg)
+            raise error.ProfileError(msg)
+    else:
+        value = node.get(key)
+
+    if type_cast is not None:
+        try:
+            if type_cast == bool and isinstance(value,str):
+                    value = value.strip().lower()
+                    value = value == "true"
+            else:
+                value = type_cast(value)
+        except ValueError:
+            msg = f"Failed casting '{value}' to type '{str(type_cast)}'"
+            logging.getLogger("system").error(msg)
+            raise error.ProfileError(msg)
+    return value
+
+
+def safe_format(value, data_type, formatter=str):
+    """Returns a formatted value ensuring type correctness.
+
+    This function ensures that the value being formatted is of correct type
+    before attempting formatting. Raises an exception on non-matching data
+    types.
+
+    :param value the value to format
+    :param data_type expected data type of the value
+    :param formatter function to format value with
+    :return value formatted according to formatter
+    """
+    if isinstance(value, data_type):
+        return formatter(value)
+    else:
+        raise error.ProfileError(
+            f"Value \"{value}\" has type {type(value)} when {data_type} is expected"
+        )
+
+
+
+def parse_guid(value):
+    """Reads a string GUID representation into the internal data format.
+
+    This transforms a GUID of the form {B4CA5720-11D0-11E9-8002-444553540000}
+    into the underlying raw and exposed objects used within Gremlin.
+
+    :param value the string representation of the GUID
+    :param dinput.GUID object representing the provided value
+    """
+    try:
+        tmp = uuid.UUID(value)
+        raw_guid = dinput._GUID()
+        raw_guid.Data1 = int.from_bytes(tmp.bytes[0:4], "big")
+        raw_guid.Data2 = int.from_bytes(tmp.bytes[4:6], "big")
+        raw_guid.Data3 = int.from_bytes(tmp.bytes[6:8], "big")
+        for i in range(8):
+            raw_guid.Data4[i] = tmp.bytes[8 + i]
+
+        return dinput.GUID(raw_guid)
+    except (ValueError, AttributeError) as e:
+        raise error.ProfileError(
+            f"Failed parsing GUID from value {value}"
+        )
+
+
+def parse_bool(value, default_value=False):
+    """Returns the boolean representation of the provided value.
+
+    :param value the value as string to parse
+    :param default_value value to return in case no valid value was provided
+    :return representation of value as either True or False
+    """
+    # Terminate early if the value is None to start with, i.e. we know it will
+    # fail
+    if value is None:
+        return default_value
+
+    # Attempt to parse the value
+    try:
+        if value.isnumeric():
+            int_value = int(value)
+            if int_value in [0, 1]:
+                return int_value == 1
+            else:
+                raise error.ProfileError(
+                    f"Invalid bool value used: {value}"
+                )
+        else:
+            value = value.lower()
+            if value in ["true", "false"]:
+                return value == "true"
+            else: 
+                raise error.ProfileError(
+                    f"Invalid bool value used: {value}"
+                )
+    except ValueError:
+        value = value.lower()
+        if value in ["true", "false"]:
+            return value == "true"
+        else:
+            raise error.ProfileError(
+                f"Invalid bool value used: {value}"
+            )
+    except TypeError:
+        raise error.ProfileError(
+            f"Invalid type provided: {type(value)}"
+        )
+
+def read_guid(node, key, default_value = None):
+    ''' reads a GUID '''
+    try:
+        s_guid = node.get(key)
+        return uuid.UUID(s_guid)
+    except:
+        return default_value
+    
+
+def read_bool(node, key, default_value=False):
+    """Attempts to read a boolean value.
+
+    If there is an error when reading the given field from the node
+    the default value is returned instead.
+
+    :param node the node from which to read the value
+    :param key the key to read from the node
+    :param default_value the default value to return in case of errors
+    """
+    try:
+        return parse_bool(node.get(key), default_value)
+    except error.ProfileError:
+        return default_value
+
+def byte_string_to_list(value : str) -> list:
+    ''' converts a text string of sequential bytes separated by a space'''
+    tokens = value.split()
+    data = []
+    for token in tokens:
+        try:
+            value = int(token, 16) # expecting a hexadecimal number
+            data.append(value)
+        except:
+            raise ValueError(f"Unable to convert byte string to list, offending value: {token}")
+    
+    return data
+
+def byte_list_to_string(data, as_hex = True):
+    ''' converts a byte list to a string '''
+    result = ''
+    for value in data:
+        if as_hex:
+            result += f"{value:02x} "
+        else:
+            result += f"{value} "
+
+    # strip the last space
+    result = result[:-1]
+    return result
+
+def scale_to_gremlin(value, r_min, r_max):
+    ''' scales a value to an axis value of -1 to +1
+    
+    value: the value to scale
+    r_min: the value's min range 
+    r_max: the value's max range
+    
+    '''
+    return r_min + (value + 1.0)*((r_max - r_min)/2.0)

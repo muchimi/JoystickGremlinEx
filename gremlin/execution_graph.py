@@ -21,10 +21,16 @@ import copy
 import logging
 import time
 
-from gremlin import actions, base_classes, common, error, plugin_manager
+import gremlin.base_buttons
+import gremlin.base_classes
+import gremlin.base_profile
+from gremlin.input_types import InputType
+import gremlin.actions
+import gremlin.error
+import gremlin.plugin_manager
+import gremlin.base_conditions
 
 
-CallbackData = namedtuple("ContainerCallback", ["callback", "event"])
 
 
 class ContainerCallback:
@@ -50,24 +56,24 @@ class ContainerCallback:
         execution graph until every entry has run or it is aborted.
         """
         if event.event_type in [
-            common.InputType.JoystickAxis,
-            common.InputType.JoystickHat
+            InputType.JoystickAxis,
+            InputType.JoystickHat
         ]:
-            value = actions.Value(event.value)
+            value = gremlin.actions.Value(event.value)
         elif event.event_type in [
-            common.InputType.JoystickButton,
-            common.InputType.Keyboard,
-            common.InputType.VirtualButton
+            InputType.JoystickButton,
+            InputType.Keyboard,
+            InputType.VirtualButton
         ]:
-            value = actions.Value(event.is_pressed)
+            value = gremlin.actions.Value(event.is_pressed)
         else:
-            raise error.GremlinError("Invalid event type")
+            raise gremlin.error.GremlinError("Invalid event type")
 
         # Containers representing a virtual button get their individual
         # value instance, all others share one to propagate changes across
         shared_value = copy.deepcopy(value)
 
-        if event == common.InputType.VirtualButton:
+        if event == InputType.VirtualButton:
             # TODO: remove this at a future stage
             logging.getLogger("system").error(
                 "Virtual button code path being used"
@@ -94,7 +100,7 @@ class VirtualButtonCallback:
         """
         self._execution_graph.process_event(
             event,
-            actions.Value(event.is_pressed)
+            gremlin.actions.Value(event.is_pressed)
         )
 
 
@@ -110,18 +116,18 @@ class VirtualButtonProcess:
         """
         self.virtual_button = None
 
-        if isinstance(data, base_classes.VirtualAxisButton):
-            self.virtual_button = actions.AxisButton(
+        if isinstance(data, gremlin.base_buttons.VirtualAxisButton):
+            self.virtual_button = gremlin.actions.AxisButton(
                 data.lower_limit,
                 data.upper_limit,
                 data.direction
             )
-        elif isinstance(data, base_classes.VirtualHatButton):
-            self.virtual_button = actions.HatButton(
+        elif isinstance(data, gremlin.base_buttons.VirtualHatButton):
+            self.virtual_button = gremlin.actions.HatButton(
                 data.directions
             )
         else:
-            raise error.GremlinError("Invalid virtual button data provided")
+            raise gremlin.error.GremlinError("Invalid virtual button data provided")
 
     def __call__(self, event):
         """Processes the provided event through the virtual button instance.
@@ -174,7 +180,7 @@ class AbstractExecutionGraph(metaclass=ABCMeta):
 
             result = functor.process_event(event, value)
 
-            if isinstance(functor, actions.AxisButton):
+            if isinstance(functor, gremlin.actions.AxisButton):
                 process_again = functor.forced_activation
 
             self.current_index = self.transitions.get(
@@ -203,30 +209,30 @@ class AbstractExecutionGraph(metaclass=ABCMeta):
         """
         conditions = []
         for condition in activation_condition.conditions:
-            if isinstance(condition, base_classes.KeyboardCondition):
+            if isinstance(condition, gremlin.base_conditions.KeyboardCondition):
                 conditions.append(
-                    actions.KeyboardCondition(
+                    gremlin.actions.KeyboardCondition(
                         condition.scan_code,
                         condition.is_extended,
                         condition.comparison
                     )
                 )
-            elif isinstance(condition, base_classes.JoystickCondition):
+            elif isinstance(condition, gremlin.base_conditions.JoystickCondition):
                 conditions.append(
-                    actions.JoystickCondition(condition)
+                    gremlin.actions.JoystickCondition(condition)
                 )
-            elif isinstance(condition, base_classes.VJoyCondition):
+            elif isinstance(condition, gremlin.base_conditions.VJoyCondition):
                 conditions.append(
-                    actions.VJoyCondition(condition)
+                    gremlin.actions.VJoyCondition(condition)
                 )
-            elif isinstance(condition, base_classes.InputActionCondition):
+            elif isinstance(condition, gremlin.base_conditions.InputActionCondition):
                 conditions.append(
-                    actions.InputActionCondition(condition.comparison)
+                    gremlin.actions.InputActionCondition(condition.comparison)
                 )
             else:
-                raise error.GremlinError("Invalid condition provided")
+                raise gremlin.error.GremlinError("Invalid condition provided")
 
-        return actions.ActivationCondition(
+        return gremlin.actions.ActivationCondition(
             conditions,
             activation_condition.rule
         )
@@ -240,7 +246,7 @@ class AbstractExecutionGraph(metaclass=ABCMeta):
         """
         if activation_condition:
             return any([
-                isinstance(cond, base_classes.InputActionCondition)
+                isinstance(cond, gremlin.base_conditions.InputActionCondition)
                 for cond in activation_condition.conditions
             ])
         else:
@@ -282,7 +288,7 @@ class ContainerExecutionGraph(AbstractExecutionGraph):
         :param container the container data from which to generate the
             execution graph
         """
-        assert isinstance(container, base_classes.AbstractContainer)
+        assert isinstance(container, gremlin.base_profile.AbstractContainer)
         super().__init__(container)
 
     def _build_graph(self, container):
@@ -305,7 +311,7 @@ class ContainerExecutionGraph(AbstractExecutionGraph):
             sequence.append("Condition")
 
         functor = container.functor(container)
-        container_plugins = plugin_manager.ContainerPlugins()
+        container_plugins = gremlin.plugin_manager.ContainerPlugins()
         container_plugins.register_functor(functor)
         self.functors.append(functor)
         
@@ -384,13 +390,13 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
             )
 
             if add_default_activation and not has_input_action:
-                condition = base_classes.InputActionCondition()
+                condition = gremlin.base_conditions.InputActionCondition()
                 condition.comparison = ActionSetExecutionGraph.comparison_map[
                     action.default_button_activation
                 ]
-                activation_condition = base_classes.ActivationCondition(
+                activation_condition = gremlin.base_conditions.ActivationCondition(
                     [condition],
-                    base_classes.ActivationRule.All
+                    gremlin.base_conditions.ActivationRule.All
                 )
                 self.functors.append(
                     self._create_activation_condition(activation_condition)

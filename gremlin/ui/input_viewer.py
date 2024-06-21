@@ -23,7 +23,7 @@ from PySide6 import QtCore, QtGui, QtWidgets
 import dinput
 
 import gremlin
-from . import common
+from . import ui_common
 
 
 class VisualizationType(enum.Enum):
@@ -98,7 +98,7 @@ class VisualizationSelector(QtWidgets.QWidget):
             )
 
 
-class InputViewerUi(common.BaseDialogUi):
+class InputViewerUi(ui_common.BaseDialogUi):
 
     """Main UI dialog for the input viewer."""
 
@@ -312,7 +312,7 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
         if self.device_guid != event.device_guid:
             return
 
-        if event.event_type == gremlin.common.InputType.JoystickAxis:
+        if event.event_type == InputType.JoystickAxis:
             for widget in self.widgets:
                 widget.add_point(event.value, event.identifier)
 
@@ -380,7 +380,7 @@ class ButtonState(QtWidgets.QGroupBox):
 
         :param event the event with which to update the state display
         """
-        if event.event_type == gremlin.common.InputType.JoystickButton:
+        if event.event_type == InputType.JoystickButton:
             state = event.is_pressed if event.is_pressed is not None else False
             self.buttons[event.identifier].setDown(state)
             self._event_times[event.identifier] = time.time()
@@ -419,7 +419,7 @@ class HatState(QtWidgets.QGroupBox):
 
         :param event the event with which to update the state display
         """
-        if event.event_type == gremlin.common.InputType.JoystickHat:
+        if event.event_type == InputType.JoystickHat:
             self.hats[event.identifier].set_angle(event.value)
             self._event_times[event.identifier] = time.time()
 
@@ -507,7 +507,7 @@ class AxesCurrentState(QtWidgets.QGroupBox):
 
         :param event the event with which to update the state display
         """
-        if event.event_type == gremlin.common.InputType.JoystickAxis:
+        if event.event_type == InputType.JoystickAxis:
             axis_id = gremlin.joystick_handling.linear_axis_index(
                 self.device.axis_map,
                 event.identifier

@@ -21,16 +21,16 @@ import threading
 import time
 from xml.etree import ElementTree
 
-from gremlin.common import load_icon
+from gremlin.util import load_icon
 from PySide6 import QtWidgets
 
 from gremlin.base_classes import InputActionCondition
-from gremlin.common import InputType
+from gremlin.input_types import InputType
 from gremlin import input_devices, joystick_handling, util
 from gremlin.error import ProfileError
 import gremlin.plugin_manager
 from gremlin.profile import safe_format, safe_read
-import gremlin.ui.common
+import gremlin.ui.ui_common
 import gremlin.ui.input_item
 import os
 from gremlin.util import *
@@ -92,7 +92,7 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
                 InputType.JoystickHat
             ]
         }
-        self.vjoy_selector = gremlin.ui.common.VJoySelector(
+        self.vjoy_selector = gremlin.ui.ui_common.VJoySelector(
             lambda x: self.save_changes(),
             input_types[self._get_input_type()],
             self.action_data.get_settings().vjoy_as_input
@@ -109,7 +109,7 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.absolute_checkbox = QtWidgets.QRadioButton("Absolute")
             self.absolute_checkbox.setChecked(True)
             self.relative_checkbox = QtWidgets.QRadioButton("Relative")
-            self.relative_scaling = gremlin.ui.common.DynamicDoubleSpinBox()
+            self.relative_scaling = gremlin.ui.ui_common.DynamicDoubleSpinBox()
 
             self.remap_type_layout.addStretch()
             self.remap_type_layout.addWidget(self.absolute_checkbox)
@@ -318,7 +318,7 @@ class RemapFunctor(gremlin.base_classes.AbstractFunctor):
         return needs_auto_release
 
 
-class Remap(gremlin.base_classes.AbstractAction):
+class Remap(gremlin.base_profile.AbstractAction):
 
     """Action remapping physical joystick inputs to vJoy inputs."""
 

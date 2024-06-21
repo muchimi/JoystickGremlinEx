@@ -24,6 +24,7 @@ import dinput
 from . import common, error, util
 from vjoy import vjoy
 from dinput import DeviceSummary
+from gremlin.input_types import InputType
 
 
 # List of all joystick devices
@@ -106,7 +107,7 @@ def select_first_valid_vjoy_input(valid_types):
     Parameters
     ==========
     valid_types : list
-        List of common.InputType values that are valid type to be returned
+        List of InputType values that are valid type to be returned
 
     Return
     ======
@@ -114,22 +115,22 @@ def select_first_valid_vjoy_input(valid_types):
         Dictionary containing the information about the selected vJoy input
     """
     for dev in vjoy_devices():
-        if common.InputType.JoystickAxis in valid_types and dev.axis_count > 0:
+        if InputType.JoystickAxis in valid_types and dev.axis_count > 0:
             return {
                 "device_id": dev.vjoy_id,
-                "input_type": common.InputType.JoystickAxis,
+                "input_type": InputType.JoystickAxis,
                 "input_id": dev.axis_map[0].axis_index
             }
-        elif common.InputType.JoystickButton in valid_types and dev.button_count > 0:
+        elif InputType.JoystickButton in valid_types and dev.button_count > 0:
             return {
                 "device_id": dev.vjoy_id,
-                "input_type": common.InputType.JoystickButton,
+                "input_type": InputType.JoystickButton,
                 "input_id": 1
             }
-        elif common.InputType.JoystickHat in valid_types and dev.hat_count > 0:
+        elif InputType.JoystickHat in valid_types and dev.hat_count > 0:
             return {
                 "device_id": dev.vjoy_id,
-                "input_type": common.InputType.JoystickHat,
+                "input_type": InputType.JoystickHat,
                 "input_id": 1
             }
     return None

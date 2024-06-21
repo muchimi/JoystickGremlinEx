@@ -20,8 +20,8 @@ import os
 from PySide6 import QtWidgets
 from xml.etree import ElementTree
 
-from gremlin.base_classes import AbstractAction, AbstractFunctor
-from gremlin.common import InputType
+import gremlin.base_profile
+from gremlin.input_types import InputType
 import gremlin.ui.input_item
 
 
@@ -41,7 +41,7 @@ class PauseActionWidget(gremlin.ui.input_item.AbstractActionWidget):
         pass
 
 
-class PauseActionFunctor(AbstractFunctor):
+class PauseActionFunctor(gremlin.base_profile.AbstractFunctor):
 
     def __init__(self, action):
         super().__init__(action)
@@ -51,7 +51,7 @@ class PauseActionFunctor(AbstractFunctor):
         return True
 
 
-class PauseAction(AbstractAction):
+class PauseAction(gremlin.base_profile.AbstractAction):
 
     """Action for pausing the execution of callbacks."""
 

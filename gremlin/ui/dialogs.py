@@ -31,12 +31,12 @@ from gremlin.clipboard import Clipboard
 import gremlin.config
 import gremlin.joystick_handling
 from joystick_gremlin import GremlinUi
-from . import common, ui_about
-from gremlin.common import load_icon
+from . import ui_about, ui_common
+from gremlin.util import load_icon
 import logging
 
 
-class OptionsUi(common.BaseDialogUi):
+class OptionsUi(ui_common.BaseDialogUi):
 
     """UI allowing the configuration of a variety of options."""
 
@@ -191,7 +191,7 @@ class OptionsUi(common.BaseDialogUi):
         self.macro_axis_polling_layout = QtWidgets.QHBoxLayout()
         self.macro_axis_polling_label = \
             QtWidgets.QLabel("Macro axis polling rate")
-        self.macro_axis_polling_value = common.DynamicDoubleSpinBox()
+        self.macro_axis_polling_value = ui_common.DynamicDoubleSpinBox()
         self.macro_axis_polling_value.setRange(0.001, 1.0)
         self.macro_axis_polling_value.setSingleStep(0.05)
         self.macro_axis_polling_value.setDecimals(3)
@@ -209,7 +209,7 @@ class OptionsUi(common.BaseDialogUi):
         self.macro_axis_minimum_change_layout = QtWidgets.QHBoxLayout()
         self.macro_axis_minimum_change_label = \
             QtWidgets.QLabel("Macro axis minimum change value")
-        self.macro_axis_minimum_change_value = common.DynamicDoubleSpinBox()
+        self.macro_axis_minimum_change_value = ui_common.DynamicDoubleSpinBox()
         self.macro_axis_minimum_change_value.setRange(0.00001, 1.0)
         self.macro_axis_minimum_change_value.setSingleStep(0.01)
         self.macro_axis_minimum_change_value.setDecimals(5)
@@ -699,7 +699,7 @@ If this option is on, the last active profile will remain active until a differe
             hg.remove_device(device.vendor_id, device.product_id)
 
 
-class ProcessWindow(common.BaseDialogUi):
+class ProcessWindow(ui_common.BaseDialogUi):
 
     """Displays active processes in a window for the user to select."""
 
@@ -739,7 +739,7 @@ class ProcessWindow(common.BaseDialogUi):
         self.close()
 
 
-class LogWindowUi(common.BaseDialogUi):
+class LogWindowUi(ui_common.BaseDialogUi):
 
     """Window displaying log file content."""
 
@@ -826,7 +826,7 @@ class LogWindowUi(common.BaseDialogUi):
         )
 
 
-class AboutUi(common.BaseDialogUi):
+class AboutUi(ui_common.BaseDialogUi):
 
     """Widget which displays information about the application."""
 
@@ -866,7 +866,7 @@ class AboutUi(common.BaseDialogUi):
         self.ui.third_party_licenses.setHtml(third_party_licenses)
 
 
-class ModeManagerUi(common.BaseDialogUi):
+class ModeManagerUi(ui_common.BaseDialogUi):
 
     """Enables the creation of modes and configuring their inheritance."""
 
@@ -944,7 +944,7 @@ class ModeManagerUi(common.BaseDialogUi):
     def _populate_mode_layout(self):
         """Generates the mode layout UI displaying the different modes."""
         # Clear potentially existing content
-        common.clear_layout(self.mode_layout)
+        ui_common.clear_layout(self.mode_layout)
         self.mode_dropdowns = {}
         self.mode_rename = {}
         self.mode_delete = {}
@@ -1155,7 +1155,7 @@ class ModeManagerUi(common.BaseDialogUi):
             self._populate_mode_layout()
 
 
-class DeviceInformationUi(common.BaseDialogUi):
+class DeviceInformationUi(ui_common.BaseDialogUi):
 
     """Widget which displays information about all connected joystick
     devices."""
@@ -1354,7 +1354,7 @@ class DeviceInformationUi(common.BaseDialogUi):
 
 
 
-class SwapDevicesUi(common.BaseDialogUi):
+class SwapDevicesUi(ui_common.BaseDialogUi):
 
     """UI Widget that allows users to swap identical devices."""
 
@@ -1375,7 +1375,7 @@ class SwapDevicesUi(common.BaseDialogUi):
 
     def _create_swap_ui(self):
         """Displays possible groups of swappable devices."""
-        common.clear_layout(self.main_layout)
+        ui_common.clear_layout(self.main_layout)
 
         profile_modifier = gremlin.profile.ProfileModifier(self.profile)
         device_list = profile_modifier.device_information_list()
@@ -1446,12 +1446,12 @@ class SwapDevicesUi(common.BaseDialogUi):
 
         :param callback function to call with the accepted input
         """
-        self.input_dialog = common.InputListenerWidget(
+        self.input_dialog = ui_common.InputListenerWidget(
             callback,
             [
-                gremlin.common.InputType.JoystickAxis,
-                gremlin.common.InputType.JoystickButton,
-                gremlin.common.InputType.JoystickHat
+                InputType.JoystickAxis,
+                InputType.JoystickButton,
+                InputType.JoystickHat
             ],
             return_kb_event=False,
             multi_keys=False

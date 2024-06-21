@@ -20,12 +20,12 @@ import os
 from xml.etree import ElementTree
 
 from PySide6 import QtWidgets, QtCore, QtGui
+import gremlin.base_profile
 
-from gremlin.base_classes import AbstractAction, AbstractFunctor
-from gremlin.common import InputType
+from gremlin.input_types import InputType
 from gremlin.input_devices import ButtonReleaseActions
 import gremlin.macro
-import gremlin.ui.common
+import gremlin.ui.ui_common
 import gremlin.ui.input_item
 import enum
 from gremlin.profile import safe_format, safe_read
@@ -201,7 +201,7 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _record_keys_cb(self):
         """Prompts the user to press the desired key combination."""
-        self.button_press_dialog = gremlin.ui.common.InputListenerWidget(
+        self.button_press_dialog = gremlin.ui.ui_common.InputListenerWidget(
             self._update_keys,
             [InputType.Keyboard],
             return_kb_event=False,
@@ -223,7 +223,7 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.button_press_dialog.show()
 
 
-class MapToKeyboardExFunctor(AbstractFunctor):
+class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
 
     def __init__(self, action):
         super().__init__(action)
@@ -298,7 +298,7 @@ class MapToKeyboardExMode(enum.Enum):
     Release = 2 # keyboard release only
     Hold = 3 # press while held (default Gremlin behavior)
 
-class MapToKeyboardEx(AbstractAction):
+class MapToKeyboardEx(gremlin.base_profile.AbstractAction):
 
     """Action data for the map to keyboard action.
 

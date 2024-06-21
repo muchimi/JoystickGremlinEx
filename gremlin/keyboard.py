@@ -23,10 +23,6 @@ from ctypes import wintypes
 import win32api
 import win32con
 
-import gremlin
-from gremlin import input_devices
-
-
 
 
 def _create_function(lib_name, fn_name, param_types, return_type):
@@ -199,8 +195,9 @@ class Key:
 
     @lookup_name.setter
     def lookup_name(self, name):
+        from gremlin import error
         if self._lookup_name is not None:
-            raise gremlin.error.KeyboardError("Setting lookup name repeatedly")
+            raise error.KeyboardError("Setting lookup name repeatedly")
         self._lookup_name = name
 
     def __eq__(self, other):
@@ -392,7 +389,7 @@ def send_key_down(key):
     """
     flags = win32con.KEYEVENTF_EXTENDEDKEY if key.is_extended else 0
 
-    
+    from gremlin import input_devices
     (is_local, is_remote) = input_devices.remote_state.state
     if is_local:
         win32api.keybd_event(key.virtual_code, key.scan_code, flags, 0)
@@ -405,6 +402,8 @@ def send_key_up(key):
 
     :param key the key for which to send the KEYUP event
     """
+
+    from gremlin import input_devices
     flags = win32con.KEYEVENTF_EXTENDEDKEY if key.is_extended else 0
     flags |= win32con.KEYEVENTF_KEYUP
 
@@ -425,6 +424,7 @@ def key_from_name(name, validate = False):
     :return Key instance or None
     """
     global g_scan_code_to_key, g_name_to_key
+    from gremlin import error
 
     # Attempt to located the key in our database and return it if successful
     key_name = name.lower().replace(" ", "")
@@ -442,7 +442,7 @@ def key_from_name(name, validate = False):
         logging.getLogger("system").warning(
             f"Invalid key name specified \"{name}\""
         )
-        raise gremlin.error.KeyboardError(
+        raise error.KeyboardError(
             f"Invalid key specified, {name}"
         )
     else:
@@ -476,6 +476,8 @@ def key_from_code(scan_code, is_extended):
     :return Key instance or None
     """
     global g_scan_code_to_key, g_name_to_key
+    from gremlin import error
+
 
     # Attempt to located the key in our database and return it if successful
     key = g_scan_code_to_key.get((scan_code, is_extended), None)
@@ -490,7 +492,7 @@ def key_from_code(scan_code, is_extended):
         logging.getLogger("system").warning(
             f"Invalid scan code specified ({scan_code}, {is_extended})"
         )
-        raise gremlin.error.KeyboardError(
+        raise error.KeyboardError(
             f"Invalid scan code specified ({scan_code}, {is_extended})"
         )
     else:

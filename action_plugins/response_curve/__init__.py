@@ -24,9 +24,9 @@ from PySide6 import QtCore, QtGui, QtWidgets
 from xml.etree import ElementTree
 
 import gremlin
-from gremlin.base_classes import AbstractAction, AbstractFunctor
-from gremlin.common import InputType
-from gremlin.ui.common import DualSlider, DynamicDoubleSpinBox
+import gremlin.base_profile
+from gremlin.input_types import InputType
+from gremlin.ui.ui_common import DualSlider, DynamicDoubleSpinBox
 import gremlin.ui.input_item
 
 g_scene_size = 250.0
@@ -1211,7 +1211,7 @@ class ResponseCurveWidget(gremlin.ui.input_item.AbstractActionWidget):
             2*g_scene_size,
             2*g_scene_size
         ))
-        gremlin.ui.common.clear_layout(self.curve_view_layout)
+        gremlin.ui.ui_common.clear_layout(self.curve_view_layout)
         self.curve_view_layout.addStretch()
         self.curve_view_layout.addWidget(self.curve_view)
         self.curve_view_layout.addStretch()
@@ -1220,7 +1220,7 @@ class ResponseCurveWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.curve_model.invert()
 
 
-class ResponseCurveFunctor(AbstractFunctor):
+class ResponseCurveFunctor(gremlin.base_profile.AbstractFunctor):
 
     def __init__(self, action):
         super().__init__(action)
@@ -1244,7 +1244,7 @@ class ResponseCurveFunctor(AbstractFunctor):
         return True
 
 
-class ResponseCurve(AbstractAction):
+class ResponseCurve(gremlin.base_profile.AbstractAction):
 
     """Represents axis response curve mapping."""
 

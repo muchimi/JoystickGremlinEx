@@ -5,11 +5,11 @@ from lxml import etree
 
 from PySide6 import QtWidgets, QtCore, QtGui
 
-from gremlin.base_classes import AbstractAction, AbstractFunctor
-from gremlin.common import InputType
+import gremlin.base_profile
+from gremlin.input_types import InputType
 from gremlin.input_devices import ButtonReleaseActions
 import gremlin.macro
-import gremlin.ui.common
+import gremlin.ui.ui_common
 import gremlin.ui.input_item
 import gremlin.util
 from .SimConnect import *

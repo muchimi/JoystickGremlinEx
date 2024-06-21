@@ -22,14 +22,14 @@ import time
 from xml.etree import ElementTree
 
 from PySide6 import QtWidgets, QtCore, QtGui
-from gremlin.common import load_icon
+from gremlin.util import load_icon
 
-from gremlin.base_classes import InputActionCondition
-from gremlin.common import InputType
+from gremlin.base_conditions import InputActionCondition
+from gremlin.input_types import InputType
 from gremlin import input_devices, joystick_handling, util
 from gremlin.error import ProfileError
-from gremlin.profile import safe_format, safe_read, Profile, parse_guid, write_guid
-import gremlin.ui.common
+from gremlin.util import safe_format, safe_read
+import gremlin.ui.ui_common
 import gremlin.ui.input_item
 import os
 import action_plugins
@@ -38,6 +38,8 @@ from gremlin.input_devices import VjoyAction, remote_state
 from gremlin.util import *
 
 IdMapToButton = -2 # map to button special ID
+import gremlin.ui.input_item 
+import gremlin.base_profile
 
 
 
@@ -599,10 +601,10 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.absolute_checkbox = QtWidgets.QRadioButton("Absolute")
         self.absolute_checkbox.setChecked(True)
         self.relative_checkbox = QtWidgets.QRadioButton("Relative")
-        self.relative_scaling = gremlin.ui.common.DynamicDoubleSpinBox()
+        self.relative_scaling = gremlin.ui.ui_common.DynamicDoubleSpinBox()
 
 
-        self.sb_start_value = gremlin.ui.common.DynamicDoubleSpinBox()
+        self.sb_start_value = gremlin.ui.ui_common.DynamicDoubleSpinBox()
         # w = 100
         # self.set_width(self.sb_start_value,w)
         self.sb_start_value.setMinimum(-1.0)
@@ -619,11 +621,11 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.b_max_value = QtWidgets.QPushButton("+1")
         self.set_width(self.b_max_value,w)
 
-        self.sb_axis_range_low = gremlin.ui.common.DynamicDoubleSpinBox()
+        self.sb_axis_range_low = gremlin.ui.ui_common.DynamicDoubleSpinBox()
         self.sb_axis_range_low.setMinimum(-1.0)
         self.sb_axis_range_low.setMaximum(1.0)
         self.sb_axis_range_low.setDecimals(3)
-        self.sb_axis_range_high = gremlin.ui.common.DynamicDoubleSpinBox()
+        self.sb_axis_range_high = gremlin.ui.ui_common.DynamicDoubleSpinBox()
         self.sb_axis_range_high.setMinimum(-1.0)
         self.sb_axis_range_high.setMaximum(1.0)        
         self.sb_axis_range_high.setDecimals(3)
@@ -784,7 +786,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 
         # behavior combo box  - lets the user select the output behavior
-        self.cb_action_list = gremlin.ui.common.NoWheelComboBox()
+        self.cb_action_list = gremlin.ui.ui_common.NoWheelComboBox()
         self.cb_action_list.currentIndexChanged.connect(self._action_mode_changed)
         lbl = QtWidgets.QLabel("Mode:")
        
@@ -801,7 +803,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         row = 2        
         self.lbl_vjoy_device_selector = QtWidgets.QLabel("Device:")
         grid.addWidget(self.lbl_vjoy_device_selector,row,0)
-        self.cb_vjoy_device_selector = gremlin.ui.common.NoWheelComboBox()
+        self.cb_vjoy_device_selector = gremlin.ui.ui_common.NoWheelComboBox()
         grid.addWidget(self.cb_vjoy_device_selector,row,1)
         
                              
@@ -813,7 +815,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         
 
         row = 3
-        self.cb_vjoy_input_selector = gremlin.ui.common.NoWheelComboBox()
+        self.cb_vjoy_input_selector = gremlin.ui.ui_common.NoWheelComboBox()
         self.lbl_vjoy_input_selector = QtWidgets.QLabel("Output:")
         grid.addWidget(self.lbl_vjoy_input_selector,row,0)
         grid.addWidget(self.cb_vjoy_input_selector,row,1)
@@ -864,8 +866,8 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self.lbl_input_device_b = QtWidgets.QLabel("Axis B Input Device:")
         self.lbl_input_axis_b = QtWidgets.QLabel("Axis B Input Axis:")
-        self.hardware_device = gremlin.ui.common.NoWheelComboBox()
-        self.hardware_axis = gremlin.ui.common.NoWheelComboBox()
+        self.hardware_device = gremlin.ui.ui_common.NoWheelComboBox()
+        self.hardware_axis = gremlin.ui.ui_common.NoWheelComboBox()
         self.hardware_device.currentIndexChanged.connect(self._hardware_device_changed)
         self.hardware_axis.currentIndexChanged.connect(self._hardware_axis_changed)
 
@@ -939,11 +941,11 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         # set axis range widget
         self.axis_range_value_widget = QtWidgets.QWidget()
         box = QtWidgets.QHBoxLayout(self.axis_range_value_widget)
-        self.sb_button_range_low = gremlin.ui.common.DynamicDoubleSpinBox()
+        self.sb_button_range_low = gremlin.ui.ui_common.DynamicDoubleSpinBox()
         self.sb_button_range_low.setMinimum(-1.0)
         self.sb_button_range_low.setMaximum(1.0)
         self.sb_button_range_low.setDecimals(3)
-        self.sb_button_range_high = gremlin.ui.common.DynamicDoubleSpinBox()
+        self.sb_button_range_high = gremlin.ui.ui_common.DynamicDoubleSpinBox()
         self.sb_button_range_high.setMinimum(-1.0)
         self.sb_button_range_high.setMaximum(1.0)  
         self.sb_button_range_high.setDecimals(3)
@@ -970,7 +972,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         # button to axis value widget
         self.button_to_axis_widget = QtWidgets.QWidget()
         box = QtWidgets.QHBoxLayout(self.button_to_axis_widget)
-        self.sb_button_to_axis_value = gremlin.ui.common.DynamicDoubleSpinBox()
+        self.sb_button_to_axis_value = gremlin.ui.ui_common.DynamicDoubleSpinBox()
         self.sb_button_to_axis_value.setMinimum(-1.0)
         self.sb_button_to_axis_value.setMaximum(1.0)
         self.sb_button_to_axis_value.setDecimals(3)
@@ -2005,7 +2007,7 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
 
 
 
-class VjoyRemap(gremlin.base_classes.AbstractAction):
+class VjoyRemap(gremlin.base_profile.AbstractAction):
 
     """Action remapping physical joystick inputs to vJoy inputs."""
 

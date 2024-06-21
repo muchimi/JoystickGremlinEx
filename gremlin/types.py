@@ -217,23 +217,26 @@ _MouseButton_to_enum_lookup = {
 }
 
 
+
 class DeviceType(enum.Enum):
 
     """Enumeration of the different possible input types."""
 
-    Keyboard = 1
-    Joystick = 2
-    VJoy = 3
+    Keyboard = 1 # keyboard 
+    Joystick = 2 # game controller 
+    VJoy = 3 # vjoy (virtual)
+    Midi = 4 # midi
+    Osc = 5 # open source control
 
     @staticmethod
-    def to_string(value: DeviceType) -> str:
+    def to_string(value):
         try:
             return _DeviceType_to_string_lookup[value]
         except KeyError:
             raise gremlin.error.GremlinError("Invalid type in lookup")
 
     @staticmethod
-    def to_enum(value: str) -> DeviceType:
+    def to_enum(value):
         try:
             return _DeviceType_to_enum_lookup[value]
         except KeyError:
@@ -243,12 +246,19 @@ class DeviceType(enum.Enum):
 _DeviceType_to_string_lookup = {
     DeviceType.Keyboard: "keyboard",
     DeviceType.Joystick: "joystick",
-    DeviceType.VJoy: "vjoy"
+    DeviceType.VJoy: "vjoy",
+    DeviceType.Midi: "midi",
+    DeviceType.Osc: "osc"
 }
+
+
 _DeviceType_to_enum_lookup = {
     "keyboard": DeviceType.Keyboard,
     "joystick": DeviceType.Joystick,
-    "vjoy": DeviceType.VJoy
+    "vjoy": DeviceType.VJoy,
+    "midi": DeviceType.Midi,
+    "osc": DeviceType.Osc
+
 }
 
 

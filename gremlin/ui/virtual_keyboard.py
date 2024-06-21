@@ -3,11 +3,11 @@ from xml.etree import ElementTree
 
 from PySide6 import QtWidgets, QtCore, QtGui
 
-from gremlin.base_classes import AbstractAction, AbstractFunctor
-from gremlin.common import InputType
+import gremlin.base_profile
+from gremlin.input_types import InputType
 from gremlin.input_devices import ButtonReleaseActions
 import gremlin.macro
-import gremlin.ui.common
+import gremlin.ui.ui_common
 import gremlin.ui.input_item
 import enum
 from gremlin.profile import safe_format, safe_read
@@ -15,11 +15,6 @@ from gremlin.keyboard import Key, key_from_name
 import logging
 
       
-class QHLine(QtWidgets.QFrame):
-    def __init__(self, parent = None):
-        super().__init__(parent)
-        self.setFrameShape(QtWidgets.QFrame.Shape.HLine)
-        self.setFrameShadow(QtWidgets.QFrame.Shadow.Sunken)
 
 class QKeyWidget(QtWidgets.QPushButton):
     ''' custom key label '''
@@ -120,7 +115,7 @@ class InputKeyboardDialog(QtWidgets.QDialog):
 
 
         main_layout.addWidget(self.keyboard_widget)
-        main_layout.addWidget(QHLine())
+        main_layout.addWidget(gremlin.ui.ui_common.QHLine())
         main_layout.addWidget(self.button_widget)
 
 

@@ -26,11 +26,13 @@ from xml.etree import ElementTree
 from PySide6 import QtWidgets
 
 import gremlin
-import gremlin.ui.common
+import gremlin.ui.ui_common
 import gremlin.ui.input_item
+from gremlin.ui.input_item import AbstractContainerWidget
+from gremlin.base_profile import AbstractContainer
 
 
-class ButtonContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
+class ButtonContainerWidget(AbstractContainerWidget):
 
     """Container with two actions, one for input button is pressed, the other for when the input button is released 
     
@@ -67,7 +69,7 @@ class ButtonContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
                 0,
                 "Button Press",
                 self.action_layout,
-                gremlin.ui.common.ContainerViewTypes.Action
+                gremlin.ui.ui_common.ContainerViewTypes.Action
             )
 
         if self.profile_data.action_sets[1] is None:
@@ -81,7 +83,7 @@ class ButtonContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
                 1,
                 "Button Release",
                 self.action_layout,
-                gremlin.ui.common.ContainerViewTypes.Action
+                gremlin.ui.ui_common.ContainerViewTypes.Action
             )
 
     def _create_condition_ui(self):
@@ -91,7 +93,7 @@ class ButtonContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
                     0,
                     "Button Press",
                     self.activation_condition_layout,
-                    gremlin.ui.common.ContainerViewTypes.Condition
+                    gremlin.ui.ui_common.ContainerViewTypes.Condition
                 )
 
             if self.profile_data.action_sets[1] is not None:
@@ -99,7 +101,7 @@ class ButtonContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
                     1,
                     "Button Release",
                     self.activation_condition_layout,
-                    gremlin.ui.common.ContainerViewTypes.Condition
+                    gremlin.ui.ui_common.ContainerViewTypes.Condition
                 )
 
     def _add_action_selector(self, add_action_cb, label, paste_action_cb):
@@ -108,7 +110,7 @@ class ButtonContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
         :param add_action_cb function to call when an action is added
         :param label the description of the action selector
         """
-        action_selector = gremlin.ui.common.ActionSelector(
+        action_selector = gremlin.ui.ui_common.ActionSelector(
             self.profile_data.get_input_type()
         )
         action_selector.action_added.connect(add_action_cb)
@@ -230,7 +232,7 @@ class ButtonContainerFunctor(gremlin.base_classes.AbstractFunctor):
         return True
 
 
-class ButtonContainer(gremlin.base_classes.AbstractContainer):
+class ButtonContainer(AbstractContainer):
 
     """A container with two actions which are triggered based on the duration
     of the activation.
@@ -245,9 +247,9 @@ class ButtonContainer(gremlin.base_classes.AbstractContainer):
     widget = ButtonContainerWidget
     # override default allowed inputs here
     # input_types = [
-    #     gremlin.common.InputType.JoystickButton,
-    #     gremlin.common.InputType.JoystickHat,
-    #     gremlin.common.InputType.Keyboard
+    #     InputType.JoystickButton,
+    #     InputType.JoystickHat,
+    #     InputType.Keyboard
     # ]
     interaction_types = [
         gremlin.ui.input_item.ActionSetView.Interactions.Edit,

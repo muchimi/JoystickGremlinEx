@@ -22,9 +22,11 @@ from PySide6 import QtWidgets, QtCore
 
 import container_plugins.basic
 import gremlin
-from gremlin.common import DeviceType, InputType
-from . import common, input_item
-from gremlin.keyboard import Key
+from gremlin.types import DeviceType
+from gremlin.input_types import InputType
+import gremlin.types
+from . import input_item, ui_common
+
 
 
 class InputItemConfiguration(QtWidgets.QFrame):
@@ -62,7 +64,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
             return
 
         self._create_description()
-        if self.item_data.parent.parent.type == gremlin.common.DeviceType.VJoy:
+        if self.item_data.parent.parent.type == DeviceType.VJoy:
             self._create_vjoy_dropdowns()
         else:
             self._create_dropdowns()
@@ -173,7 +175,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
         """
         self.action_layout = QtWidgets.QHBoxLayout()
 
-        self.action_selector = gremlin.ui.common.ActionSelector(
+        self.action_selector = gremlin.ui.ui_common.ActionSelector(
             self.item_data.input_type
         )
         self.action_selector.action_added.connect(self._add_action)
@@ -197,8 +199,8 @@ class InputItemConfiguration(QtWidgets.QFrame):
         """Creates the action drop down selection for vJoy devices."""
         self.action_layout = QtWidgets.QHBoxLayout()
 
-        self.action_selector = gremlin.ui.common.ActionSelector(
-            gremlin.common.DeviceType.VJoy
+        self.action_selector = gremlin.ui.ui_common.ActionSelector(
+            gremlin.types.DeviceType.VJoy
         )
         self.action_selector.action_added.connect(self._add_action)
         self.action_selector.action_paste.connect(self._paste_action)
@@ -226,7 +228,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
         :return list of valid action names
         """
         action_names = []
-        if self.item_data.input_type == gremlin.common.DeviceType.VJoy:
+        if self.item_data.input_type == gremlin.types.DeviceType.VJoy:
             entry = gremlin.plugin_manager.ActionPlugins().repository.get(
                 "response-curve",
                 None
@@ -244,7 +246,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
         return sorted(action_names)
 
 
-class ActionContainerModel(common.AbstractModel):
+class ActionContainerModel(ui_common.AbstractModel):
 
     """Stores action containers for display using the corresponding view."""
 
@@ -297,7 +299,7 @@ class ActionContainerModel(common.AbstractModel):
         self.data_changed.emit()
 
 
-class ActionContainerView(common.AbstractView):
+class ActionContainerView(ui_common.AbstractView):
 
     """View class used to display ActionContainerModel contents."""
 
@@ -333,7 +335,7 @@ class ActionContainerView(common.AbstractView):
 
     def redraw(self):
         """Redraws the entire view."""
-        common.clear_layout(self.scroll_layout)
+        ui_common.clear_layout(self.scroll_layout)
         container_count = self.model.rows()
         if container_count:
             for index in range(container_count):
@@ -483,16 +485,16 @@ class JoystickDeviceTabWidget(QtWidgets.QWidget):
         if self.device.device_guid != event.device_guid:
             return
                 
-        if event.event_type == gremlin.common.InputType.JoystickButton:
+        if event.event_type == InputType.JoystickButton:
             if not event.is_pressed:
                 return
-        elif event.event_type == gremlin.common.InputType.JoystickAxis:
+        elif event.event_type == InputType.JoystickAxis:
             cfg = gremlin.config.Configuration()
             if not cfg.highlight_input:
                 return
             if not gremlin.input_devices.JoystickInputSignificant().should_process(event):
                 return
-        elif event.event_type == gremlin.common.InputType.JoystickHat:
+        elif event.event_type == InputType.JoystickHat:
             if not event.is_pressed:
                 return
 
@@ -592,267 +594,6 @@ class JoystickDeviceTabWidget(QtWidgets.QWidget):
         self.device_profile.label = text
 
 
-class KeyboardDeviceTabWidget(QtWidgets.QWidget):
-
-    """Widget used to configure keyboard inputs """
-
-    def __init__(
-            self,
-            device_profile,
-            current_mode,
-            parent=None
-    ):
-        """Creates a new object instance.
-
-        :param device_profile profile data of the entire device
-        :param current_mode currently active mode
-        :param parent the parent of this widget
-        """
-        super().__init__(parent)
-
-        # Store parameters
-        self.device_profile = device_profile
-        self.current_mode = current_mode
-
-        self.main_layout = QtWidgets.QHBoxLayout(self)
-        self.left_panel_layout = QtWidgets.QVBoxLayout()
-        self.device_profile.ensure_mode_exists(self.current_mode)
-        self.widget_storage = {}
-
-        # List of inputs
-        self.input_item_list_model = input_item.InputItemListModel(
-            device_profile,
-            current_mode
-        )
-        self.input_item_list_view = input_item.InputItemListView()
-        self.input_item_list_view.setMinimumWidth(350)
-
-        # Input type specific setups
-        self.input_item_list_view.set_model(self.input_item_list_model)
-        
-
-        # TODO: make this saner
-        self.input_item_list_view.redraw()
-
-        # Handle user interaction
-        self.input_item_list_view.item_selected.connect(
-            self.input_item_selected_cb
-        )
-
-        self.left_panel_layout.addWidget(self.input_item_list_view)
-        self.main_layout.addLayout(self.left_panel_layout,1)
-
-        # add a blank input configuration if nothing is selected - the configuration widget is always the second widget of the main layout
-        right_panel = self.main_layout.takeAt(1)
-        if right_panel is not None and right_panel.widget():
-            right_panel.widget().hide()
-            right_panel.widget().deleteLater()
-        if right_panel:
-            self.main_layout.removeItem(right_panel)
-
-        widget = InputItemConfiguration()     
-        self.main_layout.addWidget(widget,3)
-
-        button_container_widget = QtWidgets.QWidget()
-        button_container_layout = QtWidgets.QHBoxLayout()
-        button_container_widget.setLayout(button_container_layout)
-
-        # key clear button
-        
-        clear_keyboard_button = common.ConfirmPushButton("Clear Keys", show_callback = self._show_clear_cb)
-        clear_keyboard_button.confirmed.connect(self._clear_keys_cb)
-        button_container_layout.addWidget(clear_keyboard_button)
-        button_container_layout.addStretch(1)
-
-        # Key add button
-        button = common.NoKeyboardPushButton("Add Key")
-        button.clicked.connect(self._record_keyboard_key_cb)
-
-        button_container_layout.addWidget(button)
-        
-
-        virtual_keyboard_button = QtWidgets.QPushButton("Select Key")
-        virtual_keyboard_button.clicked.connect(self._select_keys_cb)
-        button_container_layout.addWidget(virtual_keyboard_button)
-        
-
-        self.left_panel_layout.addWidget(button_container_widget)
-        
-
-        # Select default entry
-        selected_index = self.input_item_list_view.current_index
-        if selected_index is not None:
-            self.input_item_selected_cb(selected_index)
-        
-
-    def _show_clear_cb(self):
-        return self.input_item_list_model.keyboard_rows > 0
-
-    def _clear_keys_cb(self):
-        ''' clears keyboard input keys '''
-
-        self.input_item_list_model.clear()
-        self.input_item_list_view.redraw()
-
-    def _select_keys_cb(self):
-        ''' display the keyboard input dialog '''
-        from gremlin.ui.virtual_keyboard import InputKeyboardDialog
-        self._keyboard_dialog = InputKeyboardDialog(parent = self, select_single = True)
-        self._keyboard_dialog.accepted.connect(self._keyboard_dialog_ok_cb)
-        self._keyboard_dialog.showNormal()  
-
-    def _keyboard_dialog_ok_cb(self):
-        ''' callled when the dialog completes '''
-
-        # grab the new data
-        keys = self._keyboard_dialog.keys
-        if keys:
-            modifiers = []
-            root_key = None
-            for key in keys:
-                if key.is_modifier:
-                    modifiers.append(key)
-                else:
-                    root_key = key
-            if modifiers:
-                root_key.latched_keys = modifiers
-            self._add_keyboard_key_cb(root_key)
-                  
-
-    def input_item_selected_cb(self, index):
-        """Handles the selection of an input item.
-
-        :param index the index of the selected item
-        """
-        # Assumption is that the entries are sorted by their scancode and
-        # extended flag identification
-        # sorted_keys = sorted(self.device_profile.modes[self.current_mode].config[InputType.Keyboard])
-        #sorted_keys = list(self.device_profile.modes[self.current_mode].config[InputType.Keyboard])
-
-        item_data = self.input_item_list_model.data(index)
-
-
-        # if index is None or len(sorted_keys) <= index:
-        #     item_data = None
-        # else:
-        #     index_key = sorted_keys[index]
-        #     item_data = self.device_profile.modes[self.current_mode]. \
-        #         config[InputType.Keyboard][index_key]
-
-        right_panel = self.main_layout.takeAt(1)
-        if right_panel is not None and right_panel.widget():
-            right_panel.widget().hide()
-            right_panel.widget().deleteLater()
-        if right_panel:
-            self.main_layout.removeItem(right_panel)
-
-        widget = InputItemConfiguration(item_data)
-        self.main_layout.addWidget(widget,3)            
-
-        if item_data:
-            
-            # Create new configuration widget
-            
-            change_cb = self._create_change_cb(index)
-            widget.action_model.data_changed.connect(change_cb)
-            widget.description_changed.connect(change_cb)
-
-            
-
-            # Refresh item list view and select correct entry
-            #self.input_item_list_view.redraw()
-            #self.input_item_list_view.select_item(index,False)
-
-    def _record_keyboard_key_cb(self):
-        """Handles adding of new keyboard keys to the list.
-
-        Asks the user to press the key they wish to add bindings for.
-        """
-        self.button_press_dialog = common.InputListenerWidget(
-            self._add_keyboard_key_cb,
-            [gremlin.common.InputType.Keyboard],
-            return_kb_event=False,
-            multi_keys=False
-        )
-
-        # Display the dialog centered in the middle of the UI
-        root = self
-        while root.parent():
-            root = root.parent()
-        geom = root.geometry()
-
-        self.button_press_dialog.setGeometry(
-            int(geom.x() + geom.width() / 2 - 150),
-            int(geom.y() + geom.height() / 2 - 75),
-            300,
-            150
-        )
-        self.button_press_dialog.show()
-
-    def _add_keyboard_key_cb(self, key : Key):
-        """Adds the provided key to the list of keys.
-
-        :param key the new key to add, either a single key or a combo-key
-
-        """
-
-        # ensure there's an entry for the 
-        input_type = InputType.KeyboardLatched if key.is_latched else InputType.Keyboard
-
-        self.device_profile.modes[self.current_mode].get_data(input_type,key)
-        self.input_item_list_view.redraw()
-        self.input_item_list_view.select_item(self._index_for_key(key),True)
-
-    def _index_for_key(self, key_or_index):
-        """Returns the index into the key list based on the key itself.
-
-        :param key the keyboard key being queried
-        :return index of the provided key
-        """
-
-        mode = self.device_profile.modes[self.current_mode]
-        if isinstance(key_or_index, Key):
-            key = key_or_index
-            if key.is_latched:
-                sorted_keys = list(mode.config[InputType.KeyboardLatched])
-                return sorted_keys.index(key)
-        sorted_keys = list(mode.config[InputType.Keyboard])
-        return sorted_keys.index(key_or_index)
-        
-
-    def _create_change_cb(self, index):
-        """Creates a callback handling content changes.
-
-        :param index the index of the content being changed
-        :return callback function redrawing changed content
-        """
-        return lambda: self.input_item_list_view.redraw_index(index)
-
-    def set_mode(self, mode):
-        ''' changes the mode of the tab '''        
-        self.current_mode = mode
-        self.device_profile.ensure_mode_exists(self.current_mode)
-        self.input_item_list_model.mode = mode
-
-        # Remove the existing widget, if there is one
-        item = self.main_layout.takeAt(1)
-        if item is not None and item.widget():
-            item.widget().hide()
-            item.widget().deleteLater()
-        if item:
-            self.main_layout.removeItem(item)
-
-    def mode_changed_cb(self, mode):
-        """Handles mode change.
-
-        :param mode the new mode
-        """
-        self.set_mode(mode)
-
-
-    def refresh(self):
-        """Refreshes the current selection, ensuring proper synchronization."""
-        self.input_item_selected_cb(self.input_item_list_view.current_index)
 
 
 def input_item_index_lookup(index, input_items):

@@ -19,7 +19,7 @@
 from PySide6 import QtCore, QtWidgets
 
 import gremlin.joystick_handling
-import gremlin.ui.common
+import gremlin.ui.ui_common
 
 
 class ProfileSettingsWidget(QtWidgets.QWidget):
@@ -66,7 +66,7 @@ class ProfileSettingsWidget(QtWidgets.QWidget):
 
     def refresh_ui(self, emit_change=False):
         """Refreshes the entire UI."""
-        gremlin.ui.common.clear_layout(self.scroll_layout)
+        gremlin.ui.ui_common.clear_layout(self.scroll_layout)
         self._create_ui()
         if emit_change:
             self.changed.emit()
@@ -142,7 +142,7 @@ class DefaultDelay(QtWidgets.QGroupBox):
         """Creates the UI of this widget."""
         self.setTitle("Default Macro Action Delay")
 
-        self.delay_value = gremlin.ui.common.DynamicDoubleSpinBox()
+        self.delay_value = gremlin.ui.ui_common.DynamicDoubleSpinBox()
         self.delay_value.setRange(0.0, 10.0)
         self.delay_value.setSingleStep(0.05)
         self.delay_value.setValue(self.profile_data.default_delay)
@@ -246,7 +246,7 @@ class VJoyAxisDefaultsWidget(QtWidgets.QWidget):
                 0
             )
 
-            box = gremlin.ui.common.DynamicDoubleSpinBox()
+            box = gremlin.ui.ui_common.DynamicDoubleSpinBox()
             box.setRange(-1, 1)
             box.setSingleStep(0.05)
             box.setValue(self.profile_data.get_initial_vjoy_axis_value(

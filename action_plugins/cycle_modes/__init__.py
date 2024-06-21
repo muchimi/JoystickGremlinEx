@@ -21,8 +21,8 @@ from PySide6 import QtCore, QtGui, QtWidgets
 from xml.etree import ElementTree
 
 from PySide6.QtGui import QIcon
-from gremlin.base_classes import AbstractAction, AbstractFunctor
-from gremlin.common import InputType
+import gremlin.base_profile 
+from gremlin.input_types import InputType
 import gremlin.ui.input_item
 
 
@@ -38,7 +38,7 @@ class CycleModesWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _create_ui(self):
 
-        from gremlin.common import load_icon
+        from gremlin.util import load_icon
 
         if CycleModesWidget.locked:
             return
@@ -130,7 +130,7 @@ class CycleModesWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.save_changes()
 
 
-class CycleModesFunctor(AbstractFunctor):
+class CycleModesFunctor(gremlin.base_profile.AbstractFunctor):
 
     def __init__(self, action):
         super().__init__(action)
@@ -141,7 +141,7 @@ class CycleModesFunctor(AbstractFunctor):
         return True
 
 
-class CycleModes(AbstractAction):
+class CycleModes(gremlin.base_profile.AbstractAction):
 
     """Action allowing the switching through a list of modes."""
 

@@ -21,11 +21,11 @@ import os
 from PySide6 import QtCore, QtWidgets
 from xml.etree import ElementTree
 
-from gremlin.base_classes import AbstractAction, AbstractFunctor
-from gremlin.common import InputType
+import gremlin.base_profile
+from gremlin.input_types import InputType
 from gremlin.profile import safe_read, safe_format
 from gremlin import util
-import gremlin.ui.common
+import gremlin.ui.ui_common
 import gremlin.ui.input_item
 
 
@@ -47,7 +47,7 @@ class SplitAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.split_slider.setRange(-1e5, 1e5)
         self.split_slider.setTickInterval(1e4)
         self.split_slider.setTickPosition(QtWidgets.QSlider.TicksBelow)
-        self.split_readout = gremlin.ui.common.DynamicDoubleSpinBox()
+        self.split_readout = gremlin.ui.ui_common.DynamicDoubleSpinBox()
         self.split_readout.setRange(-1, 1)
         self.split_readout.setSingleStep(0.1)
         self.split_slider_layout.addWidget(self.split_slider)
@@ -59,11 +59,11 @@ class SplitAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         # Device selection
         self.split_device_layout = QtWidgets.QHBoxLayout()
-        self.vjoy_selector_1 = gremlin.ui.common.VJoySelector(
+        self.vjoy_selector_1 = gremlin.ui.ui_common.VJoySelector(
             self._create_vjoy_selector_callback(1),
             [InputType.JoystickAxis]
         )
-        self.vjoy_selector_2 = gremlin.ui.common.VJoySelector(
+        self.vjoy_selector_2 = gremlin.ui.ui_common.VJoySelector(
             self._create_vjoy_selector_callback(2),
             [InputType.JoystickAxis]
         )
@@ -163,7 +163,7 @@ class SplitAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
         return lambda data: self.save_vjoy_selection(axis_id, data)
 
 
-class SplitAxisFunctor(AbstractFunctor):
+class SplitAxisFunctor(gremlin.base_profile.AbstractFunctor):
 
     def __init__(self, action):
         super().__init__(action)
@@ -196,7 +196,7 @@ class SplitAxisFunctor(AbstractFunctor):
         return True
 
 
-class SplitAxis(AbstractAction):
+class SplitAxis(gremlin.base_profile.AbstractAction):
 
     name = "Split Axis"
     tag = "split-axis"

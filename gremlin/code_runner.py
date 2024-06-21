@@ -28,6 +28,8 @@ import dinput
 import gremlin
 from gremlin import event_handler, input_devices, \
     joystick_handling, macro, sendinput, user_plugin, util
+from gremlin.input_types import InputType
+import gremlin.types
 import gremlin.plugin_manager
 import vjoy as vjoy_module
 
@@ -175,7 +177,11 @@ class CodeRunner:
                             # Only add callbacks for input items that actually
                             # contain actions
                             if len(input_item.containers) == 0:
+                                # no containers = no actions = skip
                                 continue
+
+                            if input_item.input_type == gremlin.input_types.InputType.Midi:
+                                pass
 
                             event = event_handler.Event(
                                 event_type=input_item.input_type,
@@ -223,7 +229,7 @@ class CodeRunner:
 
                 # Lower axis callback
                 event = event_handler.Event(
-                    event_type=gremlin.common.InputType.JoystickAxis,
+                    event_type=InputType.JoystickAxis,
                     device_guid=entry["lower"]["device_guid"],
                     identifier=entry["lower"]["axis_id"]
                 )
@@ -237,7 +243,7 @@ class CodeRunner:
 
                 # Upper axis callback
                 event = event_handler.Event(
-                    event_type=gremlin.common.InputType.JoystickAxis,
+                    event_type=InputType.JoystickAxis,
                     device_guid=entry["upper"]["device_guid"],
                     identifier=entry["upper"]["axis_id"]
                 )
@@ -276,6 +282,13 @@ class CodeRunner:
             evt_listener.virtual_event.connect(
                 self.event_handler.process_event
             )
+            evt_listener.midi_event.connect(
+                self.event_handler.process_event
+            )
+            evt_listener.osc_event.connect(
+                self.event_handler.process_event
+            )
+            
             
             # monitor keyboard input state
             kb = input_devices.Keyboard()
@@ -287,6 +300,9 @@ class CodeRunner:
             # connect remote gremlin client
             input_devices.remote_server.start()
             input_devices.remote_client.start()
+
+            # listen to MIDI 
+            input_devices.midi_client.start()
             
             #evt_listener.remote_event.connect(self.event_handler.process_event)
 
@@ -360,6 +376,9 @@ class CodeRunner:
             evt_lst.keyboard_event.disconnect(self.event_handler.process_event)
             evt_lst.joystick_event.disconnect(self.event_handler.process_event)
             evt_lst.virtual_event.disconnect(self.event_handler.process_event)
+            evt_lst.midi_event.disconnect(self.event_handler.process_event)
+            evt_lst.osc_event.disconnect(self.event_handler.process_event)
+
             evt_lst.keyboard_event.disconnect(kb.keyboard_event)
             evt_lst.gremlin_active = False
             self.event_handler.mode_changed.disconnect(
@@ -420,7 +439,7 @@ class VJoyCurves:
         for guid, device in self.profile_data.items():
             if mode_name in device.modes:
                 for aid, data in device.modes[mode_name].config[
-                        gremlin.common.InputType.JoystickAxis
+                        InputType.JoystickAxis
                 ].items():
                     # Get integer axis id in case an axis enum was used
                     axis_id = vjoy_module.vjoy.VJoy.axis_equivalence.get(aid, aid)
@@ -444,7 +463,7 @@ class MergeAxis:
             self,
             vjoy_id: int,
             input_id: int,
-            operation: gremlin.common.MergeAxisOperation
+            operation: gremlin.types.MergeAxisOperation
     ):
         self.axis_values = [0.0, 0.0]
         self.vjoy_id = vjoy_id
@@ -454,13 +473,13 @@ class MergeAxis:
     def _update(self):
         """Updates the merged axis value."""
         value = 0.0
-        if self.operation == gremlin.common.MergeAxisOperation.Average:
+        if self.operation == gremlin.types.MergeAxisOperation.Average:
             value = (self.axis_values[0] - self.axis_values[1]) / 2.0
-        elif self.operation == gremlin.common.MergeAxisOperation.Minimum:
+        elif self.operation == gremlin.types.MergeAxisOperation.Minimum:
             value = min(self.axis_values[0], self.axis_values[1])
-        elif self.operation == gremlin.common.MergeAxisOperation.Maximum:
+        elif self.operation == gremlin.types.MergeAxisOperation.Maximum:
             value = max(self.axis_values[0], self.axis_values[1])
-        elif self.operation == gremlin.common.MergeAxisOperation.Sum:
+        elif self.operation == gremlin.types.MergeAxisOperation.Sum:
             value = gremlin.util.clamp(
                 self.axis_values[0] + self.axis_values[1],
                 -1.0,

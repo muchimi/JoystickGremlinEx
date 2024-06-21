@@ -17,35 +17,23 @@
 
 
 import logging
-import threading
-import time
-import math
 from xml.etree import ElementTree
-
-from PySide6 import QtWidgets, QtCore, QtGui
-from PySide6.QtCore import Qt
-
-
-from gremlin.base_classes import InputActionCondition
-from gremlin.common import InputType, MouseButton, get_guid
-from gremlin import input_devices, joystick_handling, util
-from gremlin.util import rad2deg
-from gremlin.error import ProfileError
-from gremlin.profile import safe_format, safe_read, read_bool, Profile, parse_guid, write_guid
-import gremlin.ui.common
+from gremlin.input_types import InputType
+from gremlin.util import rad2deg, get_guid
+from gremlin.profile import safe_format, safe_read
+import gremlin.ui.ui_common
 import gremlin.ui.input_item
 import os
+from gremlin.ui.input_item import AbstractContainerWidget
+from gremlin.base_profile import AbstractContainer
 
-from gremlin.input_devices import VjoyAction, remote_state
-from gremlin.base_classes import AbstractAction, AbstractFunctor
-from gremlin.input_devices import ButtonReleaseActions
 from action_plugins.map_to_keyboard import *
 from action_plugins.map_to_mouse import *
 
 syslog = logging.getLogger("system")
 
 
-class RangeContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
+class RangeContainerWidget(AbstractContainerWidget):
     ''' Range container for a ranged action '''
 
     def __init__(self, profile_data, parent=None):
@@ -82,7 +70,7 @@ class RangeContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
         self.widget_layout = QtWidgets.QVBoxLayout()
 
         # self.profile_data.create_or_delete_virtual_button()
-        self.action_selector = gremlin.ui.common.ActionSelector(
+        self.action_selector = gremlin.ui.ui_common.ActionSelector(
             self.profile_data.get_input_type()
         )
 
@@ -93,7 +81,7 @@ class RangeContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
         profile._widget = self
 
         # min range box
-        min_box = gremlin.ui.common.DynamicDoubleSpinBox()
+        min_box = gremlin.ui.ui_common.DynamicDoubleSpinBox()
         min_box.setMinimum(-1.0)
         min_box.setMaximum(1.0)
         min_box.setDecimals(3)
@@ -160,7 +148,7 @@ class RangeContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
         replace_range.clicked.connect(self._replace_range)
         
         # max range box
-        max_box = gremlin.ui.common.DynamicDoubleSpinBox()
+        max_box = gremlin.ui.ui_common.DynamicDoubleSpinBox()
         max_box.setMinimum(-1.0)
         max_box.setMaximum(1.0)
         max_box.setDecimals(3)
@@ -234,7 +222,7 @@ class RangeContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
             widget = self._create_action_set_widget(
                 self.profile_data.action_sets[i],
                 f"Action {i:d}",
-                gremlin.ui.common.ContainerViewTypes.Action
+                gremlin.ui.ui_common.ContainerViewTypes.Action
             )
             self.action_layout.addWidget(widget)
             widget.redraw()
@@ -249,7 +237,7 @@ class RangeContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
                 widget = self._create_action_set_widget(
                     self.profile_data.action_sets[i],
                     f"Action {i:d}",
-                    gremlin.ui.common.ContainerViewTypes.Condition
+                    gremlin.ui.ui_common.ContainerViewTypes.Condition
                 )
                 self.activation_condition_layout.addWidget(widget)
                 widget.redraw()
@@ -514,7 +502,7 @@ class RangeContainerFunctor(gremlin.base_classes.AbstractFunctor):
 
         return False
 
-class RangeContainer(gremlin.base_classes.AbstractContainer):
+class RangeContainer(AbstractContainer):
     ''' action data for the map to Range action '''
 
     
@@ -522,7 +510,7 @@ class RangeContainer(gremlin.base_classes.AbstractContainer):
     tag = "range"
 
     # this container only works with axis inputs
-    input_types = [gremlin.common.InputType.JoystickAxis]
+    input_types = [InputType.JoystickAxis]
 
     # allowed interactions with this container
     interaction_types = [

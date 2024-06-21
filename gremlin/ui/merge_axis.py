@@ -20,10 +20,10 @@ import logging
 from PySide6 import QtWidgets, QtCore, QtGui
 
 import gremlin
-from . import common
+from . import ui_common
 
 
-class MergeAxisUi(common.BaseDialogUi):
+class MergeAxisUi(ui_common.BaseDialogUi):
 
     """Allows merging physical axes into a single virtual ones."""
 
@@ -188,18 +188,18 @@ class MergeAxisEntry(QtWidgets.QDockWidget):
 
         # Selectors for both physical and virtual joystick axis for the
         # mapping selection
-        self.vjoy_selector = common.VJoySelector(
+        self.vjoy_selector = ui_common.VJoySelector(
             lambda x: change_cb(),
-            [gremlin.common.InputType.JoystickAxis],
+            [InputType.JoystickAxis],
             profile_data.settings.vjoy_as_input
         )
-        self.joy1_selector = common.JoystickSelector(
+        self.joy1_selector = ui_common.JoystickSelector(
             lambda x: change_cb(),
-            [gremlin.common.InputType.JoystickAxis]
+            [InputType.JoystickAxis]
         )
-        self.joy2_selector = common.JoystickSelector(
+        self.joy2_selector = ui_common.JoystickSelector(
             lambda x: change_cb(),
-            [gremlin.common.InputType.JoystickAxis]
+            [InputType.JoystickAxis]
         )
 
         # Operation selection
@@ -213,7 +213,7 @@ class MergeAxisEntry(QtWidgets.QDockWidget):
         )
 
         # Mode selection
-        self.mode_selector = gremlin.ui.common.ModeWidget()
+        self.mode_selector = gremlin.ui.ui_common.ModeWidget()
         self.mode_selector.populate_selector(profile_data)
         self.mode_selector.mode_changed.connect(change_cb)
 
@@ -254,7 +254,7 @@ class MergeAxisEntry(QtWidgets.QDockWidget):
         """
         try:
             self.vjoy_selector.set_selection(
-                gremlin.common.InputType.JoystickAxis,
+                InputType.JoystickAxis,
                 data["vjoy"]["vjoy_id"],
                 data["vjoy"]["axis_id"]
             )
@@ -271,12 +271,12 @@ class MergeAxisEntry(QtWidgets.QDockWidget):
         joy2_id = data["upper"]["device_guid"]
 
         self.joy1_selector.set_selection(
-            gremlin.common.InputType.JoystickAxis,
+            InputType.JoystickAxis,
             joy1_id,
             data["lower"]["axis_id"]
         )
         self.joy2_selector.set_selection(
-            gremlin.common.InputType.JoystickAxis,
+            InputType.JoystickAxis,
             joy2_id,
             data["upper"]["axis_id"]
         )
