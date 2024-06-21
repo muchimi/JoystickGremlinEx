@@ -8,8 +8,7 @@
 # WARNING! All changes made in this file will be lost!
 
 from PySide6 import QtCore, QtGui, QtWidgets
-import gremlin
-from joystick_gremlin import Version
+import joystick_gremlin
 
 class Ui_About(object):
     def setupUi(self, About):
@@ -31,7 +30,7 @@ class Ui_About(object):
         self.about_box_widget = QtWidgets.QWidget()
         self.about_box_widget.setLayout(self.about_box_layout)
 
-        self.version_widget = QtWidgets.QLabel(f"Version: {Version().version}")
+        self.version_widget = QtWidgets.QLabel(f"Version: {joystick_gremlin.Version().version}")
         self.about_box_layout.addWidget(self.version_widget)
         self.about_box_layout.addWidget(self.about)
         self.horizontalLayout_4.addWidget(self.about_box_widget)

@@ -849,12 +849,15 @@ def byte_list_to_string(data, as_hex = True):
     result = result[:-1]
     return result
 
-def scale_to_gremlin(value, r_min, r_max):
-    ''' scales a value to an axis value of -1 to +1
+def scale_to_range(value, r_min, r_max, new_min = -1.0, new_max = 1.0):
+    ''' scales a value on one range to the new range
     
     value: the value to scale
     r_min: the value's min range 
     r_max: the value's max range
+    new_min: the new range's min
+    new_max: the new range's max
     
     '''
-    return r_min + (value + 1.0)*((r_max - r_min)/2.0)
+    return (((value - r_min) * (new_max - new_min)) / (r_max - r_min)) + new_min
+    

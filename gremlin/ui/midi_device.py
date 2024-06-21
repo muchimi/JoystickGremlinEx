@@ -34,7 +34,7 @@ from gremlin.singleton_decorator import SingletonDecorator
 import gremlin.ui.input_item 
 import gremlin.ui.ui_common
 import enum
-from gremlin.util import parse_guid
+from gremlin.util import parse_guid, byte_list_to_string
 import gremlin.event_handler
 from gremlin.ui.device_tab import InputItemConfiguration
 
@@ -161,6 +161,13 @@ _string_to_midi_lookup = {
 
 class MidiInputItem():
     ''' holds the data for a MIDI device '''
+
+    class InputMode(enum.Enum):
+        ''' possible input modes '''
+        Axis = 0  # input is variable
+        Button = 1 # input is marked pressed if the value is in the upper range 
+        OnChange = 2 # input triggers pressed on any state change
+
     def __init__(self):
         self.id = None # GUID
         self._port_name = None
@@ -168,6 +175,8 @@ class MidiInputItem():
         self._display_name =  "MIDI (not configured)"
         self._display_tooltip = "Input configuration not set"
         self._command = None # decoded command
+        self._message_key = "" # key for this message category
+        self._mode = MidiInputItem.InputMode.Button  # mode is button or axis 
 
 
     @property
@@ -180,6 +189,41 @@ class MidiInputItem():
         self._update_display_name()
 
     @property
+    def message_key(self):
+        ''' returns the sorting key for this message '''
+        return self._message_key
+    
+    @property 
+    def mode(self):
+        ''' input mode '''
+        return self._mode
+    
+    @property
+    def mode_string(self):
+        if self._mode == MidiInputItem.InputMode.Axis:
+            return "axis"
+        if self._mode == MidiInputItem.InputMode.Button:
+            return "button"
+        if self._mode == MidiInputItem.InputMode.OnChange:
+            return "change"
+        
+    def mode_from_string(self, value):
+        if value == "axis":
+            self._mode = MidiInputItem.InputMode.Axis
+        elif value == "button":
+            self._mode = MidiInputItem.InputMode.Button
+        elif value == "change":
+            self._mode = MidiInputItem.InputMode.change
+        else:
+            raise ValueError(f"mode_from_string(): don't know how to handle {value}")
+
+    
+    @mode.setter
+    def mode(self, value):
+        self._mode = value
+
+
+    @property
     def port_name(self):
         return self._port_name
     
@@ -189,16 +233,23 @@ class MidiInputItem():
     
     @port_name.setter
     def port_name(self, value):
-        self._port_name = value
+        self._port_name = value.upper()
         self._update_display_name()
 
+
+    @property
+    def port_valid(self):
+        ''' true if the current port exists '''
+        interface = MidiInterface()
+        return interface.port_valid(self._port_name)
 
     def parse_xml(self, node):
         ''' reads an input item from xml '''
         if node.tag == "input":
             self.id = read_guid(node, "guid")
             self.port_name = safe_read(node, "port", str)
-            data = safe_read(node,"data", str)
+            self.mode_from_string(safe_read(node, "mode", str))
+            data = safe_read(node, "data", str)
             bytes = byte_string_to_list(data)
             self.message = mido.Message.from_bytes(bytes) if bytes else None
 
@@ -208,6 +259,7 @@ class MidiInputItem():
         node = ElementTree.Element("input")
         node.set("guid", str(self.id))
         node.set("port", str(self.port_name))
+        node.set("mode", self.mode_string)
         data = [] if self.message is None else self.message.bytes()
         node.set("data", byte_list_to_string(data))
         return node
@@ -229,7 +281,8 @@ class MidiInputItem():
             mido_type = message.type
             command = MidiCommandType.from_mido_type(mido_type)
             command_display = MidiCommandType.to_string(command)
-            self._display_name = f"MIDI {port_name}/{command_display}/{message.channel}/{message.hex()}"
+            stub_channel = f"/{message.channel + 1}" if command != MidiCommandType.SysEx else ""
+            self._display_name = f"{port_name}/{command_display}{stub_channel}/{message.hex()}"
             if command == MidiCommandType.Control:
                 stub = f"<b>Control:</b> {message.control}<br><b>Value:</b> {message.value} (0x{message.value:02X})"
             elif command in (MidiCommandType.NoteOff, MidiCommandType.NoteOn):
@@ -242,16 +295,55 @@ class MidiInputItem():
                 stub = f"<b>Program:</b> {message.program} (0x{message.program:02X})"
             elif command == MidiCommandType.PitchWheel:
                 stub = f"<b>Program:</b> {message.pitch} (0x{message.pitch:04X})"
+            elif command == MidiCommandType.SysEx:
+                stub = f"<b>Data:</b> {message.data}"
             else:
                 stub = f"</b>Unable to decode:</b> {command}"
 
-            self._command = command
+            if self._mode == MidiInputItem.InputMode.Button:
+                mode_stub = "Button"
+            elif self._mode == MidiInputItem.InputMode.Axis:
+                mode_stub = "Axis"
+            if self._mode == MidiInputItem.InputMode.OnChange:
+                mode_stub = "Change"
 
-            self._display_tooltip = f"<b>MIDI Configuration:</b><br/><b>Port:</b> {port_name}<br/><b>Command:</b> {command_display}<br/><b>Channel:</b> {self.message.channel}<br/>{stub}<br/><b>Bytes (hex):</b> {self.message.hex()}"
+            # build the unique key to distinguish entries - the key includes the port and mode so that two inputs using the same message can be used in different modes
+            self._command = command
+            if command == MidiCommandType.SysEx:
+                self._message_key = f"{self._port_name} {byte_list_to_string(message.bytes())}" # key is the whole sysex message
+            else:
+                self._message_key = f"{self._port_name} {message.bytes()[0]}" # non sysex: get the command byte and the mode
+
+            self._display_tooltip = f"<b>MIDI Configuration:</b><br/><b>Port:</b> {port_name}<br/>" \
+                                    f"<b>Command:</b> {command_display}<br/>" \
+                                    f"<b>Channel:</b> {self.message.channel}<br/>" \
+                                    f"{stub}<br/>" \
+                                    f"<b>Mode:<b/>{mode_stub}<br/>" \
+                                    f"<b>Bytes (hex):</b> {self.message.hex()}" 
+                                    
+            
         else:
             self._display_name = f"MIDI {port_name}/(not configured)"
+            self._message_key = ""
 
 
+    @staticmethod
+    def from_message(port_name, message, mode = None):
+        ''' returns an input item based on the message data 
+        
+        :param message - the midi message MIDO format
+        :param mode - the input mode to use
+        
+        '''
+        input_item = MidiInputItem()
+        if mode is None:
+            mode = MidiInputItem.InputMode.Button
+        input_item._mode = mode
+        input_item.message = message  # updates the whole item
+        input_item.port_name = port_name
+        return input_item
+    
+    
     def __hash__(self):
         return str(self.id).__hash__()
     
@@ -262,13 +354,7 @@ class MidiInputItem():
     
     # def __eq__(self, other):
     #     ''' compares two midi inputs to see if they are the same '''
-
-        
-    #     if self.message is not None and other.message is not None:
-    #         return self.message == other.message
-    #     if self.message is None and other.message is None:
-    #         return True
-    #     return False
+    #     return self._message_key == other._message_key
 
 
 
@@ -297,7 +383,7 @@ class MidiListener(QtCore.QThread):
                 for message in inport.iter_pending():
                     logging.getLogger("system").info(f"Midinput: heard message: {message}")
                     self.callback(self.port_name, self.port_number, message)
-                time.sleep(0.1)
+                time.sleep(0.01)
             logging.getLogger("system").info(f"Midinput: close port {self.port_number}")
 
 
@@ -414,7 +500,12 @@ class MidiInterface(QtCore.QObject):
         ''' returns a list of MIDI port names '''
         return self._port_names
     
-
+    def port_valid(self, value : str):
+        '''true if the port name exists (case insensitive) '''
+        return value.casefold() in (name.casefold() for name in self._port_names)
+    
+    
+        
 
 
     
@@ -541,6 +632,7 @@ class MidiInputConfigDialog(QtWidgets.QDialog):
         # midi message
         self._midi_message = None
         self._port_name = None
+        self._mode = MidiInputItem.InputMode.Button # default to button input mode
 
         interface : MidiInterface = MidiInterface()
 
@@ -633,13 +725,58 @@ class MidiInputConfigDialog(QtWidgets.QDialog):
 
         # midi message repeater 
         self._midi_message_widget = QtWidgets.QLabel()
+        self._midi_message_container_widget = QtWidgets.QWidget()
+        self._midi_message_container_layout = QtWidgets.QHBoxLayout()
+        self._midi_message_container_widget.setLayout(self._midi_message_container_layout)
+        self._midi_message_container_layout.addWidget(self._midi_message_widget)
 
         # validation message
         self._validation_message_widget = gremlin.ui.ui_common.QIconLabel()
 
+        # input mode
+        self._container_mode_widget = QtWidgets.QWidget()
+        self._container_mode_layout = QtWidgets.QVBoxLayout()
+        self._container_mode_widget.setLayout(self._container_mode_layout)
+        
+        
+        self._container_mode_radio_widget = QtWidgets.QWidget()
+        self._container_mode_radio_layout = QtWidgets.QHBoxLayout()
+        self._container_mode_radio_widget.setLayout(self._container_mode_radio_layout)
+        self._container_mode_description_widget = QtWidgets.QLabel()
+
+
+
+        self._mode_button_widget = QtWidgets.QRadioButton("Button")
+        self._mode_button_widget.setToolTip("The input will behave as an on/off button based on the value.<br/>" 
+                                            "If the value is in the lower half of the range, the button is released.<br>" 
+                                            "If the value is in the upper half of the reange, the button will be pressed<br>")
+        self._mode_button_widget.clicked.connect(self._mode_button_cb)
+
+        self._mode_axis_widget = QtWidgets.QRadioButton("Axis")
+        self._mode_axis_widget.setToolTip("The input will be scaled (-1 to +1) based on the input's value")
+        self._mode_axis_widget.clicked.connect(self._mode_axis_cb)
+
+
+        self._mode_on_change_widget = QtWidgets.QRadioButton("Change")
+        self._mode_on_change_widget.setToolTip("The input will trigger as button press on any change in value")
+        self._mode_on_change_widget.clicked.connect(self._mode_change_cb)
+
+
+
+        self._container_mode_radio_layout.addWidget(QtWidgets.QLabel("Action mode:"))
+        self._container_mode_radio_layout.addWidget(self._mode_on_change_widget)
+        self._container_mode_radio_layout.addWidget(self._mode_button_widget)
+        self._container_mode_radio_layout.addWidget(self._mode_axis_widget)
+        self._container_mode_radio_layout.addStretch()
+
+        self._container_mode_layout.addWidget(self._container_mode_radio_widget)
+        self._container_mode_layout.addWidget(self._container_mode_description_widget)
+
+
         
         main_layout.addWidget(self.config_widget)
-        main_layout.addWidget(self._midi_message_widget)
+        main_layout.addWidget(self._container_mode_widget)
+        main_layout.addWidget(self._midi_message_container_widget)
         main_layout.addWidget(self._validation_message_widget)
         main_layout.addWidget(gremlin.ui.ui_common.QHLine())
         main_layout.addWidget(self.button_widget)
@@ -694,6 +831,25 @@ class MidiInputConfigDialog(QtWidgets.QDialog):
         elif command == MidiCommandType.PitchWheel:
             self._midi_data_a_label.setText("Value (0..16383)")
             max_a_range = 16383
+        elif command == MidiCommandType.SysEx:
+            pass
+        
+        # mode radio buttons
+        if self._mode == MidiInputItem.InputMode.Button:
+            self._container_mode_description_widget.setText(f"The input will trigger a button press when the value is in range {max_a_range//2}..{max_a_range}<br>Use this to trigger a button press from a specific MIDI message.")
+            with QtCore.QSignalBlocker(self._mode_button_widget):
+                self._mode_button_widget.setChecked(True)
+        elif self._mode == MidiInputItem.InputMode.Axis:
+            self._container_mode_description_widget.setText(f"The input act as an axis input using the MIDI value.<br>Use this mode if mapping to an axis output (MIDI value messages only)")
+            # turn off the value when in axis mode as it will change
+            display_b_data = False
+            with QtCore.QSignalBlocker(self._mode_axis_widget):
+                self._mode_axis_widget.setChecked(True)
+        elif self._mode == MidiInputItem.InputMode.OnChange:
+            self._container_mode_description_widget.setText(f"The input will trigger a button press on any value change<br>Use this mode to trigger a button or action whenever the MIDI command value changes.")
+            with QtCore.QSignalBlocker(self._mode_on_change_widget):
+                self._mode_on_change_widget.setChecked(True)                
+            
 
         self._midi_data_widget.setVisible(show_sysex)
         self._midi_data_label.setVisible(show_sysex)
@@ -705,7 +861,7 @@ class MidiInputConfigDialog(QtWidgets.QDialog):
         # update range based on command type
         self._midi_data_a_widget.setRange(0, max_a_range)
 
-        # update port specific listen
+        # update port specific listen button label
         self.listen_filter_widget.setText(f"Listen ({self.port_name})")
 
     def _update_command(self):
@@ -737,7 +893,7 @@ class MidiInputConfigDialog(QtWidgets.QDialog):
         message = None
         if show_sysex:
             # sysex message 
-            data_str = self._midi_data_widget.value()
+            data_str = self._midi_data_widget.text()
             data = byte_string_to_list(data_str)
 
             message = mido.Message("sysex")
@@ -773,7 +929,6 @@ class MidiInputConfigDialog(QtWidgets.QDialog):
         self._update_display()
         self._update_status(update = False)
 
-        
 
     def _update_status(self, update = False):
         # updates the status and message 
@@ -781,15 +936,52 @@ class MidiInputConfigDialog(QtWidgets.QDialog):
         message : mido.Message
         message = self.midi_message
         if message:
-            channel = message.channel + 1
-            msg_hex = self.midi_message.hex()
             cmd = MidiCommandType.from_mido_type(message.type)
             cmd_s = MidiCommandType.to_string(cmd)
-            msg = f"Port: {self.port_name} Channel: {channel} Cmd: {cmd_s} ({msg_hex})"
+            msg_hex = self.midi_message.hex()
+            if cmd != MidiCommandType.SysEx:
+                channel = message.channel + 1
+                msg = f"Port: {self.port_name} Channel: {channel} Cmd: {cmd_s} ({msg_hex})"
+            else:
+                data = self.midi_message.data
+                msg_data = byte_list_to_string(data)
+                if not msg_data:
+                    msg_data = "None"
+                msg = f"Port: {self.port_name} Cmd: {cmd_s} Data: {msg_data} ({msg_hex})"
         else:
             msg = "No valid message"
         
         self._midi_message_widget.setText(msg)
+
+    def _mode_button_cb(self):
+        if self._mode_button_widget.isChecked():
+            self._mode = MidiInputItem.InputMode.Button
+            self._update_display()
+
+    def _mode_axis_cb(self):
+        if self._mode_axis_widget.isChecked():
+            # validate that the mode can be set for this midi emssage
+            cmd = self.command
+            if cmd in (MidiCommandType.SysEx,MidiCommandType.ProgramChange):
+                # not allowed
+                if self._mode == MidiInputItem.InputMode.Button:
+                    with QtCore.QSignalBlocker(self._mode_button_widget):
+                        self._mode_button_widget.setChecked(True)
+                elif self._mode == MidiInputItem.InputMode.OnChange:
+                    with QtCore.QSignalBlocker(self._mode_on_change_widget):
+                        self._mode_on_change_widget.setChecked(True)
+                self._validation_message_widget.setText(f"The current MIDI command cannot be setup as an axis input.")
+                self._validation_message_widget.setIcon("fa.warning",True,color="red")
+            else:
+                # allowed
+                self._mode = MidiInputItem.InputMode.Axis
+                self._validate()
+        self._update_display()                
+
+    def _mode_change_cb(self):
+        if self._mode_on_change_widget.isChecked():
+            self._mode = MidiInputItem.InputMode.OnChange
+            self._update_display()
 
 
     @property
@@ -911,11 +1103,8 @@ class MidiInputConfigDialog(QtWidgets.QDialog):
         if command == MidiCommandType.SysEx:
             # grab the sysex data
             data = message.data
-            hex_data = ""
-            for byte in data:
-                hex_data += f"{byte:02X} "
-            hex_data.pop()
-            self._midi_data_widget.setText(hex_data)
+            hex = byte_list_to_string(data)
+            self._midi_data_widget.setText(hex)
 
             logging.getLogger("system").info(f"MIDI: set port: {port_name} cmd: {command} data: {data}")
         else:
@@ -964,34 +1153,65 @@ class MidiInputConfigDialog(QtWidgets.QDialog):
     def _validate(self):
         ''' validates the input to ensure it does not conflict with an existing input '''
         # assume ok
-        self._validation_message_widget.setText("")
-        if self._midi_message is not None:
-            # get the list of all the other inputs
-            parent_widget = self._parent
-            model : input_item.InputItemListModel = parent_widget.input_item_list_model
-            self_bytes = self._midi_message.bytes()
-            for index in range(model.rows()):
-                widget = parent_widget.itemAt(index)
-                if widget == self: continue # skip us
-                # grab the input's configured midi message
-                other_message = widget.identifier.input_id.message
-                if other_message is None:
-                    # input not set = ok
-                    continue 
-                other_bytes = other_message.bytes()
-                if self_bytes == other_bytes:
-                    self._validation_message_widget.setText(f"Input conflict detected with input [{index+1}] - ensure inputs are unique")
-                    self._validation_message_widget.setIcon("fa.warning",True)
-                    return False
+        valid = True
+        try:
+            self._validation_message_widget.setText("")
+            if self._midi_message is not None:
+                # get the list of all the other inputs
+                parent_widget = self._parent
+                model = parent_widget.input_item_list_model
+                message = self._midi_message
+                input_item = MidiInputItem.from_message(self._port_name, message, self._mode)
+                key = input_item.message_key
+                for index in range(model.rows()):
+                    widget = parent_widget.itemAt(index)
+                    if widget == self: continue # skip us
+                    # grab the input's configured midi message
+                    other_input = widget.identifier.input_id
+                    other_message = other_input.message
+                    if other_message is None:
+                        # input not set = ok
+                        continue 
+
+                    other_key = other_input.message_key
+                    if key == other_key:
+                        self._validation_message_widget.setText(f"Input conflict detected with input [{index+1}] - ensure inputs are unique")
+                        self._validation_message_widget.setIcon("fa.warning",True, color="red")
+                        valid = False
+                        return
+                        
+                    
+                # validate message values
+                cmd = input_item.command
+                if cmd == MidiCommandType.SysEx and len(message.data) == 0:
+                    # no data for sysex provided
+                    valid = False
+                    return
+                    
+                if self._mode == MidiInputItem.InputMode.Axis and cmd in (MidiCommandType.SysEx,MidiCommandType.ProgramChange):
+                    # cannot be an axis mode for sysex or program change
+                    valid = False
+                    return
+                
+
+
             
-        # no conflicts
-        self._validation_message_widget.setText()
-        self._validation_message_widget.setIcon()
+        finally:
+            self.ok_widget.setEnabled(valid)
+            self._valid = valid
 
-        return True
+            if valid:
+                # clear error status
+                self._validation_message_widget.setText()
+                self._validation_message_widget.setIcon()
+
+        return valid
 
 
-        
+    @property
+    def mode(self):
+        ''' current input mode '''
+        return self._mode
         
         
             
@@ -1042,6 +1262,7 @@ class MidiDeviceTabWidget(QtWidgets.QWidget):
 
         # Input type specific setups
         self.input_item_list_view.set_model(self.input_item_list_model)
+        self.input_item_list_view.updated.connect(self._update_conflicts)
         self.input_item_list_view.redraw()
 
         # Handle user interaction
@@ -1214,6 +1435,14 @@ class MidiDeviceTabWidget(QtWidgets.QWidget):
         widget.update_description(data.description)
         widget.enable_close()
         widget.enable_edit()
+        mode = input_id.mode
+        if mode == MidiInputItem.InputMode.Button:
+            widget.setIcon("mdi.gesture-tap-button")
+        elif mode == MidiInputItem.InputMode.Axis:
+            widget.setIcon("fa.sliders")
+        elif mode == MidiInputItem.InputMode.OnChange:
+            widget.setIcon("fa.exchange")
+
         # remember what widget is at what index
         self._widget_map[index] = widget
 
@@ -1242,37 +1471,140 @@ class MidiDeviceTabWidget(QtWidgets.QWidget):
         message = self._edit_dialog.midi_message
         index = self._edit_dialog.index
         port_name = self._edit_dialog.port_name
+        mode = self._edit_dialog.mode
 
 
         data = self.input_item_list_model.data(index)
         data.input_id.port_name = port_name
         data.input_id.message = message
-        
+        data.input_id.mode = mode
         self.input_item_list_view.redraw()
         
 
     def _close_item_cb(self, widget, index, data):
         ''' called when the close button is clicked '''
         self.model.removeRow(index)
-        pass                    
-    
+        pass
+
+    def _update_conflicts(self):
+         # check for conflicts with other entries
+        model = self.input_item_list_model
+        
+        widgets = [self.itemAt(index) for index in range(model.rows())]
+        compared_widgets = []
+        conflicted_widgets = []
+        for input_widget in widgets: 
+            input_widget_index = widgets.index(input_widget)
+            key = input_widget.identifier.input_id.message_key
+            compare_widgets = [w for w in widgets if w != input_widget]
+            for widget in compare_widgets:
+                if not widget:
+                    continue
+                if (input_widget, widgets) in compared_widgets:
+                    continue 
+                if (widget, input_widget) in compared_widgets:
+                    continue 
+                compared_widgets.append((input_widget, widget))
+
+                # grab the input's configured midi message
+                other_input = widget.identifier.input_id
+                other_message = other_input.message
+                if other_message is None:
+                    # input not set = ok
+                    continue 
+
+                other_key = other_input.message_key
+                if key == other_key:
+                    index = widgets.index(widget)
+                    self._set_status(widget,"fa.warning", f"Input conflict detected with input [{input_widget_index + 1}]", color = "red")
+                    self._set_status(input_widget,"fa.warning", f"Input conflict detected with input [{index + 1}]", color = "red")
+                    conflicted_widgets.append(widget)
+                    conflicted_widgets.append(input_widget)
+                    break
+
+        ok_widgets = [widget for widget in widgets if not widget in conflicted_widgets]
+        for widget in ok_widgets:
+            self._set_status(widget)
+        
+
+    def _set_status(self, widget, icon = None, status = None, use_qta = True, color = None):
+        ''' sets the status of an input widget '''
+        status_widget = widget.findChild(gremlin.ui.ui_common.QIconLabel, "status")
+        if color:
+            status_widget.setIcon(icon, use_qta = use_qta, color = color)
+        else:
+            status_widget.setIcon(icon, use_qta = use_qta)
+        
+        status_widget.setText(status)
+        status_widget.setVisible(status is not None)
+
     def _populate_input_widget_ui(self, input_widget, container_widget):
         ''' called when a button is created for custom content '''
         data : MidiInputItem = input_widget.identifier.input_id 
-        label = gremlin.ui.ui_common.QIconLabel(text=data.display_name)
-        
+        label_widget = QtWidgets.QLabel(data.display_name)
+        status_widget = gremlin.ui.ui_common.QIconLabel()
+        status_widget.setObjectName("status")
+        is_warning = False
+        status_text = ""
         if data.message is None:
-            label.setIcon("fa.warning", use_qta=True)
-        layout = QtWidgets.QHBoxLayout()
+            is_warning = True
+            status_text = "Not configured"
+        if not data.port_valid:
+            is_warning = True
+            if status_text:
+                status_text += " "
+            status_text += f"Invalid port '{data.port_name}'"
+        
+        # # check for conflicts with other entries
+        # model = self.input_item_list_model
+        # key = data.message_key
+        # for index in range(model.rows()):
+        #     widget = self.itemAt(index)
+        #     if not widget:
+        #         continue
+        #     if widget == input_widget: continue # skip us
+        #     # grab the input's configured midi message
+        #     other_input = widget.identifier.input_id
+        #     other_message = other_input.message
+        #     if other_message is None:
+        #         # input not set = ok
+        #         continue 
+
+        #     other_key = other_input.message_key
+        #     if key == other_key:
+        #         status_text = f"Input conflict detected with input [{index+1}]<br>Ensure inputs are unique"
+        #         is_warning = True
+        #         break
+
+        
+
+        if is_warning:
+            status_widget.setIcon("fa.warning", use_qta=True, color="red")
+        else:
+            status_widget.setIcon() # clear it
+
+        status_widget.setText(status_text)
+
+        layout = QtWidgets.QVBoxLayout()
         container_widget.setLayout(layout)
-        layout.addWidget(label)
+        layout.addWidget(label_widget)
+        layout.addWidget(status_widget)
+        
         container_widget.parent().setToolTip(data.display_tooltip)
 
         
 
 
-    def _populate_name(self, widget, identifier):        
-        return "MIDI input"
+    def _populate_name(self, widget, identifier):       
+        mode = identifier.input_id.mode
+
+        if mode == MidiInputItem.InputMode.Button:
+            stub = "button"
+        elif mode == MidiInputItem.InputMode.Axis:
+            stub = "axis"
+        elif mode == MidiInputItem.InputMode.OnChange:
+            stub = "on change"
+        return f"MIDI input ({stub})"
     
 
 

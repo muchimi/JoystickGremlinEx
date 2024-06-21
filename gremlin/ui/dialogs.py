@@ -30,7 +30,6 @@ from PySide6.QtWidgets import QMessageBox
 from gremlin.clipboard import Clipboard
 import gremlin.config
 import gremlin.joystick_handling
-from joystick_gremlin import GremlinUi
 from . import ui_about, ui_common
 from gremlin.util import load_icon
 import logging

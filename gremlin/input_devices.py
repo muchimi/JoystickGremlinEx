@@ -1147,60 +1147,106 @@ class MidiClient(QtCore.QObject):
         from gremlin.ui.midi_device import MidiInterface
         super().__init__()
         self._interface = MidiInterface()
-        self._interface.midi_message.connect(self._midi_message)
+        self._interface.midi_message.connect(self._midi_message_cb)
         self._event_handler = gremlin.event_handler.EventHandler()
         self._event_listener = gremlin.event_handler.EventListener()
-        
+        self._midi_map = {}  # list of message keys
+      
 
     def start(self):
         ''' starts the client - all ports '''
+        # build a map of the input items
+        from gremlin.ui.midi_device import MidiInterface, MidiInputItem
+        import gremlin.shared_state
+        profile = gremlin.shared_state.current_profile
+        
+        # build a list of input items to midi messages
+        self._midi_map = {}  # list of message keys
+        for device in profile.devices.values():
+            if device.name == "midi":
+                for mode in device.modes.values():
+                    for input_items in mode.config.values():
+                        for input_item in input_items:
+                            if isinstance(input_item, MidiInputItem):
+                                message_key = input_item.message_key
+                                if not message_key in self._midi_map.keys():
+                                    self._midi_map[message_key] = []
+                                if input_item.port_valid:
+                                    self._midi_map[message_key].append(input_item)
+                                    logging.getLogger("system").info(f"MIDI: register trigger on: {input_item.display_name} mode: {input_item.mode_string} key: {message_key}")
+                            
+
+
         self._interface.start()
 
     def stop(self):
         ''' stops the client '''
         self._interface.stop()
+        self._midi_map = {}  
 
-    def _midi_message(self, port_name : str, port_index : int,  message):
+    def _midi_message_cb(self, port_name : str, port_index : int,  message):
         ''' called when a midi messages is provided by the listener  '''
         from gremlin.ui.midi_device import MidiInputItem, MidiDeviceTabWidget, MidiCommandType
         from gremlin.input_types import InputType
         #self._callback(port_name, port_index, message)
+
+        # get the input items behind this message
         data = MidiInputItem()
         data.port_name = port_name
         data.message = message # this decodes the data
+        message_key = data.message_key
 
-        # send the value over if the message is a value type message
-        command = data.command
-        range = 127
-        raw_value = None
-        if command == MidiCommandType.Control:
-            raw_value = message.value
-        elif command in (MidiCommandType.NoteOff, MidiCommandType.NoteOn):
-            raw_value = message.velocity
-        elif command == MidiCommandType.Aftertouch:
-            raw_value = message.value
-        elif command == MidiCommandType.ChannelAftertouch:  
-            raw_value = message.value
-        elif command == MidiCommandType.ProgramChange:
-            raw_value = None
-        elif command == MidiCommandType.PitchWheel:
-            raw_value = message.pitch
-            range = 16383
         
-        
-        
-        value = gremlin.util.scale_to_gremlin(raw_value, 0, range) if raw_value else None
 
-        self._event_listener.midi_event.emit(
-        gremlin.event_handler.Event(
-            event_type= InputType.Midi,
-            device_guid= MidiDeviceTabWidget.device_guid,
-            identifier=data,
-            is_pressed = True, # this ensures the event is processed as if a key/button was pressed
-            value = value,
-            raw_value = raw_value
+        if message_key in self._midi_map.keys():
+            logging.getLogger("system").info(f"MIDI: runtime: processing {message_key}")
+            for input_item in self._midi_map[message_key]:
+                # send the value over if the message is a value type message
+                command = input_item.command
+                range = 127
+                raw_value = None
+                if command == MidiCommandType.Control:
+                    raw_value = message.value
+                elif command in (MidiCommandType.NoteOff, MidiCommandType.NoteOn):
+                    raw_value = message.velocity
+                elif command == MidiCommandType.Aftertouch:
+                    raw_value = message.value
+                elif command == MidiCommandType.ChannelAftertouch:  
+                    raw_value = message.value
+                elif command == MidiCommandType.ProgramChange:
+                    raw_value = None
+                elif command == MidiCommandType.PitchWheel:
+                    raw_value = message.pitch
+                    range = 16383
+                
+                # button press mode - if the value is in the top half of the range, the button is considered pressed
+                is_axis = False
+                if input_item.mode == MidiInputItem.InputMode.Button:
+                    is_pressed = raw_value >= range / 2
+                    value = 1 if is_pressed else 0
+                elif input_item.mode == MidiInputItem.InputMode.Axis:
+                    is_pressed = False
+                    value = gremlin.util.scale_to_range(raw_value, 0, range)
+                    is_axis = True
+                elif input_item.mode == MidiInputItem.InputMode.OnChange:
+                    is_pressed = True
+                    value = raw_value
 
-        ))
+                logging.getLogger("system").info(f"MIDI: send event: is_pressed: {is_pressed} value: {value} raw value: {raw_value} is axis: {is_axis}")
+
+                self._event_listener.midi_event.emit(
+                gremlin.event_handler.Event(
+                    event_type= InputType.Midi,
+                    device_guid= MidiDeviceTabWidget.device_guid,
+                    identifier= input_item,
+                    is_pressed = is_pressed, 
+                    value = value,
+                    raw_value = raw_value,
+                    is_axis = is_axis
+
+                ))
+        else:
+            logging.getLogger("system").info(f"MIDI: runtime: ignoring {message_key}")
     
 
 

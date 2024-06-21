@@ -20,6 +20,7 @@ from PySide6 import QtWidgets, QtCore, QtGui
 import copy
 
 import gremlin
+import gremlin.ui.midi_device
 from gremlin.util import load_icon, load_pixmap
 from gremlin.input_types import InputType
 from gremlin.base_buttons import *
@@ -37,6 +38,7 @@ syslog = logging.getLogger("system")
 import qtawesome as qta
 import gremlin.ui.input_item 
 import gremlin.base_profile 
+import gremlin.ui.ui_common
 
  
 from gremlin.ui import virtual_button
@@ -273,6 +275,9 @@ class InputItemListView(ui_common.AbstractView):
 
     """View displaying the contents of an InputItemListModel."""
 
+    # fires when the list view is redrawn
+    updated = QtCore.Signal()
+
     # Conversion from input type to a display name
     type_to_string = {
         InputType.JoystickAxis: "Axis",
@@ -414,6 +419,8 @@ class InputItemListView(ui_common.AbstractView):
             if verbose:
                 logging.getLogger("system").info(f"LV: {device_name} [{index:02d}] type: {InputType.to_string(data.input_type)} name: {data.input_id}")
         self.scroll_layout.addStretch()
+
+        self.updated.emit()
         
 
 
@@ -486,6 +493,34 @@ class InputItemListView(ui_common.AbstractView):
         
         return self.model.data(index)
     
+    def _close_item_cb(self, index):
+        ''' remove a particular input '''
+
+        # select the widget if it's not selected
+        data = self.model.data(index)
+        if data and data.containers:
+            # prompt confirm
+            message_box = QtWidgets.QMessageBox()
+            message_box.setText("Delete confirmation")
+            message_box.setInformativeText("This will delete associated actions for this entry.\nAre you sure?")
+            pixmap = load_pixmap("warning.svg")
+            pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio) 
+            message_box.setIconPixmap(pixmap)
+            message_box.setStandardButtons(
+                QtWidgets.QMessageBox.StandardButton.Ok |
+                QtWidgets.QMessageBox.StandardButton.Cancel
+                )
+            message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
+            result = message_box.exec()
+            if result == QtWidgets.QMessageBox.StandardButton.Ok:
+                self._confirmed_close(index)
+
+    
+    def _confirmed_close(self, index):
+        self.model.removeRow(index)
+        self.redraw()
+        
+    
     def _edit_item_cb(self, index):
         ''' emits the edit event along with the item being edited '''
         self.item_edit.emit(self, index, self.model.data(index).input_id) # widget, index, data
@@ -501,7 +536,7 @@ class InputItemListView(ui_common.AbstractView):
 
 
     def select_item(self, index, emit_signal=True):
-        """Handles selecting a specific item.
+        """Handles selecting a specific item.  this is called whenever an input item is selected
 
         :param index the index of the item being selected
         :param emit_signal flag indicating whether or not a signal is to be
@@ -794,7 +829,7 @@ class InputItemWidget(QtWidgets.QFrame):
         self.populate_name = populate_name
 
         
-        self._label_widget = QtWidgets.QLabel()
+        self._label_widget = gremlin.ui.ui_common.QIconLabel()
         self._description_widget = QtWidgets.QLabel()
         self._icon_layout = QtWidgets.QHBoxLayout()
         self._icons = []
@@ -879,6 +914,9 @@ class InputItemWidget(QtWidgets.QFrame):
             self.label_selected.setStyleSheet(style)   
             
 
+    def setIcon(self, icon_path, use_qta = True):
+        ''' sets the widget's icon '''
+        self._label_widget.setIcon(icon_path, use_qta)
 
     def enable_close(self):
         ''' enables the close button on the input widget (keyboard only usually) '''
@@ -1333,6 +1371,12 @@ class AbstractActionWidget(QtWidgets.QFrame):
         :return InputType corresponding to this action
         """
         return self.action_data.parent.parent.input_type
+        # if input_type == InputType.Midi:
+        #     # change input type based on midi mode so action configures itself correctly for the type of input that will be sent
+        #     input_item = self.action_data.parent.parent.input_id
+        #     if input_item.mode == gremlin.ui.midi_device.MidiInputItem.InputMode.Axis:
+        #         return InputType.JoystickAxis
+        # return input_type
 
     def _get_profile_root(self):
         """Returns the root of the entire profile.

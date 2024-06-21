@@ -94,7 +94,6 @@ from gremlin.singleton_decorator import SingletonDecorator
 class Version():
     version = APPLICATION_VERSION
 
-
 class GremlinUi(QtWidgets.QMainWindow):
 
     """Main window of the Joystick Gremlin user interface."""
@@ -1757,6 +1756,7 @@ if __name__ == "__main__":
 
     # Create Gremlin UI
     ui = GremlinUi()
+    
     syslog.info("Gremlin UI created")
 
     # Handle user provided command line arguments
@@ -1788,3 +1788,7 @@ if __name__ == "__main__":
 
     syslog.info("Terminating Gremlin")
     sys.exit(0)
+
+
+
+    

@@ -60,6 +60,8 @@ class Event:
 			raw_value=None,
 			force_remote = False,
 			action_id = None,
+			data = None,
+			is_axis = False # true if the input should be considered an axis (variable) input
 	):
 		"""Creates a new Event object.
 
@@ -82,22 +84,17 @@ class Event:
 		self.raw_value = raw_value
 		self.force_remote = force_remote
 		self.action_id = action_id # the current action id to load
+		self.data = data # extra data passed along with the event
+		self.is_axis = is_axis
 
 	def clone(self):
 		"""Returns a clone of the event.
 
 		:return cloned copy of this event
 		"""
-		return Event(
-			self.event_type,
-			self.identifier,
-			self.device_guid,
-			self.value,
-			self.is_pressed,
-			self.raw_value,
-			self.force_remote,
-			self.action_id
-		)
+		import copy
+		return copy.deepcopy(self)
+
 
 	def __eq__(self, other):
 		return self.__hash__() == other.__hash__()
@@ -289,7 +286,8 @@ class EventListener(QtCore.QObject):
 				device_guid=event.device_guid,
 				identifier=event.input_index,
 				value=self._apply_calibration(event),
-				raw_value=event.value
+				raw_value=event.value,
+				is_axis = True
 			))
 		elif event.input_type == dinput.InputType.Button:
 			self.joystick_event.emit(Event(
@@ -463,6 +461,7 @@ class EventHandler(QtCore.QObject):
 		if plugin.keyword not in self.plugins:
 			self.plugins[plugin.keyword] = plugin
 
+
 	def add_callback(self, device_guid, mode, event, callback, permanent=False):
 		"""Installs the provided callback for the given event.
 
@@ -504,15 +503,14 @@ class EventHandler(QtCore.QObject):
 			elif event.event_type == InputType.Midi:
 				# MIDI event
 				midi_input = event.identifier
-				message = midi_input.message
-				bytes = message.hex() # hashable string
+				key = midi_input.message_key
 				if device_guid not in self.midi_callbacks.keys():
 					self.midi_callbacks[device_guid] = {}
 				if mode not in self.midi_callbacks[device_guid].keys():
 					self.midi_callbacks[device_guid][mode] = {}
-				if not bytes in self.midi_callbacks[device_guid][mode]:
-					self.midi_callbacks[device_guid][mode][bytes] = []
-				data = self.midi_callbacks[device_guid][mode][bytes]
+				if not key in self.midi_callbacks[device_guid][mode]:
+					self.midi_callbacks[device_guid][mode][key] = []
+				data = self.midi_callbacks[device_guid][mode][key]
 				data.append((self._install_plugins(callback),permanent))
 
 			elif event.event_type == InputType.OpenSoundControl:
@@ -526,8 +524,6 @@ class EventHandler(QtCore.QObject):
 					self.osc_callbacks[device_guid][mode][osc_input] = []
 				data = self.osc_callbacks[device_guid][mode][osc_input]
 				data.append((self._install_plugins(callback),permanent))				
-			
-
 			else:
 				# regular event
 				if device_guid not in self.callbacks:
@@ -687,11 +683,11 @@ class EventHandler(QtCore.QObject):
 		''' returns list of callbacks matching the event '''
 		callback_list = []
 		if event.event_type == InputType.Midi:
-			bytes = event.identifier.message.hex()
+			key = event.identifier.message_key
 			if event.device_guid in self.midi_callbacks:
 				callback_list = self.midi_callbacks[event.device_guid].get(
 					self._active_mode, {}
-				).get(bytes, [])
+				).get(key, [])
 
 		# Filter events when the system is paused
 		if not self.process_callbacks:

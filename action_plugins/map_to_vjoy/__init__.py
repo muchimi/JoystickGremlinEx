@@ -471,21 +471,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
     """
     locked = False
 
-    # Mapping from types to display names
-    # type_to_name_map = {
-    #     InputType.JoystickAxis: "Axis",
-    #     InputType.JoystickButton: "Button",
-    #     InputType.JoystickHat: "Hat",
-    #     InputType.Keyboard: "Button",
-    #     InputType.KeyboardLatched: "Button",
-    #     InputType.OpenSoundControl: "Button",
-    # }
-
-    # name_to_type_map = {
-    #     "Axis": InputType.JoystickAxis,
-    #     "Button": InputType.JoystickButton,
-    #     "Hat": InputType.JoystickHat
-    # }
+ 
 
     # all button type inputs (hat is handled separately as is axis)
     input_type_buttons = [InputType.JoystickButton, 
@@ -513,38 +499,12 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         try:
             VJoyWidget.locked = True    
 
-            input_types = {
-                InputType.Keyboard: [
-                    InputType.JoystickButton
-                ],
-                InputType.KeyboardLatched: [
-                    InputType.JoystickButton
-                ],
-                InputType.OpenSoundControl: [
-                    InputType.JoystickAxis,
-                    InputType.JoystickButton
-                ],
-                InputType.Midi: [
-                    InputType.JoystickAxis,
-                    InputType.JoystickButton
-                ],
-                InputType.JoystickAxis: [
-                    InputType.JoystickAxis,
-                    InputType.JoystickButton
-                ],
-                InputType.JoystickButton: [
-                    InputType.JoystickButton
-                ],
-                InputType.JoystickHat: [
-                    InputType.JoystickButton,
-                    InputType.JoystickHat
-                ]
-            }
-
             self.valid_types = [
                     InputType.JoystickAxis,
                     InputType.JoystickButton,
-                    InputType.JoystickHat
+                    InputType.JoystickHat,
+                    InputType.Midi,
+                    InputType.OpenSoundControl,
                 ]
 
 
@@ -555,7 +515,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
             # Create UI widgets for absolute / relative axis modes if the remap
             # action is being added to an axis input type
-            self.input_type = self.action_data.input_type
+            self.input_type = self._get_input_type() # self.action_data.input_type
         
             #self.main_layout.addWidget(self.vjoy_selector)
 
@@ -750,11 +710,18 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         else:
             action_name = None
 
-        if input_type == InputType.JoystickAxis:
-            axis_name = self.get_axis_name(input_id)
+        if self.action_data.input_is_axis():
             if not action_name:
                 action_name = f"Vjoy device {vjoy_device_id} axis {vjoy_input_id} ({self.get_axis_name(vjoy_input_id)})"
-            name = f"Axis {input_id} ({axis_name}) -> {action_name}"
+            if input_type == InputType.Midi:
+                name = f"MIDI axis -> {action_name}"
+            else:
+                axis_name = self.get_axis_name(input_id)
+                name = f"Axis {input_id} ({axis_name}) -> {action_name}"
+        elif input_type == InputType.Midi:
+            if not action_name:
+                action_name = f"Vjoy device {vjoy_device_id} button {vjoy_input_id}"
+            name = f"MIDI trigger -> {action_name}"
         elif input_type in VJoyWidget.input_type_buttons:
             if not action_name:
                 action_name = f"Vjoy device {vjoy_device_id} button {vjoy_input_id}"
@@ -764,6 +731,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
                 action_name = f"Vjoy device {vjoy_device_id} hat {vjoy_input_id}"
             name = f"Hat {input_id} -> {action_name}"
         else:
+
             name = f"Unknown input type: {input_type}"
         
         
@@ -1020,7 +988,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.cb_action_list.clear()
 
             actions = ()
-            if self.action_data.input_type == InputType.JoystickAxis:
+            if self.action_data.input_is_axis():
                 # axis can only set an axis
                 actions = (VjoyAction.VJoyAxis, VjoyAction.VJoyAxisToButton) #, VjoyAction.VjoyMergeAxis)
                 
@@ -1111,7 +1079,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             action_mode = self._get_action_mode()
 
             dev = self.vjoy_map[self.action_data.vjoy_device_id]
-            if input_type == InputType.JoystickAxis and action_mode != VjoyAction.VJoyAxisToButton:
+            if self.action_data.input_is_axis() and action_mode != VjoyAction.VJoyAxisToButton:
                 count = dev.axis_count
                 for id in range(1, count+1):
                     self.cb_vjoy_input_selector.addItem(f"Axis {id} {self.get_axis_name(id)}",id)
@@ -1142,6 +1110,9 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         else:
             self.target_value_valid = False
 
+    
+
+
     def _update_ui_action_mode(self, action_data):
         ''' updates ui based on the current action requested to show/hide needed components '''
         action = action_data.action_mode
@@ -1158,7 +1129,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         paired_visible = False
         hardware_widget_visible = False
 
-        if input_type == InputType.JoystickAxis:
+        if self.action_data.input_is_axis(): #input_type == InputType.JoystickAxis:
             
             grid_visible = action == VjoyAction.VJoyAxisToButton
             range_visible = action in (VjoyAction.VJoyRangeAxis, VjoyAction.VJoyAxisToButton)
@@ -1189,17 +1160,6 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 
         self.hardware_input_container_widget.setVisible(hardware_widget_visible)
-        # self.lbl_input_device_a.setVisible(hardware_widget_visible)
-        # self.lbl_input_axis_a.setAcceptDrops(hardware_widget_visible)
-        # self.lbl_input_device_name_a.setVisible(hardware_widget_visible)
-        # self.lbl_input_axis_name_a.setAcceptDrops(hardware_widget_visible)
-
-        # self.lbl_input_device_b.setVisible(hardware_widget_visible)
-        # self.lbl_input_axis_b.setAcceptDrops(hardware_widget_visible)
-        # self.hardware_device.setVisible(hardware_widget_visible)
-        # self.hardware_axis.setVisible(hardware_widget_visible)
-
-
         self.axis_range_value_widget.setVisible(range_visible)
         self.chkb_exec_on_release.setVisible(exec_on_release_visible)
         self.chkb_paired.setVisible(paired_visible)
@@ -1402,6 +1362,8 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         # Get the input type which can change depending on the container used
         input_type = self.action_data.input_type
+
+
         if self.action_data.parent.tag == "hat_buttons":
             input_type = InputType.JoystickButton
 
@@ -1432,6 +1394,8 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         is_button_mode = False
         button_id = None
 
+        
+        
         try:
             with QtCore.QSignalBlocker(self.cb_vjoy_device_selector):
                 index = self.cb_vjoy_device_selector.findData(vjoy_dev_id)
@@ -1453,8 +1417,8 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             else:
                 self.cb_action_list.setCurrentIndex(index)
                
-
-            if self.action_data.input_type == InputType.JoystickAxis:
+            if self.action_data.input_type == InputType.JoystickAxis or \
+                (self.action_data.input_type == InputType.Midi and self.action_data.hardware_input_id.mode_string =="axis"):
                 with QtCore.QSignalBlocker(self.reverse_checkbox):
                     self.reverse_checkbox.setChecked(self.action_data.reverse)
                 
@@ -1791,8 +1755,9 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
             # force remote mode on if specified in the event
             is_remote = True
             is_local = False
-        
-        if self.input_type == InputType.JoystickAxis:
+
+        if event.is_axis: # self.input_type == InputType.JoystickAxis:
+            # axis response mode
             target = value.current
 
             # axis mode
@@ -1874,11 +1839,13 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
                             force_remote = force_remote
                         )
 
-                    if event.is_pressed:
-                        if is_local:    
-                            joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = value.current                        
-                        if is_remote or is_paired:
-                            self.remote_client.send_button(self.vjoy_device_id, self.vjoy_input_id, value.current, force_remote = is_paired )
+                    #if event.is_pressed:
+                    if is_local:    
+                        joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = value.current                        
+                    if is_remote or is_paired:
+                        self.remote_client.send_button(self.vjoy_device_id, self.vjoy_input_id, value.current, force_remote = is_paired )
+                    
+
                     
             
             elif self.action_mode == VjoyAction.VjoyButtonRelease:
@@ -2016,14 +1983,6 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
 
     default_button_activation = (True, True)
 
-    # override default allowed input types here if not all
-    # input_types = [
-    #     InputType.JoystickAxis,
-    #     InputType.JoystickButton,
-    #     InputType.JoystickHat,
-    #     InputType.Keyboard
-    # ]
-
     functor = VJoyRemapFunctor
     widget = VJoyWidget
 
@@ -2054,7 +2013,7 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         self._merge_device_b_guid = None
         self._merge_device_b_axis = 1
 
-
+        # default mode
         self._action_mode = VjoyAction.VJoyButton
 
         self.range_low = -1.0 # axis range min
@@ -2064,6 +2023,9 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         # pick an appropriate default action set for the type of input this is
         if self.input_type == InputType.JoystickAxis:
             self.action_mode = VjoyAction.VJoyAxis
+        elif self.input_is_axis():
+                # input is setup as an axis
+                self.action_mode = VjoyAction.VJoyAxis
         elif self.input_type in VJoyWidget.input_type_buttons:
             self.action_mode = VjoyAction.VJoyButton
         elif self.input_type == InputType.JoystickHat:
@@ -2075,6 +2037,10 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         self.target_value = 0.0
         self.target_value_valid = True
         
+    def input_is_axis(self):
+        ''' true if the input is an axis type input '''
+        return self.input_type == InputType.JoystickAxis or \
+                self.input_type == InputType.Midi and self.hardware_input_id.mode_string == "axis"
 
 
     @property
@@ -2164,16 +2130,14 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
             input_string = None
             #log_sys_warn(f"VjoyRemap: don't know how to handle action mode: {self.action_mode}")
 
-
-        root_path = get_root_path()
-        folder = os.path.join(root_path, "action_plugins", "remap")
-        icon_file = os.path.join(folder, "gfx", f"icon_{input_string}_{self.vjoy_input_id:03d}.png")
-        if input_string and os.path.isfile(icon_file):
+        
+        icon_path = f"icon_{input_string}_{self.vjoy_input_id:03d}.png" if input_string else "joystick.png"
+        
+        icon_file = get_icon_path(icon_path)
+        if os.path.isfile(icon_file):
             return icon_file
             
-        # log_sys_warn(f"Icon folder: {folder}")
-        # log_sys_warn(f"Icon file: {icon_file}")
-        # log_sys_warn(f"Warning: unable to determine icon type: {self.input_type} for id {self.vjoy_input_id}")
+
         return super().icon()
             
     

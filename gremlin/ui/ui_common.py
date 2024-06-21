@@ -1352,12 +1352,18 @@ class QIconLabel(QtWidgets.QWidget):
         if stretch:
             layout.addStretch()   
 
-    def setIcon(self, icon_path = None, use_qta = False):
-        ''' sets the icon of the label '''
-        if use_qta:
-            pixmap = qta.icon(icon_path).pixmap(self.IconSize)
+    def setIcon(self, icon_path = None, use_qta = False, color = None):
+        ''' sets the icon of the label, pass a blank or None path to clear the icon'''
+        if icon_path:
+            if use_qta:
+                if color:
+                    pixmap = qta.icon(icon_path, color=color).pixmap(self.IconSize)    
+                else:
+                    pixmap = qta.icon(icon_path).pixmap(self.IconSize)
+            else:
+                pixmap = load_pixmap(icon_path) if icon_path else None
         else:
-            pixmap = load_pixmap(icon_path) if icon_path else None
+            pixmap = None
         if pixmap:
             pixmap = pixmap.scaled(QIconLabel.IconSize, QtCore.Qt.AspectRatioMode.KeepAspectRatio)
             self._icon_widget.setPixmap(pixmap)

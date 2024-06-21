@@ -1673,7 +1673,7 @@ class ContainerCallback:
         Creates a Value object from the event and passes the two through the
         execution graph until every entry has run or it is aborted.
         """
-        if event.event_type in [
+        if event.is_axis or event.event_type in [
             InputType.JoystickAxis,
             InputType.JoystickHat
         ]:
