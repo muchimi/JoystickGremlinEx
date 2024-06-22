@@ -32,12 +32,13 @@ added_binaries = [
 	
 ]
 
+
 a = Analysis(
     ["joystick_gremlin.py"],
     pathex=['C:/JoystickGremlin-develop'],
     binaries=added_binaries,
     datas=added_files,
-    hiddenimports=[],
+    hiddenimports=['mido.backends.rtmidi'],
     hookspath=None,
     runtime_hooks=None,
     excludes=None,

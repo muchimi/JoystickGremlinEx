@@ -74,6 +74,7 @@ Joystick Gremlin EX
 
 13.40.14ex
 
+- New MIDI input device - GremlinEx can listen to MIDI events
 - New file menu for opening Explorer to the current profile folder
 - New file menu for opening the profile XML in a text editor (it will save the profile first)
 
@@ -349,6 +350,96 @@ If the persist option is not checked, GremlinEx will use whatever data is in the
 
 ![](copy_paste_operations.png)
 
+
+# Devices
+
+## HID devices
+
+GremlinEx will show all detected game controllers in tabs located at the top of the UI.  These are the raw input devices, either buttons, hats or axes.
+
+## Keyboard device
+
+GremlinEx has a special Keyboard device that allows you to map keyboard combinations.  This functionality is provided for combination keys noting that Gremlin will not stop detected keyboard inputs by the target application.  Rather, it will add functionality to them if the keyboard combination is not used in the target application.
+
+GremlinEx allows you to map function keys F13 to F24 and any QWERTY keyboard layouts (no support for other layouts as of yet).  Localization is on the to-do list.
+
+Unlike hardware devices, keyboard inputs can be added, removed and edited.  If an input is removed, it will remove any associated mappings and display a warning box to this effect.
+
+## MIDI device
+
+This is a feature I wanted for a long time. GremlinEx, as of 13.40.14ex, can map MIDI messages and use those to trigger actions.
+
+Unlike hardware devices, MIDI inputs must be defined and added to tell GremlinEx what to listen to.  Because MIDI can be cryptic, the configuration dialog allows you to listen to MIDI data and automatically program what it "hears" as an input.  Inputs can also be manually setup if needed.
+
+Gremlin categorizes MIDI messages in that it doesn't look at the value data in the MIDI input stream - rather it looks at the port, the channel, the command, and any specific command data, such as the note number or the controller number.
+
+Gremlin will thus, on purpose, not distinguish between two notes if the velocity is the only thing that changes.  Rather, the MIDI value is passed along to the actions as the value parameter, which enables mapping to joystick values easily (see the trigger mode section below)
+
+### MIDI inputs
+
+All MIDI inputs are supported including SysEx messages.  The general process is to add a new input to GremlinEx in the MIDI device tab which will appear on the left.  The input can be configured by click on the cog wheel.
+
+Inputs can be deleted via the trashcan icon, or all inputs cleared via the clear all button.  Use with causion as if you get past the confirmation box, there is no undo and all the container data will be gone unless you previously copied it to the clipboard.  Confirmation boxes only show up if you have a container defined for an input.
+
+### MIDI trigger modes
+
+The input has three trigger modes for each MIDI input that alter how the MIDI data is processed by GremlinEx.
+
+#### Change
+
+In the change mode, anytime the MIDI data is changed for this command, such as velocity, pressure, or control value, the input will trigger.
+
+#### Button
+
+In the button mode, GremlinEx will monitor the MIDI data value for that command if it has one, and will trigger a "pressed event" if the value is in the top half of the range.  This is equivalent to pressing the button.  A "released event" will trigger if the value is the lower half of the range.  The range is typically 0 to 127 for most commands, except for the Pitch wheel which is 0 to 16383.
+
+#### Axis
+
+In the axis trigger mode, GremlinEx will treat the MIDI input as an axis, and will tell actions that the input is an axis. This will let you map an output axis to that input and function like any other input mapped to an axis.  All actions available to an axis mapping become available.   GremlinEx will take the range of values possible for that MIDI commmand, typically 0 to 127, and map that to a -1.0 to +1.0 range, meaning that 63 is the centered position.
+
+The axis mode is typically used to map MIDI faders and rotary knobs to a VJOY axis.
+
+To map an axis via Gremlin using a MIDI input, the VjoyRemap action must be used as the regular remap action is not aware of MIDI, and cannot be changed to avoid breaking old profiles.
+
+### Changing modes
+
+If an input already has mapping containers attached, GremlinEx will prevent switching from an axis mode to a button/change mode and vice versa.  This is because containers and actions, when added to an input, are tailored to the type of input it is, and it's not possible to change it after the fact to avoid mapping problems and odd behaviors.
+
+### MIDI conflicts
+
+MIDI input conflicts are possible and stem from the ability to map MIDI messages via different inputs that map to the same or similar message.   GremlinEx will scan existing mappings to avoid this as much as possible, however it is not foolproof as there are ways to configure MIDI messages in such a way conflicts may not be detected.
+
+
+### MIDI ports
+
+GremlinEx listens to all MIDI ports concurrently so multiple MIDI ports can be used at the same time.  GremlinEx will scan for available ports.
+
+If a port goes away after you've configured an input on that port, that port becomes invalid and will not be used for output.  GremlinEx will not delete that input however, but GremlinEx will display a warning on each invalid input.
+
+### Network MIDI
+
+While outside of the scope of this document and GremlinEx, you can easily network MIDI events using [rtpMidi](https://www.tobias-erichsen.de/software/rtpmidi.html).  Another utility that is useful is [loopMidi](https://www.tobias-erichsen.de/software/loopmidi.html). These utilities let you map MIDI input from a device attached to another computer via the network and send that data to the GremlinEx machine.   We won't go into details on how to set that up, but the idea is that a MIDI device sends output to a port, and rtpMidi allows that port data to be transferred to the GremlinEx machine.  GremlinEx will be able to use that input to trigger events.
+
+**important**  GremlinEx will not listen to MIDI data via the remote control feature.  The remote control feature is only for output mapping, not for input.  Use the utilities above to network MIDI traffic which is outside the scope of GremlinEx.
+
+
+### Using MIDI from touch surfaces
+
+The MIDI input feature in GremlinEx is designed to work hand in hand with "glass" input surfaces like Hexler's TouchOSC or OSCPilot, or any software based control surface that sends MIDI data.
+
+In TouchOSC's case, if you use the button mode in Gremlin to map a particular command, GremlinEx will press the button while the "glass" button is pressed, and automatically release it when the "glass" button is released.
+
+Similarly, "glass" faders and rotary controls can be mapped using GremlinEx's MIDI axis mode.  Other modes can of course be used if the idea is to trigger an action if a specific range of values are reached.
+
+### MIDI controllers
+
+GremlinEx will see any MIDI message so long as the controller shows up as a MIDI port on the machine running GremlinEx (which can be a networked virtual port via rtpMidi).  GremlinEx was tested with hardware from MidiPlus, Arturia, and software controllers like Hexler TouchOSC.  It will also work with any software that outputs MIDI data.
+
+### MIDI troubleshooting
+
+The majority of issues will come from messages not being recognized by GremlinEx because the input configuration is causing it to filter (skip) that message.  To this end, Gremlin will tell you what it's listening to.
+
+There are some tools that let you visualize what MIDI messages the computer is receiving such as [MidiOx](http://www.midiox.com/), and older but tried and true MIDI diagnostics tool, or something like [Hexler Protokol](https://hexler.net/protokol).  Both utilities are free.  It's always a good idea to verify the MIDI signaling is functional outside of GremlinEx to verify the machine is seeing messages.  If GremlinEx cannot "listen" to a message via the listen buttons, it cannot see it.
 
 <!-- TOC --><a name="vjoyremap-action"></a>
 # VJoyRemap action 
