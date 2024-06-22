@@ -1352,7 +1352,7 @@ class QIconLabel(QtWidgets.QWidget):
         if stretch:
             layout.addStretch()   
 
-    def setIcon(self, icon_path = None, use_qta = False, color = None):
+    def setIcon(self, icon_path = None, use_qta = True, color = None):
         ''' sets the icon of the label, pass a blank or None path to clear the icon'''
         if icon_path:
             if use_qta:
