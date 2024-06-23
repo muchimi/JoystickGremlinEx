@@ -85,7 +85,7 @@ from gremlin.ui.midi_device import MidiDeviceTabWidget
 from gremlin.ui.osc_device import OscDeviceTabWidget
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.14ex (b)"
+APPLICATION_VERSION = "13.40.14ex (c)"
 
 
 from gremlin.singleton_decorator import SingletonDecorator

@@ -28,6 +28,7 @@ import distutils
 import shutil
 import uuid
 import dinput
+import qtawesome as qta
 
 from PySide6 import QtCore, QtWidgets, QtGui
 from win32api import GetFileVersionInfo, LOWORD, HIWORD
@@ -615,19 +616,34 @@ def load_pixmap(*paths):
     logging.getLogger("system").error(f"load_pixmap(): invalid path")
     return None
 
-def load_icon(*paths):
-    ''' gets an icon (returns a QIcon) '''
+def load_icon(*paths, use_qta = False, qta_color = None):
+    ''' gets an icon (returns a QIcon) - uses the qtawesome library or does a raw file search '''
     from gremlin.config import Configuration
     verbose = Configuration().verbose
-    pixmap = load_pixmap(*paths)
-    if not pixmap or pixmap.isNull():
+    
+    (the_path,) = paths
+    _, ext = os.path.splitext(the_path.lower())
+    icon = None
+    if use_qta or ext == "":
+        # assume a QTA icon if no extension
+        try:
+            if qta_color:
+                icon = QtGui.QIcon(qta.icon(the_path, color = qta_color))
+            else:
+                icon = QtGui.QIcon(qta.icon(the_path))
+        except:
+            pass
+    if not icon:
+        pixmap = load_pixmap(*paths)
+        if not pixmap or pixmap.isNull():
+            if verbose:
+                logging.getLogger("system").info(f"LoadIcon() using generic icon - failed to locate: {paths}")        
+            return get_generic_icon()
+
+        icon = QtGui.QIcon()
+        icon.addPixmap(pixmap, QtGui.QIcon.Normal)
         if verbose:
-            logging.getLogger("system").info(f"LoadIcon() using generic icon - failed to locate: {paths}")        
-        return get_generic_icon()
-    icon = QtGui.QIcon()
-    icon.addPixmap(pixmap, QtGui.QIcon.Normal)
-    if verbose:
-        logging.getLogger("system").info(f"LoadIcon() found icon: {paths}") 
+            logging.getLogger("system").info(f"LoadIcon() found icon: {paths}")
     return icon
 
 def load_image(*paths):

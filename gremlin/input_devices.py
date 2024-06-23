@@ -1140,8 +1140,63 @@ class RemoteClient(QtCore.QObject):
 
             
 
+class OscClient(QtCore.QObject):
+    ''' runtime client for OSC messages '''
+
+    def __init__(self):
+        from gremlin.ui.osc_device import OscInterface
+        super().__init__()
+        self._interface = OscInterface()
+        self._interface.osc_message.connect(self._osc_message_cb)
+        self._event_handler = gremlin.event_handler.EventHandler()
+        self._event_listener = gremlin.event_handler.EventListener()
+        self._midi_map = {}  # list of message keys
+
+    def start(self):
+        ''' starts the client '''
+
+        # build a list of messages configured for input
+        from gremlin.ui.osc_device import OscInputItem
+        import gremlin.shared_state
+        profile = gremlin.shared_state.current_profile
+        
+        # build a list of input items to midi messages
+        self._midi_map = {}  # list of message keys
+        for device in profile.devices.values():
+            if device.name == "midi":
+                for mode in device.modes.values():
+                    for input_items in mode.config.values():
+                        for input_item in input_items:
+                            if isinstance(input_item, OscInputItem):
+                                message_key = input_item.message_key
+                                if not message_key in self._midi_map.keys():
+                                    self._midi_map[message_key] = []
+                                if input_item.port_valid:
+                                    self._midi_map[message_key].append(input_item)
+                                    logging.getLogger("system").info(f"MIDI: register trigger on: {input_item.display_name} mode: {input_item.mode_string} key: {message_key}")  
+
+
+        self._interface.start()
+
+    def stop(self):
+        ''' stops the client '''
+        self._interface.stop()
+
+    def _osc_message_cb(self, *args):
+        ''' called when an OSC message is received '''
+        from gremlin.ui.osc_device import OscInputItem
+        # get the input items behind this message
+        data = OscInputItem()
+        # data.message = message # this decodes the data
+        # message_key = data.message_key
+
+
+      
+
 class MidiClient(QtCore.QObject):
     ''' runtime client for MIDI messages '''
+
+    
 
     def __init__(self):
         from gremlin.ui.midi_device import MidiInterface
@@ -1156,7 +1211,7 @@ class MidiClient(QtCore.QObject):
     def start(self):
         ''' starts the client - all ports '''
         # build a map of the input items
-        from gremlin.ui.midi_device import MidiInterface, MidiInputItem
+        from gremlin.ui.midi_device import MidiInputItem
         import gremlin.shared_state
         profile = gremlin.shared_state.current_profile
         

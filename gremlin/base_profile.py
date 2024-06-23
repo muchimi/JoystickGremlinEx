@@ -424,6 +424,18 @@ class AbstractContainer(ProfileData):
             for action in actions:
                 state = state & action.is_valid()
         return state
+    
+
+    def is_valid_for_save(self):
+        """ true if the container can be saved to a profile """
+        state = self._is_container_valid()
+
+        # Check state of all linked actions
+        for actions in [a for a in self.action_sets if a is not None]:
+            for action in actions:
+                state = state & action.is_valid_for_save()
+        return state        
+        
 
     @abstractmethod
     def _is_container_valid(self):
@@ -678,7 +690,8 @@ class InputItem:
             node.set("description", "")
         
         for entry in self.containers:
-            valid = entry.is_valid()
+            # gremlinex change: containers can still be saved if they are invalid if they are still being configured:
+            valid = entry.is_valid_for_save()
             if valid:
                 container_node.append(entry.to_xml())
             else:
@@ -853,8 +866,18 @@ class AbstractAction(ProfileData):
         :return True if a virtual button has to be used, False otherwise
         """
         raise error.MissingImplementationError(
-            "AbstractAction.requires_virtual_button not implemented"
+            "AbstractAction.requires_virtual_button() not implemented"
         )
+    
+    def _is_valid(self):
+        raise error.MissingImplementationError(
+            "AbstractAction._is_valid() not implemented"
+        )
+    
+    def is_valid_for_save(self):
+        ''' indicates an action can be saved to a profile even if it's not configured - this allows in process profile saving '''
+        return True
+
     
 
 class Settings:

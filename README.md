@@ -90,7 +90,7 @@ Joystick Gremlin EX
 
 13.40.14ex
 
-- New MIDI input device - GremlinEx can listen to MIDI events
+- New MIDI input device - GremlinEx can listen to MIDI events.  See MIDI section below.
 - New file menu for opening Explorer to the current profile folder
 - New file menu for opening the profile XML in a text editor (it will save the profile first)
 
@@ -100,6 +100,7 @@ Joystick Gremlin EX
 
 - Action container will now scroll horizontally if the action is too wide to fit based on windows size / UI scaling options.
 
+- Profiles can be saved even if one or more actions are not configured (QOL enhancement).
 
 6/6/24 - 13.40.13ex (h) **potentially breaking change**
 
@@ -149,9 +150,17 @@ Introduction
 
 ------------
 
-For general Joystick Gremlin documentation - consult https://whitemagic.github.io/JoystickGremlin/
+# Releases
 
-The EX version adds to release 13.3 of Gremlin:
+Releases, including pre-releases can be found [here on GitHub](https://github.com/muchimi/JoystickGremlinEx/releases).  Be aware the release version may not be the most up to date as GitHub hides pre-releases by default.
+
+Pre-releases are mostly (proposed) bug fixes but also can contain work-in-progress items and
+
+# General
+
+GremlinEx started as a fork of the excellent original Gremlin project by WhiteMagic.  For general original Joystick Gremlin documentation - consult https://whitemagic.github.io/JoystickGremlin/
+
+Gremlin EX adds a number of features to the original, including some bug fixes or quality of life enhancements I wanted to see, or were suggested to me.  Many parts of the original were rewritten although the core design and mechanics have remained the same, a good thing.  The major changes are below.
 
 - Update to x64 bit from x32 bit
 - Update to Python 12.x (improved execution speed over Python 10)
@@ -164,12 +173,25 @@ The EX version adds to release 13.3 of Gremlin:
 - Range container for mapping axis ranges to actions easily
 - MapToKeyboardEx action plugin for enhanced keyboard control with separate make/break and delay functionality
 - Button container - provides a direct way perform actions on a raw button press or release, which is helpful for on/off and three-way buttons
+- MIDI input mapping - GremlinEx can listen to MIDI messages and trigger actions based on those.
+- Copy/Paste containers and actions between inputs.
+- Save profiles in progress for which actions are not necessarily all configured.
+- Use of more icons and tooltips to make GremlinEx more intuitive to navigate.
 
 
 I suggest you make VjoyRemap the default action in the options panel as this plugin is what provides many enhancements over the default Remap plugin.  Same for mouse output - MapToMouseEx provides enhanced options for the mouse macro functions.
 
 This said, the default plugins are all functional but they won't be aware of the new features in GremlinEx.
 
+# Compatibility
+
+GremlinEx will load original Gremlin profiles and copy them to a new profile folder called *Joystick Gremlin Ex*.  Profiles saved with GremlinEx may however not be compatible with the original.
+
+While the core functionality looks similar, GremlinEx adds new container types, new input types and in some cases processes things differently.
+
+Original plugins have not been touched unless core GremlinEx code and behavior changes broke them.  Updated versions will typically be marked Ex - these actions will have similar functionality but may add a few more features.
+
+User scripts for GremlinEx also gain a few new functions and decorators to help with script management and state awareness in particular.
 
 
 

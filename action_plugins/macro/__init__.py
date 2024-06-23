@@ -1453,7 +1453,9 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.toolbar.addWidget(self.record_hat)
             self.toolbar.addWidget(self.record_key)
             self.toolbar.addWidget(self.record_mouse)
-            self.toolbar.setMinimumHeight(230)
+
+            #required_height = self.toolbar.frameGeometry().height()
+            self.toolbar.setMinimumHeight(260)
 
             # Assemble the entire widget
 
@@ -1476,7 +1478,7 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
         :param is_checkable whether or not the button can be toggled
         :param default_on whether or not to toggle the button by default
         """
-        from gremlin.common import load_pixmap, load_icon
+        from gremlin.util import load_pixmap, load_icon
         button = QtWidgets.QToolButton()
         
         if isinstance(icon_path, list):

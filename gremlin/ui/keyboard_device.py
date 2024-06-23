@@ -126,6 +126,11 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         if selected_index is not None:
             self.input_item_selected_cb(selected_index)
         
+    @property
+    def model(self):
+        ''' the current model '''
+        return self.input_item_list_model
+
 
     def _show_clear_cb(self):
         return self.input_item_list_model.rows() > 0
@@ -313,6 +318,7 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         widget.selected_changed.connect(list_view._create_selection_callback(index))
         widget.closed.connect(self._create_close_callback(index))
         widget.edit.connect(self._create_edit_callback(index))
+        widget.setIcon("fa.keyboard-o")
                 
         widget.enable_close()
         widget.enable_edit()

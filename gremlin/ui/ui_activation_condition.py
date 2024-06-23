@@ -75,7 +75,7 @@ class ActivationConditionWidget(QtWidgets.QWidget):
                 self._granularity_changed_cb
             )
 
-            self.help_button = QtWidgets.QPushButton(load_icon("gfx/help"), "")
+            self.help_button = QtWidgets.QPushButton(load_icon("gfx/help.png"), "")
             self.help_button.clicked.connect(self._show_hint)
 
             self.controls_layout = QtWidgets.QHBoxLayout()

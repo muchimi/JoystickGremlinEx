@@ -2118,17 +2118,18 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         # if self.vjoy_input_id is None:
         #     return None
 
-        if self.input_type == InputType.JoystickAxis:
+        if self.action_mode in (VjoyAction.VJoySetAxis, VjoyAction.VJoyInvertAxis, VjoyAction.VJoyAxis):
             input_string = "axis"
-        elif self.action_mode in (VjoyAction.VJoySetAxis, VjoyAction.VJoyInvertAxis, VjoyAction.VJoyAxis):
-            input_string = "axis"
+            fallback = "joystick.svg"
         elif self.action_mode == VjoyAction.VJoyHat:
             input_string = "hat"
+            fallback = "mdi.axis-arrow"
         elif self.action_mode in (VjoyAction.VJoyButton, VjoyAction.VjoyButtonRelease):
             input_string = "button"
+            fallback = "mdi.gesture-tap-button"
         else:
             input_string = None
-            #log_sys_warn(f"VjoyRemap: don't know how to handle action mode: {self.action_mode}")
+            log_sys_warn(f"VjoyRemap: don't know how to handle action mode: {self.action_mode}")
 
         
         icon_path = f"icon_{input_string}_{self.vjoy_input_id:03d}.png" if input_string else "joystick.png"
@@ -2137,8 +2138,9 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         if os.path.isfile(icon_file):
             return icon_file
             
-
-        return super().icon()
+        return fallback
+    
+        #return super().icon()
             
     
 

@@ -25,8 +25,7 @@ from gremlin.input_types import InputType
 from gremlin.ui.input_item import AbstractActionWidget
 
 
-class NoOpActionWidgetgremlin.ui.input_item.AbstractActionWidget:
-
+class NoOpActionWidget(AbstractActionWidget):
     """Widget for the NoOp action."""
 
     def __init__(self, action_data, parent=None):

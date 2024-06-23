@@ -402,6 +402,12 @@ class InputItemListView(ui_common.AbstractView):
                 assert widget is not None, "Custom widget handler didn't return a widget"
             else:
                 widget = InputItemWidget(identifier)
+                if identifier.input_type == InputType.JoystickAxis:
+                    widget.setIcon("joystick_no_frame.png",use_qta=False)
+                elif identifier.input_type == InputType.JoystickButton:
+                    widget.setIcon("mdi.gesture-tap-button")
+                elif identifier.input_type == InputType.JoystickHat:
+                    widget.setIcon("ei.fullscreen")
                 widget.create_action_icons(data)
                 widget.update_description(data.description)
 
@@ -433,7 +439,7 @@ class InputItemListView(ui_common.AbstractView):
             return
         
 
-        logging.getLogger("system").info(f"redraw_index: {index}") 
+        # logging.getLogger("system").info(f"redraw_index: {index}") 
 
         data = self.model.data(index)
         item = self.scroll_layout.itemAt(index)

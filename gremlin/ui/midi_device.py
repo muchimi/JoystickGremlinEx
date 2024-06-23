@@ -38,6 +38,7 @@ import enum
 from gremlin.util import parse_guid, byte_list_to_string
 import gremlin.event_handler
 from gremlin.ui.device_tab import InputItemConfiguration
+from gremlin.config import Configuration
 
 ''' these MIDI objects are based on the MIDO and python-rtMIDI libraries '''
 
@@ -338,6 +339,10 @@ class MidiInputItem():
             self._message_key = ""
 
 
+
+
+
+
     @staticmethod
     def from_message(port_name, message, mode = None):
         ''' returns an input item based on the message data 
@@ -388,14 +393,19 @@ class MidiListener(QtCore.QThread):
 
 
     def run(self):
+        verbose = Configuration().verbose
         with mido.open_input(self.port_name) as inport:
-            logging.getLogger("system").info(f"Midinput: open port {self.port_number}")
+            if verbose:
+                logging.getLogger("system").info(f"Midinput: open port {self.port_number}")
             while not self.isInterruptionRequested():
                 for message in inport.iter_pending():
-                    logging.getLogger("system").info(f"Midinput: heard message: {message}")
+                    if verbose:
+                        logging.getLogger("system").info(f"Midinput: heard message: {message}")
                     self.callback(self.port_name, self.port_number, message)
                 time.sleep(0.01)
-            logging.getLogger("system").info(f"Midinput: close port {self.port_number}")
+                    
+            if verbose:
+                logging.getLogger("system").info(f"Midinput: close port {self.port_number}")
 
 
 
@@ -420,7 +430,6 @@ class MidiInterface(QtCore.QObject):
         ''' setup the midi interface '''
         super().__init__()
 
-
         self._started = False # true if the interface is actively listening
         self._listeners = {} # map of port numer to its listener
 
@@ -438,6 +447,7 @@ class MidiInterface(QtCore.QObject):
 
         self._port_names.sort()
 
+    
         for port in self._port_names:
             logging.getLogger("system").info(f"MIDI device detected: {port}")
 
@@ -450,6 +460,8 @@ class MidiInterface(QtCore.QObject):
             if none - opens all known ports 
         
         '''
+
+        verbose = Configuration().verbose
 
         # request start
         if self._started:
@@ -476,7 +488,8 @@ class MidiInterface(QtCore.QObject):
         # start the listeners
         for port_number in self._monitored_ports:
             port_name = self._port_names[port_number]
-            logging.getLogger("system").info(f"MIDI Interface: START listen requested on port: {port_name} [{port_number}]")
+            if verbose:
+                logging.getLogger("system").info(f"MIDI Interface: START listen requested on port: {port_name} [{port_number}]")
             listener = MidiListener(port_name, port_number, self._message_cb)
             listener.start()
             self._listeners[port_number] = listener
@@ -485,7 +498,9 @@ class MidiInterface(QtCore.QObject):
 
     def stop(self):
         # request stop
-        logging.getLogger("system").info(f"MIDI Interface: STOP listen requested")
+        verbose = Configuration().verbose
+        if verbose:
+            logging.getLogger("system").info(f"MIDI Interface: STOP listen requested")
 
 
         for port_number in self._monitored_ports:
@@ -495,7 +510,8 @@ class MidiInterface(QtCore.QObject):
                 # request exit and wait for it
                 listener.requestInterruption() # request terminate
                 listener.wait()
-            logging.getLogger("system").info(f"MIDI Interface: port [{port_number}] stopped")
+            if verbose:
+                logging.getLogger("system").info(f"MIDI Interface: port [{port_number}] stopped")
             del self._listeners[port_number]
 
         # clear
@@ -1122,6 +1138,8 @@ class MidiInputConfigDialog(QtWidgets.QDialog):
         ''' load the config from a MIDI message '''
         # decode the message 
         
+        verbose = Configuration().verbose
+
         mido_type = message.type
         command = MidiCommandType.from_mido_type(mido_type)
         if not command:
@@ -1148,8 +1166,8 @@ class MidiInputConfigDialog(QtWidgets.QDialog):
             data = message.data
             hex = byte_list_to_string(data)
             self._midi_data_widget.setText(hex)
-
-            logging.getLogger("system").info(f"MIDI: set port: {port_name} cmd: {command} data: {data}")
+            if verbose:
+                logging.getLogger("system").info(f"MIDI: set port: {port_name} cmd: {command} data: {data}")
         else:
             v2 = 0
             if command == MidiCommandType.PitchWheel:
@@ -1172,8 +1190,8 @@ class MidiInputConfigDialog(QtWidgets.QDialog):
             else:
                 raise ValueError(f"MIDI _load_message(): don't know how ot handle command: {command}")
 
-
-            logging.getLogger("system").info(f"MIDI: set port: {port_name} cmd: {command} V1 {v1}/{v1:02X} V2 {v2}/{v2:02X}")
+            if verbose:
+                logging.getLogger("system").info(f"MIDI: set port: {port_name} cmd: {command} V1 {v1}/{v1:02X} V2 {v2}/{v2:02X}")
             
               
             with QtCore.QSignalBlocker(self._midi_data_a_widget):
@@ -1529,7 +1547,7 @@ class MidiDeviceTabWidget(QtWidgets.QWidget):
     def _close_item_cb(self, widget, index, data):
         ''' called when the close button is clicked '''
         self.model.removeRow(index)
-        pass
+        
 
     def _update_conflicts(self):
          # check for conflicts with other entries
