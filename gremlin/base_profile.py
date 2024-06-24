@@ -619,15 +619,15 @@ class InputItem:
                 
 
         elif self.input_type == InputType.OpenSoundControl:
-            # midi data 
+            # OSC data 
+            from gremlin.ui.osc_device import OscInputItem
+            osc_input_item = OscInputItem()
             for child in node:
                 if child.tag == "input":
-                    #TODO: process OSC XML
-                    pass
-                    # port = safe_read(child, "port", str)
-                    # channel = safe_read(child, "channel", str)
-                    # action = safe_read(child, "action", str)
-                    # value = safe_read(child, "value", str)
+                    osc_input_item.parse_xml(child)
+            self.input_id = osc_input_item
+
+        assert self.input_id is not None,"Error processing input - check types"
             
 
         
@@ -1172,8 +1172,6 @@ class Profile():
 
         # Parse each device into separate DeviceConfiguration objects
         for child in root.iter("device"):
-            if child.attrib["name"] == "midi":
-                pass
             device = Device(self)
             device.from_xml(child)
             self.devices[device.device_guid] = device
@@ -1319,9 +1317,7 @@ class Profile():
                 device.device_guid = device_guid
 
                 # Set the correct device type
-                device.type = DeviceType.Joystick
-                if device_name == "keyboard":
-                    device.type = DeviceType.Keyboard
+                device.type = device_type
                 self.devices[device_guid] = device
             return self.devices[device_guid]
 
@@ -1433,7 +1429,7 @@ class Mode:
 
             if store_item:
                 self.config[item.input_type][item.input_id] = item
-                pass
+                
 
     def to_xml(self):
         """Generates XML code for this DeviceConfiguration.

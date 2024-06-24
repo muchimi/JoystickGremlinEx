@@ -1013,3 +1013,9 @@ class ProfileModifier:
             if dev_guid == device_guid:
                 return device
         return None
+
+def parse_guid(value):
+    # parses a GUID
+    from gremlin.util import parse_guid
+    return parse_guid(value)
+

@@ -48,7 +48,7 @@ from collections.abc import Iterable
 import struct
 from datetime import datetime, timedelta, date
 
-from gremlin.util import parse_guid, byte_list_to_string, safe_read, read_guid, safe_format, byte_string_to_list
+from gremlin.util import *
 from xml.etree import ElementTree
 import gremlin.ui.ui_common
 import gremlin.ui.input_item
@@ -1269,7 +1269,7 @@ class OscDispatcher(object):
         pattern = escaped_address_pattern.replace('\\?', '\\w?')
         # '*' in the OSC Address Pattern matches any sequence of zero or more
         # characters.
-        pattern = pattern.replace('\\*', '[\w|\+]*')
+        pattern = pattern.replace(r'\*', r'[\w|\+]*')
         # The rest of the syntax in the specification is like the re module so
         # we're fine.
         pattern = pattern + '$'
@@ -1615,11 +1615,12 @@ class OscServer():
             self._running = True
 
 
+
     def stop(self):
         ''' stops the server '''
         if not self._running or self._start_requested:
             return
-        self.log("OSC: stop requested")
+        logging.getLogger("system").info("OSC: stop requested")
         self._stop = True
         if self._server:
             self._server.shutdown()
@@ -1742,12 +1743,20 @@ class OscInputItem():
     def __init__(self):
         self.id = None # GUID of this input
         self._message = None # the OSC message command
-        self._data = None # the list of values associated with that command
+        self._message_data = None # the list of values associated with that command
+        self._message_data_string = None # the string representation of the data args
         self._mode = OscInputItem.InputMode.Button
         self._command_mode = OscInputItem.CommandMode.Message
-        self._display_name =  "OSC (not configured)"
+        self._title_name = "OSC (not configured)"
+        self._display_name =  ""
         self._display_tooltip = "Input configuration not set"
         self._message_key = "" # unique key that identifies this input
+        self._min_range = 0.0
+        self._max_range = 1.0 
+
+    @property
+    def is_axis(self):
+        return self._mode == OscInputItem.InputMode.Axis
 
     @property
     def message(self):
@@ -1756,13 +1765,77 @@ class OscInputItem():
     @message.setter
     def message(self, value):
         self._message = value
-        self._update_display_name()    
+        self._update()
 
     
     @property 
     def mode(self):
         ''' input mode '''
         return self._mode
+    
+    @mode.setter
+    def mode(self, value):
+        self._mode = value
+        self._update()
+
+    
+    @property 
+    def command_mode(self):
+        ''' command mode '''
+        return self._command_mode 
+    
+    @command_mode.setter
+    def command_mode(self, value):
+        self._command_mode = value
+        self._update()
+
+    @property
+    def title_name(self):
+        ''' title for this input '''
+        return self._title_name
+
+    @property
+    def display_name(self):
+        ''' display name for this input '''
+        return self._display_name
+    
+    @property
+    def data(self):
+        return self._message_data
+    
+    @data.setter
+    def data(self, value):
+        assert isinstance(value, tuple) or isinstance(value, list)
+        self._message_data = value
+        self._message_data_string = list_to_csv(value)
+        self._update()
+    
+    @property
+    def data_string(self):
+        ''' string representation of the OSC arguments '''
+        return self._message_data_string
+    
+
+    @property
+    def min_range(self):
+        return self._min_range
+    
+    @min_range.setter
+    def min_range(self, value):
+        self._min_range = value
+    
+    @property 
+    def max_range(self):
+        return self._max_range
+    
+    @max_range.setter
+    def max_range(self, value):
+        self._max_range = value
+
+    @property
+    def display_tooltip(self):
+        ''' detailed tooltip '''
+        return self._display_tooltip
     
     @property
     def mode_string(self):
@@ -1786,13 +1859,21 @@ class OscInputItem():
 
     @property
     def command_mode_string(self):
-        if self._command_mode == OscInputItem.CommandMode.Message:
-            return "cmd"
-        elif self._command_mode == OscInputItem.CommandMode.Data:
-            return "data"
+        return  OscInputItem.command_mode_to_string(self._command_mode)
         
-    def _command_mode_from_string(self, value):
-        ''' converts string command to enum '''
+    
+    @staticmethod
+    def command_mode_to_string(value):
+        ''' converts a string to a command mode '''
+        if value == OscInputItem.CommandMode.Message:
+            return "cmd"
+        elif value == OscInputItem.CommandMode.Data:
+            return "data"
+        # default
+        return "cmd"
+    
+    @staticmethod
+    def command_mode_from_string(value):
         if value == "cmd":
             return OscInputItem.CommandMode.Message
         elif value == "data":
@@ -1808,28 +1889,26 @@ class OscInputItem():
     
     def _data_to_string(self, data):
         ''' returns a string representation of the data '''
-        import csv
-        if not data:
-            return ""
-        result = csv.writer(data)
-        return result
+        return list_to_csv(data)
+        
 
     def _string_to_data(self, value):
         ''' converts a string representation of the data to a list of args '''
-        import csv
-        if not value:
-            return []
-        data = list(csv.reader(value))
-        return data
+        return csv_to_list(value)
 
     def _update(self):
         ''' updates the message key based on the current config '''
         if self._command_mode == OscInputItem.CommandMode.Data:
-            self.message_key = f"{self.message} {self._data_to_string(self._data)}"
+            self._message_key = f"{self.message} {self._data_to_string(self._data)}"
         elif self._command_mode == OscInputItem.CommandMode.Message:
-            self.message_key = self.message
+            self._message_key = self.message
         else:
             raise ValueError(f"_update(): don't know how to handle {self._command_mode}")
+        
+        # update data string from the raw data
+        self._message_data_string = list_to_csv(self._message_data)
+        
+        self._update_display_name()
 
     def parse_xml(self, node):
         ''' reads an input item from xml '''
@@ -1837,9 +1916,13 @@ class OscInputItem():
             self.id = read_guid(node, "guid")
             self._message = safe_read(node, "cmd", str)
             csv = safe_read(node, "data", str)
-            self._data = self._string_to_data(csv)
+            self._message_data = csv_to_list(csv)
             self._mode_from_string(safe_read(node, "mode", str))
-            self._command_mode_from_string(safe_read(node,"cmd_mode", str))
+            self._command_mode = OscInputItem.command_mode_from_string(safe_read(node,"cmd_mode", str))
+            self._min_range = safe_read(node,"min",float, 0.0)
+            self._max_range = safe_read(node,"max",float, 1.0)
+
+        self._update()
 
 
     def to_xml(self):
@@ -1847,26 +1930,31 @@ class OscInputItem():
         node = ElementTree.Element("input")
         node.set("guid", str(self.id))
         node.set("cmd", self.message)
-        node.set("data", self._data_to_string(self._data))
+        node.set("data", list_to_csv(self._message_data))
         node.set("mode", self.mode_string)
         node.set("cmd_mode", self.command_mode_string)
-
-
+        node.set("min", str(self._min_range))
+        node.set("max", str(self._max_range))
         return node
           
-    @property
-    def display_name(self):
-        ''' display name for this input '''
-        return self._display_name
-
-    @property
-    def display_tooltip(self):
-        ''' detailed tooltip '''
-        return self._display_tooltip
-
+   
     def _update_display_name(self):
-        if self._message:
-            pass
+        
+        if self._mode == OscInputItem.InputMode.Button:
+                mode_stub = "Button"
+        elif self._mode == OscInputItem.InputMode.Axis:
+            mode_stub = "Axis"
+        elif self._mode == OscInputItem.InputMode.OnChange:
+            mode_stub = "Change"
+        else:
+            mode_stub = f"Unknown: {self._mode}"
+
+        self._title_name = f"OSC input ({mode_stub})"
+        if self._command_mode == OscInputItem.CommandMode.Message:
+            self._display_name =  f"{self._message}"
+        else:
+            self._display_name =  f"{self._message}/{self._message_data_string}"
+        
 
     def __hash__(self):
         return str(self.id).__hash__()
@@ -1876,6 +1964,8 @@ class OscInputItem():
         # keep as is (don't sort)
         return False
     
+    def __str__(self):
+        return self._title_name
 
     
 class OscInputListenerWidget(QtWidgets.QFrame):
@@ -1919,7 +2009,7 @@ class OscInputListenerWidget(QtWidgets.QFrame):
         self.host_ip = self._interface.host_ip
         self.input_port = self._interface.input_port
 
-        self._interface.osc_message.connect(self._osc_message)
+        self._interface.osc_message.connect(self._osc_message_cb)
         self._callback = callback
         
         self.message = None
@@ -1962,9 +2052,10 @@ class OscInputListenerWidget(QtWidgets.QFrame):
             # close the winow
             self.close()
 
-    def _osc_message(self, message, data):
+    def _osc_message_cb(self, message, data):
         ''' called when a osc messages is provided by the listener '''
         if self.message is None:
+            self.message = message
             self._callback(message, data)
 
         self.close()
@@ -1998,10 +2089,13 @@ class OscInputConfigDialog(QtWidgets.QDialog):
         self.identifier = data
         self._mode = OscInputItem.InputMode.Button
         self._command_mode = OscInputItem.CommandMode.Message
+        self._mode_locked = False # if set, prevents flipping input modes axis to a button mode
+        self._min_range = 0.0 # min value for axis mapping (maps to -1.0 in vjoy)
+        self._max_range = 1.0 # max value for axis mapping (maps to 1.0 in vjoy)
 
         # midi message
-        self._osc_message = None # OSC command text
-        self._osc_message_data = [] # OSC arguments
+        self._command = None # OSC command text
+        self._command_data = [] # OSC arguments
 
         self._command_widget = QtWidgets.QLineEdit()
         self._data_widget = QtWidgets.QLineEdit()
@@ -2035,24 +2129,37 @@ class OscInputConfigDialog(QtWidgets.QDialog):
         self._mode_axis_widget.setToolTip("The input will be scaled (-1 to +1) based on the input's value")
         self._mode_axis_widget.clicked.connect(self._mode_axis_cb)
 
+        self._container_range_widget = QtWidgets.QWidget()
+        self._container_range_layout = QtWidgets.QHBoxLayout()
+        self._container_range_widget.setLayout(self._container_range_layout)
+
+        self._min_range_widget = gremlin.ui.ui_common.DynamicDoubleSpinBox()
+        self._min_range_widget.setValue(0.0) # default min range 
+        self._min_range_widget.valueChanged.connect(self._min_range_cb)
+        self._max_range_widget = gremlin.ui.ui_common.DynamicDoubleSpinBox()
+        self._max_range_widget.setValue(1.0) # default min range 
+        self._min_range_widget.valueChanged.connect(self._max_range_cb)
+
+        self._container_range_layout.addWidget(QtWidgets.QLabel("Min range:"))
+        self._container_range_layout.addWidget(self._min_range_widget)
+        self._container_range_layout.addWidget(QtWidgets.QLabel("Max range:"))
+        self._container_range_layout.addWidget(self._max_range_widget)
+        self._container_range_layout.addStretch()
+
+        # validation message
+        self._validation_message_widget = gremlin.ui.ui_common.QIconLabel()
+
         self._container_mode_radio_layout.addWidget(self._mode_axis_widget)
-
-
-
-
 
         self._command_mode_message_widget = QtWidgets.QRadioButton("Message only")
         self._command_mode_message_widget.clicked.connect(self._command_mode_message_cb)
         self._command_mode_data_widget = QtWidgets.QRadioButton("Message + data")
         self._command_mode_data_widget.clicked.connect(self._command_mode_data_cb)
 
-
-
         self._mode_on_change_widget = QtWidgets.QRadioButton("Change")
         self._mode_on_change_widget.setToolTip("The input will trigger as button press on any change in value")
         self._mode_on_change_widget.clicked.connect(self._mode_change_cb)
         self._mode_locked_widget = gremlin.ui.ui_common.QIconLabel()
-
 
         self._container_mode_radio_layout.addWidget(QtWidgets.QLabel("Action mode:"))
         self._container_mode_radio_layout.addWidget(self._mode_on_change_widget)
@@ -2097,18 +2204,120 @@ class OscInputConfigDialog(QtWidgets.QDialog):
         main_layout.addWidget(QtWidgets.QLabel("OSC message:"))
         main_layout.addWidget(self.config_widget)
         main_layout.addWidget(self._container_options_widget)
+        main_layout.addWidget(self._container_range_widget)
+        main_layout.addWidget(self._container_mode_description_widget)
+        main_layout.addWidget(self._container_command_mode_description_widget)
+        main_layout.addWidget(self._validation_message_widget)
         main_layout.addWidget(gremlin.ui.ui_common.QHLine())
         main_layout.addWidget(self.button_widget)
         
         self.setLayout(main_layout)
 
-        self._update_message()
+        if data:
+            input_id : OscInputItem = data
+            # see if this input has any containers 
+            profile = gremlin.shared_state.current_profile
+            for device in profile.devices.values():
+                if device.name == "midi":
+                    if current_mode in device.modes:
+                        for input_items in device.modes[current_mode].config.values():
+                            if data in input_items:
+                                item = input_items[data]
+                                self._mode_locked = len(item.containers) > 0 # lock mode to prevent axis to button/change 
+                                break
+
+            message = input_id.message
+            if message:
+                self._mode = input_id.mode
+                self._command_mode = input_id.command_mode
+                self._command = input_id.message
+                self._command_data = input_id.data
+
+        self._update_display()
+
+    def _validate(self):
+        ''' validates the input to ensure it does not conflict with an existing input '''
+        # assume ok
+        valid = True
+        try:
+            self._validation_message_widget.setText("")
+            if self._command is not None:
+                # get the list of all the other inputs
+                parent_widget = self._parent
+                model = parent_widget.input_item_list_model
+                message = self._command
+                input_item = OscInputItem()
+                input_item._message = message
+                input_item._message_data = self._command_data
+                input_item._command_mode = self._command_mode
+                input_item._mode = self._mode
+                input_item._update() # this updates the message key
+                key = input_item.message_key
+                
+                for index in range(model.rows()):
+                    widget = parent_widget.itemAt(index)
+                    if index == self.index : continue # ignore self
+                    # grab the input's configured midi message
+                    other_input = widget.identifier.input_id
+                    other_message = other_input.message
+                    if other_message is None:
+                        # input not set = ok
+                        continue 
+
+                    other_key = other_input.message_key
+                    if key == other_key:
+                        logging.getLogger("system").info(f"OSC: conflict detected: key {key} is the same as {other_key}")
+                        self._validation_message_widget.setText(f"Input conflict detected with input [{index+1}] - ensure inputs are unique")
+                        self._validation_message_widget.setIcon("fa.warning",True, color="red")
+                        valid = False
+                        return
+                        
+                    
+                if self._mode == OscInputItem.InputMode.Axis:
+                    # cannot be an axis mode for sysex or program change
+                    
+                    valid = len(self._command_data) > 0 # in axis mode, data MUST be provided
+                    if not valid:
+                        self._validation_message_widget.setText(f"Data value must be given in axis mode")
+                        self._validation_message_widget.setIcon("fa.warning",True, color="red")
+                        return
+                
+                    if self._min_range > self._max_range:
+                        self._validation_message_widget.setText(f"Min range must be less than max range")
+                        self._validation_message_widget.setIcon("fa.warning",True, color="red")
+                        return
+                    
+                    if self._min_range == self._max_range:
+                        self._validation_message_widget.setText(f"Min range cannot be the same as the max range")
+                        self._validation_message_widget.setIcon("fa.warning",True, color="red")
+                        return
+                    
+                    # ensure the argument is numeric
+                    arg = self._command_data[0]
+                    if not (isinstance(arg, int) or isinstance(arg, float)):
+                        self._validation_message_widget.setText(f"First data item must be a number for axis input")
+                        self._validation_message_widget.setIcon("fa.warning",True, color="red")
+                        return
+
+
+            
+        finally:
+            self.ok_widget.setEnabled(valid)
+            self._valid = valid
+
+            if valid:
+                # clear error status
+                self._validation_message_widget.setText()
+                self._validation_message_widget.setIcon()
+
+        return valid
+
 
     def _mode_axis_cb(self):
         if self._mode_axis_widget.isChecked():
             self._mode = OscInputItem.InputMode.Axis
             self._validate()
-        self._update_display()           
+            self._update_display()           
 
     def _mode_button_cb(self):
         if self._mode_button_widget.isChecked():
@@ -2122,20 +2331,41 @@ class OscInputConfigDialog(QtWidgets.QDialog):
 
     def _command_mode_message_cb(self):
         if self._command_mode_message_widget.isChecked():
-            self._command_mode == OscInputItem.CommandMode.Message
+            self._command_mode = OscInputItem.CommandMode.Message
             self._update_display()
 
     def _command_mode_data_cb(self):
         if self._command_mode_data_widget.isChecked():
-            self._command_mode == OscInputItem.CommandMode.Data
+            self._command_mode = OscInputItem.CommandMode.Data
             self._update_display()
 
+    def _min_range_cb(self):
+        self._min_range = self._min_range_widget.value()
+        self._validate()
+
+    def _max_range_cb(self):
+        self._min_range = self._max_range_widget.value()  
+        self._validate()     
+
+
+    @property
+    def min_range(self):
+        return self._min_range
+    
+    @min_range.setter
+    def min_range(self, value):
+        self._min_range = value
+    
+    @property 
+    def max_range(self):
+        return self._max_range
+    
+    @max_range.setter
+    def max_range(self, value):
+        self._max_range = value
+
     def _update_display(self):
-        pass
-
-
-    def _update_message(self):
-        ''' updates the OSC message that will be listened to from the configuration items'''
+        ''' loads message data into the UI '''
            # mode radio buttons
         if self._mode == OscInputItem.InputMode.Button:
             self._container_mode_description_widget.setText(f"The input will trigger a button press when the value is 1<br>Use this to trigger a button press from a specific OSC message.")
@@ -2153,21 +2383,44 @@ class OscInputConfigDialog(QtWidgets.QDialog):
                 self._mode_on_change_widget.setChecked(True)      
 
         if self._command_mode == OscInputItem.CommandMode.Message:
+            self._container_command_mode_description_widget.setText(f"The OSC message is the primary input (data ignored)")
             with QtCore.QSignalBlocker(self._command_mode_message_widget):
                 self._command_mode_message_widget.setChecked(True)
+                self._data_widget.setEnabled(False) # disable the value area if in message only mode
         elif self._command_mode == OscInputItem.CommandMode.Data:
+            self._container_command_mode_description_widget.setText(f"The OSC message and arguments are used as the primary input")
             with QtCore.QSignalBlocker(self._command_mode_data_widget):
                 self._command_mode_data_widget.setChecked(True)
+            self._data_widget.setEnabled(True) # enable the value area if in message + data mode
 
+        self._container_range_widget.setVisible(self._mode == OscInputItem.InputMode.Axis)
+        self._command_widget.setText(self._command)
+        csv = list_to_csv(self._command_data)
+        self._data_widget.setText(csv)
 
-    @property
-    def osc_message(self):
-        ''' OSC message as edited '''
-        return self._osc_message
+    def _update_message(self):
+        ''' updates message data from UI '''
+        if self._mode_button_widget.isChecked():
+            mode = OscInputItem.InputMode.Button
+        elif self._mode_axis_widget.isChecked():
+            mode = OscInputItem.InputMode.Axis
+        elif self._mode_on_change_widget.isChecked():
+            mode = OscInputItem.InputMode.OnChange
+
+        if self._command_mode_message_widget.isChecked():
+            command_mode = OscInputItem.CommandMode.Message
+        elif self._command_mode_data_widget.isChecked():
+            command_mode = OscInputItem.CommandMode.Data
+
+        self._mode = mode
+        self._command_mode = command_mode
+        self._command = self._command_widget.text()
+        self._command_data = csv_to_list(self._data_widget.text())
 
 
     def _ok_button_cb(self):
         ''' ok button pressed '''
+        self._update_message() # update data from UI
         self.accept()
         
     def _cancel_button_cb(self):
@@ -2179,7 +2432,7 @@ class OscInputConfigDialog(QtWidgets.QDialog):
         ''' listens to an inbound OSC message '''
 
 
-        self.listener_dialog = OscInputListenerWidget(self._load_message)
+        self.listener_dialog = OscInputListenerWidget(self._capture_message)
 
         # Display the dialog centered in the middle of the UI
         root = self
@@ -2193,32 +2446,63 @@ class OscInputConfigDialog(QtWidgets.QDialog):
             300,
             150
         )
-        self.listener_dialog.show()                
+        self.listener_dialog.show()               
 
-    def _load_message(self, command, data):
-        ''' called when the listener dialog grabbed a message '''
-        self.command = command
-        self._osc_message = command
-        self._osc_message_data = list(data)
-
+    def _capture_message(self, command, data) :
+        ''' called when an OSC message is captured '''
+        self._command = command
+        self._command_data = data
+        self._update_display() # update UI with these settings
 
     @property
     def command(self):
-        return self._command_widget.text()
+        ''' returns the current command '''
+        return self._command
+    
     @command.setter
     def command(self, value):
-        self._command_widget.setText(value)
+        if value is None:
+            value = "" # catch None type
+        self._command = value
+        self._update_display()
+
+    @property
+    def mode(self):
+        ''' gets the current input mode '''
+        return self._mode
+    
+    @mode.setter
+    def mode(self, value):
+        self._mode = value
+        self._update_display()
+
+    @property
+    def command_mode(self):
+        ''' returns the command type'''
+        return self._command_mode
+    
+    @command_mode.setter
+    def command_mode(self, value):
+        self._command_mode = value
+        self._update_display()
 
     @property
     def data(self) -> list:
         ''' returns a list of parameters for that command '''
-        return self._osc_message_data
+        return self._command_data
+    
+    @data.setter
+    def data(self, value):
+        self._command_data = value
+        self._update_display()  
+        
 
 class OscDeviceTabWidget(QtWidgets.QWidget):
 
     """Widget used to configure open sound control (OSC) inputs """
-
-    device_guid = uuid.UUID('ccb486e8-808e-4b3f-abe7-bcb380f39aa4')
+    
+    # IMPORTANT: MUST BE A DID FORMATTED ID ON CUSTOM INPUTS
+    device_guid = parse_guid('ccb486e8-808e-4b3f-abe7-bcb380f39aa4')
 
     def __init__(
             self,
@@ -2248,8 +2532,12 @@ class OscDeviceTabWidget(QtWidgets.QWidget):
         # List of inputs
         self.input_item_list_model = input_item.InputItemListModel(
             device_profile,
-            current_mode
+            current_mode,
+            [InputType.OpenSoundControl] # only allow OSC inputs for this widget
         )
+
+        # update the display names 
+
         self.input_item_list_view = input_item.InputItemListView(custom_widget_handler=self._custom_widget_handler)
         self.input_item_list_view.setMinimumWidth(350)
 
@@ -2301,7 +2589,7 @@ class OscDeviceTabWidget(QtWidgets.QWidget):
         # Select default entry
         selected_index = self.input_item_list_view.current_index
         if selected_index is not None:
-            self.input_item_selected_cb(selected_index)
+            self._select_item_cb(selected_index)
 
     def itemAt(self, index):
         ''' returns the input widget at the given index '''
@@ -2386,8 +2674,8 @@ class OscDeviceTabWidget(QtWidgets.QWidget):
         
         '''
 
-        widget = gremlin.ui.input_item.InputItemWidget(identifier = identifier, populate_ui = self._populate_input_widget_ui, populate_name= self._populate_name)
-        input_id = identifier.input_id
+        widget = gremlin.ui.input_item.InputItemWidget(identifier = identifier, populate_ui = self._populate_input_widget_ui, config_external=True)
+        #identifier = identifier.input_id
         widget.create_action_icons(data)
         widget.update_description(data.description)
         widget.enable_close()
@@ -2453,7 +2741,11 @@ class OscDeviceTabWidget(QtWidgets.QWidget):
     def _populate_input_widget_ui(self, input_widget, container_widget):
         ''' called when a button is created for custom content '''
         data : OscInputItem = input_widget.identifier.input_id 
-        label_widget = QtWidgets.QLabel(data.display_name)
+
+        input_widget.setTitle(data.title_name)
+        input_widget.setDescription(data.display_name)
+
+
         status_widget = gremlin.ui.ui_common.QIconLabel()
         status_widget.setObjectName("status")
         is_warning = False
@@ -2461,12 +2753,7 @@ class OscDeviceTabWidget(QtWidgets.QWidget):
         if data.message is None:
             is_warning = True
             status_text = "Not configured"
-        # if not data.port_valid:
-        #     is_warning = True
-        #     if status_text:
-        #         status_text += " "
-        #     status_text += f"Invalid port '{data.port_name}'"
-        
+       
 
         if is_warning:
             status_widget.setIcon("fa.warning", use_qta=True, color="red")
@@ -2477,14 +2764,8 @@ class OscDeviceTabWidget(QtWidgets.QWidget):
 
         layout = QtWidgets.QVBoxLayout()
         container_widget.setLayout(layout)
-        layout.addWidget(label_widget)
         layout.addWidget(status_widget)
-        
-        container_widget.parent().setToolTip(data.display_tooltip)
-
-
-    def _populate_name(self, widget, identifier):       
-        return "OSC Input (TODO: what is it)"
+        input_widget.setToolTip(data.display_tooltip)
 
 
     def _create_close_callback(self, index):
@@ -2495,11 +2776,6 @@ class OscDeviceTabWidget(QtWidgets.QWidget):
     def _create_edit_callback(self, index):
         ''' creates a callback to handle the edit of items '''
         return lambda x: self._edit_item(index)
-                                
-        
-
-
-
  
     def _edit_item_cb(self, widget, index, data):
         ''' called when the edit button is clicked  '''
@@ -2512,16 +2788,23 @@ class OscDeviceTabWidget(QtWidgets.QWidget):
         message = self._edit_dialog.command
         data = self._edit_dialog.data
         index = self._edit_dialog.index
+        mode = self._edit_dialog.mode
+        command_mode = self._edit_dialog.command_mode
+        min_range = self._edit_dialog.min_range
+        max_range = self._edit_dialog.max_range
+        
 
-        data = self.input_item_list_model.data(index)
-        data.input_id.message = message
-        data.input_id.data = data
+        identifier = self.input_item_list_model.data(index)
+        input_item : OscInputItem = identifier.input_id
+        input_item._message = message # OSC command message as text
+        input_item._message_data = data  # arguments as a list
+        input_item._mode = mode
+        input_item._command_mode = command_mode
+        input_item._min_range = min_range
+        input_item._max_range = max_range
+        input_item._update() # refresh other properties
+
         self.input_item_list_view.redraw()
-                
-
-
-  
-
 
     def _index_for_key(self, input_id):
         ''' returns the index of the selected input id'''
@@ -2562,4 +2845,4 @@ class OscDeviceTabWidget(QtWidgets.QWidget):
 
     def refresh(self):
         """Refreshes the current selection, ensuring proper synchronization."""
-        self.input_item_selected_cb(self.input_item_list_view.current_index)
+        self._select_item_cb(self.input_item_list_view.current_index)

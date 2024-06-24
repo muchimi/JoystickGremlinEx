@@ -814,7 +814,7 @@ class InputItemWidget(QtWidgets.QFrame):
     edit =  QtCore.Signal(InputIdentifier)
 
 
-    def __init__(self, identifier, parent=None, populate_ui = None, populate_name = None):
+    def __init__(self, identifier, parent=None, populate_ui = None, populate_name = None, config_external = False):
         """Creates a new instance.
 
         :param identifier identifying information about the button
@@ -832,11 +832,20 @@ class InputItemWidget(QtWidgets.QFrame):
         self.identifier = identifier
         self._selected = False
         
-        self.populate_name = populate_name
+        self.populate_name = populate_name # callback to populate the name
+        self._config_external = config_external # true if the widget is a custom widget configured externally
 
         
-        self._label_widget = gremlin.ui.ui_common.QIconLabel()
+        self._title_widget = gremlin.ui.ui_common.QIconLabel()
+        self._title_widget.setText("Input Not configured")
+        self._title_widget.setObjectName("title")
         self._description_widget = QtWidgets.QLabel()
+        self._description_widget.setObjectName("description")
+
+        # line 2 input description - only displayed in multirow custom inputs
+        self._input_description_widget = QtWidgets.QLabel()
+        self._input_description_widget.setObjectName("input_description")
+        self._input_description_widget.setStyleSheet("padding-left: 10px;")
         self._icon_layout = QtWidgets.QHBoxLayout()
         self._icons = []
 
@@ -857,7 +866,7 @@ class InputItemWidget(QtWidgets.QFrame):
         # main container 
 
         self.container_layout.addWidget(QtWidgets.QLabel(" "), data_row, 0)
-        self.container_layout.addWidget(self._label_widget, data_row, 1)
+        self.container_layout.addWidget(self._title_widget, data_row, 1)
         self.container_layout.addWidget(self._description_widget, data_row, 2)
         self.container_layout.addLayout(self._icon_layout, data_row, 3)
 
@@ -877,11 +886,12 @@ class InputItemWidget(QtWidgets.QFrame):
         self.container_layout.addWidget(self._close_button_widget, data_row, 5)
         self.container_layout.addWidget(QtWidgets.QLabel(" "), data_row, 6)
 
-        
         if self._multi_row:
+
             self.container_layout.addWidget(QtWidgets.QWidget(), 0, 0, 1, -1) # top row margine
             self.custom_container_widget = QtWidgets.QWidget()
-            self.container_layout.addWidget(self.custom_container_widget, data_row + 1, 0, -1, -1)
+            self.container_layout.addWidget(self._input_description_widget, data_row + 1, 0, 1, -1 )
+            self.container_layout.addWidget(self.custom_container_widget, data_row + 2, 0, -1, -1)
             self.populate_ui(self, self.custom_container_widget)
 
 
@@ -896,13 +906,32 @@ class InputItemWidget(QtWidgets.QFrame):
 
         self.update_display()
 
+    @property
+    def config_external(self):
+        return self._config_external
+    
+    @config_external.setter
+    def config_external(self, value):
+        self._config_external = value
+
+    def setTitle(self, value):
+        ''' sets the title of the input widget '''
+        self._title_widget.setText(value)
+
+    def setDescription(self, value):
+        ''' sets the description of the input widget '''
+        self._input_description_widget.setText(value)
+    
+    def setToolTip(self, tooltip):
+        ''' sets the tooltip for the widget '''
+        super().setToolTip(tooltip)
+    
+
     def update_display(self):
         ''' updates the display text for the button '''
-
-        
-        display_text = self.populate_name(self, self.identifier) if self.populate_name else gremlin.common.input_to_ui_string( self.identifier.input_type,self.identifier.input_id)
-        self._label_widget.setText(display_text)
-    
+        if not self._config_external:
+            display_text = self.populate_name(self, self.identifier) if self.populate_name else gremlin.common.input_to_ui_string( self.identifier.input_type,self.identifier.input_id)
+            self._title_widget.setText(display_text)
 
     @property
     def selected(self) -> bool:
@@ -922,7 +951,7 @@ class InputItemWidget(QtWidgets.QFrame):
 
     def setIcon(self, icon_path, use_qta = True):
         ''' sets the widget's icon '''
-        self._label_widget.setIcon(icon_path, use_qta)
+        self._title_widget.setIcon(icon_path, use_qta)
 
     def enable_close(self):
         ''' enables the close button on the input widget (keyboard only usually) '''

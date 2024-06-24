@@ -516,14 +516,15 @@ class EventHandler(QtCore.QObject):
 			elif event.event_type == InputType.OpenSoundControl:
 				# OSC event
 				osc_input = event.identifier
+				key = osc_input.message_key
 				if device_guid not in self.osc_callbacks.keys():
 					self.osc_callbacks[device_guid] = {}
-				if mode not in self.midi_callbacks[device_guid].keys():
+				if mode not in self.osc_callbacks[device_guid].keys():
 					self.osc_callbacks[device_guid][mode] = {}
-				if not osc_input in self.osc_callbacks[device_guid][mode]:
-					self.osc_callbacks[device_guid][mode][osc_input] = []
-				data = self.osc_callbacks[device_guid][mode][osc_input]
-				data.append((self._install_plugins(callback),permanent))				
+				if not key in self.osc_callbacks[device_guid][mode]:
+					self.osc_callbacks[device_guid][mode][key] = []
+				data = self.osc_callbacks[device_guid][mode][key]
+				data.append((self._install_plugins(callback),permanent))			
 			else:
 				# regular event
 				if device_guid not in self.callbacks:
@@ -699,20 +700,17 @@ class EventHandler(QtCore.QObject):
 		''' returns list of callbacks matching the event '''
 		callback_list = []
 		if event.event_type == InputType.OpenSoundControl:
-			# TODO
-			pass
-			# bytes = event.identifier.message.hex()
-			# if event.device_guid in self.osc_callbacks:
-			# 	callback_list = self.osc_callbacks[event.device_guid].get(
-			# 		self._active_mode, {}
-			# 	).get(bytes, [])
+			key = event.identifier.message_key
+			if event.device_guid in self.osc_callbacks:
+				callback_list = self.osc_callbacks[event.device_guid].get(
+					self._active_mode, {}
+				).get(key, [])
 
 		# Filter events when the system is paused
 		if not self.process_callbacks:
 			return [c[0] for c in callback_list if c[1]]
 		else:
 			return [c[0] for c in callback_list]
-		
 			
 
 	def _matching_callbacks(self, event):

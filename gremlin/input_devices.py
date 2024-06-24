@@ -28,6 +28,7 @@ from typing import Callable
 from PySide6 import QtCore
 
 
+import gremlin.config
 import gremlin.keyboard
 import gremlin.types
 from dinput import DILL, GUID, GUID_Invalid
@@ -1150,7 +1151,8 @@ class OscClient(QtCore.QObject):
         self._interface.osc_message.connect(self._osc_message_cb)
         self._event_handler = gremlin.event_handler.EventHandler()
         self._event_listener = gremlin.event_handler.EventListener()
-        self._midi_map = {}  # list of message keys
+        self._osc_map = {}  # list of message keys
+        
 
     def start(self):
         ''' starts the client '''
@@ -1160,20 +1162,22 @@ class OscClient(QtCore.QObject):
         import gremlin.shared_state
         profile = gremlin.shared_state.current_profile
         
+        self._verbose = gremlin.config.Configuration().verbose
         # build a list of input items to midi messages
-        self._midi_map = {}  # list of message keys
+        self._osc_map = {}  # list of message keys
         for device in profile.devices.values():
-            if device.name == "midi":
+            if device.name == "osc":
                 for mode in device.modes.values():
                     for input_items in mode.config.values():
                         for input_item in input_items:
                             if isinstance(input_item, OscInputItem):
                                 message_key = input_item.message_key
-                                if not message_key in self._midi_map.keys():
-                                    self._midi_map[message_key] = []
-                                if input_item.port_valid:
-                                    self._midi_map[message_key].append(input_item)
-                                    logging.getLogger("system").info(f"MIDI: register trigger on: {input_item.display_name} mode: {input_item.mode_string} key: {message_key}")  
+                                if not message_key in self._osc_map.keys():
+                                    self._osc_map[message_key] = []
+                            
+                                self._osc_map[message_key].append(input_item)
+                                if self._verbose:
+                                    logging.getLogger("system").info(f"OSC: register trigger on: {input_item.display_name} mode: {input_item.mode_string} key: {message_key}")  
 
 
         self._interface.start()
@@ -1182,15 +1186,55 @@ class OscClient(QtCore.QObject):
         ''' stops the client '''
         self._interface.stop()
 
-    def _osc_message_cb(self, *args):
+    def _osc_message_cb(self, message, args):
         ''' called when an OSC message is received '''
-        from gremlin.ui.osc_device import OscInputItem
+        from gremlin.ui.osc_device import OscInputItem, OscDeviceTabWidget
+        from gremlin.input_types import InputType
         # get the input items behind this message
-        data = OscInputItem()
-        # data.message = message # this decodes the data
-        # message_key = data.message_key
+        input_item = OscInputItem()
+        input_item.message = message # this decodes the data
+        input_item.data = args
+        message_key = input_item.message_key
+        
 
+        if message_key in self._osc_map.keys():
+            logging.getLogger("system").info(f"OSC: runtime: processing {message_key}")
+            for input_item in self._osc_map[message_key]:
 
+                # button press mode - if the value is in the top half of the range, the button is considered pressed
+                is_axis = False
+                raw_value = args[0]
+                
+                if input_item.mode == OscInputItem.InputMode.Button:
+                    is_pressed = raw_value != 0.0   #for OSC pressed is any value except 0
+                    value = 1 if is_pressed else 0
+                elif input_item.mode == OscInputItem.InputMode.Axis:
+                    is_pressed = False
+                    # map to -1 +1 range for vjoy output
+                    value = gremlin.util.scale_to_range(raw_value, input_item.min_range, input_item.max_range)
+                    is_axis = True
+                elif input_item.mode == OscInputItem.InputMode.OnChange:
+                    is_pressed = True
+                    value = raw_value
+
+                if self._verbose:
+                    logging.getLogger("system").info(f"OSC: send event: is_pressed: {is_pressed} value: {value} raw value: {raw_value} is axis: {is_axis}")
+
+                self._event_listener.midi_event.emit(
+                gremlin.event_handler.Event(
+                    event_type= InputType.OpenSoundControl,
+                    device_guid= OscDeviceTabWidget.device_guid,
+                    identifier= input_item,
+                    is_pressed = is_pressed, 
+                    value = value,
+                    raw_value = raw_value,
+                    is_axis = is_axis
+
+                ))
+        # else:
+        #     if verbose:
+        #         logging.getLogger("system").info(f"OSC: runtime: ignoring {message_key}")
+    
       
 
 class MidiClient(QtCore.QObject):
@@ -1215,6 +1259,8 @@ class MidiClient(QtCore.QObject):
         import gremlin.shared_state
         profile = gremlin.shared_state.current_profile
         
+        self._verbose = gremlin.config.Configuration().verbose
+        
         # build a list of input items to midi messages
         self._midi_map = {}  # list of message keys
         for device in profile.devices.values():
@@ -1228,10 +1274,11 @@ class MidiClient(QtCore.QObject):
                                     self._midi_map[message_key] = []
                                 if input_item.port_valid:
                                     self._midi_map[message_key].append(input_item)
-                                    logging.getLogger("system").info(f"MIDI: register trigger on: {input_item.display_name} mode: {input_item.mode_string} key: {message_key}")
+                                    if self._verbose:
+                                        logging.getLogger("system").info(f"MIDI: register trigger on: {input_item.display_name} mode: {input_item.mode_string} key: {message_key}")
                             
 
-
+        
         self._interface.start()
 
     def stop(self):
@@ -1246,10 +1293,10 @@ class MidiClient(QtCore.QObject):
         #self._callback(port_name, port_index, message)
 
         # get the input items behind this message
-        data = MidiInputItem()
-        data.port_name = port_name
-        data.message = message # this decodes the data
-        message_key = data.message_key
+        input_item = MidiInputItem()
+        input_item.port_name = port_name
+        input_item.message = message # this decodes the data
+        message_key = input_item.message_key
 
         
 
@@ -1287,7 +1334,8 @@ class MidiClient(QtCore.QObject):
                     is_pressed = True
                     value = raw_value
 
-                logging.getLogger("system").info(f"MIDI: send event: is_pressed: {is_pressed} value: {value} raw value: {raw_value} is axis: {is_axis}")
+                if self._verbose:
+                    logging.getLogger("system").info(f"MIDI: send event: is_pressed: {is_pressed} value: {value} raw value: {raw_value} is axis: {is_axis}")
 
                 self._event_listener.midi_event.emit(
                 gremlin.event_handler.Event(
@@ -1300,8 +1348,8 @@ class MidiClient(QtCore.QObject):
                     is_axis = is_axis
 
                 ))
-        else:
-            logging.getLogger("system").info(f"MIDI: runtime: ignoring {message_key}")
+        # else:
+        #     logging.getLogger("system").info(f"MIDI: runtime: ignoring {message_key}")
     
 
 
@@ -1332,6 +1380,8 @@ remote_client = RemoteClient()
 # listens to MIDI input
 midi_client = MidiClient()
 
+# listens to OSC input
+osc_client = OscClient()
 
 
 def register_callback(callback, device, input_type, input_id):
@@ -1667,8 +1717,8 @@ class Keyboard(QtCore.QObject):
         """
         if isinstance(key, str):
             key = gremlin.keyboard.key_from_name(key)
-        elif isinstance(key, gremlin.keyboard.Key):
-            pass
+        # elif isinstance(key, gremlin.keyboard.Key):
+        #     pass
         return self._keyboard_state.get(key, False)
 
 

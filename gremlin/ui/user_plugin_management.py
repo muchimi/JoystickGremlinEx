@@ -22,7 +22,8 @@ from PySide6 import QtCore, QtGui, QtWidgets
 
 from gremlin.common import PluginVariableType
 from gremlin.util import load_icon
-import gremlin.profile
+import gremlin.base_profile
+from gremlin.input_types import InputType
 import gremlin.user_plugin
 import gremlin.ui.ui_common
 import os
@@ -50,7 +51,7 @@ class ModuleManagementController(QtCore.QObject):
             # Only add a new entry if the module doesn't exist yet
             if fname not in [v.file_name for v in self.profile_data.plugins]:
                 # Update the model
-                module = gremlin.profile.Plugin(self.profile_data)
+                module = gremlin.base_profile.Plugin(self.profile_data)
                 module.file_name = fname
 
                 # Create new data instance
@@ -123,7 +124,7 @@ class ModuleManagementController(QtCore.QObject):
             ]:
                 # Create basic profile variable instance if it does not exist
                 if not instance.has_variable(var.label):
-                    profile_var = gremlin.profile.PluginVariable(instance)
+                    profile_var = gremlin.base_profile.PluginVariable(instance)
                     profile_var.name = var.label
                     profile_var.type = var.variable_type
                     profile_var.value = var.value
@@ -215,7 +216,7 @@ class ModuleManagementController(QtCore.QObject):
 
     def _create_module_instance(self, name, module_data):
         # Create the model data side of things
-        instance = gremlin.profile.PluginInstance(module_data)
+        instance = gremlin.base_profile.PluginInstance(module_data)
         instance.name = name
 
         # Properly populate the new instance with default values for all

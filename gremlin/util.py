@@ -875,5 +875,41 @@ def scale_to_range(value, r_min, r_max, new_min = -1.0, new_max = 1.0):
     new_max: the new range's max
     
     '''
+    r_delta = r_max - r_min
+    if r_delta == 0:
+        # frame the value if no valid range given
+        if value < -1.0:
+            return -1.0
+        if value > 1.0:
+            return 1.0
+        return value
+            
     return (((value - r_min) * (new_max - new_min)) / (r_max - r_min)) + new_min
     
+
+def list_to_csv(data) -> str:
+    ''' converts an input list to a CSV stream  - returns a single row '''
+    if not data:
+        return ""
+    assert isinstance(data, tuple) or isinstance(data, list)
+    import csv
+    import io
+    output = io.StringIO()
+    writer = csv.writer(output, quoting=csv.QUOTE_MINIMAL)
+    writer.writerow(data)
+    return output.getvalue().strip() # remove new lines
+
+
+def csv_to_list(value) -> list:
+    ''' converts a single row csv input to a list '''
+    if value:
+        import csv
+        import io
+        input = io.StringIO(value)
+        try:
+            reader = csv.reader(input, delimiter=',')
+            for row in reader:
+                return row
+        except:
+            logging.getLogger("system").error(f"Unable to convert data stream {value} to a list")
+    return []

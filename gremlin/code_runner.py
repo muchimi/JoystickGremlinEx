@@ -180,9 +180,6 @@ class CodeRunner:
                                 # no containers = no actions = skip
                                 continue
 
-                            if input_item.input_type == gremlin.input_types.InputType.Midi:
-                                pass
-
                             event = event_handler.Event(
                                 event_type=input_item.input_type,
                                 device_guid=device.device_guid,
@@ -303,6 +300,9 @@ class CodeRunner:
 
             # listen to MIDI 
             input_devices.midi_client.start()
+
+            # listen to OSC
+            input_devices.osc_client.start()
             
             #evt_listener.remote_event.connect(self.event_handler.process_event)
 
@@ -348,6 +348,11 @@ class CodeRunner:
         el = gremlin.event_handler.EventListener()
         el.profile_stop.emit()
 
+        # stop midi client
+        input_devices.midi_client.stop()
+
+        # stop OSC client
+        input_devices.osc_client.stop()
 
         # stop remote client
         input_devices.remote_client.stop()

@@ -393,7 +393,25 @@ class TempoExContainerFunctor(gremlin.base_classes.AbstractFunctor):
             for cond in container.activation_condition.conditions:
                 if isinstance(cond, gremlin.base_conditions.InputActionCondition):
                     if cond.comparison == "press":
-                        self.switch_on_press = True        
+                        self.switch_on_press = True       
+
+        el = gremlin.event_handler.EventListener()
+        el.profile_start.connect(self._profile_start)
+
+    def _profile_start(self):
+        # reset any prior values before start
+        self.start_time = 0
+        self.timer = None
+        self.value_press = None
+        self.event_press = None
+        self.chain_short = True # chain by default
+        self.chain_long = True # chain by default
+        self.short_index = 0
+        self.long_index = 0
+        self.last_short_execution = 0.0
+        self.last_long_execution = 0.0
+        self.last_short_value = None
+
 
 
     def _trigger_short_press(self, event, value):

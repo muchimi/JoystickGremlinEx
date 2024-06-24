@@ -1374,6 +1374,8 @@ class QIconLabel(QtWidgets.QWidget):
     def setText(self, text = None):
         ''' sets the text of the label '''
         if text:
+            if "OSC input" in text:
+                pass
             self._label_widget.setText(text)
         else: 
             self._label_widget.setText("")
@@ -1386,4 +1388,7 @@ class QIconLabel(QtWidgets.QWidget):
         ''' shows the icon '''
         self._icon_widget.setVisible(False)
 
+    def text(self):
+        ''' gets the text of the widget '''
+        return self._icon_widget.text()
     

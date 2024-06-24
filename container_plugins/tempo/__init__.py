@@ -238,6 +238,17 @@ class TempoContainerFunctor(gremlin.base_classes.AbstractFunctor):
         self.value_press = None
         self.event_press = None
 
+        el = gremlin.event_handler.EventListener()
+        el.profile_start.connect(self._profile_start)
+
+    def _profile_start(self):
+        # reset any prior values before start
+        self.start_time = 0
+        self.timer = None
+        self.value_press = None
+        self.event_press = None
+
+
     def process_event(self, event, value):
         # TODO: Currently this does not handle hat or axis events, however
         #       virtual buttons created on those inputs is supported

@@ -490,6 +490,8 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         super().__init__(action_data, parent=parent)
         assert(isinstance(action_data, VjoyRemap))
 
+    
+
     def _create_ui(self):
         """Creates the UI components."""
 
@@ -522,7 +524,11 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             # init default widget tracking
             self.button_grid_widget  = None
             self.axis_widget = None
-            
+
+            # if self.action_data.input_type in (InputType.Midi, InputType.OpenSoundControl):
+            #     pass
+
+            self._is_axis = self.action_data.input_is_axis()
             
 
             # add the selector
@@ -710,18 +716,15 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         else:
             action_name = None
 
-        if self.action_data.input_is_axis():
+        is_axis = self.action_data.input_is_axis()
+        if is_axis:
             if not action_name:
                 action_name = f"Vjoy device {vjoy_device_id} axis {vjoy_input_id} ({self.get_axis_name(vjoy_input_id)})"
-            if input_type == InputType.Midi:
-                name = f"MIDI axis -> {action_name}"
+            if input_type != InputType.JoystickAxis:
+                name = f"Input axis -> {action_name}"
             else:
                 axis_name = self.get_axis_name(input_id)
                 name = f"Axis {input_id} ({axis_name}) -> {action_name}"
-        elif input_type == InputType.Midi:
-            if not action_name:
-                action_name = f"Vjoy device {vjoy_device_id} button {vjoy_input_id}"
-            name = f"MIDI trigger -> {action_name}"
         elif input_type in VJoyWidget.input_type_buttons:
             if not action_name:
                 action_name = f"Vjoy device {vjoy_device_id} button {vjoy_input_id}"
@@ -730,9 +733,10 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             if not action_name:
                 action_name = f"Vjoy device {vjoy_device_id} hat {vjoy_input_id}"
             name = f"Hat {input_id} -> {action_name}"
-        else:
-
-            name = f"Unknown input type: {input_type}"
+        else: 
+            if not action_name:
+                action_name = f"Vjoy device {vjoy_device_id} button {vjoy_input_id}"
+            name = f"Input trigger -> {action_name}" 
         
         
         box.addWidget(QtWidgets.QLabel(name))
@@ -1129,8 +1133,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         paired_visible = False
         hardware_widget_visible = False
 
-        if self.action_data.input_is_axis(): #input_type == InputType.JoystickAxis:
-            
+        if self._is_axis: 
             grid_visible = action == VjoyAction.VJoyAxisToButton
             range_visible = action in (VjoyAction.VJoyRangeAxis, VjoyAction.VJoyAxisToButton)
             # hardware_widget_visible = action == VjoyAction.VjoyMergeAxis
@@ -1417,8 +1420,9 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             else:
                 self.cb_action_list.setCurrentIndex(index)
                
-            if self.action_data.input_type == InputType.JoystickAxis or \
-                (self.action_data.input_type == InputType.Midi and self.action_data.hardware_input_id.mode_string =="axis"):
+            is_axis = self._is_axis
+            if is_axis:
+                
                 with QtCore.QSignalBlocker(self.reverse_checkbox):
                     self.reverse_checkbox.setChecked(self.action_data.reverse)
                 
@@ -2018,12 +2022,10 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
 
         self.range_low = -1.0 # axis range min
         self.range_high = 1.0 # axis range max
-        
+        is_axis = self.input_is_axis()
 
         # pick an appropriate default action set for the type of input this is
-        if self.input_type == InputType.JoystickAxis:
-            self.action_mode = VjoyAction.VJoyAxis
-        elif self.input_is_axis():
+        if is_axis:
                 # input is setup as an axis
                 self.action_mode = VjoyAction.VJoyAxis
         elif self.input_type in VJoyWidget.input_type_buttons:
@@ -2039,8 +2041,10 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         
     def input_is_axis(self):
         ''' true if the input is an axis type input '''
-        return self.input_type == InputType.JoystickAxis or \
-                self.input_type == InputType.Midi and self.hardware_input_id.mode_string == "axis"
+        is_axis = hasattr(self.hardware_input_id, "is_axis") and self.hardware_input_id.is_axis
+        return is_axis or self.input_type == InputType.JoystickAxis
+            
+        
 
 
     @property
@@ -2204,38 +2208,6 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
 
             if not valid:
                 raise gremlin.error.GremlinError(f"VJOYREMAP: Invalid remap type provided: {node.attrib}")
-
-            # if "axis" in node.attrib:
-            #     self.input_type = InputType.JoystickAxis
-            #     self.vjoy_input_id = safe_read(node, "axis", int)
-            #     self.vjoy_axis_id = self.vjoy_input_id
-            # elif "button" in node.attrib:
-            #     self.input_type = InputType.JoystickButton
-            #     self.vjoy_input_id = safe_read(node, "button", int)
-            #     self.vjoy_button_id = self.vjoy_input_id
-            # elif "hat" in node.attrib:
-            #     self.input_type = InputType.JoystickHat
-            #     self.vjoy_input_id = safe_read(node, "hat", int)
-            #     self.vjoy_hat_id = self.vjoy_input_id
-            # elif "keyboard" in node.attrib:
-            #     self.input_type = InputType.Keyboard
-            #     self.vjoy_input_id = safe_read(node, "keyboard", int)
-            # elif "keylatched" in node.attrib:
-            #     self.input_type = InputType.KeyboardLatched
-            #     self.vjoy_input_id = safe_read(node, "keylatched", int)
-            #     self.vjoy_button_id = self.vjoy_input_id
-            # elif "midi" in node.attrib:
-            #     self.input_type = InputType.Midi
-            #     self.vjoy_input_id = safe_read(node, "midi", int)
-            #     self.vjoy_button_id = self.vjoy_input_id
-            # elif "osc" in node.attrib:
-            #     self.input_type = InputType.OpenSoundControl
-            #     self.vjoy_input_id = safe_read(node, "osc", int)
-            #     self.vjoy_button_id = self.vjoy_input_id
-            # else:
-            #     raise gremlin.error.GremlinError(
-            #         f"Invalid remap type provided: {node.attrib}"
-            #     )
 
             self.vjoy_device_id = safe_read(node, "vjoy", int)
 

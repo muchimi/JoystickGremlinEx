@@ -10,7 +10,7 @@ from configuration import * # load constants defining the devices connected to t
 from util import *
 from hardware import *
 from gremlin.macro import Macro, MacroManager
-
+from gremlin.util import parse_guid
 
 gremlin.util.log("Custom MSFS module enabled")
 
@@ -103,14 +103,14 @@ f1_macro.release('F1')
 
 joy = gremlin.input_devices.JoystickProxy()
 
-t_rudder_raw = joy[gremlin.profile.parse_guid(MFG_Crosswind_V2_3_GUID)]
-vpc_left_raw = joy[gremlin.profile.parse_guid(VPC_LEFT_GUID)]
+t_rudder_raw = joy[parse_guid(MFG_Crosswind_V2_3_GUID)]
+vpc_left_raw = joy[parse_guid(VPC_LEFT_GUID)]
 
 
 
 
 
-bravo_raw = joy[gremlin.profile.parse_guid(BRAVO_GUID)]
+bravo_raw = joy[parse_guid(BRAVO_GUID)]
 
 RUDDER_FACTOR = 0.75 # scale value when scaling the rudder
 rudder_scaled = False # don't start with scaled rudder - left stick trigger toggles between the modes

@@ -174,12 +174,17 @@ class MidiInputItem():
         self.id = None # GUID
         self._port_name = None
         self._message = None # the midi message
-        self._display_name =  "MIDI (not configured)"
+        self._title_name =  "MIDI (not configured)"
+        self._display_name = None
         self._display_tooltip = "Input configuration not set"
         self._command = None # decoded command
         self._message_key = "" # key for this message category
         self._mode = MidiInputItem.InputMode.Button  # mode is button or axis 
 
+
+    @property
+    def is_axis(self):
+        return self._mode == MidiInputItem.InputMode.Axis
 
     @property
     def message(self):
@@ -255,6 +260,8 @@ class MidiInputItem():
             bytes = byte_string_to_list(data)
             self.message = mido.Message.from_bytes(bytes) if bytes else None
 
+        self._update_display_name()
+
 
     def to_xml(self):
         ''' writes the input item to XML'''
@@ -265,6 +272,12 @@ class MidiInputItem():
         data = [] if self.message is None else self.message.bytes()
         node.set("data", byte_list_to_string(data))
         return node
+    
+    @property
+    def title_name(self):
+        ''' title for this input '''
+        return self._title_name
+
     
     @property
     def display_name(self):
@@ -315,6 +328,10 @@ class MidiInputItem():
                 mode_stub = "Axis"
             if self._mode == MidiInputItem.InputMode.OnChange:
                 mode_stub = "Change"
+            else:
+                mode_stub = f"Unknown: {self._mode}"
+
+            self._title_name = f"MIDI input ({mode_stub})"
 
             self._display_name = f"{port_name}/{command_display}{stub_channel} {display_stub}"
 
@@ -433,7 +450,7 @@ class MidiInterface(QtCore.QObject):
         self._started = False # true if the interface is actively listening
         self._listeners = {} # map of port numer to its listener
 
-
+        self._monitored_ports = set()
         
 
         # get a list of available devices to listen into
@@ -1284,6 +1301,7 @@ class MidiDeviceTabWidget(QtWidgets.QWidget):
 
     """Widget used to configure open sound control (OSC) inputs """
 
+    # IMPORTANT: MUST BE A DID FORMATTED ID ON CUSTOM INPUTS
     device_guid = parse_guid('1b56ecf7-0624-4049-b7b3-8d9b7d8ed7e0')
 
     def __init__(
@@ -1492,7 +1510,7 @@ class MidiDeviceTabWidget(QtWidgets.QWidget):
         
         '''
 
-        widget = gremlin.ui.input_item.InputItemWidget(identifier = identifier, populate_ui = self._populate_input_widget_ui, populate_name= self._populate_name)
+        widget = gremlin.ui.input_item.InputItemWidget(identifier = identifier, populate_ui = self._populate_input_widget_ui, config_external=True)
         input_id = identifier.input_id
         widget.create_action_icons(data)
         widget.update_description(data.description)
@@ -1604,7 +1622,11 @@ class MidiDeviceTabWidget(QtWidgets.QWidget):
     def _populate_input_widget_ui(self, input_widget, container_widget):
         ''' called when a button is created for custom content '''
         data : MidiInputItem = input_widget.identifier.input_id 
-        label_widget = QtWidgets.QLabel(data.display_name)
+
+        input_widget.setTitle(data.title_name)
+        input_widget.setDescription(data.display_name)
+
+
         status_widget = gremlin.ui.ui_common.QIconLabel()
         status_widget.setObjectName("status")
         is_warning = False
@@ -1618,28 +1640,7 @@ class MidiDeviceTabWidget(QtWidgets.QWidget):
                 status_text += " "
             status_text += f"Invalid port '{data.port_name}'"
         
-        # # check for conflicts with other entries
-        # model = self.input_item_list_model
-        # key = data.message_key
-        # for index in range(model.rows()):
-        #     widget = self.itemAt(index)
-        #     if not widget:
-        #         continue
-        #     if widget == input_widget: continue # skip us
-        #     # grab the input's configured midi message
-        #     other_input = widget.identifier.input_id
-        #     other_message = other_input.message
-        #     if other_message is None:
-        #         # input not set = ok
-        #         continue 
-
-        #     other_key = other_input.message_key
-        #     if key == other_key:
-        #         status_text = f"Input conflict detected with input [{index+1}]<br>Ensure inputs are unique"
-        #         is_warning = True
-        #         break
-
-        
+      
 
         if is_warning:
             status_widget.setIcon("fa.warning", use_qta=True, color="red")
@@ -1650,24 +1651,13 @@ class MidiDeviceTabWidget(QtWidgets.QWidget):
 
         layout = QtWidgets.QVBoxLayout()
         container_widget.setLayout(layout)
-        layout.addWidget(label_widget)
         layout.addWidget(status_widget)
         
-        container_widget.parent().setToolTip(data.display_tooltip)
+        input_widget.setToolTip(data.display_tooltip)
 
         
 
 
-    def _populate_name(self, widget, identifier):       
-        mode = identifier.input_id.mode
-
-        if mode == MidiInputItem.InputMode.Button:
-            stub = "button"
-        elif mode == MidiInputItem.InputMode.Axis:
-            stub = "axis"
-        elif mode == MidiInputItem.InputMode.OnChange:
-            stub = "on change"
-        return f"MIDI input ({stub})"
-    
+  
 
 
