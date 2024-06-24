@@ -25,6 +25,7 @@ import shutil
 import uuid
 from xml.dom import minidom
 from xml.etree import ElementTree
+import gremlin.base_classes
 import gremlin.base_profile
 
 from PySide6 import QtCore
@@ -790,7 +791,7 @@ class ProfileModifier:
             device_guids.append(guid)
             device_names[guid] = dev.name
         for cond in self.all_conditions():
-            if isinstance(cond, JoystickCondition):
+            if isinstance(cond, gremlin.base_classes.JoystickCondition):
                 device_guids.append(cond.device_guid)
                 device_names[cond.device_guid] = cond.device_name
         for entry in self.profile.merge_axes:
@@ -799,7 +800,7 @@ class ProfileModifier:
 
         device_info = []
         for device_guid in set(device_guids):
-            device_info.append(ProfileDeviceInformation(
+            device_info.append(gremlin.base_profile.ProfileDeviceInformation(
                 device_guid,
                 device_names.get(device_guid, "Unknown"),
                 self.container_count(device_guid),
@@ -956,7 +957,7 @@ class ProfileModifier:
                 target_hardware_device = dev
 
         for condition in self.all_conditions():
-            if isinstance(condition, gbc.JoystickCondition):
+            if isinstance(condition, gremlin.base_classes.JoystickCondition):
                 if condition.device_guid == source_guid:
                     condition.device_guid = target_guid
                     condition.device_name = target_hardware_device.name
@@ -983,7 +984,7 @@ class ProfileModifier:
         for device in self.profile.devices.values():
             name_map[device.device_guid] = device.name
         for cond in self.all_conditions():
-            if isinstance(cond, gbc.JoystickCondition):
+            if isinstance(cond, gremlin.base_classes.JoystickCondition):
                 name_map[cond.device_guid] = cond.device_name
         return name_map
 

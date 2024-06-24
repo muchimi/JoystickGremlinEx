@@ -19,7 +19,7 @@ from PySide6 import QtWidgets, QtCore
 
 import gremlin
 from . import ui_common
-
+from gremlin.input_types import InputType
 
 class CalibrationUi(ui_common.BaseDialogUi):
 

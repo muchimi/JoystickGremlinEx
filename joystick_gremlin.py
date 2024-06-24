@@ -49,7 +49,7 @@ import dinput
 import gremlin.event_handler 
 import gremlin.config
 from gremlin.types import DeviceType
-from gremlin.util import load_icon, load_pixmap
+from gremlin.util import load_icon, load_pixmap, userprofile_path, find_file
 from gremlin.ui.device_tab import JoystickDeviceTabWidget
 from gremlin.ui.keyboard_device import KeyboardDeviceTabWidget
 from gremlin.ui.midi_device  import MidiDeviceTabWidget
@@ -176,6 +176,14 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         # Load existing configuration or create a new one otherwise
         if self.config.last_profile and os.path.isfile(self.config.last_profile):
+            # check if this was a profile swap that we load the profile from the current user folder
+            current_profile_folder = userprofile_path().lower()
+            last_profile = self.config.last_profile.lower()
+            if not current_profile_folder in last_profile:
+                _, base_file = os.path.split(last_profile)
+                located_profile = find_file(base_file,current_profile_folder)
+                if located_profile:
+                    self.config.last_profile = located_profile
             self._do_load_profile(self.config.last_profile)
         else:
             self.new_profile()
@@ -924,8 +932,11 @@ class GremlinUi(QtWidgets.QMainWindow):
                 self._create_tabs()
 
                 # Stop Gremlin execution
+                
                 self.ui.actionActivate.setChecked(False)
                 restart = self.runner.is_running()
+                if restart:
+                    logging.getLogger("system").info(f"Profile restart due to device change") 
                 self.activate(restart)
             finally:
 
@@ -1451,12 +1462,10 @@ class GremlinUi(QtWidgets.QMainWindow):
         if is_enabled:
             el.joystick_event.connect(self._joystick_input_selection)
         else:
-            # Try to disconnect the handler and if it's not there ignore
-            # the exception raised by QT
-            try:
+            try: 
                 el.joystick_event.disconnect(self._joystick_input_selection)
-            except:
-                pass
+            except (TypeError, RuntimeError):  # pragma: no cover 
+                pass             
 
 
     def _set_joystick_input_buttons_highlighting(self, is_enabled):
@@ -1469,12 +1478,10 @@ class GremlinUi(QtWidgets.QMainWindow):
         if is_enabled:
             el.joystick_event.connect(self._joystick_input_button_selection)
         else:
-            # Try to disconnect the handler and if it's not there ignore
-            # the exception raised by QT
-            try:
+            try: 
                 el.joystick_event.disconnect(self._joystick_input_button_selection)
-            except:
-                pass
+            except (TypeError, RuntimeError):  # pragma: no cover 
+                pass 
 
 
     def _should_process_input(self, event, widget, buttons_only = False):

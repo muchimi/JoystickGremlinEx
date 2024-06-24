@@ -1198,7 +1198,7 @@ class OscClient(QtCore.QObject):
         
 
         if message_key in self._osc_map.keys():
-            logging.getLogger("system").info(f"OSC: runtime: processing {message_key}")
+            # logging.getLogger("system").info(f"OSC: runtime: processing {message_key}")
             for input_item in self._osc_map[message_key]:
 
                 # button press mode - if the value is in the top half of the range, the button is considered pressed
@@ -1359,7 +1359,7 @@ callback_registry = CallbackRegistry()
 # Global registry of all periodic callbacks
 periodic_registry = PeriodicRegistry()
 
-# Global registry of all start callbacks
+# Global registry of all start callbacks -
 start_registry = SimpleRegistry()
 
 # Global registry of all stop callbacks
@@ -1382,6 +1382,8 @@ midi_client = MidiClient()
 
 # listens to OSC input
 osc_client = OscClient()
+
+
 
 
 def register_callback(callback, device, input_type, input_id):
@@ -2100,6 +2102,7 @@ def _axis(axis_id, device_guid, mode, always_execute=False):
     return wrap
 
 
+''' KEYBOARD DECORATOR '''
 def keyboard(key_name, mode, always_execute=False):
     """Decorator for keyboard key callbacks.
 
@@ -2127,7 +2130,7 @@ def keyboard(key_name, mode, always_execute=False):
 
 
 
-
+''' PERIODIC DECORATOR '''
 def periodic(interval):
     """Decorator for periodic function callbacks.
 
@@ -2148,7 +2151,7 @@ def periodic(interval):
 
 
 
-
+''' PROFILE START DECORATOR '''
 def gremlin_start():
     ''' decorator when a profile is activated '''
     def wrap(callback):
@@ -2163,6 +2166,7 @@ def gremlin_start():
 
     return wrap
 
+''' PROFILE STOP DECORATOR '''
 def gremlin_stop():
     ''' decorator when a profile is de-activated '''
     def wrap(callback):
@@ -2177,7 +2181,7 @@ def gremlin_stop():
 
     return wrap
 
-
+''' PROFILE MODE DECORATOR'''
 def gremlin_mode():
     ''' decorator when gremlin changes profile modes - passes the new mode to the plugin '''
     def wrap(callback):
@@ -2191,6 +2195,7 @@ def gremlin_mode():
 
     return wrap
 
+''' STATE DECORATOR '''
 def gremlin_state():
     ''' decorator when gremlin changes states local or remote or both '''
     def wrap(callback):
@@ -2203,6 +2208,9 @@ def gremlin_state():
         return wrapper_fn
 
     return wrap
+
+
+
 
 
 def squash(value, func):

@@ -25,10 +25,12 @@ from PySide6 import QtCore, QtQml
 from PySide6.QtCore import Property, Signal, Slot
 
 from gremlin import error, plugin_manager, profile, tree, util
-from gremlin.profile_library import ActionTree, RootAction
+from gremlin.profile import ActionTree, RootAction
 from gremlin.signal import signal
 from gremlin.tree import TreeNode
-from gremlin.types import AxisButtonDirection, HatDirection, InputType
+from gremlin.types import AxisButtonDirection, HatDirection
+from gremlin.input_types import InputType
+
 
 if TYPE_CHECKING:
     from gremlin.base_classes import AbstractActionModel

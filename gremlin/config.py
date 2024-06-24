@@ -671,3 +671,33 @@ class Configuration:
     def verbose(self, value):
         self._data["verbose"] = value
         self.save()
+
+    @property
+    def midi_enabled(self):
+        ''' true if MIDI module is enabled '''
+        return self._data.get("midi_enabled", True)
+    
+    @midi_enabled.setter
+    def midi_enabled(self, value):
+        self._data["midi_enabled"] = value
+        self.save
+
+    @property
+    def osc_enabled(self):
+        ''' true if osc module is enabled '''
+        return self._data.get("osc_enabled", True)
+    
+    @osc_enabled.setter
+    def osc_enabled(self, value):
+        self._data["osc_enabled"] = value
+        self.save
+
+    @property
+    def osc_port(self):
+        ''' OSC listen port '''
+        port = self._data.get("osc_port", 8000)
+        return port
+    @osc_port.setter
+    def osc_port(self, value):
+        self._data["osc_port"] = value
+        self.save

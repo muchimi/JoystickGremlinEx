@@ -24,7 +24,7 @@ import dinput
 
 import gremlin
 from . import ui_common
-
+from gremlin.input_types import InputType
 
 class VisualizationType(enum.Enum):
 

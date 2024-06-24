@@ -188,6 +188,7 @@ class EventListener(QtCore.QObject):
 
 	# Signal emitted when a joystick is attached or removed
 	device_change_event = QtCore.Signal()
+	
 	# Signal emitted when the icon needs to be refreshed
 	icon_changed = QtCore.Signal(DeviceChangeEvent)
 
@@ -277,6 +278,9 @@ class EventListener(QtCore.QObject):
 		from gremlin.util import dill_hat_lookup
 		verbose = config.Configuration().verbose
 		
+		if not self._running:
+			return True
+		
 		event = dinput.InputEvent(data)
 		if event.input_type == dinput.InputType.Axis:
 			if verbose:
@@ -334,9 +338,8 @@ class EventListener(QtCore.QObject):
 
 		:param event the keyboard event
 		"""
-		# Ignore injected keyboard events while Gremlin is active
-		# if self.gremlin_active and event.is_injected:
-		#	  return True
+		if not self._running:
+			return True
 
 		key_id = (event.scan_code, event.is_extended)
 		is_pressed = event.is_pressed
@@ -368,8 +371,11 @@ class EventListener(QtCore.QObject):
 
 		:param event the mouse event
 		"""
+		
 		# Ignore events we created via the macro system
 		if not event.is_injected:
+			if not self._running:
+				return
 			self.mouse_event.emit(Event(
 				event_type= InputType.Mouse,
 				device_guid=dinput.GUID_Keyboard,

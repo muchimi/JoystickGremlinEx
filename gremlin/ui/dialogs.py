@@ -33,7 +33,7 @@ import gremlin.joystick_handling
 from . import ui_about, ui_common
 from gremlin.util import load_icon
 import logging
-
+from gremlin.input_types import InputType
 
 class OptionsUi(ui_common.BaseDialogUi):
 
@@ -126,6 +126,24 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.verbose.clicked.connect(self._verbose)
         self.verbose.setChecked(self.config.verbose)
 
+        # midi enabled
+        self.osc_enabled = QtWidgets.QCheckBox("Enable OSC input")
+        self.osc_enabled.clicked.connect(self._osc_enabled)
+        self.osc_enabled.setChecked(self.config.osc_enabled)
+
+        self.osc_port = QtWidgets.QSpinBox()
+        self.osc_port.setRange(4096,65535)
+        self.osc_port.setEnabled(self.config.osc_enabled)
+        port = self.config.osc_port
+        self.osc_port.setValue(port)
+        self.osc_port.valueChanged.connect(self._osc_port)
+
+
+        # midi enabled
+        self.midi_enabled = QtWidgets.QCheckBox("Enable MIDI input")
+        self.midi_enabled.clicked.connect(self._midi_enabled)
+        self.midi_enabled.setChecked(self.config.midi_enabled)
+
         # Show message on mode change
         self.show_mode_change_message = QtWidgets.QCheckBox(
             "Show message when changing mode"
@@ -163,6 +181,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.remote_control_port.setDecimals(0)
         self.remote_control_port.setValue(float(self.config.server_port))
         self.remote_control_port.valueChanged.connect(self._remote_control_server_port)
+        
 
         self.remote_control_layout.addWidget(self.enable_remote_control)
         self.remote_control_layout.addWidget(self.enable_remote_broadcast)
@@ -235,6 +254,18 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.general_layout.addWidget(self.start_with_windows)
         self.general_layout.addWidget(self.persist_clipboard)
         self.general_layout.addWidget(self.verbose)
+        self.general_layout.addWidget(self.midi_enabled)
+        
+        container = QtWidgets.QWidget()
+        layout = QtWidgets.QHBoxLayout()
+        container.setLayout(layout)
+        layout.addWidget(self.osc_enabled)
+        layout.addWidget(QtWidgets.QLabel("Listen port number (outbound is +1)"))
+        layout.addWidget(self.osc_port)
+        layout.addStretch()
+        layout.setContentsMargins(0,0,0,0)
+        self.general_layout.addWidget(container)
+
         self.general_layout.addWidget(self.show_mode_change_message)
 
         self.general_layout.addLayout(self.default_action_layout)
@@ -467,6 +498,19 @@ If this option is on, the last active profile will remain active until a differe
     def _verbose(self, clicked):
         ''' stores verbose setting '''
         self.config.verbose = clicked
+        self.config.save
+
+    def _midi_enabled(self, clicked):
+        self.config.midi_enabled = clicked
+        self.config.save
+
+    def _osc_enabled(self, clicked):
+        self.config.osc_enabled = clicked
+        self.osc_port.setEnabled(clicked)
+        self.config.save
+
+    def _osc_port(self):
+        self.config.osc_port = self.osc_port.value()
         self.config.save
 
 

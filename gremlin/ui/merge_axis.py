@@ -21,7 +21,7 @@ from PySide6 import QtWidgets, QtCore, QtGui
 
 import gremlin
 from . import ui_common
-
+from gremlin.input_types import InputType
 
 class MergeAxisUi(ui_common.BaseDialogUi):
 

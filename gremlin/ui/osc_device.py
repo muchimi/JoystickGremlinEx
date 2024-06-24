@@ -22,6 +22,7 @@ import logging
 
 from PySide6 import QtWidgets, QtCore, QtGui
 import threading
+import gremlin.config
 from gremlin.types import DeviceType
 from gremlin.input_types import InputType
 from . import input_item, ui_common 
@@ -1652,8 +1653,8 @@ class OscInterface(QtCore.QObject):
 
         #self._host_ip = "192.168.1.59"
         # host OSC listen port (UDP) - make sure the host's firewall allows that port in
-        self._input_port = 8000
-        self._output_port = 8001
+        self._input_port = gremlin.config.Configuration().osc_port
+        self._output_port = self._input_port + 1
         self._osc_server = OscServer() # the OSC server
 
         # find our current IP address

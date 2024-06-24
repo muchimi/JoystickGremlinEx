@@ -29,7 +29,7 @@ user32 = ctypes.WinDLL("user32")
 
 g_keyboard_callbacks = []
 g_mouse_callbacks = []
-
+import win32api
 
 # The following pages are references to the various functions used:
 #
@@ -274,6 +274,10 @@ class MouseEvent:
     @property
     def is_injected(self):
         return self._is_injected
+    
+def get_last_error():
+    ''' last error implementatoin'''
+    return win32api.GetLastError()
 
 
 @SingletonDecorator
@@ -384,3 +388,4 @@ class MouseHook:
                 raise ctypes.WinError(get_last_error())
             user32.TranslateMessage(ctypes.byref(msg))
             user32.DispatchMessageW(ctypes.byref(msg))
+            

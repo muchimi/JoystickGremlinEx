@@ -25,7 +25,7 @@ from PySide6 import QtCore
 from PySide6.QtCore import Property, Signal, Slot
 
 from gremlin import code_runner, common, config, error, plugin_manager, \
-    profile, profile_library, shared_state, types
+    profile, shared_state, types
 from gremlin.signal import signal
 
 from gremlin.ui.device import InputIdentifier

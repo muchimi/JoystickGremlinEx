@@ -500,7 +500,7 @@ def get_guid(strip=True):
     
 
 
-def find_file(icon_path):
+def find_file(file_path, root_folder = None):
     ''' finds a file '''
 
 
@@ -509,22 +509,26 @@ def find_file(icon_path):
     from gremlin.config import Configuration
     verbose = Configuration().verbose
 
-    icon_path = icon_path.lower().replace("/",os.sep)
+    file_path = file_path.lower().replace("/",os.sep)
     sub_folders = None
     folders = []
 
-    root_folder = get_root_path()
-    if os.sep in icon_path:
+    if not root_folder:
+        root_folder = get_root_path()
+    if not os.path.isdir(root_folder):
+        return None
+    
+    if os.sep in file_path:
         # we have folders
-        splits = icon_path.split(os.sep)
+        splits = file_path.split(os.sep)
         folders = splits[:-1]
-        icon_path = splits[-1]
+        file_path = splits[-1]
         sub_folders = os.path.join("", *folders)
 
     files = []
-    if not os.path.isfile(icon_path):
+    if not os.path.isfile(file_path):
         # path not found 
-        file_root, ext = os.path.splitext(icon_path)
+        file_root, ext = os.path.splitext(file_path)
         if ext:
             extensions = [ext]
         else:
@@ -545,14 +549,14 @@ def find_file(icon_path):
         files.sort(key = lambda x: len(x)) # shortest to largest
         found_path = files.pop(0) # grab the first one
         if verbose:
-            logging.getLogger("system").info(f"Find_files() - found : {found_path} for {icon_path}")
+            logging.getLogger("system").info(f"Find_files() - found : {found_path} for {file_path}")
         return found_path
     
     if circuit_breaker == 0:
-        logging.getLogger("system").error(f"Find_files() - search exceeded maximum when searching for: {icon_path}")
+        logging.getLogger("system").error(f"Find_files() - search exceeded maximum when searching for: {file_path}")
     
     if verbose or circuit_breaker == 0:
-        logging.getLogger("system").error(f"Find_files() failed for: {icon_path}")
+        logging.getLogger("system").error(f"Find_files() failed for: {file_path}")
     return None
 
 
@@ -913,3 +917,17 @@ def csv_to_list(value) -> list:
         except:
             logging.getLogger("system").error(f"Unable to convert data stream {value} to a list")
     return []
+
+
+def _silent_disconnect(signal, slot): 
+     """Disconnects a signal from a slot, ignoring errors. Sometimes 
+     Qt might disconnect a signal automatically for unknown reasons. 
+     """
+     import warnings
+     with warnings.catch_warnings():
+         # PySide 6.7+ issues a UserWarning instead of an exception.
+         warnings.filterwarnings("ignore", category=UserWarning)
+         try: 
+             signal.disconnect(slot) 
+         except (TypeError, RuntimeError):  # pragma: no cover 
+             pass 

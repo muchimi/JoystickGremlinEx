@@ -28,6 +28,7 @@ import dinput
 import gremlin
 from gremlin import event_handler, input_devices, \
     joystick_handling, macro, sendinput, user_plugin, util
+import gremlin.config
 from gremlin.input_types import InputType
 import gremlin.types
 import gremlin.plugin_manager
@@ -299,10 +300,12 @@ class CodeRunner:
             input_devices.remote_client.start()
 
             # listen to MIDI 
-            input_devices.midi_client.start()
+            if gremlin.config.Configuration().midi_enabled:
+                input_devices.midi_client.start()
 
             # listen to OSC
-            input_devices.osc_client.start()
+            if gremlin.config.Configuration().osc_enabled:
+                input_devices.osc_client.start()
             
             #evt_listener.remote_event.connect(self.event_handler.process_event)
 
@@ -320,7 +323,8 @@ class CodeRunner:
 
             # call start functions
             input_devices.start_registry.start()
-            input_devices.periodic_registry.start()            
+            input_devices.periodic_registry.start()     
+
 
 
             macro.MacroManager().start()

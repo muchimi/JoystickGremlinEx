@@ -25,6 +25,7 @@ import dinput
 from gremlin import common, joystick_handling, macro, util
 import gremlin.ui.ui_common
 import gremlin.ui.input_item
+from gremlin.input_types import InputType
 
 # TODO: Retire this entire bit here as the action library will replace it
 #       in it's entirety

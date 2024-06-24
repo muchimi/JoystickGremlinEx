@@ -30,7 +30,7 @@ from PySide6 import QtCore, QtGui, QtWidgets
 import dinput
 from gremlin import common, error, input_devices, joystick_handling, profile, shared_state
 import gremlin.ui.ui_common
-
+from gremlin.input_types import InputType
 
 def get_variable_definitions(fname):
     """Returns all variable definitions contained in the provided module.
