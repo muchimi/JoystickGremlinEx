@@ -595,16 +595,33 @@ class InputItem:
             self.input_id = (scan_code, is_extended)
 
 
-        elif self.input_type == InputType.KeyboardLatched:
+        elif self.input_type in (InputType.KeyboardLatched, InputType.Keyboard):
+            from gremlin.ui.keyboard_device import KeyboardInputItem
             from gremlin.keyboard import Key
-            scan_code = self.input_id
-            is_extended = read_bool(node, "extended")
-            key = Key(None, scan_code, is_extended)
-            for child in node:
-                if child.tag == "latched":
-                    latched_key = Key(None, safe_read(child,"id",int),read_bool(child,"extended"))
-                    key.latched_keys.append(latched_key)
-            self.input_id = key
+            input_item = KeyboardInputItem()
+
+            # see if old style keyboard entry
+            if "extended" in node.attrib:
+                scan_code = self.input_id
+                is_extended = read_bool(node, "extended")
+                key = Key(scan_code=scan_code, is_extended=is_extended)
+                input_item.key = key
+                for child in node:
+                    if child.tag == "latched":
+                        latched_key = Key(scan_code=safe_read(child,"id",int), is_extended= read_bool(child,"extended"))
+                        if not latched_key in key.latched_keys:
+                            key.latched_keys.append(latched_key)
+            else:
+                # new style
+                for child in node:
+                    if child.tag == "input":
+                        input_item.parse_xml(child)
+                        break
+            self.input_type = InputType.KeyboardLatched # force new input type
+            #logging.getLogger("system").info(f"Loaded key input: {input_item.display_name}")
+            self.input_id = input_item
+
+
 
         elif self.input_type == InputType.Midi:
             # midi data 
@@ -632,7 +649,7 @@ class InputItem:
 
         
         for child in container_node:
-            if child.tag in ("latched", "input"):
+            if child.tag in ("latched", "input", "keylatched"):
                 # ignore extra data
                 continue
             container_type = child.attrib["type"]
@@ -670,7 +687,9 @@ class InputItem:
                     child.set("id", safe_format(latched_key.scan_code, int))
                     child.set("extended", safe_format(latched_key.is_extended, bool))
                     node.append(child)
-
+            elif hasattr(self.input_id,"to_xml"):
+                child = self.input_id.to_xml()
+                node.append(child)    
             else:
                 node.set("id", safe_format(self.input_id[0], int))
                 node.set("extended", safe_format(self.input_id[1], bool))

@@ -35,16 +35,19 @@ from gremlin.util import *
 from gremlin.input_types import InputType
 import gremlin.base_classes
 from xml.etree import ElementTree
+from gremlin.common import MouseButton
 
-class KeyboardInputItem():
-    ''' holds a keyboard input item '''
+class MouseInputItem():
+    ''' holds a mouse input item '''
     def __init__(self):
         self.id = uuid.uuid4() # GUID (unique) if loaded from XML - will reload that one
         self._key = None # associated primary key (containing latched items)
-        self._title_name = "Keyboard input (not configured)"
+        self._title_name = "Mouse input (not configured)"
         self._display_name = None
         self._display_tooltip = None
         self._suspend_update = False
+        self._message_key = None
+        self._button = None
         self._update()
         
     @property
@@ -62,43 +65,19 @@ class KeyboardInputItem():
         return self._display_tooltip
     
     @property
-    def key(self):
-        return self._key
+    def button(self):
+        return self._button
     
-    @property
-    def key_tuple(self):
-        if self._key:
-            return (self._key.scan_code, self._key.is_extended)
-        return None
-    
-    def _latched_key_update(self, source, action, index, value):
+    @button.setter
+    def button(self, value):
+        self._button = value
         self._update()
     
-    @key.setter
-    def key(self, value):
-        assert isinstance(value, Key), f"Invalid type for key property: expected Key - got {value.type()}"
-        if self._key:
-            # dsiconnect 
-            self._key._latched_keys.remove_callback(self._latched_key_update)
-        self._key = value
-        if value:
-            # attach latched key changes to here
-            value._latched_keys.add_callback(self._latched_key_update)
-        self._update()
-
 
     @property
     def message_key(self):
         ''' returns the sorting key for this message '''
         return self._message_key
-    
-    @property
-    def latched_keys(self):
-        ''' returns a list of latched keys'''
-        if not self.key:
-            return []
-        return self.key._latched_keys
-
 
 
     def parse_xml(self, node):
@@ -111,18 +90,10 @@ class KeyboardInputItem():
 
             for child in node:
                 # ready key nodes
-                if child.tag in ("key"):
-                    scan_code = safe_read(child, "scan-code", int, 0)
-                    is_extended = safe_read(child, "extended", bool, False)
-                    key = key_from_code(scan_code, is_extended)
-                    self._key = key
-                    for latched_child in child:
-                        if latched_child.tag == "latched":
-                            scan_code = safe_read(latched_child, "scan-code", int, 0)
-                            is_extended = safe_read(latched_child, "extended", bool, False)
-                            key = key_from_code(scan_code, is_extended)
-                            if not key in self._key.latched_keys:
-                                self._key._latched_keys.append(key) 
+                if child.tag in ("mouse"):
+                    self._button = MouseButton(safe_read(child, "button", int))
+                    
+               
         self._suspend_update = False
         self._update()
                     
@@ -131,17 +102,8 @@ class KeyboardInputItem():
         # saves itself to xml
         node = ElementTree.Element("input")
         node.set("guid", str(self.id))
-        child = ElementTree.Element("key")
-        child.set("scan-code", str(self._key.scan_code))
-        child.set("extended", str(self._key.is_extended))
-        child.set("description", self.key.lookup_name)
-        node.append(child)
-        for key in self._key._latched_keys:
-            latched_child = ElementTree.Element("latched")
-            latched_child.set("scan-code", str(key.scan_code))
-            latched_child.set("extended", str(key.is_extended))
-            latched_child.set("description", key.lookup_name)
-            child.append(latched_child)
+        child = ElementTree.Element("mouse")
+        child.set("button", str(self.button.value))
         return node
     
     def _update(self):
@@ -149,38 +111,18 @@ class KeyboardInputItem():
         if self._suspend_update:
             # ignore
             return 
-        if not self._key:
+        if not self._button:
             self._message_key = ""
-            self._title_name = "Keyboard Input (not configured)"
+            self._title_name = "Mouse Input (not configured)"
             self._display_name = ""
             self._display_tooltip = ""
             return
-        
-        message_key = f"{self._key._scan_code:x}{1 if self.key._is_extended else 0}"
-        from gremlin.keyboard import sort_keys
-        display_name = self.key.lookup_name
-        key : Key
-        for key in self._key._latched_keys:
-            message_key += f"|{key._scan_code:x}{1 if key._is_extended else 0}"
-            
-        self._message_key = message_key
-        latched_keys = self._key._latched_keys
-
-        # setup display details for this key - sorted by modifier
-        if latched_keys:
-            keys = [self._key]
-            keys.extend(latched_keys)
-            # order the key by modifier and sequence
-            keys = sort_keys(keys)
-            display_name = ""
-            for key in keys:
-                if display_name:
-                    display_name += " + "
-                display_name += key.name
-        
-        self._title_name = f"Key input {'(latched)'if latched_keys else ''}"
+        display_name = MouseButton.to_string(self._button)
+        message_key = f"{self._button}"
+        self._title_name = f"Mouse input"
         self._display_name = display_name
         self._display_tooltip = display_name
+        self._message_key = message_key
 
     @property
     def name(self):
@@ -188,7 +130,7 @@ class KeyboardInputItem():
         return self._display_name
 
     def __eq__(self, other):
-        if isinstance(other, KeyboardInputItem):
+        if isinstance(other, MouseInputItem):
             return self.message_key == other.message_key 
         return self.__hash__() == other.__hash__()
 
@@ -220,12 +162,12 @@ class KeyboardInputItem():
             
 
 
-class KeyboardDeviceTabWidget(QtWidgets.QWidget):
+class MouseDeviceTabWidget(QtWidgets.QWidget):
 
-    """Widget used to configure keyboard inputs """
+    """Widget used to configure mouse inputs """
 
     # IMPORTANT: MUST BE A DID FORMATTED ID ON CUSTOM INPUTS (this one happens to match the regular keyboard device ID)
-    device_guid = parse_guid('6F1D2B61-D5A0-11CF-BFC7-444553540000')
+    device_guid = parse_guid('065ffe54-8356-4646-9e6d-46ebefe58a40')
 
     def __init__(
             self,
@@ -254,7 +196,7 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         self.input_item_list_model = input_item.InputItemListModel(
             device_profile,
             current_mode,
-            [InputType.Keyboard, InputType.KeyboardLatched]
+            [InputType.Mouse]
         )
         self.input_item_list_view = input_item.InputItemListView(custom_widget_handler=self.custom_widget_handler)
         self.input_item_list_view.setMinimumWidth(350)
@@ -287,7 +229,7 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
 
         # key clear button
         
-        clear_keyboard_button = ui_common.ConfirmPushButton("Clear Keys", show_callback = self._show_clear_cb)
+        clear_keyboard_button = ui_common.ConfirmPushButton("Clear Inputs", show_callback = self._show_clear_cb)
         clear_keyboard_button.confirmed.connect(self._clear_keys_cb)
         button_container_layout.addWidget(clear_keyboard_button)
         button_container_layout.addStretch(1)
@@ -299,8 +241,8 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         # button_container_layout.addWidget(button)
         
 
-        virtual_keyboard_button = QtWidgets.QPushButton("Add Key")
-        virtual_keyboard_button.clicked.connect(self._add_key_dialog_cb)
+        virtual_keyboard_button = QtWidgets.QPushButton("Add Input")
+        virtual_keyboard_button.clicked.connect(self._add_input_dialog_cb)
         button_container_layout.addWidget(virtual_keyboard_button)
         
 
@@ -329,50 +271,13 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         self.input_item_list_model.clear()
         self.input_item_list_view.redraw()
 
-    def _add_key_dialog_cb(self):
+    def _add_input_dialog_cb(self):
         ''' display the keyboard input dialog '''
         from gremlin.ui.virtual_keyboard import InputKeyboardDialog
         self._keyboard_dialog = InputKeyboardDialog(parent = self, select_single = False, index = -1)
         self._keyboard_dialog.accepted.connect(self._dialog_ok_cb)
         self._keyboard_dialog.showNormal()  
 
-
-    # def _add_listener_keyboard_key_cb(self):
-    #     """Handles adding of new keyboard keys to the list.
-
-    #     Asks the user to press the key they wish to add bindings for.
-    #     """
-    #     self.button_press_dialog = ui_common.InputListenerWidget(
-    #         self._add_keyboard_listener_key_cb,
-    #         [InputType.Keyboard],
-    #         return_kb_event=False,
-    #         multi_keys=True # allow key combinations
-    #     )
-
-    #     # Display the dialog centered in the middle of the UI
-    #     root = self
-    #     while root.parent():
-    #         root = root.parent()
-    #     geom = root.geometry()
-
-    #     self.button_press_dialog.setGeometry(
-    #         int(geom.x() + geom.width() / 2 - 150),
-    #         int(geom.y() + geom.height() / 2 - 75),
-    #         300,
-    #         150
-    #     )
-    #     self.button_press_dialog.show()
-
-      
-
-    # def _add_keyboard_listener_key_cb(self, keys):
-    #     """Adds the provided key to the list of keys.
-
-    #     :param key the new key to add, either a single key or a combo-key
-
-    #     """
-    #     # the new entry will be a new index
-    #     self._process_input_keys(keys, -1)
 
     def _dialog_ok_cb(self):
         ''' callled when the dialog completes '''
@@ -421,7 +326,7 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
                 input_id = identifier.input_id
                 logging.getLogger("system").info(f"Editing index {index} {input_id.display_name}")
             else:
-                input_id = KeyboardInputItem()
+                input_id = MouseInputItem()
                 index = self.input_item_list_model.rows() # new index
                 logging.getLogger("system").info(f"Adding index {index} {input_id.display_name}")
             input_id.key = root_key
@@ -610,8 +515,3 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         self.model.removeRow(index)
         self.redraw()
 
-
-
-
-
-                

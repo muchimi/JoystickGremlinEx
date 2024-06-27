@@ -397,10 +397,13 @@ class MapToKeyboardEx(gremlin.base_profile.AbstractAction):
         node.set("mode",safe_format(mode, str) )
 
         node.set("delay",safe_format(self.delay, int))
-        for key in self.keys:
+        for scan_code, extended in self.keys:
             key_node = ElementTree.Element("key")
-            key_node.set("scan-code", str(key[0]))
-            key_node.set("extended", str(key[1]))
+            key_node.set("scan-code", str(scan_code))
+            key_node.set("extended", str(extended))
+            # useful for xml readability purposes = what scan code is this
+            key_item = Key(scan_code=scan_code, is_extended = extended)
+            key_node.set("description", key_item.lookup_name)
             node.append(key_node)
         return node
 

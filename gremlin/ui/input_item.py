@@ -92,6 +92,7 @@ class InputItemListModel(ui_common.AbstractModel):
         self._device_data = device_data
         self._mode = mode
         self._index_map = {} # map of index to input item
+        self._item_map = {} # map of input_id to index
         if allowed_types is not None:
             self._allowed_input_types  = gremlin.base_classes.TraceableList(allowed_types, self._filter_change_cb)
         else:
@@ -137,13 +138,15 @@ class InputItemListModel(ui_common.AbstractModel):
         
         input_items = self._device_data.modes[self._mode]
         index = 0
-        self._index_map = {}
+        self._index_map = {} # map of index to value
+        self._item_map = {}  # map of values to their index
         for input_type in self._allowed_input_types:
             if input_type in input_items.config.keys():
                 sorted_keys = sorted(input_items.config[input_type].keys())
                 for data_key in sorted_keys:
                     data = input_items.config[input_type][data_key]
                     self._index_map[index] = data
+                    self._item_map[data.input_id] = index
                     index += 1
 
         if emit_change:
@@ -176,7 +179,6 @@ class InputItemListModel(ui_common.AbstractModel):
             return None
         
         return self._index_map[index]
-
        
             
     def removeRow(self, index):
@@ -211,6 +213,12 @@ class InputItemListModel(ui_common.AbstractModel):
                                 return index
 
         # not found       
+        return -1
+    
+    def input_id_index(self, item):
+        ''' gets the model index based on the input id content '''
+        if item and item in self._item_map.keys():
+            return self._item_map[item]
         return -1
 
     def event_to_index(self, event):
@@ -428,6 +436,12 @@ class InputItemListView(ui_common.AbstractView):
 
         self.updated.emit()
         
+    def itemAt(self, index):
+        ''' gets the input widget as the given index'''
+        item =  self.scroll_layout.itemAt(index)
+        if item:
+            return item.wid
+        return None
 
 
     def redraw_index(self, index):
@@ -501,6 +515,12 @@ class InputItemListView(ui_common.AbstractView):
     
     def _close_item_cb(self, index):
         ''' remove a particular input '''
+        from PySide6.QtCore import QMetaMethod
+
+        widget = self.itemAt(index)
+        if isSignalConnected(widget,"closed(InputIdentifier)"):
+            widget.closed.emit(self, index)
+            return
 
         # select the widget if it's not selected
         data = self.model.data(index)
@@ -520,7 +540,9 @@ class InputItemListView(ui_common.AbstractView):
             result = message_box.exec()
             if result == QtWidgets.QMessageBox.StandardButton.Ok:
                 self._confirmed_close(index)
-
+        else:
+            # no need to confirm
+            self._confirmed_close(index)
     
     def _confirmed_close(self, index):
         self.model.removeRow(index)

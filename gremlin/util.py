@@ -919,15 +919,18 @@ def csv_to_list(value) -> list:
     return []
 
 
-def _silent_disconnect(signal, slot): 
-     """Disconnects a signal from a slot, ignoring errors. Sometimes 
-     Qt might disconnect a signal automatically for unknown reasons. 
-     """
-     import warnings
-     with warnings.catch_warnings():
-         # PySide 6.7+ issues a UserWarning instead of an exception.
-         warnings.filterwarnings("ignore", category=UserWarning)
-         try: 
-             signal.disconnect(slot) 
-         except (TypeError, RuntimeError):  # pragma: no cover 
-             pass 
+def isSignalConnected(q_object, signature):
+    ''' returns the connection status of a QObject to a signature signal on it'''
+    meta = q_object.metaObject()
+    return q_object.isSignalConnected(meta.method(meta.indexOfSignal(signature)))
+
+def waitCursor():
+    ''' sets the app to a wait cursor '''
+    QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.CursorShape.WaitCursor)
+    QtWidgets.QApplication.processEvents()
+
+def popCursor():
+    ''' restores form wait cusor '''
+    QtWidgets.QApplication.restoreOverrideCursor()
+    QtWidgets.QApplication.processEvents()
+    

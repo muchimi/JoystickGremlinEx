@@ -171,7 +171,7 @@ class MidiInputItem():
         OnChange = 2 # input triggers pressed on any state change
 
     def __init__(self):
-        self.id = None # GUID
+        self.id = uuid.uuid4() # GUID (unique) if loaded from XML - will reload that one
         self._port_name = None
         self._message = None # the midi message
         self._title_name =  "MIDI (not configured)"
@@ -1350,7 +1350,7 @@ class MidiDeviceTabWidget(QtWidgets.QWidget):
         self.input_item_list_view.item_selected.connect(self._select_item_cb)
         self.input_item_list_view.item_edit.connect(self._edit_item_cb)
         self.input_item_list_view.item_closed.connect(self._close_item_cb)
-
+        
         self.left_panel_layout.addWidget(self.input_item_list_view)
         self.main_layout.addLayout(self.left_panel_layout,1)
 
@@ -1449,9 +1449,15 @@ class MidiDeviceTabWidget(QtWidgets.QWidget):
         self.input_item_list_view.redraw()
         self.input_item_list_view.select_item(self._index_for_key(input_id),True)
 
-        # auto edit input
+
         index = self.input_item_list_view.current_index
+
+        # redraw the UI
+        self._select_item_cb(index)        
+
+        # auto edit input
         self._edit_item_cb(None, index, input_id)
+
 
 
     def _index_for_key(self, input_id):
@@ -1530,17 +1536,6 @@ class MidiDeviceTabWidget(QtWidgets.QWidget):
         return widget
 
     
-
-    def _create_close_callback(self, index):
-        ''' creates a callback to handle the closing of items '''
-        return lambda x: self._close_item(index)
-    
-    
-    def _create_edit_callback(self, index):
-        ''' creates a callback to handle the edit of items '''
-        return lambda x: self._edit_item(index)
-                    
-    
     def _edit_item_cb(self, widget, index, data):
         ''' called when the edit button is clicked  '''
         self._edit_dialog = MidiInputConfigDialog(self.current_mode, index, data, self)
@@ -1564,7 +1559,8 @@ class MidiDeviceTabWidget(QtWidgets.QWidget):
 
     def _close_item_cb(self, widget, index, data):
         ''' called when the close button is clicked '''
-        self.model.removeRow(index)
+        self.input_item_list_model.removeRow(index)
+        self.input_item_list_view.redraw()
         
 
     def _update_conflicts(self):

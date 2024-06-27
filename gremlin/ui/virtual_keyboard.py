@@ -13,6 +13,7 @@ import enum
 from gremlin.profile import safe_format, safe_read
 from gremlin.keyboard import Key, key_from_name
 import logging
+import copy
 
       
 
@@ -71,7 +72,7 @@ class InputKeyboardDialog(QtWidgets.QDialog):
     ''' dialog showing a virtual keyboard in which to select key combinations with the keyboard or mouse '''
 
 
-    def __init__(self, sequence = None, parent = None, select_single = False, allow_modifiers = True):
+    def __init__(self, sequence = None, parent = None, select_single = False, allow_modifiers = True, index = None):
         '''
         :param sequence - input keys to use
         :param select_single - if set, only can select a single key
@@ -84,6 +85,7 @@ class InputKeyboardDialog(QtWidgets.QDialog):
 
         self._select_single = select_single
         self._allow_modifiers = allow_modifiers
+        self.index = index
 
         self._modifier_keys = ["leftshift","rightshift","leftalt","rightalt", "leftcontrol","rightcontrol", "leftwin", "rightwin"]
 
@@ -102,6 +104,10 @@ class InputKeyboardDialog(QtWidgets.QDialog):
         self.clear_widget.clicked.connect(self._clear_button_cb)
         self.clear_widget.setToolTip("Clears the selection")
 
+        self.listen_widget = QtWidgets.QPushButton("Listen")
+        self.listen_widget.clicked.connect(self._listen_cb)
+
+
         self.ok_widget = QtWidgets.QPushButton("Ok")
         self.ok_widget.clicked.connect(self._ok_button_cb)
 
@@ -109,6 +115,7 @@ class InputKeyboardDialog(QtWidgets.QDialog):
         self.cancel_widget.clicked.connect(self._cancel_button_cb)
 
         self.button_layout.addWidget(self.clear_widget)
+        self.button_layout.addWidget(self.listen_widget)
         self.button_layout.addStretch(1)
         self.button_layout.addWidget(self.ok_widget)
         self.button_layout.addWidget(self.cancel_widget)
@@ -121,18 +128,66 @@ class InputKeyboardDialog(QtWidgets.QDialog):
 
         self.setLayout(main_layout)
 
-        # populate the sequence (the sequence is a sequence of keys)
+        self._set_sequence(sequence)       
+
+
+    def _set_sequence(self, sequence):
+        ''' loads a given key sequence into the virtual keyboard '''
         if sequence:
             # the action keeps a list of keys in the format (scancode, extended_flag)
             # convert that to a key from it and selected it if the key is mapped
-            for scancode_extended_tuple in sequence:
-                if scancode_extended_tuple in self._key_map.keys():
-                    key_name = self._key_map[scancode_extended_tuple]
+            for widget in self._key_widget_map.values():
+                widget.selected = False
+
+            for item in sequence:
+                if isinstance(item, Key):
+                    key_name = self._key_map[item.index_tuple()]
+                    widget = self._key_widget_map[key_name]
+                    widget.selected = True
+                elif item in self._key_map.keys():
+                    key_name = self._key_map[item]
                     widget = self._key_widget_map[key_name]
                     widget.selected = True
                 else:
                     # log the fact we didn't find the key in the keyboard dialog
-                    logging.getLogger("system").warning(f"Keyboard: unable to find {scancode_extended_tuple:x} in dialog keyboard")
+                    logging.getLogger("system").warning(f"Keyboard: unable to find {item} in dialog keyboard")
+
+    def _listen_cb(self):
+        """Handles adding of new keyboard keys to the list.
+
+        Asks the user to press the key they wish to add bindings for.
+        """
+        from gremlin.ui.ui_common import InputListenerWidget
+        self.button_press_dialog = InputListenerWidget(
+            self._add_keyboard_listener_key_cb,
+            [InputType.Keyboard],
+            return_kb_event=False,
+            multi_keys=True # allow key combinations
+        )
+
+        # Display the dialog centered in the middle of the UI
+        root = self
+        while root.parent():
+            root = root.parent()
+        geom = root.geometry()
+
+        self.button_press_dialog.setGeometry(
+            int(geom.x() + geom.width() / 2 - 150),
+            int(geom.y() + geom.height() / 2 - 75),
+            300,
+            150
+        )
+
+        self.button_press_dialog.show()
+
+    def _add_keyboard_listener_key_cb(self, keys):
+        """Adds the provided key to the list of keys.
+
+        :param key the new key to add, either a single key or a combo-key
+
+        """
+        # the new entry will be a new index
+        self._set_sequence(keys)
 
 
     def keyPressEvent(self, event):
@@ -165,7 +220,7 @@ class InputKeyboardDialog(QtWidgets.QDialog):
 
     def _ok_button_cb(self):
         ''' ok button pressed '''
-        keys = [widget.key for widget in self._key_widget_map.values() if widget.selected]
+        keys = [copy.deepcopy(widget.key) for widget in self._key_widget_map.values() if widget.selected]
         self.keys = keys
         # convert to a scancode/extended sequence
         data = []
@@ -178,9 +233,9 @@ class InputKeyboardDialog(QtWidgets.QDialog):
         # create output - place modifiers up front
         for key in keys:
             item = (key.scan_code, key.is_extended)
-            key_name = key.lookup_name
-            if key_name in modifiers:
-                modifier_map[key_name].append(item)
+            lookup_name = key.lookup_name
+            if lookup_name in modifiers:
+                modifier_map[lookup_name].append(item)
             else:
                 data.append(item)
         sequence = []
@@ -190,11 +245,13 @@ class InputKeyboardDialog(QtWidgets.QDialog):
         sequence.extend(data)            
         self.sequence = sequence
         self.accept()
+        self.close()
         
 
     def _cancel_button_cb(self):
         ''' cancel button pressed '''
         self.reject()
+        self.close()
 
     def _clear_button_cb(self):
         ''' clear button pressed - clear all entries  '''

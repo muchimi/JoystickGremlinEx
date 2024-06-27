@@ -49,7 +49,7 @@ import dinput
 import gremlin.event_handler 
 import gremlin.config
 from gremlin.types import DeviceType
-from gremlin.util import load_icon, load_pixmap, userprofile_path, find_file
+from gremlin.util import load_icon, load_pixmap, userprofile_path, find_file, waitCursor, popCursor
 from gremlin.ui.device_tab import JoystickDeviceTabWidget
 from gremlin.ui.keyboard_device import KeyboardDeviceTabWidget
 from gremlin.ui.midi_device  import MidiDeviceTabWidget
@@ -533,6 +533,9 @@ class GremlinUi(QtWidgets.QMainWindow):
     def new_profile(self):
         """Creates a new empty profile."""
         # Disable Gremlin if active before opening a new profile
+
+        waitCursor()
+
         self.ui.actionActivate.setChecked(False)
         self.activate(False)
 
@@ -546,12 +549,28 @@ class GremlinUi(QtWidgets.QMainWindow):
         for device in gremlin.joystick_handling.physical_devices():
             self._profile.initialize_joystick_device(device, ["Default"])
 
+        # add MIDI device
+        midi_device =  gremlin.base_profile.Device(self._profile)
+        midi_device.name = "midi"
+        midi_device.device_guid = MidiDeviceTabWidget.device_guid
+        midi_device.type = DeviceType.Midi
+        self._profile.devices[midi_device.device_guid ] = midi_device
+
+        # add OSC device
+        osc_device =  gremlin.base_profile.Device(self._profile)
+        osc_device.name = "osc"
+        osc_device.device_guid = OscDeviceTabWidget.device_guid
+        osc_device.type = DeviceType.Osc
+        self._profile.devices[osc_device.device_guid ] = osc_device
+
         # Create keyboard device entry
-        keyboard_device = gremlin.profile.Device(self._profile)
+        keyboard_device = gremlin.base_profile.Device(self._profile)
         keyboard_device.name = "keyboard"
         keyboard_device.device_guid = dinput.GUID_Keyboard
         keyboard_device.type = DeviceType.Keyboard
         self._profile.devices[dinput.GUID_Keyboard] = keyboard_device
+
+        
 
         # Update profile information
         self._profile_fname = None
@@ -569,6 +588,8 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         # Update everything to the new mode
         self._mode_configuration_changed()
+
+        popCursor()
 
     def save_profile(self):
         """Saves the current profile to the hard drive.
@@ -727,6 +748,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                 DeviceType.Joystick,
                 device.name
             )
+            
 
             widget = gremlin.ui.device_tab.JoystickDeviceTabWidget(
                 device,
@@ -1369,8 +1391,8 @@ class GremlinUi(QtWidgets.QMainWindow):
             message_box.setInformativeText("Do you want to save your changes?")
             message_box.setStandardButtons(
                 QtWidgets.QMessageBox.StandardButton.Save |
-                QtWidgets.QMessageBox.StandardButtonDiscard |
-                QtWidgets.QMessageBox.StandardButtonCancel
+                QtWidgets.QMessageBox.StandardButton.Discard |
+                QtWidgets.QMessageBox.StandardButton.Cancel
             )
             message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Save)
 

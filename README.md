@@ -411,7 +411,7 @@ Unlike hardware devices, keyboard inputs can be added, removed and edited.  If a
 
 This is a feature I wanted for a long time. GremlinEx, as of 13.40.14ex, can map MIDI messages and use those to trigger actions.
 
-Unlike hardware devices, MIDI inputs must be defined and added to tell GremlinEx what to listen to.  Because MIDI can be cryptic, the configuration dialog allows you to listen to MIDI data and automatically program what it "hears" as an input.  Inputs can also be manually setup if needed.
+Unlike hardware devices, MIDI inputs must be user defined and added to tell GremlinEx what to listen to.  Because MIDI can be cryptic, the configuration dialog allows you to listen to MIDI data and automatically program what it "hears" as an input.  Inputs can also be manually setup if needed.
 
 Gremlin categorizes MIDI messages in that it doesn't look at the value data in the MIDI input stream - rather it looks at the port, the channel, the command, and any specific command data, such as the note number or the controller number.
 
@@ -429,24 +429,12 @@ Inputs can be deleted via the trashcan icon, or all inputs cleared via the clear
 
 The input has three trigger modes for each MIDI input that alter how the MIDI data is processed by GremlinEx.
 
-<!-- TOC --><a name="change"></a>
-#### Change
 
-In the change mode, anytime the MIDI data is changed for this command, such as velocity, pressure, or control value, the input will trigger.
-
-<!-- TOC --><a name="button"></a>
-#### Button
-
-In the button mode, GremlinEx will monitor the MIDI data value for that command if it has one, and will trigger a "pressed event" if the value is in the top half of the range.  This is equivalent to pressing the button.  A "released event" will trigger if the value is the lower half of the range.  The range is typically 0 to 127 for most commands, except for the Pitch wheel which is 0 to 16383.
-
-<!-- TOC --><a name="axis"></a>
-#### Axis
-
-In the axis trigger mode, GremlinEx will treat the MIDI input as an axis, and will tell actions that the input is an axis. This will let you map an output axis to that input and function like any other input mapped to an axis.  All actions available to an axis mapping become available.   GremlinEx will take the range of values possible for that MIDI commmand, typically 0 to 127, and map that to a -1.0 to +1.0 range, meaning that 63 is the centered position.
-
-The axis mode is typically used to map MIDI faders and rotary knobs to a VJOY axis.
-
-To map an axis via Gremlin using a MIDI input, the VjoyRemap action must be used as the regular remap action is not aware of MIDI, and cannot be changed to avoid breaking old profiles.
+| Mode      | Description |
+| ----------- | ----------- |
+| Change      | Triggers whenever the MIDI value for the current command changes |
+| Button      | Triggers a press event if the first argument is in the top half of the MIDI command range, usually 63 to 127.  The trigger value will be shown.   |
+| Axis        | The input is placed in axis mode, which enables the vjoy-remap container in axis input mode. The range of the MIDI command value is used, so velocity for a note, value for a CC, etc... |
 
 <!-- TOC --><a name="changing-modes"></a>
 ### Changing modes
@@ -494,6 +482,64 @@ GremlinEx will see any MIDI message so long as the controller shows up as a MIDI
 The majority of issues will come from messages not being recognized by GremlinEx because the input configuration is causing it to filter (skip) that message.  To this end, Gremlin will tell you what it's listening to.
 
 There are some tools that let you visualize what MIDI messages the computer is receiving such as [MidiOx](http://www.midiox.com/), and older but tried and true MIDI diagnostics tool, or something like [Hexler Protokol](https://hexler.net/protokol).  Both utilities are free.  It's always a good idea to verify the MIDI signaling is functional outside of GremlinEx to verify the machine is seeing messages.  If GremlinEx cannot "listen" to a message via the listen buttons, it cannot see it.
+
+
+## OSC device (Open Sound Control)
+
+GremlinEx, as of 13.40.14ex, can map OSC messages and use those to trigger actions.  OSC is generally much easier to setup and program than MIDI.  For more info on OSC, visit 
+
+Unlike hardware devices, OSC inputs must be user defined and added to tell GremlinEx what to listen to. GremlinEx supports any OSC message, although in the current version, limits are imposed on parameter types for ease of processing/mapping to a VJOY device:
+
+OSC messages must consist of a text part, example  /this_is_my_test_fader followed by a numeric value (float or int).   Extra parameters are currently ignored, but can be provided without error.
+
+### OSC port
+
+OSC uses a UDP port to listen on the network for OSC messages.  The default port is 8000 for receiving, and 8001 for sending.   The port can be configured by your OSC utility, just make sure GremlinEx listens on the correct port for messages.  The output port is not used by GremlinEx currently except to configure the OSC client. The output port is always 1 above the input port, so 8001 if the default 8000 input port is used. If you are using a firewall, make sure the port is configured to receive.
+
+The port is configured in options.
+
+The host is auto-configured to the current IP of the machine. Currently, that IP cannot be localhost (127.0.0.1).  This makes sense because any OSC input device will typically run on a separate host, and thus the GremlinEx machine needs to have network connectivity.
+
+
+<!-- TOC --><a name="midi-inputs"></a>
+### OSC inputs
+
+All OSC inputs must be unique or a warning will be triggered in the UI.  An input maps to a specific message type.  In the current release, OSC inputs support the following input modes:
+
+#### OSC Trigger modes
+
+
+| Mode      | Description |
+| ----------- | ----------- |
+| Change      | Triggers whenever the value changes |
+| Button      | Triggers a press event if the first argument is non-zero, and a released event when the first argument is zero  |
+| Axis        | The input is placed in axis mode, which enables the vjoy-remap container in axis input mode. A range value can be provided that tells GremlinEx the input range, it can map it to the VJOY range of -1 to +1.  The default is 0 to 1. |
+
+
+| Command Mode      | Description |
+| ----------- | ----------- |
+| Message      | The input uses the message (string) part of the OSC message as the input identifier  |
+
+| Message + Data     | The input uses the complete message as the input identifier, including any arguments.    |
+
+The recommendation is to keep it to Message mode as it makes OSC programming much simpler.
+
+A typical OSC command will thus be /my_command_1, number  where number is:
+
+| Value of first argument    | Description |
+| ----------- | ----------- |
+| range min to range max (usually 0 to 1)    | Axis mapping -1 to +1 |
+| zero    | Button release |
+| non-zero    | Button press |
+
+
+
+<!-- TOC --><a name="changing-modes"></a>
+### Changing modes
+
+If an input already has mapping containers attached, GremlinEx will prevent switching from an axis mode to a button/change mode and vice versa.  This is because containers and actions, when added to an input, are tailored to the type of input it is, and it's not possible to change it after the fact to avoid mapping problems and odd behaviors.
+
+
 
 <!-- TOC --><a name="vjoyremap-action"></a>
 # VJoyRemap action 

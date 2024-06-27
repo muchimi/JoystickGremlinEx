@@ -23,7 +23,7 @@ from ctypes import wintypes
 import win32api
 import win32con
 
-
+from gremlin.base_classes import TraceableList
 
 def _create_function(lib_name, fn_name, param_types, return_type):
     """Creates a handle to a windows dll library function.
@@ -99,7 +99,7 @@ class Key:
     different representations.
     """
 
-    def __init__(self, name, scan_code, is_extended, virtual_code = None):
+    def __init__(self, name = None, scan_code = None, is_extended = None, virtual_code = None):
         """Creates a new Key instance.
 
         :param name the name used to refer to this key
@@ -110,6 +110,7 @@ class Key:
         :param virtual_code the virtual key code assigned to this
             key by windows
         """
+        
         self._scan_code = scan_code
         self._is_extended = is_extended
         if not virtual_code:
@@ -120,15 +121,21 @@ class Key:
             #name = _virtual_input_to_unicode(virtual_code)
 
         self._name = name
+        self._latched_name = ""
         
         self._virtual_code = virtual_code
         self._lookup_name = None
-        self._latched_keys = [] # list of keys latched to this keystroke (modifiers)
+        self._latched_keys = TraceableList() #[] # list of keys latched to this keystroke (modifiers)
+        # self._latched_keys.add_callback(self._changed_cb)
+        self._update()
 
-    @property
-    def name(self):
-        ''' display name - can be a compound key '''
-        if self._latched_keys:
+
+    # def _changed_cb(self, owner , action, index, value):
+    #     logging.getLogger("system").info(f"Key {self.name} latch change: {action} index: {index} value: {value}")
+    #     self._update()
+
+    def _update(self):
+        if len(self._latched_keys) > 0:
             keys = [self]
             keys.extend(self._latched_keys)
             # order the key by modifier 
@@ -138,9 +145,16 @@ class Key:
                 if result:
                     result += " + "
                 result += key._name
-            return result
+            name = result
+        else: 
+            name = ""
+        self._latched_name = name
 
-        return self._name
+
+
+    @property
+    def name(self):
+        return self._latched_name if self._latched_name else self._name
 
     @property
     def scan_code(self):
@@ -162,10 +176,11 @@ class Key:
         from gremlin.event_handler import EventListener
         el = EventListener()
         # assume the current key is pressed
-        latched = True
-        if latched and self._latched_keys:
+        latched = len(self._latched_keys) > 0
+        if latched:
             # check the latched keys
             key_name = self.name
+            key : Key
             for key in self._latched_keys:
                 state = el.get_key_state(key)
                 latched = latched and state
@@ -192,6 +207,10 @@ class Key:
             return self._lookup_name
         else:
             return self._name
+        
+    @property
+    def message_key(self):
+        return {self._scan_code, self._is_extended}
 
     @lookup_name.setter
     def lookup_name(self, name):
@@ -199,6 +218,7 @@ class Key:
         if self._lookup_name is not None:
             raise error.KeyboardError("Setting lookup name repeatedly")
         self._lookup_name = name
+        self._update()
 
     def __eq__(self, other):
         return hash(self) == hash(other)
@@ -234,17 +254,18 @@ class Key:
     def __str__(self):
         return self.name
     
-    
+
     
     
     
     @property
-    def latched_keys(self) -> list:
+    def latched_keys(self) -> TraceableList:
         ''' list of key objects that are latched to this key (modifiers)'''
         return self._latched_keys
     @latched_keys.setter
     def latched_keys(self, value):
-        self._latched_keys = value
+        self._latched_keys.clear()
+        self._latched_keys.extend(value)
     
     @property
     def is_latched(self):

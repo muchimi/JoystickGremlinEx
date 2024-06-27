@@ -24,6 +24,7 @@ import sys
 from PySide6 import QtGui
 
 from gremlin.input_types import InputType
+import gremlin.keyboard
 
 
 class AxisNames(enum.Enum):
@@ -140,7 +141,10 @@ def input_to_ui_string(input_type, input_id):
     elif input_type == InputType.KeyboardLatched:
         # input ID contains a Key object
         return input_id.name
-    elif input_type == InputType.Keyboard:
+    elif input_type in (InputType.Keyboard, InputType.KeyboardLatched):
+        if isinstance(input_id, gremlin.keyboard.Key):
+            return  key_from_code(input_id.scan_code, input_id.is_extended).name
+        
         return key_from_code(*input_id).name
     else:
         return f"{InputType.to_string(input_type).capitalize()} {input_id}"

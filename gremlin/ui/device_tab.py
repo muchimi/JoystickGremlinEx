@@ -611,6 +611,8 @@ def input_item_index_lookup(index, input_items):
     hat_count = len(input_items.config[InputType.JoystickHat])
     key_count = len(input_items.config[InputType.Keyboard])
 
+    
+
     if key_count > 0:
         if not input_items.has_data(InputType.Keyboard, index):
             logging.getLogger("system").error(

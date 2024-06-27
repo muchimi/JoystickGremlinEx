@@ -28,9 +28,12 @@ class TraceableList(MutableSequence):
     ''' implements a custom list that can be traced when it changes  '''
 
     def __init__(self, initlist=None, callback = None):
-        super().__init__()
+        MutableSequence.__init__(self)
+        
         self.data = []
-        self._callback = callback
+        self._callbacks = []
+        if callback:
+            self._callbacks.append(callback)
         if initlist is not None:
             if isinstance(initlist, list):
                 self.data[:] = initlist
@@ -40,6 +43,25 @@ class TraceableList(MutableSequence):
 
             else:
                 self.data = list(initlist)
+
+    def add_callback(self, value):
+        ''' adds a callback - signature (action: str, index: int, value [optional object])'''
+        if not value in self._callbacks:
+            self._callbacks.append(value)
+
+    def remove_callback(self, value):
+        ''' removes a callback '''
+        if value in self._callbacks:
+            self._callbacks.remove(value)
+
+    def clear_callbacks(self):
+        ''' removes all callbacks '''
+        self._callbacks.clear()
+
+    def _trigger(self, action, index = None, value = None):
+        for callback in self._callbacks:
+            callback(self, action, index, value)
+
 
     def __repr__(self):
         return """<{} data: {}>""".format(self.__class__.__name__, repr(self.data))
@@ -82,12 +104,10 @@ class TraceableList(MutableSequence):
     def __setitem__(self, idx, value):
         # optional: self._acl_check(val)
         self.data[idx] = value
-        if self._callback:
-            self._callback("setitem", idx, value)
+        self._trigger("setitem", idx, value)
 
     def __delitem__(self, idx):
-        if self._callback:
-            self._callback("delitem", idx)
+        self._trigger("delitem", idx)
         del self.data[idx]
 
     def __add__(self, other):
@@ -140,31 +160,31 @@ class TraceableList(MutableSequence):
 
     def append(self, value):
         self.data.append(value)
-        if self._callback:
-            self._callback("append",value)
+        if self._callbacks:
+            self._trigger("append",value)
         
 
     def insert(self, idx, value):
-        if self._callback:
-            self._callback("insert",value)
+        if self._callbacks:
+            self._trigger("insert",value)
         self.data.insert(idx, value)
 
     def pop(self, idx=-1):
-        if self._callback:
-            self._callback("pop",idx)
+        if self._callbacks:
+            self._trigger("pop",idx)
         return self.data.pop(idx)
 
     def remove(self, value):
         self.data.remove(value)
 
     def clear(self):
-        if self._callback:
-            self._callback("clear")
+        if self._callbacks:
+            self._trigger("clear")
         self.data.clear()
 
     def copy(self):
-        if self._callback:
-            self._callback("copy")
+        if self._callbacks:
+            self._trigger("copy")
         return self.__class__(self)
 
     def count(self, value):
@@ -180,10 +200,9 @@ class TraceableList(MutableSequence):
         self.data.sort(*args, **kwds)
 
     def extend(self, other):
-        if self._callback:
-            self._callback("extend",other.data)
-        if isinstance(other, TraceableList):
-            self.data.extend(other.data)
+        data = other.data if isinstance(other, TraceableList) else other
+        self.data.extend(data)
+        self._trigger("extend", value = data)
 
-        else:
-            self.data.extend(other) 
+    def to_list(self):
+        return self.data

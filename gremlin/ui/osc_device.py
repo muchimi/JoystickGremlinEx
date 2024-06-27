@@ -1742,7 +1742,7 @@ class OscInputItem():
 
 
     def __init__(self):
-        self.id = None # GUID of this input
+        self.id = uuid.uuid4() # GUID (unique) if loaded from XML - will reload that one
         self._message = None # the OSC message command
         self._message_data = None # the list of values associated with that command
         self._message_data_string = None # the string representation of the data args
@@ -2234,6 +2234,7 @@ class OscInputConfigDialog(QtWidgets.QDialog):
                 self._command = input_id.message
                 self._command_data = input_id.data
 
+        self._validate()
         self._update_display()
 
     def _validate(self):
@@ -2453,6 +2454,7 @@ class OscInputConfigDialog(QtWidgets.QDialog):
         ''' called when an OSC message is captured '''
         self._command = command
         self._command_data = data
+        self._validate()
         self._update_display() # update UI with these settings
 
     @property
@@ -2595,7 +2597,7 @@ class OscDeviceTabWidget(QtWidgets.QWidget):
     def itemAt(self, index):
         ''' returns the input widget at the given index '''
         if index in self._widget_map.keys():
-            return self._widget_map[index]
+           return self._widget_map[index]
         return None
 
     def display_name(self, input_id):
@@ -2614,14 +2616,17 @@ class OscDeviceTabWidget(QtWidgets.QWidget):
         """Adds a new input to the inputs list  """
         input_type = InputType.OpenSoundControl
         input_id = OscInputItem()
-        input_id.id = uuid.uuid4() # unique ID for this new item
         self.device_profile.modes[self.current_mode].get_data(input_type, input_id)
         self.input_item_list_model.refresh()
         self.input_item_list_view.redraw()
         self.input_item_list_view.select_item(self._index_for_key(input_id),True)
-
-        # auto edit input
+        
         index = self.input_item_list_view.current_index
+
+        # redraw the UI
+        self._select_item_cb(index)
+
+        # auto edit new input
         self._edit_item_cb(None, index, input_id)
 
 
@@ -2661,7 +2666,10 @@ class OscDeviceTabWidget(QtWidgets.QWidget):
 
     def _close_item_cb(self, widget, index, data):
         ''' called when the close button is clicked '''
-        self.model.removeRow(index)
+
+        # show a warning before deleting an input
+        self.input_item_list_model(index)
+        self.input_item_list_view.redraw()
         
 
     def _custom_widget_handler(self, list_view, index : int, identifier, data):
@@ -2768,15 +2776,6 @@ class OscDeviceTabWidget(QtWidgets.QWidget):
         layout.addWidget(status_widget)
         input_widget.setToolTip(data.display_tooltip)
 
-
-    def _create_close_callback(self, index):
-        ''' creates a callback to handle the closing of items '''
-        return lambda x: self._close_item(index)
-    
-    
-    def _create_edit_callback(self, index):
-        ''' creates a callback to handle the edit of items '''
-        return lambda x: self._edit_item(index)
  
     def _edit_item_cb(self, widget, index, data):
         ''' called when the edit button is clicked  '''

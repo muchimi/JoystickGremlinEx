@@ -1341,21 +1341,21 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
 
             # Create buttons used to modify and interact with the macro actions
             self.button_new_entry = self._create_toolbutton(
-                "list_add",
+                "list_add.svg",
                 "Add a new action",
                 False
             )
             self.button_new_entry.clicked.connect(self._add_entry)
 
             self.button_delete = self._create_toolbutton(
-                "list_delete",
+                "list_delete.svg",
                 "Delete currently selected entry",
                 False
             )
             self.button_delete.clicked.connect(self._delete_cb)
 
             self.button_pause = self._create_toolbutton(
-                "pause",
+                "pause.svg",
                 "Add pause after the currently selected entry",
                 False
             )
@@ -1363,8 +1363,8 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
 
             self.button_record = self._create_toolbutton(
                 [
-                    "macro_record",
-                    "macro_record_on"
+                    "macro_record.svg",
+                    "macro_record_on.svg"
                 ],
                 "Record keyboard and joystick inputs",
                 True,
@@ -1374,8 +1374,8 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
 
             self.record_time = self._create_toolbutton(
                 [
-                    "time",
-                    "time_on"
+                    "time.svg",
+                    "time_on.svg"
                 ],
                 "Record pauses between actions",
                 True,
@@ -1386,8 +1386,8 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             cfg = gremlin.config.Configuration()
             self.record_axis = self._create_toolbutton(
                 [
-                    "record_axis",
-                    "record_axis_on"
+                    "record_axis.svg",
+                    "record_axis_on.svg"
                 ],
                 "Record joystick axis events",
                 True,
@@ -1396,8 +1396,8 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.record_axis.clicked.connect(self._update_record_settings)
             self.record_button = self._create_toolbutton(
                 [
-                    "record_button",
-                    "record_button_on"
+                    "record_button.svg",
+                    "record_button_on.svg"
                 ],
                 "Record joystick button events",
                 True,
@@ -1406,8 +1406,8 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.record_button.clicked.connect(self._update_record_settings)
             self.record_hat = self._create_toolbutton(
                 [
-                    "record_hat",
-                    "record_hat_on"
+                    "record_hat.svg",
+                    "record_hat_on.svg"
                 ],
                 "Record joystick hat events",
                 True,
@@ -1416,8 +1416,8 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.record_hat.clicked.connect(self._update_record_settings)
             self.record_key = self._create_toolbutton(
                 [
-                    "record_key",
-                    "record_key_on"
+                    "record_key.svg",
+                    "record_key_on.svg"
                 ],
                 "Record keyboard events",
                 True,
@@ -1426,8 +1426,8 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.record_key.clicked.connect(self._update_record_settings)
             self.record_mouse = self._create_toolbutton(
                 [
-                    "record_mouse",
-                    "record_mouse_on"
+                    "record_mouse.svg",
+                    "record_mouse_on.svg"
                 ],
                 "Record mouse events",
                 True,
