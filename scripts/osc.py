@@ -351,7 +351,7 @@ def vjoy_handler(address, args):
 
 
 def osc_message_handler(address, *args):
-    log(f"OSC: {address}: {args}")
+    #log(f"OSC: {address}: {args}")
     address = address.lower()
     ESC = "!ESC!"
     try:

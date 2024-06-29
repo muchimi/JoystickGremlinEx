@@ -902,7 +902,7 @@ class ConditionView(ui_common.AbstractView):
         self.controls_layout.addWidget(self.condition_selector)
         self.controls_layout.addWidget(self.condition_add_button)
 
-        self.help_button = QtWidgets.QPushButton(load_icon("gfx/help"), "")
+        self.help_button = QtWidgets.QPushButton(load_icon("gfx/help.png"), "")
         self.help_button.clicked.connect(self._show_hint)
         self.controls_layout.addWidget(self.help_button)
 

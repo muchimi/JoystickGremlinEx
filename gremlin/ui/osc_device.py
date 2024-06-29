@@ -1550,7 +1550,7 @@ class OscServer():
     def thread_loop(self):
         ''' main threading loop '''
         
-        logging.getLogger("system").info("OSC: server starting")
+        #logging.getLogger("system").info("OSC: server starting")
         self._dispatcher = OscDispatcher()
         self._dispatcher.set_default_handler(self._callback)
         self._server = BlockingOSCUDPServer((self._host_ip, self._input_port), self._dispatcher)
@@ -1566,7 +1566,7 @@ class OscServer():
 
 
     def __init__(self):
-        logging.getLogger("system").info("OSC: server init")
+        #logging.getLogger("system").info("OSC: server init")
         self._server = None
         self._server_thread = None
         self._stop = False
@@ -1601,7 +1601,7 @@ class OscServer():
         with self._lock:
             # everything here is now locked until the server start is completed
 
-            logging.getLogger("system").info("OSC: start requested")
+            #logging.getLogger("system").info("OSC: start requested")
             if self._running:
                 return
             
@@ -1610,9 +1610,8 @@ class OscServer():
             self._callback = callback
             
             self._stop = False
-            if not self._server_thread.is_alive():
-                self._server_thread = threading.Thread(target=self.thread_loop)
-                self._server_thread.start()
+            self._server_thread = threading.Thread(target=self.thread_loop)
+            self._server_thread.start()
             self._running = True
 
 
@@ -1621,17 +1620,17 @@ class OscServer():
         ''' stops the server '''
         if not self._running or self._start_requested:
             return
-        logging.getLogger("system").info("OSC: stop requested")
+        #logging.getLogger("system").info("OSC: stop requested")
         self._stop = True
         if self._server:
             self._server.shutdown()
         self._server_thread.join()
         self._server_thread = None
         self._running = False
-        logging.getLogger("system").info("OSC: server stopped")
+        #logging.getLogger("system").info("OSC: server stopped")
 
     def __del__(self):
-        logging.getLogger("system").info("OSC stopping...")
+        #logging.getLogger("system").info("OSC stopping...")
         self.stop()
 
     
@@ -2643,6 +2642,10 @@ class OscDeviceTabWidget(QtWidgets.QWidget):
         :param index the index of the selected item
         """
 
+        if index == -1:
+            # nothing to select
+            return 
+        
         item_data = self.input_item_list_model.data(index)
 
         right_panel = self.main_layout.takeAt(1)
@@ -2683,7 +2686,7 @@ class OscDeviceTabWidget(QtWidgets.QWidget):
         
         '''
 
-        widget = gremlin.ui.input_item.InputItemWidget(identifier = identifier, populate_ui = self._populate_input_widget_ui, config_external=True)
+        widget = gremlin.ui.input_item.InputItemWidget(identifier = identifier, populate_ui_callback = self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True)
         #identifier = identifier.input_id
         widget.create_action_icons(data)
         widget.update_description(data.description)
@@ -2747,36 +2750,43 @@ class OscDeviceTabWidget(QtWidgets.QWidget):
         status_widget.setText(status)
         status_widget.setVisible(status is not None)    
 
-    def _populate_input_widget_ui(self, input_widget, container_widget):
-        ''' called when a button is created for custom content '''
-        data : OscInputItem = input_widget.identifier.input_id 
 
+    def _update_input_widget(self, input_widget, container_widget):
+        ''' called when the widget has to update itself on a data change '''
+        data = input_widget.identifier.input_id 
         input_widget.setTitle(data.title_name)
         input_widget.setDescription(data.display_name)
+        input_widget.setToolTip(data.display_tooltip)
 
-
-        status_widget = gremlin.ui.ui_common.QIconLabel()
-        status_widget.setObjectName("status")
+        status_text = ''
         is_warning = False
-        status_text = ""
-        if data.message is None:
+        if not data.message:
             is_warning = True
             status_text = "Not configured"
        
 
+        status_widget = container_widget.findChild(gremlin.ui.ui_common.QIconLabel, "status")
         if is_warning:
             status_widget.setIcon("fa.warning", use_qta=True, color="red")
         else:
             status_widget.setIcon() # clear it
 
         status_widget.setText(status_text)
+ 
 
+    def _populate_input_widget_ui(self, input_widget, container_widget):
+        ''' called when a button is created for custom content '''
+
+        status_widget = gremlin.ui.ui_common.QIconLabel()
+        status_widget.setObjectName("status")
         layout = QtWidgets.QVBoxLayout()
         container_widget.setLayout(layout)
         layout.addWidget(status_widget)
-        input_widget.setToolTip(data.display_tooltip)
+        
 
- 
+        self._update_input_widget(input_widget, container_widget)
+
+
     def _edit_item_cb(self, widget, index, data):
         ''' called when the edit button is clicked  '''
         self._edit_dialog = OscInputConfigDialog(self.current_mode, index, data, self)
@@ -2804,7 +2814,7 @@ class OscDeviceTabWidget(QtWidgets.QWidget):
         input_item._max_range = max_range
         input_item._update() # refresh other properties
 
-        self.input_item_list_view.redraw()
+        self.input_item_list_view.update_item(index)
 
     def _index_for_key(self, input_id):
         ''' returns the index of the selected input id'''

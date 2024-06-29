@@ -704,7 +704,7 @@ class MouseButtonAction(MacroAbstractAction):
         :param button the button to use in the action
         :param is_pressed True if the button should be pressed, False otherwise
         """
-        if not isinstance(button, gremlin.common.MouseButton):
+        if not isinstance(button, gremlin.types.MouseButton):
             raise gremlin.error.MouseError("Invalid mouse button provided")
 
         self.button = button
@@ -713,13 +713,13 @@ class MouseButtonAction(MacroAbstractAction):
     def __call__(self, is_local = None, is_remote = None, force_remote = None):
         # ignore passed local/remote states
         is_local, is_remote = self._update_flags(is_local, is_remote, force_remote)
-        if self.button == gremlin.common.MouseButton.WheelDown:
+        if self.button == gremlin.types.MouseButton.WheelDown:
             if is_local:
                 gremlin.sendinput.mouse_wheel(1)
             if is_remote:
                 gremlin.input_devices.remote_client.send_mouse_wheel(1, force_remote)
 
-        elif self.button == gremlin.common.MouseButton.WheelUp:
+        elif self.button == gremlin.types.MouseButton.WheelUp:
             if is_local:
                 gremlin.sendinput.mouse_wheel(-1)
             if is_remote:

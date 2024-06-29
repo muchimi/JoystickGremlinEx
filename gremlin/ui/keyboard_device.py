@@ -35,6 +35,7 @@ from gremlin.util import *
 from gremlin.input_types import InputType
 import gremlin.base_classes
 from xml.etree import ElementTree
+import gremlin.ui.ui_common
 
 class KeyboardInputItem():
     ''' holds a keyboard input item '''
@@ -87,6 +88,14 @@ class KeyboardInputItem():
         self._update()
 
 
+    @property 
+    def latched(self):
+        ''' true if all the keys in this input are latched '''
+        if not self._key:
+            return False
+        return self._key.latched
+
+
     @property
     def message_key(self):
         ''' returns the sorting key for this message '''
@@ -99,7 +108,18 @@ class KeyboardInputItem():
             return []
         return self.key._latched_keys
 
-
+    @property 
+    def has_mouse(self):
+        ''' true if any of the keys in the input is a mouse input '''
+        if self._key:
+            keys = [self._key]
+            keys.extend(self._key._latched_keys)
+            key: Key
+            for key in keys:
+                if key._is_mouse:
+                    return True
+                
+        return False
 
     def parse_xml(self, node):
         ''' loads itself from xml '''
@@ -114,13 +134,21 @@ class KeyboardInputItem():
                 if child.tag in ("key"):
                     scan_code = safe_read(child, "scan-code", int, 0)
                     is_extended = safe_read(child, "extended", bool, False)
-                    key = key_from_code(scan_code, is_extended)
+                    is_mouse = safe_read(child, "mouse", bool, False)
+                    if is_mouse:
+                        key = Key(scan_code = scan_code, is_mouse=True)
+                    else:
+                        key = key_from_code(scan_code, is_extended)
                     self._key = key
                     for latched_child in child:
                         if latched_child.tag == "latched":
                             scan_code = safe_read(latched_child, "scan-code", int, 0)
                             is_extended = safe_read(latched_child, "extended", bool, False)
-                            key = key_from_code(scan_code, is_extended)
+                            is_mouse = safe_read(latched_child, "mouse", bool, False)
+                            if is_mouse:
+                                key = Key(scan_code = scan_code, is_mouse=True)
+                            else:
+                                key = key_from_code(scan_code, is_extended)
                             if not key in self._key.latched_keys:
                                 self._key._latched_keys.append(key) 
         self._suspend_update = False
@@ -134,15 +162,22 @@ class KeyboardInputItem():
         child = ElementTree.Element("key")
         child.set("scan-code", str(self._key.scan_code))
         child.set("extended", str(self._key.is_extended))
+        child.set("mouse", str(self._key.is_mouse))
         child.set("description", self.key.lookup_name)
         node.append(child)
         for key in self._key._latched_keys:
             latched_child = ElementTree.Element("latched")
             latched_child.set("scan-code", str(key.scan_code))
             latched_child.set("extended", str(key.is_extended))
+            latched_child.set("mouse", str(key.is_mouse))
             latched_child.set("description", key.lookup_name)
             child.append(latched_child)
         return node
+    
+    def _fix_name(name):
+        if len(name) == 1:
+            return name.upper()
+        return name
     
     def _update(self):
         # updates the message key and display 
@@ -176,7 +211,10 @@ class KeyboardInputItem():
             for key in keys:
                 if display_name:
                     display_name += " + "
-                display_name += key.name
+                
+                display_name += self._fix_name(key.name)
+        else:
+            display_name = self._fix_name(self._key.name)
         
         self._title_name = f"Key input {'(latched)'if latched_keys else ''}"
         self._display_name = display_name
@@ -265,7 +303,7 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         # Handle user interaction
         self.input_item_list_view.item_selected.connect(self._select_item_cb)
         self.input_item_list_view.item_edit.connect(self._edit_item_cb)
-        self.input_item_list_view.item_closed.connect(self._close_item_cb)
+        
         
         self.left_panel_layout.addWidget(self.input_item_list_view)
         self.main_layout.addLayout(self.left_panel_layout,1)
@@ -292,13 +330,6 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         button_container_layout.addWidget(clear_keyboard_button)
         button_container_layout.addStretch(1)
 
-        # # Key add button
-        # button = ui_common.NoKeyboardPushButton("Add Key")
-        # button.clicked.connect(self._add_listener_keyboard_key_cb)
-
-        # button_container_layout.addWidget(button)
-        
-
         virtual_keyboard_button = QtWidgets.QPushButton("Add Key")
         virtual_keyboard_button.clicked.connect(self._add_key_dialog_cb)
         button_container_layout.addWidget(virtual_keyboard_button)
@@ -306,11 +337,13 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
 
         self.left_panel_layout.addWidget(button_container_widget)
         # Select default entry
-        selected_index = self.input_item_list_view.current_index
+        
 
         self.input_item_list_view.redraw()
 
-        if selected_index is not None:
+        selected_index = self.input_item_list_view.current_index
+
+        if selected_index != -1:
             self._select_item_cb(selected_index)
 
         
@@ -337,42 +370,6 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         self._keyboard_dialog.showNormal()  
 
 
-    # def _add_listener_keyboard_key_cb(self):
-    #     """Handles adding of new keyboard keys to the list.
-
-    #     Asks the user to press the key they wish to add bindings for.
-    #     """
-    #     self.button_press_dialog = ui_common.InputListenerWidget(
-    #         self._add_keyboard_listener_key_cb,
-    #         [InputType.Keyboard],
-    #         return_kb_event=False,
-    #         multi_keys=True # allow key combinations
-    #     )
-
-    #     # Display the dialog centered in the middle of the UI
-    #     root = self
-    #     while root.parent():
-    #         root = root.parent()
-    #     geom = root.geometry()
-
-    #     self.button_press_dialog.setGeometry(
-    #         int(geom.x() + geom.width() / 2 - 150),
-    #         int(geom.y() + geom.height() / 2 - 75),
-    #         300,
-    #         150
-    #     )
-    #     self.button_press_dialog.show()
-
-      
-
-    # def _add_keyboard_listener_key_cb(self, keys):
-    #     """Adds the provided key to the list of keys.
-
-    #     :param key the new key to add, either a single key or a combo-key
-
-    #     """
-    #     # the new entry will be a new index
-    #     self._process_input_keys(keys, -1)
 
     def _dialog_ok_cb(self):
         ''' callled when the dialog completes '''
@@ -386,14 +383,21 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         ''' processes input keys
          
         index of -1 indicates a new item
+        reload: if set, updates the whole model
 
         '''
-        if keys:
-            # figure out if the has modifiers or not
-            modifiers = []
-            primary_keys = []
-            
-            root_key : Key = None
+
+        # reload on new index
+        reload = index == -1
+
+        # figure out if the has modifiers or not
+        modifiers = []
+        primary_keys = []
+        root_key : Key = None
+        if not keys:
+            # no data
+            root_key = Key()
+        else:
             for key in keys:
                 if key.is_modifier:
                     modifiers.append(key)
@@ -406,45 +410,50 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
                     if not root_key:
                         root_key = key
 
-            if modifiers and not root_key.is_modifier:
-                root_key.latched_keys = modifiers
-            
-            # latch the other keys that must be pressed at the same time
-            if len(primary_keys) > 1:
-                primary_keys.remove(root_key)
-                root_key.latched_keys.extend(primary_keys)
+        if modifiers and not root_key.is_modifier:
+            root_key.latched_keys = modifiers
+        
+        # latch the other keys that must be pressed at the same time
+        if len(primary_keys) > 1:
+            primary_keys.remove(root_key)
+            root_key.latched_keys.extend(primary_keys)
 
-            # ensure the input item exists in the profile data
-            if index >= 0:
+        # ensure the input item exists in the profile data
+        if index >= 0:
 
-                identifier = self.input_item_list_model.data(index)
-                input_id = identifier.input_id
-                logging.getLogger("system").info(f"Editing index {index} {input_id.display_name}")
-            else:
-                input_id = KeyboardInputItem()
-                index = self.input_item_list_model.rows() # new index
-                logging.getLogger("system").info(f"Adding index {index} {input_id.display_name}")
-            input_id.key = root_key
-            input_type = InputType.KeyboardLatched if root_key.is_latched else InputType.Keyboard
+            identifier = self.input_item_list_model.data(index)
+            input_id = identifier.input_id
+            logging.getLogger("system").info(f"Editing index {index} {input_id.display_name}")
+        else:
+            input_id = KeyboardInputItem()
+            index = self.input_item_list_model.rows() # new index
+            logging.getLogger("system").info(f"Adding new kbd input index {index} ")
+        input_id.key = root_key
+        input_type = InputType.KeyboardLatched # always use latched type starting with 13.40.14ex if root_key.is_latched else InputType.Keyboard
 
-            # creates the item in the profile
-            self.device_profile.modes[self.current_mode].get_data(input_type,input_id)
+
+        # creates the item in the profile if needed 
+        self.device_profile.modes[self.current_mode].get_data(input_type,input_id)
+
+        if reload:
             # refreshes the model from the profile
             self.input_item_list_model.refresh()
             # redraw the list to include the new item
             self.input_item_list_view.redraw()
             # select the new item - its index may have changed
             index = self.input_item_list_model.input_id_index(input_id)
-            self.input_item_list_view.select_item(index,True)
-
-            logging.getLogger("system").info(f"Final item index {index} {input_id.display_name}")
-            
-            # update on selection
-            self._select_item_cb(index)
+        else:
+            # update the widget for this entry
+            self.input_item_list_view.update_item(index)
 
 
+        # select the item
+        self.input_item_list_view.select_item(index, force = True)
 
 
+        logging.getLogger("system").info(f"Final item index {index} {input_id.display_name}")
+        
+ 
 
     def _select_item_cb(self, index):
         ''' called when a key has been selected - refreshes the view panel '''
@@ -532,29 +541,27 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         
         '''
 
-        widget = InputItemWidget(identifier = identifier, populate_ui=self._populate_input_widget_ui, config_external=True)
+        widget = InputItemWidget(identifier = identifier, populate_ui_callback=self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True)
         widget.create_action_icons(data)
         widget.update_description(data.description)
         widget.setIcon("fa.keyboard-o")
-                
         widget.enable_close()
         widget.enable_edit()
 
         return widget
     
 
-    
-
-
-    def _populate_input_widget_ui(self, input_widget, container_widget):
-        ''' called when a button is created for custom content '''
-        data : KeyboardInputItem = input_widget.identifier.input_id 
-
+    def _update_input_widget(self, input_widget, container_widget):
+        ''' called when the widget has to update itself on a data change '''
+        data = input_widget.identifier.input_id 
         input_widget.setTitle(data.title_name)
         input_widget.setDescription(data.display_name)
+        input_widget.setToolTip(data.display_tooltip)
+        if data.has_mouse:
+            input_widget.setDescriptionIcon("mdi.mouse")
+        else:
+            input_widget.setDescriptionIcon(None)
 
-        status_widget = gremlin.ui.ui_common.QIconLabel()
-        status_widget.setObjectName("status")
         is_warning = False
         status_text = ""
         if data.key is None:
@@ -562,6 +569,7 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
             status_text = "Not configured"
        
 
+        status_widget = container_widget.findChild(gremlin.ui.ui_common.QIconLabel, "status")
         if is_warning:
             status_widget.setIcon("fa.warning", use_qta=True, color="red")
         else:
@@ -569,11 +577,21 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
 
         status_widget.setText(status_text)
 
+
+
+    def _populate_input_widget_ui(self, input_widget, container_widget):
+        ''' called when a button is created for custom content '''
+
+        status_widget = gremlin.ui.ui_common.QIconLabel()
+        status_widget.setObjectName("status")
         layout = QtWidgets.QVBoxLayout()
         container_widget.setLayout(layout)
         layout.addWidget(status_widget)
-        input_widget.setToolTip(data.display_tooltip)
+        
 
+        self._update_input_widget(input_widget, container_widget)
+                
+  
     
     def _edit_item_cb(self, widget, index, data):
         ''' called when the edit button is clicked  '''
@@ -595,20 +613,6 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         self._keyboard_dialog.accepted.connect(self._dialog_ok_cb)
         self._keyboard_dialog.showNormal()        
 
-    def _close_item_cb(self, widget, index, data):
-        ''' called when the close button is clicked '''
-
-        # show a warning before deleting an input
-        self.input_item_list_model(index)
-        self.input_item_list_view.redraw()
-        
-
-
-
-
-    def _confirmed_close(self, index):
-        self.model.removeRow(index)
-        self.redraw()
 
 
 

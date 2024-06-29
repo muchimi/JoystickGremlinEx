@@ -12,20 +12,26 @@ import gremlin.ui.input_item
 import enum
 from gremlin.profile import safe_format, safe_read
 from gremlin.keyboard import Key, key_from_name
+from gremlin.util import load_icon
 import logging
 import copy
 
       
 
 class QKeyWidget(QtWidgets.QPushButton):
+
+
+    # fires when selection changes
+    selected_changed = QtCore.Signal(object)
+
     ''' custom key label '''
-    def __init__(self, parent = None) -> None:
-        super().__init__(parent)
+    def __init__(self, text = None, parent = None) -> None:
+        super().__init__(text= text, parent = parent)
         self._key = None
         self._selected = False
 
-        self._default_style = "QPushButton {border: 2px solid black; background-color: #E8E8E8; border-style: outset; padding: 4px; min-width: 32px; max-height: 30px;} QPushButton:hover {border: 2px #4A4648;}"
-        self._selected_style = "QPushButton {border: 2px solid black; background-color: #8FBC8F; border-style: outset; padding: 4px; min-width: 32px; max-height: 30px;} QPushButton:hover {border: 2px #4A4648;}"
+        self._default_style = "QPushButton {border: 2px solid black; border-radius: 4px; background-color: #E8E8E8; border-style: outset; padding: 4px; min-width: 32px; max-height: 30px;} QPushButton:hover {border: 2px #4A4648;}"
+        self._selected_style = "QPushButton {border: 2px solid black; border-radius: 4px; background-color: #8FBC8F; border-style: outset; padding: 4px; min-width: 32px; max-height: 30px;} QPushButton:hover {border: 2px #4A4648;}"
         self.setStyleSheet(self._default_style)
         
         self.normal_key = None # what to display normally
@@ -58,6 +64,8 @@ class QKeyWidget(QtWidgets.QPushButton):
         if self._selected != value:
             self._selected = value
             self._update_state()
+            # tell listeners status changed
+            self.selected_changed.emit(self)
 
     def _update_state(self):
         ''' updates the color of the button based on the selection state '''
@@ -81,7 +89,7 @@ class InputKeyboardDialog(QtWidgets.QDialog):
         super().__init__(parent)
         # self._sequence = InputKeyboardModel(sequence=sequence)
         main_layout = QtWidgets.QVBoxLayout()
-        self.setWindowTitle("Keyboard Input Mapper")
+        self.setWindowTitle("Keyboard & Mouse Input Mapper")
 
         self._select_single = select_single
         self._allow_modifiers = allow_modifiers
@@ -220,7 +228,7 @@ class InputKeyboardDialog(QtWidgets.QDialog):
 
     def _ok_button_cb(self):
         ''' ok button pressed '''
-        keys = [copy.deepcopy(widget.key) for widget in self._key_widget_map.values() if widget.selected]
+        keys = [Key(scan_code = widget.key.scan_code, is_extended = widget.key.is_extended, is_mouse=widget.key.is_mouse) for widget in self._key_widget_map.values() if widget.selected]
         self.keys = keys
         # convert to a scancode/extended sequence
         data = []
@@ -266,7 +274,7 @@ class InputKeyboardDialog(QtWidgets.QDialog):
         # list of scancodes  https://handmade.network/forums/articles/t/2823-keyboard_inputs_-_scancodes%252C_raw_input%252C_text_input%252C_key_names
 
         # first row = QUERTY object
-        row_0 = ["","","F13","F14","F15","F16","F17","F18","F19","F20","F21","F22","F23","F24"]
+        row_0 = ["","","F13","F14","F15","F16","F17","F18","F19","F20","F21","F22","F23","F24","","mouse_1","mouse_2","mouse_3","","mouse_4","mouse_5","mouse_up","mouse_down"]
         row_1 = ["Esc","","F1","F2","F3","F4","F5","F6","F7","F8","F9","F10","F11","F12","",["PrtSc","printscreen"],["Scrlck","scrolllock"],["Pause","pause"]]
         row_2 = ["`","1","2","3","4","5","6","7","8","9","0","-","=",["Back","backspace"],"",["Ins","insert"],["Home","home"],["PgUp","pageup"],"",["NumLck","numlock"],["/","npdivide"],["*","npmultiply"],["-","npminus"]]
         row_3 = [["Tab","tab"],"Q","W","E","R","T","Y","U","I","O","P","[","]","\\","",["Del","delete"],"End",["PgDn","pagedown"],"",["7","np7"],["8","np8"],["9","np9"],["+","npplus",1,2]]
@@ -335,8 +343,35 @@ class InputKeyboardDialog(QtWidgets.QDialog):
                         shifted = shifted_map[key] if not key_complex else key
                     else:
                         shifted = key
+
+                    icon = None
+                    # handle special key names
+                    if key == "mouse_1":
+                        key = "M1"
+                        icon = "mdi.mouse"
+                    elif key == "mouse_2":
+                        key = "M2"
+                        icon = "mdi.mouse"
+                    elif key == "mouse_3":
+                        key = "Mid"
+                        icon = "mdi.mouse"
+                    elif key == "mouse_4":
+                        key = "M4"
+                        icon = "mdi.mouse"
+                    elif key == "mouse_5":
+                        key = "M5"
+                        icon = "mdi.mouse"
+                    elif key == "mouse_up":
+                        key = "MWU"
+                        icon = "mdi.mouse-move-up"
+                    elif key == "mouse_down":
+                        key = "MWD"
+                        icon = "mdi.mouse-move-down"                        
                     
                     widget = QKeyWidget(key)
+                    if icon:
+                        widget.setIcon(load_icon(icon))
+                        widget.setIconSize(QtCore.QSize(14,14))
                     action_key = key_from_name(key_name)
                     widget.key = action_key # this name must be defined in keybpoard.py 
                     widget.normal_key = key

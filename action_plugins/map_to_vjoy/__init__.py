@@ -2128,7 +2128,7 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         elif self.action_mode == VjoyAction.VJoyHat:
             input_string = "hat"
             fallback = "mdi.axis-arrow"
-        elif self.action_mode in (VjoyAction.VJoyButton, VjoyAction.VjoyButtonRelease):
+        elif self.action_mode in (VjoyAction.VJoyButton, VjoyAction.VjoyButtonRelease, VjoyAction.VJoyPulse):
             input_string = "button"
             fallback = "mdi.gesture-tap-button"
         else:

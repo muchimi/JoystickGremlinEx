@@ -174,6 +174,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         el.keyboard_event.connect(self._kb_event_cb)
 
+
         # Load existing configuration or create a new one otherwise
         if self.config.last_profile and os.path.isfile(self.config.last_profile):
             # check if this was a profile swap that we load the profile from the current user folder
@@ -1184,6 +1185,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         except e:
             log_sys_error(f"Unable to update status bar mode: {mode}")
             log_sys_error(e)
+
 
     def _kb_event_cb(self, event):
         ''' listen for keyboard modifiers and keyboard events at runtime '''

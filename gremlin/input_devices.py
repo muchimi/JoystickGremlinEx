@@ -1301,7 +1301,7 @@ class MidiClient(QtCore.QObject):
         
 
         if message_key in self._midi_map.keys():
-            logging.getLogger("system").info(f"MIDI: runtime: processing {message_key}")
+            # logging.getLogger("system").info(f"MIDI: runtime: processing {message_key}")
             for input_item in self._midi_map[message_key]:
                 # send the value over if the message is a value type message
                 command = input_item.command
@@ -1320,6 +1320,9 @@ class MidiClient(QtCore.QObject):
                 elif command == MidiCommandType.PitchWheel:
                     raw_value = message.pitch
                     range = 16383
+                elif command == MidiCommandType.SysEx:
+                    range = 0
+                    raw_value = 1
                 
                 # button press mode - if the value is in the top half of the range, the button is considered pressed
                 is_axis = False

@@ -90,6 +90,7 @@ Joystick Gremlin EX
 
 13.40.14ex
 
+- Revamped keyboard input device and UI with virtual keyboard and mouse input support with multiple latched keys (profiles using the old style should convert automatically to the new style)
 - New MIDI input device - GremlinEx can listen to MIDI events.  See MIDI section below.
 - New file menu for opening Explorer to the current profile folder
 - New file menu for opening the profile XML in a text editor (it will save the profile first)
@@ -398,20 +399,51 @@ If the persist option is not checked, GremlinEx will use whatever data is in the
 GremlinEx will show all detected game controllers in tabs located at the top of the UI.  These are the raw input devices, either buttons, hats or axes.
 
 <!-- TOC --><a name="keyboard-device"></a>
-## Keyboard device
+## Keyboard (+Mouse) device
 
-GremlinEx has a special Keyboard device that allows you to map keyboard combinations.  This functionality is provided for combination keys noting that Gremlin will not stop detected keyboard inputs by the target application.  Rather, it will add functionality to them if the keyboard combination is not used in the target application.
+GremlinEx has an updated special Keyboard device that allows you to map keyboard and mouse button as inputs to trigger actions and containers. 
 
-GremlinEx allows you to map function keys F13 to F24 and any QWERTY keyboard layouts (no support for other layouts as of yet).  Localization is on the to-do list.
+GremlinEx allows you to map unusual function keys F13 to F24 and any QWERTY keyboard layouts (no support for other layouts as of yet), as well as mouse input buttons including mouse wheel actions. 
 
-Unlike hardware devices, keyboard inputs can be added, removed and edited.  If an input is removed, it will remove any associated mappings and display a warning box to this effect.
+### Virtual Keyboard
+
+For input simplicity, GremlinEx now uses a virtual keyboard to show which keys are used for the input selected.  It is still possible to listen to keys using the listen button (currently this will only capture keys, mouse buttons will be ignored).
+
+
+![](virtual_keyboard.png)
+
+
+The virtual keyboard is the same used in map to keyboard Ex.
+
+
+Localization is on the to-do list, however GremlinEx uses scan-codes under the hood so any keyboard will work until localization is able to display the correct key layout for the current keyboard in use.
+
+Keyboard inputs can be added, removed and edited.  If an input is removed, it will remove any associated mappings and display a warning box to this effect.
+
+### Latching
+
+GremlinEx allows multiple keys to be latched as a single trigger.  The trigger will fire if all the keys in the latched set are pressed concurrently.  The order does not matter.
+
+Each selected key shows highlighted in the virtual keyboard.
+
+There are no guardrails provided - and GremlinEx does not prevent the output application from seeing the keys and buttons pressed to trigger a GremlinEx action.  When mapping to a game use care to employ key combinations that make sense and do not conflict with one another.
+
+### Special considerations
+
+Some actions, like mouse wheel presses, do not have a release associated with them (there is no event fired to "stop" the mouse wheel).  When mapping to an output, be aware that the output should be pulsed or otherwise handled if you expect such triggers to be momentary.  For example, if mapping a wheel event to a joystick button, use the pulse mode unless you want the button to stay pressed.
+
+Another potential gotcha is to create a loop, wherein the output of an action creates a trigger for an output.
+
+There are no guardrails to encourage flexibility however it is imperative to use this capability with care to avoid odd behaviors.
 
 <!-- TOC --><a name="midi-device"></a>
 ## MIDI device
 
-This is a feature I wanted for a long time. GremlinEx, as of 13.40.14ex, can map MIDI messages and use those to trigger actions.
+GremlinEx, as of 13.40.14ex, can map MIDI messages and use those to trigger actions.
 
-Unlike hardware devices, MIDI inputs must be user defined and added to tell GremlinEx what to listen to.  Because MIDI can be cryptic, the configuration dialog allows you to listen to MIDI data and automatically program what it "hears" as an input.  Inputs can also be manually setup if needed.
+MIDI is a music oriented protocol to facilitate the exchange of music information between MIDI devices.  These devices can be hardware or software devices.
+
+Unlike hardware devices, MIDI inputs must be user defined and added to tell GremlinEx what to listen to.  Because MIDI can be cryptic, the configuration dialog allows you to listen to MIDI data and automatically program what it "hears" as an input using the listen buttons.  Inputs can also be manually setup if needed.
 
 Gremlin categorizes MIDI messages in that it doesn't look at the value data in the MIDI input stream - rather it looks at the port, the channel, the command, and any specific command data, such as the note number or the controller number.
 

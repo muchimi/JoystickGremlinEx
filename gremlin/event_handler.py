@@ -31,6 +31,7 @@ from . import config, error, joystick_handling, windows_event_hook
 from gremlin.keyboard import Key
 
 
+
 class Event:
 
 	"""Represents a single event captured by the system.
@@ -143,6 +144,17 @@ class Event:
 			)
 		
 		raise ValueError(f"Unable to handle parameter - not a valid key: {key}")
+	
+	def __str__(self):
+		if self.event_type == InputType.Mouse:
+			return f"Event: Mouse - button {self.identifier} pressed: {self.is_pressed}"
+		elif self.event_type == InputType.Keyboard:
+			return f"Event: Keyboard - scan code, extended : {self.identifier} pressed: {self.is_pressed}"
+		elif self.event_type == InputType.JoystickAxis or self.is_axis:
+			return f"Event: Axis : {self.identifier} raw value: {self.raw_value} value: {self.value}"
+		elif self.event_type == InputType.JoystickButton:
+			return f"Event: Axis : {self.identifier} pressed: {self.is_pressed}"
+		return f"Event: {self.event_type} identifier {self.identifier}"
 
 class DeviceChangeEvent:
 	''' sent when a new device is selected '''
@@ -161,6 +173,8 @@ class StateChangeEvent:
 		self.is_local = is_local
 		self.is_remote = is_remote
 		self.is_broadcast_enabled = is_broadcast_enabled
+
+
 
 
 
@@ -232,15 +246,22 @@ class EventListener(QtCore.QObject):
 		self._keyboard_state = {}
 		self.gremlin_active = False
 
-		#self._init_joysticks()
 		self.keyboard_hook.start()
 
 		Thread(target=self._run).start()
+
+	def start(self):
+		''' starts the non regular listener '''
+		self.mouse_hook.start()
+
+	def stop(self):
+		self.mouse_hook.stop()
 
 	def terminate(self):
 		"""Stops the loop from running."""
 		self._running = False
 		self.keyboard_hook.stop()
+		self.mouse_hook.stop()
 
 	def reload_calibrations(self):
 		"""Reloads the calibration data from the configuration file."""
@@ -361,6 +382,7 @@ class EventListener(QtCore.QObject):
 	def get_key_state(self, key: Key):
 		''' returns the state of the given key '''
 		return self._keyboard_state.get(key.index_tuple(), False)
+	
 
 
 	def _mouse_handler(self, event):
@@ -382,6 +404,11 @@ class EventListener(QtCore.QObject):
 				identifier=event.button_id,
 				is_pressed=event.is_pressed,
 			))
+
+			# update keyboard state for that key 
+			key_id = (event.button_id.value + 0x1000, False)
+			self._keyboard_state[key_id] = event.is_pressed
+			#logging.getLogger(f"system").info(f"Mouse button state: {key_id} {event.is_pressed}")
 		# Allow the windows event to propagate further
 		return True
 
@@ -481,30 +508,41 @@ class EventHandler(QtCore.QObject):
 			if the system is paused
 		"""
 		if event:
-			if event.event_type == InputType.KeyboardLatched:
+			if event.event_type in (InputType.Keyboard, InputType.KeyboardLatched):
 				# keyboard latched event
-				key : Key = event.identifier
-				index = key.index_tuple()  # the events will arrive as keyboard events
-				if key.is_latched:
+				identifier = event.identifier
+				primary_key : Key = identifier.key
+				
+
+				# if the key can latch with multiple primary keys, build the table of all combinations
+				key_list = [primary_key]
+				if primary_key.is_latched:
+					# multiple keys 
+					key_list.extend(primary_key._latched_keys)
+
+				for key in key_list:
+ 					# the events will arrive as keyboard events - in any order - this makes sure latching is checked regardless of the order of key presses
+					index = key.index_tuple() 
 					if device_guid not in self.latched_events.keys():
 						self.latched_events[device_guid] = {}
 					if mode not in self.latched_events[device_guid].keys():
 						self.latched_events[device_guid][mode] = {}
 					if index not in self.latched_events[device_guid][mode].keys():
 						self.latched_events[device_guid][mode][index] = []
-					self.latched_events[device_guid][mode][index].append(key)
-					#logging.getLogger("system").info(f"Key latch registered: {index} -> {key.name}")
+					self.latched_events[device_guid][mode][index].append(identifier)
+					#logging.getLogger("system").info(f"Key latch registered: {index} {key.name} -> {identifier.display_name}")
 
-					if device_guid not in self.latched_callbacks.keys():
-						self.latched_callbacks[device_guid] = {}
-					if mode not in self.latched_callbacks[device_guid].keys():
-						self.latched_callbacks[device_guid][mode] = {}
-					if not key in self.latched_callbacks[device_guid][mode]:
-						self.latched_callbacks[device_guid][mode][key] = []
-					data = self.latched_callbacks[device_guid][mode][key]
-					data.append((self._install_plugins(callback),permanent))
-					#logging.getLogger("system").info(f"Key callback registered: {key.name}")
-					return
+				if device_guid not in self.latched_callbacks.keys():
+					self.latched_callbacks[device_guid] = {}
+				if mode not in self.latched_callbacks[device_guid].keys():
+					self.latched_callbacks[device_guid][mode] = {}
+				if not key in self.latched_callbacks[device_guid][mode]:
+					self.latched_callbacks[device_guid][mode][primary_key] = []
+				data = self.latched_callbacks[device_guid][mode][primary_key]
+				data.append((self._install_plugins(callback),permanent))
+				#logging.getLogger("system").info(f"Key callback registered: {key.name}")
+				return
+								
 				
 			elif event.event_type == InputType.Midi:
 				# MIDI event
@@ -544,16 +582,30 @@ class EventHandler(QtCore.QObject):
 					permanent
 				))
 
-	def _matching_latched_keys(self, event):
+	def _matching_event_keys(self, event):
 		''' gets the list of latched keys for this event '''
-		if not event.event_type in (InputType.Keyboard, InputType.KeyboardLatched):
+		if not event.event_type in (InputType.Keyboard, InputType.KeyboardLatched, InputType.Mouse):
 			# not a keyboard event
 			return []
-		if event.device_guid in self.latched_events:
+		# convert mouse events to keyboard event
+		if event.event_type == InputType.Mouse:
+			from gremlin.ui.keyboard_device import KeyboardDeviceTabWidget
+			device_guid = KeyboardDeviceTabWidget.device_guid
+			mouse_button = event.identifier
+			# convert the mouse button to the virtual scan code we use for mouse events
+			identifier = (mouse_button.value + 0x1000, False)
+			# logging.getLogger("system").info(f"matching mouse event {event.identifier} to {identifier}")
+		else:
+			device_guid = event.device_guid
+			identifier = event.identifier  # this is (scan_code, is_extended)
+
+		if device_guid in self.latched_events:
 			data = self.latched_events[event.device_guid].get(self._active_mode, {})
-			index = event.identifier
+			index = identifier
 			keys = data.get(index,[])
-			#logging.getLogger("system").info(f"event: {index} -> found {len(keys)} matching keys")
+			# logging.getLogger("system").info(f"event matching: {identifier} -> found {len(keys)} matching callback events")
+			# for key in keys:
+			# 	logging.getLogger("system").info(f"event: {key.name} latched: {key.latched}")
 			return keys
 		return []		
 	
@@ -647,26 +699,34 @@ class EventHandler(QtCore.QObject):
 		# list of callbacks
 		m_list = []
 
-		# filter latched keyboard events
-		if event.event_type in (InputType.Keyboard, InputType.KeyboardLatched):
-			keys = self._matching_latched_keys(event)
-			if keys:
-
-				#logging.getLogger("system").info(f"Matched keys for event {event.identifier} keys: {len(keys)}")
-				# latched input
-				key : Key
-				latch_key = None
-				for key in keys:
-
-					is_latched = key.latched
-					#logging.getLogger("system").info(f"Check key {key.name} -> latched {is_latched}")
-					if is_latched:
-						latch_key = key
-						break
-					
-				if latch_key:
-					logging.getLogger("system").info(f"Found latched key: Check key {latch_key.name}")
-					m_list = self._matching_latched_callbacks(event, key)
+		# filter latched keyboard or mouse events
+		if event.event_type in (InputType.Keyboard, InputType.KeyboardLatched, InputType.Mouse):
+			identifiers = self._matching_event_keys(event)  # returns list of primary keys
+			# if event.event_type == InputType.Mouse:
+			# 	key = Key(scan_code = event.identifier.value, is_extended = False) # the key for this key event	
+			# else:
+			# 	key = Key(scan_code = event.identifier[0], is_extended=event.identifier[1]) # the key for this key event
+			if identifiers:
+				# logging.getLogger("system").info(f"Matched keys for event {event} keys: {len(identifiers)} --------------------------")
+				for identifier in identifiers:
+					latch_key = None
+					is_latched = identifier.latched
+					if event.is_pressed:
+						# logging.getLogger("system").info(f"KEY PRESSED: {key.name} -> latched {is_latched}")
+						if is_latched: 
+							latch_key = identifier.key
+					else:
+						# any key in the latch sequence that isn't pressed breaks the press
+						if not is_latched:
+							latch_key = identifier.key
+							# logging.getLogger("system").info(f"KEY RELEASED: {key.name}")
+									
+					if latch_key:
+						m_list = self._matching_latched_callbacks(event, latch_key)
+						# logging.getLogger("system").info(f"Found latched key: Check key {latch_key.name} callbacks: {len(m_list)} event: {event}")
+						self._trigger_callbacks(m_list, event)
+			return
+						
 		elif event.event_type ==InputType.Midi:
 			m_list = self._matching_midi_callbacks(event)
 		elif event.event_type == InputType.OpenSoundControl:
@@ -675,15 +735,16 @@ class EventHandler(QtCore.QObject):
 			# other inputs
 			m_list = self._matching_callbacks(event)
 
-		for cb in m_list:
+
+	def _trigger_callbacks(self, callbacks, event):
+
+		for cb in callbacks:
 			try:
 				cb(event)
-			except error.VJoyError as e:
-				display_error(str(e))
-				logging.getLogger("system").exception(
-					f"VJoy related error: {e}"
-				)
-				self.pause()
+			except:
+				pass
+			# except error.VJoyError as e:
+			# 	self.pause()
 
 
 	def _matching_midi_callbacks(self, event):
@@ -691,6 +752,9 @@ class EventHandler(QtCore.QObject):
 		callback_list = []
 		if event.event_type == InputType.Midi:
 			key = event.identifier.message_key
+			import gremlin.ui.midi_device 
+			if event.identifier.command == gremlin.ui.midi_device.MidiCommandType.SysEx:
+					pass
 			if event.device_guid in self.midi_callbacks:
 				callback_list = self.midi_callbacks[event.device_guid].get(
 					self._active_mode, {}

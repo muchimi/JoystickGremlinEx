@@ -150,56 +150,6 @@ def input_to_ui_string(input_type, input_id):
         return f"{InputType.to_string(input_type).capitalize()} {input_id}"
 
 
-class MouseButton(enum.Enum):
-
-    """Enumeration of all possible mouse buttons."""
-
-    Left = 1
-    Right = 2
-    Middle = 3
-    Forward = 4
-    Back = 5
-    WheelUp = 10
-    WheelDown = 11
-
-    @staticmethod
-    def to_string(value):
-        try:
-            return _MouseButton_to_string_lookup[value]
-        except KeyError:
-            raise gremlin.error.GremlinError("Invalid type in lookup")
-
-    @staticmethod
-    def to_enum(value):
-        if isinstance(value, int):
-            return MouseButton(value)
-        try:
-            return _MouseButton_to_enum_lookup[value]
-        except KeyError:
-            raise gremlin.error.GremlinError("Invalid type in lookup")
-
-
-_MouseButton_to_string_lookup = {
-    MouseButton.Left: "Left",
-    MouseButton.Right: "Right",
-    MouseButton.Middle: "Middle",
-    MouseButton.Forward: "Forward",
-    MouseButton.Back: "Back",
-    MouseButton.WheelUp: "Wheel Up",
-    MouseButton.WheelDown: "Wheel Down",
-}
-
-
-_MouseButton_to_enum_lookup = {
-    "Left": MouseButton.Left,
-    "Right": MouseButton.Right,
-    "Middle": MouseButton.Middle,
-    "Forward": MouseButton.Forward,
-    "Back": MouseButton.Back,
-    "Wheel Up": MouseButton.WheelUp,
-    "Wheel Down": MouseButton.WheelDown,
-}
-
 
 def index_to_direction(direction):
     """Returns a direction index to a direction name.

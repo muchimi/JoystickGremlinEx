@@ -628,7 +628,9 @@ def load_icon(*paths, use_qta = False, qta_color = None):
     (the_path,) = paths
     _, ext = os.path.splitext(the_path.lower())
     icon = None
-    if use_qta or ext == "":
+    if the_path == "mdi.mouse":
+        pass
+    if ext == "" or not (ext in (".png",".ico",".svg")) or use_qta:
         # assume a QTA icon if no extension
         try:
             if qta_color:

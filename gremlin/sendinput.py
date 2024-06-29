@@ -374,7 +374,7 @@ def mouse_relative_motion(dx, dy):
 
 
 def mouse_press(button):
-    from gremlin.common import MouseButton
+    from gremlin.types import MouseButton
     if button == MouseButton.Left:
         _send_input(_mouse_input(MOUSEEVENTF_LEFTDOWN))
     elif button == MouseButton.Right:
@@ -388,7 +388,7 @@ def mouse_press(button):
 
 
 def mouse_release(button):
-    from gremlin.common import MouseButton
+    from gremlin.types import MouseButton
     if button == MouseButton.Left:
         _send_input(_mouse_input(MOUSEEVENTF_LEFTUP))
     elif button == MouseButton.Right:

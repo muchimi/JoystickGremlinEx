@@ -25,6 +25,7 @@ import win32con
 
 from gremlin.base_classes import TraceableList
 
+
 def _create_function(lib_name, fn_name, param_types, return_type):
     """Creates a handle to a windows dll library function.
 
@@ -95,11 +96,14 @@ _keyboard_modifiers = ["leftshift","leftcontrol","leftalt","rightshift","rightco
 
 class Key:
 
-    """Represents a single key on the keyboard together with its
-    different representations.
+    """Represents a single key on the keyboard or mouse together with its different representations and latching (multiple keys) 
+     
+    If in mouse mode, the virtual code contains the MouseButton enum value for which mouse button this key corresponds to.  
+       
+        
     """
 
-    def __init__(self, name = None, scan_code = None, is_extended = None, virtual_code = None):
+    def __init__(self, name = None, scan_code = None, is_extended = None, virtual_code = None, is_mouse = False):
         """Creates a new Key instance.
 
         :param name the name used to refer to this key
@@ -109,22 +113,57 @@ class Key:
             extended scan code or not
         :param virtual_code the virtual key code assigned to this
             key by windows
+        :param is_mouse True if the key is a mouse button instead of a key - if set only the name is used
         """
+
+        from gremlin.types import MouseButton
         
+        
+        lookup_name = None
+        if not name:
+            name = "Not configured"
+        if not scan_code:
+            scan_code = 0
+        if not virtual_code:
+            virtual_code = 0
+        if not is_extended:
+            is_extended = False
+
+
+        if is_mouse or scan_code >= 0x1000:
+            if scan_code >= 0x1000:
+                # convert fake scan code to convert to a mouse button
+                mouse_button = MouseButton(scan_code - 0x1000)
+            else:
+                # use the given name
+                mouse_button = mouse_from_name(name)
+            if not mouse_button:
+                raise ValueError(f"Don't know how to handle mouse button name: {name}")
+            scan_code = mouse_button.value + 0x1000 # makes it unique in the tuple
+            virtual_code = scan_code
+            name = MouseButton.to_string(mouse_button)
+            lookup_name = name
+            is_mouse = True
+
+            
+
+        else:
+            # regular key
+            if scan_code > 0:
+                if not virtual_code:
+                    virtual_code = _scan_code_to_virtual_code(scan_code, is_extended)
+                    k = key_from_code(scan_code, is_extended)
+                    name = k.name
+                    
+
+        self._is_mouse = is_mouse
         self._scan_code = scan_code
         self._is_extended = is_extended
-        if not virtual_code:
-            virtual_code = _scan_code_to_virtual_code(scan_code, is_extended)
-        if not name:
-            k = key_from_code(scan_code, is_extended)
-            name = k.name
-            #name = _virtual_input_to_unicode(virtual_code)
-
         self._name = name
         self._latched_name = ""
         
         self._virtual_code = virtual_code
-        self._lookup_name = None
+        self._lookup_name = lookup_name
         self._latched_keys = TraceableList() #[] # list of keys latched to this keystroke (modifiers)
         # self._latched_keys.add_callback(self._changed_cb)
         self._update()
@@ -169,6 +208,11 @@ class Key:
     def index_tuple(self):
         ''' returns the gremlin index key for this key '''
         return  (self._scan_code, self._is_extended)
+    
+    @property
+    def is_mouse(self):
+        return self._is_mouse
+    
 
     @property
     def latched(self):
@@ -176,19 +220,23 @@ class Key:
         from gremlin.event_handler import EventListener
         el = EventListener()
         # assume the current key is pressed
-        latched = len(self._latched_keys) > 0
-        if latched:
+        latched = el.get_key_state(self)
+        if latched and len(self._latched_keys) > 0:
             # check the latched keys
-            key_name = self.name
-            key : Key
             for key in self._latched_keys:
-                state = el.get_key_state(key)
-                latched = latched and state
-                logging.getLogger("system").info(f"latched key {key_name} check: key {key.name} pressed: {state}")
+                if not el.get_key_state(key):
+                    # one key isn't pressed = not latched
+                    return False
 
-        logging.getLogger("system").info(f"latch check: key {self.name} latched: {latched}")
+        #logging.getLogger("system").info(f"latch check: key {self.name} latched: {latched}")
         return latched
-        
+    
+    @property
+    def state(self):
+        ''' returns the pressed state of the current key '''
+        from gremlin.event_handler import EventListener
+        el = EventListener()
+        return el.get_key_state(self)
         
     @property
     def data(self):
@@ -218,6 +266,7 @@ class Key:
         if self._lookup_name is not None:
             raise error.KeyboardError("Setting lookup name repeatedly")
         self._lookup_name = name
+
         self._update()
 
     def __eq__(self, other):
@@ -322,12 +371,15 @@ def _scan_code_to_virtual_code(scan_code, is_extended):
     :param is_extended whether or not the scan code is extended
     :return virtual code corresponding to the given scan code
     """
-    value = scan_code
-    if is_extended:
-        value = 0xe0 << 8 | scan_code
 
-    virtual_code = _map_virtual_key_ex(value, 3, _get_keyboard_layout(0))
-    return virtual_code
+    if scan_code: 
+        value = scan_code
+        if is_extended:
+            value = 0xe0 << 8 | scan_code
+
+        virtual_code = _map_virtual_key_ex(value, 3, _get_keyboard_layout(0))
+        return virtual_code
+    return None
 
 
 def _virtual_input_to_unicode(virtual_code):
@@ -337,8 +389,8 @@ def _virtual_input_to_unicode(virtual_code):
     :return unicode character corresponding to the given virtual code
     """
 
-    if virtual_code == 0x7c:
-        pass
+    if not virtual_code:
+        return None
 
     keyboard_layout = _get_keyboard_layout(0)
     output_buffer = ctypes.create_unicode_buffer(8)
@@ -435,6 +487,27 @@ def send_key_up(key):
     if is_remote:
         input_devices.remote_client.send_key(key.virtual_code, key.scan_code, flags )
 
+def mouse_from_name(name):
+    ''' validates if this is a special mouse key - returns None if it is not'''
+    from gremlin.types import MouseButton
+    mouse_button = None
+    name = name.lower()
+    if name in ("mouse_1", "mouse_left", MouseButton.to_string(MouseButton.Left).lower()): # left button
+        mouse_button = MouseButton.Left
+    elif name in ("mouse_2", "mouse_right", MouseButton.to_string(MouseButton.Right).lower()): # right button
+        mouse_button = MouseButton.Right
+    elif name in ("mouse_3", "mouse_middle", MouseButton.to_string(MouseButton.Middle).lower()):
+        mouse_button = MouseButton.Middle
+    elif name in ("mouse_4", "mouse_forward", MouseButton.to_string(MouseButton.Forward).lower()):
+        mouse_button = MouseButton.Forward
+    elif name in ("mouse_5", "mouse_back", MouseButton.to_string(MouseButton.Back).lower()):
+        mouse_button = MouseButton.Back
+    elif name in ("mouse_up", "wheel_up", MouseButton.to_string(MouseButton.WheelUp).lower()):
+        mouse_button = MouseButton.WheelUp
+    elif name in ("mouse_down", "wheel_down", MouseButton.to_string(MouseButton.WheelDown).lower()):
+        mouse_button = MouseButton.WheelDown
+    
+    return mouse_button
 
 def key_from_name(name, validate = False):
     """Returns the key corresponding to the provided name.
@@ -447,8 +520,18 @@ def key_from_name(name, validate = False):
     global g_scan_code_to_key, g_name_to_key
     from gremlin import error
 
+
+    # see if it's a mouse key
+    mouse_button = mouse_from_name(name)
+    if mouse_button:
+        key = Key(name, is_mouse=True)
+        return key    
+
     # Attempt to located the key in our database and return it if successful
     key_name = name.lower().replace(" ", "")
+
+
+
     key = g_name_to_key.get(key_name, None)
     if key is not None:
         return key
@@ -500,6 +583,11 @@ def key_from_code(scan_code, is_extended):
     from gremlin import error
 
 
+    if scan_code > 0x1000:
+        # mouse special code
+        key = Key(scan_code = scan_code, is_mouse = True)
+        return key
+
     # Attempt to located the key in our database and return it if successful
     key = g_scan_code_to_key.get((scan_code, is_extended), None)
     if key is not None:
@@ -509,6 +597,8 @@ def key_from_code(scan_code, is_extended):
     virtual_code = _scan_code_to_virtual_code(scan_code, is_extended)
     name = _virtual_input_to_unicode(virtual_code)
 
+
+    
     if virtual_code == 0xFF or name is None:
         logging.getLogger("system").warning(
             f"Invalid scan code specified ({scan_code}, {is_extended})"

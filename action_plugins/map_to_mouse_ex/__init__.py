@@ -12,7 +12,7 @@ from PySide6 import QtCore, QtWidgets
 
 import gremlin.base_profile
 from gremlin.input_types import InputType
-from gremlin.common import MouseButton
+from gremlin.types import MouseButton
 from gremlin.profile import read_bool, safe_read, safe_format
 from gremlin.util import rad2deg
 import gremlin.ui.ui_common
@@ -345,7 +345,7 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _create_mouse_button_ui(self):
         self.mouse_button = gremlin.ui.ui_common.NoKeyboardPushButton(
-            gremlin.common.MouseButton.to_string(self.action_data.button_id)
+            gremlin.types.MouseButton.to_string(self.action_data.button_id)
         )
         self.mouse_button.clicked.connect(self._request_user_input)
 
@@ -358,13 +358,13 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 
         self.mouse_button_widget = QtWidgets.QComboBox()
-        self.mouse_button_widget.addItem("Left (mouse 1)",gremlin.common.MouseButton.Left)
-        self.mouse_button_widget.addItem("Middle (mouse 2)",gremlin.common.MouseButton.Middle)
-        self.mouse_button_widget.addItem("Right (mouse 3)",gremlin.common.MouseButton.Right)
-        self.mouse_button_widget.addItem("Forward (mouse 4)",gremlin.common.MouseButton.Forward)
-        self.mouse_button_widget.addItem("Back (mouse 5)",gremlin.common.MouseButton.Back)
-        self.mouse_button_widget.addItem("Wheel up",gremlin.common.MouseButton.WheelUp)
-        self.mouse_button_widget.addItem("Wheel down",gremlin.common.MouseButton.WheelDown)
+        self.mouse_button_widget.addItem("Left (mouse 1)",gremlin.types.MouseButton.Left)
+        self.mouse_button_widget.addItem("Middle (mouse 2)",gremlin.types.MouseButton.Middle)
+        self.mouse_button_widget.addItem("Right (mouse 3)",gremlin.types.MouseButton.Right)
+        self.mouse_button_widget.addItem("Forward (mouse 4)",gremlin.types.MouseButton.Forward)
+        self.mouse_button_widget.addItem("Back (mouse 5)",gremlin.types.MouseButton.Back)
+        self.mouse_button_widget.addItem("Wheel up",gremlin.types.MouseButton.WheelUp)
+        self.mouse_button_widget.addItem("Wheel down",gremlin.types.MouseButton.WheelDown)
 
 
         # update based on the current data
@@ -441,14 +441,14 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _populate_mouse_button_ui(self):
         self.mouse_button.setText(
-            gremlin.common.MouseButton.to_string(self.action_data.button_id)
+            gremlin.types.MouseButton.to_string(self.action_data.button_id)
         )
 
     def _change_mouse_button_cb(self):
         ''' mouse event drop down selected '''
         self.action_data.button_id = self.mouse_button_widget.currentData()
         self.mouse_button.setText(
-            gremlin.common.MouseButton.to_string(self.action_data.button_id)
+            gremlin.types.MouseButton.to_string(self.action_data.button_id)
         )
 
 
@@ -519,7 +519,7 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _update_mouse_button(self, event):
         self.action_data.button_id = event.identifier
         self.mouse_button.setText(
-            gremlin.common.MouseButton.to_string(self.action_data.button_id)
+            gremlin.types.MouseButton.to_string(self.action_data.button_id)
         )
         # update the drop down
         with QtCore.QSignalBlocker(self.mouse_button_widget):
@@ -917,7 +917,7 @@ class MapToMouseEx(gremlin.base_profile.AbstractAction):
         # Flag whether or not this is mouse motion or button press
         self.motion_input = False
         # Mouse button enum
-        self.button_id = gremlin.common.MouseButton.Left
+        self.button_id = gremlin.types.MouseButton.Left
         # Angle of motion, 0 is up and 90 is right, etc.
         self.direction = 0
         # Minimum motion speed in pixels / sec
@@ -966,14 +966,14 @@ class MapToMouseEx(gremlin.base_profile.AbstractAction):
 
         self.motion_input = read_bool(node, "motion-input", False)
         try:
-            self.button_id = gremlin.common.MouseButton(
+            self.button_id = gremlin.types.MouseButton(
                 safe_read(node, "button-id", int, 1)
             )
         except ValueError as e:
             logging.getLogger("system").warning(
                 f"Invalid mouse identifier in profile: {e:}"
             )
-            self.button_id = gremlin.common.MouseButton.Left
+            self.button_id = gremlin.types.MouseButton.Left
 
         self.direction = safe_read(node, "direction", int, 0)
         self.min_speed = safe_read(node, "min-speed", int, 5)

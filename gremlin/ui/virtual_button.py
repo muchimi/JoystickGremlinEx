@@ -108,7 +108,7 @@ class VirtualAxisButtonWidget(AbstractVirtualButtonWidget):
 
             self.range_layout.addStretch(1)
 
-            self.help_button = QtWidgets.QPushButton(load_icon("gfx/help"), "")
+            self.help_button = QtWidgets.QPushButton(load_icon("gfx/help.png"), "")
             self.help_button.clicked.connect(self._show_hint)
             self.range_layout.addWidget(self.help_button)
 
@@ -200,7 +200,7 @@ class VirtualHatButtonWidget(AbstractVirtualButtonWidget):
 
             self.main_layout.addStretch(1)
 
-            self.help_button = QtWidgets.QPushButton(load_icon("gfx/help"), "")
+            self.help_button = QtWidgets.QPushButton(load_icon("gfx/help.png"), "")
             self.help_button.clicked.connect(self._show_hint)
             self.main_layout.addWidget(self.help_button)
         finally:

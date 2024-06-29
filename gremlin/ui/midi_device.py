@@ -170,6 +170,21 @@ class MidiInputItem():
         Button = 1 # input is marked pressed if the value is in the upper range 
         OnChange = 2 # input triggers pressed on any state change
 
+        @staticmethod
+        def to_string(value):
+            if isinstance(value, int) or isinstance(value, str):
+                value = MidiInputItem.InputMode(value)
+
+            if value == MidiInputItem.InputMode.Axis:
+                return "Axis"
+            if value == MidiInputItem.InputMode.Button:
+                return "Button"
+            if value == MidiInputItem.InputMode.OnChange:
+                return "Change"
+            
+        
+
+
     def __init__(self):
         self.id = uuid.uuid4() # GUID (unique) if loaded from XML - will reload that one
         self._port_name = None
@@ -322,14 +337,7 @@ class MidiInputItem():
             else:
                 stub = f"</b>Unable to decode:</b> {command}"
 
-            if self._mode == MidiInputItem.InputMode.Button:
-                mode_stub = "Button"
-            elif self._mode == MidiInputItem.InputMode.Axis:
-                mode_stub = "Axis"
-            if self._mode == MidiInputItem.InputMode.OnChange:
-                mode_stub = "Change"
-            else:
-                mode_stub = f"Unknown: {self._mode}"
+            mode_stub = MidiInputItem.InputMode.to_string(self._mode)
 
             self._title_name = f"MIDI input ({mode_stub})"
 
@@ -343,9 +351,11 @@ class MidiInputItem():
                 self._message_key = f"{self._port_name} {message.bytes()[0]} {message.bytes()[1]}" # 
                 #self._message_key = f"{self._port_name} {message.bytes()[0]}" # non sysex: get the command byte and the mode
 
+            channel_stub = f"<b>Channel:</b> {self.message.channel}<br/>" if hasattr(self.message,"channel") else ""
+
             self._display_tooltip = f"<b>MIDI Configuration:</b><br/><b>Port:</b> {port_name}<br/>" \
                                     f"<b>Command:</b> {command_display}<br/>" \
-                                    f"<b>Channel:</b> {self.message.channel}<br/>" \
+                                    f"{channel_stub}" \
                                     f"{stub}<br/>" \
                                     f"<b>Mode:<b/>{mode_stub}<br/>" \
                                     f"<b>Bytes (hex):</b> {self.message.hex()}" 
@@ -971,7 +981,6 @@ class MidiInputConfigDialog(QtWidgets.QDialog):
             # sysex message 
             data_str = self._midi_data_widget.text()
             data = byte_string_to_list(data_str)
-
             message = mido.Message("sysex")
             message.data = data
         else:
@@ -1021,6 +1030,7 @@ class MidiInputConfigDialog(QtWidgets.QDialog):
             else:
                 data = self.midi_message.data
                 msg_data = byte_list_to_string(data)
+
                 if not msg_data:
                     msg_data = "None"
                 msg = f"Port: {self.port_name} Cmd: {cmd_s} Data: {msg_data} ({msg_hex})"
@@ -1161,9 +1171,9 @@ class MidiInputConfigDialog(QtWidgets.QDialog):
         command = MidiCommandType.from_mido_type(mido_type)
         if not command:
             return # not a valid type
-        channel = message.channel + 1
-
-        # set the port
+        
+        
+         # set the port
         with QtCore.QSignalBlocker(self._midi_port_selector_widget):
             self._midi_port_selector_widget.setCurrentText(port_name)
 
@@ -1172,13 +1182,10 @@ class MidiInputConfigDialog(QtWidgets.QDialog):
             index = self._midi_command_selector_widget.findData(command)
             self._midi_command_selector_widget.setCurrentIndex(index)        
 
-        # set the channel
-        with QtCore.QSignalBlocker(self._midi_channel_selector_widget):
-            self._midi_channel_selector_widget.setValue(channel)
 
         
-
         if command == MidiCommandType.SysEx:
+
             # grab the sysex data
             data = message.data
             hex = byte_list_to_string(data)
@@ -1186,6 +1193,13 @@ class MidiInputConfigDialog(QtWidgets.QDialog):
             if verbose:
                 logging.getLogger("system").info(f"MIDI: set port: {port_name} cmd: {command} data: {data}")
         else:
+  
+            # set the channel
+            channel = message.channel + 1
+            with QtCore.QSignalBlocker(self._midi_channel_selector_widget):
+                self._midi_channel_selector_widget.setValue(channel)
+
+
             v2 = 0
             if command == MidiCommandType.PitchWheel:
                 # uses a 14 bit value - ensure the control will take it
@@ -1516,7 +1530,7 @@ class MidiDeviceTabWidget(QtWidgets.QWidget):
         
         '''
 
-        widget = gremlin.ui.input_item.InputItemWidget(identifier = identifier, populate_ui = self._populate_input_widget_ui, config_external=True)
+        widget = gremlin.ui.input_item.InputItemWidget(identifier = identifier, populate_ui_callback = self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True)
         input_id = identifier.input_id
         widget.create_action_icons(data)
         widget.update_description(data.description)
@@ -1554,7 +1568,7 @@ class MidiDeviceTabWidget(QtWidgets.QWidget):
         data.input_id.port_name = port_name
         data.input_id.message = message
         data.input_id.mode = mode
-        self.input_item_list_view.redraw()
+        self.input_item_list_view.update_item(index)
         
 
     def _close_item_cb(self, widget, index, data):
@@ -1615,18 +1629,16 @@ class MidiDeviceTabWidget(QtWidgets.QWidget):
         status_widget.setText(status)
         status_widget.setVisible(status is not None)
 
-    def _populate_input_widget_ui(self, input_widget, container_widget):
-        ''' called when a button is created for custom content '''
-        data : MidiInputItem = input_widget.identifier.input_id 
-
+    def _update_input_widget(self, input_widget, container_widget):
+        ''' called when the widget has to update itself on a data change '''
+        data = input_widget.identifier.input_id 
         input_widget.setTitle(data.title_name)
         input_widget.setDescription(data.display_name)
+        input_widget.setToolTip(data.display_tooltip)
 
 
-        status_widget = gremlin.ui.ui_common.QIconLabel()
-        status_widget.setObjectName("status")
+        status_text = ''
         is_warning = False
-        status_text = ""
         if data.message is None:
             is_warning = True
             status_text = "Not configured"
@@ -1636,21 +1648,29 @@ class MidiDeviceTabWidget(QtWidgets.QWidget):
                 status_text += " "
             status_text += f"Invalid port '{data.port_name}'"
         
-      
+       
 
+        status_widget = container_widget.findChild(gremlin.ui.ui_common.QIconLabel, "status")
         if is_warning:
             status_widget.setIcon("fa.warning", use_qta=True, color="red")
         else:
             status_widget.setIcon() # clear it
 
         status_widget.setText(status_text)
+  
 
+    def _populate_input_widget_ui(self, input_widget, container_widget):
+        ''' called when a button is created for custom content '''
+
+        status_widget = gremlin.ui.ui_common.QIconLabel()
+        status_widget.setObjectName("status")
         layout = QtWidgets.QVBoxLayout()
         container_widget.setLayout(layout)
         layout.addWidget(status_widget)
         
-        input_widget.setToolTip(data.display_tooltip)
 
+        self._update_input_widget(input_widget, container_widget)
+                    
         
 
 

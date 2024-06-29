@@ -34,6 +34,7 @@ import gremlin.ui.input_item
 import gremlin.input_devices
 from gremlin.input_devices import VjoyAction
 from gremlin.keyboard import key_from_code, key_from_name
+import gremlin.types
 
 syslog = logging.getLogger("system")
 
@@ -191,7 +192,7 @@ class MacroActionEditor(QtWidgets.QWidget):
         elif value == "Mouse Button":
             self.model.set_entry(
                 gremlin.macro.MouseButtonAction(
-                    gremlin.common.MouseButton.Left,
+                    gremlin.types.MouseButton.Left,
                     True
                 ),
                 self.index.row()
@@ -281,7 +282,7 @@ class MacroActionEditor(QtWidgets.QWidget):
         self.ui_elements["mouse_label"] = QtWidgets.QLabel("Button")
         self.ui_elements["mouse_input"] = \
             gremlin.ui.ui_common.NoKeyboardPushButton(
-                gremlin.common.MouseButton.to_string(action.button)
+                gremlin.types.MouseButton.to_string(action.button)
             )
         self.ui_elements["mouse_input"].clicked.connect(
             lambda: self._request_user_input([InputType.Mouse])
@@ -292,8 +293,8 @@ class MacroActionEditor(QtWidgets.QWidget):
         # Mouse wheel directions cannot be pressed or released, as such they
         # are set to "press" with the inputs disabled
         if action.button in [
-            gremlin.common.MouseButton.WheelDown,
-            gremlin.common.MouseButton.WheelUp
+            gremlin.types.MouseButton.WheelDown,
+            gremlin.types.MouseButton.WheelUp
         ]:
             self.ui_elements["mouse_press"].setChecked(True)
             self.ui_elements["mouse_press"].setEnabled(False)
@@ -800,12 +801,12 @@ class MacroListModel(QtCore.QAbstractListModel):
                 display =  f"{'Press' if entry.is_pressed else 'Release'} key {entry.key.name}"
             elif isinstance(entry, gremlin.macro.MouseButtonAction):
                 if entry.button in [
-                    gremlin.common.MouseButton.WheelDown,
-                    gremlin.common.MouseButton.WheelUp,
+                    gremlin.types.MouseButton.WheelDown,
+                    gremlin.types.MouseButton.WheelUp,
                 ]:
-                    display =  f"{gremlin.common.MouseButton.to_string(entry.button)}"
+                    display =  f"{gremlin.types.MouseButton.to_string(entry.button)}"
                 else:
-                    display =  f"{'Press' if entry.is_pressed else 'Release'} {gremlin.common.MouseButton.to_string(entry.button)} mouse button"
+                    display =  f"{'Press' if entry.is_pressed else 'Release'} {gremlin.types.MouseButton.to_string(entry.button)} mouse button"
             elif isinstance(entry, gremlin.macro.MouseMotionAction):
                 display =  f"Move mouse by x: {entry.dx:d} y: {entry.dy:d}"
             elif isinstance(entry, gremlin.macro.PauseAction):
@@ -1796,7 +1797,7 @@ class Macro(gremlin.base_profile.AbstractAction):
                 self.sequence.append(key_action)
             elif child.tag == "mouse":
                 mouse_action = gremlin.macro.MouseButtonAction(
-                    gremlin.common.MouseButton(safe_read(child, "button", int)),
+                    gremlin.types.MouseButton(safe_read(child, "button", int)),
                     gremlin.profile.parse_bool(child.get("press"))
                 )
                 self.sequence.append(mouse_action)

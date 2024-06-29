@@ -67,13 +67,18 @@ _InputType_to_string_lookup = {
     InputType.JoystickButton: "button",
     InputType.JoystickHat: "hat",
     InputType.Keyboard: "key",
+    InputType.Mouse: "mouse",
+    InputType.VirtualButton: "virtual_button"
 }
 
 _InputType_to_enum_lookup = {
     "axis": InputType.JoystickAxis,
     "button": InputType.JoystickButton,
     "hat": InputType.JoystickHat,
-    "key": InputType.Keyboard
+    "key": InputType.Keyboard,
+    "mouse": InputType.Mouse,
+    "virtual_button": InputType.VirtualButton,
+
 }
 
 
@@ -635,3 +640,62 @@ class ConditionType(enum.Enum):
                 f"Invalid condition operator type: {str(string)}"
             )
         return value
+
+
+
+class MouseButton(enum.Enum):
+
+    """Enumeration of all possible mouse buttons."""
+
+    Left = 1
+    Right = 2
+    Middle = 3
+    Forward = 4
+    Back = 5
+    WheelUp = 10
+    WheelDown = 11
+
+    @staticmethod
+    def to_string(value):
+        try:
+            return _MouseButton_to_string_lookup[value]
+        except KeyError:
+            raise gremlin.error.GremlinError("Invalid type in lookup")
+
+    @staticmethod
+    def to_enum(value):
+        if isinstance(value, int):
+            return MouseButton(value)
+        try:
+            return _MouseButton_to_enum_lookup[value]
+        except KeyError:
+            raise gremlin.error.GremlinError("Invalid type in lookup")
+
+
+_MouseButton_to_string_lookup = {
+    MouseButton.Left: "Mouse Left",
+    MouseButton.Right: "Mouse Right",
+    MouseButton.Middle: "Mouse Middle",
+    MouseButton.Forward: "Mouse Forward",
+    MouseButton.Back: "Mouse Back",
+    MouseButton.WheelUp: "Wheel Up",
+    MouseButton.WheelDown: "Wheel Down",
+}
+
+
+_MouseButton_to_enum_lookup = {
+    "Mouse Left": MouseButton.Left,
+    "Mouse Right": MouseButton.Right,
+    "Mouse Middle": MouseButton.Middle,
+    "Mouse Forward": MouseButton.Forward,
+    "Mouse Back": MouseButton.Back,
+    "Mouse Wheel Up": MouseButton.WheelUp,
+    "Mouse Wheel Down": MouseButton.WheelDown,
+    "Left": MouseButton.Left,
+    "Right": MouseButton.Right,
+    "Middle": MouseButton.Middle,
+    "Forward": MouseButton.Forward,
+    "Back": MouseButton.Back,
+    "Wheel Up": MouseButton.WheelUp,
+    "Wheel Down": MouseButton.WheelDown,    
+}

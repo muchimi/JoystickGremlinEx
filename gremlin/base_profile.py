@@ -547,7 +547,15 @@ class InputItem:
         self.description = ""
         #self._containers = base_classes.TraceableList(callback = self._container_change_cb) # container
         self._containers = []
+        self._selected = False # true if the item is selected
 
+
+    @property
+    def selected(self):
+        return self._selected
+    @selected.setter
+    def selected(self, value):
+        self._selected = value
 
     @property
     def containers(self):
@@ -589,13 +597,8 @@ class InputItem:
             self.input_id = safe_read(node, "id", int)
         self.description = safe_read(node, "description", str)
         self.always_execute = read_bool(node, "always-execute", False)
-        if self.input_type == InputType.Keyboard:
-            scan_code = self.input_id
-            is_extended = read_bool(node, "extended")
-            self.input_id = (scan_code, is_extended)
 
-
-        elif self.input_type in (InputType.KeyboardLatched, InputType.Keyboard):
+        if self.input_type in (InputType.KeyboardLatched, InputType.Keyboard):
             from gremlin.ui.keyboard_device import KeyboardInputItem
             from gremlin.keyboard import Key
             input_item = KeyboardInputItem()
@@ -604,7 +607,8 @@ class InputItem:
             if "extended" in node.attrib:
                 scan_code = self.input_id
                 is_extended = read_bool(node, "extended")
-                key = Key(scan_code=scan_code, is_extended=is_extended)
+                is_mouse = safe_read(node,"mouse", bool, False)
+                key = Key(scan_code=scan_code, is_extended=is_extended, is_mouse = is_mouse)
                 input_item.key = key
                 for child in node:
                     if child.tag == "latched":
@@ -1720,6 +1724,7 @@ class ContainerCallback:
             InputType.JoystickButton,
             InputType.Keyboard,
             InputType.KeyboardLatched,
+            InputType.Mouse,
             InputType.Midi,
             InputType.OpenSoundControl,
             InputType.VirtualButton,

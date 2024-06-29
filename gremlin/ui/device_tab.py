@@ -26,7 +26,7 @@ from gremlin.types import DeviceType
 from gremlin.input_types import InputType
 import gremlin.types
 from . import input_item, ui_common
-
+import gremlin.util
 
 
 class InputItemConfiguration(QtWidgets.QFrame):
@@ -523,6 +523,7 @@ class JoystickDeviceTabWidget(QtWidgets.QWidget):
         self.last_item_data = item_data
 
         # Remove the existing widget, if there is one
+        
         item = self.main_layout.takeAt(1)
         if item is not None and item.widget():
             item.widget().hide()
@@ -539,7 +540,7 @@ class JoystickDeviceTabWidget(QtWidgets.QWidget):
             widget.description_changed.connect(change_cb)
 
         self.main_layout.addWidget(widget)
-            
+
     def set_mode(self, mode):
         ''' changes the mode of the tab '''
 

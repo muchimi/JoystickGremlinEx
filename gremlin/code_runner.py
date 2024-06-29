@@ -177,6 +177,8 @@ class CodeRunner:
                         for input_item in input_items.values():
                             # Only add callbacks for input items that actually
                             # contain actions
+
+                            
                             if len(input_item.containers) == 0:
                                 # no containers = no actions = skip
                                 continue
@@ -270,19 +272,34 @@ class CodeRunner:
 
             # Connect signals
             evt_listener = event_handler.EventListener()
-            
+
+           
+            # hook mouse events
+            evt_listener.mouse_event.connect(
+                self.event_handler.process_event
+            )
+
+            # hook keyboard events
             evt_listener.keyboard_event.connect(
                 self.event_handler.process_event
             )
+
+            # hook joystick input events 
             evt_listener.joystick_event.connect(
                 self.event_handler.process_event
             )
+
+            # hook virtual events
             evt_listener.virtual_event.connect(
                 self.event_handler.process_event
             )
+
+            # hook midi events
             evt_listener.midi_event.connect(
                 self.event_handler.process_event
             )
+
+            # hook osc events
             evt_listener.osc_event.connect(
                 self.event_handler.process_event
             )
@@ -335,6 +352,9 @@ class CodeRunner:
 
             sendinput.MouseController().start()
 
+            # start listen
+            evt_listener.start()
+
             # tell listener profiles are starting
             el = gremlin.event_handler.EventListener()
             el.profile_start.emit()
@@ -350,6 +370,10 @@ class CodeRunner:
         """Stops listening to events and unloads all callbacks."""
 
         el = gremlin.event_handler.EventListener()
+
+        # stop listen
+        el.stop()
+
         el.profile_stop.emit()
 
         # stop midi client
