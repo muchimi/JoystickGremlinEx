@@ -47,6 +47,7 @@ MOUSEEVENTF_MIDDLEDOWN = 0x0020
 MOUSEEVENTF_MIDDLEUP = 0x0040
 MOUSEEVENTF_VIRTUALDESK = 0x4000
 MOUSEEVENTF_WHEEL = 0x0800
+MOUSEEVENTF_HWHEEL = 0x1000
 MOUSEEVENTF_XDOWN = 0x0080
 MOUSEEVENTF_XUP = 0x0100
 
@@ -402,7 +403,15 @@ def mouse_release(button):
 
 
 def mouse_wheel(motion):
+    # vertical mouse wheel
     _send_input(_mouse_input(MOUSEEVENTF_WHEEL, data=-motion*WHEEL_DELTA))
+
+def mouse_h_wheel(motion):
+    # horizontal mouse wheel
+    import logging
+    logging.getLogger("system").info(f"send h wheel direction {motion}")
+    _send_input(_mouse_input(MOUSEEVENTF_HWHEEL, data=-motion*WHEEL_DELTA))
+
 
 
 def _mouse_input(flags, dx=0, dy=0, data=0):

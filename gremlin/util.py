@@ -24,12 +24,11 @@ import re
 import sys
 import threading
 import time
-import distutils
 import shutil
 import uuid
 import dinput
 import qtawesome as qta
-import pathlib
+
 
 from PySide6 import QtCore, QtWidgets, QtGui
 from win32api import GetFileVersionInfo, LOWORD, HIWORD
@@ -432,27 +431,27 @@ def get_dll_version(path, as_string = True):
     return (f_major, f_minor, p_major, p_minor)
 
 
-def get_vjoy_driver_version() -> str:
-    ''' gets the vjoy driver version on the current machine '''
-    import subprocess, sys
-    p = subprocess.Popen(["powershell.exe", 
-                "Get-WmiObject Win32_PnPSignedDriver | select devicename, driverversion | ConvertTo-CSV"], 
-                stdout=subprocess.PIPE,
-                startupinfo=subprocess.STARTUPINFO(dwFlags=subprocess.STARTF_USESHOWWINDOW, wShowWindow=subprocess.SW_HIDE,)
-    )
-    p_out, p_err = p.communicate()
+# def get_vjoy_driver_version() -> str:
+#     ''' gets the vjoy driver version on the current machine '''
+#     import subprocess, sys
+#     p = subprocess.Popen(["powershell.exe", 
+#                 "Get-WmiObject Win32_PnPSignedDriver | select devicename, driverversion | ConvertTo-CSV"], 
+#                 stdout=subprocess.PIPE,
+#                 startupinfo=subprocess.STARTUPINFO(dwFlags=subprocess.STARTF_USESHOWWINDOW, wShowWindow=subprocess.SW_HIDE,)
+#     )
+#     p_out, p_err = p.communicate()
 
-    if not p_out:
-        return None
-    p_out = p_out.decode('ascii').lower() # binary string to regular string
-    # convert to dict
-    for line in p_out.split("\n"):
-        # if "vjoy" in line:
-        #     pass
-        if  "vjoy device" in line:
-            _, version = line.split(",")
-            return version.replace("\r","").replace("\"","")
-    return None    
+#     if not p_out:
+#         return None
+#     p_out = p_out.decode('ascii').lower() # binary string to regular string
+#     # convert to dict
+#     for line in p_out.split("\n"):
+#         # if "vjoy" in line:
+#         #     pass
+#         if  "vjoy device" in line:
+#             _, version = line.split(",")
+#             return version.replace("\r","").replace("\"","")
+#     return None    
 
 def version_valid(v, v_req):
     ''' compares two versions 

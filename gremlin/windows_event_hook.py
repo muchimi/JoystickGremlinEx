@@ -200,18 +200,27 @@ def process_mouse_event(n_code, w_param, l_param):
                 button_id = gremlin.types.MouseButton.Forward
             is_pressed = w_param == WM_XBUTTONDOWN
         elif w_param == WM_MOUSEWHEEL:
-            if (msg.mouseData >> 16) == 120:
+            delta = (msg.mouseData >> 16) / 120
+            if delta == 120:
                 button_id = gremlin.types.MouseButton.WheelUp
-            elif (msg.mouseData >> 16) == 65416:
+            elif delta == 65416:
                 button_id = gremlin.types.MouseButton.WheelDown
+        elif w_param == WM_MOUSEHWHEEL:
+            # horizontal mouse wheel
+            delta = msg.mouseData >> 16
+            if delta == 120:
+                button_id = gremlin.types.MouseButton.WheelRight
+            elif delta == 65416:
+                button_id = gremlin.types.MouseButton.WheelLeft
 
         # if button_id:
         #     logging.getLogger("system").info(f"Mouse button: {button_id}")
 
-        # Create the event and pass it to all all registered callbacks
-        evt = MouseEvent(button_id, is_pressed, False)
-        for cb in g_mouse_callbacks:
-            cb(evt)
+        if button_id:
+            # Create the event and pass it to all all registered callbacks
+            evt = MouseEvent(button_id, is_pressed, False)
+            for cb in g_mouse_callbacks:
+                cb(evt)
 
     # Pass the event on to the next callback in the chain
     return user32.CallNextHookEx(None, n_code, w_param, l_param)

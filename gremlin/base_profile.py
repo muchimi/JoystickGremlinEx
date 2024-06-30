@@ -592,6 +592,8 @@ class InputItem:
         container_node = node # node that holds the container information
         container_plugins = ContainerPlugins()
         container_name_map = container_plugins.tag_map
+        if node.tag == "key":
+            pass
         self.input_type = InputType.to_enum(node.tag)
         if "id" in node.attrib.keys():
             self.input_id = safe_read(node, "id", int)
@@ -801,6 +803,7 @@ class AbstractAction(ProfileData):
 
         self.activation_condition = None
         self._id = None
+        self._action_type = None 
 
     @property
     def hardware_device(self):

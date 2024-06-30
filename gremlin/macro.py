@@ -217,6 +217,15 @@ def _send_mouse_button(button_id, is_pressed, is_local = True, is_remote = False
                     gremlin.sendinput.mouse_wheel(direction)
                 if is_remote:
                     gremlin.input_devices.remote_client.send_mouse_wheel(direction)
+        elif button_id in [MouseButton.WheelLeft, MouseButton.WheelRight]:
+            if is_pressed:
+                direction = -16
+                if button_id == MouseButton.WheelRight:
+                    direction = 16
+                if is_local:
+                    gremlin.sendinput.mouse_h_wheel(direction)
+                if is_remote:
+                    gremlin.input_devices.remote_client.send_mouse_h_wheel(direction)                    
         else:
             if is_pressed:
                 if is_local:

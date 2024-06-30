@@ -535,6 +535,10 @@ def mouse_from_name(name):
         mouse_button = MouseButton.WheelUp
     elif name in ("mouse_down", "wheel_down", MouseButton.to_string(MouseButton.WheelDown).lower()):
         mouse_button = MouseButton.WheelDown
+    elif name in ("mouse_wleft", "wheel_left", MouseButton.to_string(MouseButton.WheelLeft).lower()):
+        mouse_button = MouseButton.WheelLeft
+    elif name in ("mouse_wright", "wheel_right", MouseButton.to_string(MouseButton.WheelRight).lower()):
+        mouse_button = MouseButton.WheelRight
     
     return mouse_button
 

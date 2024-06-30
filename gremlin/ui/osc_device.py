@@ -2851,14 +2851,9 @@ class OscDeviceTabWidget(QtWidgets.QWidget):
         self.current_mode = mode
         self.device_profile.ensure_mode_exists(self.current_mode)
         self.input_item_list_model.mode = mode
-
-        # Remove the existing widget, if there is one
-        item = self.main_layout.takeAt(1)
-        if item is not None and item.widget():
-            item.widget().hide()
-            item.widget().deleteLater()
-        if item:
-            self.main_layout.removeItem(item)
+        self.input_item_list_model.refresh()
+        self.input_item_list_view.redraw()        
+        self.input_item_list_view.select_item(-1)
 
     def mode_changed_cb(self, mode):
         """Handles mode change.

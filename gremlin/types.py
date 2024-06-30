@@ -654,6 +654,8 @@ class MouseButton(enum.Enum):
     Back = 5
     WheelUp = 10
     WheelDown = 11
+    WheelLeft = 12
+    WheelRight = 13
 
     @staticmethod
     def to_string(value):
@@ -680,6 +682,8 @@ _MouseButton_to_string_lookup = {
     MouseButton.Back: "Mouse Back",
     MouseButton.WheelUp: "Wheel Up",
     MouseButton.WheelDown: "Wheel Down",
+    MouseButton.WheelLeft: "Wheel Left",
+    MouseButton.WheelRight: "Wheel Right"
 }
 
 
@@ -697,5 +701,7 @@ _MouseButton_to_enum_lookup = {
     "Forward": MouseButton.Forward,
     "Back": MouseButton.Back,
     "Wheel Up": MouseButton.WheelUp,
-    "Wheel Down": MouseButton.WheelDown,    
+    "Wheel Down": MouseButton.WheelDown, 
+    "Wheel Left": MouseButton.WheelLeft,
+    "Wheel Right": MouseButton.WheelRight   
 }

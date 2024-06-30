@@ -730,7 +730,9 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
             if subtype == "wheel":
                 direction = data["direction"]
                 gremlin.sendinput.mouse_wheel(direction)
-
+            elif subtype == "hwheel":
+                direction = data["direction"]
+                gremlin.sendinput.mouse_h_wheel(direction)
             elif subtype == "button":
                 button_id = data["button"]
                 button = gremlin.sendinput.MouseButton.to_enum(button_id)
@@ -1100,6 +1102,19 @@ class RemoteClient(QtCore.QObject):
             raw_data = msgpack.packb(data)
             self._send(raw_data)
             #syslog.debug(f"remote gremlin event set mouse: wheel {direction}")
+
+    def send_mouse_h_wheel(self, direction, force_remote = False):
+        ''' sends horizontal mousewheel data  '''
+        if self.enabled or force_remote:
+            data = {}
+            data["sender"] = self._id
+            data["action"] = "mouse"
+            data["subtype"] = "hwheel"
+            data["direction"] = direction
+            
+            raw_data = msgpack.packb(data)
+            self._send(raw_data)
+            #syslog.debug(f"remote gremlin event set mouse: wheel {direction}")            
 
     def send_mouse_motion(self, dx, dy, force_remote = False):
         ''' sends mouse motion data '''

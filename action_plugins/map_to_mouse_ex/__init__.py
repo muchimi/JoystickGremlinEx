@@ -710,6 +710,15 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
                     gremlin.sendinput.mouse_wheel(direction)
                 if is_remote:
                     input_devices.remote_client.send_mouse_wheel(direction)
+        elif self.action.button_id in [MouseButton.WheelLeft, MouseButton.WheelRight]:
+            if value.current:
+                direction = -16
+                if self.action.button_id == MouseButton.WheelRight:
+                    direction = 16
+                if is_local:
+                    gremlin.sendinput.mouse_h_wheel(direction)
+                if is_remote:
+                    input_devices.remote_client.send_mouse_h_wheel(direction)                      
         else:
             if self.action.click_mode == MouseClickMode.Normal:
                 if value.current:

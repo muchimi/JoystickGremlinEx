@@ -671,8 +671,14 @@ class InputItemListView(ui_common.AbstractView):
                 index = self.model.event_to_index(event)
 
 
-        
-        widget = self._widget_map[index] if index != -1 else None 
+        if index == -1 and len(self._widget_map) > 0:
+            found_index = 0
+            for i, w in self._widget_map.items():
+                if w.selected:
+                    found_index = i
+                    break
+            index = found_index
+        widget = self._widget_map[index] if index in self._widget_map.keys() else None 
 
         if self._current_index in self._widget_map.keys():
             # prior item was selected

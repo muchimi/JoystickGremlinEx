@@ -300,8 +300,8 @@ class InputKeyboardDialog(QtWidgets.QDialog):
         # list of scancodes  https://handmade.network/forums/articles/t/2823-keyboard_inputs_-_scancodes%252C_raw_input%252C_text_input%252C_key_names
 
         # first row = QUERTY object
-        row_0 = ["","","F13","F14","F15","F16","F17","F18","F19","F20","F21","F22","F23","F24","","mouse_1","mouse_2","mouse_3","","mouse_4","mouse_5","mouse_up","mouse_down"]
-        row_1 = ["Esc","","F1","F2","F3","F4","F5","F6","F7","F8","F9","F10","F11","F12","",["PrtSc","printscreen"],["Scrlck","scrolllock"],["Pause","pause"]]
+        row_0 = ["","","F13","F14","F15","F16","F17","F18","F19","F20","F21","F22","F23","F24","","mouse_1","mouse_2","mouse_3","","mouse_4","mouse_5","wheel_up","wheel_down"]
+        row_1 = ["Esc","","F1","F2","F3","F4","F5","F6","F7","F8","F9","F10","F11","F12","",["PrtSc","printscreen"],["Scrlck","scrolllock"],["Pause","pause"],"","","","wheel_left","wheel_right"]
         row_2 = ["`","1","2","3","4","5","6","7","8","9","0","-","=",["Back","backspace"],"",["Ins","insert"],["Home","home"],["PgUp","pageup"],"",["NumLck","numlock"],["/","npdivide"],["*","npmultiply"],["-","npminus"]]
         row_3 = [["Tab","tab"],"Q","W","E","R","T","Y","U","I","O","P","[","]","\\","",["Del","delete"],"End",["PgDn","pagedown"],"",["7","np7"],["8","np8"],["9","np9"],["+","npplus",1,2]]
         row_4 = [["CapsLck","capslock"],"A","S","D","F","G","H","J","K","L",";","'",["Enter",2],"","","","","",["4","np4"],["5","np5"],["6","np6"]]
@@ -387,12 +387,19 @@ class InputKeyboardDialog(QtWidgets.QDialog):
                     elif key == "mouse_5":
                         key = "M5"
                         icon = "mdi.mouse"
-                    elif key == "mouse_up":
+                    elif key == "wheel_up":
                         key = "MWU"
-                        icon = "mdi.mouse-move-up"
-                    elif key == "mouse_down":
+                        icon = "mdi.mouse"
+                    elif key == "wheel_down":
                         key = "MWD"
-                        icon = "mdi.mouse-move-down"                        
+                        icon = "mdi.mouse"
+                    elif key == "wheel_left":
+                        key = "MWL"
+                        icon = "mdi.mouse"      
+                    elif key == "wheel_right":
+                        key = "MWR"
+                        icon = "mdi.mouse"                                                     
+
                     
                     widget = QKeyWidget(key)
                     if icon:

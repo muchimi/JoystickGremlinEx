@@ -79,7 +79,8 @@ def _get_root_path():
     import os
     if getattr(sys, 'frozen', False):
         # as exe via pyinstallaler
-        application_path = sys._MEIPASS
+        application_path = os.path.dirname(sys.executable)
+        #application_path = sys._MEIPASS
     else:
         #app = QtWidgets.QApplication.instance()
         # application_path = app.applicationDirPath()
