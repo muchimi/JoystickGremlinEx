@@ -86,7 +86,7 @@ class KeyboardCondition(AbstractCondition):
         self.comparison = safe_read(node, "comparison")
         self.scan_code = safe_read(node, "scan-code", int)
         self.is_extended = parse_bool(safe_read(node, "extended"))
-        self.input_item = None
+        input_item = None
         for child in node:
             if child.tag=="input":
                 from gremlin.keyboard import Key
@@ -94,6 +94,7 @@ class KeyboardCondition(AbstractCondition):
                 input_item = KeyboardInputItem()
                 input_item.parse_xml(child)
 
+        
         self.input_item = input_item
 
                 

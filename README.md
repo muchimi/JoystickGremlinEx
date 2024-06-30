@@ -104,7 +104,7 @@ This release adds major new features, including some minor changes in UI functio
 - Revamped keyboard input device and UI with virtual keyboard with mouse input support with multiple latched keys (profiles using the old style should convert automatically to the new style).  Inputs can be added, edited and removed.
 - Revamped keyboard conditions on actions or containers:  a keyboard condition now uses the new virtual keyboard editor and allows for multiple latched keys and mouse button triggers.
 - New MIDI input device - GremlinEx can now map MIDI events. The new MIDI inputs can be added, edited and removed in the MIDI device tab. 
--- New OSC (Open Sound Control) input device - GremlinEx can now map OSC events. The new OSC inputs can be added, edited and removed from the OSC device tab.
+- New OSC (Open Sound Control) input device - GremlinEx can now map OSC events. The new OSC inputs can be added, edited and removed from the OSC device tab.
 - Improved icon reload speed (speeds up the UI load/refresh/update)
 - New file menu for opening Explorer to the current profile folder
 - New file menu for opening the profile XML in a text editor (it will save the profile first)
