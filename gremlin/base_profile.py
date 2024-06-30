@@ -1879,7 +1879,8 @@ class AbstractExecutionGraph(metaclass=ABCMeta):
                     gremlin.actions.KeyboardCondition(
                         condition.scan_code,
                         condition.is_extended,
-                        condition.comparison
+                        condition.comparison, 
+                        condition.input_item
                     )
                 )
             elif isinstance(condition, JoystickCondition):

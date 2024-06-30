@@ -94,6 +94,7 @@ class InputKeyboardDialog(QtWidgets.QDialog):
         self._select_single = select_single
         self._allow_modifiers = allow_modifiers
         self.index = index
+        self._latched_key = None # contains a single primary key latched to all the others
 
         self._modifier_keys = ["leftshift","rightshift","leftalt","rightalt", "leftcontrol","rightcontrol", "leftwin", "rightwin"]
 
@@ -137,6 +138,11 @@ class InputKeyboardDialog(QtWidgets.QDialog):
         self.setLayout(main_layout)
 
         self._set_sequence(sequence)       
+
+    @property
+    def latched_key(self):
+        ''' contains a single key which represents the latched selection in the dialog '''
+        return self._latched_key
 
 
     def _set_sequence(self, sequence):
@@ -238,20 +244,40 @@ class InputKeyboardDialog(QtWidgets.QDialog):
         for key_name in modifiers:
             modifier_map[key_name] = []
 
+        # primary keys
+        primary_keys = []
+        modifier_keys = []
+
+        key : Key
+
         # create output - place modifiers up front
         for key in keys:
             item = (key.scan_code, key.is_extended)
             lookup_name = key.lookup_name
             if lookup_name in modifiers:
                 modifier_map[lookup_name].append(item)
+                modifier_keys.append(key)
             else:
                 data.append(item)
+                primary_keys.append(key)
         sequence = []
         
         for key_name in modifiers:
             sequence.extend(modifier_map[key_name])
         sequence.extend(data)            
         self.sequence = sequence
+
+        # latched key
+        
+        if primary_keys:
+            key = primary_keys[0]
+        else:
+            key = modifier_keys[0]
+
+        latched = [k for k in keys if not k == key]
+        key.latched_keys.extend(latched)
+        self._latched_key = key
+
         self.accept()
         self.close()
         

@@ -58,14 +58,6 @@ class InputIdentifier:
         self._input_id = input_id
         self._device_type = device_type
         self._input_guid = get_guid() # unique internal GUID for this entry
-        self._selected = False
-
-    @property
-    def selected(self):
-        return self._selected
-    @selected.setter
-    def selected(self, value):
-        self._selected = value
 
 
     @property
@@ -188,7 +180,7 @@ class InputItemListModel(ui_common.AbstractModel):
 
         if not index in self._index_map.keys():
             # bad index
-            logging.getLogger("system").error(f"InputItemListModel: bad index request {index} for mode: {self._mode} device: {self._device_data.name}")
+            #logging.getLogger("system").error(f"InputItemListModel: bad index request {index} for mode: {self._mode} device: {self._device_data.name}")
             return None
 
         return self._index_map[index]
@@ -284,16 +276,14 @@ class InputItemListModel(ui_common.AbstractModel):
         else:
             return offset_map[event.event_type] + event.identifier - 1
 
-    def clear(self):
-        ''' removes all input items for keyboard items data if keyboard
-            only keyboard inputs can be removed
-
-        '''
+    def clear(self, input_types):
+        ''' removes all inputs of the specififed type '''
         input_items = self._device_data.modes[self._mode]
-        if InputType.Keyboard in input_items.config:
-            input_items.config[InputType.Keyboard].clear()
-        if InputType.KeyboardLatched in input_items.config:
-            input_items.config[InputType.KeyboardLatched].clear()
+        for input_type in input_types:
+            if input_type in input_items.config:
+                input_items.config[input_type] = {}
+        self._index_map = {}
+        
 
 
 class InputItemListView(ui_common.AbstractView):
@@ -496,7 +486,7 @@ class InputItemListView(ui_common.AbstractView):
 
         if selected_index >= 0:
             # select the item
-            self.select_item(selected_index)
+            self.select_item(selected_index, False)
 
         self.scroll_layout.addStretch()
         self.updated.emit()
@@ -654,7 +644,7 @@ class InputItemListView(ui_common.AbstractView):
             widget.update_display()
 
 
-    def select_item(self, index, emit_signal=True, force = False):
+    def select_item(self, index, emit_signal=True, force = True):
         """Handles selecting a specific item.  this is called whenever an input item is selected
 
         :param index the index of the item being selected
@@ -662,6 +652,10 @@ class InputItemListView(ui_common.AbstractView):
             emitted when the item is being selected
         """
 
+        
+        if index == -1:
+            # always reset things if the index is the clear value of -1
+            force = True
 
         if not force and self._current_index == index:
             return # nothing to do if the current index is the same as the new index
@@ -677,18 +671,19 @@ class InputItemListView(ui_common.AbstractView):
                 index = self.model.event_to_index(event)
 
 
-        widget = self._widget_map[index]
+        
+        widget = self._widget_map[index] if index != -1 else None 
 
-        if self._current_index >= 0:
+        if self._current_index in self._widget_map.keys():
             # prior item was selected
             last_widget = self._widget_map[self._current_index]
-            last_widget.selected = False
-            last_data = self.model.data(self._current_index)
+            with (QtCore.QSignalBlocker(last_widget)):
+                last_widget.selected = False
+            # last_data = self.model.data(self._current_index)
             #logging.getLogger("system").info(f"Deselect widget: index {self._current_index} {last_data.display_name}")
         
 
-        # if the list is long - bring the selected widget into view
-        QtCore.QTimer.singleShot(0, partial(self.scroll_area.ensureWidgetVisible, widget))
+        
 
         # signal the hardware input device changed
         el = gremlin.event_handler.EventListener()
@@ -699,10 +694,15 @@ class InputItemListView(ui_common.AbstractView):
         event.device_input_type = data.input_type if data else None
         event.device_input_id = data.input_id if data else None
         el.profile_device_changed.emit(event)
-
-
         self._current_index = index
-        widget.selected = True
+
+        
+        if widget:
+            # if the list is long - bring the selected widget into view
+            QtCore.QTimer.singleShot(0, partial(self.scroll_area.ensureWidgetVisible, widget))
+            # select it
+            with (QtCore.QSignalBlocker(widget)):
+                widget.selected = True
 
         #logging.getLogger("system").info(f"Select widget: index {index} {data.display_name}")
 
@@ -1079,8 +1079,7 @@ class InputItemWidget(QtWidgets.QFrame):
                 style = "background-color: #E8E8E8; border-width: 6px; ; border-color: #E8E8E8;"
 
             self.label_selected.setStyleSheet(style)
-
-            self.identifier.selected = value
+            self.selected_changed.emit(self.identifier)
 
 
     def setIcon(self, icon_path, use_qta = True):

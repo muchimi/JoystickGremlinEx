@@ -1220,7 +1220,7 @@ class OscClient(QtCore.QObject):
                 if self._verbose:
                     logging.getLogger("system").info(f"OSC: send event: is_pressed: {is_pressed} value: {value} raw value: {raw_value} is axis: {is_axis}")
 
-                self._event_listener.midi_event.emit(
+                self._event_listener.osc_event.emit(
                 gremlin.event_handler.Event(
                     event_type= InputType.OpenSoundControl,
                     device_guid= OscDeviceTabWidget.device_guid,

@@ -1705,7 +1705,7 @@ class OscInterface(QtCore.QObject):
 
     def _osc_message_handler(self, address, *args):
         ''' handles OSC messages'''
-        logging.getLogger("system").info(f"OSC: {address}: {args}")
+        # logging.getLogger("system").info(f"OSC: {address}: {args}")
         address = address.lower()
         self.osc_message.emit(address, args)
      
@@ -2574,13 +2574,13 @@ class OscDeviceTabWidget(QtWidgets.QWidget):
 
         # key clear button
         
-        clear_keyboard_button = ui_common.ConfirmPushButton("Clear Inputs", show_callback = self._show_clear_cb)
+        clear_keyboard_button = ui_common.ConfirmPushButton("Clear OSC Inputs", show_callback = self._show_clear_cb)
         clear_keyboard_button.confirmed.connect(self._clear_inputs_cb)
         button_container_layout.addWidget(clear_keyboard_button)
         button_container_layout.addStretch(1)
 
         # Key add button
-        button = QtWidgets.QPushButton("Add Input")
+        button = QtWidgets.QPushButton("Add OSC Input")
         button.clicked.connect(self._add_input_cb)
 
         button_container_layout.addWidget(button)
@@ -2608,8 +2608,19 @@ class OscDeviceTabWidget(QtWidgets.QWidget):
 
     def _clear_inputs_cb(self):
         ''' clears all input keys '''
-        self.input_item_list_model.clear()
+        self.input_item_list_model.clear(input_types=[InputType.OpenSoundControl])
         self.input_item_list_view.redraw()
+
+        # add a blank input configuration if nothing is selected - the configuration widget is always the second widget of the main layout
+        right_panel = self.main_layout.takeAt(1)
+        if right_panel is not None and right_panel.widget():
+            right_panel.widget().hide()
+            right_panel.widget().deleteLater()
+        if right_panel:
+            self.main_layout.removeItem(right_panel)
+
+        widget = InputItemConfiguration()     
+        self.main_layout.addWidget(widget,3)  
   
     def _add_input_cb(self):
         """Adds a new input to the inputs list  """
@@ -2646,7 +2657,10 @@ class OscDeviceTabWidget(QtWidgets.QWidget):
             # nothing to select
             return 
         
-        item_data = self.input_item_list_model.data(index)
+        
+        with QtCore.QSignalBlocker(self.input_item_list_view):
+            self.input_item_list_view.select_item(index, False)
+        
 
         right_panel = self.main_layout.takeAt(1)
         if right_panel is not None and right_panel.widget():
@@ -2655,6 +2669,7 @@ class OscDeviceTabWidget(QtWidgets.QWidget):
         if right_panel:
             self.main_layout.removeItem(right_panel)
 
+        item_data = self.input_item_list_model.data(index)
         widget = InputItemConfiguration(item_data)
         self.main_layout.addWidget(widget,3)            
 

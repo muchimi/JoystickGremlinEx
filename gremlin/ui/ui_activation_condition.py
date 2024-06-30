@@ -25,6 +25,7 @@ from gremlin.util import load_icon
 import gremlin.base_classes as bc
 from . import ui_common
 from gremlin.base_conditions import *
+import gremlin.keyboard
 
 
 class ActivationConditionWidget(QtWidgets.QWidget):
@@ -188,13 +189,15 @@ class KeyboardConditionWidget(AbstractConditionWidget):
             KeyboardConditionWidget.locked = True
 
             self.key_label = QtWidgets.QLabel("")
-            if self.condition_data.scan_code is not None:
-                self.key_label.setText(
-                    f"<b>{macro.key_from_code(
-                        self.condition_data.scan_code,
-                        self.condition_data.is_extended
-                    ).name}</b>"
-                    )
+            if self.condition_data.input_item:
+                self.key_label.setText(f"<b>{self.condition_data.input_item.display_name}</b>")
+            # if self.condition_data.scan_code is not None:
+            #     self.key_label.setText(
+            #         f"<b>{macro.key_from_code(
+            #             self.condition_data.scan_code,
+            #             self.condition_data.is_extended
+            #         ).name}</b>"
+            #         )
             self.record_button = ui_common.NoKeyboardPushButton(
                 load_icon("gfx/button_edit.png"), ""
             )
@@ -233,13 +236,20 @@ class KeyboardConditionWidget(AbstractConditionWidget):
 
         :param key the key that has been pressed
         """
-        self.condition_data.scan_code = key.identifier[0]
-        self.condition_data.is_extended = key.identifier[1]
+        from gremlin.ui.keyboard_device import KeyboardInputItem
+        input_item = KeyboardInputItem()
+        input_item.key = key
+        self.condition_data.input_item = input_item
+        self.condition_data.scan_code = key.scan_code
+        self.condition_data.is_extended = key.is_extended
+        # self.condition_data.scan_code = key.identifier[0]
+        # self.condition_data.is_extended = key.identifier[1]
         self.condition_data.comparison = \
             self.comparison_dropdown.currentText().lower()
-        self.key_label.setText(
-            f"<b>{macro.key_from_code(self.condition_data.scan_code,self.condition_data.is_extended).name}</b>"
-        )
+        # self.key_label.setText(
+        #     f"<b>{gremlin.keyboard.key_from_code(self.condition_data.scan_code,self.condition_data.is_extended).name}</b>"
+        # )
+        self.key_label.setText(f"<b>{input_item.display_name}</b>")
 
     def _comparison_changed_cb(self, text):
         """Updates the comparison operation to use.
@@ -250,26 +260,44 @@ class KeyboardConditionWidget(AbstractConditionWidget):
 
     def _request_user_input(self):
         """Prompts the user for the input to bind to this item."""
-        self.button_press_dialog = ui_common.InputListenerWidget(
-            self._key_pressed_cb,
-            [InputType.Keyboard],
-            return_kb_event=True,
-            multi_keys=False
-        )
 
-        # Display the dialog centered in the middle of the UI
-        root = self
-        while root.parent():
-            root = root.parent()
-        geom = root.geometry()
+        from gremlin.ui.virtual_keyboard import InputKeyboardDialog
+        sequence = []
+        if self.condition_data.input_item:
+            sequence = self.condition_data.input_item.sequence
+        self._keyboard_dialog = InputKeyboardDialog(sequence = sequence, parent = self, select_single = False, index = -1)
+        self._keyboard_dialog.accepted.connect(self._dialog_ok_cb)
+        self._keyboard_dialog.showNormal()  
 
-        self.button_press_dialog.setGeometry(
-            int(geom.x() + geom.width() / 2 - 150),
-            int(geom.y() + geom.height() / 2 - 75),
-            300,
-            150
-        )
-        self.button_press_dialog.show()
+
+        # self.button_press_dialog = ui_common.InputListenerWidget(
+        #     self._key_pressed_cb,
+        #     [InputType.Keyboard],
+        #     return_kb_event=True,
+        #     multi_keys=False
+        # )
+
+        # # Display the dialog centered in the middle of the UI
+        # root = self
+        # while root.parent():
+        #     root = root.parent()
+        # geom = root.geometry()
+
+        # self.button_press_dialog.setGeometry(
+        #     int(geom.x() + geom.width() / 2 - 150),
+        #     int(geom.y() + geom.height() / 2 - 75),
+        #     300,
+        #     150
+        # )
+        # self.button_press_dialog.show()
+
+    def _dialog_ok_cb(self):
+        ''' callled when the dialog completes '''
+
+        # grab a new data index as this is a new entry
+        self._key_pressed_cb(self._keyboard_dialog.latched_key)
+
+        
 
 
 class JoystickConditionWidget(AbstractConditionWidget):

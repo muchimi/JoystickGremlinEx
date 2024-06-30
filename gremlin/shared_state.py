@@ -25,6 +25,8 @@ parts of the program.
 This is ugly but the only sane way to do this at the moment.
 """
 
+root_path = None # root path
+
 # Flag indicating whether or not input highlighting should be
 # prevented even if it is enabled by the user
 _suspend_input_highlighting = False
@@ -66,3 +68,25 @@ def delayed_input_highlighting_suspension():
             lambda: set_suspend_input_highlighting(False)
     )
     _suspend_timer.start()
+
+
+_icon_path_cache = {}
+
+def _get_root_path():
+    ''' gets the root path of the application '''    
+    import sys
+    import pathlib
+    import os
+    if getattr(sys, 'frozen', False):
+        # as exe via pyinstallaler
+        application_path = sys._MEIPASS
+    else:
+        #app = QtWidgets.QApplication.instance()
+        # application_path = app.applicationDirPath()
+        # as script (because common is a subfolder, return the parent folder)
+        application_path = pathlib.Path(os.path.dirname(__file__)).parent
+    global root_path
+    root_path = application_path
+    return application_path
+
+_get_root_path()

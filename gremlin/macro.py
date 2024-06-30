@@ -201,12 +201,48 @@ def _unicode_to_key(character):
     return gremlin.keyboard.Key(character, scan_code, is_extended, virtual_code)
 
 
+def _send_mouse_button(button_id, is_pressed, is_local = True, is_remote = False, force_remote = False):
+        from gremlin.types import MouseButton
+        import gremlin.sendinput
+        import gremlin.input_devices
+
+        if force_remote:
+            is_remote = True
+        if button_id in [MouseButton.WheelDown, MouseButton.WheelUp]:
+            if is_pressed:
+                direction = -16
+                if button_id == MouseButton.WheelDown:
+                    direction = 16
+                if is_local:
+                    gremlin.sendinput.mouse_wheel(direction)
+                if is_remote:
+                    gremlin.input_devices.remote_client.send_mouse_wheel(direction)
+        else:
+            if is_pressed:
+                if is_local:
+                    gremlin.sendinput.mouse_press(button_id)
+                if is_remote:
+                    gremlin.input_devices.remote_client.send_mouse_button(button_id.value, True)
+            else:
+                if is_local:
+                    gremlin.sendinput.mouse_release(button_id)
+                if is_remote:
+                    gremlin.input_devices.remote_client.send_mouse_button(button_id.value, False)
+
+
 def _send_key_down(key, is_local = True, is_remote = False, force_remote = False):
     """Sends the KEYDOWN event for a single key.
 
     :param key the key for which to send the KEYDOWN event
     """
     
+    if key.is_mouse:
+        # special handling of virtual keys for mouse buttons
+        _send_mouse_button(key.mouse_button, True, is_local, is_remote, force_remote )
+        return
+
+    if force_remote:
+        is_remote = True
     flags = win32con.KEYEVENTF_EXTENDEDKEY if key.is_extended else 0
 
     if is_local:
@@ -218,15 +254,28 @@ def _send_key_down(key, is_local = True, is_remote = False, force_remote = False
 
 def _send_key_up(key, is_local = True, is_remote = False, force_remote = False):
     """Sends the KEYUP event for a single key.
-
     :param key the key for which to send the KEYUP event
     """
+    if key.is_mouse:
+        # special handling of virtual keys for mouse buttons
+        _send_mouse_button(key.mouse_button, False, is_local, is_remote, force_remote )
+        return
+
     flags = win32con.KEYEVENTF_EXTENDEDKEY if key.is_extended else 0
     flags |= win32con.KEYEVENTF_KEYUP
     if is_local:
         win32api.keybd_event(key.virtual_code, key.scan_code, flags, 0)
     if is_remote:
         gremlin.input_devices.remote_client.send_key(key.virtual_code, key.scan_code, flags, force_remote )
+
+def key_from_code(scan_code, is_extended):
+    ''' returns a key from a code '''
+    return gremlin.keyboard.key_from_code(scan_code, is_extended)
+
+def key_from_name(name, validate = False):
+    ''' returns a key from a lookup name '''
+    return gremlin.keyboard.key_from_name(name, validate)
+
 
 
 @SingletonDecorator

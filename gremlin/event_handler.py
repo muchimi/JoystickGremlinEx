@@ -649,8 +649,27 @@ class EventHandler(QtCore.QObject):
 		for device in self.callbacks.values():
 			if new_mode in device:
 				mode_exists = True
+
 		if not mode_exists:
-			logging.getLogger("system").error(
+			for device in self.osc_callbacks.values():
+				if new_mode in device:
+					mode_exists = True
+
+		if not mode_exists:
+			for device in self.midi_callbacks.values():
+				if new_mode in device:
+					mode_exists = True
+
+		if not mode_exists:
+			for device in self.latched_callbacks.values():
+				if new_mode in device:
+					mode_exists = True
+			
+		if not mode_exists:
+			# import gremlin.config
+			# verbose = gremlin.config.Configuration().verbose
+			# if verbose:
+			logging.getLogger("system").warning(
 				f"The mode \"{new_mode}\" does not exist or has no associated callbacks"
 			)
 
@@ -734,6 +753,8 @@ class EventHandler(QtCore.QObject):
 		else:			 
 			# other inputs
 			m_list = self._matching_callbacks(event)
+
+		self._trigger_callbacks(m_list, event)			
 
 
 	def _trigger_callbacks(self, callbacks, event):

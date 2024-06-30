@@ -641,11 +641,6 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
         self.input_type = action.input_type
         self.exec_on_release = action.exec_on_release
         self.action_mode = action.action_mode
-        #syslog.debug(f"Init mouse functor event: {self.action_mode.name} {action.action_id} exec on release: {action.exec_on_release}")
-        # if action.exec_on_release:
-        #     pass
-        
-
     
 
     def process_event(self, event, value):
@@ -710,7 +705,7 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
             if value.current:
                 direction = -16
                 if self.action.button_id == MouseButton.WheelDown:
-                    direction = 1
+                    direction = 16
                 if is_local:
                     gremlin.sendinput.mouse_wheel(direction)
                 if is_remote:

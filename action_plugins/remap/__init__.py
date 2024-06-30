@@ -356,6 +356,7 @@ class Remap(gremlin.base_profile.AbstractAction):
 
         :return icon representing the remap action
         """
+        import gremlin.shared_state
         # Do not return a valid icon if the input id itself is invalid
         if self.vjoy_input_id is None:
             input_string = None
@@ -367,7 +368,7 @@ class Remap(gremlin.base_profile.AbstractAction):
                 input_string = "hat"
         if input_string:
             
-            root_path = get_root_path()
+            root_path = gremlin.shared_state.root_path
             folder = os.path.join(root_path, "action_plugins", "remap")
             icon_file = os.path.join(folder, "gfx", f"icon_{input_string}_{self.vjoy_input_id:03d}.png")
             if os.path.isfile(icon_file):

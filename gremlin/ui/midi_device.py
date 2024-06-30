@@ -438,7 +438,7 @@ class MidiListener(QtCore.QThread):
 
     def _finished(self):
         ''' called when the listener is closed '''
-        logging.getLogger("system").info(f"Midinput: finished")
+        # logging.getLogger("system").info(f"Midinput: finished")
         self.deleteLater()
 
 
@@ -1413,8 +1413,20 @@ class MidiDeviceTabWidget(QtWidgets.QWidget):
 
     def _clear_inputs_cb(self):
         ''' clears all input keys '''
-        self.input_item_list_model.clear()
+        self.input_item_list_model.clear(input_types=[InputType.Midi])
         self.input_item_list_view.redraw()
+        
+        # add a blank input configuration if nothing is selected - the configuration widget is always the second widget of the main layout
+        right_panel = self.main_layout.takeAt(1)
+        if right_panel is not None and right_panel.widget():
+            right_panel.widget().hide()
+            right_panel.widget().deleteLater()
+        if right_panel:
+            self.main_layout.removeItem(right_panel)
+
+        widget = InputItemConfiguration()     
+        self.main_layout.addWidget(widget,3)  
+
 
     def itemAt(self, index):
         ''' returns the input widget at the given index '''

@@ -1299,9 +1299,10 @@ class ConfirmPushButton(QtWidgets.QPushButton):
             result = self.show_callback()
             if not result:
                 return
-            
+        
+        from gremlin.util import load_pixmap
         message_box = QtWidgets.QMessageBox()
-        pixmap = gremlin.common.load_pixmap("warning.svg")
+        pixmap = load_pixmap("warning.svg")
         pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio) 
         message_box.setIconPixmap(pixmap)
         message_box.setText(self.title)

@@ -122,8 +122,9 @@ class ContainerPlugins:
 
     def _discover_plugins(self):
         """Processes known plugin folders for action plugins."""
+        import gremlin.shared_state
         plugin_folder = "container_plugins"
-        root_path = get_root_path()
+        root_path = gremlin.shared_state.root_path
         walk_path = os.path.join(root_path, plugin_folder)
         log_sys(f"Container plugin folder: {walk_path}")
         if not os.path.isdir(walk_path):
@@ -264,8 +265,9 @@ class ActionPlugins:
 
     def _discover_plugins(self):
         """Processes known plugin folders for action plugins."""
+        import gremlin.shared_state
         plugin_folder = "action_plugins"
-        root_path = get_root_path()
+        root_path = gremlin.shared_state.root_path
         walk_path = os.path.join(root_path, plugin_folder)
         log_sys(f"Action plugin folder: {walk_path}")
         if not os.path.isdir(walk_path):

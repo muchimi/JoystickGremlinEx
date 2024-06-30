@@ -48,6 +48,7 @@ import dinput
 
 import gremlin.event_handler 
 import gremlin.config
+import gremlin.shared_state
 from gremlin.types import DeviceType
 from gremlin.util import load_icon, load_pixmap, userprofile_path, find_file, waitCursor, popCursor
 from gremlin.ui.device_tab import JoystickDeviceTabWidget
@@ -56,7 +57,7 @@ from gremlin.ui.midi_device  import MidiDeviceTabWidget
 from gremlin.ui.osc_device import OscDeviceTabWidget
 
 
-from gremlin.util import log_sys_error, log_sys_warn, log_sys, get_root_path
+from gremlin.util import log_sys_error
 
 
 
@@ -111,6 +112,8 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         :param parent the parent of this window
         """
+        
+
         QtWidgets.QMainWindow.__init__(self, parent)
         self.ui = Ui_Gremlin()
         self.ui.setupUi(self)
@@ -118,6 +121,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.device_change_locked = False
 
         self._resize_count = 0
+
+
 
         # Process monitor
         self.process_monitor = gremlin.process_monitor.ProcessMonitor()
@@ -871,7 +876,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         # Menu actions
         from pathlib import Path
 
-        folder = get_root_path()
+        folder = gremlin.shared_state.root_path
         gfx_folder = os.path.join(folder, "gfx")
         if not os.path.isdir(gfx_folder):
             # look for parent
@@ -1676,6 +1681,7 @@ if __name__ == "__main__":
         action="store_true"
     )
     args = parser.parse_args()
+
 
     # Path manging to ensure Gremlin starts independent of the CWD
     sys.path.insert(0, gremlin.util.userprofile_path())

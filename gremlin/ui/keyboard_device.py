@@ -72,8 +72,17 @@ class KeyboardInputItem():
             return (self._key.scan_code, self._key.is_extended)
         return None
     
+    @property
+    def sequence(self):
+        ''' returns a list of (scan_code, extended) tuples for all latched keys in this sequence '''
+        if self._key:
+            return self._key.sequence
+        return []
+    
     def _latched_key_update(self, source, action, index, value):
         self._update()
+
+    
     
     @key.setter
     def key(self, value):
@@ -174,7 +183,7 @@ class KeyboardInputItem():
             child.append(latched_child)
         return node
     
-    def _fix_name(name):
+    def _fix_name(self, name):
         if len(name) == 1:
             return name.upper()
         return name
@@ -359,8 +368,19 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
     def _clear_keys_cb(self):
         ''' clears keyboard input keys '''
 
-        self.input_item_list_model.clear()
+        self.input_item_list_model.clear(input_types=[InputType.Keyboard, InputType.KeyboardLatched])
         self.input_item_list_view.redraw()
+
+        # add a blank input configuration if nothing is selected - the configuration widget is always the second widget of the main layout
+        right_panel = self.main_layout.takeAt(1)
+        if right_panel is not None and right_panel.widget():
+            right_panel.widget().hide()
+            right_panel.widget().deleteLater()
+        if right_panel:
+            self.main_layout.removeItem(right_panel)
+
+        widget = InputItemConfiguration()     
+        self.main_layout.addWidget(widget,3)            
 
     def _add_key_dialog_cb(self):
         ''' display the keyboard input dialog '''
@@ -598,15 +618,8 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         from gremlin.keyboard import Key
         from gremlin.ui.virtual_keyboard import InputKeyboardDialog
 
-
         data = self.model.data(index)
-        key : Key = data.input_id.key
-        sequence = [key.index_tuple()]
-        if data.input_type == InputType.KeyboardLatched:
-            # potentially more than one key
-            lk: Key
-            for lk in key.latched_keys:
-                sequence.append(lk.index_tuple())
+        sequence = data.input_id.sequence
             
         logging.getLogger("system").info(f"Editing index {index} {data.input_id.display_name}")
         self._keyboard_dialog = InputKeyboardDialog(sequence, parent = self, select_single = False, index = index)

@@ -24,6 +24,7 @@ import win32api
 import win32con
 
 from gremlin.base_classes import TraceableList
+from gremlin.types import MouseButton
 
 
 def _create_function(lib_name, fn_name, param_types, return_type):
@@ -116,8 +117,7 @@ class Key:
         :param is_mouse True if the key is a mouse button instead of a key - if set only the name is used
         """
 
-        from gremlin.types import MouseButton
-        
+
         
         lookup_name = None
         if not name:
@@ -130,6 +130,7 @@ class Key:
             is_extended = False
 
 
+        self._mouse_button = None
         if is_mouse or scan_code >= 0x1000:
             if scan_code >= 0x1000:
                 # convert fake scan code to convert to a mouse button
@@ -144,6 +145,7 @@ class Key:
             name = MouseButton.to_string(mouse_button)
             lookup_name = name
             is_mouse = True
+            self._mouse_button = mouse_button
 
             
 
@@ -168,6 +170,33 @@ class Key:
         # self._latched_keys.add_callback(self._changed_cb)
         self._update()
 
+    # duplicate
+    def duplicate(self):
+        '''' creates a copy of this key '''
+        new_key = Key(scan_code = self.scan_code, is_extended=self.is_extended, is_mouse = self.is_mouse)
+        return new_key
+
+    @property
+    def sequence(self):
+        ''' returns a list of (scan_code, extended) tuples for all latched keys in this sequence '''
+        sequence = [self.index_tuple()]
+        lk: Key
+        for lk in self._latched_keys:
+            sequence.append(lk.index_tuple())
+        return sequence
+
+    @property
+    def mouse_button(self) -> MouseButton:
+        ''' returns a mouse button if the key is a virtual mouse button or mouse wheel '''
+        return self._mouse_button
+    
+    @mouse_button.setter
+    def mouse_button(self, button : MouseButton):
+        ''' sets a mouse button '''
+        scan_code = button.value + 0x1000
+        self._mouse_button = button
+        self._is_mouse = True
+        self.scan_code = scan_code
 
     # def _changed_cb(self, owner , action, index, value):
     #     logging.getLogger("system").info(f"Key {self.name} latch change: {action} index: {index} value: {value}")
@@ -583,7 +612,7 @@ def key_from_code(scan_code, is_extended):
     from gremlin import error
 
 
-    if scan_code > 0x1000:
+    if scan_code >= 0x1000:
         # mouse special code
         key = Key(scan_code = scan_code, is_mouse = True)
         return key

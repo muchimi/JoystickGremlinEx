@@ -29,6 +29,7 @@ import shutil
 import uuid
 import dinput
 import qtawesome as qta
+import pathlib
 
 from PySide6 import QtCore, QtWidgets, QtGui
 from win32api import GetFileVersionInfo, LOWORD, HIWORD
@@ -206,16 +207,10 @@ def resource_path(relative_path):
 
     return os.path.normcase(os.path.join(base_path, relative_path))
 
-def get_root_path():
-    ''' gets the root path of the application '''    
-    from pathlib import Path
-    if getattr(sys, 'frozen', False):
-        # as exe via pyinstallaler
-        application_path = sys._MEIPASS
-    else:
-        # as script (because common is a subfolder, return the parent folder)
-        application_path = Path(os.path.dirname(os.path.abspath(__file__))).parent
-    return application_path
+
+
+
+
 
 
 
@@ -505,8 +500,8 @@ def find_file(file_path, root_folder = None):
 
 
     from pathlib import Path
-    from gremlin.util import get_root_path
     from gremlin.config import Configuration
+    import gremlin.shared_state
     verbose = Configuration().verbose
 
     file_path = file_path.lower().replace("/",os.sep)
@@ -514,7 +509,7 @@ def find_file(file_path, root_folder = None):
     folders = []
 
     if not root_folder:
-        root_folder = get_root_path()
+        root_folder = gremlin.shared_state.root_path
     if not os.path.isdir(root_folder):
         return None
     
@@ -568,39 +563,49 @@ def get_icon_path(*paths):
            
         '''
 
-        from gremlin.util import get_root_path
         from gremlin.config import Configuration
         verbose = Configuration().verbose
         
-
+        import gremlin.shared_state
 
         # be aware of runtime environment
-        root_path = get_root_path()
+        root_path = gremlin.shared_state.root_path
         try:
-            the_path = os.path.join(*paths)
+            the_path = os.path.join(*paths).lower()
         except:
             # no path provided
             return None
-        icon_file = os.path.join(root_path, the_path).replace("/",os.sep).lower()
+        
+        if the_path in gremlin.shared_state._icon_path_cache.keys():
+            return gremlin.shared_state._icon_path_cache[the_path]
+
+   
+        # logging.getLogger("system").info(f"icon path: {the_path}  root: {root_path}")        
+        icon_file = os.path.join(root_path, the_path)
+        icon_file = icon_file.replace("/",os.sep).lower()
         if icon_file:
             if os.path.isfile(icon_file):
                 if verbose:
                     logging.getLogger("system").info(f"Icon file (straight) found: {icon_file}")        
+                gremlin.shared_state._icon_path_cache[the_path] = icon_file
                 return icon_file
             if not icon_file.endswith(".png"):
                 icon_file_png = icon_file + ".png"
                 if os.path.isfile(icon_file_png):
                     if verbose:
                         logging.getLogger("system").info(f"Icon file (png) found: {icon_file_png}")        
+                    gremlin.shared_state._icon_path_cache[the_path] = icon_file_png
                     return icon_file_png
             if not icon_file.endswith(".svg"):
                 icon_file_svg = icon_file + ".svg"
                 if os.path.isfile(icon_file_svg):
                     if verbose:
                         logging.getLogger("system").info(f"Icon file (svg) found: {icon_file_svg}")        
+                    gremlin.shared_state._icon_path_cache[the_path] = icon_file_svg
                     return icon_file_svg
             brute_force = find_file(the_path)
             if brute_force and os.path.isfile(brute_force):
+                gremlin.shared_state._icon_path_cache[the_path] = brute_force
                 return brute_force
         
         logging.getLogger("system").error(f"Icon file not found: {icon_file}")
@@ -670,8 +675,8 @@ def load_image(*paths):
 
 def get_generic_icon():
     ''' gets a generic icon'''
-    from gremlin.util import get_root_path
-    root_path = get_root_path()
+    import gremlin.shared_state
+    root_path = gremlin.shared_state.root_path
     generic_icon = os.path.join(root_path, "gfx/generic.png")
     if generic_icon and os.path.isfile(generic_icon):
         pixmap = QtGui.QPixmap(generic_icon)

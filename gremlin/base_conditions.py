@@ -74,6 +74,7 @@ class KeyboardCondition(AbstractCondition):
     def __init__(self):
         """Creates a new instance."""
         super().__init__()
+        self.input_item = None
         self.scan_code = None
         self.is_extended = None
 
@@ -85,6 +86,17 @@ class KeyboardCondition(AbstractCondition):
         self.comparison = safe_read(node, "comparison")
         self.scan_code = safe_read(node, "scan-code", int)
         self.is_extended = parse_bool(safe_read(node, "extended"))
+        self.input_item = None
+        for child in node:
+            if child.tag=="input":
+                from gremlin.keyboard import Key
+                from gremlin.ui.keyboard_device import KeyboardInputItem
+                input_item = KeyboardInputItem()
+                input_item.parse_xml(child)
+
+        self.input_item = input_item
+
+                
 
     def to_xml(self):
         """Returns an XML node containing the objects data.
@@ -97,6 +109,11 @@ class KeyboardCondition(AbstractCondition):
         node.set("comparison", str(self.comparison))
         node.set("scan-code", str(self.scan_code))
         node.set("extended", str(self.is_extended))
+        
+        if self.input_item:
+            child = self.input_item.to_xml()
+            node.append(child)
+
         return node
 
     def is_valid(self):

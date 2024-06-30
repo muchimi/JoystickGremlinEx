@@ -58,7 +58,7 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.action_layout = QtWidgets.QHBoxLayout()
         self.action_widget.setLayout(self.action_layout)
 
-        self.record_button = QtWidgets.QPushButton("Record keys")
+        self.record_button = QtWidgets.QPushButton("Listen")
         self.record_button.clicked.connect(self._record_keys_cb)
 
         self._options_widget = QtWidgets.QWidget()
@@ -68,7 +68,7 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self.rb_press = QtWidgets.QRadioButton("Press")
         self.rb_release = QtWidgets.QRadioButton("Release")
-        self.rb_both = QtWidgets.QRadioButton("Press/Release/Delay")
+        self.rb_both = QtWidgets.QRadioButton("Pulse")
         self.rb_hold = QtWidgets.QRadioButton("Hold")
 
         self.delay_container_widget = QtWidgets.QWidget()
@@ -123,6 +123,7 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.delay_container_layout.addStretch(1)
 
         self.show_keyboard_widget = QtWidgets.QPushButton("Select Keys")
+        self.show_keyboard_widget.setIcon(load_icon("mdi.keyboard-settings-outline"))
         self.show_keyboard_widget.clicked.connect(self._select_keys_cb)
 
         self.action_layout.addWidget(self.record_button)
@@ -137,7 +138,7 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
         
         
         self.main_layout.addStretch(1)
-
+        self._mode_changed() # update UI based on mode
     
     def _select_keys_cb(self):
         ''' display the keyboard input dialog '''
@@ -174,6 +175,7 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.action_modified.emit()
 
     def _mode_changed(self):
+        delay_enabled = False
         if self.rb_press.isChecked():
             mode = MapToKeyboardExMode.Press
         elif self.rb_release.isChecked():
@@ -182,9 +184,12 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
             mode = MapToKeyboardExMode.Hold
         elif self.rb_both.isChecked():
             mode = MapToKeyboardExMode.Both
+            delay_enabled = True
         else:
-            mode = MapToKeyboardExMode.Hold
+            # default
+            mode = MapToKeyboardExMode.Hold 
         self.action_data.mode = mode
+        self.delay_container_widget.setEnabled(delay_enabled)
 
     def _delay_changed(self):
         self.action_data.delay = self.delay_box.value()
@@ -237,14 +242,16 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
         if self.delay < 0:
             self.delay = 0
 
+        # build the macro that will play when the action is called 
+        key: Key
         for key in action.keys:
+            # regular key
             self.press.press(key_from_code(key[0], key[1]))
 
         self.release = gremlin.macro.Macro()
         # Execute release in reverse order
         for key in reversed(action.keys):
-            self.release.release(key_from_code(key[0], key[1]))
-            
+            self.release.release(key_from_code(key[0], key[1]))            
 
         self.delay_press_release = gremlin.macro.Macro()
         # execute press/release with a delay before releasing
@@ -258,6 +265,43 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
         # tell the time delay or release macros to inform us when they are done running
         self.release.completed_callback = self._macro_completed
         self.delay_press_release.completed_callback = self._macro_completed
+
+
+    def _perform_mouse_button(self, button_id):
+        assert self.action.motion_input is False
+        (is_local, is_remote) = self.get_state()
+        if button_id in [MouseButton.WheelDown, MouseButton.WheelUp]:
+            if value.current:
+                direction = -16
+                if self.action.button_id == MouseButton.WheelDown:
+                    direction = 1
+                if is_local:
+                    gremlin.sendinput.mouse_wheel(direction)
+                if is_remote:
+                    input_devices.remote_client.send_mouse_wheel(direction)
+        else:
+            if self.action.click_mode == MouseClickMode.Normal:
+                if value.current:
+                    if is_local:
+                        gremlin.sendinput.mouse_press(self.action.button_id)
+                    if is_remote:
+                        input_devices.remote_client.send_mouse_button(self.action.button_id.value, True)
+                else:
+                    if is_local:
+                        gremlin.sendinput.mouse_release(self.action.button_id)
+                    if is_remote:
+                        input_devices.remote_client.send_mouse_button(self.action.button_id.value, False)
+            elif self.action.click_mode == MouseClickMode.Press:
+                if is_local:
+                    gremlin.sendinput.mouse_press(self.action.button_id)
+                if is_remote:
+                    input_devices.remote_client.send_mouse_button(self.action.button_id.value, True)
+            elif self.action.click_mode == MouseClickMode.Release:
+                if is_local:
+                    gremlin.sendinput.mouse_release(self.action.button_id)
+                if is_remote:
+                    input_devices.remote_client.send_mouse_button(self.action.button_id.value, False)
+
 
     def _macro_completed(self):
         ''' called when a macro is done running '''

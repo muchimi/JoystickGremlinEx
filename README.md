@@ -8,6 +8,9 @@ Joystick Gremlin EX
 <!-- TOC start (generated with https://github.com/derlin/bitdowntoc) -->
 
    * [Changelog](#changelog)
+- [Releases](#releases)
+- [General](#general)
+- [Compatibility](#compatibility)
 - [There be dragons ahead!  ](#there-be-dragons-ahead)
    * [Support](#support)
    * [History](#history)
@@ -24,13 +27,13 @@ Joystick Gremlin EX
 - [Copy/Paste operations](#copypaste-operations)
 - [Devices](#devices)
    * [HID devices](#hid-devices)
-   * [Keyboard device](#keyboard-device)
+   * [Keyboard (+Mouse) device](#keyboard-mouse-device)
+      + [Virtual Keyboard](#virtual-keyboard)
+      + [Latching](#latching)
+      + [Special considerations](#special-considerations)
    * [MIDI device](#midi-device)
       + [MIDI inputs](#midi-inputs)
       + [MIDI trigger modes](#midi-trigger-modes)
-         - [Change](#change)
-         - [Button](#button)
-         - [Axis](#axis)
       + [Changing modes](#changing-modes)
       + [MIDI conflicts](#midi-conflicts)
       + [MIDI ports](#midi-ports)
@@ -38,6 +41,11 @@ Joystick Gremlin EX
       + [Using MIDI from touch surfaces](#using-midi-from-touch-surfaces)
       + [MIDI controllers](#midi-controllers)
       + [MIDI troubleshooting](#midi-troubleshooting)
+   * [OSC device (Open Sound Control)](#osc-device-open-sound-control)
+      + [OSC port](#osc-port)
+      + [OSC inputs](#osc-inputs)
+         - [OSC Trigger modes](#osc-trigger-modes)
+      + [Changing modes](#changing-modes-1)
 - [VJoyRemap action ](#vjoyremap-action)
    * [VJoyRemap button press actions](#vjoyremap-button-press-actions)
    * [VJoyRemap axis mapping actions](#vjoyremap-axis-mapping-actions)
@@ -48,7 +56,7 @@ Joystick Gremlin EX
       + [Ranges](#ranges)
       + [Include/exclude flag](#includeexclude-flag)
       + [Symmetry](#symmetry)
-      + [Latching](#latching)
+      + [Latching](#latching-1)
       + [Dragons](#dragons-1)
 - [Button Container](#button-container)
       + [Usage tips](#usage-tips)
@@ -90,17 +98,18 @@ Joystick Gremlin EX
 
 13.40.14ex
 
-- Revamped keyboard input device and UI with virtual keyboard and mouse input support with multiple latched keys (profiles using the old style should convert automatically to the new style)
-- New MIDI input device - GremlinEx can listen to MIDI events.  See MIDI section below.
+This release adds major new features, including some minor changes in UI functionality, and a few more QOL (quality of life).
+
+- New virtual keyboard dialog to simplify key and mouse button selection. The updated editor supports hidden keys such as F13 to F24 and enables mouse buttons to be used as any "key" input to simplify mapping.
+- Revamped keyboard input device and UI with virtual keyboard with mouse input support with multiple latched keys (profiles using the old style should convert automatically to the new style).  Inputs can be added, edited and removed.
+- Revamped keyboard conditions on actions or containers:  a keyboard condition now uses the new virtual keyboard editor and allows for multiple latched keys and mouse button triggers.
+- New MIDI input device - GremlinEx can now map MIDI events. The new MIDI inputs can be added, edited and removed in the MIDI device tab. 
+-- New OSC (Open Sound Control) input device - GremlinEx can now map OSC events. The new OSC inputs can be added, edited and removed from the OSC device tab.
+- Improved icon reload speed (speeds up the UI load/refresh/update)
 - New file menu for opening Explorer to the current profile folder
 - New file menu for opening the profile XML in a text editor (it will save the profile first)
-
-- New keystroke editor in map to keyboard ex: allows to select keys and sequence using the mouse and adds support for F13 to F24 keys.
-
 - New mouse event drop down selector in map to mouse ex: adds a mouse event selection drop down so mouse actions can be selected by name rather than mouse input only.  
-
 - Action container will now scroll horizontally if the action is too wide to fit based on windows size / UI scaling options.
-
 - Profiles can be saved even if one or more actions are not configured (QOL enhancement).
 
 6/6/24 - 13.40.13ex (h) **potentially breaking change**
@@ -151,12 +160,14 @@ Introduction
 
 ------------
 
+<!-- TOC --><a name="releases"></a>
 # Releases
 
 Releases, including pre-releases can be found [here on GitHub](https://github.com/muchimi/JoystickGremlinEx/releases).  Be aware the release version may not be the most up to date as GitHub hides pre-releases by default.
 
 Pre-releases are mostly (proposed) bug fixes but also can contain work-in-progress items and
 
+<!-- TOC --><a name="general"></a>
 # General
 
 GremlinEx started as a fork of the excellent original Gremlin project by WhiteMagic.  For general original Joystick Gremlin documentation - consult https://whitemagic.github.io/JoystickGremlin/
@@ -184,6 +195,7 @@ I suggest you make VjoyRemap the default action in the options panel as this plu
 
 This said, the default plugins are all functional but they won't be aware of the new features in GremlinEx.
 
+<!-- TOC --><a name="compatibility"></a>
 # Compatibility
 
 GremlinEx will load original Gremlin profiles and copy them to a new profile folder called *Joystick Gremlin Ex*.  Profiles saved with GremlinEx may however not be compatible with the original.
@@ -398,13 +410,14 @@ If the persist option is not checked, GremlinEx will use whatever data is in the
 
 GremlinEx will show all detected game controllers in tabs located at the top of the UI.  These are the raw input devices, either buttons, hats or axes.
 
-<!-- TOC --><a name="keyboard-device"></a>
+<!-- TOC --><a name="keyboard-mouse-device"></a>
 ## Keyboard (+Mouse) device
 
 GremlinEx has an updated special Keyboard device that allows you to map keyboard and mouse button as inputs to trigger actions and containers. 
 
 GremlinEx allows you to map unusual function keys F13 to F24 and any QWERTY keyboard layouts (no support for other layouts as of yet), as well as mouse input buttons including mouse wheel actions. 
 
+<!-- TOC --><a name="virtual-keyboard"></a>
 ### Virtual Keyboard
 
 For input simplicity, GremlinEx now uses a virtual keyboard to show which keys are used for the input selected.  It is still possible to listen to keys using the listen button (currently this will only capture keys, mouse buttons will be ignored).
@@ -413,13 +426,12 @@ For input simplicity, GremlinEx now uses a virtual keyboard to show which keys a
 ![](virtual_keyboard.png)
 
 
-The virtual keyboard is the same used in map to keyboard Ex.
 
-
-Localization is on the to-do list, however GremlinEx uses scan-codes under the hood so any keyboard will work until localization is able to display the correct key layout for the current keyboard in use.
+Currently only US layout (QWERTY) is supported.  Localization is on the to-do list, however GremlinEx uses scan-codes (physical keys) on the keyboard so what the key actually says doesn't matter. I do plan to add localization that is correct for the current locale setting at some point so the dialog displays the correct key layout for the current keyboard in use.
 
 Keyboard inputs can be added, removed and edited.  If an input is removed, it will remove any associated mappings and display a warning box to this effect.
 
+<!-- TOC --><a name="latching"></a>
 ### Latching
 
 GremlinEx allows multiple keys to be latched as a single trigger.  The trigger will fire if all the keys in the latched set are pressed concurrently.  The order does not matter.
@@ -428,6 +440,7 @@ Each selected key shows highlighted in the virtual keyboard.
 
 There are no guardrails provided - and GremlinEx does not prevent the output application from seeing the keys and buttons pressed to trigger a GremlinEx action.  When mapping to a game use care to employ key combinations that make sense and do not conflict with one another.
 
+<!-- TOC --><a name="special-considerations"></a>
 ### Special considerations
 
 Some actions, like mouse wheel presses, do not have a release associated with them (there is no event fired to "stop" the mouse wheel).  When mapping to an output, be aware that the output should be pulsed or otherwise handled if you expect such triggers to be momentary.  For example, if mapping a wheel event to a joystick button, use the pulse mode unless you want the button to stay pressed.
@@ -516,6 +529,7 @@ The majority of issues will come from messages not being recognized by GremlinEx
 There are some tools that let you visualize what MIDI messages the computer is receiving such as [MidiOx](http://www.midiox.com/), and older but tried and true MIDI diagnostics tool, or something like [Hexler Protokol](https://hexler.net/protokol).  Both utilities are free.  It's always a good idea to verify the MIDI signaling is functional outside of GremlinEx to verify the machine is seeing messages.  If GremlinEx cannot "listen" to a message via the listen buttons, it cannot see it.
 
 
+<!-- TOC --><a name="osc-device-open-sound-control"></a>
 ## OSC device (Open Sound Control)
 
 GremlinEx, as of 13.40.14ex, can map OSC messages and use those to trigger actions.  OSC is generally much easier to setup and program than MIDI.  For more info on OSC, visit 
@@ -524,6 +538,7 @@ Unlike hardware devices, OSC inputs must be user defined and added to tell Greml
 
 OSC messages must consist of a text part, example  /this_is_my_test_fader followed by a numeric value (float or int).   Extra parameters are currently ignored, but can be provided without error.
 
+<!-- TOC --><a name="osc-port"></a>
 ### OSC port
 
 OSC uses a UDP port to listen on the network for OSC messages.  The default port is 8000 for receiving, and 8001 for sending.   The port can be configured by your OSC utility, just make sure GremlinEx listens on the correct port for messages.  The output port is not used by GremlinEx currently except to configure the OSC client. The output port is always 1 above the input port, so 8001 if the default 8000 input port is used. If you are using a firewall, make sure the port is configured to receive.
@@ -533,11 +548,12 @@ The port is configured in options.
 The host is auto-configured to the current IP of the machine. Currently, that IP cannot be localhost (127.0.0.1).  This makes sense because any OSC input device will typically run on a separate host, and thus the GremlinEx machine needs to have network connectivity.
 
 
-<!-- TOC --><a name="midi-inputs"></a>
+<!-- TOC --><a name="osc-inputs"></a>
 ### OSC inputs
 
 All OSC inputs must be unique or a warning will be triggered in the UI.  An input maps to a specific message type.  In the current release, OSC inputs support the following input modes:
 
+<!-- TOC --><a name="osc-trigger-modes"></a>
 #### OSC Trigger modes
 
 
@@ -566,7 +582,7 @@ A typical OSC command will thus be /my_command_1, number  where number is:
 
 
 
-<!-- TOC --><a name="changing-modes"></a>
+<!-- TOC --><a name="changing-modes-1"></a>
 ### Changing modes
 
 If an input already has mapping containers attached, GremlinEx will prevent switching from an axis mode to a button/change mode and vice versa.  This is because containers and actions, when added to an input, are tailored to the type of input it is, and it's not possible to change it after the fact to avoid mapping problems and odd behaviors.
@@ -706,7 +722,7 @@ Each bracket can include or exclude the value.  Think of it as greater than, ver
 The symmetry option applies the opposite bracket as the trigger.  So if the bracket is (0.9 to 1.0), in symmetry mode the bracket (-1, -0.9) will also trigger if the axis is in that range.
 
 
-<!-- TOC --><a name="latching"></a>
+<!-- TOC --><a name="latching-1"></a>
 ### Latching
 
 The range container is latched - meaning that this special container is aware of other range containers in the execution graph.  The latching is automatic and ensures that when the axis is moved to a different position, prior active ranges reset so can re-trigger when the axis moves into their range again, so the container has to be aware of other ranges.
@@ -1026,5 +1042,7 @@ If you want to run from the source code, you will need the following python pack
 	msgpack
 	reportlab
 	dill
+	mido
+	python-rtpmidi
 
 

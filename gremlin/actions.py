@@ -162,7 +162,7 @@ class KeyboardCondition(AbstractCondition):
     particular key is pressed or released.
     """
 
-    def __init__(self, scan_code, is_extended, comparison):
+    def __init__(self, scan_code, is_extended, comparison, input_item = None):
         """Creates a new instance.
 
         :param scan_code the scan code of the key to evaluate
@@ -170,7 +170,15 @@ class KeyboardCondition(AbstractCondition):
         :param comparison the comparison operation to perform when evaluated
         """
         super().__init__(comparison)
-        self.key = gremlin.macro.key_from_code(scan_code, is_extended)
+        from gremlin.ui.keyboard_device import KeyboardInputItem
+         
+        if not input_item:
+            input_item = KeyboardInputItem()
+            key = gremlin.macro.key_from_code(scan_code, is_extended)
+            input_item.key = key
+
+        self.input_item = input_item
+       
 
     def __call__(self, event, value):
         """Evaluates the condition using the condition and provided data.
@@ -179,7 +187,8 @@ class KeyboardCondition(AbstractCondition):
         :param value the possibly modified value
         :return True if the condition is satisfied, False otherwise
         """
-        key_pressed = gremlin.input_devices.Keyboard().is_pressed(self.key)
+        # key_pressed = gremlin.input_devices.Keyboard().is_pressed(self.key)
+        key_pressed = self.input_item.latched
         if self.comparison == "pressed":
             return key_pressed
         else:
