@@ -1081,20 +1081,25 @@ class InputListenerWidget(QtWidgets.QFrame):
         """
         super().__init__(parent)
         from gremlin.shared_state import set_suspend_input_highlighting
+        from gremlin.keyboard import key_from_code, key_from_name
 
         self.callback = callback
         self._event_types = event_types
         self._return_kb_event = return_kb_event
         self._multi_keys = multi_keys
         self.filter_func = filter_func
-
-        self._abort_timer = threading.Timer(1.0, self.close)
+        self._aborting = False
+        self._closing = False
+        self._abort_timer = threading.Timer(1.0, self._abort_request)
         self._multi_key_storage = []
+
+        self._close_on_key = not (InputType.Keyboard in event_types or InputType.KeyboardLatched in event_types)
+        self._esc_key = key_from_name("esc")
 
         # Create and configure the ui overlay
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.main_layout.addWidget(
-            QtWidgets.QLabel(f"""<center>Please press the desired {self._valid_event_types_string()}.<br/><br/>Hold ESC for one second to abort.</center>""")
+            QtWidgets.QLabel(f"""<center>Please press the desired {self._valid_event_types_string()}.<br/><br/>Hold ESC{'' if self._close_on_key else ' for one second'} to abort.</center>""")
         )
 
         self.setWindowModality(QtCore.Qt.ApplicationModal)
@@ -1118,6 +1123,7 @@ class InputListenerWidget(QtWidgets.QFrame):
             gremlin.windows_event_hook.MouseHook().start()
             event_listener.mouse_event.connect(self._mouse_event_cb)
 
+
     def _joy_event_cb(self, event):
         """Passes the pressed joystick event to the provided callback
         and closes the overlay.
@@ -1137,8 +1143,7 @@ class InputListenerWidget(QtWidgets.QFrame):
             return
 
         # Ensure the event corresponds to a significant enough change in input
-        process_event = gremlin.input_devices.JoystickInputSignificant() \
-            .should_process(event)
+        process_event = gremlin.input_devices.JoystickInputSignificant().should_process(event)
         if event.event_type == InputType.JoystickButton:
             process_event &= not event.is_pressed
 
@@ -1155,17 +1160,23 @@ class InputListenerWidget(QtWidgets.QFrame):
         the keypress event to be processed
         """
 
+        if self._aborting:
+            self.close()
+
         from gremlin.keyboard import key_from_code, key_from_name
         key = key_from_code(
                 event.identifier[0],
                 event.identifier[1]
         )
 
-
+        if self._close_on_key:
+            if key == self._esc_key:
+                self.close()
+            return # ignore keys otherwise
 
         # Return immediately once the first key press is detected
         if not self._multi_keys:
-            if event.is_pressed and key == key_from_name("esc"):
+            if event.is_pressed and key == self._esc_key:
                 if not self._abort_timer.is_alive():
                     self._abort_timer.start()
             elif not event.is_pressed and \
@@ -1184,26 +1195,36 @@ class InputListenerWidget(QtWidgets.QFrame):
                         self._multi_key_storage.append(key)
                     else:
                         self._multi_key_storage.append(event)
-                if key == key_from_name("esc"):
+                if key == self._esc_key:
                     # Start a timer and close if it expires, aborting the
                     # user input request
                     if not self._abort_timer.is_alive():
                         self._abort_timer.start()
             else:
+                
                 self._abort_timer.cancel()
-                self.callback(self._multi_key_storage)
+                if not self._aborting:
+                    self.callback(self._multi_key_storage)
                 self.close()
 
         # Ensure the timer is cancelled and reset in case the ESC is released
         # and we're not looking to return keyboard events
-        if key == key_from_name("esc") and not event.is_pressed:
+        if key == self._esc_key and not event.is_pressed:
             self._abort_timer.cancel()
-            self._abort_timer = threading.Timer(1.0, self.close)
+            self._abort_timer = threading.Timer(1.0, self._abort_request)
 
     def _mouse_event_cb(self, event):
         self.callback(event)
         self.close()
 
+    def _abort_request(self):
+        import time
+        self._aborting = True
+        if self._abort_timer.is_alive():
+            self._abort_timer.cancel()
+            time.sleep(0.1)
+
+    
     def closeEvent(self, evt):
         """Closes the overlay window."""
         event_listener = gremlin.event_handler.EventListener()
@@ -1214,7 +1235,6 @@ class InputListenerWidget(QtWidgets.QFrame):
             event_listener.joystick_event.disconnect(self._joy_event_cb)
         elif InputType.Mouse in self._event_types:
             event_listener.mouse_event.disconnect(self._mouse_event_cb)
-
         # Stop mouse hook in case it is running
         gremlin.windows_event_hook.MouseHook().stop()
 

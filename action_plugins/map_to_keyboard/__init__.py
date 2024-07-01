@@ -56,7 +56,7 @@ class MapToKeyboardWidget(gremlin.ui.input_item.AbstractActionWidget):
         text = "<b>Current key combination:</b> "
         names = []
         for key in self.action_data.keys:
-            names.append(key_from_code(*key).name)
+            names.append(key_from_code(key[0],key[1]).name)
         text += " + ".join(names)
 
         self.key_combination.setText(text)

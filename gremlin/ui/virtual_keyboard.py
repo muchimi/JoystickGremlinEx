@@ -154,6 +154,10 @@ class InputKeyboardDialog(QtWidgets.QDialog):
                 widget.selected = False
 
             for item in sequence:
+                if item in self._key_map.keys():
+                    key_name = self._key_map[item]
+                    widget = self._key_widget_map[key_name]
+                    widget.selected = True
                 if isinstance(item, Key):
                     key_name = self._key_map[item.index_tuple()]
                     widget = self._key_widget_map[key_name]
@@ -193,6 +197,7 @@ class InputKeyboardDialog(QtWidgets.QDialog):
         )
 
         self.button_press_dialog.show()
+        
 
     def _add_keyboard_listener_key_cb(self, keys):
         """Adds the provided key to the list of keys.

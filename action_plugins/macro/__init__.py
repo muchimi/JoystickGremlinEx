@@ -671,7 +671,7 @@ class MacroActionEditor(QtWidgets.QWidget):
         :param event the event containing information about the key to use
         """
         self.model.get_entry(self.index.row()).key = \
-            key_from_code(*event.identifier)
+            key_from_code(event.identifier[0],event.identifier[1])
         self._update_model()
         gremlin.ui.ui_common.clear_layout(self.action_layout)
         self.ui_elements = {}

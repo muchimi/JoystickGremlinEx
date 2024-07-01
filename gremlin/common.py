@@ -145,7 +145,7 @@ def input_to_ui_string(input_type, input_id):
         if isinstance(input_id, gremlin.keyboard.Key):
             return  key_from_code(input_id.scan_code, input_id.is_extended).name
         
-        return key_from_code(*input_id).name
+        return key_from_code(input_id[0],input_id[1]).name
     else:
         return f"{InputType.to_string(input_type).capitalize()} {input_id}"
 

@@ -387,7 +387,9 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         from gremlin.ui.virtual_keyboard import InputKeyboardDialog
         self._keyboard_dialog = InputKeyboardDialog(parent = self, select_single = False, index = -1)
         self._keyboard_dialog.accepted.connect(self._dialog_ok_cb)
+        self._keyboard_dialog.setModal(True)
         self._keyboard_dialog.showNormal()  
+        
 
 
 
@@ -621,7 +623,9 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         logging.getLogger("system").info(f"Editing index {index} {data.input_id.display_name}")
         self._keyboard_dialog = InputKeyboardDialog(sequence, parent = self, select_single = False, index = index)
         self._keyboard_dialog.accepted.connect(self._dialog_ok_cb)
+        self._keyboard_dialog.setModal(True)
         self._keyboard_dialog.showNormal()        
+        
 
 
 
