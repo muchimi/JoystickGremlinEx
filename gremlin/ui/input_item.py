@@ -17,7 +17,6 @@
 
 import enum
 from PySide6 import QtWidgets, QtCore, QtGui
-import copy
 
 import gremlin
 import gremlin.ui.midi_device
