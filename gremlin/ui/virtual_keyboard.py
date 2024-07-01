@@ -276,11 +276,14 @@ class InputKeyboardDialog(QtWidgets.QDialog):
         
         if primary_keys:
             key = primary_keys[0]
-        else:
+        elif modifier_keys:
             key = modifier_keys[0]
+        else:
+            key = None
 
-        latched = [k for k in keys if not k == key]
-        key.latched_keys.extend(latched)
+        if key:
+            latched = [k for k in keys if not k == key]
+            key.latched_keys.extend(latched)
         self._latched_key = key
 
         self.accept()

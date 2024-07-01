@@ -166,7 +166,7 @@ class ContainerPlugins:
         ''' duplicates a container '''
         # because containers can be quite complex - we'll just generate the xml and change IDs as needed and reload
         # into a new container of the same type
-        from gremlin.base_classes import AbstractContainer
+        from gremlin.base_profile import AbstractContainer
         assert isinstance(container, AbstractContainer),"Invalid container data for duplicate()"
         container_item = copy.deepcopy(container)
 
