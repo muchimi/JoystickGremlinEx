@@ -167,12 +167,13 @@ class ContainerPlugins:
         # because containers can be quite complex - we'll just generate the xml and change IDs as needed and reload
         # into a new container of the same type
         from gremlin.base_profile import AbstractContainer
+        from gremlin.util import get_guid()
         assert isinstance(container, AbstractContainer),"Invalid container data for duplicate()"
         container_item = copy.deepcopy(container)
 
         for action_set in container_item.get_action_sets():
             for action in action_set:
-                action.action_id = common.get_guid()
+                action.action_id = get_guid()
         
         return container_item
 
@@ -298,7 +299,8 @@ class ActionPlugins:
 
     def duplicate(self, action):
         ''' duplicates an action and gives it a unique ID '''
+        from gremlin.util import get_guid
         dup = copy.deepcopy(action)
-        dup.action_id = common.get_guid()
+        dup.action_id = get_guid()
         return dup
     
