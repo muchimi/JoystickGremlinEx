@@ -1051,6 +1051,7 @@ class Profile():
         self.plugins = []
         self.settings = Settings(self)
         self.parent = parent
+        self.start_mode = None # startup mode for this profile
 
     def initialize_joystick_device(self, device, modes):
         """Ensures a joystick is properly initialized in the profile.
@@ -1122,7 +1123,18 @@ class Profile():
             for mode_name, mode in device.modes.items():
                 if mode.inherit is None:
                     root_modes.append(mode_name)
-        return list(set(root_modes))
+        return list(set(root_modes))  # unduplicated
+    
+    def get_modes(self):
+        ''' get all profile modes '''
+        modes = []
+        for device in self.devices.values():
+            if device.type != DeviceType.Keyboard:
+                continue
+            for mode_name, mode in device.modes.items():
+                modes.append(mode_name)
+        return list(set(modes))  # unduplicated
+        
 
     def list_unused_vjoy_inputs(self):
         """Returns a list of unused vjoy inputs for the given profile.
@@ -1196,11 +1208,16 @@ class Profile():
         tree = ElementTree.parse(fname)
         root = tree.getroot()
 
+        self._start_mode = None
+        if "start_mode" in root.attrib:
+            self._start_mode = root.get("start_mode")
+
         # Parse each device into separate DeviceConfiguration objects
         for child in root.iter("device"):
             device = Device(self)
             device.from_xml(child)
             self.devices[device.device_guid] = device
+
 
         # Parse each vjoy device into separate DeviceConfiguration objects
         for child in root.iter("vjoy-device"):
@@ -1252,7 +1269,17 @@ class Profile():
             plugin.from_xml(child)
             self.plugins.append(plugin)
 
+        if not self._start_mode:
+            # use a default mode
+            self._start_mode = self.get_default_mode()
+
         return profile_was_updated
+    
+    def get_default_mode(self):
+        ''' gets the default mode for this profile '''
+        modes = self.get_root_modes()
+        if modes:
+            return modes[0]
 
     def to_xml(self, fname):
         """Generates XML code corresponding to this profile.
@@ -1262,6 +1289,7 @@ class Profile():
         # Generate XML document
         root = ElementTree.Element("profile")
         root.set("version", str(gremlin.profile.ProfileConverter.current_version))
+        root.set("start_mode", self._start_mode)
 
         # Device settings
         devices = ElementTree.Element("devices")
@@ -1404,6 +1432,21 @@ class Profile():
             }
 
         return entry
+
+    def get_start_mode(self):
+        ''' gets the start mode for this profile '''
+        mode = self._start_mode
+        # verify the mode is in the mode list
+        modes = self.get_modes()
+        if not mode in modes:
+            mode = modes[0]
+            self._start_mode = mode
+        return self._start_mode
+    
+    def set_start_mode(self, value):
+        ''' sets the start up mode '''
+        self._start_mode = value
+
 
 
 

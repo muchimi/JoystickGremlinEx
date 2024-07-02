@@ -47,6 +47,7 @@ class PreviousModeFunctor(gremlin.base_profile.AbstractFunctor):
         super().__init__(action)
 
     def process_event(self, event, value):
+        import gremlin.control_action
         gremlin.control_action.switch_to_previous_mode()
         return True
 

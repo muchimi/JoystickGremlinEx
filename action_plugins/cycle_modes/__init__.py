@@ -134,9 +134,11 @@ class CycleModesFunctor(gremlin.base_profile.AbstractFunctor):
 
     def __init__(self, action):
         super().__init__(action)
+        import gremlin.control_action
         self.mode_list = gremlin.control_action.ModeList(action.mode_list)
 
     def process_event(self, event, value):
+        import gremlin.control_action
         gremlin.control_action.cycle_modes(self.mode_list)
         return True
 

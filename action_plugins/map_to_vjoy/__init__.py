@@ -1756,7 +1756,7 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
                 #r_min, r_max = usage_data.get_range(self.vjoy_device_id, self.vjoy_input_id)
                 if value.current >= r_min and value.current <= r_max:
                     # axis in range
-                    print (f"In range {value.current}")
+                    # print (f"In range {value.current}")
                     if not event.is_pressed:
                         if is_local:
                             joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = True

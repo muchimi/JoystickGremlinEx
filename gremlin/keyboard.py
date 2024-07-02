@@ -638,11 +638,12 @@ def key_from_code(scan_code, is_extended):
     
     if virtual_code == 0xFF or name is None:
         logging.getLogger("system").warning(
-            f"Invalid scan code specified ({scan_code}, {is_extended})"
+            f"Invalid scan code specified ({scan_code} (0x{scan_code:x}), {is_extended})"
         )
-        raise error.KeyboardError(
-            f"Invalid scan code specified ({scan_code}, {is_extended})"
-        )
+        # raise error.KeyboardError(
+        #     f"Invalid scan code specified ({scan_code}, {is_extended})"
+        # )
+        return None
     else:
         key = Key(name, scan_code, is_extended, virtual_code)
         g_scan_code_to_key[(scan_code, is_extended)] = key

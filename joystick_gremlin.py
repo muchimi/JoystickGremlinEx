@@ -86,8 +86,10 @@ from gremlin.ui.midi_device import MidiDeviceTabWidget
 from gremlin.ui.osc_device import OscDeviceTabWidget
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.14ex (f)"
+APPLICATION_VERSION = "13.40.14ex (g)"
 
+# the main ui
+ui = None
 
 from gremlin.singleton_decorator import SingletonDecorator
 
@@ -1345,6 +1347,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             if profile_updated:
                 self._profile.to_xml(fname)
 
+
         except (KeyError, TypeError) as error:
             # An error occurred while parsing an existing profile,
             # creating an empty profile instead
@@ -1664,6 +1667,7 @@ def exception_hook(exception_type, value, trace):
     gremlin.util.display_error(msg)
 
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -1793,6 +1797,8 @@ if __name__ == "__main__":
 
     # Create Gremlin UI
     ui = GremlinUi()
+
+    gremlin.shared_state.ui = ui
     
     syslog.info("Gremlin UI created")
 
@@ -1828,4 +1834,3 @@ if __name__ == "__main__":
 
 
 
-    

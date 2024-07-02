@@ -26,6 +26,7 @@ import gremlin.profile
 import gremlin.ui.input_item
 
 
+
 class SwitchModeWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     """Widget which allows the configuration of a mode to switch to."""
@@ -57,6 +58,7 @@ class SwitchModeFunctor(gremlin.base_profile.AbstractFunctor):
         self.mode_name = action.mode_name
 
     def process_event(self, event, value):
+        import gremlin.control_action
         gremlin.control_action.switch_mode(self.mode_name)
         return True
 
@@ -69,12 +71,12 @@ class SwitchMode(gremlin.base_profile.AbstractAction):
     tag = "switch-mode"
 
     default_button_activation = (True, False)
-    input_types = [
-        InputType.JoystickAxis,
-        InputType.JoystickButton,
-        InputType.JoystickHat,
-        InputType.Keyboard
-    ]
+    # input_types = [
+    #     InputType.JoystickAxis,
+    #     InputType.JoystickButton,
+    #     InputType.JoystickHat,
+    #     InputType.Keyboard
+    # ]
 
     functor = SwitchModeFunctor
     widget = SwitchModeWidget

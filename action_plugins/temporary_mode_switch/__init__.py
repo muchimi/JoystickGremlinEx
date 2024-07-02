@@ -57,6 +57,7 @@ class TemporaryModeSwitchFunctor(gremlin.base_profile.AbstractFunctor):
         self.mode_name = action.mode_name
 
     def process_event(self, event, value):
+        import gremlin.control_action
         gremlin.input_devices.ButtonReleaseActions().register_callback(
             gremlin.control_action.switch_to_previous_mode,
             event

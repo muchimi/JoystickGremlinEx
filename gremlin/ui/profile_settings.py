@@ -19,6 +19,7 @@
 from PySide6 import QtCore, QtWidgets
 
 import gremlin.joystick_handling
+import gremlin.shared_state
 import gremlin.ui.ui_common
 
 
@@ -184,11 +185,12 @@ class DefaultModeSelector(QtWidgets.QGroupBox):
         self.setTitle("Startup Mode")
 
         self.dropdown = QtWidgets.QComboBox()
-        self.dropdown.addItem("Use Heuristic")
+        # self.dropdown.addItem("Use Heuristic")
         for mode in gremlin.profile.mode_list(self.profile_data):
             self.dropdown.addItem(mode)
-        if self.profile_data.startup_mode:
-            self.dropdown.setCurrentText(self.profile_data.startup_mode)
+        start_mode = gremlin.shared_state.current_profile.get_start_mode()
+        if start_mode:
+            self.dropdown.setCurrentText(start_mode)
         self.dropdown.currentIndexChanged.connect(self._update_cb)
 
         self.main_layout.addWidget(self.dropdown)
@@ -199,10 +201,8 @@ class DefaultModeSelector(QtWidgets.QGroupBox):
 
         :param index the index of the entry selected
         """
-        if index == 0:
-            self.profile_data.startup_mode = None
-        else:
-            self.profile_data.startup_mode = self.dropdown.currentText()
+        mode = self.dropdown.currentText()
+        gremlin.shared_state.current_profile.set_start_mode(mode)
 
 
 class VJoyAxisDefaultsWidget(QtWidgets.QWidget):

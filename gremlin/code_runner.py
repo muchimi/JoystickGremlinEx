@@ -30,6 +30,7 @@ from gremlin import event_handler, input_devices, \
     joystick_handling, macro, sendinput, user_plugin, util
 import gremlin.config
 from gremlin.input_types import InputType
+import gremlin.shared_state
 import gremlin.types
 import gremlin.plugin_manager
 import vjoy as vjoy_module
@@ -85,10 +86,10 @@ class CodeRunner:
 
         # Check if we want to override the start mode as determined by the
         # heuristic
-        if settings.startup_mode is not None:
-            if settings.startup_mode in gremlin.profile.mode_list(profile):
-                start_mode = settings.startup_mode
 
+        start_mode = gremlin.shared_state.current_profile.get_start_mode()
+        logging.getLogger("system").info(f"Startup mode: {start_mode}")
+        
         # Set default macro action delay
         gremlin.macro.MacroManager().default_delay = settings.default_delay
 
@@ -217,6 +218,10 @@ class CodeRunner:
                                         cb_data.callback,
                                         input_item.always_execute
                                     )
+
+                            verbose = gremlin.config.Configuration().verbose
+                            if verbose:
+                                self.event_handler.dump_callbacks()
 
             # Create merge axis callbacks
             for entry in profile.merge_axes:

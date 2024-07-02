@@ -102,6 +102,8 @@ class KeyboardInputItem():
         ''' true if all the keys in this input are latched '''
         if not self._key:
             return False
+        if self._key.scan_code == 56:
+            pass
         return self._key.latched
 
 
@@ -229,6 +231,9 @@ class KeyboardInputItem():
         self._display_name = display_name
         self._display_tooltip = display_name
 
+    def to_string(self):
+        return f"KeyboardInputItem: pair: {self.key_tuple} name: {self._display_name}"
+
     @property
     def name(self):
         ''' display name - can be a compound key '''
@@ -263,7 +268,7 @@ class KeyboardInputItem():
         return self._display_name > other._display_name
     
     def __str__(self):
-        return self._display_name
+        return self.to_string()
             
 
 

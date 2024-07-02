@@ -230,6 +230,26 @@ class Configuration:
         :return name of the mode if present, None otherwise
         """
         return self._data["last_mode"].get(profile_path, None)
+    
+    def set_start_mode(self, profile_path, mode_name):
+        """Stores the last active mode of the given profile.
+
+        :param profile_path profile path for which to store the mode
+        :param mode_name name of the active mode
+        """
+        if profile_path is None or mode_name is None:
+            return
+        self._data["start_mode"][profile_path] = mode_name
+        self.save()
+
+    def get_start_mode(self, profile_path):
+        """Returns the last active mode of the given profile.
+
+        :param profile_path profile path for which to return the mode
+        :return name of the mode if present, None otherwise
+        """
+        return self._data["start_mode"].get(profile_path, None)
+
 
     def _has_profile(self, exec_path):
         """Returns whether or not a profile exists for a given executable.

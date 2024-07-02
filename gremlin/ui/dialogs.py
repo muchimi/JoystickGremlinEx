@@ -30,10 +30,12 @@ from PySide6.QtWidgets import QMessageBox
 from gremlin.clipboard import Clipboard
 import gremlin.config
 import gremlin.joystick_handling
+import gremlin.shared_state
 from . import ui_about, ui_common
 from gremlin.util import load_icon
 import logging
 from gremlin.input_types import InputType
+import gremlin.base_profile
 
 class OptionsUi(ui_common.BaseDialogUi):
 
@@ -992,6 +994,7 @@ class ModeManagerUi(ui_common.BaseDialogUi):
         self.mode_rename = {}
         self.mode_delete = {}
         self.mode_callbacks = {}
+        self.mode_default = None # default startup mode
 
         # Obtain mode names and the mode they inherit from
         mode_list = self._get_mode_list()
@@ -1000,6 +1003,8 @@ class ModeManagerUi(ui_common.BaseDialogUi):
         self.mode_layout.addWidget(QtWidgets.QLabel("<b>Name</b>"), 0, 0)
         self.mode_layout.addWidget(QtWidgets.QLabel("<b>Parent</b>"), 0, 1)
 
+        self.mode_default_selector = QtWidgets.QComboBox()
+
         # Create UI element for each mode
         row = 1
         for mode, inherit in sorted(mode_list.items()):
@@ -1007,9 +1012,12 @@ class ModeManagerUi(ui_common.BaseDialogUi):
             self.mode_dropdowns[mode] = QtWidgets.QComboBox()
             self.mode_dropdowns[mode].addItem("None")
             self.mode_dropdowns[mode].setMinimumContentsLength(20)
+            self.mode_default_selector.addItem(mode)
             for name in sorted(mode_list.keys()):
                 if name != mode:
                     self.mode_dropdowns[mode].addItem(name)
+                
+                
 
             self.mode_callbacks[mode] = self._create_inheritance_change_cb(mode)
             self.mode_dropdowns[mode].currentTextChanged.connect(
@@ -1019,7 +1027,7 @@ class ModeManagerUi(ui_common.BaseDialogUi):
 
             # Rename mode button
             self.mode_rename[mode] = QtWidgets.QPushButton(
-                load_icon("gfx","button_edit.png"), ""
+                load_icon("button_edit.png"), ""
             )
             self.mode_layout.addWidget(self.mode_rename[mode], row, 2)
             self.mode_rename[mode].clicked.connect(
@@ -1027,7 +1035,7 @@ class ModeManagerUi(ui_common.BaseDialogUi):
             )
             # Delete mode button
             self.mode_delete[mode] = QtWidgets.QPushButton(
-                load_icon("gfx","mode_delete.svg"), ""
+                load_icon("mode_delete.svg"), ""
             )
             self.mode_layout.addWidget(self.mode_delete[mode], row, 3)
             self.mode_delete[mode].clicked.connect(
@@ -1036,6 +1044,23 @@ class ModeManagerUi(ui_common.BaseDialogUi):
 
             self.mode_layout.addWidget(self.mode_dropdowns[mode], row, 1)
             row += 1
+
+        # add the default mode selector
+        self.container_default_widget = QtWidgets.QWidget()
+        self.container_default_layout = QtWidgets.QHBoxLayout()
+        self.container_default_widget.setLayout(self.container_default_layout)
+
+        self.container_default_layout.addWidget(QtWidgets.QLabel("Profile start mode:"))
+        self.container_default_layout.addWidget(self.mode_default_selector)
+        self.container_default_layout.addStretch()
+        self.mode_layout.addWidget(self.container_default_widget, row, 0, 1, -1)
+        row += 1
+
+
+        mode = gremlin.shared_state.current_profile.get_start_mode()
+        self.mode_default_selector.setCurrentText(mode)
+        self.mode_default_selector.currentIndexChanged.connect(self._change_default_mode_cb)
+
 
     def _create_inheritance_change_cb(self, mode):
         """Returns a lambda function callback to change the inheritance of
@@ -1135,6 +1160,10 @@ class ModeManagerUi(ui_common.BaseDialogUi):
                         if mode.inherit == mode_name:
                             mode.inherit = name
 
+                # rename the startup mode if it's the same
+                if mode_name == gremlin.shared_state.current_profile.get_start_mode():
+                    gremlin.shared_state.current_profile.set_start_mode(name)
+
                 self.modes_changed.emit()
 
             self._populate_mode_layout()
@@ -1190,12 +1219,17 @@ class ModeManagerUi(ui_common.BaseDialogUi):
                 )
             else:
                 for device in self._profile.devices.values():
-                    new_mode = gremlin.profile.Mode(device)
+                    new_mode = gremlin.base_profile.Mode(device)
                     new_mode.name = name
                     device.modes[name] = new_mode
                 self.modes_changed.emit()
 
             self._populate_mode_layout()
+
+    def _change_default_mode_cb(self, index):
+        ''' occurs when the default mode is changed '''
+        mode = self.mode_default_selector.currentText()
+        gremlin.shared_state.current_profile.set_start_mode(mode)
 
 
 class DeviceInformationUi(ui_common.BaseDialogUi):

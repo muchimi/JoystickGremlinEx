@@ -151,6 +151,8 @@ def process_keyboard_event(n_code, w_param, l_param):
         is_pressed = w_param in [0x0100, 0x0104]
         is_injected = msg.flags is not None and bool(msg.flags & 0x0010)
 
+        #print (f"{scan_code} (0x{scan_code:x}) ext: {is_extended} pressed: {is_pressed}")
+
         # A scan code of 541 indicates AltGr being pressed. AltGr is sent
         # as a combination of RAlt + RCtrl to the system and as such
         # generates two key events, one for RAlt and one for RCtrl. The

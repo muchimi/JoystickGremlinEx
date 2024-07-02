@@ -24,7 +24,6 @@ import gremlin.base_profile
 from gremlin.input_types import InputType
 import gremlin.ui.input_item
 
-
 class PauseActionWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     """Widget for the pause action."""
@@ -47,6 +46,7 @@ class PauseActionFunctor(gremlin.base_profile.AbstractFunctor):
         super().__init__(action)
 
     def process_event(self, event, value):
+        import gremlin.control_action
         gremlin.control_action.pause()
         return True
 

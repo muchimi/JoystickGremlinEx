@@ -494,6 +494,17 @@ class EventHandler(QtCore.QObject):
 		if plugin.keyword not in self.plugins:
 			self.plugins[plugin.keyword] = plugin
 
+	def dump_callbacks(self):
+		# dump latched events
+		import gremlin.ui.keyboard_device
+		for device_guid in self.latched_events.keys():
+			for mode in self.latched_events[device_guid].keys():
+				for key_pair in self.latched_events[device_guid][mode]:
+					identifier = self.latched_events[device_guid][mode][key_pair]
+					if isinstance(identifier, gremlin.ui.keyboard_device.KeyboardInputItem):
+						print (f"Device ID: {device_guid} mode: {mode} pair: {key_pair} data: {identifier.to_string()}")
+
+
 
 	def add_callback(self, device_guid, mode, event, callback, permanent=False):
 		"""Installs the provided callback for the given event.
@@ -507,6 +518,8 @@ class EventHandler(QtCore.QObject):
 		:param permanent if True the callback is always active even
 			if the system is paused
 		"""
+		import gremlin.config
+		verbose = gremlin.config.Configuration().verbose
 		if event:
 			if event.event_type in (InputType.Keyboard, InputType.KeyboardLatched):
 				# keyboard latched event
@@ -530,7 +543,9 @@ class EventHandler(QtCore.QObject):
 					if index not in self.latched_events[device_guid][mode].keys():
 						self.latched_events[device_guid][mode][index] = []
 					self.latched_events[device_guid][mode][index].append(identifier)
-					#logging.getLogger("system").info(f"Key latch registered: {index} {key.name} -> {identifier.display_name}")
+					if verbose:
+						logging.getLogger("system").info(f"Key latch registered: guid {device_guid}  mode:  {mode} index: {index} name: {key.name} -> {identifier.display_name}")
+					
 
 				if device_guid not in self.latched_callbacks.keys():
 					self.latched_callbacks[device_guid] = {}
@@ -587,6 +602,8 @@ class EventHandler(QtCore.QObject):
 		if not event.event_type in (InputType.Keyboard, InputType.KeyboardLatched, InputType.Mouse):
 			# not a keyboard event
 			return []
+		import gremlin.config
+		verbose = gremlin.config.Configuration().verbose
 		# convert mouse events to keyboard event
 		if event.event_type == InputType.Mouse:
 			from gremlin.ui.keyboard_device import KeyboardDeviceTabWidget
@@ -599,14 +616,29 @@ class EventHandler(QtCore.QObject):
 			device_guid = event.device_guid
 			identifier = event.identifier  # this is (scan_code, is_extended)
 
+		#found = False
+		#print (f"looking for:  {identifier} mode: {self._active_mode}")
 		if device_guid in self.latched_events:
-			data = self.latched_events[event.device_guid].get(self._active_mode, {})
-			index = identifier
-			keys = data.get(index,[])
-			# logging.getLogger("system").info(f"event matching: {identifier} -> found {len(keys)} matching callback events")
-			# for key in keys:
-			# 	logging.getLogger("system").info(f"event: {key.name} latched: {key.latched}")
-			return keys
+			#print (f"found guid: {device_guid}")
+			data = self.latched_events[event.device_guid]
+			if self._active_mode in data.keys():
+				#print (f"found mode {self._active_mode}")
+				data = data[self._active_mode]
+				if identifier in data.keys():
+					#print ("found identifier")
+					keys = data[identifier]
+					#found = True
+					if verbose:
+						logging.getLogger("system").info(f"event matching: {identifier} -> found {len(keys)} matching callback events")	
+						for key in keys:
+							logging.getLogger("system").info(f"event: {key.name} latched: {key.latched}")
+
+					return keys
+			# if not found:
+			# 	print (f"did not find index {identifier} - available keys are:")
+			# 	self.dump_callbacks()
+			
+			
 		return []		
 	
 
@@ -680,6 +712,8 @@ class EventHandler(QtCore.QObject):
 			cfg = config.Configuration()
 			cfg.set_last_mode(cfg.last_profile, new_mode)
 
+			logging.getLogger("system").info(f"Mode switch to: {new_mode}")
+
 			self._active_mode = new_mode
 			self.mode_changed.emit(self._active_mode)
 
@@ -714,35 +748,41 @@ class EventHandler(QtCore.QObject):
 		"""
 
 		from gremlin.util import display_error
+		import gremlin.config
 
 		# list of callbacks
 		m_list = []
 
+		verbose = gremlin.config.Configuration().verbose
+
 		# filter latched keyboard or mouse events
 		if event.event_type in (InputType.Keyboard, InputType.KeyboardLatched, InputType.Mouse):
-			identifiers = self._matching_event_keys(event)  # returns list of primary keys
-			# if event.event_type == InputType.Mouse:
-			# 	key = Key(scan_code = event.identifier.value, is_extended = False) # the key for this key event	
-			# else:
-			# 	key = Key(scan_code = event.identifier[0], is_extended=event.identifier[1]) # the key for this key event
-			if identifiers:
-				# logging.getLogger("system").info(f"Matched keys for event {event} keys: {len(identifiers)} --------------------------")
-				for identifier in identifiers:
+
+			# print (f"process event: {event}")
+			keys = self._matching_event_keys(event)  # returns list of primary keys
+			if keys:
+				if verbose:
+					logging.getLogger("system").info(f"Matched keys for event {event} keys: {len(keys)} ")
+				for key in keys:
 					latch_key = None
-					is_latched = identifier.latched
+					is_latched = key.latched
 					if event.is_pressed:
-						# logging.getLogger("system").info(f"KEY PRESSED: {key.name} -> latched {is_latched}")
 						if is_latched: 
-							latch_key = identifier.key
+							latch_key = key.key
+						if verbose:
+							logging.getLogger("system").info(f"KEY PRESSED: {key.key.name} -> latched {is_latched}")
+
 					else:
 						# any key in the latch sequence that isn't pressed breaks the press
 						if not is_latched:
-							latch_key = identifier.key
-							# logging.getLogger("system").info(f"KEY RELEASED: {key.name}")
+							latch_key = key.key
+							if verbose:
+								logging.getLogger("system").info(f"KEY RELEASED: {latch_key.name}")
 									
 					if latch_key:
 						m_list = self._matching_latched_callbacks(event, latch_key)
-						# logging.getLogger("system").info(f"Found latched key: Check key {latch_key.name} callbacks: {len(m_list)} event: {event}")
+						if verbose and m_list:
+							logging.getLogger("system").info(f"Found latched key: Check key {latch_key.name} callbacks: {len(m_list)} event: {event}")
 						self._trigger_callbacks(m_list, event)
 			return
 						

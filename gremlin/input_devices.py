@@ -612,10 +612,10 @@ class ModeChangeRegistry():
         :return new callback with plugins installed
         """
         signature = inspect.signature(callback).parameters
-        print ("Signature:")
-        for item in signature:
-            print(item)
-        print("End signature")
+        # print ("Signature:")
+        # for item in signature:
+        #     print(item)
+        # print("End signature")
         partial_fn = functools.partial
         if "self" in signature:
             partial_fn = functools.partialmethod

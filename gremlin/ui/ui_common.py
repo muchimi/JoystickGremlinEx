@@ -26,6 +26,7 @@ import gremlin.error
 import qtawesome as qta
 from gremlin.input_types import InputType
 from  gremlin.clipboard import Clipboard
+import gremlin.joystick_handling
 import gremlin.types
 from gremlin.util import load_pixmap
 
@@ -1027,6 +1028,7 @@ class ModeWidget(QtWidgets.QWidget):
     def _create_widget(self):
         """Creates the mode selection and management dialog."""
         # Size policies used
+        from gremlin.util import load_icon
         min_min_sp = QtWidgets.QSizePolicy(
             QtWidgets.QSizePolicy.Minimum,
             QtWidgets.QSizePolicy.Minimum
@@ -1043,6 +1045,12 @@ class ModeWidget(QtWidgets.QWidget):
         self.selector.setSizePolicy(exp_min_sp)
         self.selector.setMinimumContentsLength(20)
 
+        # add the mode change button
+        self.mode_change = QtWidgets.QPushButton()
+        self.mode_change.setIcon(load_icon("manage_modes.svg"))
+        self.mode_change.setToolTip("Manage Modes")
+        self.mode_change.clicked.connect(self._manage_modes_cb)
+
         # Connect signal
         self.selector.currentIndexChanged.connect(self._mode_changed_cb)
 
@@ -1050,6 +1058,13 @@ class ModeWidget(QtWidgets.QWidget):
         self.main_layout.addStretch(10)
         self.main_layout.addWidget(self.label)
         self.main_layout.addWidget(self.selector)
+        self.main_layout.addWidget(self.mode_change)
+
+    def _manage_modes_cb(self):
+        ''' calls up the mode change dialog '''
+        import gremlin.shared_state
+        ui = gremlin.shared_state.ui
+        ui.manage_modes()
 
 
 class InputListenerWidget(QtWidgets.QFrame):
