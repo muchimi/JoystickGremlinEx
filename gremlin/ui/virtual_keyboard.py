@@ -283,7 +283,10 @@ class InputKeyboardDialog(QtWidgets.QDialog):
 
         if key:
             latched = [k for k in keys if not k == key]
-            key.latched_keys.extend(latched)
+            latched = list(set(latched)) # remove any duplicates
+            key.latched_keys = latched
+
+        
         self._latched_key = key
 
         self.accept()

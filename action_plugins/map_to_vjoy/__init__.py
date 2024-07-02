@@ -1255,15 +1255,9 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             h_box.setAlignment(QtCore.Qt.AlignCenter)
             cb = QtWidgets.QRadioButton()
 
-            # wire the radio check
-            #cb.clicked.connect(self._select_changed)
-
             self.button_group.addButton(cb)
             self.button_group.setId(cb, id)
-            # if id == input_id:
-            #     cb.setChecked(True)
-            #     self.active_id = id
-            #     self.usage_state.set_state(device_id,'button',id,True)
+ 
             name = str(id)
             h_box.addWidget(cb)
             v_box.addWidget(h_cont)
@@ -1279,6 +1273,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             icon_lbl = QtWidgets.QLabel()
             
             lbl = QtWidgets.QLabel(name)
+            lbl.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
             
 
             self.icon_map[id] = icon_lbl
@@ -1562,22 +1557,12 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
     
     def _populate_grid(self, device_id, button_id):
         ''' updates the usage grid based on current VJOY mappings '''
-        icon_path = os.path.join("action_plugins","map_to_vjoy")
-        unused_path = os.path.join(icon_path, "unused.png")
-        used_path = os.path.join(icon_path, "used.png")
-        # used_icon = load_icon(used_path)
-        # unused_icon = load_icon(unused_path)
-        used_pixmap = QtGui.QPixmap(used_path)
-        unused_pixmap = QtGui.QPixmap(unused_path)
-        
-
-        # self.usage_state.free_inputs
+        used_pixmap = load_pixmap("used.png")
+        unused_pixmap = load_pixmap("unused.png")
 
         for cb in self.button_group.buttons():
             id = self.button_group.id(cb)
-            
-            # ctrl = self.icon_map[id]
-            # ctrl.setPixmap(unused_pixmap if id in free_buttons else used_pixmap)
+
             if id == button_id:
                 with QtCore.QSignalBlocker(cb):
                     cb.setChecked(True)

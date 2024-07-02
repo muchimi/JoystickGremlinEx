@@ -1538,9 +1538,12 @@ class MidiDeviceTabWidget(QtWidgets.QWidget):
         '''
 
         widget = gremlin.ui.input_item.InputItemWidget(identifier = identifier, populate_ui_callback = self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True)
-        input_id = identifier.input_id
+        input_id : MidiInputItem = identifier.input_id
         widget.create_action_icons(data)
-        widget.update_description(data.description)
+        widget.setTitle(input_id.title_name)
+        widget.setInputDescription(input_id.display_name)
+        widget.setDescription(data.description)
+        # widget.setIcon("mdi.midi")
         widget.enable_close()
         widget.enable_edit()
         mode = input_id.mode
@@ -1627,55 +1630,53 @@ class MidiDeviceTabWidget(QtWidgets.QWidget):
 
     def _set_status(self, widget, icon = None, status = None, use_qta = True, color = None):
         ''' sets the status of an input widget '''
-        status_widget = widget.findChild(gremlin.ui.ui_common.QIconLabel, "status")
         if color:
-            status_widget.setIcon(icon, use_qta = use_qta, color = color)
+            self._status_widget.setIcon(icon, use_qta = use_qta, color = color)
         else:
-            status_widget.setIcon(icon, use_qta = use_qta)
+            self._status_widget.setIcon(icon, use_qta = use_qta)
         
-        status_widget.setText(status)
-        status_widget.setVisible(status is not None)
+        self._status_widget.setText(status)
+        self._status_widget.setVisible(status is not None)
 
     def _update_input_widget(self, input_widget, container_widget):
         ''' called when the widget has to update itself on a data change '''
-        data = input_widget.identifier.input_id 
-        input_widget.setTitle(data.title_name)
-        input_widget.setDescription(data.display_name)
-        input_widget.setToolTip(data.display_tooltip)
-
+        input_item : MidiInputItem = input_widget.identifier.input_id 
+        input_widget.setTitle(input_item.title_name)
+        input_widget.setInputDescription(input_item.display_name)
+        input_widget.setToolTip(input_item.display_tooltip)
+        
+        
 
         status_text = ''
         is_warning = False
-        if data.message is None:
+        if input_item.message is None:
             is_warning = True
             status_text = "Not configured"
-        if not data.port_valid:
+        if not input_item.port_valid:
             is_warning = True
             if status_text:
                 status_text += " "
-            status_text += f"Invalid port '{data.port_name}'"
+            status_text += f"Invalid port '{input_item.port_name}'"
         
-       
-
-        status_widget = container_widget.findChild(gremlin.ui.ui_common.QIconLabel, "status")
+        
         if is_warning:
-            status_widget.setIcon("fa.warning", use_qta=True, color="red")
+            self._status_widget.setIcon("fa.warning", use_qta=True, color="red")
         else:
-            status_widget.setIcon() # clear it
+            self._status_widget.setIcon() # clear it
 
-        status_widget.setText(status_text)
+        self._status_widget.setText(status_text)
+        self._status_widget.setVisible(len(status_text)>0)
   
 
     def _populate_input_widget_ui(self, input_widget, container_widget):
         ''' called when a button is created for custom content '''
 
-        status_widget = gremlin.ui.ui_common.QIconLabel()
-        status_widget.setObjectName("status")
+        self._status_widget = gremlin.ui.ui_common.QIconLabel()
+        self._status_widget.setObjectName("status")
         layout = QtWidgets.QVBoxLayout()
         container_widget.setLayout(layout)
-        layout.addWidget(status_widget)
-        
-
+        layout.addWidget(self._status_widget)
+        self._status_widget.setVisible(False)
         self._update_input_widget(input_widget, container_widget)
                     
         

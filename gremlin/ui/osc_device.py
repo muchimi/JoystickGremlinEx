@@ -2704,7 +2704,7 @@ class OscDeviceTabWidget(QtWidgets.QWidget):
         widget = gremlin.ui.input_item.InputItemWidget(identifier = identifier, populate_ui_callback = self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True)
         #identifier = identifier.input_id
         widget.create_action_icons(data)
-        widget.update_description(data.description)
+        widget.setDescription(data.description)
         widget.enable_close()
         widget.enable_edit()
         widget.setIcon("mdi.surround-sound")
@@ -2770,7 +2770,7 @@ class OscDeviceTabWidget(QtWidgets.QWidget):
         ''' called when the widget has to update itself on a data change '''
         data = input_widget.identifier.input_id 
         input_widget.setTitle(data.title_name)
-        input_widget.setDescription(data.display_name)
+        input_widget.setInputDescription(data.display_name)
         input_widget.setToolTip(data.display_tooltip)
 
         status_text = ''

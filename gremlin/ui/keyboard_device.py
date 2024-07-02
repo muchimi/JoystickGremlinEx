@@ -445,11 +445,11 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
 
             identifier = self.input_item_list_model.data(index)
             input_id = identifier.input_id
-            logging.getLogger("system").info(f"Editing index {index} {input_id.display_name}")
+            #logging.getLogger("system").info(f"Editing index {index} {input_id.display_name}")
         else:
             input_id = KeyboardInputItem()
             index = self.input_item_list_model.rows() # new index
-            logging.getLogger("system").info(f"Adding new kbd input index {index} ")
+            #logging.getLogger("system").info(f"Adding new kbd input index {index} ")
         input_id.key = root_key
         input_type = InputType.KeyboardLatched # always use latched type starting with 13.40.14ex if root_key.is_latched else InputType.Keyboard
 
@@ -562,7 +562,7 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
 
         widget = InputItemWidget(identifier = identifier, populate_ui_callback=self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True)
         widget.create_action_icons(data)
-        widget.update_description(data.description)
+        widget.setDescription(data.description)
         widget.setIcon("fa.keyboard-o")
         widget.enable_close()
         widget.enable_edit()
@@ -574,12 +574,12 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         ''' called when the widget has to update itself on a data change '''
         data = input_widget.identifier.input_id 
         input_widget.setTitle(data.title_name)
-        input_widget.setDescription(data.display_name)
+        input_widget.setInputDescription(data.display_name)
         input_widget.setToolTip(data.display_tooltip)
         if data.has_mouse:
-            input_widget.setDescriptionIcon("mdi.mouse")
+            input_widget.setInputDescriptionIcon("mdi.mouse")
         else:
-            input_widget.setDescriptionIcon(None)
+            input_widget.setInputDescriptionIcon(None)
 
         is_warning = False
         status_text = ""
@@ -588,24 +588,24 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
             status_text = "Not configured"
        
 
-        status_widget = container_widget.findChild(gremlin.ui.ui_common.QIconLabel, "status")
+ 
         if is_warning:
-            status_widget.setIcon("fa.warning", use_qta=True, color="red")
+            self._status_widget.setIcon("fa.warning", use_qta=True, color="red")
         else:
-            status_widget.setIcon() # clear it
-
-        status_widget.setText(status_text)
+            self._status_widget.setIcon() # clear it
+        self._status_widget.setText(status_text)
+        self._status_widget.setVisible(len(status_text)>0)
 
 
 
     def _populate_input_widget_ui(self, input_widget, container_widget):
         ''' called when a button is created for custom content '''
 
-        status_widget = gremlin.ui.ui_common.QIconLabel()
-        status_widget.setObjectName("status")
+        self._status_widget = gremlin.ui.ui_common.QIconLabel()
+        self._status_widget.setObjectName("status")
         layout = QtWidgets.QVBoxLayout()
         container_widget.setLayout(layout)
-        layout.addWidget(status_widget)
+        layout.addWidget(self._status_widget)
         
 
         self._update_input_widget(input_widget, container_widget)

@@ -1346,6 +1346,16 @@ class QHLine(QtWidgets.QFrame):
         self.setFrameShape(QtWidgets.QFrame.Shape.HLine)
         self.setFrameShadow(QtWidgets.QFrame.Shadow.Sunken)
         
+class QWrapableLabel(QtWidgets.QLabel):
+    ''' wrappable label '''
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def setWordWrapAt(self, char):
+        ''' sets the word wrap on a given character '''
+        newtext = self.text().replace(char, f"{char}\u200b")
+        self.setText(newtext)
+        self.setWordWrap(True)
 
 class QIconLabel(QtWidgets.QWidget):
     ''' label with an icon using the QAWESEOME lib '''
@@ -1367,7 +1377,8 @@ class QIconLabel(QtWidgets.QWidget):
         layout.addWidget(self._icon_widget)
         layout.addSpacing(self.HorizontalSpacing)
 
-        self._label_widget = QtWidgets.QLabel(text)
+        self._label_widget =  QWrapableLabel(text)
+        self._label_widget.setWordWrap(True)
         layout.addWidget(self._label_widget)
 
         if stretch:
@@ -1400,6 +1411,9 @@ class QIconLabel(QtWidgets.QWidget):
             self._label_widget.setText(text)
         else: 
             self._label_widget.setText("")
+
+    def setTextMinWidth(self, value):
+        self._label_widget.setMinimumWidth(value)
 
     def showIcon(self):
         ''' hides the icon '''

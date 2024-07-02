@@ -456,7 +456,7 @@ class InputItemListView(ui_common.AbstractView):
                 elif data.input_type == InputType.JoystickHat:
                     widget.setIcon("ei.fullscreen")
                 widget.create_action_icons(data)
-                widget.update_description(data.description)
+                widget.setDescription(data.description)
 
             # hook the widget
             
@@ -524,7 +524,7 @@ class InputItemListView(ui_common.AbstractView):
             widget = self.scroll_layout.itemAt(index).widget()
             if widget is not None:
                 widget.create_action_icons(data)
-                widget.update_description(data.description)
+                widget.setDescription(data.description)
 
     # def _create_selection_callback(self, index):
     #     """Creates a callback handling the selection of items.
@@ -943,10 +943,20 @@ class InputItemWidget(QtWidgets.QFrame):
         """
         QtWidgets.QFrame.__init__(self, parent)
 
-        self.container_widget = QtWidgets.QWidget(self)
-        self.container_layout = QtWidgets.QGridLayout()
+        self._container_widget = QtWidgets.QWidget(self)
+        self._container_layout = QtWidgets.QVBoxLayout()
+        self._container_widget.setLayout(self._container_layout)
+        self._container_layout.setContentsMargins(0,0,0,0)
+        
+        
 
-        self.container_widget.setLayout(self.container_layout)
+        self._title_container_widget = QtWidgets.QWidget(self)
+        self._title_container_layout = QtWidgets.QGridLayout()
+        self._title_container_widget.setLayout(self._title_container_layout)
+        self._title_container_layout.setContentsMargins(0,0,0,0)
+
+        
+        
 
         self.identifier = identifier
         self._selected = False
@@ -959,13 +969,7 @@ class InputItemWidget(QtWidgets.QFrame):
         self._title_widget = gremlin.ui.ui_common.QIconLabel()
         self._title_widget.setText("Input Not configured")
         self._title_widget.setObjectName("title")
-        self._description_widget = gremlin.ui.ui_common.QIconLabel()
-        self._description_widget.setObjectName("description")
-
-        # line 2 input description - only displayed in multirow custom inputs
-        self._input_description_widget =gremlin.ui.ui_common.QIconLabel()
-        self._input_description_widget.setObjectName("input_description")
-        self._input_description_widget.setStyleSheet("padding-left: 10px;")
+        
         self._icon_layout = QtWidgets.QHBoxLayout()
         self._icons = []
 
@@ -978,24 +982,21 @@ class InputItemWidget(QtWidgets.QFrame):
         self.setFrameShape(QtWidgets.QFrame.Box)
 
 
-        # background label to fix QT6 draw order - occupise the entire space
-        self.label_selected = QtWidgets.QLabel()
-        self.container_layout.addWidget(self.label_selected, 0, 0, -1, -1)
-        self.label_selected.setMinimumHeight(30)
 
-        # main container
+        # title row
 
-        self.container_layout.addWidget(QtWidgets.QLabel(" "), data_row, 0)
-        self.container_layout.addWidget(self._title_widget, data_row, 1)
-        self.container_layout.addWidget(self._description_widget, data_row, 2)
-        self.container_layout.addLayout(self._icon_layout, data_row, 3)
+        #self.container_layout.addWidget(QtWidgets.QWidget(), data_row, 0) # spacer
+        self._title_container_layout.addWidget(self._title_widget, data_row, 0) # title
+        self._title_container_layout.addLayout(self._icon_layout, data_row, 1) # container icons
+        self._title_container_layout.setContentsMargins(0,0,0,0)
 
-        self._edit_button_widget = QtWidgets.QPushButton(qta.icon("fa.gear"),"")
+        # action buttons
+        self._edit_button_widget = QtWidgets.QPushButton(qta.icon("fa.gear"),"") 
         self._edit_button_widget.setToolTip("Configure")
         self._edit_button_widget.setFixedSize(24,16)
         self._edit_button_widget.clicked.connect(self._edit_button_cb)
         self._edit_button_widget.setVisible(False) # not visible by default
-        self.container_layout.addWidget(self._edit_button_widget, data_row, 4)
+        self._title_container_layout.addWidget(self._edit_button_widget, data_row, 2)
 
         self._close_button_widget = QtWidgets.QPushButton(qta.icon("mdi.delete"),"")
         self._close_button_widget.setFixedSize(16,16)
@@ -1003,27 +1004,54 @@ class InputItemWidget(QtWidgets.QFrame):
         self._close_button_widget.setVisible(False) # not visible by default
 
 
-        self.container_layout.addWidget(self._close_button_widget, data_row, 5)
-        self.container_layout.addWidget(QtWidgets.QLabel(" "), data_row, 6)
+        self._title_container_layout.addWidget(self._close_button_widget, data_row, 3)
+        self._title_container_layout.addWidget(QtWidgets.QLabel(" "), data_row, 4)        
 
+        
+        self._description_widget = gremlin.ui.ui_common.QIconLabel()
+        self._description_widget.setObjectName("description")
+        self._description_widget.setTextMinWidth(280)
+
+
+        self._input_description_widget =gremlin.ui.ui_common.QIconLabel()
+        self._input_description_widget.setObjectName("input_description")
+        self._input_description_widget.setTextMinWidth(280)
+        
+         
+        
+        
+        
         if self._multi_row:
 
-            self.container_layout.addWidget(QtWidgets.QWidget(), 0, 0, 1, -1) # top row margin
-            self.custom_container_widget = QtWidgets.QWidget()
-            self.container_layout.addWidget(self._input_description_widget, data_row + 1, 0, 1, -1 )
-            self.container_layout.addWidget(self.custom_container_widget, data_row + 2, 0, -1, -1)
+            self.custom_container_widget = QtWidgets.QWidget()    
             self.populate_ui(self, self.custom_container_widget)
+        else:
+            self.custom_container_widget = None
 
 
-        #self.container_layout.setColumnMinimumWidth(0, 50)
+        self._container_layout.addWidget(self._title_container_widget) # title bar
+        self._container_layout.addWidget(self._description_widget) # description bar - hidden if none
+        #self._description_widget.setStyleSheet("Background-color: yellow;")
+
+        self._container_layout.addWidget(self._input_description_widget) # input description - hidden if none
+        #self._input_description_widget.setStyleSheet("Background-color: orange;")
+        self._container_layout.setContentsMargins(0,0,0,0)
+
+        if self.custom_container_widget:
+            self._container_layout.addWidget(self.custom_container_widget) # custom container
+        
+       
         self.setMinimumWidth(300)
 
-        self.main_layout = QtWidgets.QHBoxLayout()
-        self.main_layout.setContentsMargins(0,0,0,0)
-        self.setContentsMargins(2,2,2,2)
+        
+        self.main_layout = QtWidgets.QVBoxLayout()
+        self.main_layout.setSpacing(0)
+        self.setObjectName("main_layout")
+        self.main_layout.setContentsMargins(8,2,2,2)
+        self.main_layout.addWidget(self._container_widget)
         self.setLayout(self.main_layout)
-        self.main_layout.addWidget(self.container_widget)
-
+        
+        
         self.update_display()
 
     @property
@@ -1048,15 +1076,40 @@ class InputItemWidget(QtWidgets.QFrame):
         ''' sets the title of the input widget '''
         self._title_widget.setText(value)
 
+    def setInputDescription(self, value):
+        ''' sets the title of the input widget '''
+        if value:
+            self._input_description_widget.setText(value)
+            self._input_description_widget.setVisible(True)
+        else:
+            self._input_description_widget.setVisible(False)
+        
+
+    def setInputDescriptionIcon(self, icon_path, use_qta = True):
+        ''' sets the icon for the input description line '''
+        self._input_description_widget.setIcon(icon_path, use_qta)        
+
     def setDescription(self, value):
         ''' sets the description of the input widget '''
-        self._input_description_widget.setText(value)
+        if value:
+            self._description_widget.setText(f"<i>{value}</i>")
+            self._description_widget.setVisible(True)
+        else:
+            self._description_widget.setVisible(False)
+
+
+    def setDescriptionIcon(self, icon_path, use_qta = True):
+        ''' sets the description of the input widget '''
+        self._description_widget.setIcon(icon_path, use_qta)        
+
 
     def setToolTip(self, tooltip):
         ''' sets the tooltip for the widget '''
         super().setToolTip(tooltip)
 
-
+    def setIcon(self, icon_path, use_qta = True):
+        ''' sets the widget's icon '''
+        self._title_widget.setIcon(icon_path, use_qta)
 
 
     def update_display(self):
@@ -1079,22 +1132,14 @@ class InputItemWidget(QtWidgets.QFrame):
         if value != self._selected:
             self._selected = value
             if value:
-                style = "background-color:  #8FBC8F; border-width: 6px; border-color: #8FBC8F;"
+                style = "#main_layout{background-color: #8FBC8F; }"
             else:
-                style = "background-color: #E8E8E8; border-width: 6px; ; border-color: #E8E8E8;"
+                style = "#main_layout{background-color: #E8E8E8; }"
 
-            self.label_selected.setStyleSheet(style)
+            self.setStyleSheet(style)
             self.selected_changed.emit(self.identifier)
 
 
-    def setIcon(self, icon_path, use_qta = True):
-        ''' sets the widget's icon '''
-        self._title_widget.setIcon(icon_path, use_qta)
-
-
-    def setDescriptionIcon(self, icon_path, use_qta = True):
-        ''' sets the icon for the description line '''
-        self._input_description_widget.setIcon(icon_path, use_qta)
 
     def enable_close(self):
         ''' enables the close button on the input widget (keyboard only usually) '''
@@ -1112,15 +1157,6 @@ class InputItemWidget(QtWidgets.QFrame):
     def disable_edit(self):
         ''' enables the edit button on the input widget (keyboard only usually) '''
         self._edit_button_widget.setVisible(False)
-
-
-
-    def update_description(self, description):
-        """Updates the description of the button.
-
-        :param description the description to use
-        """
-        self._description_widget.setText(f"<i>{description}</i>")
 
     def create_action_icons(self, profile_data):
         """Creates the label of this instance.

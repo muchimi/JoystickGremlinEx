@@ -92,7 +92,8 @@ _vk_key_scan_ex = _create_function(
  
 
 
-_keyboard_modifiers = ["leftshift","leftcontrol","leftalt","rightshift","rightcontrol","rightalt","leftwin","rightwin"]
+
+
 
 
 class Key:
@@ -156,6 +157,7 @@ class Key:
                     virtual_code = _scan_code_to_virtual_code(scan_code, is_extended)
                     k = key_from_code(scan_code, is_extended)
                     name = k.name
+                    lookup_name = k.lookup_name
                     
 
         self._is_mouse = is_mouse
@@ -289,14 +291,14 @@ class Key:
     def message_key(self):
         return {self._scan_code, self._is_extended}
 
-    @lookup_name.setter
-    def lookup_name(self, name):
-        from gremlin import error
-        if self._lookup_name is not None:
-            raise error.KeyboardError("Setting lookup name repeatedly")
-        self._lookup_name = name
+    # @lookup_name.setter
+    # def lookup_name(self, name):
+    #     from gremlin import error
+    #     if self._lookup_name is not None:
+    #         raise error.KeyboardError("Setting lookup name repeatedly")
+    #     self._lookup_name = name
 
-        self._update()
+    #     self._update()
 
     def __eq__(self, other):
         return hash(self) == hash(other)
@@ -335,7 +337,6 @@ class Key:
 
     
     
-    
     @property
     def latched_keys(self) -> TraceableList:
         ''' list of key objects that are latched to this key (modifiers)'''
@@ -343,6 +344,10 @@ class Key:
     @latched_keys.setter
     def latched_keys(self, value):
         self._latched_keys.clear()
+        # check_dups = list(set(value))
+        # if len(value) != len(check_dups):
+        #     pass
+
         self._latched_keys.extend(value)
     
     @property
@@ -368,7 +373,7 @@ class Key:
         Modifiers will be a lower index than normal character which will be lower than special keys
            
         '''
-        lookup_name = self.lookup_name
+        lookup_name = self.lookup_name.lower()
         if lookup_name in _keyboard_modifiers:
             return self.modifier_order()
         
@@ -382,10 +387,9 @@ class Key:
         
         start_index = 1000
         # special keys
-        special_names = [g_name_to_key.keys()]
 
-        if self._lookup_name in special_names:
-            value = special_names.index(lookup_name)
+        if lookup_name in _keyboard_special:
+            value = _keyboard_special.index(lookup_name)
             return start_index + value
         
         # no clue
@@ -597,7 +601,7 @@ def sort_keys(keys):
         sequence.append((key, index))
     
     sequence.sort(key = lambda x: x[1])
-    keys_list = [k for (k, _) in sequence]
+    keys_list = [pair[0] for pair in sequence]
     return keys_list
 
 
@@ -735,5 +739,9 @@ g_name_to_key = {
 # Populate the scan code based lookup table
 for name_, key_ in g_name_to_key.items():
     assert isinstance(key_, Key)
-    key_.lookup_name = name_
+    key_._lookup_name = name_
     g_scan_code_to_key[(key_.scan_code, key_.is_extended)] = key_
+
+
+_keyboard_special = list(g_name_to_key.keys())
+_keyboard_modifiers = ["leftshift","leftcontrol","leftalt","rightshift","rightshift2","rightcontrol","rightalt","leftwin","rightwin"]
