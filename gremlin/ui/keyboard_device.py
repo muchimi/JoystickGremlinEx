@@ -102,8 +102,6 @@ class KeyboardInputItem():
         ''' true if all the keys in this input are latched '''
         if not self._key:
             return False
-        if self._key.scan_code == 56:
-            pass
         return self._key.latched
 
 

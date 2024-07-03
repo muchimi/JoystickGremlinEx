@@ -186,6 +186,7 @@ def process_mouse_event(n_code, w_param, l_param):
         # https://msdn.microsoft.com/en-us/library/windows/desktop/ms644985(v=vs.85).aspx
         button_id = None
         is_pressed = True
+        is_wheel = False
         if w_param in [WM_LBUTTONDOWN, WM_LBUTTONUP]:
             button_id = gremlin.types.MouseButton.Left
             is_pressed = w_param == WM_LBUTTONDOWN
@@ -202,11 +203,12 @@ def process_mouse_event(n_code, w_param, l_param):
                 button_id = gremlin.types.MouseButton.Forward
             is_pressed = w_param == WM_XBUTTONDOWN
         elif w_param == WM_MOUSEWHEEL:
-            delta = (msg.mouseData >> 16) / 120
+            delta = msg.mouseData >> 16
             if delta == 120:
                 button_id = gremlin.types.MouseButton.WheelUp
             elif delta == 65416:
                 button_id = gremlin.types.MouseButton.WheelDown
+            is_wheel = True
         elif w_param == WM_MOUSEHWHEEL:
             # horizontal mouse wheel
             delta = msg.mouseData >> 16
@@ -214,6 +216,7 @@ def process_mouse_event(n_code, w_param, l_param):
                 button_id = gremlin.types.MouseButton.WheelRight
             elif delta == 65416:
                 button_id = gremlin.types.MouseButton.WheelLeft
+            is_wheel = True
 
         # if button_id:
         #     logging.getLogger("system").info(f"Mouse button: {button_id}")
@@ -221,11 +224,25 @@ def process_mouse_event(n_code, w_param, l_param):
         if button_id:
             # Create the event and pass it to all all registered callbacks
             evt = MouseEvent(button_id, is_pressed, False)
+            if is_wheel:
+                # queue a release event for mouse wheel 
+                threading.Thread(target=lambda: _queue_wheel_release(button_id)).start()
             for cb in g_mouse_callbacks:
                 cb(evt)
 
     # Pass the event on to the next callback in the chain
     return user32.CallNextHookEx(None, n_code, w_param, l_param)
+
+
+
+def _queue_wheel_release(button_id):
+    ''' queues a mouse wheel release for wheel events '''
+    import time
+    # print (f"wheel release: {button_id}")
+    time.sleep(0.1)
+    evt = MouseEvent(button_id, False, False)
+    for cb in g_mouse_callbacks:
+        cb(evt)
 
 
 class KeyEvent:

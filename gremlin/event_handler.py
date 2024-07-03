@@ -398,17 +398,19 @@ class EventListener(QtCore.QObject):
 		if not event.is_injected:
 			if not self._running:
 				return
+
+			# update keyboard state for that key 
+			key_id = (event.button_id.value + 0x1000, False)
+			self._keyboard_state[key_id] = event.is_pressed
+
+
 			self.mouse_event.emit(Event(
 				event_type= InputType.Mouse,
 				device_guid=dinput.GUID_Keyboard,
 				identifier=event.button_id,
 				is_pressed=event.is_pressed,
 			))
-
-			# update keyboard state for that key 
-			key_id = (event.button_id.value + 0x1000, False)
-			self._keyboard_state[key_id] = event.is_pressed
-			#logging.getLogger(f"system").info(f"Mouse button state: {key_id} {event.is_pressed}")
+			# print (f"Mouse button state: {key_id}  {event.is_pressed}")
 		# Allow the windows event to propagate further
 		return True
 

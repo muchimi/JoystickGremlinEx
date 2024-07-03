@@ -1727,6 +1727,7 @@ class Keyboard(QtCore.QObject):
             event.identifier[0],
             event.identifier[1]
         )
+        # print (f"Key: {key.name} pressed: {event.is_pressed}")
         self._keyboard_state[key] = event.is_pressed
 
     def is_pressed(self, key):
