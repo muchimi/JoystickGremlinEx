@@ -24,6 +24,7 @@ from PySide6 import QtWidgets, QtCore
 
 # import container_plugins.basic
 # import gremlin
+import gremlin.config
 from gremlin.input_types import InputType
 #from gremlin.common import DeviceType
 from . import input_item, ui_common 
@@ -471,8 +472,9 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         # select the item
         self.input_item_list_view.select_item(index, force = True)
 
-
-        logging.getLogger("system").info(f"Final item index {index} {input_id.display_name}")
+        verbose = gremlin.config.Configuration().verbose
+        if verbose:
+            logging.getLogger("system").info(f"Final item index {index} {input_id.display_name}")
         
  
 

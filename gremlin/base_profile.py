@@ -1059,7 +1059,7 @@ class Profile():
         self.plugins = []
         self.settings = Settings(self)
         self.parent = parent
-        self.start_mode = None # startup mode for this profile
+        self._start_mode = None # startup mode for this profile
 
     def initialize_joystick_device(self, device, modes):
         """Ensures a joystick is properly initialized in the profile.
@@ -1476,7 +1476,7 @@ class Profile():
         mode = self._start_mode
         # verify the mode is in the mode list
         modes = self.get_modes()
-        if not mode in modes:
+        if mode is None or not mode in modes:
             mode = modes[0]
             self._start_mode = mode
         return self._start_mode

@@ -24,6 +24,7 @@ import os
 import random
 import string
 import uuid
+import sys
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
@@ -31,6 +32,14 @@ import dinput
 from gremlin import common, error, input_devices, joystick_handling, profile, shared_state
 import gremlin.ui.ui_common
 from gremlin.input_types import InputType
+
+
+def load_module(module_name, file_path):
+    spec = importlib.util.spec_from_file_location(module_name, file_path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
 
 def get_variable_definitions(fname):
     """Returns all variable definitions contained in the provided module.
@@ -48,11 +57,24 @@ def get_variable_definitions(fname):
     """
     if not os.path.isfile(fname):
         return {}
+    
+    user_package = "user_plugins"
 
-    spec = importlib.util.spec_from_file_location(
+    spec = importlib.util.spec_from_file_location(user_package + "." +
         "".join(random.choices(string.ascii_lowercase, k=16)),
         fname
     )
+
+    # see if there is a package to load
+    fname_init = os.path.join(os.path.dirname(fname),"__init__.py")
+    if not os.path.isfile(fname_init):
+        # create the file so we have a package
+        open (fname_init,'a').close
+    
+    # load the package for the plugins
+    load_module("user_plugins", fname_init)
+        
+    
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
 
