@@ -73,8 +73,7 @@ class VjoyAction(enum.Enum):
     VJoyEnablePairedRemote = 17 # enables primary fire one and two on remote client
     VJoyDisablePairedRemote = 18 # disable primary fire one and two on remote client
     VjoyButtonRelease = 19 # action button release (clear a button if set)
-
-    # VjoyMergeAxis = 17 # merges two axes into one (usually used to combine toe-brakes into a single axis)
+    VjoyMergeAxis = 20 # action to merge another axis 
 
   
 
@@ -151,8 +150,8 @@ class VjoyAction(enum.Enum):
             return "Disables remote control mode (remote clients will not get inputs except for paired commands)"
         elif action == VjoyAction.VjoyButtonRelease:
             return "Releases a button"
-        # elif action == VjoyAction.VjoyMergeAxis:
-        #     return "Merges two axes into one"
+        elif action == VjoyAction.VjoyMergeAxis:
+            return "Merges two axes into one"
         
         msg  = f"Unknown [{action}]"
         syslog.debug(f"Warning: missing action description mapping: {msg}")
@@ -203,6 +202,8 @@ class VjoyAction(enum.Enum):
             return "Disable remote control"
         elif action == VjoyAction.VjoyButtonRelease:
             return "Button release"
+        elif action == VjoyAction.VjoyMergeAxis:
+            return "Merge Axis"
         
         msg  = f"Unknown [{action}]"
         syslog.debug(f"Warning: missing action name mapping: {msg}")

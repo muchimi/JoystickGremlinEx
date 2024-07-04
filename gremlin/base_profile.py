@@ -10,6 +10,7 @@ import gremlin.actions
 import gremlin.base_buttons
 import gremlin.config
 import gremlin.profile
+import gremlin.shared_state
 from gremlin.util import *
 from gremlin.input_types import InputType
 from gremlin.types import *
@@ -325,7 +326,26 @@ class AbstractContainer(ProfileData):
                 )
             ))
         else:
+            # # extra callbacks for additional inputs provided by a specific action
+            # for action_list in self.action_sets:
+            #     extra_actions = []
+            #     for action in action_list:
+            #         functor = action.functor(action)
+            #         extra_inputs = functor.latch_extra_inputs()
+            #         for device_guid, input_id in extra_inputs:
+            #             dup_action = copy.deepcopy(action)
+            #             dup_action.action_id = str(uuid.uuid4())
+            #             dup_action.hardware_device_guid = device_guid
+            #             device = gremlin.shared_state.current_profile.devices[device_guid]
+            #             dup_action.hardware_device = device
+            #             dup_action.input_id = input_id
+            #             extra_actions.append(dup_action)
+            #     if extra_actions:
+            #         # add the "new" actions to the container temporarily
+            #         action_list.extend(extra_actions)
+
             callbacks.append(CallbackData(ContainerCallback(self),None))
+
 
         return callbacks
 
@@ -831,7 +851,6 @@ class AbstractAction(ProfileData):
     @property
     def hardware_device_guid(self):
         return self.parent.hardware_device_guid
-
 
     @property
     def action_id(self):

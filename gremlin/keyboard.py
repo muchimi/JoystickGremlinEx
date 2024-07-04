@@ -148,17 +148,12 @@ class Key:
             is_mouse = True
             self._mouse_button = mouse_button
 
-            
-
         else:
             # regular key
             if scan_code > 0:
                 if not virtual_code:
                     virtual_code = _scan_code_to_virtual_code(scan_code, is_extended)
-                    k = key_from_code(scan_code, is_extended)
-                    name = k.name
-                    lookup_name = k.lookup_name
-
+                name = key_name_from_code(scan_code, is_extended)
 
         if name and len(name)==1:
             name = name.upper()
@@ -614,7 +609,22 @@ def sort_keys(keys):
     keys_list = [pair[0] for pair in sequence]
     return keys_list
 
+def key_name_from_code(scan_code, is_extended):
+    ''' gets the key name '''
+    if scan_code >= 0x1000:
+        scan_code -= 0x1000
+        return MouseButton.to_string(scan_code)
+    
+    # Attempt to located the key in our database and return it if successful
+    key = g_scan_code_to_key.get((scan_code, is_extended), None)
+    if key:
+        return key.name
+    
+        # Attempt to create the key to store and return if successful
+    virtual_code = _scan_code_to_virtual_code(scan_code, is_extended)
+    name = _virtual_input_to_unicode(virtual_code)
 
+    return name
 
 
 def key_from_code(scan_code, is_extended):

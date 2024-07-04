@@ -39,6 +39,7 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.layout = QtWidgets.QHBoxLayout()
         self.icon_widget = QtWidgets.QLabel()
         self.file_path = QtWidgets.QLineEdit()
+        self.file_path.installEventFilter(self)
         self.file_path.textChanged.connect(self._file_changed)
         self.edit_path = QtWidgets.QPushButton()
         self.edit_path.setIcon(load_icon("gfx/button_edit.png"))
@@ -53,6 +54,12 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.layout.addWidget(QtWidgets.QLabel("Volume"))
         self.layout.addWidget(self.volume)
         self.main_layout.addLayout(self.layout)
+
+
+    def eventFilter(self, object, event):
+        t = event.type()
+        if t == QtCore.QEvent.Type.FocusOut:
+            self.action_data.sound_file = self.file_path.text()    
 
     def _populate_ui(self):
         self.file_path.setText(self.action_data.sound_file)

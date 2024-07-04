@@ -814,47 +814,47 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         # second hardware input selector
 
 
-        row = 4
+        # row = 4
         
-        self.hardware_input_container_widget = QtWidgets.QWidget()
-        self.hardware_input_container_layout = QtWidgets.QVBoxLayout()
-        self.hardware_input_container_widget.setLayout(self.hardware_input_container_layout)
+        # self.hardware_input_container_widget = QtWidgets.QWidget()
+        # self.hardware_input_container_layout = QtWidgets.QVBoxLayout()
+        # self.hardware_input_container_widget.setLayout(self.hardware_input_container_layout)
 
-        self.hardware_input_row_1_widget = QtWidgets.QWidget()
-        self.hardware_input_row_1_layout = QtWidgets.QHBoxLayout()
-        self.hardware_input_row_1_widget.setLayout(self.hardware_input_row_1_layout)
+        # self.hardware_input_row_1_widget = QtWidgets.QWidget()
+        # self.hardware_input_row_1_layout = QtWidgets.QHBoxLayout()
+        # self.hardware_input_row_1_widget.setLayout(self.hardware_input_row_1_layout)
 
-        self.hardware_input_row_2_widget = QtWidgets.QWidget()
-        self.hardware_input_row_2_layout = QtWidgets.QHBoxLayout()
-        self.hardware_input_row_2_widget.setLayout(self.hardware_input_row_2_layout)
+        # self.hardware_input_row_2_widget = QtWidgets.QWidget()
+        # self.hardware_input_row_2_layout = QtWidgets.QHBoxLayout()
+        # self.hardware_input_row_2_widget.setLayout(self.hardware_input_row_2_layout)
 
-        self.hardware_input_container_layout.addWidget(self.hardware_input_row_1_widget)
-        self.hardware_input_container_layout.addWidget(self.hardware_input_row_2_widget)
+        # self.hardware_input_container_layout.addWidget(self.hardware_input_row_1_widget)
+        # self.hardware_input_container_layout.addWidget(self.hardware_input_row_2_widget)
 
-        self.lbl_input_device_a = QtWidgets.QLabel("Axis A Input Device:")
-        self.lbl_input_axis_a = QtWidgets.QLabel("Axis A Input Axis:")
-        self.lbl_input_device_name_a = QtWidgets.QLabel(self.action_data.hardware_device.name)
-        self.lbl_input_axis_name_a = QtWidgets.QLabel(self.get_axis_name(self.action_data.hardware_input_id))
+        # self.lbl_input_device_a = QtWidgets.QLabel("Axis A Input Device:")
+        # self.lbl_input_axis_a = QtWidgets.QLabel("Axis A Input Axis:")
+        # self.lbl_input_device_name_a = QtWidgets.QLabel(self.action_data.hardware_device.name)
+        # self.lbl_input_axis_name_a = QtWidgets.QLabel(self.get_axis_name(self.action_data.hardware_input_id))
 
-        self.lbl_input_device_b = QtWidgets.QLabel("Axis B Input Device:")
-        self.lbl_input_axis_b = QtWidgets.QLabel("Axis B Input Axis:")
-        self.hardware_device = gremlin.ui.ui_common.NoWheelComboBox()
-        self.hardware_axis = gremlin.ui.ui_common.NoWheelComboBox()
-        self.hardware_device.currentIndexChanged.connect(self._hardware_device_changed)
-        self.hardware_axis.currentIndexChanged.connect(self._hardware_axis_changed)
+        # self.lbl_input_device_b = QtWidgets.QLabel("Axis B Input Device:")
+        # self.lbl_input_axis_b = QtWidgets.QLabel("Axis B Input Axis:")
+        # self.hardware_device = gremlin.ui.ui_common.NoWheelComboBox()
+        # self.hardware_axis = gremlin.ui.ui_common.NoWheelComboBox()
+        # self.hardware_device.currentIndexChanged.connect(self._hardware_device_changed)
+        # self.hardware_axis.currentIndexChanged.connect(self._hardware_axis_changed)
 
-        self.hardware_input_row_1_layout.addWidget(self.lbl_input_device_a)
-        self.hardware_input_row_1_layout.addWidget(self.lbl_input_device_name_a)
-        self.hardware_input_row_1_layout.addWidget(self.lbl_input_device_b)
-        self.hardware_input_row_1_layout.addWidget(self.hardware_device)
-        grid.addWidget(self.hardware_input_container_widget, row, 0, 1, -1)
+        # self.hardware_input_row_1_layout.addWidget(self.lbl_input_device_a)
+        # self.hardware_input_row_1_layout.addWidget(self.lbl_input_device_name_a)
+        # self.hardware_input_row_1_layout.addWidget(self.lbl_input_device_b)
+        # self.hardware_input_row_1_layout.addWidget(self.hardware_device)
+        # grid.addWidget(self.hardware_input_container_widget, row, 0, 1, -1)
 
-        self.hardware_input_row_2_layout.addWidget(self.lbl_input_axis_a)
-        self.hardware_input_row_2_layout.addWidget(self.lbl_input_axis_name_a)
-        self.hardware_input_row_2_layout.addWidget(self.lbl_input_axis_b)
-        self.hardware_input_row_2_layout.addWidget(self.hardware_axis)
+        # self.hardware_input_row_2_layout.addWidget(self.lbl_input_axis_a)
+        # self.hardware_input_row_2_layout.addWidget(self.lbl_input_axis_name_a)
+        # self.hardware_input_row_2_layout.addWidget(self.lbl_input_axis_b)
+        # self.hardware_input_row_2_layout.addWidget(self.hardware_axis)
 
-        self.hardware_input_container_widget.setVisible(False)
+        #self.hardware_input_container_widget.setVisible(False)
         
 
         # pulse panel
@@ -1049,18 +1049,18 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.notify_device_changed()
 
 
-    def _hardware_device_changed(self, index):
-        ''' occurs when the hardware device input is changed '''
-        with QtCore.QSignalBlocker(self.hardware_device):
-            device = self.hardware_device.itemData(index)
-            self.action_data.merge_device_b_guid = device.device_guid
-            self._populate_hardware_axis()
+    # def _hardware_device_changed(self, index):
+    #     ''' occurs when the hardware device input is changed '''
+    #     with QtCore.QSignalBlocker(self.hardware_device):
+    #         device = self.hardware_device.itemData(index)
+    #         self.action_data.merge_device_b_guid = device.device_guid
+    #         self._populate_hardware_axis()
 
-    def _hardware_axis_changed(self, index):
-        ''' occurs when the hardware device axis input is changed'''
-        with QtCore.QSignalBlocker(self.hardware_axis):
-            axis = self.hardware_axis.itemData(index)
-            self.action_data.merge_device_b_axis = axis
+    # def _hardware_axis_changed(self, index):
+    #     ''' occurs when the hardware device axis input is changed'''
+    #     with QtCore.QSignalBlocker(self.hardware_axis):
+    #         axis = self.hardware_axis.itemData(index)
+    #         self.action_data.merge_device_b_axis = axis
 
 
     def notify_device_changed(self):
@@ -1131,13 +1131,13 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         target_value_visible = False
         exec_on_release_visible = False
         paired_visible = False
-        hardware_widget_visible = False
+        #hardware_widget_visible = False
 
         if self._is_axis: 
             grid_visible = action == VjoyAction.VJoyAxisToButton
             range_visible = action in (VjoyAction.VJoyRangeAxis, VjoyAction.VJoyAxisToButton)
             # hardware_widget_visible = action == VjoyAction.VjoyMergeAxis
-            axis_visible = not (grid_visible or range_visible or hardware_widget_visible)
+            axis_visible = not (grid_visible or range_visible) # or hardware_widget_visible)
 
         elif input_type in VJoyWidget.input_type_buttons:
             pulse_visible = action == VjoyAction.VJoyPulse
@@ -1162,7 +1162,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.axis_widget.setVisible(axis_visible)
 
 
-        self.hardware_input_container_widget.setVisible(hardware_widget_visible)
+        # self.hardware_input_container_widget.setVisible(hardware_widget_visible)
         self.axis_range_value_widget.setVisible(range_visible)
         self.chkb_exec_on_release.setVisible(exec_on_release_visible)
         self.chkb_paired.setVisible(paired_visible)
@@ -1469,9 +1469,9 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
                 with QtCore.QSignalBlocker(self.chkb_paired):
                     self.chkb_paired.setChecked(self.action_data.paired)
 
-            # populate hardware devices if in merge mode
-            self._populate_hardware()
-            self._populate_hardware_axis()
+            # # populate hardware devices if in merge mode
+            # self._populate_hardware()
+            # self._populate_hardware_axis()
 
             # update based on current mode
 
@@ -1573,49 +1573,49 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             lbl = self.icon_map[id]
             lbl.setPixmap(used_pixmap if used else unused_pixmap)
 
-    def _populate_hardware(self):
-        ''' populates hardware inputs UI 
+    # def _populate_hardware(self):
+    #     ''' populates hardware inputs UI 
         
-            this will show all possible hardware inputs if they have an axis
-            and defaults to the one mapped to this action
+    #         this will show all possible hardware inputs if they have an axis
+    #         and defaults to the one mapped to this action
         
-        '''
-        import gremlin.joystick_handling
-        phys_devices = gremlin.joystick_handling.physical_devices()
-        # filter out devices with axis input only
-        axis_devices = [d for d in phys_devices if d.axis_count > 0]
-        self.hardware_device.clear()
-        current_guid = self.action_data.hardware_device_guid
-        current_device = next((d for d in axis_devices if d.device_guid == current_guid), None)
-        if axis_devices:
-            with QtCore.QSignalBlocker(self.hardware_device):
-                for device in axis_devices:
-                    self.hardware_device.addItem(device.name, device)
+    #     '''
+    #     import gremlin.joystick_handling
+    #     phys_devices = gremlin.joystick_handling.physical_devices()
+    #     # filter out devices with axis input only
+    #     axis_devices = [d for d in phys_devices if d.axis_count > 0]
+    #     # self.hardware_device.clear()
+    #     current_guid = self.action_data.hardware_device_guid
+    #     current_device = next((d for d in axis_devices if d.device_guid == current_guid), None)
+    #     # if axis_devices:
+    #     #     with QtCore.QSignalBlocker(self.hardware_device):
+    #     #         for device in axis_devices:
+    #     #             self.hardware_device.addItem(device.name, device)
 
-        if current_device:
-            index = self.hardware_device.findData(current_device)
-            self.hardware_device.setCurrentIndex(index)
+    #     # if current_device:
+    #     #     index = self.hardware_device.findData(current_device)
+    #     #     self.hardware_device.setCurrentIndex(index)
 
                     
 
 
-    def _populate_hardware_axis(self):
-        ''' fills the axis drop down based on the current hardware device selected '''
-        index = self.hardware_device.currentIndex()
-        if index != -1:
-            device = self.hardware_device.itemData(index)
-            self.hardware_axis.clear()
+    # def _populate_hardware_axis(self):
+    #     ''' fills the axis drop down based on the current hardware device selected '''
+    #     index = self.hardware_device.currentIndex()
+    #     if index != -1:
+    #         device = self.hardware_device.itemData(index)
+    #         self.hardware_axis.clear()
             
-            current_guid = self.action_data.hardware_device_guid
-            current_axis = -1
-            if current_guid == device.device_guid:
-                # current selected input device is the same as the device mapped to this action
-                current_axis = self.action_data.hardware_input_id
-            with QtCore.QSignalBlocker(self.hardware_axis):
-                for axis in range(1,device.axis_count+1):
-                    if axis != current_axis:
-                        # add axis only if it's not already the one mapped to this action
-                        self.hardware_axis.addItem(f"Axis {self.get_axis_name(axis)} ({axis})", axis)
+    #         current_guid = self.action_data.hardware_device_guid
+    #         current_axis = -1
+    #         if current_guid == device.device_guid:
+    #             # current selected input device is the same as the device mapped to this action
+    #             current_axis = self.action_data.hardware_input_id
+    #         with QtCore.QSignalBlocker(self.hardware_axis):
+    #             for axis in range(1,device.axis_count+1):
+    #                 if axis != current_axis:
+    #                     # add axis only if it's not already the one mapped to this action
+    #                     self.hardware_axis.addItem(f"Axis {self.get_axis_name(axis)} ({axis})", axis)
 
 
 
@@ -1661,10 +1661,10 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
         self.axis_start_value = action.axis_start_value
 
         self.remote_client = input_devices.remote_client
-        self.merge_guid = action.merge_device_b_guid
-        self.merge_axis = action.merge_device_b_axis
-        if self.merge_guid:
-            pass
+        # self.merge_guid = action.merge_device_b_guid
+        # self.merge_axis = action.merge_device_b_axis
+        # if self.merge_guid:
+        #     pass
 
         self.lock = threading.Lock()
 
@@ -1999,10 +1999,10 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         self.axis_start_value = 0.0
         self._exec_on_release = False
         self._paired = False
-        self.merge_device_a_guid = self.hardware_device_guid
-        self.merge_device_a_axis = self.hardware_input_id
-        self._merge_device_b_guid = None
-        self._merge_device_b_axis = 1
+        # self.merge_device_a_guid = self.hardware_device_guid
+        # self.merge_device_a_axis = self.hardware_input_id
+        # self._merge_device_b_guid = None
+        # self._merge_device_b_axis = 1
 
         # default mode
         self._action_mode = VjoyAction.VJoyButton
@@ -2034,19 +2034,19 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         
 
 
-    @property
-    def merge_device_b_guid(self):
-        return self._merge_device_b_guid
-    @merge_device_b_guid.setter
-    def merge_device_b_guid(self, value):
-        self._merge_device_b_guid = value        
+    # @property
+    # def merge_device_b_guid(self):
+    #     return self._merge_device_b_guid
+    # @merge_device_b_guid.setter
+    # def merge_device_b_guid(self, value):
+    #     self._merge_device_b_guid = value        
 
-    @property
-    def merge_device_b_axis(self):
-        return self._merge_device_b_axis 
-    @merge_device_b_axis.setter
-    def merge_device_b_axis(self, value):
-        self._merge_device_b_axis = value
+    # @property
+    # def merge_device_b_axis(self):
+    #     return self._merge_device_b_axis 
+    # @merge_device_b_axis.setter
+    # def merge_device_b_axis(self, value):
+    #     self._merge_device_b_axis = value
 
     @property
     def exec_on_release(self):

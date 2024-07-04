@@ -306,6 +306,9 @@ class AbstractFunctor(metaclass=ABCMeta):
         """
         pass
 
+    def latch_extra_inputs(self):
+        ''' returns any extra inputs as a list of (device_guid, input_id) to latch to this action (trigger on change) '''
+        return []
 
 
 class ActivationCondition:

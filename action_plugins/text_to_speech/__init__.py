@@ -39,7 +39,7 @@ class TextToSpeechWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _create_ui(self):
         self.text_field = QtWidgets.QPlainTextEdit()
         self.text_field.textChanged.connect(self._content_changed_cb)
-        
+        self.text_field.installEventFilter(self)
 
         self.volume_widget = QtWidgets.QSpinBox()
         self.volume_widget.setRange(0, 100)
@@ -62,6 +62,11 @@ class TextToSpeechWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self.main_layout.addWidget(self.text_field)
         self.main_layout.addWidget(self.container_widget)
+
+    def eventFilter(self, object, event):
+        t = event.type()
+        if t == QtCore.QEvent.Type.FocusOut:
+            self.action_data.text = self.text_field.toPlainText()
 
     def _content_changed_cb(self):
         self.action_data.text = self.text_field.toPlainText()
