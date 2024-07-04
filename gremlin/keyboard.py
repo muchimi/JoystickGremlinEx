@@ -160,7 +160,7 @@ class Key:
                     lookup_name = k.lookup_name
 
 
-        if len(name)==1:
+        if name and len(name)==1:
             name = name.upper()
                     
 

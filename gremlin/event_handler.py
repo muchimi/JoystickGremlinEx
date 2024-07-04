@@ -625,7 +625,7 @@ class EventHandler(QtCore.QObject):
 			identifier = event.identifier  # this is (scan_code, is_extended)
 			is_mouse = False
 
-		event_key = Key(identifier[0],identifier[1], is_mouse)
+		event_key = Key(scan_code = identifier[0], is_extended = identifier[1], is_mouse = is_mouse)
 		input_items = []
 
 		#found = False

@@ -17,7 +17,7 @@
 
 
 import os
-from PySide6 import QtWidgets
+from PySide6 import QtWidgets, QtCore
 from xml.etree import ElementTree
 
 import gremlin.base_profile
@@ -39,13 +39,45 @@ class TextToSpeechWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _create_ui(self):
         self.text_field = QtWidgets.QPlainTextEdit()
         self.text_field.textChanged.connect(self._content_changed_cb)
+        
+
+        self.volume_widget = QtWidgets.QSpinBox()
+        self.volume_widget.setRange(0, 100)
+        self.volume_widget.valueChanged.connect(self._volume_changed_cb)
+                                                
+        self.rate_widget = QtWidgets.QSpinBox()
+        
+        self.rate_widget.setRange(-10, 10)
+        self.rate_widget.valueChanged.connect(self._rate_changed_cb)
+        self.container_widget = QtWidgets.QWidget()
+        self.container_layout = QtWidgets.QHBoxLayout()
+        self.container_widget.setLayout(self.container_layout)
+
+        self.container_layout.addWidget(QtWidgets.QLabel("Volume:"))
+        self.container_layout.addWidget(self.volume_widget)
+
+        self.container_layout.addWidget(QtWidgets.QLabel("Playback rate:"))
+        self.container_layout.addWidget(self.rate_widget)
+        self.container_layout.addStretch()
+
         self.main_layout.addWidget(self.text_field)
+        self.main_layout.addWidget(self.container_widget)
 
     def _content_changed_cb(self):
         self.action_data.text = self.text_field.toPlainText()
 
     def _populate_ui(self):
         self.text_field.setPlainText(self.action_data.text)
+        with QtCore.QSignalBlocker(self.volume_widget):
+            self.volume_widget.setValue(self.action_data.volume)
+        with QtCore.QSignalBlocker(self.rate_widget):
+            self.rate_widget.setValue(self.action_data.rate)
+
+    def _volume_changed_cb(self, value):
+        self.action_data.volume = value
+
+    def _rate_changed_cb(self, value):
+        self.action_data.rate = value
 
 
 class TextToSpeechFunctor(gremlin.base_profile.AbstractFunctor):
@@ -55,9 +87,14 @@ class TextToSpeechFunctor(gremlin.base_profile.AbstractFunctor):
     def __init__(self, action):
         super().__init__(action)
         self.text = action.text
+        self.volume = action.volume
+        self.rate = action.rate
 
     def process_event(self, event, value):
-        TextToSpeechFunctor.tts.speak(gremlin.tts.text_substitution(self.text))
+        tts = TextToSpeechFunctor.tts
+        tts.set_volume(self.volume)
+        tts.set_rate(self.rate)
+        tts.speak(gremlin.tts.text_substitution(self.text))
         return True
 
 
@@ -83,6 +120,8 @@ class TextToSpeech(gremlin.base_profile.AbstractAction):
     def __init__(self, parent):
         super().__init__(parent)
         self.text = ""
+        self.volume = 100
+        self.rate = 0
 
     def icon(self):
         return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
@@ -95,10 +134,20 @@ class TextToSpeech(gremlin.base_profile.AbstractAction):
 
     def _parse_xml(self, node):
         self.text = node.get("text")
+        if "volume" in node.attrib:
+            self.volume = int(node.get("volume"))
+        else:
+            self.volume = 50
+        if "rate" in node.attrib:
+            self.rate = int(node.get("rate"))
+        else:
+            self.rate = 0
 
     def _generate_xml(self):
         node = ElementTree.Element("text-to-speech")
         node.set("text", self.text)
+        node.set("volume",str(self.volume))
+        node.set("rate",str(self.rate))
         return node
 
     def _is_valid(self):
