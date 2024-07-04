@@ -168,14 +168,15 @@ class Key:
         
         self._virtual_code = virtual_code
         self._lookup_name = lookup_name
-        self._latched_keys = TraceableList() #[] # list of keys latched to this keystroke (modifiers)
+        self._latched_keys = [] # TraceableList() #[] # list of keys latched to this keystroke (modifiers)
         # self._latched_keys.add_callback(self._changed_cb)
         self._update()
 
     # duplicate
     def duplicate(self):
         '''' creates a copy of this key '''
-        new_key = Key(scan_code = self.scan_code, is_extended=self.is_extended, is_mouse = self.is_mouse)
+        import copy
+        new_key = copy.deepcopy(self)
         return new_key
 
     @property
@@ -261,6 +262,11 @@ class Key:
 
         #logging.getLogger("system").info(f"latch check: key {self.name} latched: {latched}")
         return latched
+    
+    @property
+    def is_latched(self):
+        ''' returns true if the key has latched components '''
+        return len(self._latched_keys) > 0
     
     @property
     def state(self):
@@ -617,7 +623,7 @@ def key_from_code(scan_code, is_extended):
     :return Key instance or None
     """
     global g_scan_code_to_key, g_name_to_key
-    from gremlin import error
+    import copy
 
 
     if scan_code >= 0x1000:
@@ -628,7 +634,8 @@ def key_from_code(scan_code, is_extended):
     # Attempt to located the key in our database and return it if successful
     key = g_scan_code_to_key.get((scan_code, is_extended), None)
     if key is not None:
-        return key
+        return copy.deepcopy(key)
+        
 
     # Attempt to create the key to store and return if successful
     virtual_code = _scan_code_to_virtual_code(scan_code, is_extended)

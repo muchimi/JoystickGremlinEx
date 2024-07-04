@@ -24,11 +24,13 @@ import time
 import gremlin.base_buttons
 import gremlin.base_classes
 import gremlin.base_profile
+import gremlin.config
 from gremlin.input_types import InputType
 import gremlin.actions
 import gremlin.error
 import gremlin.plugin_manager
 import gremlin.base_conditions
+import gremlin.shared_state
 
 
 
@@ -347,6 +349,8 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
         # nonetheless we abort
         if len(action_set) == 0:
             return
+        
+        verbose = gremlin.config.Configuration().verbose
 
         sequence = []
 
@@ -364,12 +368,24 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
         ordered_action_set = []
         for action in action_set:
             # if not isinstance(action, action_plugins.remap.Remap):
-            if not "remap" in action.tag :
-                ordered_action_set.append(action)
-        for action in action_set:
-            # if isinstance(action, action_plugins.remap.Remap):
-            if "remap" in action.tag:
-                ordered_action_set.append(action)
+            priority = 0
+            if hasattr(action, "priority"):
+                priority = action.priority
+            ordered_action_set.append((priority, action))
+
+        if len(ordered_action_set) > 1:
+            ordered_action_set.sort(key = lambda x: x[0])
+        ordered_action_set = [x[1] for x in ordered_action_set]
+
+
+        if verbose: 
+            logging.getLogger("system").debug("Action order:")
+            for index, action in enumerate(ordered_action_set):
+                input_item = action.get_input_item()
+                input_id = input_item.input_id
+                input_stub = str(input_id)
+                logging.getLogger("system").debug(f"{index}: input type: {input_item.input_type} {input_stub} action: {type(action)}  data: {str(action)} ")
+
 
         # Create functors
         for action in ordered_action_set:

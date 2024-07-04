@@ -2,15 +2,17 @@
 cd /d %0\..
 cd dist
 if exist joystick_gremlin\ (
- del joystick_gremlin\ /q
-) else (
- md joystick_gremlin
-)
+ rmdir joystick_gremlin\ /q /s
+) 
+md joystick_gremlin
+
 cd ..
 
 @echo "Building executable ..."
-c:\python\python312\python -m PyInstaller -y --clean joystick_gremlin.spec
+c:\python\python312\python -m PyInstaller -y --log-level INFO --clean joystick_gremlin.spec
 cd dist
+
+
 
 if exist joystick_gremlin.zip del joystick_gremlin.zip
 cd joystick_gremlin

@@ -87,13 +87,7 @@ class KeyboardInputItem():
     @key.setter
     def key(self, value):
         assert isinstance(value, Key), f"Invalid type for key property: expected Key - got {value.type()}"
-        if self._key:
-            # dsiconnect 
-            self._key._latched_keys.remove_callback(self._latched_key_update)
         self._key = value
-        if value:
-            # attach latched key changes to here
-            value._latched_keys.add_callback(self._latched_key_update)
         self._update()
 
 
@@ -134,7 +128,7 @@ class KeyboardInputItem():
         ''' loads itself from xml '''
         from gremlin.keyboard import key_from_code
         self._suspend_update = True
-        self._latched_keys = []
+        
         if node.tag == "input":
             self.id = read_guid(node, "guid", default_value=uuid.uuid4())
 
@@ -144,6 +138,8 @@ class KeyboardInputItem():
                     scan_code = safe_read(child, "scan-code", int, 0)
                     is_extended = safe_read(child, "extended", bool, False)
                     is_mouse = safe_read(child, "mouse", bool, False)
+                    if scan_code == 75:
+                        pass
                     if is_mouse:
                         key = Key(scan_code = scan_code, is_mouse=True)
                     else:

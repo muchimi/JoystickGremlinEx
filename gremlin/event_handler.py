@@ -24,7 +24,10 @@ from threading import Thread, Timer
 from PySide6 import QtCore
 
 import dinput
+import gremlin.config
 from gremlin.input_types import InputType
+import gremlin.keyboard
+import gremlin.shared_state
 from gremlin.singleton_decorator import SingletonDecorator
 from . import config, error, joystick_handling, windows_event_hook
 
@@ -504,7 +507,7 @@ class EventHandler(QtCore.QObject):
 				for key_pair in self.latched_events[device_guid][mode]:
 					identifier = self.latched_events[device_guid][mode][key_pair]
 					if isinstance(identifier, gremlin.ui.keyboard_device.KeyboardInputItem):
-						print (f"Device ID: {device_guid} mode: {mode} pair: {key_pair} data: {identifier.to_string()}")
+						logging.getLogger("system").debug(f"Device ID: {device_guid} mode: {mode} pair: {key_pair} data: {identifier.to_string()}")
 
 
 
@@ -544,7 +547,8 @@ class EventHandler(QtCore.QObject):
 						self.latched_events[device_guid][mode] = {}
 					if index not in self.latched_events[device_guid][mode].keys():
 						self.latched_events[device_guid][mode][index] = []
-					self.latched_events[device_guid][mode][index].append(identifier)
+					if not identifier in self.latched_events[device_guid][mode][index]:
+						self.latched_events[device_guid][mode][index].append(identifier)
 					if verbose:
 						logging.getLogger("system").info(f"Key latch registered: guid {device_guid}  mode:  {mode} index: {index} name: {key.name} -> {identifier.display_name}")
 					
@@ -557,7 +561,6 @@ class EventHandler(QtCore.QObject):
 					self.latched_callbacks[device_guid][mode][primary_key] = []
 				data = self.latched_callbacks[device_guid][mode][primary_key]
 				data.append((self._install_plugins(callback),permanent))
-				#logging.getLogger("system").info(f"Key callback registered: {key.name}")
 				return
 								
 				
@@ -613,10 +616,15 @@ class EventHandler(QtCore.QObject):
 			mouse_button = event.identifier
 			# convert the mouse button to the virtual scan code we use for mouse events
 			identifier = (mouse_button.value + 0x1000, False)
+			is_mouse = True
 			# logging.getLogger("system").info(f"matching mouse event {event.identifier} to {identifier}")
 		else:
 			device_guid = event.device_guid
 			identifier = event.identifier  # this is (scan_code, is_extended)
+			is_mouse = False
+
+		event_key = Key(identifier[0],identifier[1], is_mouse)
+		input_items = []
 
 		#found = False
 		#print (f"looking for:  {identifier} mode: {self._active_mode}")
@@ -628,14 +636,27 @@ class EventHandler(QtCore.QObject):
 				data = data[self._active_mode]
 				if identifier in data.keys():
 					#print ("found identifier")
-					keys = data[identifier]
-					#found = True
+					matching_keys = data[identifier]
+					for input_item in matching_keys:
+						key = input_item.key
+						if event.is_pressed:
+							if key.is_latched and key.latched:
+								input_items.append(input_item)
+							elif not key.is_latched:
+								input_items.append(input_item)
+							
+						else:
+							# not pressed
+							if not event_key in input_items:
+								input_items.append(input_item)
+							
+					
 					if verbose:
-						logging.getLogger("system").info(f"event matching: {identifier} -> found {len(keys)} matching callback events")	
-						for key in keys:
+						logging.getLogger("system").info(f"MATCHED EVENTS: mode: [{self._active_mode}] {identifier} -> found {len(input_items)} matching callback events")	
+						for key in input_items:
 							logging.getLogger("system").info(f"event: {key.name} latched: {key.latched}")
 
-					return keys
+					return input_items
 			# if not found:
 			# 	print (f"did not find index {identifier} - available keys are:")
 			# 	self.dump_callbacks()
@@ -679,6 +700,8 @@ class EventHandler(QtCore.QObject):
 
 		:param new_mode the new mode to use
 		"""
+
+		logging.getLogger("system").debug(f"EVENT: change mode to [{new_mode}] requested")
 		mode_exists = False
 		for device in self.callbacks.values():
 			if new_mode in device:
@@ -706,18 +729,20 @@ class EventHandler(QtCore.QObject):
 			logging.getLogger("system").warning(
 				f"The mode \"{new_mode}\" does not exist or has no associated callbacks"
 			)
+			return
 
-		if mode_exists:
-			if self._active_mode != new_mode:
-				self._previous_mode = self._active_mode
+		
+		if self._active_mode != new_mode:
+			self._previous_mode = self._active_mode
 
-			cfg = config.Configuration()
-			cfg.set_last_mode(cfg.last_profile, new_mode)
+		cfg = config.Configuration()
+		cfg.set_last_mode(cfg.last_profile, new_mode)
 
-			logging.getLogger("system").info(f"Mode switch to: {new_mode}")
+		logging.getLogger("system").debug(f"Mode switch to: {new_mode}")
 
-			self._active_mode = new_mode
-			self.mode_changed.emit(self._active_mode)
+		self._active_mode = new_mode
+		self.mode_changed.emit(self._active_mode)
+	
 
 	def resume(self):
 		"""Resumes the processing of callbacks."""
@@ -764,15 +789,18 @@ class EventHandler(QtCore.QObject):
 			keys = self._matching_event_keys(event)  # returns list of primary keys
 			if keys:
 				if verbose:
-					logging.getLogger("system").info(f"Matched keys for event {event} keys: {len(keys)} ")
+					logging.getLogger("system").info(f"Matched keys for mode: [{self._active_mode}]  event {event} keys: {len(keys)} ")
+					for index, key in enumerate(keys):
+						logging.getLogger("system").info(f"\t[{index}]: {key.name}")
 				for key in keys:
 					latch_key = None
 					is_latched = key.latched
+
 					if event.is_pressed:
 						if is_latched: 
 							latch_key = key.key
 						if verbose:
-							logging.getLogger("system").info(f"KEY PRESSED: {key.key.name} -> latched {is_latched}")
+							logging.getLogger("system").info(f"KEY PRESSED: mode: [{self._active_mode}] {key.key.name} -> latched {is_latched}")
 
 					else:
 						# any key in the latch sequence that isn't pressed breaks the press
@@ -784,7 +812,7 @@ class EventHandler(QtCore.QObject):
 					if latch_key:
 						m_list = self._matching_latched_callbacks(event, latch_key)
 						if verbose and m_list:
-							logging.getLogger("system").info(f"Found latched key: Check key {latch_key.name} callbacks: {len(m_list)} event: {event}")
+							logging.getLogger("system").info(f"TRIGGER: mode: [{self._active_mode}] Found latched key: Check key {latch_key.name} callbacks: {len(m_list)} event: {event}")
 						self._trigger_callbacks(m_list, event)
 			return
 						
@@ -796,18 +824,22 @@ class EventHandler(QtCore.QObject):
 			# other inputs
 			m_list = self._matching_callbacks(event)
 
+		if verbose and m_list:
+			logging.getLogger("system").info(f"TRIGGER: mode: [{self._active_mode}] callbacks: {len(m_list)} event: {event}")
 		self._trigger_callbacks(m_list, event)			
 
 
 	def _trigger_callbacks(self, callbacks, event):
-
+		#verbose = gremlin.config.Configuration().verbose
 		for cb in callbacks:
 			try:
+				# if verbose:
+				# 	logging.getLogger("system").info(f"CALLBACK: execute start")
 				cb(event)
-			except:
-				pass
-			# except error.VJoyError as e:
-			# 	self.pause()
+				# if verbose:
+				# 	logging.getLogger("system").info(f"CALLBACK: execute done")
+			except Exception as ex:
+				logging.getLogger("system").error(f"CALLBACK: error {ex}")
 
 
 	def _matching_midi_callbacks(self, event):

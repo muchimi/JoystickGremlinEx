@@ -22,7 +22,7 @@ to speech system.
 
 import logging
 import win32com.client
-
+import threading
 from . import event_handler, util
 
 
@@ -31,9 +31,9 @@ class TextToSpeech:
     def __init__(self):
         """Creates a new instance."""
         self._speaker = win32com.client.Dispatch("SAPI.SpVoice")
-        self.speak("")
+        self._speak("")
 
-    def speak(self, text):
+    def _speak(self, text):
         """Queues the given text to be spoken by SAPI using the async flag.
 
         Since the text is queued asynchronously this method returns
@@ -47,6 +47,11 @@ class TextToSpeech:
             logging.getLogger("system").error(
                 f"TTS encountered a problem: {e}"
             )
+
+    def speak(self, text):        
+        self._speak(text)
+        # thread = threading.Thread(target = self._speak, args = (text,))
+        # thread.start()
 
     def set_volume(self, value):
         """Sets the volume anywhere between 0 and 100.

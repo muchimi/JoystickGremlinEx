@@ -333,6 +333,10 @@ class Remap(gremlin.base_profile.AbstractAction):
         InputType.Keyboard
     ]
 
+    @property
+    def priority(self):
+        return 9
+
     functor = RemapFunctor
     widget = RemapWidget
 

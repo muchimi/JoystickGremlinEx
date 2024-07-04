@@ -43,6 +43,11 @@ import gremlin.code_runner
 import gremlin.repeater
 import gremlin.base_profile
 
+# imports needed by pyinstaller to be included
+import gremlin.control_action
+
+
+
 import dinput
 
 
@@ -86,7 +91,7 @@ from gremlin.ui.midi_device import MidiDeviceTabWidget
 from gremlin.ui.osc_device import OscDeviceTabWidget
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.14ex (g)"
+APPLICATION_VERSION = "13.40.14ex (h)"
 
 # the main ui
 ui = None

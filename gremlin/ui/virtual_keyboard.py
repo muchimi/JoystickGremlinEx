@@ -255,6 +255,8 @@ class InputKeyboardDialog(QtWidgets.QDialog):
 
         key : Key
 
+        
+
         # create output - place modifiers up front
         for key in keys:
             item = (key.scan_code, key.is_extended)

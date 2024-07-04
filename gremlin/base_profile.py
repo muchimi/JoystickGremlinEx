@@ -8,6 +8,7 @@ import logging
 import time
 import gremlin.actions
 import gremlin.base_buttons
+import gremlin.config
 import gremlin.profile
 from gremlin.util import *
 from gremlin.input_types import InputType
@@ -93,6 +94,13 @@ class ProfileData(metaclass=ABCMeta):
         while not isinstance(item, InputItem):
             item = item.parent
         return item.input_type
+    
+    def get_input_item(self):
+        ''' the input owner'''
+        item = self.parent
+        while not isinstance(item, InputItem):
+            item = item.parent
+        return item
 
     def get_mode(self):
         """Returns the Mode this data entry belongs to.
@@ -1793,6 +1801,8 @@ class ContainerCallback:
             self.execution_graph.process_event(event, shared_value)
 
 
+
+
 class VirtualButtonCallback:
 
     """VirtualButton event based callback class."""
@@ -2016,8 +2026,11 @@ class ContainerExecutionGraph(AbstractExecutionGraph):
         #     sequence.append("Condition")
 
         # If container based conditions exist add them before any actions
+
+        functors = []
+
         if container.activation_condition_type == "container":
-            self.functors.append(
+            functors.append(
                 self._create_activation_condition(container.activation_condition)
             )
             sequence.append("Condition")
@@ -2025,7 +2038,11 @@ class ContainerExecutionGraph(AbstractExecutionGraph):
         functor = container.functor(container)
         container_plugins = gremlin.plugin_manager.ContainerPlugins()
         container_plugins.register_functor(functor)
-        self.functors.append(functor)
+
+        functors.append(functor)
+
+        self.functors = functors
+
         
         sequence.append("Action")
 
@@ -2059,6 +2076,8 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
         # nonetheless we abort
         if len(action_set) == 0:
             return
+        
+        verbose = gremlin.config.Configuration().verbose
 
         sequence = []
 
@@ -2074,14 +2093,34 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
         # Reorder action set entries such that if any remap action is
         # present it is executed last
         ordered_action_set = []
+
         for action in action_set:
             # if not isinstance(action, action_plugins.remap.Remap):
-            if not "remap" in action.tag :
-                ordered_action_set.append(action)
-        for action in action_set:
-            # if isinstance(action, action_plugins.remap.Remap):
-            if "remap" in action.tag:
-                ordered_action_set.append(action)
+            priority = 0
+            if hasattr(action, "priority"):
+                priority = action.priority
+            ordered_action_set.append((priority, action))
+        # for action in action_set:
+        #     # if isinstance(action, action_plugins.remap.Remap):
+        #     if "remap" in action.tag:
+        #         ordered_action_set.append(action)
+
+        if len(ordered_action_set) > 1:
+            ordered_action_set.sort(key = lambda x: x[0])
+        ordered_action_set = [x[1] for x in ordered_action_set]
+
+        if verbose: 
+            logging.getLogger("system").debug("Action order:")
+            for index, action in enumerate(ordered_action_set):
+                input_item = action.get_input_item()
+                if hasattr(input_item,"to_string"):
+                    input_stub = input_item.to_string()
+                else:
+                    input_stub = str(input_item)
+                logging.getLogger("system").debug(f"{index}: input: {input_stub} action: {type(action)}  data: {str(action)} ")
+
+            
+
 
         # Create functors
         for action in ordered_action_set:

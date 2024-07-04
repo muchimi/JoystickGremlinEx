@@ -59,8 +59,15 @@ class SwitchModeFunctor(gremlin.base_profile.AbstractFunctor):
 
     def process_event(self, event, value):
         import gremlin.control_action
-        gremlin.control_action.switch_mode(self.mode_name)
+        import logging
+        if value.current:
+            logging.getLogger("system").info(f"ACTION SWITCH: mode switch to [{self.mode_name}] requested")
+            if self.mode_name:
+                gremlin.control_action.switch_mode(self.mode_name)
+        else:
+            logging.getLogger("system").info(f"ACTION SWITCH: mode switch to [{self.mode_name}] ignored - not pressed")
         return True
+
 
 
 class SwitchMode(gremlin.base_profile.AbstractAction):
@@ -71,22 +78,21 @@ class SwitchMode(gremlin.base_profile.AbstractAction):
     tag = "switch-mode"
 
     default_button_activation = (True, False)
-    # input_types = [
-    #     InputType.JoystickAxis,
-    #     InputType.JoystickButton,
-    #     InputType.JoystickHat,
-    #     InputType.Keyboard
-    # ]
 
     functor = SwitchModeFunctor
     widget = SwitchModeWidget
 
     def __init__(self, parent):
         super().__init__(parent)
-        self.mode_name = self.get_mode().name
+        self.mode_name = ""
 
     def icon(self):
         return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
+    
+    @property
+    def priority(self):
+        # priority relative to other actions in this sequence - 0 is the default for all actions unless specified
+        return 10
 
     def requires_virtual_button(self):
         return self.get_input_type() in [
@@ -103,7 +109,8 @@ class SwitchMode(gremlin.base_profile.AbstractAction):
         return node
 
     def _is_valid(self):
-        return len(self.mode_name) > 0
+        return True
+        
 
 
 version = 1

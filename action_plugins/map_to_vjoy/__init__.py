@@ -1975,7 +1975,9 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
     functor = VJoyRemapFunctor
     widget = VJoyWidget
 
-    
+    @property
+    def priority(self):
+        return 9
 
     def __init__(self, parent):
         """ vjoyremap action block """
