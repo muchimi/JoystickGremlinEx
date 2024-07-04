@@ -171,6 +171,10 @@ class CodeRunner:
             container_plugins = gremlin.plugin_manager.ContainerPlugins()
             container_plugins.reset_functors()
 
+            mode_source = gremlin.shared_state.current_profile.traverse_mode()
+            mode_source.sort(key = lambda x: x[0]) # sort parent to child
+            mode_list = [mode for (_,mode) in mode_source] # parent mode first
+
             # Create input callbacks based on the profile's content
             for device in profile.devices.values():
                 for mode in device.modes.values():

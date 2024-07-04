@@ -28,6 +28,7 @@ import gremlin.config
 from gremlin.input_types import InputType
 import gremlin.keyboard
 import gremlin.shared_state
+import gremlin.shared_state
 from gremlin.singleton_decorator import SingletonDecorator
 from . import config, error, joystick_handling, windows_event_hook
 
@@ -530,8 +531,8 @@ class EventHandler(QtCore.QObject):
 				# keyboard latched event
 				identifier = event.identifier
 				primary_key : Key = identifier.key
-				
 
+				
 				# if the key can latch with multiple primary keys, build the table of all combinations
 				key_list = [primary_key]
 				if primary_key.is_latched:
@@ -543,6 +544,7 @@ class EventHandler(QtCore.QObject):
 					index = key.index_tuple() 
 					if device_guid not in self.latched_events.keys():
 						self.latched_events[device_guid] = {}
+				
 					if mode not in self.latched_events[device_guid].keys():
 						self.latched_events[device_guid][mode] = {}
 					if index not in self.latched_events[device_guid][mode].keys():
@@ -628,6 +630,10 @@ class EventHandler(QtCore.QObject):
 
 		#found = False
 		#print (f"looking for:  {identifier} mode: {self._active_mode}")
+		# grab active modes and parent modes
+	
+		
+
 		if device_guid in self.latched_events:
 			#print (f"found guid: {device_guid}")
 			data = self.latched_events[event.device_guid]
@@ -675,22 +681,25 @@ class EventHandler(QtCore.QObject):
 		"""
 		# Propagate events from parent to children if the children lack
 		# handlers for the available events
+		callbacks_list = [self.callbacks, self.latched_callbacks, self.latched_events]
+		
 		for parent, children in inheritance_tree.items():
 			# Each device is treated separately
-			for device_guid in self.callbacks:
-				# Only attempt to copy handlers if we have any available in
-				# the parent mode
-				if parent in self.callbacks[device_guid]:
-					device_cb = self.callbacks[device_guid]
-					parent_cb = device_cb[parent]
-					# Copy the handlers into each child mode, unless they
-					# have their own handlers already defined
-					for child in children:
-						if child not in device_cb:
-							device_cb[child] = {}
-						for event, callbacks in parent_cb.items():
-							if event not in device_cb[child]:
-								device_cb[child][event] = callbacks
+			for callback_items in callbacks_list:
+				for device_guid in callback_items:
+					# Only attempt to copy handlers if we have any available in
+					# the parent mode
+					if parent in callback_items[device_guid]:
+						device_cb = callback_items[device_guid]
+						parent_cb = device_cb[parent]
+						# Copy the handlers into each child mode, unless they
+						# have their own handlers already defined
+						for child in children:
+							if child not in device_cb:
+								device_cb[child] = {}
+							for event, callbacks in parent_cb.items():
+								if event not in device_cb[child]:
+									device_cb[child][event] = callbacks
 
 			# Recurse until we've dealt with all modes
 			self.build_event_lookup(children)
@@ -784,8 +793,8 @@ class EventHandler(QtCore.QObject):
 
 		# filter latched keyboard or mouse events
 		if event.event_type in (InputType.Keyboard, InputType.KeyboardLatched, InputType.Mouse):
-
-			# print (f"process event: {event}")
+			if verbose:
+				logging.getLogger("system").info(f"process keyboard event: {event}")
 			keys = self._matching_event_keys(event)  # returns list of primary keys
 			if keys:
 				if verbose:

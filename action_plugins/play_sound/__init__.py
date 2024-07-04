@@ -19,7 +19,7 @@
 import os
 from PySide6 import QtCore, QtGui, QtMultimedia, QtWidgets
 from xml.etree import ElementTree
-
+import qtawesome as qta
 
 import gremlin.base_profile
 from gremlin.input_types import InputType
@@ -37,7 +37,9 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _create_ui(self):
         self.layout = QtWidgets.QHBoxLayout()
+        self.icon_widget = QtWidgets.QLabel()
         self.file_path = QtWidgets.QLineEdit()
+        self.file_path.textChanged.connect(self._file_changed)
         self.edit_path = QtWidgets.QPushButton()
         self.edit_path.setIcon(load_icon("gfx/button_edit.png"))
         self.edit_path.clicked.connect(self._new_executable)
@@ -45,6 +47,7 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.volume.setRange(0, 100)
         self.volume.valueChanged.connect(self._volume_changed)
 
+        self.layout.addWidget(self.icon_widget)
         self.layout.addWidget(self.file_path)
         self.layout.addWidget(self.edit_path)
         self.layout.addWidget(QtWidgets.QLabel("Volume"))
@@ -54,18 +57,57 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _populate_ui(self):
         self.file_path.setText(self.action_data.sound_file)
         self.volume.setValue(self.action_data.volume)
+        self._file_changed()
 
     def _volume_changed(self, value):
         self.action_data.volume = value
+
+    def _file_changed(self):
+        fname = self.file_path.text()
+        valid =  os.path.isfile(fname)
+        if valid:
+            self._setIcon("fa.check", color="green")
+        else:
+            self._setIcon("fa.exclamation-circle", color="red")
+
+    def _setIcon(self, icon_path = None, use_qta = True, color = None):
+        import qtawesome as qta
+        from gremlin.util import load_pixmap
+        icon_size = QtCore.QSize(16, 16)
+        ''' sets the icon of the label, pass a blank or None path to clear the icon'''
+        if icon_path:
+            if use_qta:
+                if color:
+                    pixmap = qta.icon(icon_path, color=color).pixmap(icon_size)    
+                else:
+                    pixmap = qta.icon(icon_path).pixmap(icon_size)
+            else:
+                pixmap = load_pixmap(icon_path) if icon_path else None
+        else:
+            pixmap = None
+        if pixmap:
+            pixmap = pixmap.scaled(icon_size, QtCore.Qt.AspectRatioMode.KeepAspectRatio)
+            self.icon_widget.setPixmap(pixmap)
+        else:
+            # clear the pixmap
+            self.icon_widget.setPixmap(QtGui.QPixmap())
 
     def _new_executable(self):
         """Prompts the user to select a new executable to add to the
         profile.
         """
+
+        fname = self.file_path.text() # current entry
+        if os.path.isfile(fname):
+            dir = os.path.dirname(fname)
+        elif os.path.isdir(fname):
+            dir = fname
+        else:
+            dir = "C:\\"
         fname, _ = QtWidgets.QFileDialog.getOpenFileName(
             None,
             "Path to sound file",
-            "C:\\",
+            dir,
             "All Files (*)"
         )
         if fname != "":
@@ -134,12 +176,14 @@ class PlaySound(gremlin.base_profile.AbstractAction):
 
     def _generate_xml(self):
         node = ElementTree.Element("play-sound")
+        if not self.sound_file:
+            self.sound_file = ""
         node.set("file", self.sound_file)
         node.set("volume", str(self.volume))
         return node
 
     def _is_valid(self):
-        return self.sound_file is not None and len(self.sound_file) > 0
+        return self.sound_file is not None and os.path.isfile(self.sound_file) # and len(self.sound_file) > 0
 
 
 version = 1

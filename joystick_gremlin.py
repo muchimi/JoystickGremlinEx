@@ -91,7 +91,7 @@ from gremlin.ui.midi_device import MidiDeviceTabWidget
 from gremlin.ui.osc_device import OscDeviceTabWidget
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.14ex (h)"
+APPLICATION_VERSION = "13.40.14ex (i)"
 
 # the main ui
 ui = None

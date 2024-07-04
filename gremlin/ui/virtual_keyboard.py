@@ -385,39 +385,51 @@ class InputKeyboardDialog(QtWidgets.QDialog):
 
                     icon = None
                     # handle special key names
+                    tooltip = ""
                     if key == "mouse_1":
                         key = "M1"
                         icon = "mdi.mouse"
+                        toolltip = "Left Mouse Button"
                     elif key == "mouse_2":
                         key = "M2"
                         icon = "mdi.mouse"
+                        toolltip = "Middle Mouse Button"
                     elif key == "mouse_3":
-                        key = "Mid"
+                        key = "M3"
                         icon = "mdi.mouse"
+                        toolltip = "Right Mouse Button"
                     elif key == "mouse_4":
                         key = "M4"
                         icon = "mdi.mouse"
+                        toolltip = "Forward Mouse Button"
                     elif key == "mouse_5":
                         key = "M5"
                         icon = "mdi.mouse"
+                        toolltip = "Back Mouse Button"
                     elif key == "wheel_up":
                         key = "MWU"
                         icon = "mdi.mouse"
+                        toolltip = "Wheel Up"
                     elif key == "wheel_down":
                         key = "MWD"
                         icon = "mdi.mouse"
+                        toolltip = "Wheel Down"
                     elif key == "wheel_left":
                         key = "MWL"
-                        icon = "mdi.mouse"      
+                        icon = "mdi.mouse"    
+                        toolltip = "Tilt Left"  
                     elif key == "wheel_right":
                         key = "MWR"
-                        icon = "mdi.mouse"                                                     
+                        icon = "mdi.mouse"
+                        toolltip = "Tilt Right"   
 
                     
                     widget = QKeyWidget(key)
                     if icon:
                         widget.setIcon(load_icon(icon))
                         widget.setIconSize(QtCore.QSize(14,14))
+                    if tooltip:
+                        widget.setToolTip(toolltip)
                     action_key = key_from_name(key_name)
                     widget.key = action_key # this name must be defined in keybpoard.py 
                     widget.normal_key = key

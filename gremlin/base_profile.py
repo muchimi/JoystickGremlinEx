@@ -1118,6 +1118,36 @@ class Profile():
                             branch[entry] = {}
                         branch = branch[entry]
         return tree
+    
+    def _inheritance_tree_to_list(self, data, tree, level = 0):
+        for mode, children in sorted(tree.items()):
+            data.append((level, mode))
+            self._inheritance_tree_to_list(data, children, level+1)
+    
+    def traverse_mode(self):
+        ''' returns the current mode list as a list of (level, mode) '''
+        tree = self.build_inheritance_tree()
+        data = []
+        self._inheritance_tree_to_list(data, tree)
+        return data
+    
+    def mode_map(self):
+        mode_list = self.traverse_mode()
+        mode_list.reverse()
+        data = {}
+        max_index = len(mode_list) - 1
+        for index, (level, mode) in enumerate(mode_list):
+            if index < max_index:
+                parent_level, parent_mode = mode_list[index+1]
+                data[mode] = parent_mode
+            else:
+                data[mode] = None
+        return data
+        
+
+            
+
+
 
     def get_root_modes(self):
         """Returns a list of root modes.

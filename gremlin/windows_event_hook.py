@@ -19,7 +19,7 @@
 import ctypes
 from ctypes import wintypes
 import threading
-
+import time
 import gremlin.common
 from gremlin.singleton_decorator import SingletonDecorator
 
@@ -31,6 +31,74 @@ g_keyboard_callbacks = []
 g_mouse_callbacks = []
 import win32api
 import logging
+
+
+class KeyEvent:
+
+    """Structure containing details about a key event."""
+
+    def __init__(self, scan_code, is_extended, is_pressed, is_injected):
+        """Creates a new instance with the given data.
+
+        :param scan_code the hardware scan code of this event
+        :param is_extended whether or not the scan code is an extended one
+        :param is_pressed flag indicating if the key is pressed
+        :param is_injected flag indicating if the event has been injected
+        """
+        self._scan_code = scan_code
+        self._is_extended = is_extended
+        self._is_pressed = is_pressed
+        self._is_injected = is_injected
+
+    def __str__(self):
+        """Returns a string representation of the event.
+
+        :return string representation of the event
+        """
+        return f"({hex(self._scan_code)} {self._is_extended}) {"down" if self._is_pressed else "up"}, {"injected" if self.is_injected else ""}"
+
+    @property
+    def scan_code(self):
+        return self._scan_code
+
+    @property
+    def is_extended(self):
+        return self._is_extended
+
+    @property
+    def is_pressed(self):
+        return self._is_pressed
+
+    @property
+    def is_injected(self):
+        return self._is_injected
+
+
+class MouseEvent:
+
+    """Structure containing information about a mouse event."""
+
+    def __init__(self, button_id, is_pressed, is_injected):
+        self._button_id = button_id
+        self._is_pressed = is_pressed
+        self._is_injected = is_injected
+
+    @property
+    def button_id(self):
+        return self._button_id
+
+    @property
+    def is_pressed(self):
+        return self._is_pressed
+
+    @property
+    def is_injected(self):
+        return self._is_injected
+    
+def get_last_error():
+    ''' last error implementatoin'''
+    return win32api.GetLastError()
+
 
 # The following pages are references to the various functions used:
 #
@@ -170,6 +238,8 @@ def process_keyboard_event(n_code, w_param, l_param):
     # Pass the event on to the next callback in the chain
     return user32.CallNextHookEx(None, n_code, w_param, l_param)
 
+_mouse_h_wheel_time = None
+_mouse_v_wheel_time = None
 
 @HOOKPROC
 def process_mouse_event(n_code, w_param, l_param):
@@ -203,20 +273,45 @@ def process_mouse_event(n_code, w_param, l_param):
                 button_id = gremlin.types.MouseButton.Forward
             is_pressed = w_param == WM_XBUTTONDOWN
         elif w_param == WM_MOUSEWHEEL:
-            delta = msg.mouseData >> 16
-            if delta == 120:
-                button_id = gremlin.types.MouseButton.WheelUp
-            elif delta == 65416:
-                button_id = gremlin.types.MouseButton.WheelDown
-            is_wheel = True
+            process = False
+            global _mouse_v_wheel_time
+            if not _mouse_v_wheel_time:
+                _mouse_v_wheel_time = time.time()
+                process = True
+            else:
+                current_time = time.time()
+                time_delta = (current_time - _mouse_v_wheel_time) * 1000 # in milliseconds
+                _mouse_v_wheel_time = current_time
+                process = time_delta > 500 # half a second
+            if process:
+                delta = msg.mouseData >> 16
+                # print (f"mouse V received: data {msg.mouseData} (0x{msg.mouseData:X})  flags: {msg.flags} (0x{msg.flags:X}) time: {msg.time} (0x{msg.time:X}) extra: {msg.dwExtraInfo} (0x{msg.dwExtraInfo:X})  delta: {delta} (0x{delta:x})  delta / 120: {delta/120}")
+                if delta == 120:
+                    button_id = gremlin.types.MouseButton.WheelUp
+                elif delta == 65416: # -120
+                    button_id = gremlin.types.MouseButton.WheelDown
+                is_wheel = True
         elif w_param == WM_MOUSEHWHEEL:
-            # horizontal mouse wheel
-            delta = msg.mouseData >> 16
-            if delta == 120:
-                button_id = gremlin.types.MouseButton.WheelRight
-            elif delta == 65416:
-                button_id = gremlin.types.MouseButton.WheelLeft
-            is_wheel = True
+            # horizontal mouse wheel  https://learn.microsoft.com/en-us/windows/win32/inputdev/wm-mousehwheel
+            process = False
+            global _mouse_h_wheel_time
+            if not _mouse_h_wheel_time:
+                _mouse_h_wheel_time = time.time()
+                process = True
+            else:
+                current_time = time.time()
+                time_delta = (current_time - _mouse_h_wheel_time) * 1000 # in milliseconds
+                _mouse_h_wheel_time = current_time
+                process = time_delta > 500 # half a second
+
+            if process:
+                delta = msg.mouseData >> 16
+                # print (f"mouse H received: data {msg.mouseData} (0x{msg.mouseData:X})  flags: {msg.flags} (0x{msg.flags:X}) time: {msg.time} (0x{msg.time:X}) extra: {msg.dwExtraInfo} (0x{msg.dwExtraInfo:X})  delta: {delta} (0x{delta:x})  delta / 120: {delta/120}")
+                if delta == 120:
+                    button_id = gremlin.types.MouseButton.WheelRight
+                elif delta == 65416: # -120
+                    button_id = gremlin.types.MouseButton.WheelLeft
+                is_wheel = True
 
         # if button_id:
         #     logging.getLogger("system").info(f"Mouse button: {button_id}")
@@ -244,72 +339,6 @@ def _queue_wheel_release(button_id):
     for cb in g_mouse_callbacks:
         cb(evt)
 
-
-class KeyEvent:
-
-    """Structure containing details about a key event."""
-
-    def __init__(self, scan_code, is_extended, is_pressed, is_injected):
-        """Creates a new instance with the given data.
-
-        :param scan_code the hardware scan code of this event
-        :param is_extended whether or not the scan code is an extended one
-        :param is_pressed flag indicating if the key is pressed
-        :param is_injected flag indicating if the event has been injected
-        """
-        self._scan_code = scan_code
-        self._is_extended = is_extended
-        self._is_pressed = is_pressed
-        self._is_injected = is_injected
-
-    def __str__(self):
-        """Returns a string representation of the event.
-
-        :return string representation of the event
-        """
-        return f"({hex(self._scan_code)} {self._is_extended}) {"down" if self._is_pressed else "up"}, {"injected" if self.is_injected else ""}"
-
-    @property
-    def scan_code(self):
-        return self._scan_code
-
-    @property
-    def is_extended(self):
-        return self._is_extended
-
-    @property
-    def is_pressed(self):
-        return self._is_pressed
-
-    @property
-    def is_injected(self):
-        return self._is_injected
-
-
-class MouseEvent:
-
-    """Structure containing information about a mouse event."""
-
-    def __init__(self, button_id, is_pressed, is_injected):
-        self._button_id = button_id
-        self._is_pressed = is_pressed
-        self._is_injected = is_injected
-
-    @property
-    def button_id(self):
-        return self._button_id
-
-    @property
-    def is_pressed(self):
-        return self._is_pressed
-
-    @property
-    def is_injected(self):
-        return self._is_injected
-    
-def get_last_error():
-    ''' last error implementatoin'''
-    return win32api.GetLastError()
 
 
 @SingletonDecorator
