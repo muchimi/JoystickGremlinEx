@@ -158,6 +158,10 @@ class Key:
                     k = key_from_code(scan_code, is_extended)
                     name = k.name
                     lookup_name = k.lookup_name
+
+
+        if len(name)==1:
+            name = name.upper()
                     
 
         self._is_mouse = is_mouse

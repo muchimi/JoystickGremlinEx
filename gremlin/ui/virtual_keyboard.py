@@ -20,6 +20,8 @@ import copy
 
 class QKeyWidget(QtWidgets.QPushButton):
 
+    # indicates when the widget is hovered (true = on)
+    hover = QtCore.Signal(object, bool)
 
     # fires when selection changes
     selected_changed = QtCore.Signal(object)
@@ -29,6 +31,7 @@ class QKeyWidget(QtWidgets.QPushButton):
         super().__init__(text= text, parent = parent)
         self._key = None
         self._selected = False
+        self.setAttribute(QtCore.Qt.WidgetAttribute.WA_Hover, True)
 
         self._default_style = "QPushButton {border: 2px solid black; border-radius: 4px; background-color: #E8E8E8; border-style: outset; padding: 4px; min-width: 32px; max-height: 30px;} QPushButton:hover {border: 2px #4A4648;}"
         self._selected_style = "QPushButton {border: 2px solid black; border-radius: 4px; background-color: #8FBC8F; border-style: outset; padding: 4px; min-width: 32px; max-height: 30px;} QPushButton:hover {border: 2px #4A4648;}"
@@ -36,6 +39,8 @@ class QKeyWidget(QtWidgets.QPushButton):
         
         self.normal_key = None # what to display normally
         self.shifted_key = None # what to display when shifted
+
+        self.installEventFilter(self)
 
     @property
     def key(self) -> Key:
@@ -73,6 +78,23 @@ class QKeyWidget(QtWidgets.QPushButton):
             self.setStyleSheet(self._selected_style)
         else:
             self.setStyleSheet(self._default_style)
+
+    def eventFilter(self, obj, event):
+        t = event.type()
+        if t == QtCore.QEvent.Type.HoverEnter:
+            self.hover.emit(self, True)
+        elif t == QtCore.QEvent.Type.HoverLeave:
+            self.hover.emit(self, False)
+
+        return False
+    
+    @property
+    def display_name(self):
+        ''' friendly key name'''
+        if self._key:
+            return self._key.name
+        return ""
+        
 
     
 
@@ -116,6 +138,9 @@ class InputKeyboardDialog(QtWidgets.QDialog):
         self.listen_widget = QtWidgets.QPushButton("Listen")
         self.listen_widget.clicked.connect(self._listen_cb)
 
+        self.key_description = QtWidgets.QLabel()
+
+
 
         self.ok_widget = QtWidgets.QPushButton("Ok")
         self.ok_widget.clicked.connect(self._ok_button_cb)
@@ -125,6 +150,8 @@ class InputKeyboardDialog(QtWidgets.QDialog):
 
         self.button_layout.addWidget(self.clear_widget)
         self.button_layout.addWidget(self.listen_widget)
+        self.button_layout.addWidget(QtWidgets.QLabel(" "))
+        self.button_layout.addWidget(self.key_description)
         self.button_layout.addStretch(1)
         self.button_layout.addWidget(self.ok_widget)
         self.button_layout.addWidget(self.cancel_widget)
@@ -428,13 +455,13 @@ class InputKeyboardDialog(QtWidgets.QDialog):
                     if icon:
                         widget.setIcon(load_icon(icon))
                         widget.setIconSize(QtCore.QSize(14,14))
-                    if tooltip:
-                        widget.setToolTip(toolltip)
+
                     action_key = key_from_name(key_name)
                     widget.key = action_key # this name must be defined in keybpoard.py 
                     widget.normal_key = key
                     widget.shifted_key = shifted
                     widget.clicked.connect(self._key_cb)
+                    widget.hover.connect(self._key_hover_cb)
                     #logging.getLogger("system").info(f"{key_name}: {key} {shifted}")
 
                     self._key_map[(action_key.scan_code, action_key.is_extended)] = key_name
@@ -457,6 +484,12 @@ class InputKeyboardDialog(QtWidgets.QDialog):
         grid_widget.setLayout(grid_layout)
 
         return grid_widget
+    
+    def _key_hover_cb(self, widget, hover):
+        if hover:
+            self.key_description.setText(widget.display_name)
+        else:
+            self.key_description.setText("")
 
 
     def _key_cb(self):
