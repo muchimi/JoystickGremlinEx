@@ -67,6 +67,7 @@ class TextToSpeechWidget(gremlin.ui.input_item.AbstractActionWidget):
         t = event.type()
         if t == QtCore.QEvent.Type.FocusOut:
             self.action_data.text = self.text_field.toPlainText()
+        return False
 
     def _content_changed_cb(self):
         self.action_data.text = self.text_field.toPlainText()

@@ -59,7 +59,8 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
     def eventFilter(self, object, event):
         t = event.type()
         if t == QtCore.QEvent.Type.FocusOut:
-            self.action_data.sound_file = self.file_path.text()    
+            self.action_data.sound_file = self.file_path.text()  
+        return False
 
     def _populate_ui(self):
         self.file_path.setText(self.action_data.sound_file)

@@ -51,6 +51,9 @@ MOUSEEVENTF_HWHEEL = 0x1000
 MOUSEEVENTF_XDOWN = 0x0080
 MOUSEEVENTF_XUP = 0x0100
 
+KEYEVENTF_KEYUP = 0x0002
+KEYEVENTF_EXTENDEDKEY = 0x0001
+
 
 """Defines data structure type for INPUT structures.
 
@@ -342,6 +345,12 @@ class _KEYBDINPUT(ctypes.Structure):
     )
 
 
+def _keyboard_input(virtual_key, scan_code, flags):
+    return _INPUT(
+        INPUT_KEYBOARD,
+        _INPUTunion(ki=_KEYBDINPUT(virtual_key, scan_code, flags, 0, None))
+    )
+
 class _INPUTunion(ctypes.Union):
 
     """Defines the INPUT union type.
@@ -421,7 +430,16 @@ def _mouse_input(flags, dx=0, dy=0, data=0):
     )
 
 
+
+
+def send_key(virtual_code, scan_code, flags):
+    ''' sends a key message via send input '''
+    _send_input(_keyboard_input(virtual_code, scan_code, flags))
+
+
+
 def _send_input(*inputs):
+    # https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendinput
     nInputs = len(inputs)
     LPINPUT = _INPUT * nInputs
     pInputs = LPINPUT(*inputs)

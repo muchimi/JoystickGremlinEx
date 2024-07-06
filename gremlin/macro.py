@@ -34,6 +34,7 @@ from gremlin.input_types import InputType
 import gremlin.input_devices
 import gremlin.error
 import gremlin.keyboard
+import gremlin.sendinput
 from gremlin.singleton_decorator import SingletonDecorator
 
 
@@ -244,7 +245,9 @@ def _send_key_down(key, is_local = True, is_remote = False, force_remote = False
 
     :param key the key for which to send the KEYDOWN event
     """
-    
+    assert key.virtual_code and key.scan_code, f"Invalid key: {key}"
+
+
     if key.is_mouse:
         # special handling of virtual keys for mouse buttons
         _send_mouse_button(key.mouse_button, True, is_local, is_remote, force_remote )
@@ -255,7 +258,9 @@ def _send_key_down(key, is_local = True, is_remote = False, force_remote = False
     flags = win32con.KEYEVENTF_EXTENDEDKEY if key.is_extended else 0
 
     if is_local:
-        win32api.keybd_event(key.virtual_code, key.scan_code, flags, 0)
+        gremlin.sendinput.send_key(key.virtual_code, key.scan_code, flags)
+
+        # win32api.keybd_event(key.virtual_code, key.scan_code, flags, 0)
     if is_remote:
         gremlin.input_devices.remote_client.send_key(key.virtual_code, key.scan_code, flags, force_remote)
     
@@ -273,7 +278,8 @@ def _send_key_up(key, is_local = True, is_remote = False, force_remote = False):
     flags = win32con.KEYEVENTF_EXTENDEDKEY if key.is_extended else 0
     flags |= win32con.KEYEVENTF_KEYUP
     if is_local:
-        win32api.keybd_event(key.virtual_code, key.scan_code, flags, 0)
+        gremlin.sendinput.send_key(key.virtual_code, key.scan_code, flags)
+        # win32api.keybd_event(key.virtual_code, key.scan_code, flags, 0)
     if is_remote:
         gremlin.input_devices.remote_client.send_key(key.virtual_code, key.scan_code, flags, force_remote )
 

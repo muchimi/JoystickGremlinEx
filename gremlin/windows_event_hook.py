@@ -21,6 +21,8 @@ from ctypes import wintypes
 import threading
 import time
 import gremlin.common
+import gremlin.event_handler
+import gremlin.shared_state
 from gremlin.singleton_decorator import SingletonDecorator
 
 
@@ -37,14 +39,15 @@ class KeyEvent:
 
     """Structure containing details about a key event."""
 
-    def __init__(self, scan_code, is_extended, is_pressed, is_injected):
+    def __init__(self, virtual_code, scan_code, is_extended, is_pressed, is_injected):
         """Creates a new instance with the given data.
-
+        :param virtual_code the virtual keyboard code this event
         :param scan_code the hardware scan code of this event
         :param is_extended whether or not the scan code is an extended one
         :param is_pressed flag indicating if the key is pressed
         :param is_injected flag indicating if the event has been injected
         """
+        self._virtual_code = virtual_code
         self._scan_code = scan_code
         self._is_extended = is_extended
         self._is_pressed = is_pressed
@@ -55,7 +58,7 @@ class KeyEvent:
 
         :return string representation of the event
         """
-        return f"({hex(self._scan_code)} {self._is_extended}) {"down" if self._is_pressed else "up"}, {"injected" if self.is_injected else ""}"
+        return f"(virtual: {hex(self._virtual_code)}  scancode/extended ({hex(self._scan_code)} {self._is_extended}) {"down" if self._is_pressed else "up"}, {"injected" if self.is_injected else ""}"
 
     @property
     def scan_code(self):
@@ -72,6 +75,10 @@ class KeyEvent:
     @property
     def is_injected(self):
         return self._is_injected
+    
+    @property
+    def virtual_code(self):
+        return self._virtual_code
 
 
 class MouseEvent:
@@ -214,12 +221,13 @@ def process_keyboard_event(n_code, w_param, l_param):
     # https://msdn.microsoft.com/en-us/library/windows/desktop/ms644985(v=vs.85).aspx
     if n_code >= 0 and msg.scanCode:
         # Extract data from the message
+        virtual_code = msg.vkCode
         scan_code = msg.scanCode & 0xFF
         is_extended = msg.flags is not None and bool(msg.flags & 0x0001)
         is_pressed = w_param in [0x0100, 0x0104]
         is_injected = msg.flags is not None and bool(msg.flags & 0x0010)
 
-        #print (f"{scan_code} (0x{scan_code:x}) ext: {is_extended} pressed: {is_pressed}")
+        #print (f"****** KEYBOARD HOOK: raw scancode: 0x{msg.scanCode:X} w_param: 0x{w_param:X} flags: 0x{msg.flags:X} scan code: {scan_code} (0x{scan_code:x}) ext: {is_extended} pressed: {is_pressed}")
 
         # A scan code of 541 indicates AltGr being pressed. AltGr is sent
         # as a combination of RAlt + RCtrl to the system and as such
@@ -231,7 +239,7 @@ def process_keyboard_event(n_code, w_param, l_param):
 
         # Create the event and pass it to all all registered callbacks
         if msg.scanCode != 541:
-            evt = KeyEvent(scan_code, is_extended, is_pressed, is_injected)
+            evt = KeyEvent(virtual_code = virtual_code, scan_code = scan_code, is_extended = is_extended, is_pressed = is_pressed, is_injected = is_injected)
             for cb in g_keyboard_callbacks:
                 cb(evt)
 

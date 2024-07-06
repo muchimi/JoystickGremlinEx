@@ -91,7 +91,12 @@ class KeyboardInputItem():
         self._key = value
         self._update()
 
-
+    @property
+    def index_tuple(self):
+        if self._key:
+            return self._key.index_tuple
+        return None
+    
     @property 
     def latched(self):
         ''' true if all the keys in this input are latched '''
@@ -99,6 +104,18 @@ class KeyboardInputItem():
             return False
         return self._key.latched
 
+    @property
+    def is_latched(self):
+        if self._key:
+            return self._key.is_latched
+        return False
+    
+    @property
+    def latched_keys(self) -> list:
+        if self._key:
+            return self._key.latched_keys
+        return []
+        
 
     @property
     def message_key(self):
