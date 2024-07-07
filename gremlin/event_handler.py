@@ -272,7 +272,7 @@ class EventListener(QtCore.QObject):
 	def _process_queue(self):
 		''' processes an item the keyboard buffer queue '''
 		item, is_pressed = self._keyboard_queue.get()
-		verbose = gremlin.config.Configuration().verbose
+		verbose = gremlin.config.Configuration().verbose_mode_keyboard
 
 		if isinstance(item, int):
 			virtual_code = item
@@ -397,7 +397,7 @@ class EventListener(QtCore.QObject):
 		"""
 
 		from gremlin.util import dill_hat_lookup
-		verbose = config.Configuration().verbose
+		verbose = config.Configuration().verbose_mode_joystick
 		
 		if not self._running:
 			return True
@@ -463,7 +463,7 @@ class EventListener(QtCore.QObject):
 
 		:param event the keyboard event
 		"""
-		verbose = gremlin.config.Configuration().verbose
+		verbose = gremlin.config.Configuration().verbose_mode_keyboard
 		# verbose = True
 		virtual_code = event.virtual_code
 		key_id = (event.scan_code, event.is_extended)
@@ -662,9 +662,10 @@ class EventHandler(QtCore.QObject):
 		"""
 		import gremlin.config
 		import gremlin.ui.keyboard_device
-		verbose = gremlin.config.Configuration().verbose
+		
 		if event:
 			if event.event_type in (InputType.Keyboard, InputType.KeyboardLatched):
+				verbose = gremlin.config.Configuration().verbose_mode_keyboard
 				# keyboard latched event
 				identifier = event.identifier
 				primary_key : Key = identifier.key
@@ -706,6 +707,7 @@ class EventHandler(QtCore.QObject):
 				
 			elif event.event_type == InputType.Midi:
 				# MIDI event
+				verbose = gremlin.config.Configuration().verbose
 				midi_input = event.identifier
 				key = midi_input.message_key
 				if device_guid not in self.midi_callbacks.keys():
@@ -719,6 +721,7 @@ class EventHandler(QtCore.QObject):
 
 			elif event.event_type == InputType.OpenSoundControl:
 				# OSC event
+				verbose = gremlin.config.Configuration().verbose
 				osc_input = event.identifier
 				key = osc_input.message_key
 				if device_guid not in self.osc_callbacks.keys():
@@ -749,15 +752,18 @@ class EventHandler(QtCore.QObject):
 			return []
 		import gremlin.config
 		virtual_code = 0
-		verbose = gremlin.config.Configuration().verbose
+		
 		# convert mouse events to keyboard event
 		if event.event_type == InputType.Mouse:
 			from gremlin.ui.keyboard_device import KeyboardDeviceTabWidget
 			device_guid = KeyboardDeviceTabWidget.device_guid
+			verbose = gremlin.config.Configuration().verbose_mode_keyboard
 			mouse_button = event.identifier
 			# convert the mouse button to the virtual scan code we use for mouse events
 			index = (mouse_button.value + 0x1000, False)
-			# logging.getLogger("system").info(f"matching mouse event {event.identifier} to {identifier}")
+			verbose = gremlin.config.Configuration().verbose_mode_mouse
+			if verbose:
+				logging.getLogger("system").info(f"matching mouse event {event.identifier} to {event.identifier}")
 		else:
 			device_guid = event.device_guid
 			index = event.virtual_code if event.virtual_code > 0 else event.identifier  # this is (scan_code, is_extended)
@@ -770,6 +776,7 @@ class EventHandler(QtCore.QObject):
 		# grab active modes and parent modes
 	
 		if device_guid in self.latched_events:
+			verbose = gremlin.config.Configuration().verbose_mode_keyboard
 			#print (f"found guid: {device_guid}")
 			data = self.latched_events[event.device_guid]
 			if self._active_mode in data.keys():
@@ -921,18 +928,18 @@ class EventHandler(QtCore.QObject):
 		# list of callbacks
 		m_list = []
 
-		verbose = gremlin.config.Configuration().verbose
+		verbose_mode_keyboard = gremlin.config.Configuration().verbose_mode_keyboard
 		# verbose = True
 
 		# filter latched keyboard or mouse events
 		if event.event_type in (InputType.Keyboard, InputType.KeyboardLatched, InputType.Mouse):
 			# verbose = event.event_type != InputType.Mouse
-			if verbose:
+			if verbose_mode_keyboard:
 				logging.getLogger("system").info(f"process keyboard event: {event}")
 
 			items = self._matching_event_keys(event)  # returns list of primary keys
 			if items:
-				if verbose:
+				if verbose_mode_keyboard:
 					logging.getLogger("system").info(f"Matched keys for mode: [{self._active_mode}]  event {event} pressed: {event.is_pressed} keys: {len(items)} ")
 					for index, input_item in enumerate(items):
 						logging.getLogger("system").info(f"\t[{index}]: {input_item.name}")
@@ -944,32 +951,35 @@ class EventHandler(QtCore.QObject):
 					# print (data)
 					latched_keys = [input_item.key]
 					latched_keys.extend(input_item.latched_keys)
-					if verbose:
+					if verbose_mode_keyboard:
 						logging.getLogger("system").info(f"Checking latching: {len(latched_keys)} key(s)")
 					for k in latched_keys:
 						index = k.virtual_code if k.virtual_code > 0 else k.index_tuple()
 						state = data[index] if index in data.keys() else False
-						if verbose:
+						if verbose_mode_keyboard:
 							logging.getLogger("system").info(f"\tcheck latched key: {index} {k.name} pressed: {state}")
 						is_latched = is_latched and state
 
-					if verbose: logging.getLogger("system").info(f"Final latched state: {is_latched}")
+					if verbose_mode_keyboard: logging.getLogger("system").info(f"Final latched state: {is_latched}")
 					
 				# is_latched = key.latched
 				
 				if is_latched: 
 					latch_key = input_item.key
-					if verbose:
+					if verbose_mode_keyboard:
 						logging.getLogger("system").info(f"Detect KEY PRESSED: mode: [{self._active_mode}] {input_item.key.name}")
 				else:
-					if verbose:
+					if verbose_mode_keyboard:
 						logging.getLogger("system").info(f"Detect KEY RELEASED: {input_item.key.name}")
 								
 				if latch_key:
 					m_list = self._matching_latched_callbacks(event, latch_key)
 					if m_list:
-						if verbose :
-							logging.getLogger("system").info(f"*** TRIGGER **** : mode: [{self._active_mode}] Found latched key: Check key {latch_key.name} callbacks: {len(m_list)} event: {event}")
+						if verbose_mode_keyboard :
+							trigger_line = "***** TRIGGER " + "*"*30
+							logging.getLogger("system").info(trigger_line)
+							logging.getLogger("system").info(f"\tmode: [{self._active_mode}] Found latched key: Check key {latch_key.name} callbacks: {len(m_list)} event: {event}")
+							logging.getLogger("system").info(trigger_line)
 						self._trigger_callbacks(m_list, event)
 			return
 						
@@ -981,7 +991,7 @@ class EventHandler(QtCore.QObject):
 			# other inputs
 			m_list = self._matching_callbacks(event)
 
-		if verbose and m_list:
+		if verbose_mode_keyboard and m_list:
 			logging.getLogger("system").info(f"TRIGGER: mode: [{self._active_mode}] callbacks: {len(m_list)} event: {event}")
 		self._trigger_callbacks(m_list, event)			
 

@@ -501,7 +501,7 @@ def find_file(file_path, root_folder = None):
     from pathlib import Path
     from gremlin.config import Configuration
     import gremlin.shared_state
-    verbose = Configuration().verbose
+    verbose = Configuration().verbose_mode_details
 
     file_path = file_path.lower().replace("/",os.sep)
     sub_folders = None
@@ -563,7 +563,7 @@ def get_icon_path(*paths):
         '''
 
         from gremlin.config import Configuration
-        verbose = Configuration().verbose
+        verbose = Configuration().verbose_mode_details
         
         import gremlin.shared_state
 
@@ -627,7 +627,7 @@ def load_pixmap(*paths):
 def load_icon(*paths, use_qta = False, qta_color = None):
     ''' gets an icon (returns a QIcon) - uses the qtawesome library or does a raw file search '''
     from gremlin.config import Configuration
-    verbose = Configuration().verbose
+    verbose = Configuration().verbose_mode_details
     
     (the_path,) = paths
     _, ext = os.path.splitext(the_path.lower())
@@ -659,7 +659,7 @@ def load_icon(*paths, use_qta = False, qta_color = None):
 def load_image(*paths):
     ''' loads an image '''
     from gremlin.config import Configuration
-    verbose = Configuration().verbose
+    verbose = Configuration().verbose_mode_details
     the_path = get_icon_path(*paths)
     if the_path:
         if verbose:

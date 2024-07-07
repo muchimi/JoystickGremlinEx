@@ -31,6 +31,7 @@ from gremlin.clipboard import Clipboard
 import gremlin.config
 import gremlin.joystick_handling
 import gremlin.shared_state
+import gremlin.types
 from . import ui_about, ui_common
 from gremlin.util import load_icon
 import logging
@@ -124,9 +125,32 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.persist_clipboard.setChecked(self._persist_clipboard_enabled())
 
         # verbose output
-        self.verbose = QtWidgets.QCheckBox("Verbose log")
-        self.verbose.clicked.connect(self._verbose)
-        self.verbose.setChecked(self.config.verbose)
+        self.verbose_container_widget = QtWidgets.QWidget()
+        self.verbose_container_layout = QtWidgets.QGridLayout()
+        self.verbose_container_layout.setContentsMargins(0,0,0,0)
+        self.verbose_container_widget.setLayout(self.verbose_container_layout)
+
+        self.verbose_widget = QtWidgets.QCheckBox("Verbose log")
+        verbose = self.config.verbose
+        self.verbose_widget.setChecked(verbose)
+        self.verbose_widget.clicked.connect(self._verbose_cb)
+
+        self._verbose_mode_widgets = {}
+        row = 0
+        col = 1
+        self.verbose_container_layout.addWidget(self.verbose_widget,0,0)
+        for mode in gremlin.types.VerboseMode:
+            widget = QtWidgets.QCheckBox(mode.name)
+            widget.setChecked(self.config.is_verbose_mode(mode))
+            widget.clicked.connect(lambda x:self.config.verbose_set_mode(mode, widget.isChecked()))
+            self.verbose_container_layout.addWidget(widget, row, col)
+            col += 1
+            if col > 2:
+                col = 1
+                row +=1
+            self._verbose_mode_widgets[mode] = widget
+
+
 
         # midi enabled
         self.osc_enabled = QtWidgets.QCheckBox("Enable OSC input")
@@ -255,7 +279,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.general_layout.addWidget(self.start_minimized)
         self.general_layout.addWidget(self.start_with_windows)
         self.general_layout.addWidget(self.persist_clipboard)
-        self.general_layout.addWidget(self.verbose)
+        self.general_layout.addWidget(self.verbose_container_widget)
         self.general_layout.addWidget(self.midi_enabled)
         
         container = QtWidgets.QWidget()
@@ -488,32 +512,33 @@ If this option is on, the last active profile will remain active until a differe
         :param clicked whether or not the checkbox is ticked
         """
         self.config.start_minimized = clicked
-        self.config.save()
+        
 
     def _persist_clipboard(self, clicked):
         self.config.persist_clipboard = clicked
-        self.config.save()
+        
 
     def _persist_clipboard_enabled(self):
         return self.config.persist_clipboard
     
-    def _verbose(self, clicked):
+    def _verbose_cb(self, clicked):
         ''' stores verbose setting '''
         self.config.verbose = clicked
-        self.config.save
+        for widget in self._verbose_mode_widgets.values():
+            widget.setEnabled(clicked)
 
     def _midi_enabled(self, clicked):
         self.config.midi_enabled = clicked
-        self.config.save
+        
 
     def _osc_enabled(self, clicked):
         self.config.osc_enabled = clicked
         self.osc_port.setEnabled(clicked)
-        self.config.save
+        
 
     def _osc_port(self):
         self.config.osc_port = self.osc_port.value()
-        self.config.save
+        
 
 
     def _start_windows(self, clicked):

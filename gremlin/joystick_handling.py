@@ -25,7 +25,7 @@ from . import common, error, util
 from vjoy import vjoy
 from dinput import DeviceSummary
 from gremlin.input_types import InputType
-
+import gremlin.config
 
 # List of all joystick devices
 _joystick_devices = []
@@ -203,6 +203,8 @@ def joystick_devices_initialization():
     windows id assigned to it.
     """
     global _joystick_devices, _joystick_init_lock
+    
+    verbose = gremlin.config.Configuration().verbose_mode_inputs
 
     _joystick_init_lock.acquire()
 
@@ -230,12 +232,14 @@ def joystick_devices_initialization():
     for new_dev in devices:
         if new_dev not in _joystick_devices:
             device_added = True
-            syslog.debug(f"Added: name={new_dev.name} guid={new_dev.device_guid}")
+            if verbose:
+                syslog.debug(f"Added: name={new_dev.name} guid={new_dev.device_guid}")
                 
     for old_dev in _joystick_devices:
         if old_dev not in devices:
             device_removed = True
-            syslog.debug(f"Removed: name={old_dev.name} guid={old_dev.device_guid}")
+            if verbose:
+                syslog.debug(f"Removed: name={old_dev.name} guid={old_dev.device_guid}")
 
     # Terminate if no change occurred
     if not device_added and not device_removed:
@@ -251,7 +255,8 @@ def joystick_devices_initialization():
     vjoy_lookup = {}
     for dev in [dev for dev in devices if dev.is_virtual]:
         hash_value = (dev.axis_count, dev.button_count, dev.hat_count)
-        syslog.debug(f"vJoy guid={dev.device_guid}: {hash_value}")
+        if verbose:
+            syslog.debug(f"vJoy guid={dev.device_guid}: {hash_value}")
 
         # Only unique combinations of axes, buttons, and hats are allowed
         # for vJoy devices
@@ -291,7 +296,8 @@ def joystick_devices_initialization():
         # the previous step we can directly link the SDL and vJoy device
         if hash_value in vjoy_lookup:
             vjoy_lookup[hash_value].set_vjoy_id(i)
-            syslog.debug(f"vjoy id {i:d}: {hash_value} - MATCH")
+            if verbose:
+                syslog.debug(f"vjoy id {i:d}: {hash_value} - MATCH")
         else:
             # should_terminate = True
             syslog.debug(f"vjoy id {i:d}: {hash_value} - ERROR - vJoy device exists but DILL does not see it - check HIDHide config if enabled and process is whitelisted")

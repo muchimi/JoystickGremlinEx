@@ -995,7 +995,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         if self.locked:
             return
 
-        verbose = gremlin.config.Configuration().verbose
+        verbose = gremlin.config.Configuration().verbose_mode_inputs
 
         # enter critical section
         try:
@@ -1768,10 +1768,9 @@ if __name__ == "__main__":
     # and terminate Gremlin
     try:
         syslog.info("Checking vJoy installation")
-        vjoy_working = len([
-            dev for dev in gremlin.joystick_handling.joystick_devices()
-            if dev.is_virtual
-        ]) != 0
+        vjoy_count = len([dev for dev in gremlin.joystick_handling.joystick_devices() if dev.is_virtual])
+        vjoy_working = vjoy_count != 0
+        logging.getLogger("system").info(f"\tFound {vjoy_count} vjoy device(s)")
 
         if not vjoy_working:
             logging.getLogger("system").error(
@@ -1780,6 +1779,8 @@ if __name__ == "__main__":
             raise gremlin.error.GremlinError(
                 "vJoy is not present or incorrectly setup."
             )
+        
+        
 
     except (gremlin.error.GremlinError, dinput.DILLError) as e:
         error_display = QtWidgets.QMessageBox(

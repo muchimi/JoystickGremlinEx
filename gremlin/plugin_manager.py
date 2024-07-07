@@ -126,7 +126,7 @@ class ContainerPlugins:
         plugin_folder = "container_plugins"
         root_path = gremlin.shared_state.root_path
         walk_path = os.path.join(root_path, plugin_folder)
-        log_sys(f"Container plugin folder: {walk_path}")
+        log_sys(f"Using container plugin folder: {walk_path}")
         if not os.path.isdir(walk_path):
             raise error(f"Unable to find container plugins: {walk_path}")
         
@@ -145,7 +145,7 @@ class ContainerPlugins:
                     )
                     if "version" in plugin.__dict__:
                         self._plugins[plugin.name] = plugin.create
-                        log_sys(f"Loaded container plugin: {plugin.name}"
+                        log_sys(f"\tLoaded container plugin: {plugin.name}"
                         )
                     else:
                         del plugin
@@ -153,7 +153,7 @@ class ContainerPlugins:
                     # Log an error and ignore the action_plugins if
                     # anything is wrong with it
                     logging.getLogger("system").warning(
-                        f"Loading container_plugins '{fname}' failed due to: {e}"
+                        f"\tLoading container_plugins '{fname}' failed due to: {e}"
                     )
 
     def _create_maps(self):
@@ -270,7 +270,7 @@ class ActionPlugins:
         plugin_folder = "action_plugins"
         root_path = gremlin.shared_state.root_path
         walk_path = os.path.join(root_path, plugin_folder)
-        log_sys(f"Action plugin folder: {walk_path}")
+        log_sys(f"Using action plugin folder: {walk_path}")
         if not os.path.isdir(walk_path):
             raise error(f"Unable to find action_plugins: {walk_path}")
         
@@ -288,13 +288,13 @@ class ActionPlugins:
                     )
                     if "version" in plugin.__dict__:
                         self._plugins[plugin.name] = plugin.create
-                        log_sys(f"Loaded action plugin: {plugin.name}")
+                        log_sys(f"\tLoaded action plugin: {plugin.name}")
                     else:
                         del plugin
                 except Exception as e:
                     # Log an error and ignore the action_plugins if
                     # anything is wrong with it
-                    log_sys_warn(f"Loading action_plugins '{root.split("\\")[-1]}' failed due to: {e}")
+                    log_sys_warn(f"\tLoading action_plugins '{root.split("\\")[-1]}' failed due to: {e}")
 
 
     def duplicate(self, action):

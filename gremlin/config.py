@@ -24,6 +24,7 @@ import re
 from PySide6 import QtCore
 from gremlin.singleton_decorator import SingletonDecorator
 from . import common, util, event_handler
+from gremlin.types import VerboseMode
 
 @SingletonDecorator
 class Configuration:
@@ -683,6 +684,9 @@ class Configuration:
             clipboard.clear_persisted()
 
 
+
+
+
     @property
     def verbose(self):
         ''' determines loging level '''
@@ -691,6 +695,64 @@ class Configuration:
     def verbose(self, value):
         self._data["verbose"] = value
         self.save()
+
+    @property
+    def verbose_mode(self):
+        ''' sub logging level '''
+        if not "verbose_mode" in self._data:
+            self._data["verbose_mode"] = VerboseMode.All
+            self.save()
+        return VerboseMode(self._data["verbose_mode"])
+    
+    def is_verbose_mode(self, mode):
+        value = self.verbose_mode
+        return mode in value
+    
+    @verbose_mode.setter
+    def verbose_mode(self, value):
+        self._data["verbose_mode"] = value
+        self.save()
+
+    def verbose_set_mode(self, mode, enabled):
+        ''' enables the specified verbose mode '''
+        if not "verbose_mode" in self._data:
+            self._data["verbose_mode"] = VerboseMode.All
+        value = self._data["verbose_mode"]
+        if enabled:
+            value |= mode
+        else:
+            value ^= mode 
+        self.verbose_mode = value
+
+    
+
+
+    @property
+    def verbose_mode_keyboard(self):
+        ''' true if verbose mode is in keyboard mode '''
+        return self.verbose and VerboseMode.Keyboard in self.verbose_mode
+    
+    @property
+    def verbose_mode_joystick(self):
+        ''' true if verbose mode is in joystick mode '''
+        return self.verbose and VerboseMode.Joystick in self.verbose_mode 
+    
+    @property
+    def verbose_mode_inputs(self):
+        ''' true if verbose mode is in inputs mode '''
+        return self.verbose and VerboseMode.Inputs in self.verbose_mode     
+
+    @property
+    def verbose_mode_mouse(self):
+        ''' true if verbose mode is in inputs mode '''
+        return self.verbose and VerboseMode.Mouse in self.verbose_mode     
+    
+    @property
+    def verbose_mode_details(self):
+        ''' true if verbose mode is in inputs mode '''
+        return self.verbose and VerboseMode.Details in self.verbose_mode     
+
+
 
     @property
     def midi_enabled(self):

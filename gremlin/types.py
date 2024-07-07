@@ -19,6 +19,7 @@
 from __future__ import annotations
 
 import enum
+
 from typing import Tuple, Union
 
 import gremlin.error
@@ -875,3 +876,16 @@ _MouseButton_lookup_to_button_lookup = {
     "wheel_left": MouseButton.WheelLeft,
     "wheel_right": MouseButton.WheelRight 
 }
+
+
+@enum.unique
+class VerboseMode(enum.IntFlag):
+    Keyboard = 1 # keyboard input only
+    Joystick = 2 # joystick input 
+    Inputs = 4 # list inputs
+    Mouse = 8 # mouse input
+    Details = 16 # user interface details
+    All = Keyboard | Joystick | Inputs | Mouse
+
+    def __contains__(self, item):
+        return  (self.value & item.value) == item.value

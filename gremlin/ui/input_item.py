@@ -406,7 +406,7 @@ class InputItemListView(ui_common.AbstractView):
         This creates a fake listview where a vertical container just has InputItemButton widgets
 
         """
-        verbose = gremlin.config.Configuration().verbose
+        verbose = gremlin.config.Configuration().verbose_mode_inputs
 
 
         if self.model is None:
