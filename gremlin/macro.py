@@ -646,11 +646,15 @@ class Macro:
         :param is_pressed boolean indicating if the key is pressed
             (True) or released (False)
         """
-        from gremlin.keyboard import Key, key_from_name
+        from gremlin.keyboard import Key, KeyMap
         if isinstance(key, str):
-            key = key_from_name(key)
+            key = KeyMap.find_by_name(key)
         elif isinstance(key, Key):
             pass
+        elif isinstance(key, int):
+            key = KeyMap.find_virtual(key)
+        elif isinstance(key, tuple):
+            key = KeyMap.find(key[0],key[1])
         else:
             raise gremlin.error.KeyboardError("Invalid key specified")
 

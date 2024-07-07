@@ -6,12 +6,13 @@ from PySide6 import QtWidgets, QtCore, QtGui
 import gremlin.base_profile
 from gremlin.input_types import InputType
 from gremlin.input_devices import ButtonReleaseActions
+import gremlin.keyboard
 import gremlin.macro
 import gremlin.ui.ui_common
 import gremlin.ui.input_item
 import enum
-from gremlin.profile import safe_format, safe_read
-from gremlin.keyboard import Key, key_from_name
+
+from gremlin.keyboard import Key
 from gremlin.util import load_icon
 import logging
 import copy
@@ -39,7 +40,6 @@ class QKeyWidget(QtWidgets.QPushButton):
         
         self.normal_key = None # what to display normally
         self.shifted_key = None # what to display when shifted
-
         self.installEventFilter(self)
 
     @property
@@ -51,6 +51,10 @@ class QKeyWidget(QtWidgets.QPushButton):
     def key(self, value : Key):
         ''' sets the associated key '''
         self._key = value
+
+    @property
+    def is_click_shifted(self):
+        return self._click_shifted
 
     @property
     def is_keypad(self):
@@ -70,7 +74,7 @@ class QKeyWidget(QtWidgets.QPushButton):
             self._selected = value
             self._update_state()
             # tell listeners status changed
-            self.selected_changed.emit(self)
+            #self.selected_changed.emit(self, self._click_shifted)
 
     def _update_state(self):
         ''' updates the color of the button based on the selection state '''
@@ -79,6 +83,7 @@ class QKeyWidget(QtWidgets.QPushButton):
         else:
             self.setStyleSheet(self._default_style)
 
+  
     def eventFilter(self, obj, event):
         t = event.type()
         if t == QtCore.QEvent.Type.HoverEnter:
@@ -117,14 +122,15 @@ class InputKeyboardDialog(QtWidgets.QDialog):
         self._allow_modifiers = allow_modifiers
         self.index = index
         self._latched_key = None # contains a single primary key latched to all the others
+        self._display_shifted = False
+        self._solo_select = False
 
-        self._modifier_keys = ["leftshift","rightshift","leftalt","rightalt", "leftcontrol","rightcontrol", "leftwin", "rightwin"]
+        self._modifier_keys = gremlin.keyboard.KeyMap._keyboard_modifiers
 
         self._key_map = {} # map of (scancode, extended) to keys  (scancode, extended) -> key
         self._key_widget_map = {} # map of keys to widgets  key -> widget
         self.keyboard_widget = self._create_keyboard_widget() # populate the two maps 
-        self.keys = None # return data
-        self.sequence = None # list of keys (scancode, extended)
+        self._keys = None # return data
         self._display_shifted = False # true if displayed shifted
 
         self.button_widget = QtWidgets.QWidget()
@@ -170,6 +176,11 @@ class InputKeyboardDialog(QtWidgets.QDialog):
     def latched_key(self):
         ''' contains a single key which represents the latched selection in the dialog '''
         return self._latched_key
+    
+    @property
+    def keys(self):
+        ''' list of raw selected keys '''
+        return self._keys
 
 
     def _set_sequence(self, sequence):
@@ -185,8 +196,20 @@ class InputKeyboardDialog(QtWidgets.QDialog):
                     key_name = self._key_map[item]
                     widget = self._key_widget_map[key_name]
                     widget.selected = True
-                if isinstance(item, Key):
+                elif isinstance(item, Key):
+                    # key object
                     key_name = self._key_map[item.index_tuple()]
+                    widget = self._key_widget_map[key_name]
+                    widget.selected = True
+                elif isinstance(item, tuple):
+                    # key id
+                    key_name = self._key_map[item]
+                    widget = self._key_widget_map[key_name]
+                    widget.selected = True
+                elif isinstance(item, int):
+                    # virtual code
+                    key = gremlin.keyboard.KeyMap.find_virtual(item)
+                    key_name = self._key_map[key.index_tuple()]
                     widget = self._key_widget_map[key_name]
                     widget.selected = True
                 elif item in self._key_map.keys():
@@ -204,11 +227,12 @@ class InputKeyboardDialog(QtWidgets.QDialog):
         """
         from gremlin.ui.ui_common import InputListenerWidget
         self.button_press_dialog = InputListenerWidget(
-            self._add_keyboard_listener_key_cb,
             [InputType.Keyboard],
             return_kb_event=False,
             multi_keys=True # allow key combinations
         )
+
+        self.button_press_dialog.item_selected.connect(self._add_keyboard_listener_key_cb)
 
         # Display the dialog centered in the middle of the UI
         root = self
@@ -237,14 +261,29 @@ class InputKeyboardDialog(QtWidgets.QDialog):
 
 
     def keyPressEvent(self, event):
-        if event.key() == QtCore.Qt.Key.Key_Shift:
+        key = event.key()
+        if key == QtCore.Qt.Key.Key_Shift:
             self.display_shifted = True
+        elif key == QtCore.Qt.Key.Key_Control:
+            self.solo_select = True
+        
         super().keyPressEvent(event)
 
     def keyReleaseEvent(self, event):
-        if event.key() == QtCore.Qt.Key.Key_Shift:
+        key = event.key()
+        if key == QtCore.Qt.Key.Key_Shift:
             self.display_shifted = False
+        elif key == QtCore.Qt.Key.Key_Control:
+            self.solo_select = False
         super().keyReleaseEvent(event)        
+
+    @property
+    def solo_select(self):
+        return self._solo_select
+    
+    @solo_select.setter
+    def solo_select(self, value):
+        self._solo_select = value
 
     @property
     def display_shifted(self):
@@ -266,57 +305,27 @@ class InputKeyboardDialog(QtWidgets.QDialog):
 
     def _ok_button_cb(self):
         ''' ok button pressed '''
-        keys = [Key(scan_code = widget.key.scan_code, is_extended = widget.key.is_extended, is_mouse=widget.key.is_mouse) for widget in self._key_widget_map.values() if widget.selected]
-        self.keys = keys
-        # convert to a scancode/extended sequence
-        data = []
-
-        modifier_map = {}
-        modifiers = ["leftshift","leftcontrol","leftalt","rightshift","rightcontrol","rightalt","leftwin","rightwin"]
-        for key_name in modifiers:
-            modifier_map[key_name] = []
-
-        # primary keys
-        primary_keys = []
-        modifier_keys = []
-
-        key : Key
-
         
+        # keys = [Key(scan_code = widget.key.scan_code, is_extended = widget.key.is_extended, is_mouse=widget.key.is_mouse, virtual_code=widget.key.virtual_code) for widget in self._key_widget_map.values() if widget.selected]
+        selected_widgets = [widget for widget in self._key_widget_map.values() if widget.selected]
+        keys = []
+        for widget in selected_widgets:
+            key = widget.key.duplicate()
+            # if widget.key.virtual_code > 0:
+            #     key = gremlin.keyboard.KeyMap.find_virtual(widget.key.virtual_code)
+            # else:
+            #     key = gremlin.keyboard.KeyMap.find(widget.key.scan_code, widget.key.is_extended)
+            keys.append(key)
+            # print (f"returning key: {key} ")
 
-        # create output - place modifiers up front
-        for key in keys:
-            item = (key.scan_code, key.is_extended)
-            lookup_name = key.lookup_name
-            if lookup_name in modifiers:
-                modifier_map[lookup_name].append(item)
-                modifier_keys.append(key)
-            else:
-                data.append(item)
-                primary_keys.append(key)
-        sequence = []
+        # returned keys
+        self._keys = keys
+
+        return_key = gremlin.keyboard.KeyMap.get_latched_key(keys)
         
-        for key_name in modifiers:
-            sequence.extend(modifier_map[key_name])
-        sequence.extend(data)            
-        self.sequence = sequence
-
-        # latched key
+        # print (f"Return key: {return_key}")
+        self._latched_key = return_key
         
-        if primary_keys:
-            key = primary_keys[0]
-        elif modifier_keys:
-            key = modifier_keys[0]
-        else:
-            key = None
-
-        if key:
-            latched = [k for k in keys if not k == key]
-            latched = list(set(latched)) # remove any duplicates
-            key.latched_keys = latched
-
-        
-        self._latched_key = key
 
         self.accept()
         self.close()
@@ -408,7 +417,7 @@ class InputKeyboardDialog(QtWidgets.QDialog):
                     if key in shifted_map.keys():
                         shifted = shifted_map[key] if not key_complex else key
                     else:
-                        shifted = key
+                        shifted = None
 
                     icon = None
                     # handle special key names
@@ -449,23 +458,29 @@ class InputKeyboardDialog(QtWidgets.QDialog):
                         key = "MWR"
                         icon = "mdi.mouse"
                         toolltip = "Tilt Right"   
-
                     
                     widget = QKeyWidget(key)
                     if icon:
                         widget.setIcon(load_icon(icon))
                         widget.setIconSize(QtCore.QSize(14,14))
 
-                    action_key = key_from_name(key_name)
+                    action_key = gremlin.keyboard.key_from_name(key_name)
                     widget.key = action_key # this name must be defined in keybpoard.py 
                     widget.normal_key = key
-                    widget.shifted_key = shifted
-                    widget.clicked.connect(self._key_cb)
+                    widget.shifted_key = shifted if shifted else widget.normal_key
+                    
+                    widget.clicked.connect(self._widget_clicked_cb)
                     widget.hover.connect(self._key_hover_cb)
                     #logging.getLogger("system").info(f"{key_name}: {key} {shifted}")
 
                     self._key_map[(action_key.scan_code, action_key.is_extended)] = key_name
                     assert key_name not in self._key_widget_map.keys(),f"duplicate key in keyboard map found: {key_name}"
+
+                    # handle special duplicates
+                    if key_name == "rightshift":
+                        other_key = gremlin.keyboard.key_from_name("rightshift2")
+                        self._key_map[(other_key.scan_code, other_key.is_extended)] = key_name
+                        self._key_widget_map["rightshift2"] = widget
                     self._key_widget_map[key_name] = widget
 
                 else:
@@ -491,10 +506,20 @@ class InputKeyboardDialog(QtWidgets.QDialog):
         else:
             self.key_description.setText("")
 
+    def deselect(self):
+        ''' deselects all keys '''
+        selected_widgets = [widget for widget in self._key_widget_map.values() if widget.selected]
+        for widget in selected_widgets:
+            widget.selected = False
 
-    def _key_cb(self):
+
+    def _widget_clicked_cb(self):
         ''' occurs when the widget is selected'''
         current_widget = self.sender()
+        if self.solo_select:
+            # deselect all
+            self.deselect()
+
         if self._select_single:
             # single select mode
             source_modifier = False

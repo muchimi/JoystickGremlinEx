@@ -288,10 +288,10 @@ class MapToMouseWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _request_user_input(self):
         """Prompts the user for the input to bind to this item."""
         self.button_press_dialog = gremlin.ui.ui_common.InputListenerWidget(
-            self._update_mouse_button,
             [InputType.Mouse],
             return_kb_event=False
         )
+        self.button_press_dialog.item_selected.connect(self._update_mouse_button)
 
         # Display the dialog centered in the middle of the UI
         root = self

@@ -741,9 +741,10 @@ class PhysicalInputVariable(AbstractVariable):
 
     def _record_user_input(self):
         widget = gremlin.ui.ui_common.InputListenerWidget(
-            self._user_input,
             self.valid_types
         )
+
+        widget.item_selected.connect(self._user_input)
 
         # Display the dialog centered in the middle of the UI
         geom = QtWidgets.QApplication.topLevelWindows()[0].geometry()

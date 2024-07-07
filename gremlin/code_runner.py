@@ -358,6 +358,7 @@ class CodeRunner:
             self.event_handler.change_mode(start_mode)
             self.event_handler.resume()
             self._running = True
+            gremlin.shared_state.is_running = True
 
             sendinput.MouseController().start()
 
@@ -430,6 +431,7 @@ class CodeRunner:
 
 
         self._running = False
+        gremlin.shared_state.is_running = False
 
 
         # Empty callback registry

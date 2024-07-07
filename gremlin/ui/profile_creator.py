@@ -354,10 +354,10 @@ class BindableAction(QtWidgets.QWidget):
     def _bind_action(self):
         """Prompts the user for the input to bind to this item."""
         self.button_press_dialog = gremlin.ui.ui_common.InputListenerWidget(
-            self.input_cb,
             BindableAction.valid_bind_types[self.input_type],
             return_kb_event=True
         )
+        self.button_press_dialog.item_selected.connect(self.input_cb)
 
         # Display the dialog centered in the middle of the UI
         geom = self.topLevelWidget().geometry()

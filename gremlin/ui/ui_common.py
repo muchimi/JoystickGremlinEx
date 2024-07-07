@@ -27,6 +27,7 @@ import qtawesome as qta
 from gremlin.input_types import InputType
 from  gremlin.clipboard import Clipboard
 import gremlin.joystick_handling
+import gremlin.keyboard
 import gremlin.types
 from gremlin.util import load_pixmap
 
@@ -1072,9 +1073,10 @@ class InputListenerWidget(QtWidgets.QFrame):
     """Widget overlaying the main gui while waiting for the user
     to press a key."""
 
+    item_selected = QtCore.Signal(object) # called when the items are selected
+
     def __init__(
             self,
-            callback,
             event_types,
             return_kb_event=False,
             multi_keys=False,
@@ -1097,8 +1099,6 @@ class InputListenerWidget(QtWidgets.QFrame):
         super().__init__(parent)
         from gremlin.shared_state import set_suspend_input_highlighting
         from gremlin.keyboard import key_from_code, key_from_name
-
-        self.callback = callback
         self._event_types = event_types
         self._return_kb_event = return_kb_event
         self._multi_keys = multi_keys
@@ -1164,7 +1164,7 @@ class InputListenerWidget(QtWidgets.QFrame):
 
         if process_event:
             gremlin.input_devices.JoystickInputSignificant().reset()
-            self.callback(event)
+            self.item_selected.emit(event)
             self.close()
 
     def _kb_event_cb(self, event):
@@ -1178,11 +1178,16 @@ class InputListenerWidget(QtWidgets.QFrame):
         if self._aborting:
             self.close()
 
-        from gremlin.keyboard import key_from_code, key_from_name
-        key = key_from_code(
-                event.identifier[0],
-                event.identifier[1]
-        )
+        virtual_code = event.virtual_code
+        if virtual_code > 0:
+            key = gremlin.keyboard.KeyMap.find_virtual(virtual_code)
+        else:
+            scan_code = event.identifier[0]
+            is_extended = event.identifier[1]
+            key = gremlin.keyboard.KeyMap.find(scan_code, is_extended)
+
+
+        # print (f"Head event: {event}  {key}")
 
         if self._close_on_key:
             if key == self._esc_key:
@@ -1197,9 +1202,9 @@ class InputListenerWidget(QtWidgets.QFrame):
             elif not event.is_pressed and \
                     InputType.Keyboard in self._event_types:
                 if not self._return_kb_event:
-                    self.callback(key)
+                    self.self.item_selected.emit(key)
                 else:
-                    self.callback(event)
+                    self.self.item_selected.emit(event)
                 self._abort_timer.cancel()
                 self.close()
         # Record all key presses and return on the first key release
@@ -1219,7 +1224,7 @@ class InputListenerWidget(QtWidgets.QFrame):
                 
                 self._abort_timer.cancel()
                 if not self._aborting:
-                    self.callback(self._multi_key_storage)
+                    self.item_selected.emit(self._multi_key_storage)
                 self.close()
 
         # Ensure the timer is cancelled and reset in case the ESC is released
@@ -1229,7 +1234,7 @@ class InputListenerWidget(QtWidgets.QFrame):
             self._abort_timer = threading.Timer(1.0, self._abort_request)
 
     def _mouse_event_cb(self, event):
-        self.callback(event)
+        self.item_selected.emit(event)
         self.close()
 
     def _abort_request(self):
@@ -1250,13 +1255,19 @@ class InputListenerWidget(QtWidgets.QFrame):
             event_listener.joystick_event.disconnect(self._joy_event_cb)
         elif InputType.Mouse in self._event_types:
             event_listener.mouse_event.disconnect(self._mouse_event_cb)
+
+        
         # Stop mouse hook in case it is running
         gremlin.windows_event_hook.MouseHook().stop()
 
         # Delay un-suspending input highlighting to allow an axis that's being
         # moved to return to its center without triggering an input highlight
         gremlin.shared_state.delayed_input_highlighting_suspension()
+
+        # print ("input widget close")
         super().closeEvent(evt)
+        #self.destroy(True)
+
 
     def _valid_event_types_string(self):
         """Returns a formatted string containing the valid event types.

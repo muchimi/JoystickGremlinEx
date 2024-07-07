@@ -135,18 +135,16 @@ class Key():
         # self._latched_keys.add_callback(self._changed_cb)            
 
         if not name:
-            name = "Not configured"
             self._load(scan_code, is_extended, virtual_code, is_mouse)
 
-        self._update()
+        
 
         self._name = name
         self._scan_code = scan_code
         self._is_extended = is_extended
         self._virtual_code = virtual_code
         self._is_mouse = is_mouse
-        
-
+        self._update()
 
     @property
     def virtual_code(self):
@@ -155,8 +153,6 @@ class Key():
 
     @property
     def scan_code(self):
-        if self._scan_code == 20:
-            pass
         return self._scan_code
     
     @property
@@ -174,7 +170,7 @@ class Key():
 
     def _load(self, scan_code, is_extended, virtual_code, is_mouse):
         self._mouse_button = None
-        name = None
+        
         if is_mouse or scan_code >= 0x1000:
             if scan_code >= 0x1000:
                 # convert fake scan code to convert to a mouse button
@@ -188,8 +184,11 @@ class Key():
             virtual_code = scan_code
             name = MouseButton.to_string(mouse_button)
             self._lookup_name = name
+            self._name = name
+
             is_mouse = True
             self._mouse_button = mouse_button
+            
 
         else:
             # regular key
@@ -224,17 +223,18 @@ class Key():
         return sequence
 
     @property
-    def mouse_button(self) -> MouseButton:
+    def mouse_button(self):
         ''' returns a mouse button if the key is a virtual mouse button or mouse wheel '''
         return self._mouse_button
     
     @mouse_button.setter
-    def mouse_button(self, button : MouseButton):
+    def mouse_button(self, button):
         ''' sets a mouse button '''
         scan_code = button.value + 0x1000
         self._mouse_button = button
         self._is_mouse = True
         self.scan_code = scan_code
+        self._update()
 
     # def _changed_cb(self, owner , action, index, value):
     #     logging.getLogger("system").info(f"Key {self.name} latch change: {action} index: {index} value: {value}")
@@ -261,7 +261,12 @@ class Key():
 
     @property
     def name(self):
+        return self._name
+    
+    @property
+    def latched_name(self):
         return self._latched_name if self._latched_name else self._name
+
 
     @property
     def lookup_name(self):
@@ -305,23 +310,11 @@ class Key():
     def data(self):
         # unique key for this key
         return self.__hash__()
-
-
-
-
         
     @property
     def message_key(self):
         return {self._scan_code, self._is_extended}
 
-    # @lookup_name.setter
-    # def lookup_name(self, name):
-    #     from gremlin import error
-    #     if self._lookup_name is not None:
-    #         raise error.KeyboardError("Setting lookup name repeatedly")
-    #     self._lookup_name = name
-
-    #     self._update()
 
     def __eq__(self, other):
         return hash(self) == hash(other)
@@ -367,11 +360,8 @@ class Key():
     @latched_keys.setter
     def latched_keys(self, value):
         self._latched_keys.clear()
-        # check_dups = list(set(value))
-        # if len(value) != len(check_dups):
-        #     pass
-
         self._latched_keys.extend(value)
+        self._update()
     
     @property
     def is_latched(self):
@@ -477,8 +467,8 @@ def mouse_from_name(name):
         mouse_button = MouseButton.WheelLeft
     elif name in ("mouse_wright", "wheel_right", MouseButton.to_string(MouseButton.WheelRight).lower()):
         mouse_button = MouseButton.WheelRight
-    
     return mouse_button
+
 
 def key_from_name(name, validate = False):
     """Returns the key corresponding to the provided name.
@@ -494,7 +484,10 @@ def key_from_name(name, validate = False):
     # see if it's a mouse key
     mouse_button = mouse_from_name(name)
     if mouse_button:
-        key = Key(name, is_mouse=True)
+        key_name = MouseButton.to_string(mouse_button)
+        scan_code = 0x1000 + mouse_button.value
+        is_extended = False
+        key = Key(key_name, scan_code, is_extended, 0, is_mouse=True)
         return key    
 
     # Attempt to located the key in our database and return it if successful
@@ -810,14 +803,17 @@ class KeyMap:
             key = KeyMap.get_key(scan_code, is_extended)
             if key:
                KeyMap._g_scan_code_to_key[index] = key
-               return key
+               return key.duplicate()
             return None
-        return KeyMap._g_scan_code_to_key.get((scan_code, is_extended), None)
+        key = KeyMap._g_scan_code_to_key.get((scan_code, is_extended), None)
+        if key:
+            return key.duplicate()
+        return None
     
     @staticmethod
     def find_virtual(virtual_code):
         if virtual_code in KeyMap._g_virtual_code_to_key.keys():
-            return KeyMap._g_virtual_code_to_key[virtual_code]
+            return KeyMap._g_virtual_code_to_key[virtual_code].duplicate()
         return None
             
 
@@ -825,7 +821,7 @@ class KeyMap:
     def find_by_name(name):
         name = name.replace(" ","").lower()
         if name in KeyMap._key_map:
-            return KeyMap._key_map[name]
+            return KeyMap._key_map[name].duplicate()
         return None
     
      
@@ -917,6 +913,46 @@ class KeyMap:
         return Key(character, scan_code, is_extended, virtual_code)    
     
 
+
+    @staticmethod
+    def get_latched_key(keys):
+        ''' derives a single latched key from a set of keys'''
+
+        modifier_map = {}
+        modifiers = gremlin.keyboard.KeyMap._keyboard_modifiers # ["leftshift","leftcontrol","leftalt","rightshift","rightcontrol","rightalt","leftwin","rightwin"]
+        for key_name in modifiers:
+            modifier_map[key_name] = []
+
+        # primary keys
+        primary_keys = []
+        modifier_keys = []
+        data = []
+        # create output - place modifiers up front
+        for key in keys:
+            item = (key.scan_code, key.is_extended)
+            lookup_name = key.lookup_name
+            if lookup_name in modifiers:
+                modifier_map[lookup_name].append(item)
+                modifier_keys.append(key)
+            else:
+                data.append(item)
+                primary_keys.append(key)
+
+        # latched key - pick one
+        if primary_keys:
+            return_key = primary_keys[0]
+        elif modifier_keys:
+            return_key = modifier_keys[0]
+        else:
+            return_key = None
+
+        if return_key:
+            latched = list(set(keys)) # remove any duplicates
+            latched.remove(return_key) # remove self
+            return_key.latched_keys = latched
+
+        return return_key
+
     _g_name_map = {
         # Function keys
         "f1": ("F1", 0x3b, False, win32con.VK_F1),
@@ -1001,6 +1037,16 @@ class KeyMap:
     _keyboard_special = list(_g_name_map.keys())
     _keyboard_modifiers = ["leftshift","leftcontrol","leftalt","rightshift","rightshift2","rightcontrol","rightalt","leftwin","rightwin"]
 
+# populate special mouse keys
+for mouse_button in MouseButton:
+    code = mouse_button.value
+    scan_code = 0x1000 + code
+    is_extended = False
+    name = MouseButton.to_string(mouse_button)
+    lookup_name = MouseButton.to_lookup_string(mouse_button)
+    key = Key(name, scan_code, is_extended, 0, True)
+    key._lookup_name = lookup_name
+    KeyMap.register(key)
 
 
 # Populate the scan code based lookup table

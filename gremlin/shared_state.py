@@ -43,6 +43,9 @@ ui = None
 # holds debug information for callbacks
 _callback_map = {}
 
+# true if a profile is running
+is_running = False
+
 
 
 def suspend_input_highlighting():

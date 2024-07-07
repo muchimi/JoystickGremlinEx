@@ -1524,7 +1524,6 @@ class SwapDevicesUi(ui_common.BaseDialogUi):
         :param callback function to call with the accepted input
         """
         self.input_dialog = ui_common.InputListenerWidget(
-            callback,
             [
                 InputType.JoystickAxis,
                 InputType.JoystickButton,
@@ -1533,6 +1532,7 @@ class SwapDevicesUi(ui_common.BaseDialogUi):
             return_kb_event=False,
             multi_keys=False
         )
+        self.input_dialog.item_selected.connect(callback)
 
         # Display the dialog centered in the middle of the UI
         root = self

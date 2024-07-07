@@ -21,6 +21,8 @@ import logging
 import time
 import queue
 from threading import Thread, Timer
+import gremlin.code_runner
+import gremlin.threading
 
 from PySide6 import QtCore, QtWidgets
 
@@ -249,37 +251,107 @@ class EventListener(QtCore.QObject):
 		# Calibration function for each axis of all devices
 		self._calibrations = {}
 
-
+		
 		# Joystick device change update timeout timer
 		self._device_update_timer = None
-
+		
 		self._running = True
+
+		# keyboard input handling buffer	
 		self._keyboard_state = {}
-		self._keyboard_queue = queue.Queue()
-		self._stop_requested = False
+		self._keyboard_queue = None
+		self._key_listener_started = False # true if the key listener is started
 		self.gremlin_active = False
 		self._keyboard_thread = None
 		self.keyboard_hook.start()
 
 		Thread(target=self._run).start()
+
+
+
+	def _process_queue(self):
+		''' processes an item the keyboard buffer queue '''
+		item, is_pressed = self._keyboard_queue.get()
+		if isinstance(item, int):
+			virtual_code = item
+			key = gremlin.keyboard.KeyMap.find_virtual(virtual_code)	
+			self._keyboard_buffer[virtual_code] = is_pressed
+			key_id = key.index_tuple()
+			
+		else:
+			virtual_code = 0
+			key_id, is_pressed = item
+			key = gremlin.keyboard.KeyMap.find(key_id[0], key_id[1])
+			self._keyboard_buffer[key_id] = is_pressed
+
+		# print (f"DEQUEUE KEY {key_id} vk: {virtual_code} name: {key.name} pressed: {is_pressed}")
+		
+		self.keyboard_event.emit(Event(
+			event_type= InputType.Keyboard,
+			device_guid=dinput.GUID_Keyboard,
+			identifier=key_id,
+			virtual_code = virtual_code,
+			is_pressed=is_pressed,
+			data = self._keyboard_buffer
+		))
+
+		# process the events
+		QtWidgets.QApplication.processEvents()
+		self._keyboard_queue.task_done()
+
+
+	def _keyboard_processor(self):
+		''' runs as a thread to process inbound keyboard events using a queue '''
+
+		logging.getLogger("system").info("KBD: processing start")
+		self._keyboard_buffer = {}
+		self._key_listener_started = True
+		while not self._keyboard_thread.stopped():
+			if self._keyboard_queue.empty():
+				time.sleep(0.01)
+				continue
+			self._process_queue()
+
+
+		# done 
+		# process any straglers
+		while not self._keyboard_queue.empty():
+			self._process_queue()
+		
+		logging.getLogger("system").info("KBD: processing stop")		
 	
+
+	def start_key_listener(self):
+		''' starts the key listener '''
+		if not self._key_listener_started:
+			self._keyboard_queue = queue.Queue()
+			
+			self._keyboard_thread = gremlin.threading.AbortableThread(target = self._keyboard_processor)
+			self._keyboard_thread.start()
+
+	def stop_key_listener(self):
+		''' stops the key listener '''
+		if self._key_listener_started:
+			self._keyboard_thread.stop()
+			self._keyboard_thread.join()
+			# clear any remaining input queue items
+			while not self._keyboard_queue.empty():
+				self._keyboard_queue.get()
+			self._keyboard_queue.join()
+			self._key_listener_started = False
+
+		
 
 	def start(self):
 		''' starts the non regular listener '''
 		self.mouse_hook.start()
-		self._stop_requested = False
-		self._keyboard_thread = Thread(target = self._keyboard_processor).start()
+		self._key_listener_stop_requested = False
+		self.start_key_listener()
 
 
 	def stop(self):
 		self.mouse_hook.stop()
-		self._stop_requested = True
-		QtWidgets.QApplication.processEvents()
-		# clear any remaining input items
-		while not self._keyboard_queue.empty():
-			self._keyboard_queue.get()
-		self._keyboard_queue.join()
-
+		self.stop_key_listener()
 
 
 	def terminate(self):
@@ -376,46 +448,6 @@ class EventListener(QtCore.QObject):
 		self._init_joysticks()
 		self.device_change_event.emit()
 
-	def _keyboard_processor(self):
-		''' runs as a thread to process inbound keyboard events using a queue '''
-		logging.getLogger("system").info("Keyboard input processing start")
-		app = QtWidgets.QApplication.instance()
-		self._keyboard_buffer = {}
-		while not self._stop_requested:
-			if self._keyboard_queue.empty():
-				app.processEvents()	
-				continue
-			item, is_pressed = self._keyboard_queue.get(block=False)
-
-			if isinstance(item, int):
-				virtual_code = item
-				key = gremlin.keyboard.KeyMap.find_virtual(virtual_code)	
-				self._keyboard_buffer[virtual_code] = is_pressed
-				key_id = key.index_tuple()
-				
-			else:
-				virtual_code = 0
-				key_id, is_pressed = item
-				key = gremlin.keyboard.KeyMap.find(key_id[0], key_id[1])
-				self._keyboard_buffer[key_id] = is_pressed
-
-			# print (f"DEQUEUE KEY {key_id} vk: {virtual_code} name: {key.name} pressed: {is_pressed}")
-			
-			self.keyboard_event.emit(Event(
-				event_type= InputType.Keyboard,
-				device_guid=dinput.GUID_Keyboard,
-				identifier=key_id,
-				virtual_code = virtual_code,
-				is_pressed=is_pressed,
-				data = self._keyboard_buffer
-			))
-			# process the events
-			app.processEvents()			
-			self._keyboard_queue.task_done()
-
-		# done 
-		
-		logging.getLogger("system").info("Keyboard input processing stop")
 		
 		
 
@@ -428,8 +460,6 @@ class EventListener(QtCore.QObject):
 
 		:param event the keyboard event
 		"""
-		if not self._running:
-			return True
 
 		virtual_code = event.virtual_code
 		key_id = (event.scan_code, event.is_extended)
@@ -438,20 +468,45 @@ class EventListener(QtCore.QObject):
 			is_repeat = self._keyboard_state.get(virtual_code) and is_pressed
 		else:
 			is_repeat = self._keyboard_state.get(key_id) and is_pressed
-		if not is_repeat:
+
+		if is_repeat:
+			# ignore repeats
+			return True
+
+		if virtual_code > 0:
+			#key = gremlin.keyboard.KeyMap.find_virtual(virtual_code)
+			self._keyboard_state[virtual_code] = is_pressed	
+		else:
+			#key = gremlin.keyboard.KeyMap.find(event.scan_code, event.is_extended)
+			self._keyboard_state[key_id] = is_pressed	
+		
+		if gremlin.shared_state.is_running:
+			# RUN mode - queue input events 
+			if not self._key_listener_started:
+				return True
+			
 			# Only process the key if it's pressed the first time
 			# released but not when it's being held down
 			if virtual_code > 0:
-				# key = gremlin.keyboard.KeyMap.find_virtual(virtual_code) 
-				self._keyboard_state[virtual_code] = is_pressed
 				self._keyboard_queue.put((virtual_code, is_pressed))
 			else:
-				# key = gremlin.keyboard.KeyMap.find(event.scan_code, event.is_extended)
-				self._keyboard_state[key_id] = is_pressed
 				self._keyboard_queue.put((key_id, is_pressed))
 			
 			# add to the processing queue
-			#print (f"QUEUE KEY {key_id} {key.name} pressed {is_pressed}")
+			# print (f"QUEUE KEY {key_id} {key.name} pressed {is_pressed}")
+
+		else:
+			# DESIGN mode - straight
+			# print (f"FIRE KEY {key_id} {key.name} pressed {is_pressed}")
+			self.keyboard_event.emit(
+				Event(	event_type= InputType.Keyboard,
+						device_guid=dinput.GUID_Keyboard,
+						identifier=key_id,
+						virtual_code = virtual_code,
+						is_pressed=is_pressed,
+						data = self._keyboard_state
+			))
+
 			
 		
 		# Allow the windows event to propagate further
@@ -487,6 +542,7 @@ class EventListener(QtCore.QObject):
 				device_guid=dinput.GUID_Keyboard,
 				identifier=event.button_id,
 				is_pressed=event.is_pressed,
+				data = self._keyboard_state
 			))
 			# print (f"Mouse button state: {key_id}  {event.is_pressed}")
 		# Allow the windows event to propagate further
@@ -724,7 +780,8 @@ class EventHandler(QtCore.QObject):
 				for input_item in matching_keys:
 					key = input_item.key
 					input_items.append(input_item)
-					print (f"KEY INPUT MATCH: {input_item}")
+
+					# print (f"KEY INPUT MATCH: {input_item}")
 					
 				if verbose:
 					logging.getLogger("system").info(f"MATCHED EVENTS: mode: [{self._active_mode}] {index} -> found {len(input_items)} matching callback events")	
@@ -862,7 +919,7 @@ class EventHandler(QtCore.QObject):
 
 		# filter latched keyboard or mouse events
 		if event.event_type in (InputType.Keyboard, InputType.KeyboardLatched, InputType.Mouse):
-			verbose = event.event_type != InputType.Mouse
+			# verbose = event.event_type != InputType.Mouse
 			if verbose:
 				logging.getLogger("system").info(f"process keyboard event: {event}")
 
@@ -876,29 +933,30 @@ class EventHandler(QtCore.QObject):
 				is_latched = True
 				
 				for input_item in items:
-					print (f"Processing matching item: {input_item}")
 					latch_key = None
-					print (data)
+					# print (data)
 					latched_keys = [input_item.key]
 					latched_keys.extend(input_item.latched_keys)
-					print(f"Checking latching: {len(latched_keys)} key(s)")
+					if verbose:
+						logging.getLogger("system").info(f"Checking latching: {len(latched_keys)} key(s)")
 					for k in latched_keys:
 						index = k.virtual_code if k.virtual_code > 0 else k.index_tuple()
 						state = data[index] if index in data.keys() else False
-						print (f"\tcheck latched key: {index} {k.name} pressed: {state}")
+						if verbose:
+							logging.getLogger("system").info(f"\tcheck latched key: {index} {k.name} pressed: {state}")
 						is_latched = is_latched and state
 
-					print(f"Final latched state: {is_latched}")
+					if verbose: logging.getLogger("system").info(f"Final latched state: {is_latched}")
 					
 				# is_latched = key.latched
 				
 				if is_latched: 
 					latch_key = input_item.key
 					if verbose:
-						logging.getLogger("system").info(f"KEY PRESSED: mode: [{self._active_mode}] {input_item.key.name}")
+						logging.getLogger("system").info(f"Detect KEY PRESSED: mode: [{self._active_mode}] {input_item.key.name}")
 				else:
 					if verbose:
-						logging.getLogger("system").info(f"KEY RELEASED: {input_item.key.name}")
+						logging.getLogger("system").info(f"Detect KEY RELEASED: {input_item.key.name}")
 								
 				if latch_key:
 					m_list = self._matching_latched_callbacks(event, latch_key)

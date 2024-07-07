@@ -643,6 +643,133 @@ class ConditionType(enum.Enum):
 
 
 
+class MouseClickMode(enum.Enum):
+    Normal = 0 # click on/off
+    Press = 1 # press only
+    Release = 2 # release only
+
+    @staticmethod
+    def to_string(mode):
+        return mode.name
+    
+    def __str__(self):
+        return str(self.value)
+    
+    @classmethod
+    def _missing_(cls, name):
+        for item in cls:
+            if item.name.lower() == name.lower():
+                return item
+            return cls.Normal
+        
+    @staticmethod
+    def from_string(str):
+        ''' converts from a string representation (text or numeric) to the enum, not case sensitive'''
+        str = str.lower().strip()
+        if str.isnumeric():
+            mode = int(str)
+            return MouseClickMode(mode)
+        for item in MouseClickMode:
+            if item.name.lower() == str:
+                return item
+
+        return None
+    
+    @staticmethod
+    def to_description(action):
+        ''' returns a descriptive string for the action '''
+        if action == MouseClickMode.Normal:
+            return "Normal Click"
+        elif action == MouseClickMode.Press:
+            return "Mouse button press"
+        elif action == MouseClickMode.Release:
+            return "Mouse button release"
+        return f"Unknown {action}"
+    
+    @staticmethod
+    def to_name(action):
+        ''' returns the name from the action '''
+        if action == MouseClickMode.Normal:
+            return "Normal Click"
+        elif action == MouseClickMode.Press:
+            return "Mouse button press"
+        elif action == MouseClickMode.Release:
+            return "Mouse button release"
+        return f"Unknown {action}"
+    
+class MouseAction(enum.Enum):
+    MouseButton = 0 # output a mouse button
+    MouseMotion = 1 # output a mouse motion
+    MouseWiggleOnLocal = 2 # enable mouse wiggle - local machine only
+    MouseWiggleOffLocal = 3 # disable mouse wiggle - locla machine only
+    MouseWiggleOnRemote = 4 # enable mouse wiggle - remote machines only
+    MouseWiggleOffRemote = 5 # disable mouse wiggle - remote machines only
+
+
+    @staticmethod
+    def to_string(mode):
+        return mode.name
+    
+    def __str__(self):
+        return str(self.value)
+    
+    @classmethod
+    def _missing_(cls, name):
+        for item in cls:
+            if item.name.lower() == name.lower():
+                return item
+            return cls.MouseButton
+        
+    @staticmethod
+    def from_string(str):
+        ''' converts from a string representation (text or numeric) to the enum, not case sensitive'''
+        str = str.lower().strip()
+        if str.isnumeric():
+            mode = int(str)
+            return MouseAction(mode)
+        for item in MouseAction:
+            if item.name.lower() == str:
+                return item
+
+        return None
+    
+    @staticmethod
+    def to_description(action):
+        ''' returns a descriptive string for the action '''
+        if action == MouseAction.MouseButton:
+            return "Maps a mouse button"
+        elif action == MouseAction.MouseMotion:
+            return "Maps to a mouse motion axis"
+        elif action == MouseAction.MouseWiggleOffLocal:
+            return "Turns wiggle mode off (local only)"
+        elif action == MouseAction.MouseWiggleOnLocal:
+            return "Turns wiggle mode on (local only)"
+        
+        elif action == MouseAction.MouseWiggleOffRemote:
+            return "Turns wiggle mode off (remote only)"
+        elif action == MouseAction.MouseWiggleOnRemote:
+            return "Turns wiggle mode on (remote only)"
+        
+        return f"Unknown {action}"
+    
+    @staticmethod
+    def to_name(action):
+        ''' returns the name from the action '''
+        if action == MouseAction.MouseButton:
+            return "Mouse button"
+        elif action == MouseAction.MouseMotion:
+            return "Mouse axis"
+        elif action == MouseAction.MouseWiggleOffLocal:
+            return "Wiggle Disable (local)"
+        elif action == MouseAction.MouseWiggleOnLocal:
+            return "Wiggle Enable (local)"
+        elif action == MouseAction.MouseWiggleOffRemote:
+            return "Wiggle Disable (remote)"
+        elif action == MouseAction.MouseWiggleOnRemote:
+            return "Wiggle Enable (remote)"        
+                
+        return f"Unknown {action}"
+    
 class MouseButton(enum.Enum):
 
     """Enumeration of all possible mouse buttons."""
@@ -672,6 +799,24 @@ class MouseButton(enum.Enum):
             return _MouseButton_to_enum_lookup[value]
         except KeyError:
             raise gremlin.error.GremlinError("Invalid type in lookup")
+        
+    @staticmethod
+    def to_lookup_string(value):
+        ''' mouse button to key lookup name'''
+        try:
+            return _MouseButton_to_lookup_string_lookup[value]
+        except KeyError:
+            raise gremlin.error.GremlinError("Invalid type in lookup")
+        
+    @staticmethod
+    def lookup_to_enum(value):
+        if isinstance(value, int):
+            return MouseButton(value)
+        try:
+            return _MouseButton_lookup_to_button_lookup[value]
+        except KeyError:
+            raise gremlin.error.GremlinError("Invalid type in lookup")
+
 
 
 _MouseButton_to_string_lookup = {
@@ -685,6 +830,19 @@ _MouseButton_to_string_lookup = {
     MouseButton.WheelLeft: "Wheel Left",
     MouseButton.WheelRight: "Wheel Right"
 }
+
+_MouseButton_to_lookup_string_lookup = {
+    MouseButton.Left: "mouse_1",
+    MouseButton.Right: "mouse_2",
+    MouseButton.Middle: "mouse_3",
+    MouseButton.Forward: "mouse_4",
+    MouseButton.Back: "mouse_5",
+    MouseButton.WheelUp: "wheel_up",
+    MouseButton.WheelDown: "wheel_down",
+    MouseButton.WheelLeft: "wheel_left",
+    MouseButton.WheelRight: "wheel_right"
+}
+
 
 
 _MouseButton_to_enum_lookup = {
@@ -704,4 +862,16 @@ _MouseButton_to_enum_lookup = {
     "Wheel Down": MouseButton.WheelDown, 
     "Wheel Left": MouseButton.WheelLeft,
     "Wheel Right": MouseButton.WheelRight   
+}
+
+_MouseButton_lookup_to_button_lookup = {
+    "mouse_1": MouseButton.Left, 
+    "mouse_2": MouseButton.Right,
+    "mouse_3": MouseButton.Middle,
+    "mouse_4": MouseButton.Forward,
+    "mouse_5": MouseButton.Back,
+    "wheel_up": MouseButton.WheelUp,
+    "wheel_down": MouseButton.WheelDown,
+    "wheel_left": MouseButton.WheelLeft,
+    "wheel_right": MouseButton.WheelRight 
 }

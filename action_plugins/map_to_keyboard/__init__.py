@@ -73,12 +73,14 @@ class MapToKeyboardWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _record_keys_cb(self):
         """Prompts the user to press the desired key combination."""
+        
         self.button_press_dialog = gremlin.ui.ui_common.InputListenerWidget(
-            self._update_keys,
             [InputType.Keyboard],
             return_kb_event=False,
             multi_keys=True
         )
+
+        self.button_press_dialog.item_selected.connect(self._update_keys)
 
         # Display the dialog centered in the middle of the UI
         root = self

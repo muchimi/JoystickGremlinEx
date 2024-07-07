@@ -8,6 +8,7 @@ Joystick Gremlin EX
 <!-- TOC start (generated with https://github.com/derlin/bitdowntoc) -->
 
    * [Changelog](#changelog)
+- [Virus false-positives](#virus-false-positives)
 - [Releases](#releases)
 - [General](#general)
 - [Compatibility](#compatibility)
@@ -29,7 +30,12 @@ Joystick Gremlin EX
    * [HID devices](#hid-devices)
    * [Keyboard (+Mouse) device](#keyboard-mouse-device)
       + [Virtual Keyboard](#virtual-keyboard)
-      + [Latching](#latching)
+         - [Selecting a key](#selecting-a-key)
+         - [Shift state](#shift-state)
+         - [Select single](#select-single)
+         - [Selected keys](#selected-keys)
+         - [Listen button](#listen-button)
+         - [Pass-through](#pass-through)
       + [Special considerations](#special-considerations)
    * [MIDI device](#midi-device)
       + [MIDI inputs](#midi-inputs)
@@ -56,7 +62,7 @@ Joystick Gremlin EX
       + [Ranges](#ranges)
       + [Include/exclude flag](#includeexclude-flag)
       + [Symmetry](#symmetry)
-      + [Latching](#latching-1)
+      + [Latching](#latching)
       + [Dragons](#dragons-1)
 - [Button Container](#button-container)
       + [Usage tips](#usage-tips)
@@ -161,6 +167,7 @@ Introduction
 ------------
 
 
+<!-- TOC --><a name="virus-false-positives"></a>
 # Virus false-positives
 
 GremlinEx uses a common tool called PyInstaller as its packaging option.  Pyinstaller is unfortunately known to create false-positives with some malware detection tools, because of how it works and this is unfortunately not an issue I can solve easily while it concerns me greatly.  The good news is, it happens rarely.
@@ -445,17 +452,39 @@ For input simplicity, GremlinEx now uses a virtual keyboard to show which keys a
 ![](virtual_keyboard.png)
 
 
-
 Currently only US layout (QWERTY) is supported.  Localization is on the to-do list, however GremlinEx uses scan-codes (physical keys) on the keyboard so what the key actually says doesn't matter. I do plan to add localization that is correct for the current locale setting at some point so the dialog displays the correct key layout for the current keyboard in use.
 
 Keyboard inputs can be added, removed and edited.  If an input is removed, it will remove any associated mappings and display a warning box to this effect.
 
-<!-- TOC --><a name="latching"></a>
-### Latching
+<!-- TOC --><a name="selecting-a-key"></a>
+#### Selecting a key
 
-GremlinEx allows multiple keys to be latched as a single trigger.  The trigger will fire if all the keys in the latched set are pressed concurrently.  The order does not matter.
+Click on a key to select it.  More than one key can be selected in most modes. When configuring an input and more than one key is selected, GremlinEx will only trigger the container/actions if all the keys are pressed concurrently.
+
+<!-- TOC --><a name="shift-state"></a>
+#### Shift state
+
+If you hold the shift key, keys that can be shifted will show their character.
+
+<!-- TOC --><a name="select-single"></a>
+#### Select single
+
+You can select a single key by holding the control key down.  This will clear any other selection.
+
+<!-- TOC --><a name="selected-keys"></a>
+#### Selected keys
 
 Each selected key shows highlighted in the virtual keyboard.
+
+<!-- TOC --><a name="listen-button"></a>
+#### Listen button
+
+The listen button allows you to type the keys you'd like to select.  This has a limitation in that it will only "hear" the keys that can be pressed.  Listen mode replaces the current selection.
+
+<!-- TOC --><a name="pass-through"></a>
+#### Pass-through
+
+Keys uses as inputs into GremlinEx are not captured, meaning that all applications will receive the same keys that GremlinEx sees.
 
 There are no guardrails provided - and GremlinEx does not prevent the output application from seeing the keys and buttons pressed to trigger a GremlinEx action.  When mapping to a game use care to employ key combinations that make sense and do not conflict with one another.
 
@@ -741,7 +770,7 @@ Each bracket can include or exclude the value.  Think of it as greater than, ver
 The symmetry option applies the opposite bracket as the trigger.  So if the bracket is (0.9 to 1.0), in symmetry mode the bracket (-1, -0.9) will also trigger if the axis is in that range.
 
 
-<!-- TOC --><a name="latching-1"></a>
+<!-- TOC --><a name="latching"></a>
 ### Latching
 
 The range container is latched - meaning that this special container is aware of other range containers in the execution graph.  The latching is automatic and ensures that when the axis is moved to a different position, prior active ranges reset so can re-trigger when the axis moves into their range again, so the container has to be aware of other ranges.
@@ -1063,5 +1092,6 @@ If you want to run from the source code, you will need the following python pack
 	dill
 	mido
 	python-rtpmidi
+	lxml
 
 

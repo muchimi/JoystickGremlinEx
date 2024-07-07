@@ -31,6 +31,7 @@ import enum
 from gremlin.profile import safe_format, safe_read
 from gremlin.keyboard import Key, key_from_name, key_from_code
 from gremlin.ui.virtual_keyboard import *
+from gremlin.types import MouseButton, MouseAction, MouseClickMode
 import logging
 
 
@@ -149,10 +150,10 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
         
         
     def _keyboard_dialog_ok_cb(self):
-        ''' callled when the dialog completes '''
+        ''' callled when the virtual dialog completes '''
 
         # grab the new data
-        self.action_data.keys = self._keyboard_dialog.sequence
+        self.action_data.keys = gremlin.keyboard.sort_keys(self._keyboard_dialog.keys)
         self.action_modified.emit()
     
 
@@ -160,8 +161,19 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
         """Populates the UI components."""
         text = "<b>Current key combination:</b> "
         names = []
-        for key in self.action_data.keys:
-            names.append(key_from_code(key[0], key[1]).name)
+        for code in self.action_data.keys:
+            if isinstance(code, tuple):
+                key = gremlin.keyboard.KeyMap.find(code[0], code[1])
+            elif isinstance(code, int):
+                key = gremlin.keyboard.KeyMap.find_virtual(code)
+            elif isinstance(code, Key):
+                key = code
+            else:
+                assert True, f"Don't know how to handle: {code}"
+            if key:
+                names.append(key.name)                
+
+
         text += " + ".join(names)
 
         self.key_combination.setText(text)
@@ -171,10 +183,22 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         :param keys the keys to use in the key combination
         """
-        self.action_data.keys = [
-            (key.scan_code, key.is_extended) for key in keys
-        ]
+
+        data = []
+        for code in keys:
+            if isinstance(code, tuple):
+                key = gremlin.keyboard.KeyMap.find(code[0], code[1])
+            elif isinstance(code, int):
+                key = gremlin.keyboard.KeyMap.find_virtual(code)
+            elif isinstance(code, Key):
+                key = code
+            else:
+                assert True, f"Don't know how to handle: {code}"
+            data.append(key)
+        
+        self.action_data.keys = gremlin.keyboard.sort_keys(data)
         self.action_modified.emit()
+        
 
     def _mode_changed(self):
         delay_enabled = False
@@ -208,12 +232,13 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _record_keys_cb(self):
         """Prompts the user to press the desired key combination."""
-        self.button_press_dialog = gremlin.ui.ui_common.InputListenerWidget(
-            self._update_keys,
+        button_press_dialog = gremlin.ui.ui_common.InputListenerWidget(
             [InputType.Keyboard],
             return_kb_event=False,
             multi_keys=True
         )
+
+        button_press_dialog.item_selected.connect(self._update_keys)
 
         # Display the dialog centered in the middle of the UI
         root = self
@@ -221,13 +246,13 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
             root = root.parent()
         geom = root.geometry()
 
-        self.button_press_dialog.setGeometry(
+        button_press_dialog.setGeometry(
             int(geom.x() + geom.width() / 2 - 150),
             int(geom.y() + geom.height() / 2 - 75),
             300,
             150
         )
-        self.button_press_dialog.show()
+        button_press_dialog.show()
 
 
 class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
@@ -247,62 +272,66 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
         # build the macro that will play when the action is called 
         key: Key
         for key in action.keys:
-            # regular key
-            self.press.press(key_from_code(key[0], key[1]))
+            self.press.press(key)
 
         self.release = gremlin.macro.Macro()
+
         # Execute release in reverse order
         for key in reversed(action.keys):
-            self.release.release(key_from_code(key[0], key[1]))            
+            self.release.release(key)            
 
         self.delay_press_release = gremlin.macro.Macro()
+
         # execute press/release with a delay before releasing
         for key in action.keys:
-            self.delay_press_release.press(key_from_code(key[0], key[1]))
+            self.delay_press_release.press(key)
         if self.delay > 0:
             self.delay_press_release.pause(self.delay)
         for key in reversed(action.keys):
-            self.delay_press_release.release(key_from_code(key[0], key[1]))
+            self.delay_press_release.release(key)
 
         # tell the time delay or release macros to inform us when they are done running
         self.release.completed_callback = self._macro_completed
         self.delay_press_release.completed_callback = self._macro_completed
 
 
-    def _perform_mouse_button(self, button_id):
-        assert self.action.motion_input is False
-        (is_local, is_remote) = self.get_state()
-        if button_id in [MouseButton.WheelDown, MouseButton.WheelUp]:
-            if value.current:
-                direction = -16
-                if self.action.button_id == MouseButton.WheelDown:
-                    direction = 1
-                if is_local:
-                    gremlin.sendinput.mouse_wheel(direction)
-                if is_remote:
-                    input_devices.remote_client.send_mouse_wheel(direction)
-        else:
-            if self.action.click_mode == MouseClickMode.Normal:
-                if value.current:
-                    if is_local:
-                        gremlin.sendinput.mouse_press(self.action.button_id)
-                    if is_remote:
-                        input_devices.remote_client.send_mouse_button(self.action.button_id.value, True)
-                else:
-                    if is_local:
-                        gremlin.sendinput.mouse_release(self.action.button_id)
-                    if is_remote:
-                        input_devices.remote_client.send_mouse_button(self.action.button_id.value, False)
-            elif self.action.click_mode == MouseClickMode.Press:
-                if is_local:
-                    gremlin.sendinput.mouse_press(self.action.button_id)
-                if is_remote:
-                    input_devices.remote_client.send_mouse_button(self.action.button_id.value, True)
-            elif self.action.click_mode == MouseClickMode.Release:
-                if is_local:
-                    gremlin.sendinput.mouse_release(self.action.button_id)
-                if is_remote:
-                    input_devices.remote_client.send_mouse_button(self.action.button_id.value, False)
+    # def _perform_mouse_button(self, button_id, is_pressed):
+    #     assert self.action.motion_input is False
+        
+    #     from gremlin.input_devices import remote_client
+    #     import gremlin.sendinput 
+    #     (is_local, is_remote) = self.get_state()
+    #     if button_id in [MouseButton.WheelDown, MouseButton.WheelUp]:
+    #         if is_pressed:
+    #             direction = -16
+    #             if self.action.button_id == MouseButton.WheelDown:
+    #                 direction = 1
+    #             if is_local:
+    #                 gremlin.sendinput.mouse_wheel(direction)
+    #             if is_remote:
+    #                 remote_client.send_mouse_wheel(direction)
+    #     else:
+    #         if self.action.click_mode == MouseClickMode.Normal:
+    #             if is_pressed:
+    #                 if is_local:
+    #                     gremlin.sendinput.mouse_press(self.action.button_id)
+    #                 if is_remote:
+    #                     remote_client.send_mouse_button(self.action.button_id.value, True)
+    #             else:
+    #                 if is_local:
+    #                     gremlin.sendinput.mouse_release(self.action.button_id)
+    #                 if is_remote:
+    #                     remote_client.send_mouse_button(self.action.button_id.value, False)
+    #         elif self.action.click_mode == MouseClickMode.Press:
+    #             if is_local:
+    #                 gremlin.sendinput.mouse_press(self.action.button_id)
+    #             if is_remote:
+    #                 remote_client.send_mouse_button(self.action.button_id.value, True)
+    #         elif self.action.click_mode == MouseClickMode.Release:
+    #             if is_local:
+    #                 gremlin.sendinput.mouse_release(self.action.button_id)
+    #             if is_remote:
+    #                 remote_client.send_mouse_button(self.action.button_id.value, False)
 
 
     def _macro_completed(self):
@@ -401,7 +430,7 @@ class MapToKeyboardEx(gremlin.base_profile.AbstractAction):
         :param node the node whose content should be used to populate this
             instance
         """
-        self.keys = []
+        keys = []
 
         if "mode" in node.attrib:
             mode = safe_read(node, "mode", str)
@@ -419,11 +448,18 @@ class MapToKeyboardEx(gremlin.base_profile.AbstractAction):
 
 
         for child in node.findall("key"):
-            self.keys.append((
-                int(child.get("scan-code")),
-                gremlin.profile.parse_bool(child.get("extended"))
-            ))
+            virtual_code = safe_read(child, "virtual-code", int, 0)
+            if virtual_code > 0:
+                key = gremlin.keyboard.KeyMap.find_virtual(virtual_code)         
+            else:
+                scan_code = safe_read(child, "scan-code", int, 0)
+                is_extended = safe_read(child, "extended", bool, False)
+                key = gremlin.keyboard.KeyMap.find(scan_code, is_extended)
+            if key:
+                keys.append(key)
 
+        # sort the keys for display purposes
+        self.keys = gremlin.keyboard.sort_keys(keys)
 
     def _generate_xml(self):
         """Returns an XML node containing this instance's information.
@@ -443,13 +479,33 @@ class MapToKeyboardEx(gremlin.base_profile.AbstractAction):
         node.set("mode",safe_format(mode, str) )
 
         node.set("delay",safe_format(self.delay, int))
-        for scan_code, extended in self.keys:
+        
+        for code in self.keys:
+            if isinstance(code, tuple): # key ID (scan_code, extended)
+                scan_code = code[0]
+                is_extended = code[1]
+                key = gremlin.keyboard.KeyMap.find(scan_code, is_extended)
+                virtual_code = key.virtual_code
+            elif isinstance(code, int): # single virtual code
+                key = gremlin.keyboard.KeyMap.find_virtual(code)
+                scan_code = key.scan_code
+                is_extended = key.is_extended
+                virtual_code = code
+            elif isinstance(code, Key):
+                # key
+                key = code
+                scan_code = key.scan_code
+                is_extended = key.is_extended
+                virtual_code = key.virtual_code
+            else:
+                assert True, f"Don't know how to handle: {code}"
+            
             key_node = ElementTree.Element("key")
+            key_node.set("virtual-code", str(virtual_code))
             key_node.set("scan-code", str(scan_code))
-            key_node.set("extended", str(extended))
+            key_node.set("extended", str(is_extended))
             # useful for xml readability purposes = what scan code is this
-            key_item = Key(scan_code=scan_code, is_extended = extended)
-            key_node.set("description", key_item.lookup_name)
+            key_node.set("description", key.name)
             node.append(key_node)
         return node
 

@@ -26,6 +26,7 @@ from PySide6 import QtWidgets, QtCore
 # import gremlin
 import gremlin.config
 from gremlin.input_types import InputType
+import gremlin.keyboard
 #from gremlin.common import DeviceType
 from . import input_item, ui_common 
 from gremlin.keyboard import Key
@@ -153,27 +154,35 @@ class KeyboardInputItem():
             for child in node:
                 # ready key nodes
                 if child.tag in ("key"):
+                    virtual_code = safe_read(child,"virtual-code", int, 0)
                     scan_code = safe_read(child, "scan-code", int, 0)
                     is_extended = safe_read(child, "extended", bool, False)
                     is_mouse = safe_read(child, "mouse", bool, False)
-                    if scan_code == 75:
-                        pass
                     if is_mouse:
-                        key = Key(scan_code = scan_code, is_mouse=True)
+                        pass
+                    if virtual_code > 0:
+                        key = gremlin.keyboard.KeyMap.find_virtual(virtual_code)
                     else:
-                        key = key_from_code(scan_code, is_extended)
+                        key = gremlin.keyboard.KeyMap.find(scan_code, is_extended)
+                    
                     self._key = key
                     for latched_child in child:
                         if latched_child.tag == "latched":
+                            virtual_code = safe_read(latched_child,"virtual-code", int, 0)
                             scan_code = safe_read(latched_child, "scan-code", int, 0)
                             is_extended = safe_read(latched_child, "extended", bool, False)
                             is_mouse = safe_read(latched_child, "mouse", bool, False)
                             if is_mouse:
                                 key = Key(scan_code = scan_code, is_mouse=True)
                             else:
-                                key = key_from_code(scan_code, is_extended)
+                                if virtual_code > 0:
+                                    key = gremlin.keyboard.KeyMap.find_virtual(virtual_code)
+                                else:
+                                    key = gremlin.keyboard.KeyMap.find(scan_code, is_extended)
                             if not key in self._key.latched_keys:
                                 self._key._latched_keys.append(key) 
+
+                    self._key._update()
         self._suspend_update = False
         self._update()
                     
@@ -183,24 +192,23 @@ class KeyboardInputItem():
         node = ElementTree.Element("input")
         node.set("guid", str(self.id))
         child = ElementTree.Element("key")
-        child.set("scan-code", str(self._key.scan_code))
-        child.set("extended", str(self._key.is_extended))
-        child.set("mouse", str(self._key.is_mouse))
-        child.set("description", self.key.lookup_name)
+        root_key = self._key
+        child.set("virtual-code", str(root_key.virtual_code))
+        child.set("scan-code", str(root_key.scan_code))
+        child.set("extended", str(root_key.is_extended))
+        child.set("mouse", str(root_key.is_mouse))
+        child.set("description", root_key.lookup_name)
         node.append(child)
-        for key in self._key._latched_keys:
+        for key in root_key.latched_keys:
             latched_child = ElementTree.Element("latched")
+            latched_child.set("virtual-code", str(key.virtual_code))
             latched_child.set("scan-code", str(key.scan_code))
             latched_child.set("extended", str(key.is_extended))
             latched_child.set("mouse", str(key.is_mouse))
             latched_child.set("description", key.lookup_name)
             child.append(latched_child)
         return node
-    
-    def _fix_name(self, name):
-        if len(name) == 1:
-            return name.upper()
-        return name
+
     
     def _update(self):
         # updates the message key and display 
@@ -214,34 +222,24 @@ class KeyboardInputItem():
             self._display_tooltip = ""
             return
         
-        message_key = f"{self._key._scan_code:x}{1 if self.key._is_extended else 0}"
-        from gremlin.keyboard import sort_keys
-        display_name = self.key.lookup_name
+        if self._key._virtual_code > 0:
+            message_key = f"{self._key._virtual_code:x}"
+        else:
+            message_key = f"{self._key._scan_code:x}{1 if self.key._is_extended else 0}"
+        
         key : Key
         for key in self._key._latched_keys:
-            message_key += f"|{key._scan_code:x}{1 if key._is_extended else 0}"
+            if key._virtual_code > 0:
+                message_key += f"|{key._virtual_code:x}"
+            else:
+                message_key += f"|{key._scan_code:x}{1 if key._is_extended else 0}"
             
         self._message_key = message_key
-        latched_keys = self._key._latched_keys
+        is_latched = self._key.is_latched
+        self._title_name = f"Key input {'(latched)'if is_latched else ''}"
 
-        # setup display details for this key - sorted by modifier
-        if latched_keys:
-            keys = [self._key]
-            keys.extend(latched_keys)
-            # order the key by modifier and sequence
-            keys = sort_keys(keys)
-            display_name = ""
-            for key in keys:
-                if display_name:
-                    display_name += " + "
-                
-                display_name += self._fix_name(key.name)
-        else:
-            display_name = self._fix_name(self._key.name)
-        
-        self._title_name = f"Key input {'(latched)'if latched_keys else ''}"
-        self._display_name = display_name
-        self._display_tooltip = display_name
+        self._display_name = self._key.latched_name
+        self._display_tooltip = self._key.latched_name
 
     def to_string(self):
         return f"KeyboardInputItem: pair: {self.key_tuple} name: {self._display_name}"
@@ -266,18 +264,6 @@ class KeyboardInputItem():
         ''' used for sorting purposes '''        
         # keep as is (don't sort this input entry)
         return False
-        
-    def __lt__(self, other):
-        return self._display_name < other._display_name
-    
-    def __le__(self, other):
-        return self._display_name <= other._display_name
-    
-    def __gt__(self, other):
-        return self._display_name > other._display_name
-    
-    def __ge__(self, other):
-        return self._display_name > other._display_name
     
     def __str__(self):
         return self.to_string()
@@ -416,9 +402,10 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         # grab a new data index as this is a new entry
         index = self._keyboard_dialog.index 
         keys = self._keyboard_dialog.keys
-        self._process_input_keys(keys, index)        
+        latched_key = self._keyboard_dialog.latched_key
+        self._process_input_keys(keys, index, latched_key)        
 
-    def _process_input_keys(self, keys, index):
+    def _process_input_keys(self, keys, index, root_key = None):
         ''' processes input keys
          
         index of -1 indicates a new item
@@ -429,33 +416,13 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         # reload on new index
         reload = index == -1
 
-        # figure out if the has modifiers or not
-        modifiers = []
-        primary_keys = []
-        root_key : Key = None
-        if not keys:
-            # no data
-            root_key = Key()
-        else:
-            for key in keys:
-                if key.is_modifier:
-                    modifiers.append(key)
-                    if not root_key:
-                        root_key = key # in case it's the modifier by itself
-                else:
-                    # use the last key found that isn't a modifier
-                    # if multiple keys were entered - these become latched keys
-                    primary_keys.append(key)
-                    if not root_key:
-                        root_key = key
-
-        if modifiers and not root_key.is_modifier:
-            root_key.latched_keys = modifiers
-        
-        # latch the other keys that must be pressed at the same time
-        if len(primary_keys) > 1:
-            primary_keys.remove(root_key)
-            root_key.latched_keys.extend(primary_keys)
+        # figure out the root key
+        if root_key is None:
+            if not keys:
+                # no data
+                root_key = Key()
+            else:
+                root_key = gremlin.keyboard.KeyMap.get_latched_key(keys)
 
         # ensure the input item exists in the profile data
         if index >= 0:

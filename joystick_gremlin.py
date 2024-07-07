@@ -91,7 +91,7 @@ from gremlin.ui.midi_device import MidiDeviceTabWidget
 from gremlin.ui.osc_device import OscDeviceTabWidget
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.14ex (i)"
+APPLICATION_VERSION = "13.40.14ex (j)"
 
 # the main ui
 ui = None
@@ -1236,14 +1236,14 @@ class GremlinUi(QtWidgets.QMainWindow):
             valid_key = True
 
 
-        if valid_key:
-            if self._temp_input_axis_override:
-                if self._temp_input_axis_only_override:
-                    syslog.debug("Override listen to joystick input (exclusive): ON")
-                else:
-                    syslog.debug("Override listen to joystick input: ON")
-            elif was_on:
-                syslog.debug("Override listen to joystick input: OFF")
+        # if valid_key:
+        #     if self._temp_input_axis_override:
+        #         if self._temp_input_axis_only_override:
+        #             syslog.debug("Override listen to joystick input (exclusive): ON")
+        #         else:
+        #             syslog.debug("Override listen to joystick input: ON")
+        #     elif was_on:
+        #         syslog.debug("Override listen to joystick input: OFF")
 
                 
         

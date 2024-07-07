@@ -469,7 +469,6 @@ class JoystickConditionWidget(AbstractConditionWidget):
     def _request_user_input(self):
         """Prompts the user for the input to bind to this item."""
         self.input_dialog = ui_common.InputListenerWidget(
-            self._input_pressed_cb,
             [
                 InputType.JoystickAxis,
                 InputType.JoystickButton,
@@ -478,6 +477,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
             return_kb_event=False,
             multi_keys=False
         )
+        self.input_dialog.item_selected.connect(self._input_pressed_cb)
 
         # Display the dialog centered in the middle of the UI
         root = self

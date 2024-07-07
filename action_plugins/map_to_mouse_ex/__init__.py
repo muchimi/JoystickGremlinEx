@@ -12,143 +12,19 @@ from PySide6 import QtCore, QtWidgets
 
 import gremlin.base_profile
 from gremlin.input_types import InputType
-from gremlin.types import MouseButton
+from gremlin.types import MouseButton, MouseAction, MouseClickMode
 from gremlin.profile import read_bool, safe_read, safe_format
 from gremlin.util import rad2deg
 import gremlin.ui.ui_common
 import gremlin.ui.input_item
 import gremlin.sendinput
 from gremlin import input_devices
+
 import enum, threading,time, random
+
 
 syslog = logging.getLogger("system")
 
-class MouseClickMode(enum.Enum):
-    Normal = 0 # click on/off
-    Press = 1 # press only
-    Release = 2 # release only
-
-    @staticmethod
-    def to_string(mode):
-        return mode.name
-    
-    def __str__(self):
-        return str(self.value)
-    
-    @classmethod
-    def _missing_(cls, name):
-        for item in cls:
-            if item.name.lower() == name.lower():
-                return item
-            return cls.Normal
-        
-    @staticmethod
-    def from_string(str):
-        ''' converts from a string representation (text or numeric) to the enum, not case sensitive'''
-        str = str.lower().strip()
-        if str.isnumeric():
-            mode = int(str)
-            return MouseClickMode(mode)
-        for item in MouseClickMode:
-            if item.name.lower() == str:
-                return item
-
-        return None
-    
-    @staticmethod
-    def to_description(action):
-        ''' returns a descriptive string for the action '''
-        if action == MouseClickMode.Normal:
-            return "Normal Click"
-        elif action == MouseClickMode.Press:
-            return "Mouse button press"
-        elif action == MouseClickMode.Release:
-            return "Mouse button release"
-        return f"Unknown {action}"
-    
-    @staticmethod
-    def to_name(action):
-        ''' returns the name from the action '''
-        if action == MouseClickMode.Normal:
-            return "Normal Click"
-        elif action == MouseClickMode.Press:
-            return "Mouse button press"
-        elif action == MouseClickMode.Release:
-            return "Mouse button release"
-        return f"Unknown {action}"
-    
-class MouseAction(enum.Enum):
-    MouseButton = 0 # output a mouse button
-    MouseMotion = 1 # output a mouse motion
-    MouseWiggleOnLocal = 2 # enable mouse wiggle - local machine only
-    MouseWiggleOffLocal = 3 # disable mouse wiggle - locla machine only
-    MouseWiggleOnRemote = 4 # enable mouse wiggle - remote machines only
-    MouseWiggleOffRemote = 5 # disable mouse wiggle - remote machines only
-
-
-    @staticmethod
-    def to_string(mode):
-        return mode.name
-    
-    def __str__(self):
-        return str(self.value)
-    
-    @classmethod
-    def _missing_(cls, name):
-        for item in cls:
-            if item.name.lower() == name.lower():
-                return item
-            return cls.MouseButton
-        
-    @staticmethod
-    def from_string(str):
-        ''' converts from a string representation (text or numeric) to the enum, not case sensitive'''
-        str = str.lower().strip()
-        if str.isnumeric():
-            mode = int(str)
-            return MouseAction(mode)
-        for item in MouseAction:
-            if item.name.lower() == str:
-                return item
-
-        return None
-    
-    @staticmethod
-    def to_description(action):
-        ''' returns a descriptive string for the action '''
-        if action == MouseAction.MouseButton:
-            return "Maps a mouse button"
-        elif action == MouseAction.MouseMotion:
-            return "Maps to a mouse motion axis"
-        elif action == MouseAction.MouseWiggleOffLocal:
-            return "Turns wiggle mode off (local only)"
-        elif action == MouseAction.MouseWiggleOnLocal:
-            return "Turns wiggle mode on (local only)"
-        
-        elif action == MouseAction.MouseWiggleOffRemote:
-            return "Turns wiggle mode off (remote only)"
-        elif action == MouseAction.MouseWiggleOnRemote:
-            return "Turns wiggle mode on (remote only)"
-        
-        return f"Unknown {action}"
-    
-    @staticmethod
-    def to_name(action):
-        ''' returns the name from the action '''
-        if action == MouseAction.MouseButton:
-            return "Mouse button"
-        elif action == MouseAction.MouseMotion:
-            return "Mouse axis"
-        elif action == MouseAction.MouseWiggleOffLocal:
-            return "Wiggle Disable (local)"
-        elif action == MouseAction.MouseWiggleOnLocal:
-            return "Wiggle Enable (local)"
-        elif action == MouseAction.MouseWiggleOffRemote:
-            return "Wiggle Disable (remote)"
-        elif action == MouseAction.MouseWiggleOnRemote:
-            return "Wiggle Enable (remote)"        
-                
-        return f"Unknown {action}"
 
 class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
@@ -161,7 +37,6 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         :param parent the parent of this widget
         """
         super().__init__(action_data, QtWidgets.QVBoxLayout, parent=parent)
-
         
 
     def _create_ui(self):
@@ -590,11 +465,10 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _request_user_input(self):
         """Prompts the user for the input to bind to this item."""
         self.button_press_dialog = gremlin.ui.ui_common.InputListenerWidget(
-            self._update_mouse_button,
             [InputType.Mouse],
             return_kb_event=False
         )
-
+        self.button_press_dialog.item_selected.connect(self._update_mouse_button)
         # Display the dialog centered in the middle of the UI
         root = self
         while root.parent():
