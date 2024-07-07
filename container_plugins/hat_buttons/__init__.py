@@ -285,7 +285,7 @@ class HatButtonsContainer(AbstractContainer):
                 continue
 
             # Callback generating virtual button events
-            callbacks.append(gremlin.execution_graph.CallbackData(
+            callbacks.append(gremlin.base_profile.CallbackData(
                 gremlin.execution_graph.VirtualButtonProcess(
                     VirtualHatButton([
                         gremlin.util.hat_tuple_to_direction(id_to_direction[i])
@@ -301,7 +301,7 @@ class HatButtonsContainer(AbstractContainer):
                 self.activation_condition_type
 
             # Callback reacting to virtual button events
-            callbacks.append(gremlin.execution_graph.CallbackData(
+            callbacks.append(gremlin.base_profile.CallbackData(
                 gremlin.execution_graph.VirtualButtonCallback(basic_container),
                 gremlin.event_handler.Event(
                     InputType.VirtualButton,
