@@ -531,7 +531,8 @@ class JoystickDeviceTabWidget(QtWidgets.QWidget):
         if item:
             self.main_layout.removeItem(item)
 
-        widget = InputItemConfiguration(item_data)            
+        widget = InputItemConfiguration(item_data)                 
+        self.main_layout.addWidget(widget,3)
 
         if item_data is not None:
             
@@ -539,7 +540,8 @@ class JoystickDeviceTabWidget(QtWidgets.QWidget):
             widget.action_model.data_changed.connect(change_cb)
             widget.description_changed.connect(change_cb)
 
-        self.main_layout.addWidget(widget)
+
+        
 
     def set_mode(self, mode):
         ''' changes the mode of the tab '''
@@ -551,7 +553,7 @@ class JoystickDeviceTabWidget(QtWidgets.QWidget):
         self.current_mode = mode
         self.device_profile.ensure_mode_exists(self.current_mode, self.device)
         
-
+   
         # Remove the existing widget, if there is one
         item = self.main_layout.takeAt(1)
         if item is not None and item.widget():
@@ -560,11 +562,16 @@ class JoystickDeviceTabWidget(QtWidgets.QWidget):
         if item:
             self.main_layout.removeItem(item)
 
+        widget = InputItemConfiguration()
+        self.main_layout.addWidget(widget,3)            
+
 
         self.input_item_list_model.mode = mode            
 
         # Select the first input item
         self.input_item_list_view.select_item(0, emit_signal=False)
+
+
 
 
     def mode_changed_cb(self, mode):

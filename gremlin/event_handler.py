@@ -272,6 +272,8 @@ class EventListener(QtCore.QObject):
 	def _process_queue(self):
 		''' processes an item the keyboard buffer queue '''
 		item, is_pressed = self._keyboard_queue.get()
+		verbose = gremlin.config.Configuration().verbose
+
 		if isinstance(item, int):
 			virtual_code = item
 			key = gremlin.keyboard.KeyMap.find_virtual(virtual_code)	
@@ -284,7 +286,8 @@ class EventListener(QtCore.QObject):
 			key = gremlin.keyboard.KeyMap.find(key_id[0], key_id[1])
 			self._keyboard_buffer[key_id] = is_pressed
 
-		# print (f"DEQUEUE KEY {key_id} vk: {virtual_code} name: {key.name} pressed: {is_pressed}")
+		if verbose:
+			logging.getLogger("system").info(f"DEQUEUE KEY {key_id} vk: {virtual_code} name: {key.name} pressed: {is_pressed}")
 		
 		self.keyboard_event.emit(Event(
 			event_type= InputType.Keyboard,
@@ -460,7 +463,8 @@ class EventListener(QtCore.QObject):
 
 		:param event the keyboard event
 		"""
-
+		verbose = gremlin.config.Configuration().verbose
+		# verbose = True
 		virtual_code = event.virtual_code
 		key_id = (event.scan_code, event.is_extended)
 		is_pressed = event.is_pressed
@@ -493,7 +497,9 @@ class EventListener(QtCore.QObject):
 				self._keyboard_queue.put((key_id, is_pressed))
 			
 			# add to the processing queue
-			# print (f"QUEUE KEY {key_id} {key.name} pressed {is_pressed}")
+			if verbose:
+				key = gremlin.keyboard.KeyMap.find_virtual(virtual_code) if virtual_code > 0 else gremlin.keyboard.KeyMap.find(key_id[0],key_id[1])
+				logging.getLogger("system").info(f"QUEUE KEY {key_id} vk 0x{virtual_code:X} name: {key.name} pressed {is_pressed}")
 
 		else:
 			# DESIGN mode - straight
@@ -662,7 +668,7 @@ class EventHandler(QtCore.QObject):
 				# keyboard latched event
 				identifier = event.identifier
 				primary_key : Key = identifier.key
-				verbose = True
+				# verbose = True
 				
 				# if the key can latch with multiple primary keys, build the table of all combinations
 				key_list = [primary_key]
@@ -916,6 +922,7 @@ class EventHandler(QtCore.QObject):
 		m_list = []
 
 		verbose = gremlin.config.Configuration().verbose
+		# verbose = True
 
 		# filter latched keyboard or mouse events
 		if event.event_type in (InputType.Keyboard, InputType.KeyboardLatched, InputType.Mouse):

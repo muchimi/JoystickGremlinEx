@@ -953,10 +953,31 @@ class ModeManagerUi(ui_common.BaseDialogUi):
     def _create_ui(self):
         """Creates the required UII elements."""
         self.main_layout = QtWidgets.QVBoxLayout(self)
-        self.mode_layout = QtWidgets.QGridLayout()
+        self.scroll_area = QtWidgets.QScrollArea()
+        self.scroll_widget = QtWidgets.QWidget()
+        self.scroll_layout = QtWidgets.QVBoxLayout()
 
-        self.main_layout.addLayout(self.mode_layout)
-        self.main_layout.addStretch()
+        # Configure the widget holding the layout with all the buttons
+        self.scroll_widget.setLayout(self.scroll_layout)
+        self.scroll_widget.setSizePolicy(
+            QtWidgets.QSizePolicy.Expanding,
+            QtWidgets.QSizePolicy.Expanding
+        )
+        self.scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+        self.scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+
+        # Configure the scroll area
+        self.scroll_area.setMinimumWidth(300)
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setWidget(self.scroll_widget)
+
+        self.mode_widget = QtWidgets.QWidget()    
+        self.mode_layout = QtWidgets.QGridLayout()
+        self.mode_widget.setLayout(self.mode_layout)
+
+        self.scroll_layout.addWidget(self.mode_widget)
+
+        self.main_layout.addWidget(self.scroll_area)
         self.add_button = QtWidgets.QPushButton("Add Mode")
         self.add_button.clicked.connect(self._add_mode_cb)
 
@@ -970,9 +991,9 @@ class ModeManagerUi(ui_common.BaseDialogUi):
         label.setWordWrap(True)
         label.setFrameShape(QtWidgets.QFrame.Box)
         label.setMargin(10)
-        self.main_layout.addWidget(label)
+        self.scroll_layout.addWidget(label)
 
-        self.main_layout.addWidget(self.add_button)
+        self.scroll_layout.addWidget(self.add_button)
 
         self._populate_mode_layout()
 

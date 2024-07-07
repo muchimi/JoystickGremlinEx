@@ -403,7 +403,8 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         :param name the name of the modal window to remove
         """
-        del self.modal_windows[name]
+        if name in self.modal_windows:
+            del self.modal_windows[name]
 
     # +---------------------------------------------------------------
     # | Action implementations
