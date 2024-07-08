@@ -394,7 +394,7 @@ class InstanceWidget(QtWidgets.QWidget):
         )
         self.btn_rename.clicked.connect(self.rename_instance)
         self.btn_configure = QtWidgets.QPushButton(
-            load_icon("gfx/options.png"), ""
+            load_icon("gfx/options.svg"), ""
         )
         self.btn_delete = QtWidgets.QPushButton(
              load_icon("gfx/button_delete.png"), ""

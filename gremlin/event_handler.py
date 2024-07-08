@@ -928,18 +928,19 @@ class EventHandler(QtCore.QObject):
 		# list of callbacks
 		m_list = []
 
-		verbose_mode_keyboard = gremlin.config.Configuration().verbose_mode_keyboard
-		# verbose = True
+		
+		
+		verbose = False
 
 		# filter latched keyboard or mouse events
 		if event.event_type in (InputType.Keyboard, InputType.KeyboardLatched, InputType.Mouse):
-			# verbose = event.event_type != InputType.Mouse
-			if verbose_mode_keyboard:
+			verbose = gremlin.config.Configuration().verbose_mode_keyboard
+			if verbose:
 				logging.getLogger("system").info(f"process keyboard event: {event}")
 
 			items = self._matching_event_keys(event)  # returns list of primary keys
 			if items:
-				if verbose_mode_keyboard:
+				if verbose:
 					logging.getLogger("system").info(f"Matched keys for mode: [{self._active_mode}]  event {event} pressed: {event.is_pressed} keys: {len(items)} ")
 					for index, input_item in enumerate(items):
 						logging.getLogger("system").info(f"\t[{index}]: {input_item.name}")
@@ -951,47 +952,56 @@ class EventHandler(QtCore.QObject):
 					# print (data)
 					latched_keys = [input_item.key]
 					latched_keys.extend(input_item.latched_keys)
-					if verbose_mode_keyboard:
+					if verbose:
 						logging.getLogger("system").info(f"Checking latching: {len(latched_keys)} key(s)")
 					for k in latched_keys:
 						index = k.virtual_code if k.virtual_code > 0 else k.index_tuple()
 						state = data[index] if index in data.keys() else False
-						if verbose_mode_keyboard:
+						if verbose:
 							logging.getLogger("system").info(f"\tcheck latched key: {index} {k.name} pressed: {state}")
 						is_latched = is_latched and state
 
-					if verbose_mode_keyboard: logging.getLogger("system").info(f"Final latched state: {is_latched}")
+					if verbose: logging.getLogger("system").info(f"Final latched state: {is_latched}")
 					
 				# is_latched = key.latched
 				
 				if is_latched: 
 					latch_key = input_item.key
-					if verbose_mode_keyboard:
+					if verbose:
 						logging.getLogger("system").info(f"Detect KEY PRESSED: mode: [{self._active_mode}] {input_item.key.name}")
 				else:
-					if verbose_mode_keyboard:
+					if verbose:
 						logging.getLogger("system").info(f"Detect KEY RELEASED: {input_item.key.name}")
 								
 				if latch_key:
 					m_list = self._matching_latched_callbacks(event, latch_key)
 					if m_list:
-						if verbose_mode_keyboard :
+						if verbose:
 							trigger_line = "***** TRIGGER " + "*"*30
 							logging.getLogger("system").info(trigger_line)
 							logging.getLogger("system").info(f"\tmode: [{self._active_mode}] Found latched key: Check key {latch_key.name} callbacks: {len(m_list)} event: {event}")
 							logging.getLogger("system").info(trigger_line)
 						self._trigger_callbacks(m_list, event)
+						return
 			return
 						
 		elif event.event_type ==InputType.Midi:
+			verbose = gremlin.config.Configuration().verbose_mode_details
 			m_list = self._matching_midi_callbacks(event)
 		elif event.event_type == InputType.OpenSoundControl:
+			verbose = gremlin.config.Configuration().verbose_mode_details
 			m_list = self._matching_osc_callbacks(event)
+		elif event.event_type in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat):
+			verbose = gremlin.config.Configuration().verbose_mode_joystick
+			m_list = self._matching_callbacks(event)
 		else:			 
 			# other inputs
+			verbose = gremlin.config.Configuration().verbose_mode_details
 			m_list = self._matching_callbacks(event)
 
-		if verbose_mode_keyboard and m_list:
+		
+
+		if verbose and m_list:
 			logging.getLogger("system").info(f"TRIGGER: mode: [{self._active_mode}] callbacks: {len(m_list)} event: {event}")
 		self._trigger_callbacks(m_list, event)			
 

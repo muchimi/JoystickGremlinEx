@@ -679,6 +679,7 @@ class AbstractInputSelector(QtWidgets.QWidget):
             # selection.setInsertPolicy(QtWidgets.QComboBox.InsertPolicy.NoInsert)
             selection.setMaxVisibleItems(20)
             self._input_type_registry.append([])
+            self.selection_widget = selection
             
 
             # Add items based on the input type
@@ -1453,3 +1454,15 @@ class QIconLabel(QtWidgets.QWidget):
         ''' gets the text of the widget '''
         return self._icon_widget.text()
     
+class QDataCheckbox(QtWidgets.QCheckBox):
+    def __init__(self, text, data = None, parent = None):
+        super().__init__(text, parent)
+        self._data = data
+
+    @property
+    def data(self):
+        return self._data
+    
+    @data.setter
+    def data(self, value):
+        self._data = value

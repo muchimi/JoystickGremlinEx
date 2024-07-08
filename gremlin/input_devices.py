@@ -1299,7 +1299,10 @@ class MidiClient(QtCore.QObject):
 
     def stop(self):
         ''' stops the client '''
-        self._interface.stop()
+        try:
+            self._interface.stop()
+        except:
+            pass
         self._midi_map = {}  
 
     def _midi_message_cb(self, port_name : str, port_index : int,  message):

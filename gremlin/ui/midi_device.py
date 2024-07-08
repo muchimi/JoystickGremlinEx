@@ -39,6 +39,7 @@ from gremlin.util import parse_guid, byte_list_to_string
 import gremlin.event_handler
 from gremlin.ui.device_tab import InputItemConfiguration
 from gremlin.config import Configuration
+from gremlin.threading import AbortableThread
 
 ''' these MIDI objects are based on the MIDO and python-rtMIDI libraries '''
 
@@ -401,7 +402,7 @@ class MidiInputItem():
 
 
 
-class MidiListener(QtCore.QThread):
+class MidiListener(AbortableThread):
     ''' midi input object '''
 
     def __init__(self, port_name, port_number, callback, parent=None):
@@ -416,31 +417,24 @@ class MidiListener(QtCore.QThread):
         self.port_number = port_number
         self.port_name = port_name
         self.callback = callback
-        self.finished.connect(self._finished)
-
 
     def run(self):
         verbose = Configuration().verbose
-        with mido.open_input(self.port_name) as inport:
-            if verbose:
-                logging.getLogger("system").info(f"Midinput: open port {self.port_number}")
-            while not self.isInterruptionRequested():
-                for message in inport.iter_pending():
-                    if verbose:
-                        logging.getLogger("system").info(f"Midinput: heard message: {message}")
-                    self.callback(self.port_name, self.port_number, message)
-                time.sleep(0.01)
-                    
-            if verbose:
-                logging.getLogger("system").info(f"Midinput: close port {self.port_number}")
-
-
-
-    def _finished(self):
-        ''' called when the listener is closed '''
-        # logging.getLogger("system").info(f"Midinput: finished")
-        self.deleteLater()
-
+        
+        try:
+            with mido.open_input(self.port_name) as inport:
+                logging.getLogger("system").info(f"MIDI Interface: Active on port: {self.port_name} [{self.port_number}]")
+                while not self.stopped():
+                    for message in inport.iter_pending():
+                        if verbose:
+                            logging.getLogger("system").info(f"Midinput: heard message: {message}")
+                        self.callback(self.port_name, self.port_number, message)
+                    time.sleep(0.01)
+                        
+                if verbose:
+                    logging.getLogger("system").info(f"Midinput: close port {self.port_number}")
+        except Exception as err:
+            logging.getLogger("system").error(f"Midinput: unable to open port {self.port_name} {self.port_number} - ensure another utility is not using this port.")
 
 
 @SingletonDecorator
@@ -488,7 +482,7 @@ class MidiInterface(QtCore.QObject):
         
         '''
 
-        verbose = Configuration().verbose
+        verbose = Configuration().verbose_mode_details
 
         # request start
         if self._started:
@@ -510,6 +504,7 @@ class MidiInterface(QtCore.QObject):
             for port_name in port_list:
                 port_number = self._port_map[port_name]
                 self._monitored_ports.add(port_number)
+            
 
 
         # start the listeners
@@ -525,7 +520,7 @@ class MidiInterface(QtCore.QObject):
 
     def stop(self):
         # request stop
-        verbose = Configuration().verbose
+        verbose = Configuration().verbose_mode_details
         if verbose:
             logging.getLogger("system").info(f"MIDI Interface: STOP listen requested")
 
@@ -533,10 +528,10 @@ class MidiInterface(QtCore.QObject):
         for port_number in self._monitored_ports:
             listener : MidiListener
             listener = self._listeners[port_number]
-            if listener.isRunning():
+            if not listener.stopped():
                 # request exit and wait for it
-                listener.requestInterruption() # request terminate
-                listener.wait()
+                listener.stop()
+                listener.join()
             if verbose:
                 logging.getLogger("system").info(f"MIDI Interface: port [{port_number}] stopped")
             del self._listeners[port_number]

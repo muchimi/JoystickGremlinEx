@@ -21,9 +21,10 @@ import threading
 class AbortableThread(threading.Thread):
     ''' killable thread '''
 
-    def __init__(self,  *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._stop_event = threading.Event()
+
 
     def stop(self):
         self._stop_event.set()

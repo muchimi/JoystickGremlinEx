@@ -38,6 +38,7 @@ import logging
 from gremlin.input_types import InputType
 import gremlin.base_profile
 
+
 class OptionsUi(ui_common.BaseDialogUi):
 
     """UI allowing the configuration of a variety of options."""
@@ -140,9 +141,12 @@ class OptionsUi(ui_common.BaseDialogUi):
         col = 1
         self.verbose_container_layout.addWidget(self.verbose_widget,0,0)
         for mode in gremlin.types.VerboseMode:
-            widget = QtWidgets.QCheckBox(mode.name)
-            widget.setChecked(self.config.is_verbose_mode(mode))
-            widget.clicked.connect(lambda x:self.config.verbose_set_mode(mode, widget.isChecked()))
+            if mode in (gremlin.types.VerboseMode.NotSet, gremlin.types.VerboseMode.All):
+                continue
+            widget = ui_common.QDataCheckbox(mode.name, mode)
+            is_checked = self.config.is_verbose_mode(mode)
+            widget.setChecked(is_checked)
+            widget.clicked.connect(self._verbose_set_cb)
             self.verbose_container_layout.addWidget(widget, row, col)
             col += 1
             if col > 2:
@@ -526,6 +530,13 @@ If this option is on, the last active profile will remain active until a differe
         self.config.verbose = clicked
         for widget in self._verbose_mode_widgets.values():
             widget.setEnabled(clicked)
+
+    def _verbose_set_cb(self):
+        # is_checked = self._verbose_mode_widgets[mode].isChecked()
+        widget = self.sender()
+        mode = widget.data
+        is_checked = widget.isChecked()
+        self.config.verbose_set_mode(mode, is_checked)
 
     def _midi_enabled(self, clicked):
         self.config.midi_enabled = clicked

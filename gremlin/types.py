@@ -880,12 +880,13 @@ _MouseButton_lookup_to_button_lookup = {
 
 @enum.unique
 class VerboseMode(enum.IntFlag):
-    Keyboard = 1 # keyboard input only
-    Joystick = 2 # joystick input 
-    Inputs = 4 # list inputs
-    Mouse = 8 # mouse input
-    Details = 16 # user interface details
-    All = Keyboard | Joystick | Inputs | Mouse
+    NotSet = 0
+    Keyboard = enum.auto() # keyboard input only
+    Joystick = enum.auto() # joystick input 
+    Inputs = enum.auto() # list inputs
+    Mouse = enum.auto() # mouse input
+    Details = enum.auto() # user interface details
+    All = Keyboard | Joystick | Inputs | Mouse | Details
 
     def __contains__(self, item):
         return  (self.value & item.value) == item.value

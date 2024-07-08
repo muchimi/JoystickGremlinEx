@@ -706,7 +706,8 @@ class Configuration:
     
     def is_verbose_mode(self, mode):
         value = self.verbose_mode
-        return mode in value
+        result = mode in value
+        return result
     
     @verbose_mode.setter
     def verbose_mode(self, value):
@@ -721,8 +722,10 @@ class Configuration:
         if enabled:
             value |= mode
         else:
-            value ^= mode 
+            value = value & ~mode 
         self.verbose_mode = value
+
+        
 
     
 

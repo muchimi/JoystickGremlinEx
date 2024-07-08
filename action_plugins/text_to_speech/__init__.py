@@ -19,7 +19,7 @@
 import os
 from PySide6 import QtWidgets, QtCore
 from xml.etree import ElementTree
-
+import threading
 import gremlin.base_profile
 from gremlin.input_types import InputType
 import gremlin.ui.input_item
@@ -96,11 +96,15 @@ class TextToSpeechFunctor(gremlin.base_profile.AbstractFunctor):
         self.volume = action.volume
         self.rate = action.rate
 
-    def process_event(self, event, value):
+    def _speak(self, text, volume, rate):
         tts = TextToSpeechFunctor.tts
-        tts.set_volume(self.volume)
-        tts.set_rate(self.rate)
-        tts.speak(gremlin.tts.text_substitution(self.text))
+        tts.set_volume(volume)
+        tts.set_rate(rate)
+        tts.speak(gremlin.tts.text_substitution(text))
+
+    def process_event(self, event, value):
+        t = threading.Thread(target=self._speak, args = (self.text,self.volume,self.rate))
+        t.start()
         return True
 
 

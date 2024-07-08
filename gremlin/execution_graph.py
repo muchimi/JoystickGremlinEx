@@ -350,7 +350,7 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
         if len(action_set) == 0:
             return
         
-        verbose = gremlin.config.Configuration().verbose
+        verbose = gremlin.config.Configuration().verbose_mode_details
 
         sequence = []
 
