@@ -102,6 +102,38 @@ class Configuration:
             hdl.write(encoder.encode(self._data))
 
 
+    def set_last_mode(self, profile_path, mode_name):
+        """Stores the last active mode of the given profile.
+
+        :param profile_path profile path for which to store the mode
+        :param mode_name name of the active mode
+        """
+        if profile_path is None or mode_name is None:
+            return
+        self._data["last_mode"][profile_path] = mode_name
+        self.save()
+
+    def get_last_mode(self, profile_path):
+        """Returns the last active mode of the given profile.
+
+        :param profile_path profile path for which to return the mode
+        :return name of the mode if present, None otherwise
+        """
+        return self._data["last_mode"].get(profile_path, None)
+
+    def set_profile_last_mode(self, mode_name):
+        ''' sets the profile's last used mode '''
+        fname = self.last_profile
+        if fname:
+            self.set_last_mode(fname, mode_name)
+
+    def get_profile_last_mode(self):
+        ''' gets the save last used profile mode '''
+        fname = self.last_profile
+        if fname:
+            return self.get_last_mode(fname)
+        return None
+
 
     def set_calibration(self, dev_id, limits):
         """Sets the calibration data for all axes of a device.
@@ -213,24 +245,6 @@ class Configuration:
         self._data["profiles"][exec_path] = profile_path
         self.save()
 
-    def set_last_mode(self, profile_path, mode_name):
-        """Stores the last active mode of the given profile.
-
-        :param profile_path profile path for which to store the mode
-        :param mode_name name of the active mode
-        """
-        if profile_path is None or mode_name is None:
-            return
-        self._data["last_mode"][profile_path] = mode_name
-        self.save()
-
-    def get_last_mode(self, profile_path):
-        """Returns the last active mode of the given profile.
-
-        :param profile_path profile path for which to return the mode
-        :return name of the mode if present, None otherwise
-        """
-        return self._data["last_mode"].get(profile_path, None)
     
     def set_start_mode(self, profile_path, mode_name):
         """Stores the last active mode of the given profile.
@@ -724,8 +738,18 @@ class Configuration:
         else:
             value = value & ~mode 
         self.verbose_mode = value
-
         
+
+    
+    @property
+    def restore_profile_mode_on_start(self):
+        ''' determines if a profile mode, if it exists is restored when the profile is activated '''
+        return self._data.get("restore_mode_on_start", False)
+    
+    @restore_profile_mode_on_start.setter
+    def restore_profile_mode_on_start(self, value):
+        self._data["restore_mode_on_start"] = value
+        self.save()
 
     
 

@@ -424,7 +424,12 @@ class GremlinUi(QtWidgets.QMainWindow):
         if not set_active:
             # Stop running the code
             if verbose:
-                logging.getLogger("system").info(f"Activate: deactivate profile")
+                logging.getLogger("system").info(f"Deactivate profile requested")
+            if self.runner.is_running():
+                # running - save the current mode 
+                last_mode = self._profile.current_mode
+                
+            
             self.runner.stop()
             self._update_statusbar_active(False)
             self._profile_auto_activated = False
@@ -1111,6 +1116,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         """
         
         if self._current_mode != new_mode:
+            # save the last profile used
+
             with QtCore.QSignalBlocker(self.mode_selector):
                 self._current_mode = new_mode
                 for tab in self.tabs.values():

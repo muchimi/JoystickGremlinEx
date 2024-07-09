@@ -882,9 +882,9 @@ class EventHandler(QtCore.QObject):
 		
 		if self._active_mode != new_mode:
 			self._previous_mode = self._active_mode
+			# remember the last mode for this profile
+			gremlin.shared_state.current_profile.set_last_mode(self._active_mode)
 
-		cfg = config.Configuration()
-		cfg.set_last_mode(cfg.last_profile, new_mode)
 
 		logging.getLogger("system").debug(f"Mode switch to: {new_mode}")
 

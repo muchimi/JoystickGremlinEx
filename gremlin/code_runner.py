@@ -82,7 +82,7 @@ class CodeRunner:
         input_devices.stop_registry.clear()
         input_devices.mode_registry.clear()
 
-
+        config = gremlin.config.Configuration()
 
         # Check if we want to override the start mode as determined by the
         # heuristic
@@ -223,7 +223,7 @@ class CodeRunner:
                                         input_item.always_execute
                                     )
 
-                            verbose = gremlin.config.Configuration().verbose
+                            verbose = config.verbose
                             if verbose:
                                 self.event_handler.dump_callbacks()
 
@@ -326,11 +326,11 @@ class CodeRunner:
             input_devices.remote_client.start()
 
             # listen to MIDI 
-            if gremlin.config.Configuration().midi_enabled:
+            if config.midi_enabled:
                 input_devices.midi_client.start()
 
             # listen to OSC
-            if gremlin.config.Configuration().osc_enabled:
+            if config.osc_enabled:
                 input_devices.osc_client.start()
             
             #evt_listener.remote_event.connect(self.event_handler.process_event)
@@ -355,7 +355,23 @@ class CodeRunner:
 
             macro.MacroManager().start()
 
-            self.event_handler.change_mode(start_mode)
+            # determine the profile start mode
+            mode = start_mode
+            if config.restore_profile_mode_on_start:
+                mode = profile.get_last_mode()
+                if mode:
+                    if not mode in mode_list:
+                        logging.getLogger("system").error(f"Unable to restore profile mode: '{mode}' no longer exists - using '{start_mode}' instead.")
+                        mode = start_mode
+
+            
+            if not mode in mode_list:
+                logging.getLogger("system").error(f"Unable to select startup mode: '{mode}' no longer exists")
+            else:                
+                if verbose:
+                    logging.getLogger("system").info(f"Using profile start mode: '{mode}'")
+                self.event_handler.change_mode(mode)
+                
             self.event_handler.resume()
             self._running = True
             gremlin.shared_state.is_running = True

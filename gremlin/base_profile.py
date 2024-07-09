@@ -1079,6 +1079,7 @@ class Profile():
         self.settings = Settings(self)
         self.parent = parent
         self._start_mode = None # startup mode for this profile
+        self._last_mode = None # last active mode
 
     def initialize_joystick_device(self, device, modes):
         """Ensures a joystick is properly initialized in the profile.
@@ -1162,7 +1163,25 @@ class Profile():
             else:
                 data[mode] = None
         return data
-        
+    
+    def set_last_mode(self, mode):
+        ''' sets the last used mode - this is persisted in the configuration  '''
+        if mode != self._last_mode:
+            self._last_mode = mode
+            config = gremlin.config.Configuration()
+            self._last_mode = mode
+            config.set_profile_last_mode(mode)
+
+    def get_last_mode(self):
+        ''' gets the last used mode '''
+        if self._last_mode is None:
+            config = gremlin.config.Configuration()
+            mode = config.get_profile_last_mode()
+            if mode is not None:
+                self._last_mode = mode
+        return self._last_mode
+
+
 
             
 

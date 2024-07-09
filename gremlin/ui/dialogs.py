@@ -104,6 +104,13 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.activate_on_launch.clicked.connect(self._activate_on_launch)
         self.activate_on_launch.setChecked(self.config.activate_on_launch)
 
+        # Restore last mode on profile activate
+        self.activate_restore_mode = QtWidgets.QCheckBox(
+            "Restore last used mode on profile activation"
+        )
+        self.activate_restore_mode.clicked.connect(self._restore_profile_mode)
+        self.activate_restore_mode.setChecked(self.config.restore_profile_mode_on_start)
+
         # Start minimized option
         self.start_minimized = QtWidgets.QCheckBox(
             "Start Joystick Gremlin minimized"
@@ -280,6 +287,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.general_layout.addWidget(self.highlight_device)
         self.general_layout.addWidget(self.close_to_systray)
         self.general_layout.addWidget(self.activate_on_launch)
+        self.general_layout.addWidget(self.activate_restore_mode)
         self.general_layout.addWidget(self.start_minimized)
         self.general_layout.addWidget(self.start_with_windows)
         self.general_layout.addWidget(self.persist_clipboard)
@@ -500,6 +508,10 @@ If this option is on, the last active profile will remain active until a differe
         :param clicked whether or not the checkbox is ticked
         """
         self.config.activate_on_launch = clicked
+        self.config.save()
+
+    def _restore_profile_mode(self, clicked):
+        self.config.restore_profile_mode_on_start = clicked
         self.config.save()
 
     def _close_to_systray(self, clicked):
