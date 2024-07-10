@@ -17,6 +17,7 @@
 
 import enum
 import threading
+import os
 from typing import Optional
 import logging
 from PySide6 import QtWidgets, QtCore, QtGui
@@ -1179,14 +1180,7 @@ class InputListenerWidget(QtWidgets.QFrame):
         if self._aborting:
             self.close()
 
-        virtual_code = event.virtual_code
-        if virtual_code > 0:
-            key = gremlin.keyboard.KeyMap.find_virtual(virtual_code)
-        else:
-            scan_code = event.identifier[0]
-            is_extended = event.identifier[1]
-            key = gremlin.keyboard.KeyMap.find(scan_code, is_extended)
-
+        key = gremlin.keyboard.KeyMap.from_event(event)
 
         # print (f"Head event: {event}  {key}")
 
@@ -1433,8 +1427,6 @@ class QIconLabel(QtWidgets.QWidget):
     def setText(self, text = None):
         ''' sets the text of the label '''
         if text:
-            if "OSC input" in text:
-                pass
             self._label_widget.setText(text)
         else: 
             self._label_widget.setText("")
@@ -1455,6 +1447,7 @@ class QIconLabel(QtWidgets.QWidget):
         return self._icon_widget.text()
     
 class QDataCheckbox(QtWidgets.QCheckBox):
+    ''' a checkbox that has a data property to track an object associated with the checkbox '''
     def __init__(self, text, data = None, parent = None):
         super().__init__(text, parent)
         self._data = data
@@ -1466,3 +1459,130 @@ class QDataCheckbox(QtWidgets.QCheckBox):
     @data.setter
     def data(self, value):
         self._data = value
+
+
+class QDataPushButton(QtWidgets.QPushButton):
+    ''' a checkbox that has a data property to track an object associated with the checkbox '''
+    def __init__(self, text = None, data = None, parent = None):
+        super().__init__(text, parent)
+        self._data = data
+
+    @property
+    def data(self):
+        return self._data
+    
+    @data.setter
+    def data(self, value):
+        self._data = value
+
+
+class QPathLineItem(QtWidgets.QWidget):
+    ''' An editable text input line with a file selector button '''
+
+    open = QtCore.Signal(object) # event that fires when the open button is clicked, and passes the control
+    pathChanged = QtCore.Signal(object, str) # fires when the line item changes 
+
+    IconSize = QtCore.QSize(16, 16)
+
+    def __init__(self, text = None, data = None, parent = None):
+        super().__init__(parent)
+
+        self._text = text
+        self._file_widget = QtWidgets.QLineEdit()
+        self._file_widget.installEventFilter(self)
+        self._file_widget.setText(text)
+        self._file_widget.textChanged.connect(self._file_changed)
+        self._open_button = QtWidgets.QPushButton("...")
+        self._open_button.setMaximumWidth(20)
+        self._open_button.clicked.connect(self._open_button_cb)
+        self._icon_widget = QtWidgets.QLabel()
+        self._icon_widget.setMaximumWidth(20)
+        self._layout = QtWidgets.QHBoxLayout()
+        self._layout.addWidget(self._icon_widget)
+        self._layout.addWidget(self._file_widget)
+        self._layout.addWidget(self._open_button)
+        self._layout.setContentsMargins(0,0,0,0)
+
+        self._data = data
+
+        self._file_changed()
+        self.setLayout(self._layout)
+
+    def _open_button_cb(self):
+        self.open.emit(self)
+
+    def eventFilter(self, object, event):
+        t = event.type()
+        if t == QtCore.QEvent.Type.FocusOut:
+            self._text = self._file_widget.text()  
+            self.pathChanged.emit(self, self._text)
+        return False        
+
+    def _setIcon(self, icon_path = None, use_qta = True, color = None):
+        ''' sets the icon of the label, pass a blank or None path to clear the icon'''
+        if icon_path:
+            if use_qta:
+                if color:
+                    pixmap = qta.icon(icon_path, color=color).pixmap(self.IconSize)    
+                else:
+                    pixmap = qta.icon(icon_path).pixmap(self.IconSize)
+            else:
+                pixmap = load_pixmap(icon_path) if icon_path else None
+        else:
+            pixmap = None
+        if pixmap:
+            pixmap = pixmap.scaled(QIconLabel.IconSize, QtCore.Qt.AspectRatioMode.KeepAspectRatio)
+            self._icon_widget.setPixmap(pixmap)
+        else:
+            # clear the pixmap
+            self._icon_widget.setPixmap(QtGui.QPixmap())
+        
+    def setText(self, text = None):
+        ''' sets the text of the label '''
+        with QtCore.QSignalBlocker(self._file_widget):
+            if text:
+                self._text = text
+                self._file_widget.setText(text)
+            else: 
+                self._text = ""
+                self._file_widget.setText("")
+        self._file_changed()
+    
+
+    def text(self):
+        return self._text
+
+    def showIcon(self):
+        ''' hides the icon '''
+        self._icon_widget.setVisible(True)
+
+    def hideIcon(self):
+        ''' shows the icon '''
+        self._icon_widget.setVisible(False)
+
+
+    def _file_changed(self):
+        fname = self._file_widget.text()
+        valid = os.path.isfile(fname)
+        if valid:
+            self._setIcon("fa.check", color="green")
+        else:
+            self._setIcon("fa.exclamation-circle", color="red")        
+        self._text = fname
+        self.pathChanged.emit(self, self._text)
+
+    @property
+    def valid(self):
+        ''' true if the file exists '''
+        return os.path.isfile(self._text)
+    
+    @property
+    def data(self):
+        ''' object reference for this widget '''
+        return self._data
+    
+    @data.setter
+    def data(self, value):
+        self._data = value
+
+

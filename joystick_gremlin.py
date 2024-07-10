@@ -38,6 +38,7 @@ from PySide6 import QtCore, QtGui, QtMultimedia, QtWidgets
 
 import gremlin.code_runner
 from gremlin.input_types import InputType
+import gremlin.keyboard
 import gremlin.process_monitor
 import gremlin.code_runner
 import gremlin.repeater
@@ -283,6 +284,13 @@ class GremlinUi(QtWidgets.QMainWindow):
             lambda: self._remove_modal_window("about")
         )
 
+
+    @property
+    def current_mode(self):
+        ''' returns the current active profile mode '''
+        return self._current_mode
+
+
     def calibration(self):
         """Opens the calibration window."""
         self.modal_windows["calibration"] = \
@@ -427,7 +435,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                 logging.getLogger("system").info(f"Deactivate profile requested")
             if self.runner.is_running():
                 # running - save the current mode 
-                last_mode = self._profile.current_mode
+                self._profile.set_last_mode(self.ui.current_mode)
                 
             
             self.runner.stop()
@@ -617,7 +625,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         updated, otherwise the user is prompted for a new file.
         """
         if self._profile_fname:
-            self._profile.to_xml(self._profile_fname)
+            self._profile._profile_fname = self._profile_fname
+            self._profile.save()
         else:
             self.save_profile_as()
         self._update_window_title()
@@ -631,7 +640,8 @@ class GremlinUi(QtWidgets.QMainWindow):
             "XML files (*.xml)"
         )
         if fname != "":
-            self._profile.to_xml(fname)
+            self._profile._profile_fname = fname
+            self._profile.save()
             self._profile_fname = fname
             self.config.last_profile = fname
             self._create_recent_profiles()
@@ -1133,6 +1143,10 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         :param path the path to the currently active process executable
         """
+
+        verbose = gremlin.config.Configuration().verbose
+        if verbose:
+            logging.getLogger("system").info(f"PROC: Process focus change detected: {path}")
         profile_path = self.config.get_profile_with_regex(path)
         if profile_path:
             if self._profile_fname != profile_path:
@@ -1142,10 +1156,14 @@ class GremlinUi(QtWidgets.QMainWindow):
             self.ui.actionActivate.setChecked(True)
             self.activate(True)
             self._profile_auto_activated = True
+            if verbose:
+                logging.getLogger("system").info(f"PROC: Auto activated profile {profile_path} mode: {self._current_mode}")
         elif self._profile_auto_activated and not self.config.keep_last_autoload:
             self.ui.actionActivate.setChecked(False)
             self.activate(False)
             self._profile_auto_activated = False
+            if verbose:
+                logging.getLogger("system").info(f"PROC: Deactivated profile {profile_path}")
 
     def _tray_icon_activated_cb(self, reason):
         """Callback triggered by clicking on the system tray icon.
@@ -1211,14 +1229,16 @@ class GremlinUi(QtWidgets.QMainWindow):
         ''' listen for keyboard modifiers and keyboard events at runtime '''
         from gremlin.keyboard import key_from_code, key_from_name
 
-        key = key_from_code(
-                event.identifier[0],
-                event.identifier[1]
-        )
+
+        key = gremlin.keyboard.KeyMap.from_event(event)
+        # key = key_from_code(
+        #         event.identifier[0],
+        #         event.identifier[1]
+        # )
 
 
         # ignore if we're running
-        if self.runner.is_running() or not (self.config.highlight_input or self.config.highlight_input_buttons):
+        if key is None or self.runner.is_running() or not (self.config.highlight_input or self.config.highlight_input_buttons):
             # not listening or not enabled for highlighting
             return
         
@@ -1751,7 +1771,7 @@ if __name__ == "__main__":
     hg.add_process(os.getpid())
 
     # Create user interface
-    app_id = u"joystick.gremlin"
+    app_id = u"joystick.gremlinex"
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(app_id)
 
 
@@ -1772,7 +1792,7 @@ if __name__ == "__main__":
     gremlin.joystick_handling.joystick_devices_initialization()
 
     # Check if vJoy is properly setup and if not display an error
-    # and terminate Gremlin
+    # and terminate GremlinEx
     try:
         syslog.info("Checking vJoy installation")
         vjoy_count = len([dev for dev in gremlin.joystick_handling.joystick_devices() if dev.is_virtual])
@@ -1814,7 +1834,7 @@ if __name__ == "__main__":
 
     gremlin.shared_state.ui = ui
     
-    syslog.info("Gremlin UI created")
+    syslog.info("GremlinEx UI created")
 
     # Handle user provided command line arguments
     if args.profile is not None and os.path.isfile(args.profile):
@@ -1826,9 +1846,9 @@ if __name__ == "__main__":
         ui.setHidden(True)
 
     # Run UI
-    syslog.info("Gremlin UI launching")
+    syslog.info("GremlinEx UI launching")
     app.exec()
-    syslog.info("Gremlin UI terminated")
+    syslog.info("GremlinEx UI terminated")
 
     # Terminate potentially running EventListener loop
     event_listener = gremlin.event_handler.EventListener()
@@ -1843,7 +1863,7 @@ if __name__ == "__main__":
 
     hg.remove_process(os.getpid())
 
-    syslog.info("Terminating Gremlin")
+    syslog.info("Terminating GremlinEx")
     sys.exit(0)
 
 

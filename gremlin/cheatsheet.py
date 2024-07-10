@@ -394,6 +394,7 @@ def format_input_name(input_type, identifier):
     :param identifier the identifier of the input
     :return formatted string of the provided input
     """
+    from gremlin.types import InputType
     type_map = {
         InputType.JoystickAxis: "Axis",
         InputType.JoystickButton: "Button",

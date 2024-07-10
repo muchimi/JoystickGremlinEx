@@ -1078,8 +1078,10 @@ class Profile():
         self.plugins = []
         self.settings = Settings(self)
         self.parent = parent
+        self._profile_fname = None # the file name of this profile
         self._start_mode = None # startup mode for this profile
         self._last_mode = None # last active mode
+        self._restore_last_mode = False # True if the profile should start with the last active mode (profile specific)
 
     def initialize_joystick_device(self, device, modes):
         """Ensures a joystick is properly initialized in the profile.
@@ -1288,6 +1290,11 @@ class Profile():
         if "start_mode" in root.attrib:
             self._start_mode = root.get("start_mode")
 
+        self._restore_last_mode = False
+        if "restore_last" in root.attrib:
+            self._restore_last_mode = safe_read(root, "restore_last", bool, False)
+
+
         # Parse each device into separate DeviceConfiguration objects
         for child in root.iter("device"):
             device = Device(self)
@@ -1349,6 +1356,8 @@ class Profile():
             # use a default mode
             self._start_mode = self.get_default_mode()
 
+        self._profile_fname = fname
+
         return profile_was_updated
     
     def get_default_mode(self):
@@ -1366,6 +1375,7 @@ class Profile():
         root = ElementTree.Element("profile")
         root.set("version", str(gremlin.profile.ProfileConverter.current_version))
         root.set("start_mode", self._start_mode)
+        root.set("restore_last", str(self._restore_last_mode))
 
         # Device settings
         devices = ElementTree.Element("devices")
@@ -1523,8 +1533,21 @@ class Profile():
         ''' sets the start up mode '''
         self._start_mode = value
 
+    def get_restore_mode(self):
+        ''' gets the start mode for this profile '''
+        return self._restore_last_mode
+    
+    def set_restore_mode(self, value):
+        ''' sets the start up mode '''
+        self._restore_last_mode = value
+        self.save()
 
+    def save(self):
+        ''' saves the profile '''
+        assert self._profile_fname,"File name is not set"
+        self.to_xml(self._profile_fname)
 
+        
 
 class Mode:
 
@@ -2228,4 +2251,35 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
 
         self._create_transitions(sequence)
 
+
+class ProfileMapItem():
+    ''' holds a mapping of a profile xml to an exe '''
+
+    def __init__(self, profile = None, process = None):
+        self._profile = profile
+        self._process = process
+        self._index = -1
+
+    @property
+    def profile(self):
+        return self._profile if self._profile else ""
+    @profile.setter
+    def profile(self, value):
+        self._profile = value
+
+    @property
+    def process(self):
+        return self._process if self._process else ""
+
+    @process.setter
+    def process(self, value):
+        self._process = value
+
+    @property
+    def index(self):
+        return self._index
+    @index.setter
+    def index(self, value):
+        self._index = value
+    
 

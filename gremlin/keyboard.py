@@ -824,6 +824,19 @@ class KeyMap:
             return KeyMap._key_map[name].duplicate()
         return None
     
+    @staticmethod
+    def from_event(event):
+        ''' returns a key based on a keyboard event '''
+        key = None
+        if event.virtual_code > 0:
+            key = KeyMap.find_virtual(event.virtual_code)
+        if not key :
+            key = KeyMap.find(event.identifier[0], event.identifier[1])
+        if key is None:
+            logging.getLogger("system").warning(f"Don't know how to handle key event: {event}")
+        return key
+
+    
      
     @staticmethod
     def scan_code_to_virtual_code(scan_code, is_extended):
@@ -1075,4 +1088,4 @@ for enum_code_value in scan_codes:
             key = Key(name, scan_code, is_extended, 0)
             KeyMap.register(key)
             
-        
+

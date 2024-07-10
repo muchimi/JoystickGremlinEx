@@ -242,13 +242,8 @@ class KeyboardConditionWidget(AbstractConditionWidget):
         self.condition_data.input_item = input_item
         self.condition_data.scan_code = key.scan_code
         self.condition_data.is_extended = key.is_extended
-        # self.condition_data.scan_code = key.identifier[0]
-        # self.condition_data.is_extended = key.identifier[1]
         self.condition_data.comparison = \
             self.comparison_dropdown.currentText().lower()
-        # self.key_label.setText(
-        #     f"<b>{gremlin.keyboard.key_from_code(self.condition_data.scan_code,self.condition_data.is_extended).name}</b>"
-        # )
         self.key_label.setText(f"<b>{input_item.display_name}</b>")
 
     def _comparison_changed_cb(self, text):

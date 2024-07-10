@@ -28,6 +28,7 @@ from PySide6.QtGui import QIcon
 
 import gremlin.base_profile
 from gremlin.input_types import InputType
+import gremlin.keyboard
 import gremlin.macro
 from gremlin.profile import safe_format, safe_read, parse_guid, write_guid
 import gremlin.ui.input_item
@@ -670,8 +671,8 @@ class MacroActionEditor(QtWidgets.QWidget):
 
         :param event the event containing information about the key to use
         """
-        self.model.get_entry(self.index.row()).key = \
-            key_from_code(event.identifier[0],event.identifier[1])
+
+        self.model.get_entry(self.index.row()).key = gremlin.keyboard.KeyMap.from_event(event)
         self._update_model()
         gremlin.ui.ui_common.clear_layout(self.action_layout)
         self.ui_elements = {}

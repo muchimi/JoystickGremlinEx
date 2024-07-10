@@ -30,6 +30,7 @@ from PySide6.QtCore import Property, Signal, Slot
 from gremlin import event_handler, input_devices, keyboard, shared_state,  windows_event_hook
 
 from gremlin.types import InputType
+import gremlin.keyboard
 
 
 QML_IMPORT_NAME = "Gremlin.Util"
@@ -215,7 +216,7 @@ class InputListenerModel(QtCore.QObject):
 
         # Ensure the timer is cancelled and reset in case the ESC is released
         # and we're not looking to return keyboard events
-        key = keyboard.key_from_code(event.identifier[0], event.identifier[1])
+        key = gremlin.keyboard.KeyMap.from_event(event)
         if key == keyboard.key_from_name("esc") and not event.is_pressed:
             self._abort_timer.cancel()
             self._abort_timer = threading.Timer(1.0, self._stop_listening)

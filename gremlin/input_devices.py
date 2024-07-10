@@ -1727,10 +1727,7 @@ class Keyboard(QtCore.QObject):
 
         :param event the keyboard event to use to update state
         """
-        key = gremlin.keyboard.key_from_code(
-            event.identifier[0],
-            event.identifier[1]
-        )
+        key = gremlin.keyboard.KeyMap.from_event(event)
         # print (f"Key: {key.name} pressed: {event.is_pressed}")
         self._keyboard_state[key] = event.is_pressed
 

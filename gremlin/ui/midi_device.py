@@ -632,10 +632,7 @@ class MidiInputListenerWidget(QtWidgets.QFrame):
 
     def _kb_event_cb(self, event):
         from gremlin.keyboard import key_from_code, key_from_name
-        key = key_from_code(
-                event.identifier[0],
-                event.identifier[1]
-        )
+        key =  gremlin.keyboard.KeyMap.from_event(event)
         if event.is_pressed and key == key_from_name("esc"):
 
             # stop listening

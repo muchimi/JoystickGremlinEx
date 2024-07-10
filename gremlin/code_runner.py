@@ -356,9 +356,14 @@ class CodeRunner:
             macro.MacroManager().start()
 
             # determine the profile start mode
+            verbose = True
             mode = start_mode
-            if config.restore_profile_mode_on_start:
+            if config.restore_profile_mode_on_start or profile.get_restore_mode():
+                # restore the profile mode 
+                if verbose:
+                    logging.getLogger("system").error(f"Restore last active profile mode: '{mode}'")
                 mode = profile.get_last_mode()
+
                 if mode:
                     if not mode in mode_list:
                         logging.getLogger("system").error(f"Unable to restore profile mode: '{mode}' no longer exists - using '{start_mode}' instead.")
