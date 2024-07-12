@@ -1476,6 +1476,21 @@ class QDataPushButton(QtWidgets.QPushButton):
         self._data = value
 
 
+class QDataComboBox(QtWidgets.QComboBox):
+    ''' a combo box that has a data property to track an object associated with the checkbox '''
+    def __init__(self, data = None, parent = None):
+        super().__init__(parent)
+        self._data = data
+
+    @property
+    def data(self):
+        return self._data
+    
+    @data.setter
+    def data(self, value):
+        self._data = value        
+
+
 class QPathLineItem(QtWidgets.QWidget):
     ''' An editable text input line with a file selector button '''
 
@@ -1484,10 +1499,13 @@ class QPathLineItem(QtWidgets.QWidget):
 
     IconSize = QtCore.QSize(16, 16)
 
-    def __init__(self, text = None, data = None, parent = None):
+    def __init__(self, header = None, text = None, data = None, parent = None):
         super().__init__(parent)
 
         self._text = text
+        self._header = header
+        
+
         self._file_widget = QtWidgets.QLineEdit()
         self._file_widget.installEventFilter(self)
         self._file_widget.setText(text)
@@ -1498,6 +1516,11 @@ class QPathLineItem(QtWidgets.QWidget):
         self._icon_widget = QtWidgets.QLabel()
         self._icon_widget.setMaximumWidth(20)
         self._layout = QtWidgets.QHBoxLayout()
+
+        if header:
+            self._header_widget = QtWidgets.QLabel(header)
+            self._layout.addWidget(self._header_widget)
+
         self._layout.addWidget(self._icon_widget)
         self._layout.addWidget(self._file_widget)
         self._layout.addWidget(self._open_button)
@@ -1507,6 +1530,15 @@ class QPathLineItem(QtWidgets.QWidget):
 
         self._file_changed()
         self.setLayout(self._layout)
+
+    @property
+    def header_width(self):
+        return self._header_widget.frameGeometry().width()
+    
+    @header_width.setter
+    def header_width(self, value):
+        self._header_widget.setMaximumWidth(value)
+        self._header_widget.setMinimumWidth(value)
 
     def _open_button_cb(self):
         self.open.emit(self)

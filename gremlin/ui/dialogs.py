@@ -323,12 +323,13 @@ This setting is also available on a profile by profile basis on the profile tab,
     def _create_profile_page(self):
         """Creates the profile options page."""
         self.profile_page = QtWidgets.QWidget()
-        self.profile_page_layout = QtWidgets.QVBoxLayout(self.profile_page)
+        self.profile_page_layout = QtWidgets.QGridLayout(self.profile_page)
 
         # holds the mapping of a process (.exe) to a profile (.xml)
         self._profile_mapper = gremlin.base_profile.ProfileMap()
         self._profile_map_exe_widgets = {}
         self._profile_map_xml_widgets = {}
+        self._profile_map_mode_widgets = {}
 
         # Autoload profile option
         self.autoload_checkbox = QtWidgets.QCheckBox(
@@ -399,12 +400,9 @@ The setting can be overriden by the global mode reload option set in Options for
         self.profile_layout.addWidget(self.profile_field)
         self.profile_layout.addWidget(self.profile_select)
 
-        self.profile_page_layout.addWidget(self.autoload_checkbox)
-        self.profile_page_layout.addWidget(self.keep_active_on_focus_lost_checkbox)
-        # self.profile_page_layout.addLayout(self.executable_layout)
-        # self.profile_page_layout.addLayout(self.profile_layout)
-
-
+        self.profile_page_layout.addWidget(self.autoload_checkbox,0,0)
+        self.profile_page_layout.addWidget(self.keep_active_on_focus_lost_checkbox,1,0)
+        
 
 
         self.tab_container.addTab(self.profile_page, "Profiles")
@@ -415,6 +413,7 @@ The setting can be overriden by the global mode reload option set in Options for
         self.container_map_widget = QtWidgets.QWidget()
         self.container_map_layout = QtWidgets.QVBoxLayout()
         self.container_map_widget.setLayout(self.container_map_layout)
+        # self.container_map_widget.sizePolicy().setVerticalPolicy(QtWidgets.QSizePolicy.Policy.Expanding)
 
         
         
@@ -455,7 +454,6 @@ The setting can be overriden by the global mode reload option set in Options for
         container_footer_widget = QtWidgets.QWidget()
         container_footer_layout = QtWidgets.QHBoxLayout()
         container_footer_widget.setLayout(container_footer_layout)
-        
 
         add_map_widget = QtWidgets.QPushButton("Add mapping")
         add_map_widget.setIcon(load_icon("gfx/button_add.png"))
@@ -465,10 +463,7 @@ The setting can be overriden by the global mode reload option set in Options for
         save_map_widget.setIcon(load_icon("fa.save"))
         save_map_widget.clicked.connect(self._save_map_cb)
 
-
-
-
-        self.profile_page_layout.addWidget(container_bar_widget)
+        self.profile_page_layout.addWidget(container_bar_widget, 3, 0)
         container_bar_layout.addWidget(QtWidgets.QLabel("Profile to process map:"))
         container_bar_layout.addStretch()
         container_bar_layout.addWidget(add_map_widget)
@@ -476,10 +471,10 @@ The setting can be overriden by the global mode reload option set in Options for
         container_footer_layout.addStretch()
         container_footer_layout.addWidget(save_map_widget)
 
-        self.profile_page_layout.addWidget(container_bar_widget)
-        self.profile_page_layout.addWidget(self.container_map_widget)
-        self.profile_page_layout.addWidget(container_footer_widget)
-        self.profile_page_layout.addStretch()
+        self.profile_page_layout.addWidget(container_bar_widget, 4, 0 )
+        self.profile_page_layout.addWidget(self.container_map_widget, 5, 0)
+        self.profile_page_layout.addWidget(container_footer_widget, 6, 0)
+        # self.profile_page_layout.addStretch()
 
         self.populate_executables()
 
@@ -733,9 +728,9 @@ The setting can be overriden by the global mode reload option set in Options for
 
     def _list_executables(self):
         """Shows a list of executables for the user to pick."""
-        self.executable_list_view = ProcessWindow()
-        self.executable_list_view.process_selected.connect(self._add_executable)
-        self.executable_list_view.show()
+        self.executable_dialog = ProcessWindow()
+        self.executable_dialog.process_selected.connect(self._add_executable)
+        self.executable_dialog.show()
 
     def _add_executable(self, fname):
         """Adds the provided executable to the list of configurations.
@@ -904,12 +899,22 @@ The setting can be overriden by the global mode reload option set in Options for
         self.populate_map()
 
     def _save_map_cb(self):
-        ''' saves the current mappings '''
-        self.save_profile_map()
+        ''' saves the current mappings and options '''
+        for item in self._profile_mapper.items():
+            item.save()
+
+        self._profile_mapper.save_profile_map()
 
     def populate_map(self):
         ''' populates the map of executables to profiles '''
 
+        # figure out the size of the header part of the control so things line up
+        lbl = QtWidgets.QLabel("w")
+        char_width = lbl.fontMetrics().averageCharWidth()
+        headers = ["Process:", "Profile:"]
+        width = 0
+        for header in headers:
+            width = max(width, char_width*(len(header)))
         
         for widget in self._profile_map_exe_widgets.values():
             if widget:
@@ -920,6 +925,7 @@ The setting can be overriden by the global mode reload option set in Options for
 
         self._profile_map_exe_widgets = {}
         self._profile_map_xml_widgets = {}
+        self._profile_map_mode_widgets = {}
 
         # clear the widgets
         ui_common.clear_layout(self.map_layout)
@@ -935,39 +941,100 @@ The setting can be overriden by the global mode reload option set in Options for
 
             exe_widget = None
             xml_widget = None
+
+
+            mode_list, default_mode, restore_mode = item.get_profile_modes()
+            
             
             if item:
                 # add a new item if it exists and either one of the profile/process entries are refined
 
-                exe_widget = ui_common.QPathLineItem(item.process, item)
+                container_widget = QtWidgets.QWidget()
+                container_layout = QtWidgets.QGridLayout()
+                container_layout.setColumnStretch(0,2)
+                container_layout.setColumnStretch(1,2)
+                container_layout.setContentsMargins(0,0,0,0)
+                container_widget.setLayout(container_layout)
+
+                exe_widget = ui_common.QPathLineItem("Process:",item.process, item)
                 exe_widget.pathChanged.connect(self._process_changed_cb)
                 exe_widget.open.connect(self._process_open_cb)
-                self.map_layout.addWidget(exe_widget, index, 0)
+                container_layout.addWidget(exe_widget,0,0,1,2)
                 
-                xml_widget = ui_common.QPathLineItem(item.profile, item)
+                xml_widget = ui_common.QPathLineItem("Profile:",item.profile, item)
                 xml_widget.pathChanged.connect(self._profile_changed_cb)
                 xml_widget.open.connect(self._profile_open_cb)
-                self.map_layout.addWidget(xml_widget, index, 1)
+                container_layout.addWidget(xml_widget,1,0,1,2)
+
+
+                options_line = QtWidgets.QWidget()
+                options_layout = QtWidgets.QHBoxLayout()
+                options_layout.setContentsMargins(0,0,0,0)
+                options_line.setLayout(options_layout)
+
+
+                restore_widget = ui_common.QDataCheckbox("Restore last", item)
+                restore_widget.setChecked(restore_mode)
+                restore_widget.clicked.connect(self._restore_changed)
+                restore_widget.setToolTip("When set, restores the last used mode if the profile has been automatically loaded on process change")
+                options_layout.addWidget(restore_widget)
+                options_layout.addStretch()
+
+
+                options_layout.addWidget(QtWidgets.QLabel("Default mode:"))
+
+
+
+                mode_widget = ui_common.QDataComboBox(item)
+                mode_widget.addItems(mode_list)
+                if default_mode:
+                    mode_widget.setCurrentText(default_mode)
+                mode_widget.currentIndexChanged.connect(self._default_mode_changed)
+                mode_widget.setToolTip("Default mode for this profile")
+                options_layout.addWidget(mode_widget)
+
+  
+
+                container_layout.addWidget(options_line,2,0,1,-1)
 
                 clear_button = ui_common.QDataPushButton()
                 clear_button.setIcon(load_icon("mdi.delete"))
                 clear_button.setMaximumWidth(20)
                 clear_button.data = item
                 clear_button.clicked.connect(self._mapping_delete_cb)
-                self.map_layout.addWidget(clear_button, index, 2)
+                container_layout.addWidget(clear_button, 0, 3)
+
+                container_layout.addWidget(ui_common.QHLine(),3,0,1, -1)
 
                 item.index = index
+                self.map_layout.addWidget(container_widget, index, 0)
+
+                exe_widget.header_width = width
+                xml_widget.header_width = width
 
             self._profile_map_exe_widgets[index] = exe_widget
             self._profile_map_xml_widgets[index] = xml_widget
+            self._profile_map_mode_widgets[index] = mode_widget
 
+
+    def _default_mode_changed(self):
+        widget = self.sender()
+        item : gremlin.base_profile.ProfileMapItem = widget.data
+        item.default_mode = widget.text()
+
+    def _restore_changed(self, checked):
+        widget = self.sender()
+        item : gremlin.base_profile.ProfileMapItem = widget.data
+        item.restore_mode = checked
+        #        self._profile_map_mode_widgets[item.index].setEnabled(not checked)
 
     def _process_open_cb(self, widget):
         ''' opens the process executable '''
-        self.executable_list_view = ProcessWindow()
-        self.executable_list_view.data = widget
-        self.executable_list_view.process_selected.connect(self._select_executable)
-        self.executable_list_view.show()        
+        fname = widget.data.process
+        self.executable_dialog = ProcessWindow(fname)
+        self.executable_dialog.data = widget
+        self.executable_dialog.process_selected.connect(self._select_executable)
+        self.executable_dialog.show()        
 
     def _profile_open_cb(self, widget):
         ''' opens the profile list '''
@@ -1051,9 +1118,10 @@ class ProcessWindow(ui_common.BaseDialogUi):
     # Signal emitted when the user selects a process
     process_selected = QtCore.Signal(str)
 
-    def __init__(self, parent=None):
+    def __init__(self, text = None, parent=None):
         """Creates a new instance.
 
+        :param text: the process exe to select by default (if one is provided, and the item is not in the list, the file open will executed at that folder location)
         :param parent the parent of the widget
         """
         super().__init__(parent)
@@ -1064,15 +1132,20 @@ class ProcessWindow(ui_common.BaseDialogUi):
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.list_model = QtCore.QStringListModel()
-        self.list_model.setStringList(
-            gremlin.process_monitor.list_current_processes()
-        )
+
+        process_list = gremlin.process_monitor.list_current_processes()
+        self.list_model.setStringList(process_list)
+        
+
+
         self.list_view = QtWidgets.QListView()
         self.list_view.setModel(self.list_model)
         self.list_view.setEditTriggers(
             QtWidgets.QAbstractItemView.NoEditTriggers
         )
         self.list_view.doubleClicked.connect(self._select)
+        self._current_selection_qindex = None
+        self.list_view.clicked.connect(self._selection_changed)
 
         self.button_bar_widget = QtWidgets.QWidget()
         self.button_bar_layout = QtWidgets.QHBoxLayout()
@@ -1091,9 +1164,13 @@ class ProcessWindow(ui_common.BaseDialogUi):
         self.browse_button = QtWidgets.QPushButton("Browse...")
         self.browse_button.clicked.connect(self._browse)
 
+        self.cancel_button = QtWidgets.QPushButton("Cancel")
+        self.cancel_button.clicked.connect(self._cancel)
+        
         self.button_bar_layout.addWidget(self.refresh_button)
         self.button_bar_layout.addWidget(self.select_button)
         self.button_bar_layout.addWidget(self.browse_button)
+        self.button_bar_layout.addWidget(self.cancel_button)
 
         self.main_layout.addWidget(self.button_bar_widget)
 
@@ -1101,18 +1178,45 @@ class ProcessWindow(ui_common.BaseDialogUi):
         # optional data item to track for this item
         self._data = None
 
+        if text and os.path.isfile(text):
+            if not text in process_list:
+                # selected item is not in the running process list
+                self._browse(text)
+
+            else:
+                # select the item in the list
+                index = process_list.index(text)
+                model_index = self.list_model.index(index)  # process_list.index(text)
+                with QtCore.QSignalBlocker(self.list_view):
+                    self.list_view.setCurrentIndex(model_index)
+                    self._current_selection_qindex = model_index
+
     def _refresh(self):
         self.list_model.setStringList(
             gremlin.process_monitor.list_current_processes()
         )
+
+    def _cancel(self):
+        ''' cancel clicked '''
+        self.close()
+
+
+    def _selection_changed(self, index):
+        self._current_selection_qindex = index
 
     def _select(self):
         """Emits the process_signal when the select button is pressed."""
         self.process_selected.emit(self.list_view.currentIndex().data())
         self.close()
 
-    def _browse(self):
-        dir = "C:\\"
+    def _browse(self, text = None):
+        if not text and self._current_selection_qindex is not None:
+            text = self.list_model.itemData(self._current_selection_qindex)[0]
+
+        if text and os.path.isfile(text):
+            dir = os.path.dirname(text)
+        else:
+            dir = "C:\\"
         fname, _ = QtWidgets.QFileDialog.getOpenFileName(
             None,
             "Path to executable",
@@ -1122,7 +1226,8 @@ class ProcessWindow(ui_common.BaseDialogUi):
         if fname != "":
             self.process_selected.emit(fname)
             self.close()
-            
+        
+
 
 class LogWindowUi(ui_common.BaseDialogUi):
 

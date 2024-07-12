@@ -1362,6 +1362,10 @@ class Profile():
 
         return profile_was_updated
     
+    @property
+    def profile_file(self):
+        return self._profile_fname
+    
     def get_default_mode(self):
         ''' gets the default mode for this profile '''
         modes = self.get_root_modes()
@@ -2260,7 +2264,11 @@ class ProfileMapItem():
     def __init__(self, profile = None, process = None):
         self._profile = profile
         self._process = process
+        self._modes = []
+        self._default_mode = None
+        self._restore_mode = False
         self._index = -1
+        self._update()
 
     @property
     def profile(self):
@@ -2288,9 +2296,129 @@ class ProfileMapItem():
     def valid(self):
         return self._process and self.profile
     
+    @property
+    def restore_mode(self) -> bool:
+        ''' true if the profile has the restore last used mode flag set '''
+        return self._restore_mode
+    
+    @restore_mode.setter
+    def restore_mode(self, value):
+        self._restore_mode = value
+
+    @property
+    def default_mode(self) -> str:
+        ''' true if the profile has the restore last used mode flag set '''
+        return self._default_mode
+    
+    @default_mode.setter
+    def restore_mode(self, value):
+        self._default_mode = value
+
+    def get_profile_modes(self):
+        ''' gets the list of profile modes in a given profile 
+        :returns tuple (mode_list, default_mode)
+        '''
+
+        mode_set = set()
+        default_mode = None
+        restore_last = None
 
 
+        current_profile : Profile = gremlin.shared_state.current_profile
+        profile = self.profile
 
+        if not profile:
+            # no data
+            return ([], None, False)
+        
+        if current_profile.profile_file == profile:
+            # current profile loaded - use that profile data since it's loaded and changes may not be saved yet to XML
+            return (current_profile.get_modes(), current_profile.get_default_mode(), current_profile.get_restore_mode())
+
+        # profile not loaded - grab the info from the profile xml
+        if os.path.isfile(profile):
+            try:
+                parser = etree.XMLParser(remove_blank_text=True)
+                tree = etree.parse(profile, parser)
+                for element in tree.xpath("//mode"):
+                    mode = element.get("name")
+                    mode_set.add(mode)
+
+                    
+                for element in tree.xpath("//profile"):
+                    # <profile version="10" start_mode="Default" restore_last="True">
+                    if not default_mode:
+                        default_mode = safe_read(element, "start_mode", str, None)
+                    
+                    restore_last = safe_read(element, "restore_last", bool, False)
+
+                if not restore_last:
+                    for element in tree.xpath("//startup-mode"):
+                        default_mode = element.text
+                        break
+
+                if not restore_last:
+                    restore_last = False # default value
+
+                return (list(mode_set), default_mode, restore_last)
+            
+            except Exception as ex:
+                logging.getLogger("system").error(f"PROC MAP: Unable to open profile mapping: {profile}:\n{ex}")  
+        return ([], None, False)
+    
+    def save(self):
+        ''' saves default and restore mode flags to the profile xml '''
+
+        profile = self.profile
+        current_profile : Profile = gremlin.shared_state.current_profile
+        if current_profile.profile_file == profile:
+            current_profile.set_restore_mode(self._restore_mode)
+            if self._default_mode:
+                current_profile.set_start_mode(self._default_mode)
+            current_profile.save()
+            return
+
+        
+        if os.path.isfile(profile):
+            # read the xml
+            try:
+                parser = etree.XMLParser(remove_blank_text=True)
+                tree = etree.parse(profile, parser)
+                for element in tree.xpath("//profile"):
+                    element["restore_last"] = str(self._restore_mode)
+                    if self._default_mode:
+                        element["start_mode"] = self._default_mode
+                    profile_node = element
+                    break
+
+                settings_node = None
+                for element in tree.xpath("//settings"):
+                    settings_node = element
+                    break
+
+                for element in tree.xpath("//settings/startup-mode"):
+                    restore_node = element
+                    break
+
+                if not restore_node:
+                    # add the settings node
+
+                    if not settings_node:
+                        settings_node = etree.SubElement(profile_node, "settings")
+
+                    restore_node = etree.SubElement(settings_node,"startup-mode")
+                    restore_node.value = str(self._restore_mode)
+
+
+                tree.write(profile, pretty_print=True,xml_declaration=True,encoding="utf-8")
+
+            except Exception as ex:
+                logging.getLogger("system").error(f"PROC MAP: Unable to open profile mapping: {profile}:\n{ex}")  
+
+    def _update(self):
+        self._modes, self._default_mode, self._restore_mode = self.get_profile_modes()
+
+            
 
 @SingletonDecorator
 class ProfileMap():
@@ -2304,9 +2432,10 @@ class ProfileMap():
     def get_profile_map_file(self):
         ''' gets the profile file name '''
         return os.path.join(userprofile_path(),"profile_map.xml")
-
+  
     def load_profile_map(self):
         ''' loads the mapping of profile xmls to processes '''
+        verbose = True # gremlin.config.Configuration().verbose_mode_inputs
         fname = self.get_profile_map_file()
         self._items = []
         if os.path.isfile(fname):
@@ -2319,6 +2448,8 @@ class ProfileMap():
                     profile = element.get("profile")
                     item = gremlin.base_profile.ProfileMapItem(profile, process)
                     self._items.append(item)
+                    if verbose:
+                        logging.getLogger("system").info(f"PROC MAP: Registered mapping: {process} -> {profile}")
             except Exception as ex:
                 logging.getLogger("system").error(f"PROC MAP: Unable to open profile mapping: {fname}:\n{ex}")
         self._update()
