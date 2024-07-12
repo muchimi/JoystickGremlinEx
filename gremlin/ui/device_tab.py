@@ -541,8 +541,6 @@ class JoystickDeviceTabWidget(QtWidgets.QWidget):
             widget.description_changed.connect(change_cb)
 
 
-        
-
     def set_mode(self, mode):
         ''' changes the mode of the tab '''
 

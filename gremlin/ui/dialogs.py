@@ -37,7 +37,7 @@ from gremlin.util import load_icon, userprofile_path, load_pixmap
 import logging
 from gremlin.input_types import InputType
 import gremlin.base_profile
-from lxml import etree
+
 
 
 class OptionsUi(ui_common.BaseDialogUi):
@@ -326,7 +326,7 @@ This setting is also available on a profile by profile basis on the profile tab,
         self.profile_page_layout = QtWidgets.QVBoxLayout(self.profile_page)
 
         # holds the mapping of a process (.exe) to a profile (.xml)
-        self._profile_map = []
+        self._profile_mapper = gremlin.base_profile.ProfileMap()
         self._profile_map_exe_widgets = {}
         self._profile_map_xml_widgets = {}
 
@@ -337,14 +337,11 @@ This setting is also available on a profile by profile basis on the profile tab,
         self.autoload_checkbox.clicked.connect(self._autoload_profiles)
         self.autoload_checkbox.setChecked(self.config.autoload_profiles)
 
-        self.keep_last_autoload_checkbox = QtWidgets.QCheckBox(
+        self.keep_active_on_focus_lost_checkbox = QtWidgets.QCheckBox(
             "Keep profile active on focus loss"
         )
-        self.keep_last_autoload_checkbox.setToolTip("""If this option is off, profiles that have been configured to load automatically when an application gains focus
-
-will deactivate when that application loses focus.
-
-If this option is on, the last active profile will remain active until a different profile is loaded.""")
+        self.keep_active_on_focus_lost_checkbox.setToolTip("""If this option is set, the last active profile
+will remain active until a different profile is loaded.""")
         
         self.mode_restore_flag = QtWidgets.QCheckBox("Restore last mode on activation")
         
@@ -355,9 +352,9 @@ If this option is on, the last active profile will remain active until a differe
 The setting can be overriden by the global mode reload option set in Options for this profile.
 """)
                                                     
-        self.keep_last_autoload_checkbox.clicked.connect(self._keep_last_autoload)
-        self.keep_last_autoload_checkbox.setChecked(self.config.keep_last_autoload)
-        self.keep_last_autoload_checkbox.setEnabled(self.config.autoload_profiles)
+        self.keep_active_on_focus_lost_checkbox.clicked.connect(self._keep_last_autoload)
+        self.keep_active_on_focus_lost_checkbox.setChecked(self.config.keep_profile_active_on_focus_loss)
+        self.keep_active_on_focus_lost_checkbox.setEnabled(self.config.autoload_profiles)
         self.mode_restore_flag.setChecked(gremlin.shared_state.current_profile.get_restore_mode())
 
 
@@ -403,7 +400,7 @@ The setting can be overriden by the global mode reload option set in Options for
         self.profile_layout.addWidget(self.profile_select)
 
         self.profile_page_layout.addWidget(self.autoload_checkbox)
-        self.profile_page_layout.addWidget(self.keep_last_autoload_checkbox)
+        self.profile_page_layout.addWidget(self.keep_active_on_focus_lost_checkbox)
         # self.profile_page_layout.addLayout(self.executable_layout)
         # self.profile_page_layout.addLayout(self.profile_layout)
 
@@ -486,7 +483,7 @@ The setting can be overriden by the global mode reload option set in Options for
 
         self.populate_executables()
 
-        self.load_profile_map()
+        
         self.populate_map()
 
 
@@ -597,7 +594,7 @@ The setting can be overriden by the global mode reload option set in Options for
 
         :param clicked whether or not the checkbox is ticked
         """
-        self.keep_last_autoload_checkbox.setEnabled(clicked)
+        self.keep_active_on_focus_lost_checkbox.setEnabled(clicked)
         self.config.autoload_profiles = clicked
         self.config.save()
 
@@ -899,50 +896,11 @@ The setting can be overriden by the global mode reload option set in Options for
             hg.remove_device(device.vendor_id, device.product_id)
 
 
-    def get_profile_file(self):
-        ''' gets the profile file name '''
-        return os.path.join(userprofile_path(),"profile_map.xml")
-
-    def load_profile_map(self):
-        ''' loads the mapping of profile xmls to processes '''
-        fname = self.get_profile_file()
-        self._profile_map = []
-        if os.path.isfile(fname):
-            # read the xml
-            try:
-                parser = etree.XMLParser(remove_blank_text=True)
-                tree = etree.parse(fname, parser)
-                for element in tree.xpath("//map"):
-                    process = element.get("process")
-                    profile = element.get("profile")
-                    self._profile_map.append(gremlin.base_profile.ProfileMapItem(profile, process))
-            except Exception as ex:
-                logging.getLogger("system").error(f"PROC MAP: Unable to open profile mapping: {fname}:\n{ex}")
-
-    def save_profile_map(self):
-        ''' saves the profile configuration '''
-        fname = self.get_profile_file()
-        if os.path.isfile(fname):
-            # blitz
-            os.unlink(fname)
-
-        root = etree.Element("mappings")
-        for item in self._profile_map:
-            e_map = etree.SubElement(root,"map", profile = item.profile, process = item.process)
-
-        try:    
-            # save the file
-            tree = etree.ElementTree(root)
-            tree.write(fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
-            logging.getLogger("system").info(f"PROC MAP: saved preferences to {fname}")
-
-        except Exception as err:
-            logging.getLogger("system").error(F"PROC MAP: failed to save preferences to {fname}: {err}")
-
+    
     def _add_profile_map_cb(self):
         ''' adds a new profile mapping '''
         item = gremlin.base_profile.ProfileMapItem()
-        self._profile_map.append(item)
+        self._profile_mapper.register(item)
         self.populate_map()
 
     def _save_map_cb(self):
@@ -951,6 +909,7 @@ The setting can be overriden by the global mode reload option set in Options for
 
     def populate_map(self):
         ''' populates the map of executables to profiles '''
+
         
         for widget in self._profile_map_exe_widgets.values():
             if widget:
@@ -965,19 +924,19 @@ The setting can be overriden by the global mode reload option set in Options for
         # clear the widgets
         ui_common.clear_layout(self.map_layout)
 
-        if not self._profile_map:
+        if not self._profile_mapper:
              missing = QtWidgets.QLabel("No mappings found.")
              missing.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
              self.map_layout.addWidget(missing, 0, 0)
              return
 
         item: gremlin.base_profile.ProfileMapItem
-        for index, item in enumerate(self._profile_map):
+        for index, item in enumerate(self._profile_mapper.items()):
 
             exe_widget = None
             xml_widget = None
             
-            if item and (item.process or item.profile):
+            if item:
                 # add a new item if it exists and either one of the profile/process entries are refined
 
                 exe_widget = ui_common.QPathLineItem(item.process, item)
@@ -985,13 +944,10 @@ The setting can be overriden by the global mode reload option set in Options for
                 exe_widget.open.connect(self._process_open_cb)
                 self.map_layout.addWidget(exe_widget, index, 0)
                 
-                
                 xml_widget = ui_common.QPathLineItem(item.profile, item)
                 xml_widget.pathChanged.connect(self._profile_changed_cb)
                 xml_widget.open.connect(self._profile_open_cb)
                 self.map_layout.addWidget(xml_widget, index, 1)
-
-                
 
                 clear_button = ui_common.QDataPushButton()
                 clear_button.setIcon(load_icon("mdi.delete"))
@@ -1061,7 +1017,7 @@ The setting can be overriden by the global mode reload option set in Options for
             self._delete_confirmed_cb(item)
 
     def _delete_confirmed_cb(self, item):
-        self._profile_map.remove(item)
+        self._profile_mapper.remove(item)
         self.populate_map()
 
     def _process_changed_cb(self, widget, text):

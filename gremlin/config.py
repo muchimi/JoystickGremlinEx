@@ -296,7 +296,7 @@ class Configuration:
             if value in current:
                 del current[current.index(value)]
             current.insert(0, value)
-            current = current[0:5]
+            current = current[0:8]
             self._data["recent_profiles"] = current
         self.save()
 
@@ -332,6 +332,14 @@ class Configuration:
             self.save()
 
     @property
+    def keep_profile_active_on_focus_loss(self):
+        return self._data.get("keep_active_on_focus_loss",True)
+    @keep_profile_active_on_focus_loss.setter
+    def keep_profile_active_on_focus_loss(self, value):
+        self._data["keep_active_on_focus_loss"] = value
+        self.save()
+
+    @property
     def keep_last_autoload(self):
         """Returns whether or not to keep last autoloaded profile active when it would otherwise
         be automatically disabled.
@@ -355,6 +363,20 @@ class Configuration:
         if type(value) == bool:
             self._data["keep_last_autoload"] = value
             self.save()
+
+    
+    @property
+    def restore_profile_mode_on_start(self):
+        ''' determines if a profile mode, if it exists is restored when the profile is activated '''
+        return self._data.get("restore_mode_on_start", False)
+    
+    @restore_profile_mode_on_start.setter
+    def restore_profile_mode_on_start(self, value):
+        self._data["restore_mode_on_start"] = value
+        self.save()
+
+    
+
 
     @property
     def highlight_input(self):
@@ -740,18 +762,6 @@ class Configuration:
         self.verbose_mode = value
         
 
-    
-    @property
-    def restore_profile_mode_on_start(self):
-        ''' determines if a profile mode, if it exists is restored when the profile is activated '''
-        return self._data.get("restore_mode_on_start", False)
-    
-    @restore_profile_mode_on_start.setter
-    def restore_profile_mode_on_start(self, value):
-        self._data["restore_mode_on_start"] = value
-        self.save()
-
-    
 
 
     @property

@@ -219,6 +219,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.apply_user_settings()
         self.apply_window_settings()
 
+        self._profile_map = gremlin.base_profile.ProfileMap()
+
         GremlinUi.ui = self
 
 
@@ -435,7 +437,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                 logging.getLogger("system").info(f"Deactivate profile requested")
             if self.runner.is_running():
                 # running - save the current mode 
-                self._profile.set_last_mode(self.ui.current_mode)
+                self._profile.set_last_mode(gremlin.shared_state.ui.current_mode)
                 
             
             self.runner.stop()
@@ -1145,25 +1147,59 @@ class GremlinUi(QtWidgets.QMainWindow):
         """
 
         verbose = gremlin.config.Configuration().verbose
+        config = gremlin.config.Configuration()
+        # check options
+        option_auto_load = config.autoload_profiles  
+
+        if not option_auto_load:
+            return # ignore if not auto loading profiles
+
+        option_restore_mode = config.restore_profile_mode_on_start or self._profile.get_restore_mode()
+        option_keep_focus = config.keep_profile_active_on_focus_loss   
+        
         if verbose:
-            logging.getLogger("system").info(f"PROC: Process focus change detected: {path}")
-        profile_path = self.config.get_profile_with_regex(path)
+            logging.getLogger("system").info(f"PROC: Process focus change detected: {os.path.basename(path)}  autoload: {option_auto_load}  keep focus: {option_keep_focus} restore mode: {option_restore_mode}")
+
+        profile_item = self._profile_map.get_map(path)
+        profile_path = profile_item.profile if profile_item else None
+        #profile_path = self.config.get_profile_with_regex(path)
         if profile_path:
-            if self._profile_fname != profile_path:
+            if self._profile_fname != profile_path and option_auto_load:
+                if verbose: 
+                    logging.getLogger("system").info(f"PROC: process change forces a profile load: switch from {os.path.basename(self._profile_fname)} ->  {os.path.basename(profile_path)}")   
                 self.ui.actionActivate.setChecked(False)
                 self.activate(False)
                 self._do_load_profile(profile_path)
-            self.ui.actionActivate.setChecked(True)
-            self.activate(True)
-            self._profile_auto_activated = True
-            if verbose:
-                logging.getLogger("system").info(f"PROC: Auto activated profile {profile_path} mode: {self._current_mode}")
-        elif self._profile_auto_activated and not self.config.keep_last_autoload:
+                self.ui.actionActivate.setChecked(True)
+                self.activate(True)
+                self._profile_auto_activated = True # remember the profile was auto activated by virtue of a process change
+                # restore mode for this profile 
+                mode = None
+                if option_restore_mode:
+                    mode = self._profile.get_last_mode()
+                    if verbose:
+                        logging.getLogger("system").info(f"PROC: profile:  {os.path.basename(profile_path)} restore last mode:{mode} ")                    
+
+                if mode is None or not mode in self._profile.get_modes():
+                    # restore the profile's default mode on activation
+                    mode = self._profile.get_default_mode()
+                    if verbose:
+                        logging.getLogger("system").info(f"PROC: restore default mode: {mode} ")                    
+
+                if mode:
+                    eh = gremlin.event_handler.EventHandler()
+                    eh.change_mode(mode) # set the last mode                
+
+                if verbose:
+                    logging.getLogger("system").info(f"PROC: Auto activated profile {os.path.basename(profile_path)} mode: {self._current_mode}")                    
+
+        elif self._profile_auto_activated and not option_keep_focus:
+            # deactivate the profile if it was autoloaded
             self.ui.actionActivate.setChecked(False)
             self.activate(False)
             self._profile_auto_activated = False
             if verbose:
-                logging.getLogger("system").info(f"PROC: Deactivated profile {profile_path}")
+                logging.getLogger("system").info(f"PROC: keep focus not set - deactivated profile {os.path.basename(profile_path)}")
 
     def _tray_icon_activated_cb(self, reason):
         """Callback triggered by clicking on the system tray icon.
@@ -1831,7 +1867,6 @@ if __name__ == "__main__":
 
     # Create Gremlin UI
     ui = GremlinUi()
-
     gremlin.shared_state.ui = ui
     
     syslog.info("GremlinEx UI created")

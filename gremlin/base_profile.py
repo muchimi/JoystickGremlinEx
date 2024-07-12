@@ -26,6 +26,8 @@ import gremlin.joystick_handling
 import gremlin.profile
 import gremlin.input_devices
 import gremlin.plugin_manager
+from gremlin.singleton_decorator import SingletonDecorator
+from lxml import etree
 
 
 # Data struct representing profile information of a device
@@ -2281,5 +2283,96 @@ class ProfileMapItem():
     @index.setter
     def index(self, value):
         self._index = value
+
+    @property
+    def valid(self):
+        return self._process and self.profile
     
 
+
+
+
+@SingletonDecorator
+class ProfileMap():
+    ''' manages the profile to process maps '''
+
+    def __init__(self):
+        self._items = [] # list of items 
+        self._process_map = {} # mapps process to ProcessMapItem
+        self.load_profile_map() # load the existing map
+
+    def get_profile_map_file(self):
+        ''' gets the profile file name '''
+        return os.path.join(userprofile_path(),"profile_map.xml")
+
+    def load_profile_map(self):
+        ''' loads the mapping of profile xmls to processes '''
+        fname = self.get_profile_map_file()
+        self._items = []
+        if os.path.isfile(fname):
+            # read the xml
+            try:
+                parser = etree.XMLParser(remove_blank_text=True)
+                tree = etree.parse(fname, parser)
+                for element in tree.xpath("//map"):
+                    process = element.get("process")
+                    profile = element.get("profile")
+                    item = gremlin.base_profile.ProfileMapItem(profile, process)
+                    self._items.append(item)
+            except Exception as ex:
+                logging.getLogger("system").error(f"PROC MAP: Unable to open profile mapping: {fname}:\n{ex}")
+        self._update()
+
+    def save_profile_map(self):
+        ''' saves the profile configuration '''
+        fname = self.get_profile_map_file()
+        if os.path.isfile(fname):
+            # blitz
+            os.unlink(fname)
+
+        root = etree.Element("mappings")
+        for item in self._items:
+            e_map = etree.SubElement(root,"map", profile = item.profile, process = item.process)
+
+        try:    
+            # save the file
+            tree = etree.ElementTree(root)
+            tree.write(fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
+            logging.getLogger("system").info(f"PROC MAP: saved preferences to {fname}")
+
+        except Exception as err:
+            logging.getLogger("system").error(F"PROC MAP: failed to save preferences to {fname}: {err}")
+
+
+    @property
+    def profile_map(self):
+        return self._profile_map
+    
+    def register(self, item):
+        ''' registers a new item '''
+        self._items.append(item)
+        if item.valid:
+            self._process_map[item.process] = item
+        self._update()
+    
+    def get_map(self, process) -> ProfileMapItem:
+        ''' returns the gremlin profile '''
+        if process in self._process_map.keys():
+            return self._process_map[process]
+        return None
+
+    def _update(self):
+        ''' updates the process map from the item registrations '''
+        item_list = [item for item in self._items if item.process and item.profile]
+        self._process_map = {}
+        for item in item_list:
+            self._process_map[item.process] = item
+
+
+    def get_process_list(self):
+        ''' gets a list of mapped processes '''
+        return list(self._process_map.keys())
+    
+    def items(self):
+        ''' gets a list of registered process to profile map items'''
+        return self._items
