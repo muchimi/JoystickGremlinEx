@@ -993,8 +993,6 @@ The setting can be overriden by the global mode reload option set in Options for
                 mode_widget.setToolTip("Default mode for this profile")
                 options_layout.addWidget(mode_widget)
 
-  
-
                 container_layout.addWidget(options_line,2,0,1,-1)
 
                 clear_button = ui_common.QDataPushButton()
@@ -1020,7 +1018,7 @@ The setting can be overriden by the global mode reload option set in Options for
     def _default_mode_changed(self):
         widget = self.sender()
         item : gremlin.base_profile.ProfileMapItem = widget.data
-        item.default_mode = widget.text()
+        item.default_mode = widget.currentText()
 
     def _restore_changed(self, checked):
         widget = self.sender()

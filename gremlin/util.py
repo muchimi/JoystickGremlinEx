@@ -941,3 +941,14 @@ def popCursor():
     QtWidgets.QApplication.processEvents()
     
 
+def compare_path(a, b):
+    ''' compare two paths '''
+    if a is None and b is None:
+        return True
+    if a is None:
+        return False
+    if b is None:
+        return False
+    af = a.replace("\\","/").lower()
+    bf = b.replace("\\","/").lower()
+    return af == bf

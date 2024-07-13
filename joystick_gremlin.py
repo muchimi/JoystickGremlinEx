@@ -48,7 +48,6 @@ import gremlin.base_profile
 import gremlin.control_action
 
 
-
 import dinput
 
 
@@ -63,7 +62,7 @@ from gremlin.ui.midi_device  import MidiDeviceTabWidget
 from gremlin.ui.osc_device import OscDeviceTabWidget
 
 
-from gremlin.util import log_sys_error
+from gremlin.util import log_sys_error, compare_path
 
 
 
@@ -1146,6 +1145,10 @@ class GremlinUi(QtWidgets.QMainWindow):
         :param path the path to the currently active process executable
         """
 
+        if not gremlin.shared_state.is_running:
+            # ignore unless running a profile
+            return 
+
         verbose = gremlin.config.Configuration().verbose
         config = gremlin.config.Configuration()
         # check options
@@ -1164,7 +1167,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         profile_path = profile_item.profile if profile_item else None
         #profile_path = self.config.get_profile_with_regex(path)
         if profile_path:
-            if self._profile_fname != profile_path and option_auto_load:
+            if not compare_path(self._profile_fname, profile_path) and option_auto_load:
                 if verbose: 
                     logging.getLogger("system").info(f"PROC: process change forces a profile load: switch from {os.path.basename(self._profile_fname)} ->  {os.path.basename(profile_path)}")   
                 self.ui.actionActivate.setChecked(False)

@@ -1380,6 +1380,7 @@ class Profile():
         # Generate XML document
         root = ElementTree.Element("profile")
         root.set("version", str(gremlin.profile.ProfileConverter.current_version))
+        assert isinstance(self._start_mode, str)
         root.set("start_mode", self._start_mode)
         root.set("restore_last", str(self._restore_last_mode))
 
@@ -1535,8 +1536,9 @@ class Profile():
             self._start_mode = mode
         return self._start_mode
     
-    def set_start_mode(self, value):
+    def set_start_mode(self, value : str):
         ''' sets the start up mode '''
+        assert isinstance(value, str)
         self._start_mode = value
 
     def get_restore_mode(self):
@@ -2303,6 +2305,7 @@ class ProfileMapItem():
     
     @restore_mode.setter
     def restore_mode(self, value):
+        assert isinstance(value, bool)
         self._restore_mode = value
 
     @property
@@ -2311,7 +2314,8 @@ class ProfileMapItem():
         return self._default_mode
     
     @default_mode.setter
-    def restore_mode(self, value):
+    def default_mode(self, value):
+        assert isinstance(value, str)
         self._default_mode = value
 
     def get_profile_modes(self):
@@ -2352,12 +2356,12 @@ class ProfileMapItem():
                     
                     restore_last = safe_read(element, "restore_last", bool, False)
 
-                if not restore_last:
+                if not restore_last is None:
                     for element in tree.xpath("//startup-mode"):
                         default_mode = element.text
                         break
 
-                if not restore_last:
+                if not restore_last is None:
                     restore_last = False # default value
 
                 return (list(mode_set), default_mode, restore_last)
@@ -2370,8 +2374,9 @@ class ProfileMapItem():
         ''' saves default and restore mode flags to the profile xml '''
 
         profile = self.profile
+        
         current_profile : Profile = gremlin.shared_state.current_profile
-        if current_profile.profile_file == profile:
+        if compare_path(current_profile.profile_file, profile):
             current_profile.set_restore_mode(self._restore_mode)
             if self._default_mode:
                 current_profile.set_start_mode(self._default_mode)
@@ -2385,29 +2390,30 @@ class ProfileMapItem():
                 parser = etree.XMLParser(remove_blank_text=True)
                 tree = etree.parse(profile, parser)
                 for element in tree.xpath("//profile"):
-                    element["restore_last"] = str(self._restore_mode)
+                    element.set("restore_last", str(self._restore_mode))
                     if self._default_mode:
-                        element["start_mode"] = self._default_mode
+                        element.set("start_mode", self._default_mode)
                     profile_node = element
                     break
 
                 settings_node = None
+                startup_node = None
                 for element in tree.xpath("//settings"):
                     settings_node = element
                     break
 
                 for element in tree.xpath("//settings/startup-mode"):
-                    restore_node = element
+                    startup_node = element
                     break
 
-                if not restore_node:
+                if startup_node is None:
                     # add the settings node
 
-                    if not settings_node:
+                    if settings_node is None:
                         settings_node = etree.SubElement(profile_node, "settings")
 
-                    restore_node = etree.SubElement(settings_node,"startup-mode")
-                    restore_node.value = str(self._restore_mode)
+                    startup_node = etree.SubElement(settings_node,"startup-mode")
+                    startup_node.text = str(self._default_mode)
 
 
                 tree.write(profile, pretty_print=True,xml_declaration=True,encoding="utf-8")
