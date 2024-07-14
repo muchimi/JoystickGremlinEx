@@ -25,6 +25,7 @@ import gremlin.base_profile
 from gremlin.input_types import InputType
 from gremlin.input_devices import ButtonReleaseActions
 import gremlin.macro
+import gremlin.shared_state
 import gremlin.ui.ui_common
 import gremlin.ui.input_item
 import enum
@@ -143,11 +144,17 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
     
     def _select_keys_cb(self):
         ''' display the keyboard input dialog '''
+        import gremlin.shared_state
+        gremlin.shared_state.push_suspend_ui_keyinput()
         self._keyboard_dialog = InputKeyboardDialog(sequence = self.action_data.keys, parent = self)
         self._keyboard_dialog.accepted.connect(self._keyboard_dialog_ok_cb)
+        self._keyboard_dialog.closed.connect(self._keyboard_dialog_closed_cb)
         self._keyboard_dialog.setModal(True)
         self._keyboard_dialog.showNormal()
         
+    def _keyboard_dialog_closed_cb(self):
+        import gremlin.shared_state
+        gremlin.shared_state.pop_suspend_ui_keyinput()
         
     def _keyboard_dialog_ok_cb(self):
         ''' callled when the virtual dialog completes '''
@@ -155,6 +162,7 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
         # grab the new data
         self.action_data.keys = gremlin.keyboard.sort_keys(self._keyboard_dialog.keys)
         self.action_modified.emit()
+        gremlin.shared_state.pop_suspend_ui_keyinput()
     
 
     def _populate_ui(self):

@@ -27,6 +27,7 @@ from PySide6 import QtWidgets, QtCore
 import gremlin.config
 from gremlin.input_types import InputType
 import gremlin.keyboard
+import gremlin.shared_state
 #from gremlin.common import DeviceType
 from . import input_item, ui_common 
 from gremlin.keyboard import Key
@@ -47,6 +48,7 @@ class KeyboardInputItem():
         self._title_name = "Keyboard input (not configured)"
         self._display_name = None
         self._display_tooltip = None
+        self._description = None
         self._suspend_update = False
         self._update()
         
@@ -158,12 +160,13 @@ class KeyboardInputItem():
                     scan_code = safe_read(child, "scan-code", int, 0)
                     is_extended = safe_read(child, "extended", bool, False)
                     is_mouse = safe_read(child, "mouse", bool, False)
-                    if is_mouse:
-                        pass
-                    if virtual_code > 0:
-                        key = gremlin.keyboard.KeyMap.find_virtual(virtual_code)
-                    else:
-                        key = gremlin.keyboard.KeyMap.find(scan_code, is_extended)
+                    # if is_mouse:
+                    #     pass
+                    # if virtual_code > 0:
+                    #     key = gremlin.keyboard.KeyMap.find_virtual(virtual_code)
+                    # else:
+                    scan_code, is_extended = gremlin.keyboard.KeyMap.translate((scan_code, is_extended))
+                    key = gremlin.keyboard.KeyMap.find(scan_code, is_extended)
                     
                     self._key = key
                     for latched_child in child:
@@ -173,12 +176,14 @@ class KeyboardInputItem():
                             is_extended = safe_read(latched_child, "extended", bool, False)
                             is_mouse = safe_read(latched_child, "mouse", bool, False)
                             if is_mouse:
+                                
                                 key = Key(scan_code = scan_code, is_mouse=True)
                             else:
-                                if virtual_code > 0:
-                                    key = gremlin.keyboard.KeyMap.find_virtual(virtual_code)
-                                else:
-                                    key = gremlin.keyboard.KeyMap.find(scan_code, is_extended)
+                                # if virtual_code > 0:
+                                #     key = gremlin.keyboard.KeyMap.find_virtual(virtual_code)
+                                # else:
+                                scan_code, is_extended = gremlin.keyboard.KeyMap.translate((scan_code, is_extended))
+                                key = gremlin.keyboard.KeyMap.find(scan_code, is_extended)
                             if not key in self._key.latched_keys:
                                 self._key._latched_keys.append(key) 
 
@@ -219,27 +224,29 @@ class KeyboardInputItem():
             self._message_key = ""
             self._title_name = "Keyboard Input (not configured)"
             self._display_name = ""
+            self._description = ""
             self._display_tooltip = ""
             return
         
-        if self._key._virtual_code > 0:
-            message_key = f"{self._key._virtual_code:x}"
-        else:
-            message_key = f"{self._key._scan_code:x}{1 if self.key._is_extended else 0}"
+        # if self._key._virtual_code > 0:
+        #     message_key = f"{self._key._virtual_code:x}"
+        # else:
+        message_key = f"{self._key._scan_code:x}{1 if self.key._is_extended else 0}"
         
         key : Key
         for key in self._key._latched_keys:
-            if key._virtual_code > 0:
-                message_key += f"|{key._virtual_code:x}"
-            else:
-                message_key += f"|{key._scan_code:x}{1 if key._is_extended else 0}"
+            # if key._virtual_code > 0:
+            #     message_key += f"|{key._virtual_code:x}"
+            # else:
+            message_key += f"|{key._scan_code:x}{1 if key._is_extended else 0}"
             
         self._message_key = message_key
         is_latched = self._key.is_latched
         self._title_name = f"Key input {'(latched)'if is_latched else ''}"
 
         self._display_name = self._key.latched_name
-        self._display_tooltip = self._key.latched_name
+        self._description = self.key.latched_code
+        self._display_tooltip = self._key.latched_name + " " + self.key.latched_code
 
     def to_string(self):
         return f"KeyboardInputItem: pair: {self.key_tuple} name: {self._display_name}"
@@ -388,13 +395,17 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
     def _add_key_dialog_cb(self):
         ''' display the keyboard input dialog '''
         from gremlin.ui.virtual_keyboard import InputKeyboardDialog
+        gremlin.shared_state.push_suspend_ui_keyinput()
+
         self._keyboard_dialog = InputKeyboardDialog(parent = self, select_single = False, index = -1)
         self._keyboard_dialog.accepted.connect(self._dialog_ok_cb)
+        self._keyboard_dialog.closed.connect(self._dialog_close_cb)
         self._keyboard_dialog.setModal(True)
         self._keyboard_dialog.showNormal()  
         
 
-
+    def _dialog_close_cb(self):
+        gremlin.shared_state.pop_suspend_ui_keyinput()
 
     def _dialog_ok_cb(self):
         ''' callled when the dialog completes '''
@@ -571,8 +582,8 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         if data.key is None:
             is_warning = True
             status_text = "Not configured"
-       
-
+        else:
+            status_text = data.key.latched_code
  
         if is_warning:
             self._status_widget.setIcon("fa.warning", use_qta=True, color="red")
@@ -589,10 +600,10 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         self._status_widget = gremlin.ui.ui_common.QIconLabel()
         self._status_widget.setObjectName("status")
         layout = QtWidgets.QVBoxLayout()
+        layout.setContentsMargins(0,0,0,0)
         container_widget.setLayout(layout)
         layout.addWidget(self._status_widget)
-        
-
+        self._status_widget.setVisible(False)
         self._update_input_widget(input_widget, container_widget)
                 
   
@@ -606,8 +617,10 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         sequence = data.input_id.sequence
             
         logging.getLogger("system").info(f"Editing index {index} {data.input_id.display_name}")
+        gremlin.shared_state.push_suspend_ui_keyinput()
         self._keyboard_dialog = InputKeyboardDialog(sequence, parent = self, select_single = False, index = index)
         self._keyboard_dialog.accepted.connect(self._dialog_ok_cb)
+        self._keyboard_dialog.closed.connect(self._dialog_close_cb)
         self._keyboard_dialog.setModal(True)
         self._keyboard_dialog.showNormal()        
         

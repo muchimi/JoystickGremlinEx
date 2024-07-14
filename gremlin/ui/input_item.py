@@ -1011,6 +1011,13 @@ class InputItemWidget(QtWidgets.QFrame):
         self._description_widget = gremlin.ui.ui_common.QIconLabel()
         self._description_widget.setObjectName("description")
         self._description_widget.setTextMinWidth(280)
+        self._description_widget.setVisible(False)
+
+                
+        self._comment_widget = gremlin.ui.ui_common.QIconLabel()
+        self._comment_widget.setObjectName("comment")
+        self._comment_widget.setTextMinWidth(280)
+        self._comment_widget.setVisible(False)
 
 
         self._input_description_widget =gremlin.ui.ui_common.QIconLabel()
@@ -1040,6 +1047,7 @@ class InputItemWidget(QtWidgets.QFrame):
         if self.custom_container_widget:
             self._container_layout.addWidget(self.custom_container_widget) # custom container
         
+        self._container_layout.addWidget(self._comment_widget)
        
         self.setMinimumWidth(300)
 
@@ -1096,6 +1104,14 @@ class InputItemWidget(QtWidgets.QFrame):
             self._description_widget.setVisible(True)
         else:
             self._description_widget.setVisible(False)
+
+    def setComment(self, value):
+        ''' sets the comment field of the input widget '''
+        if value:
+            self._comment_widget.setText(f"<i>{value}</i>")
+            self._comment_widget.setVisible(True)
+        else:
+            self._comment_widget.setVisible(False)
 
 
     def setDescriptionIcon(self, icon_path, use_qta = True):

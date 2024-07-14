@@ -7,7 +7,7 @@ Joystick Gremlin EX
 
 <!-- TOC start (generated with https://github.com/derlin/bitdowntoc) -->
 
-   * [Changelog](#changelog)
+- [Changelog](#changelog)
 - [Virus false-positives](#virus-false-positives)
 - [Releases](#releases)
 - [General](#general)
@@ -25,6 +25,12 @@ Joystick Gremlin EX
          - [Concurrent mode](#concurrent-mode)
       + [Client machine setup](#client-machine-setup)
    * [Master remote control functions](#master-remote-control-functions)
+- [Profile mapping](#profile-mapping)
+   * [Automatic activation](#automatic-activation)
+   * [Keep profile active when focus is lost](#keep-profile-active-when-focus-is-lost)
+   * [Mode selection](#mode-selection)
+   * [Caveats with automation](#caveats-with-automation)
+   * [Caveats with loading to the prior mode](#caveats-with-loading-to-the-prior-mode)
 - [Copy/Paste operations](#copypaste-operations)
 - [Devices](#devices)
    * [HID devices](#hid-devices)
@@ -104,27 +110,31 @@ Joystick Gremlin EX
 
 13.40.14ex
 
-This release adds major new features, including some minor changes in UI functionality, and a few more QOL (quality of life).
+This release adds major new features, including some minor changes in UI functionality, and a few more QOL (quality of life) enhancements.
 
-- New virtual keyboard dialog to simplify key and mouse button selection. The updated editor supports hidden keys such as F13 to F24 and enables mouse buttons to be used as any "key" input to simplify mapping.
-- Revamped keyboard input device and UI with virtual keyboard with mouse input support with multiple latched keys (profiles using the old style should convert automatically to the new style).  Inputs can be added, edited and removed.
-- Revamped keyboard conditions on actions or containers:  a keyboard condition now uses the new virtual keyboard editor and allows for multiple latched keys and mouse button triggers.
-- New MIDI input device - GremlinEx can now map MIDI events. The new MIDI inputs can be added, edited and removed in the MIDI device tab. 
-- New OSC (Open Sound Control) input device - GremlinEx can now map OSC events. The new OSC inputs can be added, edited and removed from the OSC device tab.
+- New virtual keyboard dialog to simplify key and mouse button selection. The updated editor supports hidden keys such as F13 to F24 and enables mouse buttons to be used as any "key" input to simplify mapping. (QOL)
+- Revamped keyboard input device and UI with virtual keyboard with mouse input support with multiple key latching.  Profiles using the old style should convert automatically to the new style.  Inputs can be added, edited and removed.  Latching (concurrent keys pressed) allows for complex and unusual keyboard input combinations to trigger actions including latching with mouse button and mouse wheel inputs.
+- Revamped keyboard conditions on actions or containers:  a keyboard condition now uses the new virtual keyboard editor and allows for multiple latched keys and mouse button triggers. (QOL)
+- **New MIDI input device** - GremlinEx can now map MIDI events to GremlinEx actions. The new MIDI inputs can be added, edited and removed in the MIDI device tab. 
+- **New OSC (Open Sound Control) input device** - GremlinEx can now map OSC events to GremlinEx actions. The new OSC inputs can be added, edited and removed from the OSC device tab.
 - Improved icon reload speed (speeds up the UI load/refresh/update)
-- New file menu for opening Explorer to the current profile folder
-- New file menu for opening the profile XML in a text editor (it will save the profile first)
+- New file menu for opening Explorer to the current profile folder (QOL)
+- New file menu for opening the profile XML in a text editor (it will save the profile first) (QOL)
 - New mouse event drop down selector in map to mouse ex: adds a mouse event selection drop down so mouse actions can be selected by name rather than mouse input only.  
-- Action container will now scroll horizontally if the action is too wide to fit based on windows size / UI scaling options.
-- Profiles can be saved even if one or more actions are not configured (QOL enhancement).
-- New profile to process mapping - centralized in the options dialog for multiple profiles.
+- Action container will now scroll horizontally if the action is too wide to fit based on windows size / UI scaling options. (QOL)
+- Profiles can be saved even if one or more actions are not configured (QOL)
+- Updated profile to application (process) mapping in the options dialog (QOL)
+- Options dialog remembers which tab it was last in (QOL)
+- Options dialog has a close button (QOL)
+- Options dialog saves profile mapping information on close (QOL)
+- Pressing F5 in the UI will activate the current profile (QOL)
 
 6/6/24 - 13.40.13ex (h) **potentially breaking change**
 
 - GremlinEx will now more gracefully handle DLL errors and check driver and DLL versions.  If the driver and DLL versions are not at minimum levels expected, an error box will be displayed and will exit the app to avoid further errors due to mismatched versions.
 
-GremlinEx requires vJoy device driver 12.53.21.621 (VJOY release 2.1.9.1 minimum).    The distribution includes the interface DLL for 2.1.9.1, but not the software which by licensing agreement cannot be included in the GremlinEx distribution.  The latest version can be found here:  
-  
+GremlinEx requires vJoy device driver 12.53.21.621 (VJOY release 2.1.9.1 minimum).    The distribution includes the interface DLL for 2.1.9.1, but not the software which by licensing agreement cannot be included in the GremlinEx distribution.  The latest version can be found here:
+
 The vJoy version can be found here: https://sourceforge.net/projects/vjoystick/files/Beta%202.x/2.1.9.1-160719/
 
 The version of HIDHide can be found here: https://github.com/nefarius/HidHide/releases
@@ -132,12 +142,12 @@ The version of HIDHide can be found here: https://github.com/nefarius/HidHide/re
 There are probably more hardening that can be done to validate the environment.
 
 
-When installing a new version of vJoy or HIDHide, uninstall the old versions first, and reboot between sessions to make sure files are removed and there will not be a conflict on installation.  There are documented issues when failing to reboot after uninstalling either HIDHide or vJoy.  
-  
+When installing a new version of vJoy or HIDHide, uninstall the old versions first, and reboot between sessions to make sure files are removed and there will not be a conflict on installation.  There are documented issues when failing to reboot after uninstalling either HIDHide or vJoy.
+ 
 Sequence wise, install vJoy first, then HIDHide.
 
 Updated Device Information dialog to use a table format that is user resizeable.  Right click on any cell to copy its contents to the clipboard.
-  
+
 Bug fix for device removal / addition while a profile is running.
 
 If a device is referenced by a script or profile and cannot be found as GremlinEx is running, or if it was added/removed dynamically while GremlinEx is running, this will no longer throw an exception.  The issue will be logged as a warning to the log file and calls using that device will just be ignored.  Plugin scripts should ensure they now check the return value of any proxy call when looking for a device as the call my return null (None) if the device cannot be found.  It is generally discouraged to change hardware configurations while GremlinEx is running, or change device hardware IDs as those are stored in profiles, and will be ignored if the ID is no longer found.  
@@ -410,10 +420,12 @@ Local and broadcast (sending output to remote GremlinEx instances on network mac
 
 Commands are available in the VjoyRemap plugin when bound to a joystick button and available from the drop down of actions for that button.
 
+<!-- TOC --><a name="profile-mapping"></a>
 # Profile mapping
 
 GremlinEx has multiple options to automate the loading and activation of profiles based on what process has the current focus (meaning, the active window).
 
+<!-- TOC --><a name="automatic-activation"></a>
 ## Automatic activation
 
 If a process (.exe) is mapped to a specific profile (.xml), GremlinEx can automatically load this profile when the process has the focus at runtime.  This only works when a GremlinEx is in "run" mode - so a profile was loaded and activated.
@@ -422,10 +434,12 @@ If configured, GremlinEx will load the mapped profile corresponding to the proce
 
 The automatic load occurs whenever GremlinEx detects a process focus change.
 
+<!-- TOC --><a name="keep-profile-active-when-focus-is-lost"></a>
 ## Keep profile active when focus is lost
 
 This mode is used to ensure GremlinEx keeps the profile running even if the process it is mapped to no longer has the primary focus.   This happens, for example when you alt-tab, or when you activate another window.  The recommendation is to leave this option enabled.
 
+<!-- TOC --><a name="mode-selection"></a>
 ## Mode selection
 
 When automatic profile load is enabled, GremlinEx has the option to override the default "startup" mode of a profile.  This is by default, the top level mode.  There are two options of interest:
@@ -436,6 +450,7 @@ When automatic profile load is enabled, GremlinEx has the option to override the
 In addition to this, the profile itself provides actions that can switch modes.
 
 
+<!-- TOC --><a name="caveats-with-automation"></a>
 ## Caveats with automation
 
 GremlinEx is not aware of anything except what process has the current focus, and what you've configured in the profile options.  It's completely possible that you will experience conflicts if you have programmed these in, or constant loading/reloading.
@@ -448,6 +463,7 @@ To guard against this behavior, here are things that are not recommended:
 
 The recommended approach is to only run one mapped process at a time, ensure the profile remains active if you alt-tab or switch to another window on multi-monitor setups.
 
+<!-- TOC --><a name="caveats-with-loading-to-the-prior-mode"></a>
 ## Caveats with loading to the prior mode
 
 Loading the prior mode may not necessarily be expected, as it will vary with the last known used mode.   This can be confusing and unexpected, but it can be helped by ensuring that you tell GremlinEx to say what mode it's in whenever a profile starts.
@@ -485,7 +501,23 @@ GremlinEx will show all detected game controllers in tabs located at the top of 
 
 GremlinEx has an updated special Keyboard device that allows you to map keyboard and mouse button as inputs to trigger actions and containers. 
 
+![](gremlin_ex_keyboard.png)
+
 GremlinEx allows you to map unusual function keys F13 to F24 and any QWERTY keyboard layouts (no support for other layouts as of yet), as well as mouse input buttons including mouse wheel actions. 
+
+#### Keyboard inputs
+
+![](keyboard_input.png)
+
+Keyboard inputs, as with joystick inputs are shown on the left panel in GremlinEx in the keyboard tab.  Inputs can be added, removed and edited (configured).  If an input is removed, it will remove any associated mappings.  A confirmation box will pop up if an input with content will be deleted.
+
+Use the action and container copy/paste feature to duplicate actions between inputs.
+
+#### Scan Codes
+
+The scan codes are the keyboard scan codes in hexadecimal that will be listened to to trigger this action.  The "_EX" means the scan code is extended.  This list is important because GremlinEx will only be able to trigger the actions if it "hears" these scan codes in pressed state at the same time.  
+
+Some keys are special - such as the Right Alt key or the numpad keys. For example, the numpad numbers change scan codes based on the state of the numlock key.
 
 <!-- TOC --><a name="virtual-keyboard"></a>
 ### Virtual Keyboard
@@ -496,9 +528,9 @@ For input simplicity, GremlinEx now uses a virtual keyboard to show which keys a
 ![](virtual_keyboard.png)
 
 
-Currently only US layout (QWERTY) is supported.  Localization is on the to-do list, however GremlinEx uses scan-codes (physical keys) on the keyboard so what the key actually says doesn't matter. I do plan to add localization that is correct for the current locale setting at some point so the dialog displays the correct key layout for the current keyboard in use.
+Currently only US layout (QWERTY) is supported for visualization. GremlinEx uses scan-codes (physical keys) on the keyboard so what the key actually says doesn't matter and is only for visualization purposes. I do plan to add localization in a future release so the keys show the correct key name for the current keyboard layout in use.
 
-Keyboard inputs can be added, removed and edited.  If an input is removed, it will remove any associated mappings and display a warning box to this effect.
+
 
 <!-- TOC --><a name="selecting-a-key"></a>
 #### Selecting a key

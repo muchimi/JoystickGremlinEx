@@ -97,7 +97,7 @@ class QKeyWidget(QtWidgets.QPushButton):
     def display_name(self):
         ''' friendly key name'''
         if self._key:
-            return self._key.name
+            return self._key.name + " " + self._key.latched_code
         return ""
         
 
@@ -105,7 +105,8 @@ class QKeyWidget(QtWidgets.QPushButton):
 
 class InputKeyboardDialog(QtWidgets.QDialog):
     ''' dialog showing a virtual keyboard in which to select key combinations with the keyboard or mouse '''
-
+    
+    closed = QtCore.Signal() # sent when the dialog closes
 
     def __init__(self, sequence = None, parent = None, select_single = False, allow_modifiers = True, index = None):
         '''
@@ -117,7 +118,6 @@ class InputKeyboardDialog(QtWidgets.QDialog):
         # self._sequence = InputKeyboardModel(sequence=sequence)
         main_layout = QtWidgets.QVBoxLayout()
         self.setWindowTitle("Keyboard & Mouse Input Mapper")
-
         self._select_single = select_single
         self._allow_modifiers = allow_modifiers
         self.index = index
@@ -170,7 +170,11 @@ class InputKeyboardDialog(QtWidgets.QDialog):
 
         self.setLayout(main_layout)
 
-        self._set_sequence(sequence)       
+        self._set_sequence(sequence)      
+
+    def closeEvent(self, event):
+        self.closed.emit()
+        super().closeEvent(event)
 
     @property
     def latched_key(self):

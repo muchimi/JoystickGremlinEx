@@ -118,7 +118,7 @@ class Key():
         :param is_mouse True if the key is a mouse button instead of a key - if set only the name is used
         """
 
-        self._lookup_name = None
+
         
         
         if scan_code is None:
@@ -130,6 +130,8 @@ class Key():
         if is_mouse is None:
             is_mouse = False
 
+        self._lookup_name = None
+        self._latched_code = ""
         self._latched_name = ""
         
         self._latched_keys = [] # TraceableList() #[] # list of keys latched to this keystroke (modifiers)
@@ -138,14 +140,15 @@ class Key():
         if not name:
             self._load(scan_code, is_extended, virtual_code, is_mouse)
 
-        
-
-        self._name = name
         self._scan_code = scan_code
         self._is_extended = is_extended
-        self._virtual_code = virtual_code
+        self._virtual_code = virtual_code            
+
+
+        self._name = name
         self._is_mouse = is_mouse
         self._update()
+
 
     @property
     def virtual_code(self):
@@ -193,17 +196,26 @@ class Key():
 
         else:
             # regular key
+
+            if virtual_code > 0 and scan_code == 0:
+                # get scan code from VK
+                scan_code, is_extended = KeyMap.find_virtual(virtual_code)
+
             if scan_code > 0:
                 key = KeyMap.find(scan_code, is_extended)
                 if key is not None:
                     self._name = key.name
                     self._lookup_name = key.lookup_name
 
+        self._scan_code = scan_code
+        self._is_extended = is_extended
+        self._virtual_code = virtual_code
+
+
         if name and len(name)==1:
             name = name.upper()
                     
-
-      
+        
         self._update()
 
 
@@ -242,20 +254,29 @@ class Key():
     #     self._update()
 
     def _update(self):
+        
         if len(self._latched_keys) > 0:
             keys = [self]
             keys.extend(self._latched_keys)
             # order the key by modifier 
             keys = sort_keys(keys)
             result = ""
+            code  = ""
             for key in keys:
                 if result:
                     result += " + "
+                if code:
+                    code += " + "
                 result += key._name
-            name = result
+                code += f"0x{key._scan_code}{'_EX' if key._is_extended else ''}"
+            self._latched_name = result
         else: 
-            name = ""
-        self._latched_name = name
+            code = f"0x{self._scan_code}{'_EX' if self._is_extended else ''}"
+            self._latched_name = ""
+        self._latched_code = code
+        
+
+
 
 
         
@@ -267,6 +288,10 @@ class Key():
     @property
     def latched_name(self):
         return self._latched_name if self._latched_name else self._name
+
+    @property
+    def latched_code(self):
+        return self._latched_code
 
 
     @property
@@ -355,9 +380,10 @@ class Key():
     
     
     @property
-    def latched_keys(self) -> TraceableList:
+    def latched_keys(self):
         ''' list of key objects that are latched to this key (modifiers)'''
         return self._latched_keys
+    
     @latched_keys.setter
     def latched_keys(self, value):
         self._latched_keys.clear()
@@ -932,6 +958,7 @@ class KeyMap:
     
 
 
+
     @staticmethod
     def get_latched_key(keys):
         ''' derives a single latched key from a set of keys'''
@@ -970,6 +997,26 @@ class KeyMap:
             return_key.latched_keys = latched
 
         return return_key
+    
+
+    @staticmethod
+    def translate(keyid):
+        ''' translates a key id and returns a list of equivalent keys
+            this is to map similar keys together 
+        '''
+        # scan_code, _ = keyid
+        # if not scan_code in (0x38, 0x1d, 0x52, 0x4f, 0x50, 0x51, 0x4b, 0x4c, 0x4d, 0x47, 0x48, 0x49):
+        #     return (scan_code, False) 
+        # # keep the extended key flag
+        return keyid
+    
+    @staticmethod
+    def keyid_tostring(keyid):
+        scan_code, is_extended = keyid
+        return f"({scan_code} 0x{scan_code:X}, {is_extended})"
+    
+    # holds the number pad scan codes
+    _g_numpad_codes = (0x52, 0x4f, 0x50, 0x51, 0x4b, 0x4c, 0x4d, 0x47, 0x48, 0x49)
 
     _g_name_map = {
         # Function keys

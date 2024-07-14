@@ -48,7 +48,24 @@ _callback_map = {}
 # true if a profile is running
 is_running = False
 
+# true if UI keyboard should be ignored (such as, when listening to keys)
+_suspend_ui_keyinput = 0
 
+
+def ui_keyinput_suspended():
+    global _suspend_ui_keyinput
+    return _suspend_ui_keyinput > 0
+
+def push_suspend_ui_keyinput():
+    ''' suspends keyboard input to the UI'''
+    global _suspend_ui_keyinput
+    _suspend_ui_keyinput += 1
+
+def pop_suspend_ui_keyinput():
+    ''' restores keyboard input to the UI'''
+    global _suspend_ui_keyinput
+    if _suspend_ui_keyinput > 0:
+        _suspend_ui_keyinput -= 1
 
 def suspend_input_highlighting():
     """Returns whether or not input highlighting is suspended.

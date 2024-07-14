@@ -92,7 +92,7 @@ from gremlin.ui.midi_device import MidiDeviceTabWidget
 from gremlin.ui.osc_device import OscDeviceTabWidget
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.14ex (j)"
+APPLICATION_VERSION = "13.40.14ex (k)"
 
 # the main ui
 ui = None
@@ -1305,55 +1305,34 @@ class GremlinUi(QtWidgets.QMainWindow):
 
     def _kb_event_cb(self, event):
         ''' listen for keyboard modifiers and keyboard events at runtime '''
-        from gremlin.keyboard import key_from_code, key_from_name
-
 
         key = gremlin.keyboard.KeyMap.from_event(event)
-        # key = key_from_code(
-        #         event.identifier[0],
-        #         event.identifier[1]
-        # )
-
 
         # ignore if we're running
-        if key is None or self.runner.is_running() or not (self.config.highlight_input or self.config.highlight_input_buttons):
-            # not listening or not enabled for highlighting
+        if key is None or self.runner.is_running() or gremlin.shared_state.ui_keyinput_suspended():
             return
         
 
 
-        valid_key = False
-        was_on = self._temp_input_axis_override
-        if key.lookup_name == "leftshift":
-            if event.is_pressed:
+        if (self.config.highlight_input or self.config.highlight_input_buttons):
+            if key.lookup_name == "leftshift":
+                if event.is_pressed:
+                    # temporarily force the listening to joystick axes changes
+                    self._set_joystick_input_highlighting(True)
+                    if not self._temp_input_axis_override:
+                        self._input_delay = 0 # eliminate delay in processing when triggering this so it switches immediately
+                        self._temp_input_axis_override = True
+                else:
+                    self._set_joystick_input_highlighting(self.config.highlight_input)
+                    self._temp_input_axis_override = False
+            
+            elif key.lookup_name == "leftcontrol":
                 # temporarily force the listening to joystick axes changes
-                self._set_joystick_input_highlighting(True)
-                if not self._temp_input_axis_override:
-                    self._input_delay = 0 # eliminate delay in processing when triggering this so it switches immediately
-                    self._temp_input_axis_override = True
-            else:
-                self._set_joystick_input_highlighting(self.config.highlight_input)
-                self._temp_input_axis_override = False
-            valid_key = True
-
-        elif key.lookup_name == "leftcontrol":
-            # temporarily force the listening to joystick axes changes
-            self._temp_input_axis_only_override = event.is_pressed
-            valid_key = True
-
-
-        # if valid_key:
-        #     if self._temp_input_axis_override:
-        #         if self._temp_input_axis_only_override:
-        #             syslog.debug("Override listen to joystick input (exclusive): ON")
-        #         else:
-        #             syslog.debug("Override listen to joystick input: ON")
-        #     elif was_on:
-        #         syslog.debug("Override listen to joystick input: OFF")
-
-                
-        
-        
+                self._temp_input_axis_only_override = event.is_pressed
+            
+        if key.lookup_name == "f5":
+            # activate mode
+            self.ui.actionActivate.trigger()
             
     @property
     def input_axis_override(self):
