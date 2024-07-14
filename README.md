@@ -425,6 +425,9 @@ Commands are available in the VjoyRemap plugin when bound to a joystick button a
 
 GremlinEx has multiple options to automate the loading and activation of profiles based on what process has the current focus (meaning, the active window).
 
+
+![](gremlin_ex_profile_options.png)
+
 <!-- TOC --><a name="automatic-activation"></a>
 ## Automatic activation
 
