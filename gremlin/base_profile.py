@@ -1081,9 +1081,15 @@ class Profile():
         self.settings = Settings(self)
         self.parent = parent
         self._profile_fname = None # the file name of this profile
+        self._profile_name = None # the friendly name of this profile
         self._start_mode = None # startup mode for this profile
         self._last_mode = None # last active mode
         self._restore_last_mode = False # True if the profile should start with the last active mode (profile specific)
+        
+
+    @property
+    def name(self):
+        return self._profile_name
 
     def initialize_joystick_device(self, device, modes):
         """Ensures a joystick is properly initialized in the profile.
@@ -1359,6 +1365,9 @@ class Profile():
             self._start_mode = self.get_default_mode()
 
         self._profile_fname = fname
+
+        name, _ = os.path.splitext(os.path.basename(fname))
+        self._profile_name = name
 
         return profile_was_updated
     
@@ -2270,6 +2279,8 @@ class ProfileMapItem():
         self._default_mode = None
         self._restore_mode = False
         self._index = -1
+        self._warning = None
+        self._valid = True # assume valid
         self._update()
 
     @property
@@ -2277,6 +2288,9 @@ class ProfileMapItem():
         return self._profile if self._profile else ""
     @profile.setter
     def profile(self, value):
+        if value:
+            # uniformly store paths
+            value = value.replace("\\","/").lower().strip()
         self._profile = value
 
     @property
@@ -2285,6 +2299,9 @@ class ProfileMapItem():
 
     @process.setter
     def process(self, value):
+        if value:
+            # uniformly store paths
+            value = value.replace("\\","/").lower().strip()
         self._process = value
 
     @property
@@ -2305,7 +2322,6 @@ class ProfileMapItem():
     
     @restore_mode.setter
     def restore_mode(self, value):
-        assert isinstance(value, bool)
         self._restore_mode = value
 
     @property
@@ -2315,12 +2331,11 @@ class ProfileMapItem():
     
     @default_mode.setter
     def default_mode(self, value):
-        assert isinstance(value, str)
         self._default_mode = value
 
     def get_profile_modes(self):
         ''' gets the list of profile modes in a given profile 
-        :returns tuple (mode_list, default_mode)
+        :returns tuple (mode_list, default_mode, restore_mode_flag)
         '''
 
         mode_set = set()
@@ -2424,7 +2439,20 @@ class ProfileMapItem():
     def _update(self):
         self._modes, self._default_mode, self._restore_mode = self.get_profile_modes()
 
-            
+    @property
+    def valid(self):
+        return self._valid
+    
+    @valid.setter
+    def valid(self, value):
+        self._valid = value
+
+    @property
+    def warning(self):
+        return self._warning
+    @warning.setter
+    def warning(self, value):
+        self._warning = value
 
 @SingletonDecorator
 class ProfileMap():
@@ -2433,6 +2461,7 @@ class ProfileMap():
     def __init__(self):
         self._items = [] # list of items 
         self._process_map = {} # mapps process to ProcessMapItem
+        self._valid = True
         self.load_profile_map() # load the existing map
 
     def get_profile_map_file(self):
@@ -2453,6 +2482,9 @@ class ProfileMap():
                     process = element.get("process")
                     profile = element.get("profile")
                     item = gremlin.base_profile.ProfileMapItem(profile, process)
+                    if "startup_mode" in element.attrib:
+                        mode = element.get("startup_mode")
+                        item.default_mode = mode
                     self._items.append(item)
                     if verbose:
                         logging.getLogger("system").info(f"PROC MAP: Registered mapping: {process} -> {profile}")
@@ -2462,14 +2494,17 @@ class ProfileMap():
 
     def save_profile_map(self):
         ''' saves the profile configuration '''
+        self.validate()
         fname = self.get_profile_map_file()
         if os.path.isfile(fname):
             # blitz
             os.unlink(fname)
-
+        
         root = etree.Element("mappings")
         for item in self._items:
-            e_map = etree.SubElement(root,"map", profile = item.profile, process = item.process)
+            if item.valid:
+                # print (f"Saving item: process: {item.process} profile: {item.profile}")
+                etree.SubElement(root,"map", profile = item.profile, process = item.process, startup_mode = item.default_mode)
 
         try:    
             # save the file
@@ -2494,6 +2529,7 @@ class ProfileMap():
     
     def get_map(self, process) -> ProfileMapItem:
         ''' returns the gremlin profile '''
+        process = process.replace("\\","/").lower().strip()
         if process in self._process_map.keys():
             return self._process_map[process]
         return None
@@ -2505,6 +2541,15 @@ class ProfileMap():
         for item in item_list:
             self._process_map[item.process] = item
 
+    def sort_profile(self):
+        ''' sorts the items by profile '''
+        self._items.sort(key = lambda x: (os.path.basename(x.profile), os.path.basename(x.process)))
+
+    def sort_process(self):
+        ''' sorts items by process'''
+        self._items.sort(key = lambda x: (os.path.basename(x.process), os.path.basename(x.profile)))
+
+
 
     def get_process_list(self):
         ''' gets a list of mapped processes '''
@@ -2513,3 +2558,47 @@ class ProfileMap():
     def items(self):
         ''' gets a list of registered process to profile map items'''
         return self._items
+    
+    def remove(self, item):
+        ''' removes a mapping '''
+        if item in self._items:
+            self._items.remove(item)
+
+    def validate(self):
+        ''' validates the mappings '''
+        
+        # validate the processes are unique
+        process_list = []
+        self._valid = True # assume valid
+        item : ProfileMapItem
+        for item in self._items:
+            valid = True
+            warning = None
+            if item.process in process_list:
+                valid = False
+                warning = f"Process '{os.path.basename(item.process)}' is duplicated - a process can only have one mapping."
+                self._valid = False
+            else:
+                process_list.append(item.process)
+
+            if not (item.process or item.profile):
+                valid = False
+                warning = f"Mapping incomplete"
+                self._valid = False
+
+            mode_list, _, _= item.get_profile_modes()
+            if not item.default_mode in mode_list:
+                valid = False
+                warning = f"Startup mode does not exist for this profile"
+                self._valid = False
+
+            # print (f"Validation: Item process: {item.process} profile: {item.profile} valid: {valid}")
+            item.valid = valid
+            item.warning = warning
+
+    @property
+    def valid(self):
+        return self._valid
+
+            
+            

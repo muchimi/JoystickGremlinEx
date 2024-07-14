@@ -133,7 +133,26 @@ class Configuration:
         if fname:
             return self.get_last_mode(fname)
         return None
+    
+    @property
+    def initial_load_mode_tts(self):
+        ''' if set, JGEX outputs a verbal readout of the current mode on profile load '''
+        return self._data.get("initial_load_mode_tts", True)
+    
+    @initial_load_mode_tts.setter
+    def initial_load_mode_tts(self, value):
+        self._data["initial_load_mode_tts"] = value
+        self.save()
 
+    @property
+    def reset_mode_on_process_activate(self):
+        ''' if set, the mode is reset when the process is reactivated to the default mode '''
+        return self._data.get("reset_mode_on_process_activate", False)
+    
+    @reset_mode_on_process_activate.setter
+    def reset_mode_on_process_activate(self, value):
+        self._data["reset_mode_on_process_activate"] = value
+        self.save()
 
     def set_calibration(self, dev_id, limits):
         """Sets the calibration data for all axes of a device.
@@ -170,6 +189,24 @@ class Configuration:
             return [-32768, 0, 32767]
 
         return self._data["calibration"][identifier][axis_name]
+    
+
+    @property
+    def last_options_tab(self):
+        ''' index of the last option tab selected'''
+        key = "last_options_tab"
+        if key in self._data.keys():
+            index = self._data[key]
+        else:
+            index = 0
+        return index
+    
+    @last_options_tab.setter
+    def last_options_tab(self, value):
+        self._data["last_options_tab"] = value
+        self.save()
+    
+
 
     def get_executable_list(self):
         """Returns a list of all executables with associated profiles.
@@ -360,9 +397,9 @@ class Configuration:
         :param value Flag indicating whether or not to enable / disable the
             feature
         """
-        if type(value) == bool:
-            self._data["keep_last_autoload"] = value
-            self.save()
+        assert isinstance(value, bool)
+        self._data["keep_last_autoload"] = value
+        self.save()
 
     
     @property

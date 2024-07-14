@@ -95,6 +95,7 @@ _vk_key_scan_ex = _create_function(
  
 
 
+
 class Key():
 
     """Represents a single key on the keyboard or mouse together with its different representations and latching (multiple keys) 
@@ -858,7 +859,11 @@ class KeyMap:
             virtual_code = _map_virtual_key_ex(value, 3, _get_keyboard_layout(0))
             return virtual_code
         return None
-
+    
+    @staticmethod
+    def virtual_code_to_scan_code(virtual_code):
+        scan_code = _map_virtual_key_ex(virtual_code, 4,_get_keyboard_layout(0))
+        return scan_code
 
     @staticmethod
     def virtual_input_to_unicode(virtual_code, scan_code = 0):

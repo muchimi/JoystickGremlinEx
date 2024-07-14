@@ -22,6 +22,7 @@ import time
 import queue
 from threading import Thread, Timer
 import gremlin.code_runner
+import gremlin.keyboard
 import gremlin.threading
 
 from PySide6 import QtCore, QtWidgets
@@ -29,8 +30,6 @@ from PySide6 import QtCore, QtWidgets
 import dinput
 import gremlin.config
 from gremlin.input_types import InputType
-import gremlin.keyboard
-import gremlin.keyboard
 import gremlin.shared_state
 import gremlin.shared_state
 from gremlin.singleton_decorator import SingletonDecorator
@@ -38,7 +37,7 @@ import gremlin.ui
 import gremlin.util
 from . import config, error, joystick_handling, windows_event_hook
 
-from gremlin.keyboard import Key
+from gremlin.keyboard import Key, KeyMap
 
 
 
@@ -162,7 +161,7 @@ class Event:
 		if self.event_type == InputType.Mouse:
 			return f"Event: Mouse - button {self.identifier} pressed: {self.is_pressed}"
 		elif self.event_type == InputType.Keyboard:
-			return f"Event: Keyboard - scan code, extended : {self.identifier}  vk: {self.virtual_code}  pressed: {self.is_pressed}"
+			return f"Event: Keyboard - scan code, extended : {self.identifier}  vk: {self.virtual_code} (0x{self.virtual_code:X}) pressed: {self.is_pressed}"
 		elif self.event_type == InputType.JoystickAxis or self.is_axis:
 			return f"Event: Axis : {self.identifier} raw value: {self.raw_value} value: {self.value}"
 		elif self.event_type == InputType.JoystickButton:
@@ -594,6 +593,10 @@ class EventHandler(QtCore.QObject):
 
 	# Signal emitted when the mode is changed
 	mode_changed = QtCore.Signal(str)
+
+	# signal emitted when the profile is changed
+	profile_changed = QtCore.Signal(str)
+
 	# Signal emitted when the application is pause / resumed
 	is_active = QtCore.Signal(bool)
 
@@ -662,6 +665,7 @@ class EventHandler(QtCore.QObject):
 		"""
 		import gremlin.config
 		import gremlin.ui.keyboard_device
+		import win32con
 		
 		if event:
 			if event.event_type in (InputType.Keyboard, InputType.KeyboardLatched):
@@ -679,19 +683,51 @@ class EventHandler(QtCore.QObject):
 
 				for key in key_list:
  					# the events will arrive as keyboard events - in any order - this makes sure latching is checked regardless of the order of key presses
+					 
+					
 					virtual_code = key.virtual_code
-					index = virtual_code if virtual_code > 0 else key.index_tuple()
+					keyid = key.index_tuple() # use the scan code for now
+					#index = virtual_code if virtual_code > 0 else keyid
+					index = keyid
+					index_list = [index]
+					
+					# translate the keys that have the same scan code
+					# scan_code = key.scan_code
+					# if virtual_code > 0:
+					# 	# other_scan_code = KeyMap.virtual_code_to_scan_code(virtual_code)
+					# 	if virtual_code in (win32con.VK_NUMPAD0,
+					# 	  					win32con.VK_NUMPAD1,
+					# 						win32con.VK_NUMPAD2,
+					# 						win32con.VK_NUMPAD3,
+					# 						win32con.VK_NUMPAD4,
+					# 						win32con.VK_NUMPAD5,
+					# 						win32con.VK_NUMPAD6,
+					# 						win32con.VK_NUMPAD7,
+					# 						win32con.VK_NUMPAD8,
+					# 						win32con.VK_NUMPAD9):
+					# 		keyid_ex = (key.scan_code, not key.is_extended)
+					# 		index_list.append(keyid_ex)
+					# 		print (f"Dual function scancode found: Adding secondary keyID: {keyid_ex}")
+						   
+						# other_vk = KeyMap.scan_code_to_virtual_code(scan_code, not key.is_extended)
+						# if other_vk != virtual_code:
+						# 	# add the second virtual key as a match
+						# 	index_list.append(other_vk)
+						# 	print (f"Adding secondary vk: {other_vk} (0x{other_vk:X}) for {virtual_code} (0x{virtual_code:X})")
+
+
 						
 					if device_guid not in self.latched_events.keys():
 						self.latched_events[device_guid] = {}
 				
 					if mode not in self.latched_events[device_guid].keys():
 						self.latched_events[device_guid][mode] = {}
-					if index not in self.latched_events[device_guid][mode].keys():
-						self.latched_events[device_guid][mode][index] = []
-					self.latched_events[device_guid][mode][index].append(identifier)
-					if verbose:
-						logging.getLogger("system").info(f"Key latch registered by guid {device_guid}  mode: {mode} index: {index} name: {key.name} -> {identifier.display_name}")
+					for index in index_list:
+						if index not in self.latched_events[device_guid][mode].keys():
+							self.latched_events[device_guid][mode][index] = []
+						self.latched_events[device_guid][mode][index].append(identifier)
+						if verbose:
+							logging.getLogger("system").info(f"Key latch registered by guid {device_guid}  mode: {mode} vk: {virtual_code} (0x{virtual_code:X}) keyId: {index} name: {key.name} -> {identifier.display_name}")
 					
 
 				if device_guid not in self.latched_callbacks.keys():
@@ -751,6 +787,7 @@ class EventHandler(QtCore.QObject):
 			# not a keyboard event
 			return []
 		import gremlin.config
+		import win32con
 		virtual_code = 0
 		
 		# convert mouse events to keyboard event
@@ -766,7 +803,8 @@ class EventHandler(QtCore.QObject):
 				logging.getLogger("system").info(f"matching mouse event {event.identifier} to {event.identifier}")
 		else:
 			device_guid = event.device_guid
-			index = event.virtual_code if event.virtual_code > 0 else event.identifier  # this is (scan_code, is_extended)
+			# index = event.virtual_code if event.virtual_code > 0 else event.identifier  # this is (scan_code, is_extended)
+			index = event.identifier
 
 		#event_key = Key(scan_code = identifier[0], is_extended = identifier[1], is_mouse = is_mouse, virtual_code= virtual_code)
 		input_items = []
@@ -783,13 +821,18 @@ class EventHandler(QtCore.QObject):
 				#print (f"found mode {self._active_mode}")
 				data = data[self._active_mode]
 				matching_keys = []
-				if virtual_code > 0:
-					if virtual_code in data.keys():
-						matching_keys = data[virtual_code]
-				else:
-					if index in data.keys():
-						#print ("found identifier")
-						matching_keys = data[index]
+				# if virtual_code > 0:
+				# 	if virtual_code in data.keys():
+				# 		matching_keys = data[virtual_code]
+				# else:
+				if index in data.keys():
+					#print ("found identifier")
+					matching_keys = data[index]
+				if not matching_keys:
+					index_ex = (index[0], not index[1])
+					if index_ex in data.keys():
+						matching_keys = data[index_ex]
+
 				for input_item in matching_keys:
 					key = input_item.key
 					input_items.append(input_item)
@@ -843,17 +886,31 @@ class EventHandler(QtCore.QObject):
 			# Recurse until we've dealt with all modes
 			self.build_event_lookup(children)
 
+	def change_profile(self, new_profile):
+		''' requests a profile load '''
+		if new_profile != gremlin.shared_state.current_profile:
+			self.profile_change.emit(new_profile)
+
 	def change_mode(self, new_mode):
 		"""Changes the currently active mode.
 
 		:param new_mode the new mode to use
 		"""
 
-		logging.getLogger("system").debug(f"EVENT: change mode to [{new_mode}] requested")
-		mode_exists = False
-		for device in self.callbacks.values():
-			if new_mode in device:
-				mode_exists = True
+		current_profile = gremlin.shared_state.current_profile
+		if new_mode == gremlin.shared_state.current_mode:
+			# already in this mode
+			return
+
+		logging.getLogger("system").debug(f"EVENT: change mode to [{new_mode}] requested - profile '{current_profile.name}")
+
+		mode_exists = new_mode in current_profile.get_modes()
+
+		
+		if not mode_exists:
+			for device in self.callbacks.values():
+				if new_mode in device:
+					mode_exists = True
 
 		if not mode_exists:
 			for device in self.osc_callbacks.values():
@@ -875,18 +932,20 @@ class EventHandler(QtCore.QObject):
 			# verbose = gremlin.config.Configuration().verbose
 			# if verbose:
 			logging.getLogger("system").warning(
-				f"The mode \"{new_mode}\" does not exist or has no associated callbacks"
+				f"The mode \"{new_mode}\" does not exist or has no associated callbacks - profile '{current_profile.name}'"
 			)
 			return
+		
+
 
 		
 		if self._active_mode != new_mode:
 			self._previous_mode = self._active_mode
 			# remember the last mode for this profile
-			gremlin.shared_state.current_profile.set_last_mode(self._active_mode)
+			current_profile.set_last_mode(self._active_mode)
 
 
-		logging.getLogger("system").debug(f"Mode switch to: {new_mode}")
+		logging.getLogger("system").debug(f"Mode switch to: {new_mode}  Profile: {current_profile.name}")
 
 		self._active_mode = new_mode
 		self.mode_changed.emit(self._active_mode)

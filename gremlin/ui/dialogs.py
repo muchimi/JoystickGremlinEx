@@ -44,6 +44,8 @@ class OptionsUi(ui_common.BaseDialogUi):
 
     """UI allowing the configuration of a variety of options."""
 
+    queue_refresh = QtCore.Signal() # refresh request
+
     def __init__(self, parent=None):
         """Creates a new options UI instance.
 
@@ -57,18 +59,76 @@ class OptionsUi(ui_common.BaseDialogUi):
 
         self.setWindowTitle("Options")
 
-        self.main_layout = QtWidgets.QVBoxLayout(self)
+        self.main_layout = QtWidgets.QGridLayout(self)
         self.tab_container = QtWidgets.QTabWidget()
-        self.main_layout.addWidget(self.tab_container)
-
+        self.main_layout.addWidget(self.tab_container,0,0)
+        
+        self.closed.connect(self._save_on_close_cb)
+        
         self._create_general_page()
         self._create_profile_page()
         self._create_hidguardian_page()
 
+        # closing bar
+        close_button = QtWidgets.QPushButton("Close")
+        close_button.clicked.connect(self.close)
+        self.main_layout.addWidget(close_button,1,0)
+
+        # select the last used tab
+        index = self.config.last_options_tab
+        if index != self.tab_container.currentIndex():
+            self.tab_container.setCurrentIndex(index)
+
+        self.queue_refresh.connect(self.populate_map)
+
+        self.tab_container.currentChanged.connect(self._tab_changed_cb)
+
+    def confirmClose(self, event):        
+        ''' override ability to close '''
+        self._profile_mapper.validate()
+        if self._profile_mapper.valid:
+            event.accept()
+        else:
+            
+            # set the tab to the proper item
+
+            # update the map with the errors
+            self.populate_map()
+
+            index = 1 # profile tab
+            if index != self.tab_container.currentIndex():
+                self.tab_container.setCurrentIndex(index)
+            # display a message box 
+            message_box = QtWidgets.QMessageBox()
+            message_box.setIcon(QtWidgets.QMessageBox.Icon.Warning)
+            message_box.setText("Configuration Error")
+            message_box.setInformativeText("The configuration is invalid.<br/>Press cancel to return,<br>or discard to remove the invalid entries.")
+            message_box.setStandardButtons(
+                QtWidgets.QMessageBox.StandardButton.Cancel | 
+                QtWidgets.QMessageBox.StandardButton.Discard 
+            )
+            result = message_box.exec()
+            if result == QtWidgets.QMessageBox.StandardButton.Discard:
+                event.accept()
+            else:
+                event.ignore()
+
+            
+
+    def _save_on_close_cb(self):
+        ''' occurs when the dialog is closed - autosave '''
+        self._save_map_cb()
+
+    def _tab_changed_cb(self, new_index):
+        ''' occurs on tab change, save the last used tab index so we can restore it later '''
+        self.config.last_options_tab = new_index
+
+
     def _create_general_page(self):
         """Creates the general options page."""
         self.general_page = QtWidgets.QWidget()
-        self.general_layout = QtWidgets.QVBoxLayout(self.general_page)
+        self.general_layout = QtWidgets.QVBoxLayout()
+        self.general_page.setLayout(self.general_layout)
 
         # Highlight input option
         self.highlight_input = QtWidgets.QCheckBox(
@@ -85,36 +145,15 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.highlight_input_buttons.setChecked(self.config.highlight_input_buttons)
 
         # Switch to highlighted device
-        self.highlight_device = QtWidgets.QCheckBox(
-            "Highlight swaps device tabs"
-        )
+        self.highlight_device = QtWidgets.QCheckBox("Highlight swaps device tabs")
         self.highlight_device.clicked.connect(self._highlight_device)
         self.highlight_device.setChecked(self.config.highlight_device)
 
         # Close to system tray option
-        self.close_to_systray = QtWidgets.QCheckBox(
-            "Closing minimizes to system tray"
-        )
+        self.close_to_systray = QtWidgets.QCheckBox("Closing minimizes to system tray")
         self.close_to_systray.clicked.connect(self._close_to_systray)
         self.close_to_systray.setChecked(self.config.close_to_tray)
 
-        # Activate profile on launch
-        self.activate_on_launch = QtWidgets.QCheckBox(
-            "Activate profile on launch"
-        )
-        self.activate_on_launch.clicked.connect(self._activate_on_launch)
-        self.activate_on_launch.setChecked(self.config.activate_on_launch)
-        self.activate_on_launch.setToolTip("When set, the last loaded profile will be automatically activated when GremlinEx starts.")
-
-        # Restore last mode on profile activate
-        self.activate_restore_mode = QtWidgets.QCheckBox(
-            "Restore last used mode on profile activation"
-        )
-        self.activate_restore_mode.clicked.connect(self._restore_profile_mode)
-        self.activate_restore_mode.setChecked(self.config.restore_profile_mode_on_start)
-        self.activate_restore_mode.setToolTip("""When set, all profiles loaded will revert to the last active mode used for that profile.  This is a global setting.
-This setting is also available on a profile by profile basis on the profile tab, or in the modes editor.                                              
-                                              """)
 
         # Start minimized option
         self.start_minimized = QtWidgets.QCheckBox(
@@ -196,7 +235,8 @@ This setting is also available on a profile by profile basis on the profile tab,
         self.show_mode_change_message.setChecked(self.config.mode_change_message)
 
         # remote control section
-        self.remote_control_layout = QtWidgets.QHBoxLayout()
+        self.remote_control_widget = QtWidgets.QWidget()
+        self.remote_control_layout = QtWidgets.QHBoxLayout(self.remote_control_widget)
         self.remote_control_label = QtWidgets.QLabel("Remote control")
 
         self.enable_remote_control = QtWidgets.QCheckBox("Enable remote control")
@@ -204,7 +244,7 @@ This setting is also available on a profile by profile basis on the profile tab,
         self.enable_remote_control.clicked.connect(self._enable_remote_control)
         self.enable_remote_control.setToolTip("When set, Joystick Gremlin Ex will enable the remote control feature.  This allows this instance of JGEX to control the master instance on another network computer.")
 
-        
+
         self.enable_remote_broadcast = QtWidgets.QCheckBox("Enable broadcast")
         self.enable_remote_broadcast.setChecked(self.config.enable_remote_broadcast)
         self.enable_remote_broadcast.clicked.connect(self._enable_remote_broadcast)
@@ -217,14 +257,14 @@ This setting is also available on a profile by profile basis on the profile tab,
         self.enable_remote_control.setToolTip("When set, Joystick Gremlin Ex will voice a enable the remote control feature.  This allows JGEX to output an audio cue when the broadcast mode is changed, which can be changed by an action.")
 
         self.remote_control_label = QtWidgets.QLabel("Port:")
-        
+
         self.remote_control_port = QtWidgets.QDoubleSpinBox()
         self.remote_control_port.setRange(4096,65535)
         self.remote_control_port.setDecimals(0)
         self.remote_control_port.setValue(float(self.config.server_port))
         self.remote_control_port.valueChanged.connect(self._remote_control_server_port)
         self.remote_control_port.setToolTip("This specifies the UDP port used to communicate with other Joystick Gremlin Ex instances on the network.  The local firewall must allow the ports to broadcast.  The +1 port is used to receive messages.")
-        
+
 
         self.remote_control_layout.addWidget(self.enable_remote_control)
         self.remote_control_layout.addWidget(self.enable_remote_broadcast)
@@ -240,7 +280,10 @@ This setting is also available on a profile by profile basis on the profile tab,
 
 
         # Default action selection
+        self.default_action_widget = QtWidgets.QWidget()
         self.default_action_layout = QtWidgets.QHBoxLayout()
+        self.default_action_widget.setLayout(self.default_action_layout)
+
         self.default_action_label = QtWidgets.QLabel("Default action")
         self.default_action_dropdown = QtWidgets.QComboBox()
         self.default_action_layout.addWidget(self.default_action_label)
@@ -249,9 +292,10 @@ This setting is also available on a profile by profile basis on the profile tab,
         self.default_action_layout.addStretch()
 
         # Macro axis polling rate
-        self.macro_axis_polling_layout = QtWidgets.QHBoxLayout()
-        self.macro_axis_polling_label = \
-            QtWidgets.QLabel("Macro axis polling rate")
+        self.macro_axis_polling_widget = QtWidgets.QWidget()
+        self.macro_axis_polling_layout = QtWidgets.QHBoxLayout(self.macro_axis_polling_widget)
+
+        self.macro_axis_polling_label = QtWidgets.QLabel("Macro axis polling rate")
         self.macro_axis_polling_value = ui_common.DynamicDoubleSpinBox()
         self.macro_axis_polling_value.setRange(0.001, 1.0)
         self.macro_axis_polling_value.setSingleStep(0.05)
@@ -267,58 +311,54 @@ This setting is also available on a profile by profile basis on the profile tab,
         self.macro_axis_polling_layout.addStretch()
 
         # Macro axis minimum change value
-        self.macro_axis_minimum_change_layout = QtWidgets.QHBoxLayout()
-        self.macro_axis_minimum_change_label = \
-            QtWidgets.QLabel("Macro axis minimum change value")
+        self.macro_axis_minimum_change_widget = QtWidgets.QWidget()
+        self.macro_axis_minimum_change_layout = QtWidgets.QHBoxLayout(self.macro_axis_minimum_change_widget)
+        
+
+        self.macro_axis_minimum_change_label = QtWidgets.QLabel("Macro axis minimum change value")
         self.macro_axis_minimum_change_value = ui_common.DynamicDoubleSpinBox()
         self.macro_axis_minimum_change_value.setRange(0.00001, 1.0)
         self.macro_axis_minimum_change_value.setSingleStep(0.01)
         self.macro_axis_minimum_change_value.setDecimals(5)
-        self.macro_axis_minimum_change_value.setValue(
-            self.config.macro_axis_minimum_change_rate
-        )
-        self.macro_axis_minimum_change_value.valueChanged.connect(
-            self._macro_axis_minimum_change_value
-        )
-        self.macro_axis_minimum_change_layout.addWidget(
-            self.macro_axis_minimum_change_label
-        )
-        self.macro_axis_minimum_change_layout.addWidget(
-            self.macro_axis_minimum_change_value
-        )
+        self.macro_axis_minimum_change_value.setValue(self.config.macro_axis_minimum_change_rate)
+        self.macro_axis_minimum_change_value.valueChanged.connect(self._macro_axis_minimum_change_value)
+        self.macro_axis_minimum_change_layout.addWidget(self.macro_axis_minimum_change_label)
+        self.macro_axis_minimum_change_layout.addWidget(self.macro_axis_minimum_change_value)
         self.macro_axis_minimum_change_layout.addStretch()
 
+        
         self.general_layout.addWidget(self.highlight_input)
         self.general_layout.addWidget(self.highlight_input_buttons)
         self.general_layout.addWidget(self.highlight_device)
         self.general_layout.addWidget(self.close_to_systray)
-        self.general_layout.addWidget(self.activate_on_launch)
-        self.general_layout.addWidget(self.activate_restore_mode)
         self.general_layout.addWidget(self.start_minimized)
         self.general_layout.addWidget(self.start_with_windows)
         self.general_layout.addWidget(self.persist_clipboard)
         self.general_layout.addWidget(self.verbose_container_widget)
         self.general_layout.addWidget(self.midi_enabled)
+
         
         container = QtWidgets.QWidget()
-        layout = QtWidgets.QHBoxLayout()
-        container.setLayout(layout)
+        layout = QtWidgets.QHBoxLayout(container)
         layout.addWidget(self.osc_enabled)
         layout.addWidget(QtWidgets.QLabel("Listen port number (outbound is +1)"))
         layout.addWidget(self.osc_port)
         layout.addStretch()
         layout.setContentsMargins(0,0,0,0)
+        
+        
+
+
+        
         self.general_layout.addWidget(container)
-
         self.general_layout.addWidget(self.show_mode_change_message)
-
-        self.general_layout.addLayout(self.default_action_layout)
-        self.general_layout.addLayout(self.macro_axis_polling_layout)
-        self.general_layout.addLayout(self.macro_axis_minimum_change_layout)
-        self.general_layout.addLayout(self.remote_control_layout)
+        self.general_layout.addWidget(self.default_action_widget)
+        self.general_layout.addWidget(self.macro_axis_minimum_change_widget)
+        self.general_layout.addWidget(self.remote_control_widget)
         self.general_layout.addWidget(self.enable_broadcast_speech)
         self.general_layout.addStretch()
         self.tab_container.addTab(self.general_page, "General")
+
 
     def _create_profile_page(self):
         """Creates the profile options page."""
@@ -332,91 +372,65 @@ This setting is also available on a profile by profile basis on the profile tab,
         self._profile_map_mode_widgets = {}
 
         # Autoload profile option
-        self.autoload_checkbox = QtWidgets.QCheckBox(
-            "Automatically load profile based on current application"
-        )
-        self.autoload_checkbox.clicked.connect(self._autoload_profiles)
+        self.autoload_checkbox = QtWidgets.QCheckBox("Automatically load a mapped profile based on current application (process)")
+        self.autoload_checkbox.clicked.connect(self._autoload_mapped_profile)
         self.autoload_checkbox.setChecked(self.config.autoload_profiles)
+        self.autoload_checkbox.setToolTip("When set, GremlinEx will autoload and activate a mapped profile when in \"run\" mode")
 
-        self.keep_active_on_focus_lost_checkbox = QtWidgets.QCheckBox(
-            "Keep profile active on focus loss"
-        )
+        self.keep_active_on_focus_lost_checkbox = QtWidgets.QCheckBox("Keep profile active on focus loss")
         self.keep_active_on_focus_lost_checkbox.setToolTip("""If this option is set, the last active profile
 will remain active until a different profile is loaded.""")
-        
-        self.mode_restore_flag = QtWidgets.QCheckBox("Restore last mode on activation")
-        
-        
-        self.mode_restore_flag.clicked.connect(self._profile_restore_flag_cb)
-        self.mode_restore_flag.setToolTip("""When enabled, the last known active mode for this profile will be used when the profile is loaded or re-activated regardless of the default mode specified in the Modes Editor
-                                          
-The setting can be overriden by the global mode reload option set in Options for this profile.
-""")
-                                                    
-        self.keep_active_on_focus_lost_checkbox.clicked.connect(self._keep_last_autoload)
+        self.keep_active_on_focus_lost_checkbox.clicked.connect(self._keep_focus)
         self.keep_active_on_focus_lost_checkbox.setChecked(self.config.keep_profile_active_on_focus_loss)
         self.keep_active_on_focus_lost_checkbox.setEnabled(self.config.autoload_profiles)
-        self.mode_restore_flag.setChecked(gremlin.shared_state.current_profile.get_restore_mode())
+        self.keep_active_on_focus_lost_checkbox.setToolTip("When set, GremlinEx will keep the profile active when the target application loses focus (such as on alt-tab)")
 
 
+        # Activate profile on launch
+        self.activate_on_launch = QtWidgets.QCheckBox("Auto-Activate last profile on launch")
+        self.activate_on_launch.clicked.connect(self._activate_on_launch)
+        self.activate_on_launch.setChecked(self.config.activate_on_launch)
+        self.activate_on_launch.setToolTip("When set, the last used profile will be automatically activated when GremlinEx starts.")
 
-        # Executable dropdown list
-        self.executable_layout = QtWidgets.QHBoxLayout()
-        self.executable_label = QtWidgets.QLabel("Executable")
-        self.executable_selection = QtWidgets.QComboBox()
-        self.executable_selection.setMinimumWidth(300)
-        self.executable_selection.currentTextChanged.connect(
-            self._show_executable
-        )
-        self.executable_add = QtWidgets.QPushButton()
-        self.executable_add.setIcon(load_icon("gfx/button_add.png"))
-        self.executable_add.clicked.connect(self._new_executable)
-        self.executable_remove = QtWidgets.QPushButton()
-        self.executable_remove.setIcon(load_icon("gfx/button_delete.png"))
-        self.executable_remove.clicked.connect(self._remove_executable)
-        self.executable_edit = QtWidgets.QPushButton()
-        self.executable_edit.setIcon(load_icon("gfx/button_edit.png"))
-        self.executable_edit.clicked.connect(self._edit_executable)
-        self.executable_list = QtWidgets.QPushButton()
-        self.executable_list.setIcon(load_icon("gfx/list_show.png"))
-        self.executable_list.clicked.connect(self._list_executables)
+        # Restore last mode on profile activate
+        self.activate_restore_mode = QtWidgets.QCheckBox("Restore last used mode on profile activation (global)")
+        self.activate_restore_mode.clicked.connect(self._restore_profile_mode)
+        self.activate_restore_mode.setChecked(self.config.restore_profile_mode_on_start)
+        self.activate_restore_mode.setToolTip("""When set, activated profiles will use the last known mode the profile used. This is a global setting and overrides the per-profile option.
+This setting is also available on a profile by profile basis on the profile tab, or in the modes editor.""")
 
-        self.executable_layout.addWidget(self.executable_label)
-        self.executable_layout.addWidget(self.executable_selection)
-        self.executable_layout.addWidget(self.executable_add)
-        self.executable_layout.addWidget(self.executable_remove)
-        self.executable_layout.addWidget(self.executable_edit)
-        self.executable_layout.addWidget(self.executable_list)
-        self.executable_layout.addStretch()
+        self.initial_load_mode_tts = QtWidgets.QCheckBox("Say active mode on profile activation via TTS")
+        self.initial_load_mode_tts.setChecked(self.config.initial_load_mode_tts)
+        self.initial_load_mode_tts.clicked.connect(self._initial_load_mode_tts)
+        self.initial_load_mode_tts.setToolTip("""When set, GremlinEx will say that text-to-speech the profile mode whenever a profile is first loaded""")
 
-        self.profile_layout = QtWidgets.QHBoxLayout()
-        self.profile_field = QtWidgets.QLineEdit()
-        self.profile_field.textChanged.connect(self._update_profile)
-        self.profile_field.editingFinished.connect(self._update_profile)
-        self.profile_select = QtWidgets.QPushButton()
-        self.profile_select.setIcon(load_icon("gfx/button_edit.png"))
-        self.profile_select.clicked.connect(self._select_profile)
+        self.reset_mode_on_process_activate = QtWidgets.QCheckBox("Reset mode on process activation")
+        self.reset_mode_on_process_activate.setChecked(self.config.reset_mode_on_process_activate)
+        self.reset_mode_on_process_activate.clicked.connect(self._reset_mode_on_process_activate)
+        self.reset_mode_on_process_activate.setToolTip("If set, the profile mode will be reset to the startup mode whenever the application has the focus")
 
-        self.profile_layout.addWidget(self.profile_field)
-        self.profile_layout.addWidget(self.profile_select)
-
-        self.profile_page_layout.addWidget(self.autoload_checkbox,0,0)
-        self.profile_page_layout.addWidget(self.keep_active_on_focus_lost_checkbox,1,0)
-        
+        row = 0
+        self.profile_page_layout.addWidget(self.autoload_checkbox,row,0)
+        row+=1
+        self.profile_page_layout.addWidget(self.keep_active_on_focus_lost_checkbox,row,0)
+        row+=1
+        self.profile_page_layout.addWidget(self.activate_on_launch,row,0)
+        row+=1
+        self.profile_page_layout.addWidget(self.activate_restore_mode,row,0)
+        row+=1
+        self.profile_page_layout.addWidget(self.initial_load_mode_tts,row,0)
+        row+=1
+        self.profile_page_layout.addWidget(self.reset_mode_on_process_activate, row, 0)
+        row+=1
 
 
         self.tab_container.addTab(self.profile_page, "Profiles")
 
 
         # profile map widgets
-
         self.container_map_widget = QtWidgets.QWidget()
         self.container_map_layout = QtWidgets.QVBoxLayout()
         self.container_map_widget.setLayout(self.container_map_layout)
-        # self.container_map_widget.sizePolicy().setVerticalPolicy(QtWidgets.QSizePolicy.Policy.Expanding)
-
-        
-        
 
 
         self.scroll_area = QtWidgets.QScrollArea()
@@ -437,7 +451,7 @@ The setting can be overriden by the global mode reload option set in Options for
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setWidget(self.scroll_widget)
 
-        self.map_widget = QtWidgets.QWidget()    
+        self.map_widget = QtWidgets.QWidget()
         self.map_layout = QtWidgets.QGridLayout()
         self.map_layout.setContentsMargins(0,0,0,0)
         self.map_widget.setLayout(self.map_layout)
@@ -451,34 +465,37 @@ The setting can be overriden by the global mode reload option set in Options for
         container_bar_layout = QtWidgets.QHBoxLayout()
         container_bar_widget.setLayout(container_bar_layout)
 
-        container_footer_widget = QtWidgets.QWidget()
-        container_footer_layout = QtWidgets.QHBoxLayout()
-        container_footer_widget.setLayout(container_footer_layout)
+
+        sort_profile_widget = QtWidgets.QPushButton("Sort Profile")
+        sort_profile_widget.clicked.connect(self._sort_profile_cb)
+        sort_profile_widget.setToolTip("Sorts mappings by profile")
+
+        sort_process_widget = QtWidgets.QPushButton("Sort Process")
+        sort_process_widget.clicked.connect(self._sort_process_cb)
+        sort_process_widget.setToolTip("Sorts mappings by process")
 
         add_map_widget = QtWidgets.QPushButton("Add mapping")
         add_map_widget.setIcon(load_icon("gfx/button_add.png"))
         add_map_widget.clicked.connect(self._add_profile_map_cb)
+        add_map_widget.setToolTip("Adds a new application (process) to profile mapping entry")
 
-        save_map_widget = QtWidgets.QPushButton("Save")
-        save_map_widget.setIcon(load_icon("fa.save"))
-        save_map_widget.clicked.connect(self._save_map_cb)
-
-        self.profile_page_layout.addWidget(container_bar_widget, 3, 0)
-        container_bar_layout.addWidget(QtWidgets.QLabel("Profile to process map:"))
+        self.profile_page_layout.addWidget(container_bar_widget, row, 0)
+        row+=1
+        container_bar_layout.addWidget(QtWidgets.QLabel("Process/Profile map:"))
         container_bar_layout.addStretch()
+
+        container_bar_layout.addWidget(sort_profile_widget)
+        container_bar_layout.addWidget(sort_process_widget)
         container_bar_layout.addWidget(add_map_widget)
 
-        container_footer_layout.addStretch()
-        container_footer_layout.addWidget(save_map_widget)
 
-        self.profile_page_layout.addWidget(container_bar_widget, 4, 0 )
-        self.profile_page_layout.addWidget(self.container_map_widget, 5, 0)
-        self.profile_page_layout.addWidget(container_footer_widget, 6, 0)
-        # self.profile_page_layout.addStretch()
+        self.profile_page_layout.addWidget(container_bar_widget, row, 0 )
+        row+=1
+        self.profile_page_layout.addWidget(self.container_map_widget, row, 0)
+        row+=1
 
-        self.populate_executables()
-
-        
+        # force a data reload
+        self._profile_mapper.load_profile_map()
         self.populate_map()
 
 
@@ -527,9 +544,7 @@ The setting can be overriden by the global mode reload option set in Options for
                 # Set checkbox state based on whether or not HidGuardian tracks
                 # the device. Add a callback with pid/vid to add / remove said
                 # device from the list of devices handled by HidGuardian
-                self.hg_device_layout.addWidget(
-                    QtWidgets.QLabel(dev.name), i+1, 0
-                )
+                self.hg_device_layout.addWidget(QtWidgets.QLabel(dev.name), i+1, 0)
                 checkbox = QtWidgets.QCheckBox("")
                 checkbox.setChecked(vid_pid_key in hg_device_list)
                 checkbox.stateChanged.connect(self._create_hg_cb(dev))
@@ -561,86 +576,85 @@ The setting can be overriden by the global mode reload option set in Options for
         self.config.save()
         super().closeEvent(event)
 
-    def populate_executables(self, executable_name=None):
-        """Populates the profile drop down menu.
+    # def populate_executables(self, executable_name=None):
+    #     """Populates the profile drop down menu.
 
-        :param executable_name name of the executable to pre select
-        """
-        self.profile_field.textChanged.disconnect(self._update_profile)
-        self.executable_selection.clear()
-        executable_list = self.config.get_executable_list()
-        for path in executable_list:
-            self.executable_selection.addItem(path)
-        self.profile_field.textChanged.connect(self._update_profile)
+    #     :param executable_name name of the executable to pre select
+    #     """
+    #     self.profile_field.textChanged.disconnect(self._update_profile)
+    #     self.executable_selection.clear()
+    #     executable_list = self.config.get_executable_list()
+    #     for path in executable_list:
+    #         self.executable_selection.addItem(path)
+    #     self.profile_field.textChanged.connect(self._update_profile)
 
-        # Select the provided executable if it exists, otherwise the first one
-        # in the list
-        index = 0
-        if executable_name is not None and executable_name in executable_list:
-            index = self.executable_selection.findText(executable_name)
-        self.executable_selection.setCurrentIndex(index)
+    #     # Select the provided executable if it exists, otherwise the first one
+    #     # in the list
+    #     index = 0
+    #     if executable_name is not None and executable_name in executable_list:
+    #         index = self.executable_selection.findText(executable_name)
+    #     self.executable_selection.setCurrentIndex(index)
 
-    def _profile_restore_flag_cb(self, clicked):
-        ''' called when the restore last mode checked state is changed '''
-        self.config.current_profile.set_restore_mode(clicked)
+    # def _profile_restore_flag_cb(self, checked):
+    #     ''' called when the restore last mode checked state is changed '''
+    #     self.config.current_profile.set_restore_mode(checked)
 
-    def _autoload_profiles(self, clicked):
+    def _autoload_mapped_profile(self, checked):
         """Stores profile autoloading preference.
 
         :param clicked whether or not the checkbox is ticked
         """
-        self.keep_active_on_focus_lost_checkbox.setEnabled(clicked)
-        self.config.autoload_profiles = clicked
-        self.config.save()
+        self.keep_active_on_focus_lost_checkbox.setEnabled(checked)
+        self.config.autoload_profiles = checked
 
-    def _keep_last_autoload(self, clicked):
-        """Stores keep last autoload preference.
 
-        :param clicked whether or not the checkbox is ticked
-        """
-        self.config.keep_last_autoload = clicked
-        self.config.save()
+    def _keep_focus(self, checked):
+        self.config.keep_profile_active_on_focus_loss = checked
 
-    def _activate_on_launch(self, clicked):
-        """Stores activation of profile on launch preference.
 
-        :param clicked whether or not the checkbox is ticked
-        """
-        self.config.activate_on_launch = clicked
-        self.config.save()
+    def _activate_on_launch(self, checked):
+        self.config.activate_on_launch = checked
 
-    def _restore_profile_mode(self, clicked):
-        self.config.restore_profile_mode_on_start = clicked
-        self.config.save()
 
-    def _close_to_systray(self, clicked):
+    def _restore_profile_mode(self, checked):
+        self.config.restore_profile_mode_on_start = checked
+
+
+    def _initial_load_mode_tts(self, checked):
+        self.config.initial_load_mode_tts = checked
+
+    def _reset_mode_on_process_activate(self, checked):
+        self.config.reset_mode_on_process_activate = checked
+
+
+    def _close_to_systray(self, checked):
         """Stores closing to system tray preference.
 
         :param clicked whether or not the checkbox is ticked
         """
-        self.config.close_to_tray = clicked
-        self.config.save()
+        self.config.close_to_tray = checked
 
-    def _start_minimized(self, clicked):
+
+    def _start_minimized(self, checked):
         """Stores start minimized preference.
 
         :param clicked whether or not the checkbox is ticked
         """
-        self.config.start_minimized = clicked
-        
+        self.config.start_minimized = checked
 
-    def _persist_clipboard(self, clicked):
-        self.config.persist_clipboard = clicked
-        
+
+    def _persist_clipboard(self, checked):
+        self.config.persist_clipboard = checked
+
 
     def _persist_clipboard_enabled(self):
         return self.config.persist_clipboard
-    
-    def _verbose_cb(self, clicked):
+
+    def _verbose_cb(self, checked):
         ''' stores verbose setting '''
-        self.config.verbose = clicked
+        self.config.verbose = checked
         for widget in self._verbose_mode_widgets.values():
-            widget.setEnabled(clicked)
+            widget.setEnabled(checked)
 
     def _verbose_set_cb(self):
         # is_checked = self._verbose_mode_widgets[mode].isChecked()
@@ -649,26 +663,26 @@ The setting can be overriden by the global mode reload option set in Options for
         is_checked = widget.isChecked()
         self.config.verbose_set_mode(mode, is_checked)
 
-    def _midi_enabled(self, clicked):
-        self.config.midi_enabled = clicked
-        
+    def _midi_enabled(self, checked):
+        self.config.midi_enabled = checked
 
-    def _osc_enabled(self, clicked):
-        self.config.osc_enabled = clicked
-        self.osc_port.setEnabled(clicked)
-        
+
+    def _osc_enabled(self, checked):
+        self.config.osc_enabled = checked
+        self.osc_port.setEnabled(checked)
+
 
     def _osc_port(self):
         self.config.osc_port = self.osc_port.value()
-        
 
 
-    def _start_windows(self, clicked):
+
+    def _start_windows(self, checked):
         """Set registry entry to launch Joystick Gremlin on login.
 
         :param clicked True if launch should happen on login, False otherwise
         """
-        if clicked:
+        if checked:
             path = os.path.abspath(sys.argv[0])
             subprocess.run(
                 f'reg add "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run" /V "Joystick Gremlin" /t REG_SZ /F /D "{path}"'
@@ -695,7 +709,7 @@ The setting can be overriden by the global mode reload option set in Options for
             if value_info[0] == "Joystick Gremlin":
                 return True
         return False
-    
+
 
 
 
@@ -715,7 +729,7 @@ The setting can be overriden by the global mode reload option set in Options for
         self.config.highlight_input_buttons = clicked
         self.config.save()
 
-        
+
 
 
     def _highlight_device(self, clicked):
@@ -725,66 +739,6 @@ The setting can be overriden by the global mode reload option set in Options for
         """
         self.config.highlight_device = clicked
         self.config.save()
-
-    def _list_executables(self):
-        """Shows a list of executables for the user to pick."""
-        self.executable_dialog = ProcessWindow()
-        self.executable_dialog.process_selected.connect(self._add_executable)
-        self.executable_dialog.show()
-
-    def _add_executable(self, fname):
-        """Adds the provided executable to the list of configurations.
-
-        :param fname the executable for which to add a mapping
-        """
-        if fname not in self.config.get_executable_list():
-            self.config.set_profile(fname, "")
-            self.populate_executables(fname)
-        else:
-            self.executable_selection.setCurrentIndex(
-                self.executable_selection.findText(fname)
-            )
-
-    def _edit_executable(self):
-        """Allows editing the path of an executable."""
-        new_text, flag = QtWidgets.QInputDialog.getText(
-            self,
-            "Change Executable / RegExp",
-            "Change the executable text or enter a regular expression to use.",
-            QtWidgets.QLineEdit.Normal,
-            self.executable_selection.currentText()
-        )
-
-        # If the user did click on ok update the entry
-        old_entry = self.executable_selection.currentText()
-        if flag:
-            if old_entry not in self.config.get_executable_list():
-                self._add_executable(new_text)
-            else:
-                self.config.set_profile(
-                    new_text,
-                    self.config.get_profile(old_entry)
-                )
-                self.config.remove_profile(old_entry)
-                self.populate_executables(new_text)
-
-    def _new_executable(self):
-        """Prompts the user to select a new executable to add to the
-        profile.
-        """
-        fname, _ = QtWidgets.QFileDialog.getOpenFileName(
-            None,
-            "Path to executable",
-            "C:\\",
-            "Executable (*.exe)"
-        )
-        if fname != "":
-            self._add_executable(fname)
-
-    def _remove_executable(self):
-        """Removes the current executable from the configuration."""
-        self.config.remove_profile(self.executable_selection.currentText())
-        self.populate_executables()
 
     def _select_profile(self):
         """Displays a file selection dialog for a profile.
@@ -804,6 +758,8 @@ The setting can be overriden by the global mode reload option set in Options for
                 self.executable_selection.currentText(),
                 self.profile_field.text()
             )
+
+            self.queue_refresh.emit()
 
     def _show_executable(self, exec_path):
         """Displays the profile associated with the given executable.
@@ -846,12 +802,12 @@ The setting can be overriden by the global mode reload option set in Options for
         self.config.save()
 
 
-    def _enable_remote_control(self, clicked):        
+    def _enable_remote_control(self, clicked):
         ''' updates remote control flag '''
         self.config.enable_remote_control = clicked
         self.config.save()
 
-    def _enable_remote_broadcast(self, clicked):        
+    def _enable_remote_broadcast(self, clicked):
         ''' updates remote broadcast flag '''
         self.config.enable_remote_broadcast = clicked
         self.config.save()
@@ -890,8 +846,16 @@ The setting can be overriden by the global mode reload option set in Options for
         else:
             hg.remove_device(device.vendor_id, device.product_id)
 
+    def _sort_profile_cb(self):
+        ''' sorts entries by profile '''
+        self._profile_mapper.sort_profile()
+        self.populate_map()
 
-    
+    def _sort_process_cb(self):
+        ''' sorts entries by process '''
+        self._profile_mapper.sort_process()
+        self.populate_map()
+
     def _add_profile_map_cb(self):
         ''' adds a new profile mapping '''
         item = gremlin.base_profile.ProfileMapItem()
@@ -915,7 +879,7 @@ The setting can be overriden by the global mode reload option set in Options for
         width = 0
         for header in headers:
             width = max(width, char_width*(len(header)))
-        
+
         for widget in self._profile_map_exe_widgets.values():
             if widget:
                 widget.setParent(None)
@@ -937,17 +901,17 @@ The setting can be overriden by the global mode reload option set in Options for
              return
 
         item: gremlin.base_profile.ProfileMapItem
+        self._profile_mapper.validate()
         for index, item in enumerate(self._profile_mapper.items()):
 
             exe_widget = None
             xml_widget = None
+            mode_list, profile_default_mode, restore_mode = item.get_profile_modes()
 
-
-            mode_list, default_mode, restore_mode = item.get_profile_modes()
-            
-            
             if item:
                 # add a new item if it exists and either one of the profile/process entries are refined
+
+                row = 0
 
                 container_widget = QtWidgets.QWidget()
                 container_layout = QtWidgets.QGridLayout()
@@ -959,50 +923,68 @@ The setting can be overriden by the global mode reload option set in Options for
                 exe_widget = ui_common.QPathLineItem("Process:",item.process, item)
                 exe_widget.pathChanged.connect(self._process_changed_cb)
                 exe_widget.open.connect(self._process_open_cb)
-                container_layout.addWidget(exe_widget,0,0,1,2)
-                
+                container_layout.addWidget(exe_widget,row,0,1,2)
+                row+=1
+
                 xml_widget = ui_common.QPathLineItem("Profile:",item.profile, item)
                 xml_widget.pathChanged.connect(self._profile_changed_cb)
                 xml_widget.open.connect(self._profile_open_cb)
-                container_layout.addWidget(xml_widget,1,0,1,2)
-
+                container_layout.addWidget(xml_widget,row,0,1,2)
+                row+=1
 
                 options_line = QtWidgets.QWidget()
-                options_layout = QtWidgets.QHBoxLayout()
+                options_layout = QtWidgets.QHBoxLayout(options_line)
                 options_layout.setContentsMargins(0,0,0,0)
-                options_line.setLayout(options_layout)
+                
 
-
-                restore_widget = ui_common.QDataCheckbox("Restore last", item)
+                restore_widget = ui_common.QDataCheckbox("Restore last mode on start", item)
                 restore_widget.setChecked(restore_mode)
                 restore_widget.clicked.connect(self._restore_changed)
                 restore_widget.setToolTip("When set, restores the last used mode if the profile has been automatically loaded on process change")
-                options_layout.addWidget(restore_widget)
-                options_layout.addStretch()
-
-
-                options_layout.addWidget(QtWidgets.QLabel("Default mode:"))
-
-
 
                 mode_widget = ui_common.QDataComboBox(item)
                 mode_widget.addItems(mode_list)
-                if default_mode:
-                    mode_widget.setCurrentText(default_mode)
+                if item.default_mode:
+                    mode_widget.setCurrentText(item.default_mode)
+                elif profile_default_mode:
+                    mode_widget.setCurrentText(profile_default_mode)
+            
                 mode_widget.currentIndexChanged.connect(self._default_mode_changed)
-                mode_widget.setToolTip("Default mode for this profile")
-                options_layout.addWidget(mode_widget)
+                mode_widget.setToolTip("Default startup mode for this profile")
 
-                container_layout.addWidget(options_line,2,0,1,-1)
+
+                options_layout.addWidget(restore_widget)
+                options_layout.addWidget(QtWidgets.QLabel("Default start mode:"))
+                options_layout.addWidget(mode_widget)
+                options_layout.addStretch()
+
+                container_layout.addWidget(options_line,row,0,1,-1)
+                row+=1
 
                 clear_button = ui_common.QDataPushButton()
                 clear_button.setIcon(load_icon("mdi.delete"))
                 clear_button.setMaximumWidth(20)
                 clear_button.data = item
                 clear_button.clicked.connect(self._mapping_delete_cb)
+                clear_button.setToolTip("Removes this entry")
                 container_layout.addWidget(clear_button, 0, 3)
 
-                container_layout.addWidget(ui_common.QHLine(),3,0,1, -1)
+
+                duplicate_button = ui_common.QDataPushButton()
+                duplicate_button.setIcon(load_icon("mdi.content-duplicate"))
+                duplicate_button.setMaximumWidth(20)
+                duplicate_button.data = item
+                duplicate_button.clicked.connect(self._mapping_duplicate_cb)
+                duplicate_button.setToolTip("Duplicates this entry")
+                container_layout.addWidget(duplicate_button, 1, 3)
+
+
+                if not item.valid:
+                    warning_widget = ui_common.QIconLabel("fa.warning", text=item.warning, use_qta = True,  icon_color="red")
+                    container_layout.addWidget(warning_widget, row, 0, 1, -1)
+                    row+=1
+
+                container_layout.addWidget(ui_common.QHLine(),row,0,1, -1)
 
                 item.index = index
                 self.map_layout.addWidget(container_widget, index, 0)
@@ -1030,9 +1012,10 @@ The setting can be overriden by the global mode reload option set in Options for
         ''' opens the process executable '''
         fname = widget.data.process
         self.executable_dialog = ProcessWindow(fname)
+        self.executable_dialog.setWindowModality(QtCore.Qt.ApplicationModal)
         self.executable_dialog.data = widget
         self.executable_dialog.process_selected.connect(self._select_executable)
-        self.executable_dialog.show()        
+        self.executable_dialog.show()
 
     def _profile_open_cb(self, widget):
         ''' opens the profile list '''
@@ -1060,9 +1043,9 @@ The setting can be overriden by the global mode reload option set in Options for
         item.process = fname
         with QtCore.QSignalBlocker(w):
             w.setText(fname)
-        
-        
-            
+        self.queue_refresh.emit()
+
+
     def _mapping_delete_cb(self):
         widget = self.sender()
         item = widget.data
@@ -1081,19 +1064,32 @@ The setting can be overriden by the global mode reload option set in Options for
         if result == QtWidgets.QMessageBox.StandardButton.Ok:
             self._delete_confirmed_cb(item)
 
+
     def _delete_confirmed_cb(self, item):
         self._profile_mapper.remove(item)
         self.populate_map()
+
+    def _mapping_duplicate_cb(self):
+        ''' duplicates the current entry '''
+        widget = self.sender()
+        item = widget.data
+        duplicate_item = gremlin.base_profile.ProfileMapItem(item.profile, item.process)
+        self._profile_mapper.register(duplicate_item)
+        self.queue_refresh.emit()
+
 
     def _process_changed_cb(self, widget, text):
         ''' called when the process path changes '''
         item = widget.data
         item.process = text if widget.valid else None
+        self.queue_refresh.emit()
+
 
     def _profile_changed_cb(self, widget, text):
         ''' called when the profile '''
         item = widget.data
         item.profile = text if widget.valid else None
+        self.queue_refresh.emit()
 
     def get_profile_item(self, profile_path, executable_path):
         widget = QtWidgets.QWidget()
@@ -1106,7 +1102,7 @@ The setting can be overriden by the global mode reload option set in Options for
         exe_widget = QtWidgets.QLineEdit()
         layout.addWidget(exe_widget)
 
-    
+
 
 
 class ProcessWindow(ui_common.BaseDialogUi):
@@ -1133,8 +1129,6 @@ class ProcessWindow(ui_common.BaseDialogUi):
 
         process_list = gremlin.process_monitor.list_current_processes()
         self.list_model.setStringList(process_list)
-        
-
 
         self.list_view = QtWidgets.QListView()
         self.list_view.setModel(self.list_model)
@@ -1149,7 +1143,7 @@ class ProcessWindow(ui_common.BaseDialogUi):
         self.button_bar_layout = QtWidgets.QHBoxLayout()
         self.button_bar_widget.setLayout(self.button_bar_layout)
 
-        self.refresh_button =QtWidgets.QPushButton("Refresh") 
+        self.refresh_button =QtWidgets.QPushButton("Refresh")
         self.refresh_button.setIcon(load_icon("fa.refresh",qta_color="green"))
         self.refresh_button.clicked.connect(self._refresh)
 
@@ -1164,7 +1158,7 @@ class ProcessWindow(ui_common.BaseDialogUi):
 
         self.cancel_button = QtWidgets.QPushButton("Cancel")
         self.cancel_button.clicked.connect(self._cancel)
-        
+
         self.button_bar_layout.addWidget(self.refresh_button)
         self.button_bar_layout.addWidget(self.select_button)
         self.button_bar_layout.addWidget(self.browse_button)
@@ -1224,7 +1218,7 @@ class ProcessWindow(ui_common.BaseDialogUi):
         if fname != "":
             self.process_selected.emit(fname)
             self.close()
-        
+
 
 
 class LogWindowUi(ui_common.BaseDialogUi):
@@ -1414,7 +1408,7 @@ class ModeManagerUi(ui_common.BaseDialogUi):
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setWidget(self.scroll_widget)
 
-        self.mode_widget = QtWidgets.QWidget()    
+        self.mode_widget = QtWidgets.QWidget()
         self.mode_layout = QtWidgets.QGridLayout()
         self.mode_widget.setLayout(self.mode_layout)
 
@@ -1469,7 +1463,7 @@ class ModeManagerUi(ui_common.BaseDialogUi):
 
         self.mode_default_selector = QtWidgets.QComboBox()
         self.mode_default_selector.setToolTip("Specifies the default startup mode for this profile when it is loaded. This setting can be overriden if the restore last active mode option is set.")
-        
+
 
         # Create UI element for each mode
         row = 1
@@ -1482,8 +1476,8 @@ class ModeManagerUi(ui_common.BaseDialogUi):
             for name in sorted(mode_list.keys()):
                 if name != mode:
                     self.mode_dropdowns[mode].addItem(name)
-                
-                
+
+
 
             self.mode_callbacks[mode] = self._create_inheritance_change_cb(mode)
             self.mode_dropdowns[mode].currentTextChanged.connect(
@@ -1519,7 +1513,7 @@ class ModeManagerUi(ui_common.BaseDialogUi):
 
         self.mode_restore_flag = QtWidgets.QCheckBox("Restore last mode on activation")
         self.mode_restore_flag.setToolTip("""When enabled, the last known active mode for this profile will be used when the profile is loaded or re-activated regardless of the default mode specified in the Modes Editor
-                                          
+
 The setting can be overriden by the global mode reload option set in Options for this profile.
 """)
         self.mode_restore_flag.setChecked(gremlin.shared_state.current_profile.get_restore_mode())
@@ -1578,7 +1572,7 @@ The setting can be overriden by the global mode reload option set in Options for
 
         # modes can be deleted except the last one
         return lambda: self._delete_mode(mode)
-        
+
 
 
     def _change_mode_inheritance(self, mode, inherit):
@@ -1746,12 +1740,12 @@ class DeviceInformationUi(ui_common.BaseDialogUi):
         # Configure the scroll area
         self.scroll_area.setMinimumWidth(400)
         self.scroll_area.setWidgetResizable(True)
-        self.scroll_area.setWidget(self.scroll_widget)  
+        self.scroll_area.setWidget(self.scroll_widget)
 
-        self.scroll_layout.addWidget(self.table)     
+        self.scroll_layout.addWidget(self.table)
 
         self.main_layout.addWidget(self.scroll_area)
-        
+
 
         # row headers
 
@@ -1766,10 +1760,10 @@ class DeviceInformationUi(ui_common.BaseDialogUi):
             "Device name (nocase)"
         ]
 
-        # table data 
+        # table data
 
 
-        
+
         self.table.setColumnCount(len(headers))
         self.table.setRowCount(len(self.devices))
         self.table.setSizeAdjustPolicy(QtWidgets.QAbstractScrollArea.AdjustToContents)
@@ -1808,8 +1802,8 @@ class DeviceInformationUi(ui_common.BaseDialogUi):
         # resize
         self.table.resizeColumnsToContents()
 
-        # toolbar 
-        
+        # toolbar
+
         self.tool_widget = QtWidgets.QWidget()
         self.tool_layout = QtWidgets.QHBoxLayout()
         self.tool_widget.setLayout(self.tool_layout)
@@ -1832,7 +1826,7 @@ class DeviceInformationUi(ui_common.BaseDialogUi):
                 pos = event.position().toPoint()
                 item = self.table.itemAt(pos)
                 if item is not None:
-                    verbose = gremlin.config.Configuration().verbose        
+                    verbose = gremlin.config.Configuration().verbose
                     if verbose:
                         logging.getLogger("system").info(f"DeviceInfo: context click on: {item.row()} {item.column()} {item.text()}")
                     self.menu = QtWidgets.QMenu(self)
@@ -1880,7 +1874,7 @@ class DeviceInformationUi(ui_common.BaseDialogUi):
 
         mode_list = list(mode_list)
         mode_list.sort()
-        
+
         for i, entry in enumerate(self.devices):
             if entry.is_virtual:
                 # skip virtual devices
@@ -1899,7 +1893,7 @@ class DeviceInformationUi(ui_common.BaseDialogUi):
         for line in s_list:
             script += line + "\n"
 
-        script += "\n# plugin decorator definitions\n"        
+        script += "\n# plugin decorator definitions\n"
         for mode_name in a_map.keys():
             script += f"\n# decorators for mode {mode_name}\n"
             for line in a_map[mode_name]:
@@ -1908,7 +1902,7 @@ class DeviceInformationUi(ui_common.BaseDialogUi):
         # set the clipboard data
         clipboard = Clipboard()
         clipboard.set_windows_clipboard_text(script)
-        
+
 
 
 

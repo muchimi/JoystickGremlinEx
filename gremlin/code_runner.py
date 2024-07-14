@@ -29,6 +29,7 @@ import gremlin
 from gremlin import event_handler, input_devices, \
     joystick_handling, macro, sendinput, user_plugin, util
 import gremlin.config
+import gremlin.event_handler
 from gremlin.input_types import InputType
 import gremlin.shared_state
 import gremlin.types
@@ -53,7 +54,8 @@ class CodeRunner:
         self._vjoy_curves = VJoyCurves()
         self._merge_axes = []
         self._running = False
-        
+        self._startup_profile = None
+        self._startup_mode = None
 
     def is_running(self):
         """Returns whether or not the code runner is executing code.
@@ -83,6 +85,10 @@ class CodeRunner:
         input_devices.mode_registry.clear()
 
         config = gremlin.config.Configuration()
+
+        # store the startup mode in the UI so it can be restored later
+        self._startup_profile = gremlin.shared_state.current_profile
+        self._startup_mode = gremlin.shared_state.current_mode
 
         # Check if we want to override the start mode as determined by the
         # heuristic
@@ -401,6 +407,7 @@ class CodeRunner:
         """Stops listening to events and unloads all callbacks."""
 
         el = gremlin.event_handler.EventListener()
+        eh = gremlin.event_handler.EventHandler()
 
         # stop listen
         el.stop()
@@ -473,6 +480,12 @@ class CodeRunner:
 
         # Remove all claims on VJoy devices
         joystick_handling.VJoyProxy.reset()
+
+        # restore any mode 
+        if self._startup_profile and gremlin.shared_state.current_profile != self._startup_profile:
+            eh.change_profile(self._startup_profile)
+        if self._startup_mode:
+            eh.change_mode(self._startup_mode)
 
 
     def _reset_state(self):

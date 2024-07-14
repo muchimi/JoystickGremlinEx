@@ -37,6 +37,8 @@ _suspend_timer = None
 # Holds the currently active profile
 current_profile = None
 
+current_mode = None
+
 # holds the main UI reference
 ui = None
 

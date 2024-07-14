@@ -949,6 +949,6 @@ def compare_path(a, b):
         return False
     if b is None:
         return False
-    af = a.replace("\\","/").lower()
-    bf = b.replace("\\","/").lower()
+    af = a.replace("\\","/").lower().strip()
+    bf = b.replace("\\","/").lower().strip()
     return af == bf

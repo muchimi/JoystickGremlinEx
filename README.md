@@ -99,7 +99,7 @@ Joystick Gremlin EX
 <!-- TOC end -->
 
 <!-- TOC --><a name="changelog"></a>
-## Changelog
+# Changelog
 
 
 13.40.14ex
@@ -117,6 +117,7 @@ This release adds major new features, including some minor changes in UI functio
 - New mouse event drop down selector in map to mouse ex: adds a mouse event selection drop down so mouse actions can be selected by name rather than mouse input only.  
 - Action container will now scroll horizontally if the action is too wide to fit based on windows size / UI scaling options.
 - Profiles can be saved even if one or more actions are not configured (QOL enhancement).
+- New profile to process mapping - centralized in the options dialog for multiple profiles.
 
 6/6/24 - 13.40.13ex (h) **potentially breaking change**
 
@@ -408,6 +409,49 @@ The enable remote control checkbox is checked, and the port (default 6012) must 
 Local and broadcast (sending output to remote GremlinEx instances on network machines) control can be enabled or disabled via GremlinEx commands bound to a joystick button (or in script).
 
 Commands are available in the VjoyRemap plugin when bound to a joystick button and available from the drop down of actions for that button.
+
+# Profile mapping
+
+GremlinEx has multiple options to automate the loading and activation of profiles based on what process has the current focus (meaning, the active window).
+
+## Automatic activation
+
+If a process (.exe) is mapped to a specific profile (.xml), GremlinEx can automatically load this profile when the process has the focus at runtime.  This only works when a GremlinEx is in "run" mode - so a profile was loaded and activated.
+
+If configured, GremlinEx will load the mapped profile corresponding to the process (.exe) automatically in the background.  Depending on the complexity of the profile, GremlinEx may take a few seconds to become active as it loads the process and activates it.
+
+The automatic load occurs whenever GremlinEx detects a process focus change.
+
+## Keep profile active when focus is lost
+
+This mode is used to ensure GremlinEx keeps the profile running even if the process it is mapped to no longer has the primary focus.   This happens, for example when you alt-tab, or when you activate another window.  The recommendation is to leave this option enabled.
+
+## Mode selection
+
+When automatic profile load is enabled, GremlinEx has the option to override the default "startup" mode of a profile.  This is by default, the top level mode.  There are two options of interest:
+
+- Activate a default mode when the profile is activated (this is the normal mode)
+- Activate the last mode used when the profile was last activated (this is the alternate mode).  If this is enabled, the default mode setting is ignored.  The first mode used will be the default mode if the mode has not been changed before.
+
+In addition to this, the profile itself provides actions that can switch modes.
+
+
+## Caveats with automation
+
+GremlinEx is not aware of anything except what process has the current focus, and what you've configured in the profile options.  It's completely possible that you will experience conflicts if you have programmed these in, or constant loading/reloading.
+
+To guard against this behavior, here are things that are not recommended:
+
+- have two processes (such as games) each associated with an automatic load profile and constantly changing focus between the two. This will cause a profile reload/reset and new mode activation whenever the focus changes.
+
+- attach a profile to a non-game, such as a background process.
+
+The recommended approach is to only run one mapped process at a time, ensure the profile remains active if you alt-tab or switch to another window on multi-monitor setups.
+
+## Caveats with loading to the prior mode
+
+Loading the prior mode may not necessarily be expected, as it will vary with the last known used mode.   This can be confusing and unexpected, but it can be helped by ensuring that you tell GremlinEx to say what mode it's in whenever a profile starts.
+
 
 
 <!-- TOC --><a name="copypaste-operations"></a>

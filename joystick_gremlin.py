@@ -54,6 +54,7 @@ import dinput
 import gremlin.event_handler 
 import gremlin.config
 import gremlin.shared_state
+import gremlin.tts
 from gremlin.types import DeviceType
 from gremlin.util import load_icon, load_pixmap, userprofile_path, find_file, waitCursor, popCursor
 from gremlin.ui.device_tab import JoystickDeviceTabWidget
@@ -133,9 +134,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         # Process monitor
         self.process_monitor = gremlin.process_monitor.ProcessMonitor()
-        self.process_monitor.process_changed.connect(
-            self._process_changed_cb
-        )
+        self.process_monitor.process_changed.connect(self._process_changed_cb)
 
         # Default path variable before any runtime changes
         self._base_path = list(sys.path)
@@ -148,7 +147,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             self._update_statusbar_repeater
         )
         self.runner.event_handler.mode_changed.connect(
-            self._update_statusbar_mode
+            self._update_mode
         )
         self.runner.event_handler.is_active.connect(
             self._update_statusbar_active
@@ -160,7 +159,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.ui.toolBar.addWidget(self.mode_selector)
 
         # Setup profile storage
-        self._current_mode = None
+        
         self._profile = gremlin.base_profile.Profile()
         self._profile_fname = None
         self._profile_auto_activated = False
@@ -183,8 +182,11 @@ class GremlinUi(QtWidgets.QMainWindow):
         # hook status bar to events
         el = gremlin.event_handler.EventListener()
         el.broadcast_changed.connect(self._update_status_bar)
-
         el.keyboard_event.connect(self._kb_event_cb)
+
+        # hook changes
+        eh = gremlin.event_handler.EventHandler()
+        eh.profile_changed.connect(self._profile_changed_cb)
 
 
         # Load existing configuration or create a new one otherwise
@@ -224,6 +226,9 @@ class GremlinUi(QtWidgets.QMainWindow):
 
 
 
+    def _profile_changed_cb(self, new_profile):
+        ''' called when the a profile should be loaded '''
+        self._load_recent_profile(new_profile)
     
 
 
@@ -289,7 +294,11 @@ class GremlinUi(QtWidgets.QMainWindow):
     @property
     def current_mode(self):
         ''' returns the current active profile mode '''
-        return self._current_mode
+        return gremlin.shared_state.current_mode
+    
+    @property
+    def current_profile(self):
+        return gremlin.shared_state.current_profile
 
 
     def calibration(self):
@@ -355,6 +364,7 @@ class GremlinUi(QtWidgets.QMainWindow):
     def options_dialog(self):
         """Opens the options dialog."""
         self.modal_windows["options"] = gremlin.ui.dialogs.OptionsUi()
+        self.modal_windows["options"].setWindowModality(QtCore.Qt.ApplicationModal)
         self.modal_windows["options"].show()
         self.modal_windows["options"].closed.connect(
             lambda: self.apply_user_settings(ignore_minimize=True)
@@ -436,7 +446,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                 logging.getLogger("system").info(f"Deactivate profile requested")
             if self.runner.is_running():
                 # running - save the current mode 
-                self._profile.set_last_mode(gremlin.shared_state.ui.current_mode)
+                self._profile.set_last_mode(gremlin.shared_state.current_mode)
                 
             
             self.runner.stop()
@@ -486,7 +496,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         container_plugins = gremlin.plugin_manager.ContainerPlugins()
         action_plugins = gremlin.plugin_manager.ActionPlugins()
 
-        mode = device_profile.modes[self._current_mode]
+        mode = device_profile.modes[gremlin.shared_state.current_mode]
         input_types = [
             InputType.JoystickAxis,
             InputType.JoystickButton,
@@ -544,17 +554,20 @@ class GremlinUi(QtWidgets.QMainWindow):
             lambda: self._remove_modal_window("input_viewer")
         )
 
-    def load_profile(self):
+    def load_profile(self, fname = None):
         """Prompts the user to select a profile file to load."""
         if not self._save_changes_request():
             return
+        
+        if not fname:
 
-        fname, _ = QtWidgets.QFileDialog.getOpenFileName(
-            None,
-            "Load Profile",
-            gremlin.util.userprofile_path(),
-            "XML files (*.xml)"
-        )
+            fname, _ = QtWidgets.QFileDialog.getOpenFileName(
+                None,
+                "Load Profile",
+                gremlin.util.userprofile_path(),
+                "XML files (*.xml)"
+            )
+
         if fname != "":
             self._load_recent_profile(fname)
 
@@ -602,14 +615,13 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         # Update profile information
         self._profile_fname = None
-        self._current_mode = None
         self._update_window_title()
         gremlin.shared_state.current_profile = self._profile
 
         # Create a default mode
         for device in self._profile.devices.values():
             device.ensure_mode_exists("Default")
-        self._current_mode = "Default"
+        gremlin.shared_state.current_mode = "Default"
 
         # Create device tabs
         self._create_tabs()
@@ -783,7 +795,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             widget = gremlin.ui.device_tab.JoystickDeviceTabWidget(
                 device,
                 device_profile,
-                self._current_mode
+                self.current_mode,
             )
             self.tabs[device.device_guid] = widget
             tab_label = device.name.strip()
@@ -804,7 +816,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             widget = JoystickDeviceTabWidget(
                 device,
                 device_profile,
-                self._current_mode
+                self.current_mode
             )
             self.tabs[device.device_guid] = widget
             tab_label = device.name.strip()
@@ -819,7 +831,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         )
         widget = KeyboardDeviceTabWidget(
             device_profile,
-            self._current_mode
+            self.current_mode
         )
         self.tabs[dinput.GUID_Keyboard] = widget
         self.ui.devices.addTab(widget, "Keyboard")
@@ -833,7 +845,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         # Create MIDI tab
         widget = MidiDeviceTabWidget(
             device_profile,
-            self._current_mode
+            self.current_mode
         )
         self.tabs[MidiDeviceTabWidget.device_guid] = widget
         self.ui.devices.addTab(widget, "MIDI")
@@ -848,7 +860,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         # Create OSC tab
         widget = OscDeviceTabWidget(
             device_profile,
-            self._current_mode
+            self.current_mode
         )
         self.tabs[OscDeviceTabWidget.device_guid] = widget
         self.ui.devices.addTab(widget, "OSC")
@@ -868,7 +880,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             widget = gremlin.ui.device_tab.JoystickDeviceTabWidget(
                 device,
                 device_profile,
-                self._current_mode
+                self.current_mode
             )
             self.tabs[device.device_guid] = widget
             self.ui.devices.addTab(widget,f"{device.name} #{device.vjoy_id:d}")
@@ -1021,7 +1033,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             if event.event_type == InputType.Keyboard:
                 # ignore keyboard inputs
                 return
-            if self.runner.is_running() or self._current_mode is None:
+            if self.runner.is_running() or self.current_mode is None:
                 return
             if gremlin.shared_state.suspend_input_highlighting():
                 return
@@ -1125,14 +1137,10 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         :param new_mode the name of the new current mode
         """
-        
-        if self._current_mode != new_mode:
-            # save the last profile used
-
-            with QtCore.QSignalBlocker(self.mode_selector):
-                self._current_mode = new_mode
-                for tab in self.tabs.values():
-                    tab.set_mode(new_mode)
+        if self.current_mode != new_mode:
+            # change the profile if different 
+            eh = gremlin.event_handler.EventHandler()
+            eh.change_mode(new_mode)
 
     def _process_changed_cb(self, path):
         """Handles changes in the active process.
@@ -1149,7 +1157,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             # ignore unless running a profile
             return 
 
-        verbose = gremlin.config.Configuration().verbose
+        
         config = gremlin.config.Configuration()
         # check options
         option_auto_load = config.autoload_profiles  
@@ -1158,16 +1166,23 @@ class GremlinUi(QtWidgets.QMainWindow):
             return # ignore if not auto loading profiles
 
         option_restore_mode = config.restore_profile_mode_on_start or self._profile.get_restore_mode()
-        option_keep_focus = config.keep_profile_active_on_focus_loss   
+        option_keep_focus = config.keep_profile_active_on_focus_loss  
+        option_reset_mode_on_process_activate = config.reset_mode_on_process_activate 
         
-        if verbose:
-            logging.getLogger("system").info(f"PROC: Process focus change detected: {os.path.basename(path)}  autoload: {option_auto_load}  keep focus: {option_keep_focus} restore mode: {option_restore_mode}")
 
+        verbose = gremlin.config.Configuration().verbose
+        # if verbose:
+        #     logging.getLogger("system").info(f"PROC: Process focus change detected: {os.path.basename(path)}  autoload: {option_auto_load}  keep focus: {option_keep_focus} restore mode: {option_restore_mode}")
+
+        # is if we have a mapping entry for this executable
         profile_item = self._profile_map.get_map(path)
         profile_path = profile_item.profile if profile_item else None
-        #profile_path = self.config.get_profile_with_regex(path)
+        profile_change = False # assume no profile change
+        mode = None # assume no mode change needed
         if profile_path:
-            if not compare_path(self._profile_fname, profile_path) and option_auto_load:
+            # profile entry found - see if we need to change profiles
+            if not compare_path(self._profile_fname, profile_path):
+                # change profile
                 if verbose: 
                     logging.getLogger("system").info(f"PROC: process change forces a profile load: switch from {os.path.basename(self._profile_fname)} ->  {os.path.basename(profile_path)}")   
                 self.ui.actionActivate.setChecked(False)
@@ -1176,25 +1191,41 @@ class GremlinUi(QtWidgets.QMainWindow):
                 self.ui.actionActivate.setChecked(True)
                 self.activate(True)
                 self._profile_auto_activated = True # remember the profile was auto activated by virtue of a process change
-                # restore mode for this profile 
-                mode = None
+                profile_change = True
+
+                # figure out which mode to restore mode for the new profile 
                 if option_restore_mode:
+                    # get the mode to restore
                     mode = self._profile.get_last_mode()
                     if verbose:
-                        logging.getLogger("system").info(f"PROC: profile:  {os.path.basename(profile_path)} restore last mode:{mode} ")                    
+                        logging.getLogger("system").info(f"PROC: profile: '{os.path.basename(profile_path)}' restore last mode: '{mode}' ")                    
 
-                if mode is None or not mode in self._profile.get_modes():
-                    # restore the profile's default mode on activation
-                    mode = self._profile.get_default_mode()
-                    if verbose:
-                        logging.getLogger("system").info(f"PROC: restore default mode: {mode} ")                    
-
-                if mode:
-                    eh = gremlin.event_handler.EventHandler()
-                    eh.change_mode(mode) # set the last mode                
-
+            # a mapping profile was found - new profile was loaded if needed - see if we need to change the mode
+            reset_mode = (profile_change or option_reset_mode_on_process_activate and profile_item.default_mode)
+            # print (f"reset mode: {reset_mode}  reset on activate: {option_reset_mode_on_process_activate}  profile mode: '{profile_item.default_mode}'  current mode: '{self.current_mode}'")
+            if not mode and reset_mode:
+                # use the default mode specified in the process mapping when changing profiles
+                mode = profile_item.default_mode
                 if verbose:
-                    logging.getLogger("system").info(f"PROC: Auto activated profile {os.path.basename(profile_path)} mode: {self._current_mode}")                    
+                    logging.getLogger("system").info(f"PROC: profile: '{os.path.basename(profile_path)}' using mapping startup mode: '{mode}' ")                    
+
+            # see if the profile activation has a new mapping
+            if mode is None or not mode in self._profile.get_modes():
+                # restore the profile's default mode on activation
+                mode = self._profile.get_default_mode()
+                # if verbose:
+                #     logging.getLogger("system").info(f"PROC: restoring default mode: '{mode}' ")                    
+
+            if mode and mode != self.current_mode:
+                eh = gremlin.event_handler.EventHandler()
+                if verbose:
+                    logging.getLogger("system").info(f"PROC: determined that mode should change to: '{mode}' ")                    
+                eh.change_mode(mode) # set the selected mode
+                
+                if config.initial_load_mode_tts:
+                    tts = gremlin.tts.TextToSpeech()              
+                    tts.speak(f"Profile mode set to {mode}")
+
 
         elif self._profile_auto_activated and not option_keep_focus:
             # deactivate the profile if it was autoloaded
@@ -1250,18 +1281,26 @@ class GremlinUi(QtWidgets.QMainWindow):
             log_sys_error(f"Unable to update status bar event: {event}")
             log_sys_error(e)
 
-    def _update_statusbar_mode(self, mode):
-        """Updates the status bar display of the current mode.
+    def _update_mode(self, new_mode):
+        """ called when the profile mode changes 
 
         :param mode the now current mode
         """
-        try:
-            self.status_bar_mode.setText(f"<b>Mode:</b> {mode}")
-            if self.config.mode_change_message:
-                self.ui.tray_icon.showMessage(f"Mode: {mode}","",QtWidgets.QSystemTrayIcon.MessageIcon.NoIcon,250)
-        except e:
-            log_sys_error(f"Unable to update status bar mode: {mode}")
-            log_sys_error(e)
+        
+        gremlin.shared_state.current_mode = new_mode
+        print (f"Mode changed received: {new_mode}")
+        if not gremlin.shared_state.is_running:
+            # update the UI when not running a profile 
+            with QtCore.QSignalBlocker(self.mode_selector):
+                for tab in self.tabs.values():
+                    tab.set_mode(new_mode)
+            try:
+                self.status_bar_mode.setText(f"<b>Mode:</b> {new_mode}")
+                if self.config.mode_change_message:
+                    self.ui.tray_icon.showMessage(f"Mode: {new_mode}","",QtWidgets.QSystemTrayIcon.MessageIcon.NoIcon,250)
+            except e:
+                log_sys_error(f"Unable to update status bar mode: {new_mode}")
+                log_sys_error(e)
 
 
     def _kb_event_cb(self, event):
@@ -1404,14 +1443,12 @@ class GremlinUi(QtWidgets.QMainWindow):
             self._profile_fname = fname
             self._update_window_title()
             gremlin.shared_state.current_profile = self._profile
-
-            self._current_mode = sorted(self._profile.get_root_modes())[0]
+            current_mode = sorted(self._profile.get_root_modes())[0]
+            gremlin.shared_state.current_mode = current_mode
             self._create_tabs()
 
             # Make the first root node the default active mode
-            self.mode_selector.populate_selector(
-                self._profile, self._current_mode
-            )
+            self.mode_selector.populate_selector(self._profile, current_mode)
 
             # Save the profile at this point if it was converted from a prior
             # profile version, as otherwise the change detection logic will
@@ -1517,6 +1554,8 @@ class GremlinUi(QtWidgets.QMainWindow):
             return last_mode
         else:
             return sorted(self._profile.build_inheritance_tree().keys())[0]
+        
+    
 
     def _load_recent_profile(self, fname):
         """Loads the provided profile and updates the list of recently used
@@ -1533,10 +1572,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
     def _mode_configuration_changed(self):
         """Updates the mode configuration of the selector and profile."""
-        self.mode_selector.populate_selector(
-            self._profile,
-            self._current_mode
-        )
+        self.mode_selector.populate_selector(self._profile,gremlin.shared_state.current_mode)
         self.ui.devices.widget(self.ui.devices.count()-1).refresh_ui()
 
     def _sanitize_profile(self, profile_data):

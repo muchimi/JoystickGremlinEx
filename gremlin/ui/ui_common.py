@@ -932,7 +932,11 @@ class BaseDialogUi(QtWidgets.QWidget):
 
         :param event the close event
         """
-        self.closed.emit()
+        if hasattr(self, "confirmClose"):
+            self.confirmClose(event)
+        if event.isAccepted():
+            self.closed.emit()
+        
 
 
 class ModeWidget(QtWidgets.QWidget):
@@ -1384,7 +1388,7 @@ class QIconLabel(QtWidgets.QWidget):
     IconSize = QtCore.QSize(16, 16)
     HorizontalSpacing = 2
 
-    def __init__(self, icon_path = None, text = None, stretch=True, use_qta = False, parent = None):
+    def __init__(self, icon_path = None, text = None, stretch=True, use_qta = False, icon_color = None, parent = None):
         super().__init__(parent)
 
         layout = QtWidgets.QHBoxLayout()
@@ -1393,7 +1397,7 @@ class QIconLabel(QtWidgets.QWidget):
 
         self._icon_widget = QtWidgets.QLabel()
         if icon_path:
-            self.setIcon(icon_path, use_qta)
+            self.setIcon(icon_path, use_qta, color = icon_color)
             
         layout.addWidget(self._icon_widget)
         layout.addSpacing(self.HorizontalSpacing)
@@ -1529,6 +1533,7 @@ class QPathLineItem(QtWidgets.QWidget):
         self._data = data
 
         self._file_changed()
+        
         self.setLayout(self._layout)
 
     @property
@@ -1546,8 +1551,10 @@ class QPathLineItem(QtWidgets.QWidget):
     def eventFilter(self, object, event):
         t = event.type()
         if t == QtCore.QEvent.Type.FocusOut:
-            self._text = self._file_widget.text()  
-            self.pathChanged.emit(self, self._text)
+            new_text = self._file_widget.text()  
+            if self._text != new_text:
+                self._text = new_text
+                self.pathChanged.emit(self, self._text)
         return False        
 
     def _setIcon(self, icon_path = None, use_qta = True, color = None):
