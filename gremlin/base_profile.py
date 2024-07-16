@@ -2589,7 +2589,7 @@ class ProfileMap():
             mode_list, _, _= item.get_profile_modes()
             if not item.default_mode in mode_list:
                 valid = False
-                warning = f"Startup mode does not exist for this profile"
+                warning = f"Startup mode '{item.default_mode}' does not exist for this profile"
                 self._valid = False
 
             # print (f"Validation: Item process: {item.process} profile: {item.profile} valid: {valid}")

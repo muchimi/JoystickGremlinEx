@@ -29,6 +29,7 @@ from gremlin.types import MouseButton
 from gremlin.singleton_decorator import SingletonDecorator
 import gremlin.config
 
+user32 = ctypes.WinDLL("user32")
 
 def _create_function(lib_name, fn_name, param_types, return_type):
     """Creates a handle to a windows dll library function.
@@ -268,10 +269,10 @@ class Key():
                 if code:
                     code += " + "
                 result += key._name
-                code += f"0x{key._scan_code}{'_EX' if key._is_extended else ''}"
+                code += f"0x{key._scan_code:X}{'_EX' if key._is_extended else ''}"
             self._latched_name = result
         else: 
-            code = f"0x{self._scan_code}{'_EX' if self._is_extended else ''}"
+            code = f"0x{self._scan_code:X}{'_EX' if self._is_extended else ''}"
             self._latched_name = ""
         self._latched_code = code
         
@@ -1000,23 +1001,69 @@ class KeyMap:
     
 
     @staticmethod
-    def translate(keyid):
+    def translate(keyid) -> tuple:
         ''' translates a key id and returns a list of equivalent keys
             this is to map similar keys together 
+            :param keyid (scan_code, is_extended)
+            :returns ((scan_code, is_extended), virtual_code)
         '''
-        # scan_code, _ = keyid
-        # if not scan_code in (0x38, 0x1d, 0x52, 0x4f, 0x50, 0x51, 0x4b, 0x4c, 0x4d, 0x47, 0x48, 0x49):
-        #     return (scan_code, False) 
-        # # keep the extended key flag
-        return keyid
+        # flip the extended bit to force numlock OFF for numeric keypad so we always get the numeric keys
+        scan_code, is_extended = keyid
+        if keyid in KeyMap._g_numpad_translate_map.keys():
+            return KeyMap._g_numpad_translate_map[keyid]
+        vk = KeyMap.scan_code_to_virtual_code(scan_code, is_extended)
+        return (keyid, vk)
+    
     
     @staticmethod
     def keyid_tostring(keyid):
         scan_code, is_extended = keyid
         return f"({scan_code} 0x{scan_code:X}, {is_extended})"
     
+    @staticmethod
+    def get_vk_keyboard_state(virtual_code):
+        ''' get the hardware keyboard state by virtual key '''
+        return (user32.GetAsyncKeyState(virtual_code) & 1) != 0 # true if the key is pressed
+    
+    @staticmethod
+    def get_keyboard_state(scan_code, is_extended):
+        ''' gets the hardware keyboard state by scan code '''
+        virtual_code = KeyMap.scan_code_to_virtual_code(scan_code, is_extended)
+        return KeyMap.get_vk_keyboard_state(virtual_code)
+    
+    @staticmethod
+    def numlock_state():
+        ''' gets the state of the numlock key '''
+        return KeyMap.get_vk_keyboard_state(win32con.VK_NUMLOCK)
+
+    
     # holds the number pad scan codes
-    _g_numpad_codes = (0x52, 0x4f, 0x50, 0x51, 0x4b, 0x4c, 0x4d, 0x47, 0x48, 0x49)
+    _g_numpad_codes = (win32con.VK_NUMPAD0,
+                       win32con.VK_NUMPAD1,
+                       win32con.VK_NUMPAD2,
+                       win32con.VK_NUMPAD3,
+                       win32con.VK_NUMPAD4,
+                       win32con.VK_NUMPAD5,
+                       win32con.VK_NUMPAD6,
+                       win32con.VK_NUMPAD7,
+                       win32con.VK_NUMPAD8,
+                       win32con.VK_NUMPAD9,
+                       )
+    
+    _g_numpad_translate_map = {
+        (0x52,False): ((0x52, False), win32con.VK_NUMPAD0),
+        (0x4F,False): ((0x4F, False), win32con.VK_NUMPAD1),
+        (0x50,False): ((0x50, False), win32con.VK_NUMPAD2),
+        (0x51,False): ((0x51, False), win32con.VK_NUMPAD3),
+        (0x4B,False): ((0x4B, False), win32con.VK_NUMPAD4),
+        (0x4C,False): ((0x4C, False), win32con.VK_NUMPAD5),
+        (0x4D,False): ((0x4D, False), win32con.VK_NUMPAD6),
+        (0x47,False): ((0x47, False), win32con.VK_NUMPAD7),
+        (0x48,False): ((0x48, False), win32con.VK_NUMPAD8),
+        (0x49,False): ((0x49, False), win32con.VK_NUMPAD9),
+
+
+    }
 
     _g_name_map = {
         # Function keys

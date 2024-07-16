@@ -326,6 +326,12 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.macro_axis_minimum_change_layout.addWidget(self.macro_axis_minimum_change_value)
         self.macro_axis_minimum_change_layout.addStretch()
 
+
+        self.runtime_ui_update = QtWidgets.QCheckBox("Update UI when profile is active")
+        self.runtime_ui_update.setChecked(self.config.runtime_ui_update)
+        self.runtime_ui_update.clicked.connect(self._runtime_ui_update)
+        self.runtime_ui_update.setToolTip("When set, Joystick Gremlin Ex will update the UI on profile or mode changes at runtime - this can be turned off to enhance performance at runtime")
+
         
         self.general_layout.addWidget(self.highlight_input)
         self.general_layout.addWidget(self.highlight_input_buttons)
@@ -335,8 +341,8 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.general_layout.addWidget(self.start_with_windows)
         self.general_layout.addWidget(self.persist_clipboard)
         self.general_layout.addWidget(self.verbose_container_widget)
+        self.general_layout.addWidget(self.runtime_ui_update)
         self.general_layout.addWidget(self.midi_enabled)
-
         
         container = QtWidgets.QWidget()
         layout = QtWidgets.QHBoxLayout(container)
@@ -614,6 +620,9 @@ This setting is also available on a profile by profile basis on the profile tab,
 
     def _activate_on_launch(self, checked):
         self.config.activate_on_launch = checked
+
+    def _runtime_ui_update(self, checked):
+        self.config.runtime_ui_update = checked
 
 
     def _restore_profile_mode(self, checked):
@@ -944,10 +953,12 @@ This setting is also available on a profile by profile basis on the profile tab,
 
                 mode_widget = ui_common.QDataComboBox(item)
                 mode_widget.addItems(mode_list)
-                if item.default_mode:
-                    mode_widget.setCurrentText(item.default_mode)
-                elif profile_default_mode:
+                if profile_default_mode:
                     mode_widget.setCurrentText(profile_default_mode)
+                    item.default_mode = profile_default_mode
+                else:
+                    item.default_mode = mode_list[0] # first item 
+
             
                 mode_widget.currentIndexChanged.connect(self._default_mode_changed)
                 mode_widget.setToolTip("Default startup mode for this profile")

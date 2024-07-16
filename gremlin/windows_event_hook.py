@@ -179,6 +179,8 @@ WM_XBUTTONUP    = 0x020C
 WM_MOUSEHWHEEL  = 0x020E
 
 
+
+
 class KBDLLHOOKSTRUCT(ctypes.Structure):
 
     """Data structure used with keuboard callbacks."""
@@ -228,6 +230,7 @@ def process_keyboard_event(n_code, w_param, l_param):
         is_injected = msg.flags is not None and bool(msg.flags & 0x0010)
 
         #print (f"****** KEYBOARD HOOK: raw scancode: 0x{msg.scanCode:X} w_param: 0x{w_param:X} flags: 0x{msg.flags:X} scan code: {scan_code} (0x{scan_code:x}) ext: {is_extended} pressed: {is_pressed}")
+
 
         # A scan code of 541 indicates AltGr being pressed. AltGr is sent
         # as a combination of RAlt + RCtrl to the system and as such
@@ -359,6 +362,7 @@ class KeyboardHook:
     def __init__(self):
         self._running = False
         self._listen_thread = threading.Thread(target=self._listen)
+        
 
     def register(self, callback):
         """Registers a new message callback.
@@ -402,6 +406,7 @@ class KeyboardHook:
                 raise ctypes.WinError(get_last_error())
             user32.TranslateMessage(ctypes.byref(msg))
             user32.DispatchMessageW(ctypes.byref(msg))
+
 
 
 @SingletonDecorator

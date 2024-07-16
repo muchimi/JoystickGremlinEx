@@ -626,16 +626,15 @@ class AbstractInputSelector(QtWidgets.QWidget):
     def _update_device(self, index):
         # Hide all selection dropdowns
 
-        with QtCore.QSignalBlocker(self.input_item_dropdowns):
-            for entry in self.input_item_dropdowns:
-                with QtCore.QSignalBlocker(entry):
-                    entry.setVisible(False)
-
-            # Show correct dropdown
-            entry = self.input_item_dropdowns[index]
+        for entry in self.input_item_dropdowns:
             with QtCore.QSignalBlocker(entry):
-                entry.setVisible(True)
-                entry.setCurrentIndex(0)
+                entry.setVisible(False)
+
+        # Show correct dropdown
+        entry = self.input_item_dropdowns[index]
+        with QtCore.QSignalBlocker(entry):
+            entry.setVisible(True)
+            entry.setCurrentIndex(0)
         self._execute_callback()
 
     def _initialize(self):

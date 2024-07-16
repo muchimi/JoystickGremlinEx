@@ -1153,12 +1153,14 @@ class GremlinUi(QtWidgets.QMainWindow):
         :param path the path to the currently active process executable
         """
 
-        if not gremlin.shared_state.is_running:
-            # ignore unless running a profile
+        config = gremlin.config.Configuration()
+
+        if gremlin.shared_state.is_running and not config.runtime_ui_update:
+            # ignore updates when running a profile unless the UI should be updated
             return 
 
         
-        config = gremlin.config.Configuration()
+        
         # check options
         option_auto_load = config.autoload_profiles  
 
@@ -1288,19 +1290,22 @@ class GremlinUi(QtWidgets.QMainWindow):
         """
         
         gremlin.shared_state.current_mode = new_mode
-        print (f"Mode changed received: {new_mode}")
-        if not gremlin.shared_state.is_running:
-            # update the UI when not running a profile 
+        update = True
+        if gremlin.shared_state.is_running:
+            update = self.config.runtime_ui_update
+            
+        if update:
             with QtCore.QSignalBlocker(self.mode_selector):
                 for tab in self.tabs.values():
                     tab.set_mode(new_mode)
-            try:
-                self.status_bar_mode.setText(f"<b>Mode:</b> {new_mode}")
-                if self.config.mode_change_message:
-                    self.ui.tray_icon.showMessage(f"Mode: {new_mode}","",QtWidgets.QSystemTrayIcon.MessageIcon.NoIcon,250)
-            except e:
-                log_sys_error(f"Unable to update status bar mode: {new_mode}")
-                log_sys_error(e)
+        
+        # update the status bar on mode change
+        try:
+            self.status_bar_mode.setText(f"<b>Mode:</b> {new_mode}")
+            if self.config.mode_change_message:
+                self.ui.tray_icon.showMessage(f"Mode: {new_mode}","",QtWidgets.QSystemTrayIcon.MessageIcon.NoIcon,250)
+        except Exception as err:
+            log_sys_error(f"Unable to update status bar mode: {new_mode}:\n{err}")
 
 
     def _kb_event_cb(self, event):

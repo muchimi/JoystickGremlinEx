@@ -144,6 +144,17 @@ class Configuration:
         self._data["initial_load_mode_tts"] = value
         self.save()
 
+    @property 
+    def runtime_ui_update(self):
+        ''' if set, JGEX will update the UI when a profile is activated '''
+        return self._data.get("runtime_ui_update", False)
+    
+    @runtime_ui_update.setter
+    def runtime_ui_update(self, value):
+        self._data["runtime_ui_update"] = value
+        self.save()
+
+
     @property
     def reset_mode_on_process_activate(self):
         ''' if set, the mode is reset when the process is reactivated to the default mode '''

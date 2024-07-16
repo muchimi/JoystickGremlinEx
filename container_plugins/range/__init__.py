@@ -86,11 +86,13 @@ class RangeContainerWidget(AbstractContainerWidget):
         min_box.setMaximum(1.0)
         min_box.setDecimals(3)
         min_box.setValue(profile.range_min)
+        min_box.setToolTip("Lower range of the bracket")
 
         # holds the mode change data when in trigger by value change mode
         mode_widget = QtWidgets.QWidget()
         mode_container = QtWidgets.QHBoxLayout() 
         mode_widget.setLayout(mode_container)
+        mode_widget.setToolTip("Sets the mode of the container.")
         self.ui_mode_widget = mode_widget
 
         # holds the range data when triggered by range
@@ -103,23 +105,26 @@ class RangeContainerWidget(AbstractContainerWidget):
         self.ui_any_change_mode = any_change_mode
         any_change_mode.setChecked(profile.any_change_mode)
         any_change_mode.clicked.connect(self._any_change_mode_changed)
-        
-
+        any_change_mode.setToolTip("When set, the action will be triggered on any axis value change.")
 
         any_change_label = QtWidgets.QLabel("Delta %")
         any_change_delta = QtWidgets.QSpinBox()
         self.ui_any_change_delta = any_change_delta
         any_change_delta.setRange(0,100) 
         any_change_delta.setValue(profile.any_change_delta)
+        any_change_delta.setToolTip("In any change mode, determines how much the axis should deviate from the old value before triggering the action")
         
         min_box_included = QtWidgets.QCheckBox("[")
         min_box_included.setChecked(profile.range_min_included)
+        min_box_included.setToolTip("Include/Exclude flag: When set, the range includes the specified min value.<br>When not set, the value is excluded from the max range")
 
         max_box_included = QtWidgets.QCheckBox("]")
         max_box_included.setChecked(profile.range_max_included)
+        max_box_included.setToolTip("Include/Exclude flag: When set, the range includes the specified max value<br>When not set, the value is excluded from the max range")
 
         add_button_top_90 = QtWidgets.QPushButton("Top 90%")
         add_button_top_90.clicked.connect(self._add_top_90)
+        add_button_top_90.setToolTip("Configures the container for the top 90 percent range.  When used with the symmetry option, sets a trigger for bottom 10 percent or top 10 percent of the input range")
 
         action_label = QtWidgets.QLabel("Actions")
         self.ui_action_dropdown = QtWidgets.QComboBox()
@@ -129,23 +134,29 @@ class RangeContainerWidget(AbstractContainerWidget):
 
         cfg = gremlin.config.Configuration()
         self.ui_action_dropdown.setCurrentText(cfg.default_action)
+        self.ui_action_dropdown.setToolTip("Determines the default action added to a new range container")
 
         self.add_button = QtWidgets.QPushButton("Add")
         self.add_button.clicked.connect(self._add_action)
+        self.add_button.setToolTip("Adds a new range container")
 
         range_count_label = QtWidgets.QLabel("Add Count")
         self.ui_range_count = QtWidgets.QSpinBox()
         self.ui_range_count.minimum = 1
         self.ui_range_count.maximum = 20
         self.ui_range_count.setValue(5)
+        self.ui_range_count.setToolTip("Determines how many ranges (brackets) will be added.  The range values for each container will be computed based on the number of 'slots' entered here.<br>A value of 5 means 5 containers will be created with a range of 20 percent each.")
 
 
         add_range = QtWidgets.QPushButton("Add Ranges")
         add_range.clicked.connect(self._add_range)
+        add_range.setToolTip("Adds the number of requested ranges (these are added)")
 
         
         replace_range = QtWidgets.QPushButton("Replace Ranges")
         replace_range.clicked.connect(self._replace_range)
+        replace_range.setToolTip("Replaces all containers with a new range.  Warning: this will delete any existing actions.")
+
         
         # max range box
         max_box = gremlin.ui.ui_common.DynamicDoubleSpinBox()
@@ -153,12 +164,13 @@ class RangeContainerWidget(AbstractContainerWidget):
         max_box.setMaximum(1.0)
         max_box.setDecimals(3)
         max_box.setValue(profile.range_max)
+        max_box.setToolTip("Upper range of the bracket")
 
 
 
         symmetrical_box = QtWidgets.QCheckBox("Symmetrical")
         symmetrical_box.setChecked(profile.symmetrical)
-
+        symmetrical_box.setToolTip("When enabled, the range given will be automatically mirrored about the center of the range, causing an action trigger when the range on either side of the center value is entered.")
 
         mode_container.addWidget(any_change_label)
         mode_container.addWidget(any_change_delta)
@@ -337,6 +349,20 @@ class RangeContainerWidget(AbstractContainerWidget):
 
     def _replace_range(self):
         ''' replaces current containers with new containers '''
+
+        # do a confirmation box just in case
+        message_box = QtWidgets.QMessageBox()
+        message_box.setIcon(QtWidgets.QMessageBox.Icon.Warning)
+        message_box.setText("This will remove the current container set and any actions.")
+        message_box.setInformativeText("Are you sure?")
+        message_box.setStandardButtons(
+            QtWidgets.QMessageBox.StandardButton.Cancel | 
+            QtWidgets.QMessageBox.StandardButton.Ok 
+        )
+        result = message_box.exec()
+        if result == QtWidgets.QMessageBox.StandardButton.Cancel:
+            return
+
         container_plugins = gremlin.plugin_manager.ContainerPlugins()
         # the profile_data member is a RangeContainer object
         widget = container_plugins.get_parent_widget(self.profile_data)

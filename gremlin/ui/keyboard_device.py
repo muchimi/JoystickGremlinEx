@@ -165,7 +165,7 @@ class KeyboardInputItem():
                     # if virtual_code > 0:
                     #     key = gremlin.keyboard.KeyMap.find_virtual(virtual_code)
                     # else:
-                    scan_code, is_extended = gremlin.keyboard.KeyMap.translate((scan_code, is_extended))
+                    (scan_code, is_extended), _= gremlin.keyboard.KeyMap.translate((scan_code, is_extended))
                     key = gremlin.keyboard.KeyMap.find(scan_code, is_extended)
                     
                     self._key = key
@@ -182,7 +182,7 @@ class KeyboardInputItem():
                                 # if virtual_code > 0:
                                 #     key = gremlin.keyboard.KeyMap.find_virtual(virtual_code)
                                 # else:
-                                scan_code, is_extended = gremlin.keyboard.KeyMap.translate((scan_code, is_extended))
+                                (scan_code, is_extended), _ = gremlin.keyboard.KeyMap.translate((scan_code, is_extended))
                                 key = gremlin.keyboard.KeyMap.find(scan_code, is_extended)
                             if not key in self._key.latched_keys:
                                 self._key._latched_keys.append(key) 
