@@ -383,7 +383,6 @@ class CodeRunner:
                     logging.getLogger("system").info(f"Using profile start mode: '{mode}'")
                 self.event_handler.change_mode(mode)
                 
-            self.event_handler.resume()
             self._running = True
             gremlin.shared_state.is_running = True
 
@@ -395,6 +394,10 @@ class CodeRunner:
             # tell listener profiles are starting
             el = gremlin.event_handler.EventListener()
             el.profile_start.emit()
+
+            #print ("resume!")
+            self.event_handler.resume()
+
 
 
         except Exception as e:

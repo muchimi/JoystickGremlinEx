@@ -469,11 +469,11 @@ class EventListener(QtCore.QObject):
 		# verbose = True
 		virtual_code = event.virtual_code
 		key_id = (event.scan_code, event.is_extended)
-		print (f"recorded key: {key_id} vk: {virtual_code} (0x{virtual_code:X})")
+		# print (f"recorded key: {key_id} vk: {virtual_code} (0x{virtual_code:X})")
 
 		# deal with any code translations needed
 		key_id, virtual_code = KeyMap.translate(key_id) # modify scan codes if needed 
-		print (f"translated key: {KeyMap.keyid_tostring(key_id)}  vk: {virtual_code} (0x{virtual_code:X})")
+		# print (f"translated key: {KeyMap.keyid_tostring(key_id)}  vk: {virtual_code} (0x{virtual_code:X})")
 
 		is_pressed = event.is_pressed
 		# if virtual_code > 0:
@@ -1025,7 +1025,7 @@ class EventHandler(QtCore.QObject):
 							logging.getLogger("system").info(f"Detect KEY RELEASED: {input_item.key.name}")
 									
 					if latch_key:
-						print (f"Found latched key: {latch_key}")
+						#print (f"Found latched key: {latch_key}")
 						m_list = self._matching_latched_callbacks(event, latch_key)
 						if m_list:
 							if verbose:
@@ -1035,8 +1035,8 @@ class EventHandler(QtCore.QObject):
 								logging.getLogger("system").info(trigger_line)
 							self._trigger_callbacks(m_list, event)
 							return
-						else:
-							print (f"No callbacks found for: {latch_key}")
+						# else:
+						# 	print (f"No callbacks found for: {latch_key}")
 
 			else:
 				if verbose:

@@ -2367,7 +2367,7 @@ class ProfileMapItem():
                 for element in tree.xpath("//profile"):
                     # <profile version="10" start_mode="Default" restore_last="True">
                     if not default_mode:
-                        default_mode = safe_read(element, "start_mode", str, None)
+                        default_mode = safe_read(element, "start_mode", str, '')
                     
                     restore_last = safe_read(element, "restore_last", bool, False)
 
@@ -2383,6 +2383,8 @@ class ProfileMapItem():
             
             except Exception as ex:
                 logging.getLogger("system").error(f"PROC MAP: Unable to open profile mapping: {profile}:\n{ex}")  
+
+        # profile is blank
         return ([], None, False)
     
     def save(self):
@@ -2453,6 +2455,9 @@ class ProfileMapItem():
     @warning.setter
     def warning(self, value):
         self._warning = value
+
+    def __str__(self):
+        return f"ProfileItem: process: {self.process}  profile: {self.profile}  default mode: {self.default_mode}  valid: {self.valid}"
 
 @SingletonDecorator
 class ProfileMap():
@@ -2587,10 +2592,11 @@ class ProfileMap():
                 self._valid = False
 
             mode_list, _, _= item.get_profile_modes()
-            if not item.default_mode in mode_list:
-                valid = False
-                warning = f"Startup mode '{item.default_mode}' does not exist for this profile"
-                self._valid = False
+            if mode_list:
+                if not item.default_mode in mode_list:
+                    valid = False
+                    warning = f"Startup mode '{item.default_mode}' does not exist for this profile"
+                    self._valid = False
 
             # print (f"Validation: Item process: {item.process} profile: {item.profile} valid: {valid}")
             item.valid = valid

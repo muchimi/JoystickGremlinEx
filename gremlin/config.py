@@ -594,6 +594,20 @@ class Configuration:
         self._data["activate_on_launch"] = bool(value)
         self.save()
 
+
+    @property
+    def activate_on_process_focus(self):
+        """Returns whether or not to activate the profile on process focus."""
+        return self._data.get("activate_on_process_focus", False)
+
+    @activate_on_process_focus.setter
+    def activate_on_process_focus(self, value):
+        """Sets whether or not to activate the profile on launch."""
+        self._data["activate_on_process_focus"] = bool(value)
+        self.save()
+
+
+
     @property
     def close_to_tray(self):
         """Returns whether or not to minimze the application when closing it.

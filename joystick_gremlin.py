@@ -64,6 +64,7 @@ from gremlin.ui.osc_device import OscDeviceTabWidget
 
 
 from gremlin.util import log_sys_error, compare_path
+import gremlin.util
 
 
 
@@ -147,7 +148,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             self._update_statusbar_repeater
         )
         self.runner.event_handler.mode_changed.connect(
-            self._update_mode
+            self._update_status_bar_mode
         )
         self.runner.event_handler.is_active.connect(
             self._update_statusbar_active
@@ -429,7 +430,7 @@ class GremlinUi(QtWidgets.QMainWindow):
     # | Action implementations
     # +---------------------------------------------------------------
 
-    def activate(self, set_active):
+    def activate(self, activate):
         """Activates and deactivates the code runner.
 
         :param checked True when the runner is to be activated, False
@@ -438,9 +439,22 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         from gremlin.config import Configuration
         verbose = Configuration().verbose
-        
 
-        if not set_active:
+        if activate:
+            # Generate the code for the profile and run it
+            if verbose:
+                logging.getLogger("system").info(f"Activate: activate profile")
+            self._profile_auto_activated = False
+            self.runner.start(
+                self._profile.build_inheritance_tree(),
+                self._profile.settings,
+                self._last_active_mode(),
+                self._profile
+            )
+            #print ("set icon ACTIVE")
+            self.ui.tray_icon.setIcon(load_icon("gfx/icon_active.ico"))
+            
+        else:
             # Stop running the code
             if verbose:
                 logging.getLogger("system").info(f"Deactivate profile requested")
@@ -461,22 +475,9 @@ class GremlinUi(QtWidgets.QMainWindow):
 
             ]:
                 self.ui.devices.currentWidget().refresh()
+            #print ("set icon INACTIVE")
             self.ui.tray_icon.setIcon(load_icon("gfx/icon.ico"))
-            
-        else:
-            # Generate the code for the profile and run it
-            if verbose:
-                logging.getLogger("system").info(f"Activate: activate profile")
-            self._profile_auto_activated = False
-            self.runner.start(
-                self._profile.build_inheritance_tree(),
-                self._profile.settings,
-                self._last_active_mode(),
-                self._profile
-            )
-            self.ui.tray_icon.setIcon(load_icon("gfx/icon_active.ico"))
-            
-            
+                    
             
 
     def create_1to1_mapping(self):
@@ -1155,31 +1156,33 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         config = gremlin.config.Configuration()
 
-        if gremlin.shared_state.is_running and not config.runtime_ui_update:
-            # ignore updates when running a profile unless the UI should be updated
-            return 
+        # if gremlin.shared_state.is_running and not config.runtime_ui_update:
+        #     # ignore updates when running a profile unless the UI should be updated
+        #     return 
 
-        
-        
         # check options
         option_auto_load = config.autoload_profiles  
+        option_auto_load_on_focus = config.activate_on_process_focus
 
-        if not option_auto_load:
-            return # ignore if not auto loading profiles
+
+
+        if not option_auto_load and not option_auto_load_on_focus:
+            return # ignore if not auto loading profiles or auto activating on focus change
 
         option_restore_mode = config.restore_profile_mode_on_start or self._profile.get_restore_mode()
         option_keep_focus = config.keep_profile_active_on_focus_loss  
         option_reset_mode_on_process_activate = config.reset_mode_on_process_activate 
-        
+        eh = gremlin.event_handler.EventHandler()
 
         verbose = gremlin.config.Configuration().verbose
         # if verbose:
         #     logging.getLogger("system").info(f"PROC: Process focus change detected: {os.path.basename(path)}  autoload: {option_auto_load}  keep focus: {option_keep_focus} restore mode: {option_restore_mode}")
 
-        # is if we have a mapping entry for this executable
+        # see if we have a mapping entry for this executable
         profile_item = self._profile_map.get_map(path)
         profile_path = profile_item.profile if profile_item else None
         profile_change = False # assume no profile change
+        #print (f"Profile: {profile_item}")
         mode = None # assume no mode change needed
         if profile_path:
             # profile entry found - see if we need to change profiles
@@ -1191,7 +1194,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                 self.activate(False)
                 self._do_load_profile(profile_path)
                 self.ui.actionActivate.setChecked(True)
-                self.activate(True)
+                
                 self._profile_auto_activated = True # remember the profile was auto activated by virtue of a process change
                 profile_change = True
 
@@ -1200,7 +1203,21 @@ class GremlinUi(QtWidgets.QMainWindow):
                     # get the mode to restore
                     mode = self._profile.get_last_mode()
                     if verbose:
-                        logging.getLogger("system").info(f"PROC: profile: '{os.path.basename(profile_path)}' restore last mode: '{mode}' ")                    
+                        logging.getLogger("system").info(f"PROC: profile: '{os.path.basename(profile_path)}' restore last mode: '{mode}' ")     
+
+            # see if we need to activate the profile 
+            if option_auto_load_on_focus and not self.runner.is_running():
+                self.ui.actionActivate.setChecked(True) # activate
+                self._profile_auto_activated = True # remember the profile was auto activated by virtue of a process change
+                if verbose:
+                    logging.getLogger("system").info(f"PROC: profile: '{os.path.basename(profile_path)}' auto activate")
+
+                if option_restore_mode:
+                    # get the mode to restore
+                    mode = self._profile.get_last_mode()
+                    if verbose:
+                        logging.getLogger("system").info(f"PROC: profile: '{os.path.basename(profile_path)}' restore last mode: '{mode}' ")
+
 
             # a mapping profile was found - new profile was loaded if needed - see if we need to change the mode
             reset_mode = (profile_change or option_reset_mode_on_process_activate and profile_item.default_mode)
@@ -1235,7 +1252,9 @@ class GremlinUi(QtWidgets.QMainWindow):
             self.activate(False)
             self._profile_auto_activated = False
             if verbose:
-                logging.getLogger("system").info(f"PROC: keep focus not set - deactivated profile {os.path.basename(profile_path)}")
+                current_profile = gremlin.shared_state.current_profile
+                if current_profile:
+                    logging.getLogger("system").info(f"PROC: keep focus not set - deactivated profile {current_profile.name}")
 
     def _tray_icon_activated_cb(self, reason):
         """Callback triggered by clicking on the system tray icon.
@@ -1249,6 +1268,7 @@ class GremlinUi(QtWidgets.QMainWindow):
     def _update_statusbar_active(self, is_active):
         self._is_active = is_active
         self._update_status_bar(remote_state.to_state_event())
+        self._update_status_bar_mode(gremlin.shared_state.current_mode)
 
     def _update_status_bar(self, event):
         # updates the status bar
@@ -1283,7 +1303,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             log_sys_error(f"Unable to update status bar event: {event}")
             log_sys_error(e)
 
-    def _update_mode(self, new_mode):
+    def _update_status_bar_mode(self, new_mode):
         """ called when the profile mode changes 
 
         :param mode the now current mode

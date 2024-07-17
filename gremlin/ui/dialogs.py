@@ -389,6 +389,7 @@ will remain active until a different profile is loaded.""")
         self.keep_active_on_focus_lost_checkbox.clicked.connect(self._keep_focus)
         self.keep_active_on_focus_lost_checkbox.setChecked(self.config.keep_profile_active_on_focus_loss)
         self.keep_active_on_focus_lost_checkbox.setEnabled(self.config.autoload_profiles)
+
         self.keep_active_on_focus_lost_checkbox.setToolTip("When set, GremlinEx will keep the profile active when the target application loses focus (such as on alt-tab)")
 
 
@@ -397,6 +398,12 @@ will remain active until a different profile is loaded.""")
         self.activate_on_launch.clicked.connect(self._activate_on_launch)
         self.activate_on_launch.setChecked(self.config.activate_on_launch)
         self.activate_on_launch.setToolTip("When set, the last used profile will be automatically activated when GremlinEx starts.")
+
+        self.activate_on_process_focus = QtWidgets.QCheckBox("Auto-Activate on profile focus")
+        self.activate_on_process_focus.clicked.connect(self._activate_on_process_focus)
+        self.activate_on_process_focus.setChecked(self.config.activate_on_process_focus)
+        self.activate_on_process_focus.setEnabled(self.config.autoload_profiles)
+        self.activate_on_process_focus.setToolTip("When set, Gremlin Ex will automatically load and activate a profile when a mapped profile receives the focus regardless of other options")
 
         # Restore last mode on profile activate
         self.activate_restore_mode = QtWidgets.QCheckBox("Restore last used mode on profile activation (global)")
@@ -420,6 +427,8 @@ This setting is also available on a profile by profile basis on the profile tab,
         row+=1
         self.profile_page_layout.addWidget(self.keep_active_on_focus_lost_checkbox,row,0)
         row+=1
+        self.profile_page_layout.addWidget(self.activate_on_process_focus,row,0)
+        row+=1        
         self.profile_page_layout.addWidget(self.activate_on_launch,row,0)
         row+=1
         self.profile_page_layout.addWidget(self.activate_restore_mode,row,0)
@@ -611,23 +620,24 @@ This setting is also available on a profile by profile basis on the profile tab,
         :param clicked whether or not the checkbox is ticked
         """
         self.keep_active_on_focus_lost_checkbox.setEnabled(checked)
+        self.activate_on_process_focus.setEnabled(checked)
         self.config.autoload_profiles = checked
 
 
     def _keep_focus(self, checked):
         self.config.keep_profile_active_on_focus_loss = checked
 
-
     def _activate_on_launch(self, checked):
         self.config.activate_on_launch = checked
+
+    def _activate_on_process_focus(self, checked):
+        self.config.activate_on_process_focus = checked
 
     def _runtime_ui_update(self, checked):
         self.config.runtime_ui_update = checked
 
-
     def _restore_profile_mode(self, checked):
         self.config.restore_profile_mode_on_start = checked
-
 
     def _initial_load_mode_tts(self, checked):
         self.config.initial_load_mode_tts = checked
@@ -790,6 +800,7 @@ This setting is also available on a profile by profile basis on the profile tab,
             self.executable_selection.currentText(),
             self.profile_field.text()
         )
+        self._profile_mapper.validate()
 
     def _init_action_dropdown(self):
         """Initializes the action selection dropdown menu."""
@@ -916,6 +927,7 @@ This setting is also available on a profile by profile basis on the profile tab,
             exe_widget = None
             xml_widget = None
             mode_list, profile_default_mode, restore_mode = item.get_profile_modes()
+            mode_enabled = bool(mode_list)
 
             if item:
                 # add a new item if it exists and either one of the profile/process entries are refined
@@ -952,12 +964,17 @@ This setting is also available on a profile by profile basis on the profile tab,
                 restore_widget.setToolTip("When set, restores the last used mode if the profile has been automatically loaded on process change")
 
                 mode_widget = ui_common.QDataComboBox(item)
+                
                 mode_widget.addItems(mode_list)
-                if profile_default_mode:
-                    mode_widget.setCurrentText(profile_default_mode)
-                    item.default_mode = profile_default_mode
+                if mode_enabled:
+                    if profile_default_mode:
+                        mode_widget.setCurrentText(profile_default_mode)
+                        item.default_mode = profile_default_mode
+                    elif mode_list:
+                        item.default_mode = mode_list[0] # first item 
+                    mode_widget.setEnabled(True)
                 else:
-                    item.default_mode = mode_list[0] # first item 
+                    mode_widget.setEnabled(False)
 
             
                 mode_widget.currentIndexChanged.connect(self._default_mode_changed)
@@ -1041,6 +1058,7 @@ This setting is also available on a profile by profile basis on the profile tab,
             item.profile = fname
             with QtCore.QSignalBlocker(widget):
                 widget.setText(fname)
+            self.populate_map()
 
 
     def _select_executable(self, fname):
