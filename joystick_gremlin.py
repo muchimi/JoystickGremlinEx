@@ -30,14 +30,29 @@ import traceback
 import threading
 import webbrowser
 
+import dinput
+import gremlin.ui.keyboard_device
+import gremlin.ui.midi_device
+import gremlin.ui.osc_device
+import gremlin.util
+
 # Import QtMultimedia so pyinstaller doesn't miss it
 import PySide6
-from PySide6 import QtCore, QtGui, QtMultimedia, QtWidgets
+from PySide6 import QtCore, QtGui, QtWidgets
 
+import gremlin.event_handler 
+import gremlin.shared_state
+from gremlin.input_types import InputType
+from gremlin.types import DeviceType
+
+
+
+import gremlin.config
+from gremlin.util import load_icon, load_pixmap, userprofile_path, find_file, waitCursor, popCursor
 
 
 import gremlin.code_runner
-from gremlin.input_types import InputType
+
 import gremlin.keyboard
 import gremlin.process_monitor
 import gremlin.code_runner
@@ -48,23 +63,9 @@ import gremlin.base_profile
 import gremlin.control_action
 
 
-import dinput
-
-
-import gremlin.event_handler 
-import gremlin.config
-import gremlin.shared_state
 import gremlin.tts
-from gremlin.types import DeviceType
-from gremlin.util import load_icon, load_pixmap, userprofile_path, find_file, waitCursor, popCursor
-from gremlin.ui.device_tab import JoystickDeviceTabWidget
-from gremlin.ui.keyboard_device import KeyboardDeviceTabWidget
-from gremlin.ui.midi_device  import MidiDeviceTabWidget
-from gremlin.ui.osc_device import OscDeviceTabWidget
-
 
 from gremlin.util import log_sys_error, compare_path
-import gremlin.util
 
 
 
@@ -87,10 +88,7 @@ import gremlin.ui.profile_settings
 from PySide6 import QtCore
 
 from gremlin.ui.ui_gremlin import Ui_Gremlin
-from gremlin.input_devices import remote_state
-
-from gremlin.ui.midi_device import MidiDeviceTabWidget
-from gremlin.ui.osc_device import OscDeviceTabWidget
+#from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
 APPLICATION_VERSION = "13.40.14ex (k)"
@@ -157,7 +155,6 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         self.mode_selector = gremlin.ui.ui_common.ModeWidget()
         self.mode_selector.edit_mode_changed.connect(self._edit_mode_changed_cb)
-        self.mode_selector.start_mode_changed.connect(self._start_mode_changed_cb)
 
         self.ui.toolBar.addWidget(self.mode_selector)
 
@@ -444,6 +441,16 @@ class GremlinUi(QtWidgets.QMainWindow):
             otherwise
         """
 
+        import gremlin.ui.device_tab
+        import gremlin.ui.keyboard_device
+        import gremlin.ui.midi_device
+        import gremlin.ui.osc_device
+
+        # from gremlin.ui.device_tab import JoystickDeviceTabWidget
+        # from gremlin.ui.keyboard_device import KeyboardDeviceTabWidget
+        # from gremlin.ui.midi_device  import MidiDeviceTabWidget
+        # from gremlin.ui.osc_device import OscDeviceTabWidget
+
         from gremlin.config import Configuration
         verbose = Configuration().verbose
 
@@ -475,10 +482,10 @@ class GremlinUi(QtWidgets.QMainWindow):
             self._profile_auto_activated = False
             current_tab = self.ui.devices.currentWidget()
             if type(current_tab) in [
-                JoystickDeviceTabWidget,
-                KeyboardDeviceTabWidget,
-                MidiDeviceTabWidget,
-                OscDeviceTabWidget
+                gremlin.ui.device_tab.JoystickDeviceTabWidget,
+                gremlin.ui.keyboard_device.KeyboardDeviceTabWidget,
+                gremlin.ui.midi_device.MidiDeviceTabWidget,
+                gremlin.ui.osc_device.OscDeviceTabWidget
 
             ]:
                 self.ui.devices.currentWidget().refresh()
@@ -601,14 +608,14 @@ class GremlinUi(QtWidgets.QMainWindow):
         # add MIDI device
         midi_device =  gremlin.base_profile.Device(self._profile)
         midi_device.name = "midi"
-        midi_device.device_guid = MidiDeviceTabWidget.device_guid
+        midi_device.device_guid = gremlin.ui.midi_device.MidiDeviceTabWidget.device_guid
         midi_device.type = DeviceType.Midi
         self._profile.devices[midi_device.device_guid ] = midi_device
 
         # add OSC device
         osc_device =  gremlin.base_profile.Device(self._profile)
         osc_device.name = "osc"
-        osc_device.device_guid = OscDeviceTabWidget.device_guid
+        osc_device.device_guid = gremlin.ui.osc_device.OscDeviceTabWidget.device_guid
         osc_device.type = DeviceType.Osc
         self._profile.devices[osc_device.device_guid ] = osc_device
 
@@ -823,7 +830,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                 device.name
             )
 
-            widget = JoystickDeviceTabWidget(
+            widget = gremlin.ui.device_tab.JoystickDeviceTabWidget(
                 device,
                 device_profile,
                 self.current_mode
@@ -839,7 +846,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             DeviceType.Keyboard,
             DeviceType.to_string(DeviceType.Keyboard)
         )
-        widget = KeyboardDeviceTabWidget(
+        widget = gremlin.ui.keyboard_device.KeyboardDeviceTabWidget(
             device_profile,
             self.current_mode
         )
@@ -847,32 +854,32 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.ui.devices.addTab(widget, "Keyboard")
 
         device_profile = self._profile.get_device_modes(
-            MidiDeviceTabWidget.device_guid,
+            gremlin.ui.midi_device.MidiDeviceTabWidget.device_guid,
             DeviceType.Midi,
             DeviceType.to_string(DeviceType.Midi)
         )
 
         # Create MIDI tab
-        widget = MidiDeviceTabWidget(
+        widget = gremlin.ui.midi_device.MidiDeviceTabWidget(
             device_profile,
             self.current_mode
         )
-        self.tabs[MidiDeviceTabWidget.device_guid] = widget
+        self.tabs[gremlin.ui.midi_device.MidiDeviceTabWidget.device_guid] = widget
         self.ui.devices.addTab(widget, "MIDI")
 
         
         device_profile = self._profile.get_device_modes(
-            OscDeviceTabWidget.device_guid,
+            gremlin.ui.osc_device.OscDeviceTabWidget.device_guid,
             DeviceType.Osc,
             DeviceType.to_string(DeviceType.Osc)
         )
 
         # Create OSC tab
-        widget = OscDeviceTabWidget(
+        widget = gremlin.ui.osc_device.OscDeviceTabWidget(
             device_profile,
             self.current_mode
         )
-        self.tabs[OscDeviceTabWidget.device_guid] = widget
+        self.tabs[gremlin.ui.osc_device.OscDeviceTabWidget.device_guid] = widget
         self.ui.devices.addTab(widget, "OSC")
 
         # Create the vjoy as output device tab
@@ -1150,14 +1157,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             eh = gremlin.event_handler.EventHandler()
             eh.change_mode(new_mode)
 
-    def _start_mode_changed_cb(self, new_mode):
-        """Updates the default start mode to the provided one.
-
-        :param new_mode the name of the new current mode
-        """
-        self.current_profile.set_default_start_mode(new_mode)
-        pass
-
+    
 
     def _process_changed_cb(self, path):
         """Handles changes in the active process.
@@ -1282,8 +1282,9 @@ class GremlinUi(QtWidgets.QMainWindow):
 
 
     def _update_status_bar_active(self, is_active):
+        import gremlin.input_devices
         self._is_active = is_active
-        self._update_status_bar(remote_state.to_state_event())
+        self._update_status_bar(gremlin.input_devices.remote_state.to_state_event())
         self._update_status_bar_mode(gremlin.shared_state.current_mode)
 
     def _update_status_bar(self, event):

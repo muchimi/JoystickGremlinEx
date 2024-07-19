@@ -20,12 +20,11 @@ import logging
 
 from PySide6 import QtWidgets, QtCore
 
-import container_plugins.basic
+
 import gremlin
+import gremlin.types
 from gremlin.types import DeviceType
 from gremlin.input_types import InputType
-import gremlin.types
-from . import input_item, ui_common
 import gremlin.util
 
 
@@ -86,6 +85,8 @@ class InputItemConfiguration(QtWidgets.QFrame):
 
         :param action_name name of the action to be added
         """
+        import container_plugins.basic
+        import gremlin.plugin_manager
         # If this is a vJoy item then do not permit adding an action if
         # there is already one present, as only response curves can be added
         # and only one of them makes sense to exist
@@ -109,6 +110,8 @@ class InputItemConfiguration(QtWidgets.QFrame):
 
     def _paste_action(self, action):
         """ paste action to the input item """
+        import container_plugins.basic
+        import gremlin.plugin_manager
         if self.item_data.get_device_type() == DeviceType.VJoy:
             if len(self.item_data.containers) > 0:
                 return
@@ -173,9 +176,11 @@ class InputItemConfiguration(QtWidgets.QFrame):
         """Creates a drop down selection with actions that can be
         added to the current input item.
         """
+        import gremlin.ui.input_item as input_item
+        import gremlin.ui.ui_common as ui_common
         self.action_layout = QtWidgets.QHBoxLayout()
 
-        self.action_selector = gremlin.ui.ui_common.ActionSelector(
+        self.action_selector = ui_common.ActionSelector(
             self.item_data.input_type
         )
         self.action_selector.action_added.connect(self._add_action)
@@ -246,7 +251,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
         return sorted(action_names)
 
 
-class ActionContainerModel(ui_common.AbstractModel):
+class ActionContainerModel(gremlin.ui.ui_common.AbstractModel):
 
     """Stores action containers for display using the corresponding view."""
 
@@ -299,7 +304,7 @@ class ActionContainerModel(ui_common.AbstractModel):
         self.data_changed.emit()
 
 
-class ActionContainerView(ui_common.AbstractView):
+class ActionContainerView(gremlin.ui.ui_common.AbstractView):
 
     """View class used to display ActionContainerModel contents."""
 
@@ -335,7 +340,8 @@ class ActionContainerView(ui_common.AbstractView):
 
     def redraw(self):
         """Redraws the entire view."""
-        ui_common.clear_layout(self.scroll_layout)
+        import gremlin.ui.ui_common
+        gremlin.ui.ui_common.clear_layout(self.scroll_layout)
         container_count = self.model.rows()
         if container_count:
             for index in range(container_count):
@@ -378,6 +384,9 @@ class JoystickDeviceTabWidget(QtWidgets.QWidget):
         :param parent the parent of this widget
         """
         super().__init__(parent)
+
+        import gremlin.plugin_manager
+        import gremlin.ui.input_item as input_item
 
         # Store parameters
         self.device_profile = device_profile

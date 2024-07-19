@@ -26,6 +26,7 @@ import gremlin.joystick_handling
 import gremlin.profile
 import gremlin.input_devices
 import gremlin.plugin_manager
+import gremlin.shared_state
 from gremlin.singleton_decorator import SingletonDecorator
 from lxml import etree
 
@@ -1087,6 +1088,7 @@ class Profile():
         self._last_mode = None # last active mode
         self._restore_last_mode = False # True if the profile should start with the last active mode (profile specific)
         self._dirty = False # dirty flag - indicates the profile data was changed but not saved yet
+        self._force_numlock_off = True # if set, forces numlock to be off if it isn't so numpad keys report the correct scan codes
 
     @property
     def dirty(self):
@@ -1197,8 +1199,12 @@ class Profile():
         return self._last_mode
 
 
-
-            
+    def get_force_numlock(self):
+        return self._force_numlock_off
+    
+    def set_force_numlock(self, value):
+        self._force_numlock_off = value
+        self.save()
 
 
 
@@ -1313,6 +1319,9 @@ class Profile():
         if "restore_last" in root.attrib:
             self._restore_last_mode = safe_read(root, "restore_last", bool, False)
 
+        if "force_numlock" in root.attrib:
+            self._force_numlock_off = safe_read(root, "force_numlock", bool, True)
+
 
         # Parse each device into separate DeviceConfiguration objects
         for child in root.iter("device"):
@@ -1403,6 +1412,7 @@ class Profile():
         root.set("start_mode", self.get_start_mode())
         root.set("default_mode", self.get_default_start_mode())
         root.set("restore_last", str(self._restore_last_mode))
+        root.set("force_numlock", str(self._force_numlock_off))
 
         # Device settings
         devices = ElementTree.Element("devices")
@@ -2305,6 +2315,16 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
         self._create_transitions(sequence)
 
 
+class ProfileData():
+    ''' data block returned by the get_profile_data function'''
+    def __init__(self):
+        self.mode_list = []
+        self.default_mode = None
+        self.start_mode = None
+        self.force_numlock_off = True
+        self.restore_last = False
+
+
 class ProfileMapItem():
     ''' holds a mapping of a profile xml to an exe '''
 
@@ -2313,11 +2333,13 @@ class ProfileMapItem():
         self._process = process
         self._modes = []
         self._default_mode = None # default mode for the profile (user defined) - if not set - this is the first root mode in the profile
-        self._last_mode = None # last moded used by the profile
+        self._last_mode = None # last moded used by the profile (start mode)
         self._restore_mode = False
         self._index = -1
         self._warning = None
         self._valid = True # assume valid
+        self._force_numlock_off = True
+        
         self._update()
 
     @property
@@ -2329,6 +2351,16 @@ class ProfileMapItem():
             # uniformly store paths
             value = value.replace("\\","/").lower().strip()
         self._profile = value
+
+    @property
+    def numlock_force(self):
+        return self._force_numlock_off
+    
+    @numlock_force.setter
+    def numlock_force(self, value):
+        self._force_numlock_off = value
+        self._update()
+
 
     @property
     def process(self):
@@ -2378,7 +2410,7 @@ class ProfileMapItem():
     def last_mode(self, value):
         self._last_mode = value
 
-    def get_profile_modes(self):
+    def get_profile_data(self) -> ProfileData:
         ''' gets the list of profile modes in a given profile 
         :returns tuple (mode_list, default_mode, last_mode, restore_mode_flag)
         '''
@@ -2391,73 +2423,89 @@ class ProfileMapItem():
 
         current_profile : Profile = gremlin.shared_state.current_profile
         profile = self.profile
+        force_numlock_off = True
+        pd = ProfileData()
 
-        if not profile:
-            # no data
-            return ([], None, None, False)
+        if profile:
         
-        if current_profile.profile_file == profile:
-            # current profile loaded - use that profile data since it's loaded and changes may not be saved yet to XML
-            return (current_profile.get_modes(), current_profile.get_default_start_mode(), current_profile.get_start_mode(), current_profile.get_restore_mode())
+            if current_profile.profile_file == profile:
+                # current profile loaded - use that profile data since it's loaded and changes may not be saved yet to XML
+                pd.mode_list = current_profile.get_modes()
+                pd.default_mode = current_profile.get_default_start_mode()
+                pd.start_mode = current_profile.get_start_mode()
+                pd.restore_last = current_profile.get_restore_mode()
+                pd.force_numlock_off = current_profile.get_force_numlock()
+                return pd
 
-        # profile not loaded - grab the info from the profile xml
-        if os.path.isfile(profile):
-            try:
-                parser = etree.XMLParser(remove_blank_text=True)
-                tree = etree.parse(profile, parser)
-                for element in tree.xpath("//mode"):
-                    mode = element.get("name")
-                    mode_list.add(mode)
-                mode_list = list(mode_list)
+            # profile not loaded - grab the info from the profile xml
+            if os.path.isfile(profile):
+                try:
+                    parser = etree.XMLParser(remove_blank_text=True)
+                    tree = etree.parse(profile, parser)
+                    for element in tree.xpath("//mode"):
+                        mode = element.get("name")
+                        mode_list.add(mode)
+                    mode_list = list(mode_list)
+                        
+                    for element in tree.xpath("//profile"):
+                        # <profile version="10" start_mode="Default" restore_last="True">
+                        if not default_mode:
+                            default_mode = safe_read(element, "default_mode", str, mode_list[0] if mode_list else '')
+                        if not start_mode:
+                            start_mode = safe_read(element, "start_mode", str, mode_list[0] if mode_list else '')
+                        restore_last = safe_read(element, "restore_last", bool, False)
+                        force_numlock_off = safe_read(element,"force_numlock", bool, True)
+
+                    if not restore_last is None:
+                        for element in tree.xpath("//startup-mode"):
+                            start_mode = element.text
+                            break
                     
-                for element in tree.xpath("//profile"):
-                    # <profile version="10" start_mode="Default" restore_last="True">
-                    if not default_mode:
-                        default_mode = safe_read(element, "default_mode", str, mode_list[0] if mode_list else '')
-                    if not start_mode:
-                        start_mode = safe_read(element, "start_mode", str, mode_list[0] if mode_list else '')
+
+                    if not restore_last is None:
+                        restore_last = False # default value
+
                     
-                    restore_last = safe_read(element, "restore_last", bool, False)
+                    pd.mode_list = mode_list
+                    pd.default_mode = default_mode
+                    pd.start_mode = start_mode
+                    pd.restore_last = restore_last
+                    pd.force_numlock_off = force_numlock_off
 
-                if not restore_last is None:
-                    for element in tree.xpath("//startup-mode"):
-                        start_mode = element.text
-                        break
+                except Exception as ex:
+                    logging.getLogger("system").error(f"PROC MAP: Unable to open profile mapping: {profile}:\n{ex}")  
 
-                if not restore_last is None:
-                    restore_last = False # default value
-
-                return (mode_list, default_mode, start_mode, restore_last)
-            
-            except Exception as ex:
-                logging.getLogger("system").error(f"PROC MAP: Unable to open profile mapping: {profile}:\n{ex}")  
-
-        # profile is blank
-        return ([], None, None, False)
+        return pd
     
     def save(self):
         ''' saves default and restore mode flags to the profile xml '''
 
         profile = self.profile
+        if not self._last_mode:
+            self._last_mode = self._default_mode
         
         current_profile : Profile = gremlin.shared_state.current_profile
         if compare_path(current_profile.profile_file, profile):
             current_profile.set_restore_mode(self._restore_mode)
             if self._default_mode:
                 current_profile.set_start_mode(self._default_mode)
+            current_profile.set_force_numlock(self._force_numlock_off)
             current_profile.save()
+            
             return
 
         
         if os.path.isfile(profile):
-            # read the xml
+            # write the xml
             try:
                 parser = etree.XMLParser(remove_blank_text=True)
                 tree = etree.parse(profile, parser)
                 for element in tree.xpath("//profile"):
                     element.set("restore_last", str(self._restore_mode))
                     if self._default_mode:
-                        element.set("start_mode", self._default_mode)
+                        element.set("default_mode", self._default_mode)
+                    element.set("start_mode", self.last_mode)
+                    element.set("force_numlock", str(self._force_numlock_off))
                     profile_node = element
                     break
 
@@ -2487,7 +2535,12 @@ class ProfileMapItem():
                 logging.getLogger("system").error(f"PROC MAP: Unable to open profile mapping: {profile}:\n{ex}")  
 
     def _update(self):
-        self._modes, self._default_mode, self._last_mode, self._restore_mode = self.get_profile_modes()
+        pd = self.get_profile_data()
+        self._modes = pd.mode_list
+        self._default_mode = pd.default_mode
+        self._last_mode = pd.start_mode
+        self._restore_mode = pd.restore_last
+        self._force_numlock_off = pd.force_numlock_off
 
     @property
     def valid(self):
@@ -2639,9 +2692,9 @@ class ProfileMap():
                 warning = f"Mapping incomplete"
                 self._valid = False
 
-            mode_list, _, _, _= item.get_profile_modes()
-            if mode_list:
-                if not item.default_mode in mode_list:
+            pd = item.get_profile_data()
+            if pd.mode_list:
+                if not item.default_mode in pd.mode_list:
                     valid = False
                     warning = f"Startup mode '{item.default_mode}' does not exist for this profile"
                     self._valid = False

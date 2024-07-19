@@ -25,9 +25,9 @@ import threading
 import gremlin.config
 from gremlin.types import DeviceType
 from gremlin.input_types import InputType
-from . import input_item, ui_common 
+
 from gremlin.keyboard import Key
-from .device_tab import InputItemConfiguration
+
 import uuid
 from gremlin.singleton_decorator import SingletonDecorator
 import collections
@@ -51,8 +51,7 @@ from datetime import datetime, timedelta, date
 
 from gremlin.util import *
 from xml.etree import ElementTree
-import gremlin.ui.ui_common
-import gremlin.ui.input_item
+
 import enum
 
 
@@ -2519,6 +2518,8 @@ class OscDeviceTabWidget(QtWidgets.QWidget):
         :param parent the parent of this widget
         """
         super().__init__(parent)
+        import gremlin.ui.ui_common as ui_common
+        import gremlin.ui.input_item as input_item
 
         self._widget_map = {} # holds the created widgets by index
 
@@ -2565,7 +2566,7 @@ class OscDeviceTabWidget(QtWidgets.QWidget):
         if right_panel:
             self.main_layout.removeItem(right_panel)
 
-        widget = InputItemConfiguration()     
+        widget = gremlin.ui.device_tab.InputItemConfiguration()     
         self.main_layout.addWidget(widget,3)
 
         button_container_widget = QtWidgets.QWidget()
@@ -2619,7 +2620,7 @@ class OscDeviceTabWidget(QtWidgets.QWidget):
         if right_panel:
             self.main_layout.removeItem(right_panel)
 
-        widget = InputItemConfiguration()     
+        widget = gremlin.ui.device_tab.InputItemConfiguration()     
         self.main_layout.addWidget(widget,3)  
   
     def _add_input_cb(self):
@@ -2670,7 +2671,7 @@ class OscDeviceTabWidget(QtWidgets.QWidget):
             self.main_layout.removeItem(right_panel)
 
         item_data = self.input_item_list_model.data(index)
-        widget = InputItemConfiguration(item_data)
+        widget = gremlin.ui.device_tab.InputItemConfiguration(item_data)
         self.main_layout.addWidget(widget,3)            
 
         if item_data:

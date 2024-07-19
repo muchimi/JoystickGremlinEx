@@ -30,12 +30,13 @@ import win32con
 import win32api
 
 import gremlin
+from gremlin.singleton_decorator import SingletonDecorator
 from gremlin.input_types import InputType
-import gremlin.input_devices
 import gremlin.error
 import gremlin.keyboard
 import gremlin.sendinput
-from gremlin.singleton_decorator import SingletonDecorator
+import gremlin.input_devices
+
 
 
 

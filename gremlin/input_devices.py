@@ -32,9 +32,11 @@ import gremlin.config
 import gremlin.keyboard
 import gremlin.types
 from dinput import DILL, GUID, GUID_Invalid
+import gremlin.util
 from gremlin.util import get_guid
 
-from . import error, joystick_handling, util
+from . import error
+import gremlin.joystick_handling
 
 import win32api
 import gremlin.sendinput, gremlin.tts
@@ -42,10 +44,10 @@ import gremlin.sendinput, gremlin.tts
 import socketserver, socket, msgpack
 import enum
 
-from gremlin.singleton_decorator import SingletonDecorator
-from gremlin.event_handler import EventHandler, EventListener, Event
-import gremlin.util
-
+import gremlin.singleton_decorator
+#from gremlin.singleton_decorator import SingletonDecorator
+import gremlin.event_handler
+#from gremlin.event_handler import Event, EventHandler, EventListener
 
 
 syslog = logging.getLogger("system")
@@ -239,12 +241,12 @@ class InternalSpeech():
 			pass
 
 
-@SingletonDecorator
+@gremlin.singleton_decorator.SingletonDecorator
 class RemoteControl():
     ''' holds remote control status information'''
 
     def __init__(self):
-        from gremlin.event_handler import EventListener
+        
         self._is_remote = False
         self._is_local = False
         self._is_paired = False
@@ -252,7 +254,7 @@ class RemoteControl():
         config = gremlin.config.Configuration()
         self._is_broadcast = config.enable_remote_broadcast
         self._update(self._mode)
-        el = EventListener()
+        el = gremlin.event_handler.EventListener()
         el.config_changed.connect(self._config_changed)
         el.broadcast_changed.connect(self._broadcast_changed)
         
@@ -373,7 +375,7 @@ class RemoteControl():
         return event
 
 
-remote_state = RemoteControl()
+
 
 def get_remote_state():
     ''' gets the remote state '''
@@ -763,7 +765,7 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
             device = data["device"]
             target = data["target"]
             value = data["value"]
-            proxy = joystick_handling.VJoyProxy()
+            proxy = gremlin.joystick_handling.VJoyProxy()
             if device in proxy.vjoy_devices:
                 # valid device
                 vjoy = proxy[device]
@@ -826,7 +828,7 @@ class RPCGremlin():
         self._server.server_close()
         self._running = False
         syslog.debug("Gremlin listener stopped.")
-        proxy = joystick_handling.VJoyProxy()
+        proxy = gremlin.joystick_handling.VJoyProxy()
         # release any locks on devices
         proxy.reset()
 
@@ -847,10 +849,10 @@ class RPCGremlin():
             return
         
         # register the devices we will need
-        vjoyid_list = [dev.vjoy_id for dev in joystick_handling.joystick_devices() if dev.is_virtual]
+        vjoyid_list = [dev.vjoy_id for dev in gremlin.joystick_handling.joystick_devices() if dev.is_virtual]
         for key in vjoyid_list:
             try:
-                device = joystick_handling.VJoyProxy()[key]
+                device = gremlin.joystick_handling.VJoyProxy()[key]
                 syslog.debug(f"Remote proxy VJOY [{key}] ok")
             except:
                 pass
@@ -915,7 +917,7 @@ class RemoteServer(QtCore.QObject):
 
 
 
-@SingletonDecorator
+@gremlin.singleton_decorator.SingletonDecorator
 class RemoteClient(QtCore.QObject):
     """ Provides access to a remote Gremlin instance """
 
@@ -1259,9 +1261,9 @@ class MidiClient(QtCore.QObject):
     
 
     def __init__(self):
-        from gremlin.ui.midi_device import MidiInterface
+        import gremlin.ui.midi_device
         super().__init__()
-        self._interface = MidiInterface()
+        self._interface = gremlin.ui.midi_device.MidiInterface()
         self._interface.midi_message.connect(self._midi_message_cb)
         self._event_handler = gremlin.event_handler.EventHandler()
         self._event_listener = gremlin.event_handler.EventListener()
@@ -1375,35 +1377,6 @@ class MidiClient(QtCore.QObject):
     
 
 
-# Global registry of all registered callbacks
-callback_registry = CallbackRegistry()
-
-# Global registry of all periodic callbacks
-periodic_registry = PeriodicRegistry()
-
-# Global registry of all start callbacks -
-start_registry = SimpleRegistry()
-
-# Global registry of all stop callbacks
-stop_registry = SimpleRegistry()
-
-# Global registry of all mode change callbacks
-mode_registry = ModeChangeRegistry()
-
-# Global state registry of all state change callbacks
-state_registry = StateChangeRegistry()
-
-# Global remote server = listens to remote client events
-remote_server = RemoteServer()
-
-# Global remote client = sends events to server
-remote_client = RemoteClient()
-
-# listens to MIDI input
-midi_client = MidiClient()
-
-# listens to OSC input
-osc_client = OscClient()
 
 
 
@@ -1427,7 +1400,7 @@ def register_callback(callback, device, input_type, input_id):
     input_id : int
         Index of the input on which to execute the callback
     """
-    event = Event(
+    event = gremlin.event_handler.Event(
         event_type=input_type,
         device_guid=device.device_guid,
         identifier=input_id
@@ -1485,7 +1458,7 @@ class JoystickWrapper:
 
         @property
         def direction(self):
-            return util.dill_hat_lookup(DILL.get_hat(self._joystick_guid, self._index))
+            return gremlin.util.dill_hat_lookup(DILL.get_hat(self._joystick_guid, self._index))
 
     def __init__(self, device_guid):
         """Creates a new wrapper object for the given object id.
@@ -1664,8 +1637,9 @@ class VJoyPlugin:
     For a function to use this plugin it requires one of its parameters
     to be named "vjoy".
     """
+    
 
-    vjoy = joystick_handling.VJoyProxy()
+    vjoy = gremlin.joystick_handling.VJoyProxy()
 
     def __init__(self):
         self.keyword = "vjoy"
@@ -1711,7 +1685,7 @@ class JoystickPlugin:
         return partial_fn(callback, joy=JoystickPlugin.joystick)
 
 
-@SingletonDecorator
+@gremlin.singleton_decorator.SingletonDecorator
 class Keyboard(QtCore.QObject):
 
     """Provides access to the keyboard state."""
@@ -1721,7 +1695,7 @@ class Keyboard(QtCore.QObject):
         QtCore.QObject.__init__(self)
         self._keyboard_state = {} # holds the state of the keys
 
-    @QtCore.Slot(Event)
+    @QtCore.Slot(gremlin.event_handler.Event)
     def keyboard_event(self, event):
         """Handles keyboard events and updates state.
 
@@ -1807,7 +1781,7 @@ ButtonReleaseEntry = collections.namedtuple(
 )
 
 
-@SingletonDecorator
+@gremlin.singleton_decorator.SingletonDecorator
 class ButtonReleaseActions(QtCore.QObject):
 
     """Ensures a desired action is run when a button is released."""
@@ -1817,18 +1791,18 @@ class ButtonReleaseActions(QtCore.QObject):
         QtCore.QObject.__init__(self)
 
         self._registry = {}
-        el = EventListener()
+        el = gremlin.event_handler.EventListener()
         el.joystick_event.connect(self._input_event_cb)
         el.keyboard_event.connect(self._input_event_cb)
         el.virtual_event.connect(self._input_event_cb)
-        eh = EventHandler()
+        eh = gremlin.event_handler.EventHandler()
         self._current_mode = eh.active_mode
         eh.mode_changed.connect(self._mode_changed_cb)
 
     def register_callback(
         self,
         callback: Callable[[], None],
-        physical_event: Event
+        physical_event
     ) -> None:
         """Registers a callback with the system.
 
@@ -1851,7 +1825,7 @@ class ButtonReleaseActions(QtCore.QObject):
     def register_button_release(
         self,
         vjoy_input: int,
-        physical_event: Event,
+        physical_event,
         activate_on: bool = False,
         is_local = True,
         is_remote = False,
@@ -1891,7 +1865,7 @@ class ButtonReleaseActions(QtCore.QObject):
         """
 
         # Check if the button is valid otherwise we cause Gremlin to crash
-        vjoy = joystick_handling.VJoyProxy()
+        vjoy = gremlin.joystick_handling.VJoyProxy()
         if vjoy[vjoy_input[0]].is_button_valid(vjoy_input[1]):
             if is_local:
                 vjoy[vjoy_input[0]].button(vjoy_input[1]).is_pressed = False
@@ -1905,7 +1879,7 @@ class ButtonReleaseActions(QtCore.QObject):
                 f"vJoy {vjoy_input[0]:d} button {vjoy_input[1]:d}"
             )
 
-    def _input_event_cb(self, event: Event):
+    def _input_event_cb(self, event):
         """Runs callbacks associated with the given event.
 
         Args:
@@ -1929,7 +1903,7 @@ class ButtonReleaseActions(QtCore.QObject):
         self._current_mode = mode
 
 
-@SingletonDecorator
+@gremlin.singleton_decorator.SingletonDecorator
 class JoystickInputSignificant:
 
     """Checks whether or not joystick inputs are significant."""
@@ -1939,7 +1913,7 @@ class JoystickInputSignificant:
         self.reset()
 
    
-    def should_process(self, event: Event, deviation = 0.1) -> bool:
+    def should_process(self, event, deviation = 0.1) -> bool:
         """Returns whether or not a particular event is significant enough to
         process.
 
@@ -1964,7 +1938,7 @@ class JoystickInputSignificant:
             )
             return False
 
-    def last_event(self, event: Event) -> Event:
+    def last_event(self, event):
         """Returns the most recent event of this type.
 
         Args:
@@ -1982,7 +1956,7 @@ class JoystickInputSignificant:
         self._time_registry = {}
         
 
-    def _process_axis(self, event: Event, deviation = 0.1) -> bool:
+    def _process_axis(self, event, deviation = 0.1) -> bool:
         """Process an axis event.
 
         Args:
@@ -2015,7 +1989,7 @@ class JoystickInputSignificant:
             self._time_registry[event] = time.time()
             return False
 
-    def _process_button(self, event: Event) -> bool:
+    def _process_button(self, event) -> bool:
         """Process a button event.
 
         Args:
@@ -2026,7 +2000,7 @@ class JoystickInputSignificant:
         """
         return True
 
-    def _process_hat(self, event: Event) -> bool:
+    def _process_hat(self, event) -> bool:
         """Process a hat event.
 
         Args:
@@ -2054,7 +2028,7 @@ def _button(button_id, device_guid, mode, always_execute=False):
         def wrapper_fn(*args, **kwargs):
             callback(*args, **kwargs)
 
-        event = Event(
+        event = gremlin.event_handler.Event(
             event_type=gremlin.types.InputType.JoystickButton,
             device_guid=device_guid,
             identifier=button_id
@@ -2082,7 +2056,7 @@ def _hat(hat_id, device_guid, mode, always_execute=False):
         def wrapper_fn(*args, **kwargs):
             callback(*args, **kwargs)
 
-        event = Event(
+        event = gremlin.event_handler.Event(
             event_type=gremlin.types.InputType.JoystickHat,
             device_guid=device_guid,
             identifier=hat_id
@@ -2110,7 +2084,7 @@ def _axis(axis_id, device_guid, mode, always_execute=False):
         def wrapper_fn(*args, **kwargs):
             callback(*args, **kwargs)
 
-        event = Event(
+        event = gremlin.event_handler.Event(
             event_type=gremlin.types.InputType.JoystickAxis,
             device_guid=device_guid,
             identifier=axis_id
@@ -2139,7 +2113,7 @@ def keyboard(key_name, mode, always_execute=False):
             callback(*args, **kwargs)
 
         key = gremlin.keyboard.key_from_name(key_name)
-        event = Event.from_key(key)
+        event = gremlin.event_handler.Event.from_key(key)
         callback_registry.add(wrapper_fn, event, mode, always_execute)
 
         return wrapper_fn
@@ -2179,7 +2153,7 @@ def gremlin_start():
         @functools.wraps(callback)
         def wrapper_fn(*args, **kwargs):
             callback(*args, **kwargs)
-        vjoy = joystick_handling.VJoyProxy()
+        vjoy = gremlin.joystick_handling.VJoyProxy()
         start_registry.add(wrapper_fn)
 
         return wrapper_fn
@@ -2264,7 +2238,7 @@ def deadzone(value, low, low_center, high_center, high):
         return max(-1, min(0, (value - low_center) / abs(low - low_center)))
 
 
-def format_input(event: Event) -> str:
+def format_input(event) -> str:
     """Formats the input specified the the device and event into a string.
 
     Args:
@@ -2275,7 +2249,7 @@ def format_input(event: Event) -> str:
     """
     # Retrieve device instance belonging to this event
     device = None
-    for dev in joystick_handling.joystick_devices():
+    for dev in gremlin.joystick_handling.joystick_devices():
         if dev.device_guid == event.device_guid:
             device = dev
             break
@@ -2298,3 +2272,37 @@ def format_input(event: Event) -> str:
     )
 
     return label
+
+
+remote_state = RemoteControl()
+
+
+# Global registry of all registered callbacks
+callback_registry = CallbackRegistry()
+
+# Global registry of all periodic callbacks
+periodic_registry = PeriodicRegistry()
+
+# Global registry of all start callbacks -
+start_registry = SimpleRegistry()
+
+# Global registry of all stop callbacks
+stop_registry = SimpleRegistry()
+
+# Global registry of all mode change callbacks
+mode_registry = ModeChangeRegistry()
+
+# Global state registry of all state change callbacks
+state_registry = StateChangeRegistry()
+
+# Global remote server = listens to remote client events
+remote_server = RemoteServer()
+
+# Global remote client = sends events to server
+remote_client = RemoteClient()
+
+# listens to MIDI input
+midi_client = MidiClient()
+
+# listens to OSC input
+osc_client = OscClient()

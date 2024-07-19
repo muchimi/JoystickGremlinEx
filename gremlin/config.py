@@ -23,22 +23,22 @@ import re
 import sys
 
 from PySide6 import QtCore
-from gremlin.singleton_decorator import SingletonDecorator
-from . import common, util, event_handler
 from gremlin.types import VerboseMode
+import gremlin.util
 
-@SingletonDecorator
+
+import gremlin.singleton_decorator
+@gremlin.singleton_decorator.SingletonDecorator
 class Configuration:
 
     """Responsible for loading and saving configuration data."""
 
     def get_config(sef):
-        fname = os.path.join(util.userprofile_path(), "config.json")
+        fname = os.path.join(gremlin.util.userprofile_path(), "config.json")
         return fname
 
     def __init__(self):
         """Creates a new instance, loading the current configuration."""
-
 
         self._data = {}
         
@@ -56,7 +56,7 @@ class Configuration:
         self.reload()
 
         self.watcher = QtCore.QFileSystemWatcher([
-            os.path.join(util.userprofile_path(), "config.json")
+            os.path.join(gremlin.util.userprofile_path(), "config.json")
         ])
         self.watcher.fileChanged.connect(self.reload)
 
@@ -111,7 +111,7 @@ class Configuration:
     @property
     def is_debug(self):
         return self._is_debug
-
+    
     def set_last_mode(self, profile_path, mode_name):
         """Stores the last active mode of the given profile.
 
@@ -532,11 +532,12 @@ class Configuration:
     @enable_remote_broadcast.setter
     def enable_remote_broadcast(self, value):
         ''' remote broadcast master switch enable '''
+        import gremlin.event_handler
         if type(value) == bool and self._data.get("enable_remote_broadcast",False)!= value:
             self._data["enable_remote_broadcast"] = value
             self.save()
 
-            eh = event_handler.EventListener()
+            eh = gremlin.event_handler.EventListener()
             eh.config_changed.emit()
 
     @property

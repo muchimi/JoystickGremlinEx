@@ -27,17 +27,18 @@ from gremlin.types import DeviceType
 import gremlin.util
 import gremlin.config
 import gremlin.plugin_manager
-from . import ui_activation_condition, ui_common
+
+import gremlin.ui.ui_common as ui_common
 from functools import partial
 from  gremlin.clipboard import Clipboard
-from gremlin.keyboard import Key
 from gremlin.util import get_guid
 import logging
 syslog = logging.getLogger("system")
 import qtawesome as qta
 import gremlin.ui.input_item
 import gremlin.base_profile
-import gremlin.ui.ui_common
+
+
 
 
 from gremlin.ui import virtual_button
@@ -941,7 +942,9 @@ class InputItemWidget(QtWidgets.QFrame):
         :param populate_ui  handler to custom input button content - this is created on a second row if it exists - signature populate_ui(inputbutton, container_widget)
         :param populate_name handler to custom display name - signature populate_name(identifier)
         :param update_callback handler to refresh widget content - signature update(widget)
+        
         """
+        import gremlin.ui.ui_common
         QtWidgets.QFrame.__init__(self)
         self.parent = parent
 
@@ -1062,20 +1065,7 @@ class InputItemWidget(QtWidgets.QFrame):
         self.setObjectName("main_layout")
         self.main_layout.setContentsMargins(8,2,2,2)
         self.main_layout.addWidget(self._container_widget)
-        self.setLayout(self.main_layout)
-
-        # self._input_description_widget.setVisible(True)
-        # self._comment_widget.setVisible(True)
-        # self._description_widget.setVisible(True)
-        # self._edit_button_widget.setVisible(True)
-        # self._close_button_widget.setVisible(True)
-        # self._container_widget.setVisible(True)
-        # self._title_container_widget.setVisible(True)
-        # self._title_widget.setVisible(True)
-
-        # if self.custom_container_widget:
-        #     self.custom_container_widget.setVisible(True)
-        
+        self.setLayout(self.main_layout)      
         self.update_display()
 
     @property
@@ -1374,6 +1364,8 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         :param profile_data the data the container handles
         :param parent the parent of the widget
         """
+
+        import gremlin.hints
         assert isinstance(profile_data, gremlin.base_profile.AbstractContainer)
         super().__init__(parent)
         self.profile_data = profile_data
@@ -1418,6 +1410,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
     def _create_activation_condition_tab(self):
         # Create widget to place inside the tab
+        import gremlin.ui.ui_activation_condition
         self.activation_condition_tab_widget = QtWidgets.QWidget()
         self.activation_condition_layout = QtWidgets.QVBoxLayout(
             self.activation_condition_tab_widget
@@ -1425,7 +1418,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
         # Create activation condition UI widget
         self.activation_condition_widget = \
-            ui_activation_condition.ActivationConditionWidget(self.profile_data)
+            gremlin.ui.ui_activation_condition.ActivationConditionWidget(self.profile_data)
         self.activation_condition_widget.activation_condition_modified.connect(
             self.container_modified.emit
         )
@@ -1902,6 +1895,7 @@ class ConditionActionWrapper(AbstractActionWrapper):
         :param parent the parent of the widget
         """
         super().__init__(action_widget, parent)
+        import gremlin.ui.ui_activation_condition as ui_activation_condition
 
         # Disable all dock features and give it a title
         self.setFeatures(QtWidgets.QDockWidget.NoDockWidgetFeatures)

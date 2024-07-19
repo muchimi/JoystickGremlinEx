@@ -32,11 +32,143 @@ import gremlin.config
 import gremlin.joystick_handling
 import gremlin.shared_state
 import gremlin.types
-from . import ui_about, ui_common
+import gremlin.ui
+
+import gremlin.ui.ui_about as ui_about
+import gremlin.ui.ui_common as ui_common
+
 from gremlin.util import load_icon, userprofile_path, load_pixmap
 import logging
 from gremlin.input_types import InputType
 import gremlin.base_profile
+
+
+class ProfileOptionsUi(ui_common.BaseDialogUi):
+    """UI to set individual profile settings """
+    start_mode_changed = QtCore.Signal(str)  # when the start mode changes
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        # make modal
+        self.setWindowModality(QtCore.Qt.ApplicationModal)
+
+        min_min_sp = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Minimum,
+            QtWidgets.QSizePolicy.Minimum
+        )
+        exp_min_sp = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.MinimumExpanding,
+            QtWidgets.QSizePolicy.Minimum
+        )        
+
+        # Actual configuration object being managed
+        self.config = gremlin.config.Configuration()
+        self.setMinimumWidth(400)
+
+        self.mode_list = []
+        self.profile = gremlin.shared_state.current_profile
+
+        self.setWindowTitle("Profile Options")
+
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+
+        self.numlock_widget = QtWidgets.QCheckBox("Force numlock off on profile start")
+        self.numlock_widget.setToolTip("When enabled, the numlock key will be turned off when the profile (re)activates - this avoids issue with keylatching for the numeric keypad")
+        self.numlock_widget.setChecked(self.profile.get_force_numlock())
+        self.numlock_widget.clicked.connect(self._numlock_force_cb)
+
+        self.profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
+        self.start_label = QtWidgets.QLabel("Start Mode")
+        self.start_label.setSizePolicy(min_min_sp)
+        self.start_mode_selector = QtWidgets.QComboBox()
+        self.start_mode_selector.setSizePolicy(exp_min_sp)
+        self.start_mode_selector.setMinimumContentsLength(20)
+        self.start_mode_selector.currentIndexChanged.connect(self._start_mode_changed_cb)
+        self.start_container_widget = QtWidgets.QWidget()
+        self.start_container_layout = QtWidgets.QHBoxLayout(self.start_container_widget)
+
+        self.start_container_layout.addWidget(self.start_label)
+        self.start_container_layout.addWidget(self.start_mode_selector)
+        self.start_container_layout.addStretch()
+
+
+        
+        # Restore last mode on profile activate
+        self.activate_restore_mode = QtWidgets.QCheckBox("Restore last used mode on profile activation")
+        self.activate_restore_mode.clicked.connect(self._restore_mode_cb)
+        self.activate_restore_mode.setChecked(self.profile.get_restore_mode())
+        self.activate_restore_mode.setToolTip("""When set, the last mode used by this profile will be set whenever the profile is activated.""")
+
+        self.close_button = QtWidgets.QPushButton("Close")
+        self.close_button.clicked.connect(self._close_cb)
+
+
+        close_button_layout = QtWidgets.QHBoxLayout(self)
+        close_button_layout.addStretch()
+        close_button_layout.addWidget(self.close_button)
+        
+
+
+        self.main_layout.addWidget(self.numlock_widget)
+        
+
+        self.main_layout.addWidget(self.start_container_widget)
+        self.main_layout.addLayout(close_button_layout)
+        
+        
+
+        self.populate_selector()
+
+    def populate_selector(self):
+
+        self.start_mode_selector.currentIndexChanged.disconnect(self._start_mode_changed_cb)
+        while self.start_mode_selector.count() > 0:
+            self.start_mode_selector.removeItem(0)
+
+        start_mode = self.profile.get_start_mode()
+        default_mode = self.profile.get_default_mode()
+        if not start_mode in self.mode_list:
+            # the start mode no longer exists - use the default mode
+            logging.getLogger("system").warning(f"Specified start mode {start_mode} no longer exists - using default mode {default_mode}")
+            default_mode = self.profile.get_default_mode()
+            start_mode = default_mode
+            self.profile.set_start_mode(default_mode)
+
+        mode_list = gremlin.ui.ui_common.get_mode_list(gremlin.shared_state.current_profile)
+        index = 0
+        current_index = 0
+        self.mode_list = []
+        for display_name, mode_name in mode_list:
+            self.start_mode_selector.addItem(display_name, mode_name)
+            if mode_name == start_mode:
+                current_index = index
+            self.mode_list.append(mode_name)
+            index +=1
+        
+        self.start_mode_selector.setCurrentIndex(current_index)
+
+        self.start_mode_selector.currentIndexChanged.connect(self._start_mode_changed_cb)
+
+    @QtCore.Slot(bool)
+    def _numlock_force_cb(self, checked):
+        self.profile.set_force_numlock(checked)
+
+
+    @QtCore.Slot(bool)
+    def _restore_mode_cb(self, checked):
+        self.profile.set_restore_mode(checked)
+
+    def _close_cb(self):
+        self.close()
+
+
+
+    @QtCore.Slot(int)
+    def _start_mode_changed_cb(self, index):
+        mode_name = self.mode_list[index]
+        self.profile.set_start_mode(mode_name)
+        self.start_mode_changed.emit(mode_name)
 
 
 
@@ -614,6 +746,7 @@ This setting is also available on a profile by profile basis on the profile tab,
     #     ''' called when the restore last mode checked state is changed '''
     #     self.config.current_profile.set_restore_mode(checked)
 
+    @QtCore.Slot(bool)
     def _autoload_mapped_profile(self, checked):
         """Stores profile autoloading preference.
 
@@ -623,29 +756,35 @@ This setting is also available on a profile by profile basis on the profile tab,
         self.activate_on_process_focus.setEnabled(checked)
         self.config.autoload_profiles = checked
 
-
+    @QtCore.Slot(bool)
     def _keep_focus(self, checked):
         self.config.keep_profile_active_on_focus_loss = checked
 
+    @QtCore.Slot(bool)
     def _activate_on_launch(self, checked):
         self.config.activate_on_launch = checked
 
+    @QtCore.Slot(bool)
     def _activate_on_process_focus(self, checked):
         self.config.activate_on_process_focus = checked
 
+    @QtCore.Slot(bool)
     def _runtime_ui_update(self, checked):
         self.config.runtime_ui_update = checked
 
+    @QtCore.Slot(bool)
     def _restore_profile_mode(self, checked):
         self.config.restore_profile_mode_on_start = checked
 
+    @QtCore.Slot(bool)
     def _initial_load_mode_tts(self, checked):
         self.config.initial_load_mode_tts = checked
 
+    @QtCore.Slot(bool)
     def _reset_mode_on_process_activate(self, checked):
         self.config.reset_mode_on_process_activate = checked
 
-
+    @QtCore.Slot(bool)
     def _close_to_systray(self, checked):
         """Stores closing to system tray preference.
 
@@ -653,7 +792,7 @@ This setting is also available on a profile by profile basis on the profile tab,
         """
         self.config.close_to_tray = checked
 
-
+    @QtCore.Slot(bool)
     def _start_minimized(self, checked):
         """Stores start minimized preference.
 
@@ -661,14 +800,15 @@ This setting is also available on a profile by profile basis on the profile tab,
         """
         self.config.start_minimized = checked
 
-
+    @QtCore.Slot(bool)
     def _persist_clipboard(self, checked):
         self.config.persist_clipboard = checked
 
-
+    @QtCore.Slot(bool)
     def _persist_clipboard_enabled(self):
         return self.config.persist_clipboard
-
+    
+    @QtCore.Slot(bool)
     def _verbose_cb(self, checked):
         ''' stores verbose setting '''
         self.config.verbose = checked
@@ -682,10 +822,11 @@ This setting is also available on a profile by profile basis on the profile tab,
         is_checked = widget.isChecked()
         self.config.verbose_set_mode(mode, is_checked)
 
+    @QtCore.Slot(bool)
     def _midi_enabled(self, checked):
         self.config.midi_enabled = checked
 
-
+    @QtCore.Slot(bool)
     def _osc_enabled(self, checked):
         self.config.osc_enabled = checked
         self.osc_port.setEnabled(checked)
@@ -695,7 +836,7 @@ This setting is also available on a profile by profile basis on the profile tab,
         self.config.osc_port = self.osc_port.value()
 
 
-
+    @QtCore.Slot(bool)
     def _start_windows(self, checked):
         """Set registry entry to launch Joystick Gremlin on login.
 
@@ -731,7 +872,7 @@ This setting is also available on a profile by profile basis on the profile tab,
 
 
 
-
+    @QtCore.Slot(bool)
     def _highlight_input(self, clicked):
         """Stores preference for input highlighting.
 
@@ -740,6 +881,7 @@ This setting is also available on a profile by profile basis on the profile tab,
         self.config.highlight_input = clicked
         self.config.save()
 
+    @QtCore.Slot(bool)
     def _highlight_input_buttons(self, clicked):
         """Stores preference for input highlighting (buttons).
 
@@ -750,7 +892,7 @@ This setting is also available on a profile by profile basis on the profile tab,
 
 
 
-
+    @QtCore.Slot(bool)
     def _highlight_device(self, clicked):
         """Stores preference for device highlighting.
 
@@ -787,6 +929,7 @@ This setting is also available on a profile by profile basis on the profile tab,
         """
         self.profile_field.setText(self.config.get_profile(exec_path))
 
+    @QtCore.Slot(bool)
     def _show_mode_change_message(self, clicked):
         """Stores the user's preference for mode change notifications.
 
@@ -926,8 +1069,9 @@ This setting is also available on a profile by profile basis on the profile tab,
 
             exe_widget = None
             xml_widget = None
-            mode_list, profile_default_mode, restore_mode = item.get_profile_modes()
-            mode_enabled = bool(mode_list)
+            pd = item.get_profile_data()
+            
+            mode_enabled = bool(pd.mode_list)
 
             if item:
                 # add a new item if it exists and either one of the profile/process entries are refined
@@ -954,24 +1098,30 @@ This setting is also available on a profile by profile basis on the profile tab,
                 row+=1
 
                 options_line = QtWidgets.QWidget()
-                options_layout = QtWidgets.QHBoxLayout(options_line)
+                options_layout = QtWidgets.QGridLayout(options_line)
                 options_layout.setContentsMargins(0,0,0,0)
                 
 
                 restore_widget = ui_common.QDataCheckbox("Restore last mode on start", item)
-                restore_widget.setChecked(restore_mode)
+                restore_widget.setChecked(pd.restore_last)
                 restore_widget.clicked.connect(self._restore_changed)
                 restore_widget.setToolTip("When set, restores the last used mode if the profile has been automatically loaded on process change")
 
+                force_numlock_widget = ui_common.QDataCheckbox("Force numlock off", item)
+                force_numlock_widget.setToolTip("When set, GremlinEx will force the keyboard numlock state to Off to prevent issues with numpad keymapping")
+                force_numlock_widget.setChecked(pd.force_numlock_off)
+                force_numlock_widget.clicked.connect(self._force_numlock_cb)
+                
+
                 mode_widget = ui_common.QDataComboBox(item)
                 
-                mode_widget.addItems(mode_list)
+                mode_widget.addItems(pd.mode_list)
                 if mode_enabled:
-                    if profile_default_mode:
-                        mode_widget.setCurrentText(profile_default_mode)
-                        item.default_mode = profile_default_mode
-                    elif mode_list:
-                        item.default_mode = mode_list[0] # first item 
+                    if pd.default_mode:
+                        mode_widget.setCurrentText(pd.default_mode)
+                        item.default_mode = pd.default_mode
+                    else:
+                        item.default_mode = pd.mode_list[0] # first item 
                     mode_widget.setEnabled(True)
                 else:
                     mode_widget.setEnabled(False)
@@ -981,10 +1131,10 @@ This setting is also available on a profile by profile basis on the profile tab,
                 mode_widget.setToolTip("Default startup mode for this profile")
 
 
-                options_layout.addWidget(restore_widget)
-                options_layout.addWidget(QtWidgets.QLabel("Default start mode:"))
-                options_layout.addWidget(mode_widget)
-                options_layout.addStretch()
+                options_layout.addWidget(force_numlock_widget,0,0,1,-1)
+                options_layout.addWidget(restore_widget,1,0)
+                options_layout.addWidget(QtWidgets.QLabel("Default start mode:"),1,1)
+                options_layout.addWidget(mode_widget,1,2)
 
                 container_layout.addWidget(options_line,row,0,1,-1)
                 row+=1
@@ -1034,7 +1184,12 @@ This setting is also available on a profile by profile basis on the profile tab,
         widget = self.sender()
         item : gremlin.base_profile.ProfileMapItem = widget.data
         item.restore_mode = checked
-        #        self._profile_map_mode_widgets[item.index].setEnabled(not checked)
+
+    def _force_numlock_cb(self, checked):
+        widget = self.sender()
+        item : gremlin.base_profile.ProfileMapItem = widget.data
+        item.numlock_force = checked
+        
 
     def _process_open_cb(self, widget):
         ''' opens the process executable '''

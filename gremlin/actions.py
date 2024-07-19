@@ -25,7 +25,7 @@ from gremlin.input_types import InputType
 #from . import base_classes, event_handler, fsm, input_devices, joystick_handling, macro, util
 from gremlin.base_conditions import ActivationRule
 import gremlin.joystick_handling
-import gremlin.input_devices
+
 import gremlin.event_handler
 import gremlin.util
 import gremlin.fsm

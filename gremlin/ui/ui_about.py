@@ -8,10 +8,11 @@
 # WARNING! All changes made in this file will be lost!
 
 from PySide6 import QtCore, QtGui, QtWidgets
-import joystick_gremlin
+
 
 class Ui_About(object):
     def setupUi(self, About):
+        import joystick_gremlin
         About.setObjectName("About")
         About.setWindowModality(QtCore.Qt.WindowModal)
         About.resize(400, 300)

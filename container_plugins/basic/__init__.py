@@ -24,11 +24,11 @@ import gremlin.ui.ui_common
 import gremlin.ui.input_item
 import gremlin.clipboard
 import gremlin.types
-from gremlin.base_conditions import AbstractFunctor
 from gremlin.base_profile import AbstractContainer
 import gremlin.execution_graph
+from gremlin.ui.input_item import AbstractContainerWidget
 
-class BasicContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
+class BasicContainerWidget(AbstractContainerWidget):
 
     """Basic container which holds a single action."""
 

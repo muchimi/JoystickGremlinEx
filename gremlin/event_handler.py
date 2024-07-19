@@ -21,8 +21,8 @@ import logging
 import time
 import queue
 from threading import Thread, Timer
-import gremlin.code_runner
-import gremlin.keyboard
+
+
 import gremlin.threading
 
 from PySide6 import QtCore, QtWidgets
@@ -31,13 +31,13 @@ import dinput
 import gremlin.config
 from gremlin.input_types import InputType
 import gremlin.shared_state
-import gremlin.shared_state
 from gremlin.singleton_decorator import SingletonDecorator
-import gremlin.ui
+
 import gremlin.util
 from . import config, error, joystick_handling, windows_event_hook
 
-from gremlin.keyboard import Key, KeyMap
+import gremlin.keyboard
+import gremlin.ui
 
 
 
@@ -125,7 +125,7 @@ class Event:
 		:return integer hash value of this event
 		"""
 		if self.event_type == InputType.Keyboard:
-			data = (self.identifier.scan_code, self.identifier.is_extended) if isinstance(self.identifier, Key) else self.identifier
+			data = (self.identifier.scan_code, self.identifier.is_extended) if isinstance(self.identifier, gremlin.keyboard.Key) else self.identifier
 			return hash((
 				self.device_guid,
 				self.event_type.value,
@@ -288,7 +288,7 @@ class EventListener(QtCore.QObject):
 			virtual_code = key.virtual_code
 			self._keyboard_buffer[key_id] = is_pressed
 		if verbose:
-			logging.getLogger("system").info(f"DEQUEUE KEY {KeyMap.keyid_tostring(key_id)} vk: {virtual_code} (0x{virtual_code:X}) name: {key.name} pressed: {is_pressed}")
+			logging.getLogger("system").info(f"DEQUEUE KEY {gremlin.keyboard.KeyMap.keyid_tostring(key_id)} vk: {virtual_code} (0x{virtual_code:X}) name: {key.name} pressed: {is_pressed}")
 		
 		self.keyboard_event.emit(Event(
 			event_type= InputType.Keyboard,
@@ -472,7 +472,7 @@ class EventListener(QtCore.QObject):
 		# print (f"recorded key: {key_id} vk: {virtual_code} (0x{virtual_code:X})")
 
 		# deal with any code translations needed
-		key_id, virtual_code = KeyMap.translate(key_id) # modify scan codes if needed 
+		key_id, virtual_code = gremlin.keyboard.KeyMap.translate(key_id) # modify scan codes if needed 
 		# print (f"translated key: {KeyMap.keyid_tostring(key_id)}  vk: {virtual_code} (0x{virtual_code:X})")
 
 		is_pressed = event.is_pressed
@@ -506,7 +506,7 @@ class EventListener(QtCore.QObject):
 			# add to the processing queue
 			if verbose:
 				# key = gremlin.keyboard.KeyMap.find_virtual(virtual_code) if virtual_code > 0 else gremlin.keyboard.KeyMap.find(key_id[0],key_id[1])
-				logging.getLogger("system").info(f"QUEUE KEY {KeyMap.keyid_tostring(key_id)} vk 0x{virtual_code:X} pressed {is_pressed}")
+				logging.getLogger("system").info(f"QUEUE KEY {gremlin.keyboard.KeyMap.keyid_tostring(key_id)} vk 0x{virtual_code:X} pressed {is_pressed}")
 
 		else:
 			# DESIGN mode - straight
@@ -525,7 +525,7 @@ class EventListener(QtCore.QObject):
 		# Allow the windows event to propagate further
 		return True
 	
-	def get_key_state(self, key: Key):
+	def get_key_state(self, key: gremlin.keyboard.Key):
 		''' returns the state of the given key '''
 		return self._keyboard_state.get(key.index_tuple(), False)
 	
@@ -673,14 +673,14 @@ class EventHandler(QtCore.QObject):
 		"""
 		import gremlin.config
 		import gremlin.ui.keyboard_device
-		import win32con
+		import gremlin.keyboard
 		
 		if event:
 			if event.event_type in (InputType.Keyboard, InputType.KeyboardLatched):
 				verbose = gremlin.config.Configuration().verbose_mode_keyboard
 				# keyboard latched event
 				identifier = event.identifier
-				primary_key : Key = identifier.key
+				primary_key = identifier.key
 				
 
 
@@ -700,7 +700,7 @@ class EventHandler(QtCore.QObject):
 					virtual_code = key.virtual_code
 					keyid_source = key.index_tuple() # use the scan code for now
 					#index = virtual_code if virtual_code > 0 else keyid
-					keyid, _ = KeyMap.translate(keyid_source)
+					keyid, _ = gremlin.keyboard.KeyMap.translate(keyid_source)
 						
 					if device_guid not in self.latched_events.keys():
 						self.latched_events[device_guid] = {}
@@ -711,7 +711,7 @@ class EventHandler(QtCore.QObject):
 						self.latched_events[device_guid][mode][keyid] = []
 					self.latched_events[device_guid][mode][keyid].append(identifier)
 					if verbose:
-						logging.getLogger("system").info(f"Key latch registered by guid {device_guid}  mode: {mode} vk: {virtual_code} (0x{virtual_code:X}) source keyid: {KeyMap.keyid_tostring(keyid_source)} -> translated keyId: {KeyMap.keyid_tostring(keyid)} name: {key.name} -> {identifier.display_name}")
+						logging.getLogger("system").info(f"Key latch registered by guid {device_guid}  mode: {mode} vk: {virtual_code} (0x{virtual_code:X}) source keyid: {gremlin.keyboard.KeyMap.keyid_tostring(keyid_source)} -> translated keyId: {gremlin.keyboard.KeyMap.keyid_tostring(keyid)} name: {key.name} -> {identifier.display_name}")
 					
 
 				if device_guid not in self.latched_callbacks.keys():
@@ -771,6 +771,7 @@ class EventHandler(QtCore.QObject):
 			# not a keyboard event
 			return []
 		import gremlin.config
+		import gremlin.keyboard
 
 		# convert mouse events to keyboard event
 		if event.event_type == InputType.Mouse:
@@ -782,15 +783,15 @@ class EventHandler(QtCore.QObject):
 			index = (mouse_button.value + 0x1000, False)
 			verbose = gremlin.config.Configuration().verbose_mode_mouse
 			if verbose:
-				logging.getLogger("system").info(f"matching mouse event {event.identifier} to {KeyMap.keyid_tostring(index)}")
+				logging.getLogger("system").info(f"matching mouse event {event.identifier} to {gremlin.keyboard.KeyMap.keyid_tostring(index)}")
 		else:
 			verbose = gremlin.config.Configuration().verbose_mode_keyboard
 			device_guid = event.device_guid
 			# index = event.virtual_code if event.virtual_code > 0 else event.identifier  # this is (scan_code, is_extended)
-			index, _ = KeyMap.translate(event.identifier)
+			index, _ = gremlin.keyboard.KeyMap.translate(event.identifier)
 			verbose = gremlin.config.Configuration().verbose_mode_keyboard
 			if verbose:
-				logging.getLogger("system").info(f"matching key event {event.identifier} to {KeyMap.keyid_tostring(index)}")
+				logging.getLogger("system").info(f"matching key event {event.identifier} to {gremlin.keyboard.KeyMap.keyid_tostring(index)}")
 
 		#event_key = Key(scan_code = identifier[0], is_extended = identifier[1], is_mouse = is_mouse, virtual_code= virtual_code)
 		input_items = []
@@ -967,8 +968,9 @@ class EventHandler(QtCore.QObject):
 		:param event the event to process
 		"""
 
-		from gremlin.util import display_error
+		
 		import gremlin.config
+		import gremlin.keyboard
 
 		# list of callbacks
 		m_list = []
@@ -987,7 +989,7 @@ class EventHandler(QtCore.QObject):
 				logging.getLogger("system").info(f"process keyboard event: {event}")
 				logging.getLogger("system").info(f"\tKeyboard state data:")
 				for key in data.keys():
-					logging.getLogger("system").info(f"\t\t{KeyMap.keyid_tostring(key)} {data[key]}")					
+					logging.getLogger("system").info(f"\t\t{gremlin.keyboard.KeyMap.keyid_tostring(key)} {data[key]}")					
 
 			items = self._matching_event_keys(event)  # returns list of primary keys
 			if items:
@@ -1006,7 +1008,6 @@ class EventHandler(QtCore.QObject):
 					# print (data)
 					latched_keys = [input_item.key]
 					latched_keys.extend(input_item.latched_keys)
-					k: Key
 					if verbose:
 						logging.getLogger("system").info(f"Checking latching: {len(latched_keys)} key(s)")
 					for k in latched_keys:
@@ -1014,7 +1015,7 @@ class EventHandler(QtCore.QObject):
 						found = index in data.keys()
 						state = data[index] if found else False
 						if verbose:
-							logging.getLogger("system").info(f"\tcheck latched key: {KeyMap.keyid_tostring(index)} {k.name} found: {found} state: {state} {'*****' if state else ''}")
+							logging.getLogger("system").info(f"\tcheck latched key: {gremlin.keyboard.KeyMap.keyid_tostring(index)} {k.name} found: {found} state: {state} {'*****' if state else ''}")
 							if not found:
 								logging.getLogger("system").info(f"\t\t* Key not found *")
 						is_latched = is_latched and state

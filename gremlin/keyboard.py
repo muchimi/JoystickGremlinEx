@@ -24,9 +24,9 @@ import enum
 import win32api
 import win32con
 
-from gremlin.base_classes import TraceableList
+# from gremlin.base_classes import TraceableList
 from gremlin.types import MouseButton
-from gremlin.singleton_decorator import SingletonDecorator
+# from gremlin.singleton_decorator import SingletonDecorator
 import gremlin.config
 
 user32 = ctypes.WinDLL("user32")
@@ -1008,8 +1008,8 @@ class KeyMap:
         '''
         # flip the extended bit to force numlock OFF for numeric keypad so we always get the numeric keys
         scan_code, is_extended = keyid
-        if keyid in KeyMap._g_numpad_translate_map.keys():
-            return KeyMap._g_numpad_translate_map[keyid]
+        if keyid in KeyMap._g_translate_map.keys():
+            return KeyMap._g_translate_map[keyid]
         vk = KeyMap.scan_code_to_virtual_code(scan_code, is_extended)
         return (keyid, vk)
     
@@ -1049,8 +1049,19 @@ class KeyMap:
                        win32con.VK_NUMPAD9,
                        )
     
-    _g_numpad_translate_map = {
-        (0x52,False): ((0x52, False), win32con.VK_NUMPAD0),
+    _g_translate_map = {
+        (0x52,True): ((0x52, False), win32con.VK_NUMPAD0), # make all numpad keys report as numpad
+        (0x4F,True): ((0x4F, False), win32con.VK_NUMPAD1),
+        (0x50,True): ((0x50, False), win32con.VK_NUMPAD2),
+        (0x51,True): ((0x51, False), win32con.VK_NUMPAD3),
+        (0x4B,True): ((0x4B, False), win32con.VK_NUMPAD4),
+        (0x4C,True): ((0x4C, False), win32con.VK_NUMPAD5),
+        (0x4D,True): ((0x4D, False), win32con.VK_NUMPAD6),
+        (0x47,True): ((0x47, False), win32con.VK_NUMPAD7),
+        (0x48,True): ((0x48, False), win32con.VK_NUMPAD8),
+        (0x49,True): ((0x49, False), win32con.VK_NUMPAD9),
+
+        (0x52,False): ((0x52, False), win32con.VK_NUMPAD0), 
         (0x4F,False): ((0x4F, False), win32con.VK_NUMPAD1),
         (0x50,False): ((0x50, False), win32con.VK_NUMPAD2),
         (0x51,False): ((0x51, False), win32con.VK_NUMPAD3),
@@ -1060,7 +1071,8 @@ class KeyMap:
         (0x47,False): ((0x47, False), win32con.VK_NUMPAD7),
         (0x48,False): ((0x48, False), win32con.VK_NUMPAD8),
         (0x49,False): ((0x49, False), win32con.VK_NUMPAD9),
-        (0x36,True): ((0x36, False), win32con.VK_RSHIFT),
+
+        (0x36,True): ((0x36, False), win32con.VK_RSHIFT),  # combine rshift and rshift 2
 
 
     }

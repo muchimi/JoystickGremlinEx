@@ -21,25 +21,21 @@
 import logging
 
 from PySide6 import QtWidgets, QtCore
-
-
+from gremlin.threading import AbortableThread
 from gremlin.input_types import InputType
 import gremlin.shared_state
 from gremlin.util import *
 from xml.etree import ElementTree
-from . import input_item, ui_common 
-import gremlin.ui.device_tab 
+import enum
+
 import uuid
 import mido
 from gremlin.singleton_decorator import SingletonDecorator
-import gremlin.ui.input_item 
-import gremlin.ui.ui_common
-import enum
+
 from gremlin.util import parse_guid, byte_list_to_string
 import gremlin.event_handler
-from gremlin.ui.device_tab import InputItemConfiguration
-from gremlin.config import Configuration
-from gremlin.threading import AbortableThread
+import gremlin.config 
+
 
 ''' these MIDI objects are based on the MIDO and python-rtMIDI libraries '''
 
@@ -419,7 +415,7 @@ class MidiListener(AbortableThread):
         self.callback = callback
 
     def run(self):
-        verbose = Configuration().verbose
+        verbose = gremlin.config.Configuration().verbose
         
         try:
             with mido.open_input(self.port_name) as inport:
@@ -482,7 +478,7 @@ class MidiInterface(QtCore.QObject):
         
         '''
 
-        verbose = Configuration().verbose_mode_details
+        verbose = gremlin.config.Configuration().verbose_mode_details
 
         # request start
         if self._started:
@@ -520,7 +516,7 @@ class MidiInterface(QtCore.QObject):
 
     def stop(self):
         # request stop
-        verbose = Configuration().verbose_mode_details
+        verbose = gremlin.config.Configuration().verbose_mode_details
         if verbose:
             logging.getLogger("system").info(f"MIDI Interface: STOP listen requested")
 
@@ -1157,7 +1153,7 @@ class MidiInputConfigDialog(QtWidgets.QDialog):
         ''' load the config from a MIDI message '''
         # decode the message 
         
-        verbose = Configuration().verbose
+        verbose = gremlin.config.Configuration().verbose
 
         mido_type = message.type
         command = MidiCommandType.from_mido_type(mido_type)
@@ -1324,6 +1320,9 @@ class MidiDeviceTabWidget(QtWidgets.QWidget):
         """
         super().__init__(parent)
 
+        import gremlin.ui.input_item as input_item
+        import gremlin.ui.ui_common as ui_common
+
         # list of input widgets by index position
         self._widget_map = {}
 
@@ -1368,7 +1367,7 @@ class MidiDeviceTabWidget(QtWidgets.QWidget):
         if right_panel:
             self.main_layout.removeItem(right_panel)
 
-        widget = InputItemConfiguration()     
+        widget = gremlin.ui.device_tab.InputItemConfiguration()     
         self.main_layout.addWidget(widget,3)
 
         button_container_widget = QtWidgets.QWidget()
@@ -1416,7 +1415,7 @@ class MidiDeviceTabWidget(QtWidgets.QWidget):
         if right_panel:
             self.main_layout.removeItem(right_panel)
 
-        widget = InputItemConfiguration()     
+        widget = gremlin.ui.device_tab.InputItemConfiguration()     
         self.main_layout.addWidget(widget,3)  
 
 
@@ -1443,7 +1442,7 @@ class MidiDeviceTabWidget(QtWidgets.QWidget):
         if right_panel:
             self.main_layout.removeItem(right_panel)
 
-        widget = InputItemConfiguration(item_data)
+        widget = gremlin.ui.device_tab.InputItemConfiguration(item_data)
         self.main_layout.addWidget(widget,3)            
 
         if item_data:

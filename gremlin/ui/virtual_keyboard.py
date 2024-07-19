@@ -8,6 +8,7 @@ from gremlin.input_types import InputType
 from gremlin.input_devices import ButtonReleaseActions
 import gremlin.keyboard
 import gremlin.macro
+import gremlin.shared_state
 import gremlin.ui.ui_common
 import gremlin.ui.input_item
 import enum
@@ -144,9 +145,11 @@ class InputKeyboardDialog(QtWidgets.QDialog):
         self.listen_widget = QtWidgets.QPushButton("Listen")
         self.listen_widget.clicked.connect(self._listen_cb)
 
+        self.numlock_widget = QtWidgets.QCheckBox("Force numlock Off")
+        self.numlock_widget.setChecked(gremlin.shared_state.current_profile.get_force_numlock())
+        self.numlock_widget.clicked.connect(self._force_numlock_cb)
+
         self.key_description = QtWidgets.QLabel()
-
-
 
         self.ok_widget = QtWidgets.QPushButton("Ok")
         self.ok_widget.clicked.connect(self._ok_button_cb)
@@ -223,6 +226,9 @@ class InputKeyboardDialog(QtWidgets.QDialog):
                 else:
                     # log the fact we didn't find the key in the keyboard dialog
                     logging.getLogger("system").warning(f"Keyboard: unable to find {item} in dialog keyboard")
+
+    def _force_numlock_cb(self, checked):
+        gremlin.shared_state.current_profile.set_force_numlock(checked)
 
     def _listen_cb(self):
         """Handles adding of new keyboard keys to the list.
@@ -468,8 +474,6 @@ class InputKeyboardDialog(QtWidgets.QDialog):
                         widget.setIcon(load_icon(icon))
                         widget.setIconSize(QtCore.QSize(14,14))
 
-                    if key_name == "rightalt2":
-                        pass
 
                     action_key = gremlin.keyboard.key_from_name(key_name)
                     widget.key = action_key # this name must be defined in keybpoard.py 
