@@ -122,6 +122,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         :param parent the parent of this window
         """
         
+        
 
         QtWidgets.QMainWindow.__init__(self, parent)
         self.ui = Ui_Gremlin()
@@ -151,11 +152,12 @@ class GremlinUi(QtWidgets.QMainWindow):
             self._update_status_bar_mode
         )
         self.runner.event_handler.is_active.connect(
-            self._update_statusbar_active
+            self._update_status_bar_active
         )
 
         self.mode_selector = gremlin.ui.ui_common.ModeWidget()
-        self.mode_selector.mode_changed.connect(self._mode_changed_cb)
+        self.mode_selector.edit_mode_changed.connect(self._edit_mode_changed_cb)
+        self.mode_selector.start_mode_changed.connect(self._start_mode_changed_cb)
 
         self.ui.toolBar.addWidget(self.mode_selector)
 
@@ -178,16 +180,19 @@ class GremlinUi(QtWidgets.QMainWindow):
         self._setup_icons()
         self._connect_actions()
         self._create_statusbar()
-        self._update_statusbar_active(False)
+        self._update_status_bar_active(False)
 
         # hook status bar to events
         el = gremlin.event_handler.EventListener()
         el.broadcast_changed.connect(self._update_status_bar)
         el.keyboard_event.connect(self._kb_event_cb)
+        el.profile_start.connect(lambda: self._update_status_bar_active(True))
+        el.profile_stop.connect(lambda: self._update_status_bar_active(False))
 
         # hook changes
         eh = gremlin.event_handler.EventHandler()
         eh.profile_changed.connect(self._profile_changed_cb)
+
 
 
         # Load existing configuration or create a new one otherwise
@@ -224,6 +229,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         self._profile_map = gremlin.base_profile.ProfileMap()
 
         GremlinUi.ui = self
+
+        
 
 
 
@@ -293,12 +300,12 @@ class GremlinUi(QtWidgets.QMainWindow):
 
 
     @property
-    def current_mode(self):
+    def current_mode(self) -> str:
         ''' returns the current active profile mode '''
         return gremlin.shared_state.current_mode
     
     @property
-    def current_profile(self):
+    def current_profile(self) -> gremlin.base_profile.Profile:
         return gremlin.shared_state.current_profile
 
 
@@ -464,7 +471,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                 
             
             self.runner.stop()
-            self._update_statusbar_active(False)
+            self._update_status_bar_active(False)
             self._profile_auto_activated = False
             current_tab = self.ui.devices.currentWidget()
             if type(current_tab) in [
@@ -802,6 +809,8 @@ class GremlinUi(QtWidgets.QMainWindow):
             tab_label = device.name.strip()
             self.ui.devices.addTab(widget, tab_label)
 
+        
+
         # Create vJoy as input device tabs
         for device in sorted(vjoy_devices, key=lambda x: x.vjoy_id):
             # Ignore vJoy as output devices
@@ -905,8 +914,6 @@ class GremlinUi(QtWidgets.QMainWindow):
                 if self.ui.devices.tabText(i) == activate_tab:
                     with QtCore.QSignalBlocker(self.ui.devices):
                         self.ui.devices.setCurrentIndex(i)
-
-                      
 
     def _setup_icons(self):
         """Sets the icons of all QAction items."""
@@ -1133,7 +1140,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             self._process_joystick_input_selection(event, True)
 
 
-    def _mode_changed_cb(self, new_mode):
+    def _edit_mode_changed_cb(self, new_mode):
         """Updates the current mode to the provided one.
 
         :param new_mode the name of the new current mode
@@ -1142,6 +1149,15 @@ class GremlinUi(QtWidgets.QMainWindow):
             # change the profile if different 
             eh = gremlin.event_handler.EventHandler()
             eh.change_mode(new_mode)
+
+    def _start_mode_changed_cb(self, new_mode):
+        """Updates the default start mode to the provided one.
+
+        :param new_mode the name of the new current mode
+        """
+        self.current_profile.set_default_start_mode(new_mode)
+        pass
+
 
     def _process_changed_cb(self, path):
         """Handles changes in the active process.
@@ -1265,7 +1281,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             self.setHidden(not self.isHidden())
 
 
-    def _update_statusbar_active(self, is_active):
+    def _update_status_bar_active(self, is_active):
         self._is_active = is_active
         self._update_status_bar(remote_state.to_state_event())
         self._update_status_bar_mode(gremlin.shared_state.current_mode)
@@ -1311,19 +1327,23 @@ class GremlinUi(QtWidgets.QMainWindow):
         
         gremlin.shared_state.current_mode = new_mode
         update = True
-        if gremlin.shared_state.is_running:
+        is_running = gremlin.shared_state.is_running
+        if is_running:
             update = self.config.runtime_ui_update
             
         if update:
             with QtCore.QSignalBlocker(self.mode_selector):
                 for tab in self.tabs.values():
                     tab.set_mode(new_mode)
+
+        
         
         # update the status bar on mode change
         try:
-            self.status_bar_mode.setText(f"<b>Mode:</b> {new_mode}")
+            self.status_bar_mode.setVisible(is_running)
+            self.status_bar_mode.setText(f"<b>Mode:</b> {new_mode if new_mode else "n/a"}")
             if self.config.mode_change_message:
-                self.ui.tray_icon.showMessage(f"Mode: {new_mode}","",QtWidgets.QSystemTrayIcon.MessageIcon.NoIcon,250)
+                self.ui.tray_icon.showMessage(f"Mode: {new_mode if new_mode else "n/a"}","",QtWidgets.QSystemTrayIcon.MessageIcon.NoIcon,250)
         except Exception as err:
             log_sys_error(f"Unable to update status bar mode: {new_mode}:\n{err}")
 
@@ -1356,8 +1376,9 @@ class GremlinUi(QtWidgets.QMainWindow):
                 self._temp_input_axis_only_override = event.is_pressed
             
         if key.lookup_name == "f5":
-            # activate mode
-            self.ui.actionActivate.trigger()
+            # activate mode on F5
+            if not self.config.is_debug:
+                self.ui.actionActivate.trigger()
             
     @property
     def input_axis_override(self):

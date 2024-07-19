@@ -359,7 +359,7 @@ class InputKeyboardDialog(QtWidgets.QDialog):
         row_3 = [["Tab","tab"],"Q","W","E","R","T","Y","U","I","O","P","[","]","\\","",["Del","delete"],"End",["PgDn","pagedown"],"",["7","np7"],["8","np8"],["9","np9"],["+","npplus",1,2]]
         row_4 = [["CapsLck","capslock"],"A","S","D","F","G","H","J","K","L",";","'",["Enter",2],"","","","","",["4","np4"],["5","np5"],["6","np6"]]
         row_5 = [["LShift","leftshift"],"Z","X","C","V","B","N","M",",",".","/",["RShift","rightshift"],"","","","","up","","",["1","np1"],["2","np2"],["3","np3"],["Enter","npenter",1,2]]
-        row_6 = [["LCtrl","leftcontrol"],["LWin","leftwin"],["LAlt","leftalt"],["Spacebar","space",6],["RAlt","rightalt"],["RWin","rightwin"],["RCtrl","rightcontrol"],"","","","left","down","right","",["0/Ins","np0",2],["./Del","npdelete"]]
+        row_6 = [["LCtrl","leftcontrol"],["LWin","leftwin"],["LAlt","leftalt"],["Spacebar","space",6],["RAlt","rightalt2"],["RWin","rightwin"],["RCtrl","rightcontrol"],"","","","left","down","right","",["0/Ins","np0",2],["./Del","npdelete"]]
 
         shifted_list = [
             ("`","~"),("1","!"),("2","@"),("3","#"),("4","$"),("5","%"),("6","^"),
@@ -390,7 +390,7 @@ class InputKeyboardDialog(QtWidgets.QDialog):
                     key = None
                     key_name = None
                     column_span = 1
-                    row_span= 1                    
+                    row_span= 1
                     for item in data:
                         if not found_key:
                             key = item
@@ -468,6 +468,9 @@ class InputKeyboardDialog(QtWidgets.QDialog):
                         widget.setIcon(load_icon(icon))
                         widget.setIconSize(QtCore.QSize(14,14))
 
+                    if key_name == "rightalt2":
+                        pass
+
                     action_key = gremlin.keyboard.key_from_name(key_name)
                     widget.key = action_key # this name must be defined in keybpoard.py 
                     widget.normal_key = key
@@ -476,15 +479,16 @@ class InputKeyboardDialog(QtWidgets.QDialog):
                     widget.clicked.connect(self._widget_clicked_cb)
                     widget.hover.connect(self._key_hover_cb)
                     #logging.getLogger("system").info(f"{key_name}: {key} {shifted}")
+  
 
                     self._key_map[(action_key.scan_code, action_key.is_extended)] = key_name
                     assert key_name not in self._key_widget_map.keys(),f"duplicate key in keyboard map found: {key_name}"
 
-                    # handle special duplicates
-                    if key_name == "rightshift":
-                        other_key = gremlin.keyboard.key_from_name("rightshift2")
-                        self._key_map[(other_key.scan_code, other_key.is_extended)] = key_name
-                        self._key_widget_map["rightshift2"] = widget
+                    # # handle special duplicates
+                    # if key_name == "rightshift":
+                    #     other_key = gremlin.keyboard.key_from_name("rightshift2")
+                    #     self._key_map[(other_key.scan_code, other_key.is_extended)] = key_name
+                    #     self._key_widget_map["rightshift2"] = widget
                     self._key_widget_map[key_name] = widget
 
                 else:

@@ -566,7 +566,7 @@ class ModeVariable(AbstractVariable):
 
         value_widget = gremlin.ui.ui_common.ModeWidget()
         value_widget.populate_selector(shared_state.current_profile, value)
-        value_widget.mode_changed.connect(
+        value_widget.edit_mode_changed.connect(
             lambda x: self.value_changed.emit({"value": x})
         )
 

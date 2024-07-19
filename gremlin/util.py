@@ -827,11 +827,13 @@ def parse_bool(value, default_value=False):
 
 def read_guid(node, key, default_value = None):
     ''' reads a GUID '''
-    try:
-        s_guid = node.get(key)
-        return uuid.UUID(s_guid)
-    except:
-        return default_value
+    if key in node.attrib:
+        try:
+            s_guid = node.get(key)
+            return uuid.UUID(s_guid)
+        except:
+            pass
+    return default_value
     
 
 def read_bool(node, key, default_value=False):
@@ -844,10 +846,9 @@ def read_bool(node, key, default_value=False):
     :param key the key to read from the node
     :param default_value the default value to return in case of errors
     """
-    try:
+    if key in node.attrib:
         return parse_bool(node.get(key), default_value)
-    except error.ProfileError:
-        return default_value
+    return default_value
 
 def byte_string_to_list(value : str) -> list:
     ''' converts a text string of sequential bytes separated by a space'''

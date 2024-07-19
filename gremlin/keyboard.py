@@ -175,6 +175,7 @@ class Key():
 
     def _load(self, scan_code, is_extended, virtual_code, is_mouse):
         self._mouse_button = None
+        name = None
         
         if is_mouse or scan_code >= 0x1000:
             if scan_code >= 0x1000:
@@ -189,6 +190,9 @@ class Key():
             virtual_code = scan_code
             name = MouseButton.to_string(mouse_button)
             self._lookup_name = name
+
+            if name and len(name)==1:
+                name = name.upper()
             self._name = name
 
             is_mouse = True
@@ -211,11 +215,6 @@ class Key():
         self._scan_code = scan_code
         self._is_extended = is_extended
         self._virtual_code = virtual_code
-
-
-        if name and len(name)==1:
-            name = name.upper()
-                    
         
         self._update()
 
@@ -1061,6 +1060,7 @@ class KeyMap:
         (0x47,False): ((0x47, False), win32con.VK_NUMPAD7),
         (0x48,False): ((0x48, False), win32con.VK_NUMPAD8),
         (0x49,False): ((0x49, False), win32con.VK_NUMPAD9),
+        (0x36,True): ((0x36, False), win32con.VK_RSHIFT),
 
 
     }
@@ -1141,13 +1141,14 @@ class KeyMap:
         "rightcontrol": ("Right Control", 0x1d, True, win32con.VK_RCONTROL),
         "rightwin": ("Right Win", 0x5c, True, win32con.VK_RWIN),
         "rightalt": ("Right Alt", 0x38, True, win32con.VK_RMENU),
+        "rightalt2": ("Right Alt", 0x38, True, win32con.VK_RMENU),
         "apps": ("Apps", 0x5d, True, win32con.VK_APPS),
         "enter": ("Enter", 0x1c, False, win32con.VK_RETURN),
         "esc": ("Esc", 0x01, False, win32con.VK_ESCAPE)
     }
 
     _keyboard_special = list(_g_name_map.keys())
-    _keyboard_modifiers = ["leftshift","leftcontrol","leftalt","rightshift","rightshift2","rightcontrol","rightalt","leftwin","rightwin"]
+    _keyboard_modifiers = ["leftshift","leftcontrol","leftalt","rightshift","rightshift2","rightcontrol","rightalt","rightalt2","leftwin","rightwin"]
 
 # populate special mouse keys
 for mouse_button in MouseButton:

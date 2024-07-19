@@ -991,39 +991,40 @@ class EventHandler(QtCore.QObject):
 
 			items = self._matching_event_keys(event)  # returns list of primary keys
 			if items:
-				# if verbose:
-				# 	logging.getLogger("system").info(f"Matched keys for mode: [{self._active_mode}]  event {event} pressed: {event.is_pressed} keys: {len(items)} ")
-				# 	for index, input_item in enumerate(items):
-				# 		logging.getLogger("system").info(f"\t[{index}]: {input_item.name}")
+				if verbose:
+					logging.getLogger("system").info(f"Matched keys for mode: [{self._active_mode}]  event {event} pressed: {event.is_pressed} keys: {len(items)} ")
+					for index, input_item in enumerate(items):
+						logging.getLogger("system").info(f"\t[{index}]: {input_item.name}")
 				
-				is_latched = True
+				
 				
 				for input_item in items:
+					if verbose:
+						logging.getLogger("system").info("-"*50)
+					is_latched = True
 					latch_key = None
 					# print (data)
 					latched_keys = [input_item.key]
 					latched_keys.extend(input_item.latched_keys)
-					# if verbose:
-					# 	logging.getLogger("system").info(f"Checking latching: {len(latched_keys)} key(s)")
+					k: Key
+					if verbose:
+						logging.getLogger("system").info(f"Checking latching: {len(latched_keys)} key(s)")
 					for k in latched_keys:
 						index = k.index_tuple()
 						found = index in data.keys()
 						state = data[index] if found else False
 						if verbose:
-							logging.getLogger("system").info(f"\tcheck latched key: {KeyMap.keyid_tostring(index)} {k.name} state found: {found} pressed state: {state} {'*****' if state else ''}")
+							logging.getLogger("system").info(f"\tcheck latched key: {KeyMap.keyid_tostring(index)} {k.name} found: {found} state: {state} {'*****' if state else ''}")
+							if not found:
+								logging.getLogger("system").info(f"\t\t* Key not found *")
 						is_latched = is_latched and state
 
 					if verbose: 
-						logging.getLogger("system").info(f"Final latched state: {is_latched}")
+						logging.getLogger("system").info(f"\tLatched state: {is_latched}")					
 					
 					if is_latched: 
 						latch_key = input_item.key
-						if verbose:
-							logging.getLogger("system").info(f"Detect KEY PRESSED: mode: [{self._active_mode}] {input_item.key.name}")
-					else:
-						if verbose:
-							logging.getLogger("system").info(f"Detect KEY RELEASED: {input_item.key.name}")
-									
+
 					if latch_key:
 						#print (f"Found latched key: {latch_key}")
 						m_list = self._matching_latched_callbacks(event, latch_key)

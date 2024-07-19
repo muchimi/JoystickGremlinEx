@@ -1082,10 +1082,15 @@ class Profile():
         self.parent = parent
         self._profile_fname = None # the file name of this profile
         self._profile_name = None # the friendly name of this profile
-        self._start_mode = None # startup mode for this profile
+        self._start_mode = None # startup mode for this profile (this will be either the default mode, or the last used mode)
+        self._default_start_mode = None # default startup mode for this profile
         self._last_mode = None # last active mode
         self._restore_last_mode = False # True if the profile should start with the last active mode (profile specific)
-        
+        self._dirty = False # dirty flag - indicates the profile data was changed but not saved yet
+
+    @property
+    def dirty(self):
+        return self._dirty
 
     @property
     def name(self):
@@ -1298,6 +1303,12 @@ class Profile():
         if "start_mode" in root.attrib:
             self._start_mode = root.get("start_mode")
 
+        if "default_start_mode" in root.attrib:
+            # older version of profile
+            self._default_start_mode = root.get("default_start_mode")
+        if "default_mode" in root.attrib:
+            self._default_start_mode = root.get("default_mode")
+
         self._restore_last_mode = False
         if "restore_last" in root.attrib:
             self._restore_last_mode = safe_read(root, "restore_last", bool, False)
@@ -1376,7 +1387,7 @@ class Profile():
         return self._profile_fname
     
     def get_default_mode(self):
-        ''' gets the default mode for this profile '''
+        ''' gets the default mode for this profile - this is the mode used if the default startup mode is not specified '''
         modes = self.get_root_modes()
         if modes:
             return modes[0]
@@ -1389,8 +1400,8 @@ class Profile():
         # Generate XML document
         root = ElementTree.Element("profile")
         root.set("version", str(gremlin.profile.ProfileConverter.current_version))
-        assert isinstance(self._start_mode, str)
-        root.set("start_mode", self._start_mode)
+        root.set("start_mode", self.get_start_mode())
+        root.set("default_mode", self.get_default_start_mode())
         root.set("restore_last", str(self._restore_last_mode))
 
         # Device settings
@@ -1546,9 +1557,30 @@ class Profile():
         return self._start_mode
     
     def set_start_mode(self, value : str):
-        ''' sets the start up mode '''
+        ''' sets the profile auto-activated start up mode '''
         assert isinstance(value, str)
         self._start_mode = value
+        verbose = gremlin.config.Configuration().verbose
+        if verbose:
+            logging.getLogger("system").info(f"Profile {self.name}: set start mode to {value}")
+        self.save()
+
+    def set_default_start_mode(self, value : str):
+        ''' sets the profile normal start up mode - this will only be used if the startup mode is not overwritten by the last mode - saving a default start mode also resets the last used start mode'''
+        assert isinstance(value, str)
+        self._default_start_mode = value
+        self._start_mode = value
+        verbose = gremlin.config.Configuration().verbose
+        if verbose:
+            logging.getLogger("system").info(f"Profile {self.name}: set default start mode to {value}")
+        self.save()
+
+    def get_default_start_mode(self):
+        ''' gets the profile's default startup mode '''
+        if not self._default_start_mode:
+            # use the default mode if not setup
+            self._default_start_mode = self.get_default_mode()
+        return self._default_start_mode
 
     def get_restore_mode(self):
         ''' gets the start mode for this profile '''
@@ -1557,12 +1589,16 @@ class Profile():
     def set_restore_mode(self, value):
         ''' sets the start up mode '''
         self._restore_last_mode = value
+        verbose = gremlin.config.Configuration().verbose
+        if verbose:
+            logging.getLogger("system").info(f"Profile {self.name}: set auto-restore flag {value}")
         self.save()
 
     def save(self):
         ''' saves the profile '''
         assert self._profile_fname,"File name is not set"
         self.to_xml(self._profile_fname)
+        self._dirty = False
 
         
 
@@ -2276,7 +2312,8 @@ class ProfileMapItem():
         self._profile = profile
         self._process = process
         self._modes = []
-        self._default_mode = None
+        self._default_mode = None # default mode for the profile (user defined) - if not set - this is the first root mode in the profile
+        self._last_mode = None # last moded used by the profile
         self._restore_mode = False
         self._index = -1
         self._warning = None
@@ -2326,21 +2363,30 @@ class ProfileMapItem():
 
     @property
     def default_mode(self) -> str:
-        ''' true if the profile has the restore last used mode flag set '''
+        ''' profile default mode (this is the startup mode unless the option is to restore a previously used mode) '''
         return self._default_mode
     
     @default_mode.setter
     def default_mode(self, value):
         self._default_mode = value
 
+    @property
+    def last_mode(self) -> str:
+        ''' last mode used by the profile '''
+        return self._last_mode
+    @last_mode.setter
+    def last_mode(self, value):
+        self._last_mode = value
+
     def get_profile_modes(self):
         ''' gets the list of profile modes in a given profile 
-        :returns tuple (mode_list, default_mode, restore_mode_flag)
+        :returns tuple (mode_list, default_mode, last_mode, restore_mode_flag)
         '''
 
-        mode_set = set()
+        mode_list = set() # avoids duplications as some nodes may have duplicate mode info when parsing
         default_mode = None
         restore_last = None
+        start_mode = None
 
 
         current_profile : Profile = gremlin.shared_state.current_profile
@@ -2348,11 +2394,11 @@ class ProfileMapItem():
 
         if not profile:
             # no data
-            return ([], None, False)
+            return ([], None, None, False)
         
         if current_profile.profile_file == profile:
             # current profile loaded - use that profile data since it's loaded and changes may not be saved yet to XML
-            return (current_profile.get_modes(), current_profile.get_default_mode(), current_profile.get_restore_mode())
+            return (current_profile.get_modes(), current_profile.get_default_start_mode(), current_profile.get_start_mode(), current_profile.get_restore_mode())
 
         # profile not loaded - grab the info from the profile xml
         if os.path.isfile(profile):
@@ -2361,31 +2407,33 @@ class ProfileMapItem():
                 tree = etree.parse(profile, parser)
                 for element in tree.xpath("//mode"):
                     mode = element.get("name")
-                    mode_set.add(mode)
-
+                    mode_list.add(mode)
+                mode_list = list(mode_list)
                     
                 for element in tree.xpath("//profile"):
                     # <profile version="10" start_mode="Default" restore_last="True">
                     if not default_mode:
-                        default_mode = safe_read(element, "start_mode", str, '')
+                        default_mode = safe_read(element, "default_mode", str, mode_list[0] if mode_list else '')
+                    if not start_mode:
+                        start_mode = safe_read(element, "start_mode", str, mode_list[0] if mode_list else '')
                     
                     restore_last = safe_read(element, "restore_last", bool, False)
 
                 if not restore_last is None:
                     for element in tree.xpath("//startup-mode"):
-                        default_mode = element.text
+                        start_mode = element.text
                         break
 
                 if not restore_last is None:
                     restore_last = False # default value
 
-                return (list(mode_set), default_mode, restore_last)
+                return (mode_list, default_mode, start_mode, restore_last)
             
             except Exception as ex:
                 logging.getLogger("system").error(f"PROC MAP: Unable to open profile mapping: {profile}:\n{ex}")  
 
         # profile is blank
-        return ([], None, False)
+        return ([], None, None, False)
     
     def save(self):
         ''' saves default and restore mode flags to the profile xml '''
@@ -2439,7 +2487,7 @@ class ProfileMapItem():
                 logging.getLogger("system").error(f"PROC MAP: Unable to open profile mapping: {profile}:\n{ex}")  
 
     def _update(self):
-        self._modes, self._default_mode, self._restore_mode = self.get_profile_modes()
+        self._modes, self._default_mode, self._last_mode, self._restore_mode = self.get_profile_modes()
 
     @property
     def valid(self):
@@ -2591,7 +2639,7 @@ class ProfileMap():
                 warning = f"Mapping incomplete"
                 self._valid = False
 
-            mode_list, _, _= item.get_profile_modes()
+            mode_list, _, _, _= item.get_profile_modes()
             if mode_list:
                 if not item.default_mode in mode_list:
                     valid = False

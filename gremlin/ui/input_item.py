@@ -328,12 +328,12 @@ class InputItemListView(ui_common.AbstractView):
 
         # Create required UI items
         self.main_layout = QtWidgets.QVBoxLayout(self)
-        self.scroll_area = QtWidgets.QScrollArea()
-        self.scroll_widget = QtWidgets.QWidget()
-        self.scroll_layout = QtWidgets.QVBoxLayout()
+        self.scroll_area = QtWidgets.QScrollArea(self)
+        self.scroll_widget = QtWidgets.QWidget(parent=self.scroll_area)
+        self.scroll_layout = QtWidgets.QVBoxLayout(self.scroll_widget)
 
         # Configure the widget holding the layout with all the buttons
-        self.scroll_widget.setLayout(self.scroll_layout)
+        #self.scroll_widget.setLayout(self.scroll_layout)
 
         # Configure the scroll area
         self.scroll_area.setWidgetResizable(True)
@@ -349,10 +349,6 @@ class InputItemListView(ui_common.AbstractView):
     @property
     def current_index(self):
         return self._current_index
-    
-    # @current_index.setter
-    # def current_index(self, value):
-    #     self._current_index = value
 
     @property
     def current_device(self):
@@ -406,88 +402,92 @@ class InputItemListView(ui_common.AbstractView):
         This creates a fake listview where a vertical container just has InputItemButton widgets
 
         """
-        verbose = gremlin.config.Configuration().verbose_mode_inputs
 
+
+        verbose = gremlin.config.Configuration().verbose_mode_inputs
 
         if self.model is None:
             return
 
-        row_count = self.model.rows()
-        device_name = self.current_device.name
-        #if self.current_device.name == "keyboard":
+        with QtCore.QSignalBlocker(self):
 
-        
-        selected_index = - 1 # nothing selected
+            row_count = self.model.rows()
+            device_name = self.current_device.name
+            #if self.current_device.name == "keyboard":
 
-        # remember the index of the item that was previously selected
-        selected_input_id = None
-        if self._current_index != -1 and self._current_index < self.model.rows():
-            selected_input_id = self.model.data(self._current_index).input_id
-
-
-        # clear the widgets
-        self._widget_map = {} # map of index to widget
-        ui_common.clear_layout(self.scroll_layout)
-
-
-        for index in range(row_count):
-            data = self.model.data(index)
-
-            # true if this index should be selected because it was selected in the old list
-            selected = selected_input_id and selected_input_id == data.input_id
-
-            identifier = InputIdentifier(
-                data.input_type,
-                data.input_id,
-                data.parent.parent.type
-            )
-
-            if self.custom_widget_handler:
-                # custom widget creation handling
-
-                widget = self.custom_widget_handler(self, index, identifier, data)
-                assert widget is not None, "Custom widget handler didn't return a widget"
-            else:
-                widget = InputItemWidget(identifier)
-                if data.input_type == InputType.JoystickAxis:
-                    widget.setIcon("joystick_no_frame.png",use_qta=False)
-                elif data.input_type == InputType.JoystickButton:
-                    widget.setIcon("mdi.gesture-tap-button")
-                elif data.input_type == InputType.JoystickHat:
-                    widget.setIcon("ei.fullscreen")
-                widget.create_action_icons(data)
-                widget.setDescription(data.description)
-
-            # hook the widget
             
-            self._widget_map[index] = widget
-            widget.selected_changed.connect(self._widget_selection_change_cb)
-            widget.index = index # assigned index
-            if selected:
-                # remember which item to select
-                selected_index = index
+            selected_index = - 1 # nothing selected
 
-            # widget.selected_changed.connect(self._create_selection_callback(index))
-            widget.edit.connect(self._create_edit_callback(index))
-            widget.closed.connect(self._create_closed_callback(index))
+            # remember the index of the item that was previously selected
+            selected_input_id = None
+            if self._current_index != -1 and self._current_index < self.model.rows():
+                selected_input_id = self.model.data(self._current_index).input_id
 
 
-            # widget.selected = index == self._current_index
-
-            #logging.getLogger("system").info(f"create widget: index {index} selected: {widget.selected}")
-            self.scroll_layout.addWidget(widget)
-            if verbose:
-                logging.getLogger("system").info(f"LV: {device_name} [{index:02d}] type: {InputType.to_string(data.input_type)} name: {data.input_id}")
+            # clear the widgets
+            self._widget_map = {} # map of index to widget
+            ui_common.clear_layout(self.scroll_layout)
 
 
-        if selected_index == -1 and row_count > 0:
-            selected_index = 0 # select the first one by default if nothing was selected
+            for index in range(row_count):
+                data = self.model.data(index)
 
-        if selected_index >= 0:
-            # select the item
-            self.select_item(selected_index, False)
+                # true if this index should be selected because it was selected in the old list
+                selected = selected_input_id and selected_input_id == data.input_id
 
-        self.scroll_layout.addStretch()
+                identifier = InputIdentifier(
+                    data.input_type,
+                    data.input_id,
+                    data.parent.parent.type
+                )
+
+                if self.custom_widget_handler:
+                    # custom widget creation handling
+
+                    widget = self.custom_widget_handler(self, index, identifier, data)
+                    assert widget is not None, "Custom widget handler didn't return a widget"
+                else:
+                    widget = InputItemWidget(identifier, parent=self)
+                    if data.input_type == InputType.JoystickAxis:
+                        widget.setIcon("joystick_no_frame.png",use_qta=False)
+                    elif data.input_type == InputType.JoystickButton:
+                        widget.setIcon("mdi.gesture-tap-button")
+                    elif data.input_type == InputType.JoystickHat:
+                        widget.setIcon("ei.fullscreen")
+                    widget.create_action_icons(data)
+                    widget.setDescription(data.description)
+
+                # hook the widget
+                
+                self._widget_map[index] = widget
+                widget.selected_changed.connect(self._widget_selection_change_cb)
+                widget.index = index # assigned index
+                if selected:
+                    # remember which item to select
+                    selected_index = index
+
+                # widget.selected_changed.connect(self._create_selection_callback(index))
+                widget.edit.connect(self._create_edit_callback(index))
+                widget.closed.connect(self._create_closed_callback(index))
+
+
+                # widget.selected = index == self._current_index
+
+                #logging.getLogger("system").info(f"create widget: index {index} selected: {widget.selected}")
+                self.scroll_layout.addWidget(widget)
+                if verbose:
+                    logging.getLogger("system").info(f"LV: {device_name} [{index:02d}] type: {InputType.to_string(data.input_type)} name: {data.input_id}")
+
+
+            if selected_index == -1 and row_count > 0:
+                selected_index = 0 # select the first one by default if nothing was selected
+
+            if selected_index >= 0:
+                # select the item
+                self.select_item(selected_index, False)
+
+            self.scroll_layout.addStretch()
+
         self.updated.emit()
 
     def _widget_selection_change_cb(self, widget):
@@ -810,6 +810,7 @@ class ActionSetView(ui_common.AbstractView):
 
 
     def redraw(self):
+
         ui_common.clear_layout(self.action_layout)
 
         if self.model is None:
@@ -941,22 +942,19 @@ class InputItemWidget(QtWidgets.QFrame):
         :param populate_name handler to custom display name - signature populate_name(identifier)
         :param update_callback handler to refresh widget content - signature update(widget)
         """
-        QtWidgets.QFrame.__init__(self, parent)
+        QtWidgets.QFrame.__init__(self)
+        self.parent = parent
+
 
         self._container_widget = QtWidgets.QWidget(self)
-        self._container_layout = QtWidgets.QVBoxLayout()
-        self._container_widget.setLayout(self._container_layout)
+        # self._container_widget.setVisible(False)
+        self._container_layout = QtWidgets.QVBoxLayout(self._container_widget)
         self._container_layout.setContentsMargins(0,0,0,0)
-        
-        
 
-        self._title_container_widget = QtWidgets.QWidget(self)
-        self._title_container_layout = QtWidgets.QGridLayout()
-        self._title_container_widget.setLayout(self._title_container_layout)
+        self._title_container_widget = QtWidgets.QWidget()
+        # self._title_container_widget.setVisible(False)
+        self._title_container_layout = QtWidgets.QGridLayout(self._title_container_widget)
         self._title_container_layout.setContentsMargins(0,0,0,0)
-
-        
-        
 
         self.identifier = identifier
         self._selected = False
@@ -967,6 +965,7 @@ class InputItemWidget(QtWidgets.QFrame):
         self._update_callback = update_callback # callback to use when a specific widget index must be updated
 
         self._title_widget = gremlin.ui.ui_common.QIconLabel()
+        # self._title_widget.setVisible(False)
         self._title_widget.setText("Input Not configured")
         self._title_widget.setObjectName("title")
         
@@ -982,7 +981,6 @@ class InputItemWidget(QtWidgets.QFrame):
         self.setFrameShape(QtWidgets.QFrame.Box)
 
 
-
         # title row
 
         #self.container_layout.addWidget(QtWidgets.QWidget(), data_row, 0) # spacer
@@ -992,16 +990,19 @@ class InputItemWidget(QtWidgets.QFrame):
 
         # action buttons
         self._edit_button_widget = QtWidgets.QPushButton(qta.icon("fa.gear"),"") 
+        # self._edit_button_widget.setVisible(False)
         self._edit_button_widget.setToolTip("Configure")
         self._edit_button_widget.setFixedSize(24,16)
         self._edit_button_widget.clicked.connect(self._edit_button_cb)
-        self._edit_button_widget.setVisible(False) # not visible by default
+        # self._edit_button_widget.setVisible(False) # not visible by default
+
         self._title_container_layout.addWidget(self._edit_button_widget, data_row, 2)
 
         self._close_button_widget = QtWidgets.QPushButton(qta.icon("mdi.delete"),"")
+        # self._close_button_widget.setVisible(False)
         self._close_button_widget.setFixedSize(16,16)
         self._close_button_widget.clicked.connect(self._close_button_cb)
-        self._close_button_widget.setVisible(False) # not visible by default
+        # self._close_button_widget.setVisible(False) # not visible by default
 
 
         self._title_container_layout.addWidget(self._close_button_widget, data_row, 3)
@@ -1009,18 +1010,21 @@ class InputItemWidget(QtWidgets.QFrame):
 
         
         self._description_widget = gremlin.ui.ui_common.QIconLabel()
+        # self._description_widget.setVisible(False)
         self._description_widget.setObjectName("description")
         self._description_widget.setTextMinWidth(280)
-        self._description_widget.setVisible(False)
+        # self._description_widget.setVisible(False)
 
                 
         self._comment_widget = gremlin.ui.ui_common.QIconLabel()
+        # self._comment_widget.setVisible(False)
         self._comment_widget.setObjectName("comment")
         self._comment_widget.setTextMinWidth(280)
-        self._comment_widget.setVisible(False)
+        # self._comment_widget.setVisible(False)
 
 
         self._input_description_widget =gremlin.ui.ui_common.QIconLabel()
+        # self._input_description_widget.setVisible(False)
         self._input_description_widget.setObjectName("input_description")
         self._input_description_widget.setTextMinWidth(280)
         
@@ -1031,6 +1035,7 @@ class InputItemWidget(QtWidgets.QFrame):
         if self._multi_row:
 
             self.custom_container_widget = QtWidgets.QWidget()    
+            # self.custom_container_widget.setVisible(False)
             self.populate_ui(self, self.custom_container_widget)
         else:
             self.custom_container_widget = None
@@ -1058,7 +1063,18 @@ class InputItemWidget(QtWidgets.QFrame):
         self.main_layout.setContentsMargins(8,2,2,2)
         self.main_layout.addWidget(self._container_widget)
         self.setLayout(self.main_layout)
-        
+
+        # self._input_description_widget.setVisible(True)
+        # self._comment_widget.setVisible(True)
+        # self._description_widget.setVisible(True)
+        # self._edit_button_widget.setVisible(True)
+        # self._close_button_widget.setVisible(True)
+        # self._container_widget.setVisible(True)
+        # self._title_container_widget.setVisible(True)
+        # self._title_widget.setVisible(True)
+
+        # if self.custom_container_widget:
+        #     self.custom_container_widget.setVisible(True)
         
         self.update_display()
 

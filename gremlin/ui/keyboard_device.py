@@ -313,7 +313,9 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
             current_mode,
             [InputType.Keyboard, InputType.KeyboardLatched]
         )
-        self.input_item_list_view = input_item.InputItemListView(custom_widget_handler=self.custom_widget_handler)
+
+
+        self.input_item_list_view = input_item.InputItemListView(custom_widget_handler=self.custom_widget_handler, parent=self)
         self.input_item_list_view.setMinimumWidth(350)
 
         # Input type specific setups
@@ -357,13 +359,14 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         self.left_panel_layout.addWidget(button_container_widget)
         # Select default entry
         
-
         self.input_item_list_view.redraw()
+        
 
         selected_index = self.input_item_list_view.current_index
 
         if selected_index != -1:
             self._select_item_cb(selected_index)
+
 
         
     @property
@@ -389,7 +392,7 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         if right_panel:
             self.main_layout.removeItem(right_panel)
 
-        widget = InputItemConfiguration()     
+        widget = InputItemConfiguration()
         self.main_layout.addWidget(widget,3)            
 
     def _add_key_dialog_cb(self):
@@ -556,7 +559,7 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         
         '''
 
-        widget = InputItemWidget(identifier = identifier, populate_ui_callback=self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True)
+        widget = InputItemWidget(identifier = identifier, populate_ui_callback=self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True, parent=list_view)
         widget.create_action_icons(data)
         widget.setDescription(data.description)
         widget.setIcon("fa.keyboard-o")

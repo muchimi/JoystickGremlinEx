@@ -157,11 +157,11 @@ def keyboard_handler(address, x):
             elif token in ("shft","lshft","shift","lshift","leftshift"):
                 key = "leftshift"
             elif token in ("rshft", "rshift","rightshift"):
-                key = "rightshift"
+                key = "rightshift2"
             elif token in ("alt", "lalt","leftalt"):
                 key = "leftalt"
             elif token == "ralt":
-                key = "rightalt"
+                key = "rightalt2" # 0x38 TRUE
             elif token in ("win","lwin","leftwin"):
                 key = "leftwin"
             elif token in ("rwin","rightwin"):

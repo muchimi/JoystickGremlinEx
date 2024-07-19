@@ -20,6 +20,7 @@ import logging
 import time
 import os
 import re
+import sys
 
 from PySide6 import QtCore
 from gremlin.singleton_decorator import SingletonDecorator
@@ -46,6 +47,9 @@ class Configuration:
             # create a stub - first time run
             self.save()
 
+        
+        gettrace = getattr(sys, 'gettrace', None)
+        self._is_debug = gettrace is not None
 
         
         self._last_reload = None
@@ -101,6 +105,12 @@ class Configuration:
             )
             hdl.write(encoder.encode(self._data))
 
+
+
+    
+    @property
+    def is_debug(self):
+        return self._is_debug
 
     def set_last_mode(self, profile_path, mode_name):
         """Stores the last active mode of the given profile.

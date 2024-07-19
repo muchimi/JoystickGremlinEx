@@ -410,6 +410,7 @@ class JoystickDeviceTabWidget(QtWidgets.QWidget):
             self.input_item_list_view.limit_input_types([InputType.JoystickAxis])
         self.input_item_list_view.set_model(self.input_item_list_model)
 
+        # load the model
         self.input_item_list_view.redraw()
     
 
@@ -473,6 +474,7 @@ class JoystickDeviceTabWidget(QtWidgets.QWidget):
         selected_index = self.input_item_list_view.current_index
         if selected_index is not None:
             self.input_item_selected_cb(selected_index)
+        
 
     def _device_update(self, event):
         if self.running:

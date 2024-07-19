@@ -29,6 +29,7 @@ from gremlin.input_types import InputType
 from  gremlin.clipboard import Clipboard
 import gremlin.joystick_handling
 import gremlin.keyboard
+import gremlin.shared_state
 import gremlin.types
 from gremlin.util import load_pixmap
 
@@ -943,7 +944,8 @@ class ModeWidget(QtWidgets.QWidget):
     """Displays the ui for mode selection and management of a device."""
 
     # Signal emitted when the mode changes
-    mode_changed = QtCore.Signal(str)
+    edit_mode_changed = QtCore.Signal(str) # when the edit mode changes
+    start_mode_changed = QtCore.Signal(str)  # when the start mode changes
 
     def __init__(self, parent=None):
         """Creates a new instance.
@@ -958,7 +960,7 @@ class ModeWidget(QtWidgets.QWidget):
         self.main_layout = QtWidgets.QHBoxLayout(self)
         self._create_widget()
 
-    def populate_selector(self, profile_data, current_mode=None):
+    def populate_selector(self, profile_data, current_mode=None, startup_mode=None):
         """Adds entries for every mode present in the profile.
 
         :param profile_data the device for which the mode selection is generated
@@ -966,13 +968,17 @@ class ModeWidget(QtWidgets.QWidget):
         """
         # To prevent emitting lots of change events the slot is first
         # disconnected and then at the end reconnected again.
-        self.selector.currentIndexChanged.disconnect(self._mode_changed_cb)
-
+        self.edit_mode_selector.currentIndexChanged.disconnect(self._edit_mode_changed_cb)
+        self.start_mode_selector.currentIndexChanged.disconnect(self._start_mode_changed_cb)
         self.profile = profile_data
 
-        # Remove all existing items
-        while self.selector.count() > 0:
-            self.selector.removeItem(0)
+        # Remove all existing items in QT6 clear() doesn't always work
+        #self.edit_mode_selector.clear()
+        #self.start_mode_selector.clear()
+        while self.edit_mode_selector.count() > 0:
+            self.edit_mode_selector.removeItem(0)
+        while self.start_mode_selector.count() > 0:
+            self.start_mode_selector.removeItem(0)
         self.mode_list = []
 
         # Create mode name labels visualizing the tree structure
@@ -998,26 +1004,43 @@ class ModeWidget(QtWidgets.QWidget):
 
         # Add properly arranged mode names to the drop down list
         for display_name, mode_name in zip(display_names, mode_names):
-            self.selector.addItem(display_name)
+            self.edit_mode_selector.addItem(display_name)
+            self.start_mode_selector.addItem(display_name)
             self.mode_list.append(mode_name)
 
         # Select currently active mode
         if len(mode_names) > 0:
             if current_mode is None or current_mode not in self.mode_list:
+                # pick the first one
                 current_mode = mode_names[0]
-            self.selector.setCurrentIndex(self.mode_list.index(current_mode))
-            self._mode_changed_cb(self.mode_list.index(current_mode))
+            if startup_mode is None or startup_mode not in self.mode_list:
+                startup_mode = mode_names[0]
+            self.edit_mode_selector.setCurrentIndex(self.mode_list.index(current_mode))
+            self._edit_mode_changed_cb(self.mode_list.index(current_mode))
+            start_mode = gremlin.shared_state.current_profile.get_start_mode()
+            if not start_mode in self.mode_list:
+                # the start mode no longer exists - use the default mode
+                default_mode = gremlin.shared_state.current_profile.get_default_mode()
+                logging.getLogger("system").warning(f"Specified start mode {start_mode} no longer exists - using default mode {default_mode}")
+                start_mode = default_mode
+                gremlin.shared_state.current_profile.set_start_mode(default_mode)
+            self.start_mode_selector.setCurrentIndex(self.mode_list.index(start_mode))
 
         # Reconnect change signal
-        self.selector.currentIndexChanged.connect(self._mode_changed_cb)
+        self.edit_mode_selector.currentIndexChanged.connect(self._edit_mode_changed_cb)
+        self.start_mode_selector.currentIndexChanged.connect(self._start_mode_changed_cb)
 
     @QtCore.Slot(int)
-    def _mode_changed_cb(self, idx):
+    def _edit_mode_changed_cb(self, idx):
         """Callback function executed when the mode selection changes.
 
         :param idx id of the now selected entry
         """
-        self.mode_changed.emit(self.mode_list[idx])
+        self.edit_mode_changed.emit(self.mode_list[idx])
+
+    @QtCore.Slot(int)
+    def _start_mode_changed_cb(self, idx):
+        self.start_mode_changed.emit(self.mode_list[idx])
 
     def _inheritance_tree_to_labels(self, labels, tree, level):
         """Generates labels to use in the dropdown menu indicating inheritance.
@@ -1044,12 +1067,20 @@ class ModeWidget(QtWidgets.QWidget):
             QtWidgets.QSizePolicy.Minimum
         )
 
+        self.start_label = QtWidgets.QLabel("Start Mode")
+        self.start_label.setSizePolicy(min_min_sp)
+        self.start_mode_selector = QtWidgets.QComboBox()
+        self.start_mode_selector.setSizePolicy(exp_min_sp)
+        self.start_mode_selector.setMinimumContentsLength(20)
+
+        self.start_mode_selector.currentIndexChanged.connect(self._start_mode_changed_cb)
+
         # Create mode selector and related widgets
-        self.label = QtWidgets.QLabel("Mode")
-        self.label.setSizePolicy(min_min_sp)
-        self.selector = QtWidgets.QComboBox()
-        self.selector.setSizePolicy(exp_min_sp)
-        self.selector.setMinimumContentsLength(20)
+        self.edit_label = QtWidgets.QLabel("Edit Mode")
+        self.edit_label.setSizePolicy(min_min_sp)
+        self.edit_mode_selector = QtWidgets.QComboBox()
+        self.edit_mode_selector.setSizePolicy(exp_min_sp)
+        self.edit_mode_selector.setMinimumContentsLength(20)
 
         # add the mode change button
         self.mode_change = QtWidgets.QPushButton()
@@ -1058,12 +1089,14 @@ class ModeWidget(QtWidgets.QWidget):
         self.mode_change.clicked.connect(self._manage_modes_cb)
 
         # Connect signal
-        self.selector.currentIndexChanged.connect(self._mode_changed_cb)
+        self.edit_mode_selector.currentIndexChanged.connect(self._edit_mode_changed_cb)
 
         # Add widgets to the layout
         self.main_layout.addStretch(10)
-        self.main_layout.addWidget(self.label)
-        self.main_layout.addWidget(self.selector)
+        self.main_layout.addWidget(self.start_label)
+        self.main_layout.addWidget(self.start_mode_selector)
+        self.main_layout.addWidget(self.edit_label)
+        self.main_layout.addWidget(self.edit_mode_selector)
         self.main_layout.addWidget(self.mode_change)
 
     def _manage_modes_cb(self):
