@@ -43,7 +43,7 @@ from gremlin.input_types import InputType
 import gremlin.base_profile
 
 
-class ProfileOptionsUi(ui_common.BaseDialogUi):
+class ProfileOptionsUi(QtWidgets.QDialog):
     """UI to set individual profile settings """
     start_mode_changed = QtCore.Signal(str)  # when the start mode changes
 
@@ -91,8 +91,6 @@ class ProfileOptionsUi(ui_common.BaseDialogUi):
         self.start_container_layout.addWidget(self.start_label)
         self.start_container_layout.addWidget(self.start_mode_selector)
         self.start_container_layout.addStretch()
-
-
         
         # Restore last mode on profile activate
         self.activate_restore_mode = QtWidgets.QCheckBox("Restore last used mode on profile activation")
@@ -104,19 +102,14 @@ class ProfileOptionsUi(ui_common.BaseDialogUi):
         self.close_button.clicked.connect(self._close_cb)
 
 
-        close_button_layout = QtWidgets.QHBoxLayout(self)
+        close_button_widget = QtWidgets.QWidget()
+        close_button_layout = QtWidgets.QHBoxLayout(close_button_widget)
         close_button_layout.addStretch()
         close_button_layout.addWidget(self.close_button)
-        
-
 
         self.main_layout.addWidget(self.numlock_widget)
-        
-
         self.main_layout.addWidget(self.start_container_widget)
-        self.main_layout.addLayout(close_button_layout)
-        
-        
+        self.main_layout.addWidget(close_button_widget)
 
         self.populate_selector()
 

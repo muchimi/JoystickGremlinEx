@@ -31,6 +31,7 @@ import gremlin
 
 
 from gremlin.input_types import InputType
+import gremlin.keyboard
 import gremlin.shared_state
 import gremlin.types
 import gremlin.plugin_manager
@@ -325,7 +326,15 @@ class CodeRunner:
             evt_listener.osc_event.connect(
                 self.event_handler.process_event
             )
-            
+
+            # set keyboard startup state for numlock
+            if profile.get_force_numlock():
+                state = gremlin.keyboard.KeyMap.numlock_state()
+                logging.getLogger("system").info(f"Numlock state: {state}")
+                if state:
+                    # toggle the mode off
+                    gremlin.keyboard.KeyMap.toggle_numlock()
+                
             
             # monitor keyboard input state
             kb = gremlin.input_devices.Keyboard()

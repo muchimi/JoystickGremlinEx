@@ -1034,6 +1034,23 @@ class KeyMap:
     def numlock_state():
         ''' gets the state of the numlock key '''
         return KeyMap.get_vk_keyboard_state(win32con.VK_NUMLOCK)
+    
+    @staticmethod
+    def set_numlock_state(value):
+        state = KeyMap.numlock_state()
+        if state != value:
+            KeyMap.toggle_numlock()
+
+    @staticmethod
+    def toggle_numlock():
+        import gremlin.sendinput
+        # key down
+        flags = win32con.KEYEVENTF_EXTENDEDKEY 
+        gremlin.sendinput.send_key(win32con.VK_NUMLOCK, 0x45, flags)
+
+        # key up
+        flags |= win32con.KEYEVENTF_KEYUP
+        gremlin.sendinput.send_key(win32con.VK_NUMLOCK, 0x45, flags)
 
     
     # holds the number pad scan codes

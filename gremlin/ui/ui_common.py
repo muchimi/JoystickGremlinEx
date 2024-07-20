@@ -1127,7 +1127,7 @@ class ModeWidget(QtWidgets.QWidget):
     def _profile_options_cb(self):
         import gremlin.ui.dialogs
         dialog = gremlin.ui.dialogs.ProfileOptionsUi()
-        dialog.show()
+        dialog.exec()
 
 
 class InputListenerWidget(QtWidgets.QFrame):
