@@ -2108,8 +2108,8 @@ class OscInputConfigDialog(QtWidgets.QDialog):
 
 
         self._container_mode_radio_widget = QtWidgets.QWidget()
-        self._container_mode_radio_layout = QtWidgets.QHBoxLayout()
-        self._container_mode_radio_widget.setLayout(self._container_mode_radio_layout)
+        self._container_mode_radio_layout = QtWidgets.QHBoxLayout(self._container_mode_radio_widget )
+        
         self._container_mode_description_widget = QtWidgets.QLabel()
 
         self._container_command_mode_radio_widget = QtWidgets.QWidget()
@@ -2129,8 +2129,8 @@ class OscInputConfigDialog(QtWidgets.QDialog):
         self._mode_axis_widget.clicked.connect(self._mode_axis_cb)
 
         self._container_range_widget = QtWidgets.QWidget()
-        self._container_range_layout = QtWidgets.QHBoxLayout()
-        self._container_range_widget.setLayout(self._container_range_layout)
+        self._container_range_layout = QtWidgets.QHBoxLayout(self._container_range_widget)
+        
 
         self._min_range_widget = gremlin.ui.ui_common.DynamicDoubleSpinBox()
         self._min_range_widget.setValue(0.0) # default min range 
@@ -2188,8 +2188,8 @@ class OscInputConfigDialog(QtWidgets.QDialog):
         self.cancel_widget.clicked.connect(self._cancel_button_cb)
 
         self.button_widget = QtWidgets.QWidget()
-        self.button_layout = QtWidgets.QHBoxLayout()
-        self.button_widget.setLayout(self.button_layout)
+        self.button_layout = QtWidgets.QHBoxLayout(self.button_widget)
+        
 
         # listen all ports button 
         self.listen_widget = QtWidgets.QPushButton("Listen")
@@ -2521,8 +2521,6 @@ class OscDeviceTabWidget(QtWidgets.QWidget):
         import gremlin.ui.ui_common as ui_common
         import gremlin.ui.input_item as input_item
 
-        self._widget_map = {} # holds the created widgets by index
-
         # Store parameters
         self.device_profile = device_profile
         self.current_mode = current_mode
@@ -2570,8 +2568,8 @@ class OscDeviceTabWidget(QtWidgets.QWidget):
         self.main_layout.addWidget(widget,3)
 
         button_container_widget = QtWidgets.QWidget()
-        button_container_layout = QtWidgets.QHBoxLayout()
-        button_container_widget.setLayout(button_container_layout)
+        button_container_layout = QtWidgets.QHBoxLayout(button_container_widget)
+        
 
         # key clear button
         
@@ -2596,9 +2594,7 @@ class OscDeviceTabWidget(QtWidgets.QWidget):
 
     def itemAt(self, index):
         ''' returns the input widget at the given index '''
-        if index in self._widget_map.keys():
-           return self._widget_map[index]
-        return None
+        return self.input_item_list_view.itemAt(index)
 
     def display_name(self, input_id):
         ''' returns the name for the given input ID '''
@@ -2691,7 +2687,7 @@ class OscDeviceTabWidget(QtWidgets.QWidget):
         self.input_item_list_view.redraw()
         
 
-    def _custom_widget_handler(self, list_view, index : int, identifier, data):
+    def _custom_widget_handler(self, list_view, index : int, identifier, data, parent = None):
         ''' creates a widget for the input 
         
         the widget must have a selected property
@@ -2701,8 +2697,9 @@ class OscDeviceTabWidget(QtWidgets.QWidget):
         :param data the data associated with this input item
         
         '''
+        import gremlin.ui.input_item
 
-        widget = gremlin.ui.input_item.InputItemWidget(identifier = identifier, populate_ui_callback = self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True)
+        widget = gremlin.ui.input_item.InputItemWidget(identifier = identifier, populate_ui_callback = self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True, parent = parent)
         #identifier = identifier.input_id
         widget.create_action_icons(data)
         widget.setDescription(data.description)
@@ -2710,7 +2707,7 @@ class OscDeviceTabWidget(QtWidgets.QWidget):
         widget.enable_edit()
         widget.setIcon("mdi.surround-sound")
         # remember what widget is at what index
-        self._widget_map[index] = widget
+        widget.index = index
         return widget
     
 
@@ -2790,16 +2787,12 @@ class OscDeviceTabWidget(QtWidgets.QWidget):
         status_widget.setText(status_text)
  
 
-    def _populate_input_widget_ui(self, input_widget, container_widget):
+    def _populate_input_widget_ui(self, input_widget, container_widget, data):
         ''' called when a button is created for custom content '''
-
+        layout = QtWidgets.QVBoxLayout(container_widget)
         status_widget = gremlin.ui.ui_common.QIconLabel()
         status_widget.setObjectName("status")
-        layout = QtWidgets.QVBoxLayout()
-        container_widget.setLayout(layout)
         layout.addWidget(status_widget)
-        
-
         self._update_input_widget(input_widget, container_widget)
 
 

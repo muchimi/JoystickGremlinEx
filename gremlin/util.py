@@ -350,6 +350,7 @@ def clear_layout(layout):
 
     :param layout the layout from which to remove all items
     """
+
     while layout.count() > 0:
         child = layout.takeAt(0)
         if child.layout():
@@ -714,7 +715,7 @@ def safe_read(node, key, type_cast=None, default_value=None):
     # Attempt to read the value and if present use the provided default value
     # in case reading fails
     value = default_value
-    if key not in node.keys():
+    if not key in node.keys():
         if default_value is None:
             msg = f"Attempted to read attribute '{key}' which does not exist."
             logging.getLogger("system").error(msg)
@@ -876,17 +877,17 @@ def byte_list_to_string(data, as_hex = True):
     result = result[:-1]
     return result
 
-def scale_to_range(value, r_min, r_max, new_min = -1.0, new_max = 1.0):
+def scale_to_range(value, source_min = -1.0, source_max = 1.0, target_min = -1.0, target_max = 1.0, invert = False):
     ''' scales a value on one range to the new range
     
     value: the value to scale
-    r_min: the value's min range 
-    r_max: the value's max range
+    r_min: the source value's min range 
+    r_max: the source value's max range
     new_min: the new range's min
     new_max: the new range's max
-    
+    invert: true if the value should be reversed
     '''
-    r_delta = r_max - r_min
+    r_delta = source_max - source_min
     if r_delta == 0:
         # frame the value if no valid range given
         if value < -1.0:
@@ -894,8 +895,12 @@ def scale_to_range(value, r_min, r_max, new_min = -1.0, new_max = 1.0):
         if value > 1.0:
             return 1.0
         return value
-            
-    return (((value - r_min) * (new_max - new_min)) / (r_max - r_min)) + new_min
+
+    if invert:
+        result = (((source_max - value) * (target_max - target_min)) / (source_max - source_min)) + target_min
+    else:
+        result = (((value - source_min) * (target_max - target_min)) / (source_max - source_min)) + target_min
+    return result
     
 
 def list_to_csv(data) -> str:

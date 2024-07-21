@@ -25,6 +25,7 @@ import PySide6.QtGui
 import PySide6.QtWidgets
 import gremlin.error
 import qtawesome as qta
+import gremlin.event_handler
 from gremlin.input_types import InputType
 from  gremlin.clipboard import Clipboard
 import gremlin.joystick_handling
@@ -1023,8 +1024,8 @@ class ModeWidget(QtWidgets.QWidget):
         while self.edit_mode_selector.count() > 0:
             self.edit_mode_selector.removeItem(0)
         
-        self.mode_list = get_mode_list(profile_data)
-
+        mode_list = get_mode_list(profile_data)
+        self.mode_list = [x[1] for x in mode_list]
         # Create mode name labels visualizing the tree structure
         inheritance_tree = self.profile.build_inheritance_tree()
         labels = []
@@ -1046,20 +1047,24 @@ class ModeWidget(QtWidgets.QWidget):
                 mode_names.append(entry[0])
                 display_names.append(entry[1])
 
-        # Add properly arranged mode names to the drop down list
-        for display_name, mode_name in zip(display_names, mode_names):
-            self.edit_mode_selector.addItem(display_name)
-            self.mode_list.append(mode_name)
-
         # Select currently active mode
         if len(mode_names) > 0:
             if current_mode is None or current_mode not in self.mode_list:
                 # pick the first one
-                current_mode = mode_names[0]
-            if startup_mode is None or startup_mode not in self.mode_list:
-                startup_mode = mode_names[0]
-            self.edit_mode_selector.setCurrentIndex(self.mode_list.index(current_mode))
-            self._edit_mode_changed_cb(self.mode_list.index(current_mode))
+                current_mode = mode_names[0]                
+
+        # Add properly arranged mode names to the drop down list
+        index = 0
+        current_index = 0
+        for display_name, mode_name in zip(display_names, mode_names):
+            self.edit_mode_selector.addItem(display_name)
+            self.mode_list.append(mode_name)
+            if mode_name == current_mode:
+                current_index = index
+            index += 1
+
+        self.edit_mode_selector.setCurrentIndex(current_index)
+        self._edit_mode_changed_cb(current_index)
 
         # Reconnect change signal
         self.edit_mode_selector.currentIndexChanged.connect(self._edit_mode_changed_cb)
@@ -1100,6 +1105,7 @@ class ModeWidget(QtWidgets.QWidget):
         self.edit_mode_selector = QtWidgets.QComboBox()
         self.edit_mode_selector.setSizePolicy(exp_min_sp)
         self.edit_mode_selector.setMinimumContentsLength(20)
+        
 
         # add the mode change button
         self.mode_change = QtWidgets.QPushButton()
@@ -1680,4 +1686,704 @@ class QPathLineItem(QtWidgets.QWidget):
     def data(self, value):
         self._data = value
 
+
+
+class AxisStateWidget(QtWidgets.QWidget):
+
+    """Visualizes the current state of an axis."""
+    css_vertical = r"QProgressBar::chunk {background: QLinearGradient( x1: 0, y1: 0, x2: 1, y2: 0,stop: 0 #78d,stop: 0.4999 #46a,stop: 0.5 #45a,stop: 1 #238 ); border-radius: 7px; border: 1px solid black;}"
+    #css_horizontal = r"QProgressBar::chunk {background: QLinearGradient( x1: 0, y1: 0, x2: 0, y2: 1,stop: 0 #78d,stop: 0.4999 #46a,stop: 0.5 #45a,stop: 1 #238 ); border-radius: 7px; border: 1px solid black;}"    
+    css_horizontal = r"QProgressBar::chunk {background: QLinearGradient( x1: 0, y1: 0, x2: 0, y2: 1,stop: 0 #77a ,stop: 0.4999 #477,stop: 0.5 #45a,stop: 1 #238 ); border-radius: 7px; border: 1px solid black;}"    
+    
+
+    def __init__(self, axis_id = None, show_percentage = True, show_value = True, show_label = True, orientation = QtCore.Qt.Orientation.Vertical, parent=None):
+        """Creates a new instance.
+
+        :param axis_id id of the axis, used in the label
+        :param parent the parent of this widget
+        """
+        super().__init__(parent)
+
+        self._scale_factor = 1000
+        if orientation == QtCore.Qt.Orientation.Vertical:
+            self.main_layout = QtWidgets.QVBoxLayout(self)
+        else:
+            self.main_layout = QtWidgets.QHBoxLayout(self)
+
+        self._progress_widget = QtWidgets.QProgressBar()
+        self._progress_widget.setOrientation(orientation)
+        self._progress_widget.setTextVisible(False)
+        self._orientation = orientation
+        self._show_percentage = show_percentage
+        self._show_value = show_value
+        self._show_label = show_label
+
+        self._readout_widget = QtWidgets.QLabel()
+        #self._readout_widget.setVisible(show_percentage or show_label)
+
+        self._label_widget = QtWidgets.QLabel()
+        self._label_widget.setVisible(show_label)
+        if axis_id:
+            self.setLabel(f"Axis {axis_id}")
+
+        self.main_layout.addWidget(self._label_widget)
+        self.main_layout.addWidget(self._progress_widget)
+        self.main_layout.addWidget(self._readout_widget)
+        self.main_layout.addStretch()
+        self._value = 0
+        self._min_range = -1
+        self._max_range = 1
+        self._device_guid = None
+        self._input_id = None
+
+
+        
+        self._width = 10
+        self._update_css()
+        self._update_range()
+
+    def setPercentageVisible(self, value: bool):
+        ''' shows or hides the percentage value on the axis '''
+        self._show_percentage = value
+        self._readout_widget.setVisible(value or self._show_value)
+
+    def setValueVisible(self, value: bool):
+        self._show_value = value
+        self._readout_widget.setVisible(value or self._show_percentage)
+
+    def _update_css(self):
+        if self._orientation == QtCore.Qt.Orientation.Vertical:
+            css = AxisStateWidget.css_vertical + f";width {self._width}px"
+            self._progress_widget.setMaximumWidth(self._width)
+            
+        elif self._orientation == QtCore.Qt.Orientation.Horizontal:
+            css = AxisStateWidget.css_horizontal+ f";height {self._width}px"
+            self._progress_widget.setMaximumHeight(self._width)
+
+        self._progress_widget.setStyleSheet(css)    
+
+    def setLabel(self, value : str):
+        ''' sets the label for the axis '''
+        self._label_widget.setText(value)
+
+    def setLabelVisible(self, value: bool):
+        self._show_label = value
+        self._label_widget.setVisible(value)
+
+    def setWidth(self, value):
+        if value > 0:
+            self._width = value
+            self._update_css()
+
+    def setValue(self, value):
+        """Sets the value shown by the widget.
+
+        :param value new value to show
+        """
+        if value < self._min_range:
+            value = self._min_range
+        if value > self._max_range:
+            value = self._max_range
+        value += 0   # avoid negative 0 (WHY?)
+        self._value = value
+        scaled_value = self._scale_factor * value
+        #print (f"{scaled_value}")
+        self._progress_widget.setValue(scaled_value)
+        self._progress_widget.update()
+        readout = ""
+        if self._show_value:
+            readout = f"{value:+0.2f}"
+        if self._show_percentage:
+            percent = int(round(100 * value / (self._max_range - self._min_range)))
+            if readout:
+                readout += " "
+            readout += f"{percent:d} %"
+        self._readout_widget.setText(readout)
+
+    def value(self):
+        ''' gets the current value '''
+        return self._value
+
+    def setRange(self, min = -1.0, max = 1.0):
+        ''' sets the range of the widget '''
+        if min > max:
+            tmp = min
+            min = max
+            max = tmp
+        self._min_range = min
+        self._max_range = max
+        self._update_range()
+
+    def _update_range(self):
+        self._progress_widget.setRange(
+            self._scale_factor * self._min_range,
+            self._scale_factor * self._max_range
+        )
+        self.setValue(self._value)
+
+    def setMaximum(self, value):
+        ''' sets the upper range value '''
+        self.setRange(self._min_range, value)
+
+    def setMinimum(self, value):
+        ''' sets the lower range value'''
+        self.setRange(value, self._max_range)
+
+    def hookDevice(self, device_guid, input_id):
+        ''' hooks an axis '''
+        self._device_guid = device_guid
+        self._input_id = input_id
+        self._scale_factor = 1000
+        self._value = -1
+        self.setRange(-1, 1)
+
+        # read the current value
+        raw_value = gremlin.joystick_handling.dinput.DILL().get_axis(device_guid, input_id)
+        eh = gremlin.event_handler.EventListener()
+        eh.joystick_event.connect(self._event_handler)
+        self._update_value(raw_value)
+
+    def unhookDevice(self):
+        eh = gremlin.event_handler.EventListener()
+        eh.joystick_event.disconnect(self._event_handler)
+
+    def _event_handler(self, event):
+        if gremlin.shared_state.is_running or not event.is_axis:
+            return
+        
+        if self._device_guid != event.device_guid or self._input_id != event.identifier:
+            return
+        self._update_value(event.raw_value)
+
+    def _update_value(self, raw_value):
+        input_value = gremlin.util.scale_to_range(raw_value, source_min = -32767, source_max = 32767, target_min = -1, target_max = 1)
+        self.setValue(input_value)
+
+        
+class AxesCurrentState(QtWidgets.QGroupBox):
+
+    """Displays the current state of all axes on a device."""
+
+    def __init__(self, device, parent=None):
+        """Creates a new instance.
+
+        :param device the device of which to display the axes sate
+        :param parent the parent of this widget
+        """
+        super().__init__(parent)
+
+        self.device = device
+        if device.is_virtual:
+            self.setTitle(f"{device.name} #{device.vjoy_id:d} - Axes")
+        else:
+            self.setTitle(f"{device.name} - Axes")
+
+        self.axes = [None]
+        axes_layout = QtWidgets.QHBoxLayout()
+        for i in range(device.axis_count):
+            axis = AxisStateWidget(i+1)
+            axis.setValue(0.0)
+            self.axes.append(axis)
+            axes_layout.addWidget(axis)
+        axes_layout.addStretch()
+        self.setLayout(axes_layout)
+
+    def process_event(self, event):
+        """Updates state visualization based on the given event.
+
+        :param event the event with which to update the state display
+        """
+        if event.event_type == InputType.JoystickAxis:
+            axis_id = gremlin.joystick_handling.linear_axis_index(
+                self.device.axis_map,
+                event.identifier
+            )
+            self.axes[axis_id].set_value(event.value)
+
+
+class HatWidget(QtWidgets.QWidget):
+
+    """Widget visualizing the state of a hat."""
+
+    # Polygon path for a triangle
+    triangle = QtGui.QPolygon(
+        [QtCore.QPoint(-10, 0), QtCore.QPoint(10, 0), QtCore.QPoint(0, 15)]
+    )
+
+    # Mapping from event values to rotation angles
+    lookup = {
+        (0, 0): -1,
+        (0, 1): 180,
+        (1, 1): 225,
+        (1, 0): 270,
+        (1, -1): 315,
+        (0, -1): 0,
+        (-1, -1): 45,
+        (-1, 0): 90,
+        (-1, 1): 135
+    }
+
+    def __init__(self, parent=None):
+        """Creates a new instance.
+
+        :param parent the parent of this widget
+        """
+        super().__init__(parent)
+
+        self.angle = -1
+
+    def minimumSizeHint(self):
+        """Returns the minimum size of the widget.
+
+        :return the widget's minimum size
+        """
+        return QtCore.QSize(120, 120)
+
+    def set_angle(self, state):
+        """Sets the current direction of the hat.
+
+        :param state the direction of the hat
+        """
+        self.angle = HatWidget.lookup.get(state, -1)
+        self.update()
+
+    def paintEvent(self, event):
+        """Draws the entire hat state visualization.
+
+        :param event the paint event
+        """
+        # Define pens and brushes
+        pen_default = QtGui.QPen(QtGui.QColor("#8f8f91"))
+        pen_default.setWidth(2)
+        pen_active = QtGui.QPen(QtGui.QColor("#661714"))
+        pen_active.setWidth(2)
+        brush_default = QtGui.QBrush(QtGui.QColor("#f6f7fa"))
+        brush_active = QtGui.QBrush(QtGui.QColor("#b22823"))
+
+        # Prepare painter instance
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing | QtGui.QPainter.SmoothPixmapTransform)
+        painter.setPen(pen_default)
+        painter.setBrush(brush_default)
+
+        painter.translate(50, 50)
+
+        # Center dot
+        if self.angle == -1:
+            painter.setBrush(brush_active)
+        painter.drawEllipse(-8, -8, 16, 16)
+        painter.setBrush(brush_default)
+        # Directions
+        for angle in [0, 45, 90, 135, 180, 225, 270, 315]:
+            painter.save()
+            painter.rotate(angle)
+            painter.translate(0, 35)
+
+            if angle == self.angle:
+                painter.setBrush(brush_active)
+                painter.setPen(pen_active)
+
+            painter.drawPolygon(HatWidget.triangle)
+            painter.restore()        
+
+
+class HatState(QtWidgets.QGroupBox):
+
+    """Visualizes the sate of a device's hats."""
+
+    def __init__(self, device, parent=None):
+        """Creates a new instance.
+
+        :param device the device of which to display the hat sate
+        :param parent the parent of this widget
+        """
+        super().__init__(parent)
+
+        self._event_times = {}
+
+        if device.is_virtual:
+            self.setTitle(f"{device.name} #{device.vjoy_id:d} - Hats")
+        else:
+            self.setTitle(f"{device.name} - Hats")
+
+        self.hats = [None]
+        hat_layout = QtWidgets.QGridLayout()
+        for i in range(device.hat_count):
+            hat = HatWidget()
+            self.hats.append(hat)
+            hat_layout.addWidget(hat, int(i / 2), int(i % 2))
+
+        self.setLayout(hat_layout)
+
+    def process_event(self, event):
+        """Updates state visualization based on the given event.
+
+        :param event the event with which to update the state display
+        """
+        if event.event_type == InputType.JoystickHat:
+            self.hats[event.identifier].set_angle(event.value)
+            self._event_times[event.identifier] = time.time()
+
+
+class AxesTimeline(QtWidgets.QGroupBox):
+
+    """Visualizes axes state as a timeline."""
+
+    color_list = {
+        1: "#e41a1c",
+        2: "#377eb8",
+        3: "#4daf4a",
+        4: "#984ea3",
+        5: "#ff7f00",
+        6: "#ffff33",
+        7: "#a65628",
+        8: "#f781bf"
+    }
+
+    def __init__(self, device, parent=None):
+        """Creates a new instance.
+
+        :param device the device of which to display the axes sate
+        :param parent the parent of this widget
+        """
+        super().__init__(parent)
+
+        if device.is_virtual:
+            self.setTitle(f"{device.name} #{device.vjoy_id:d} - Axes")
+        else:
+            self.setTitle(f"{device.name} - Axes")
+
+        self.setLayout(QtWidgets.QVBoxLayout())
+        self.plot_widget = TimeLinePlotWidget()
+        self.legend_layout = QtWidgets.QHBoxLayout()
+        self.legend_layout.addStretch()
+        for i in range(device.axis_count):
+            label = QtWidgets.QLabel(f"Axis {device.axis_map[i].axis_index:d}")
+            label.setStyleSheet(
+                f"QLabel {{ color: {AxesTimeline.color_list.get(device.axis_map[i].axis_index,"#000000")}; font-weight: bold }}"
+            )
+            self.legend_layout.addWidget(label)
+        self.layout().addWidget(self.plot_widget)
+        self.layout().addLayout(self.legend_layout)
+
+    def add_point(self, value, series_id):
+        """Adds a new point to the timline.
+
+        :param value the value to add
+        :param series_id id of the axes to which to add the value
+        """
+        self.plot_widget.add_point(value, series_id)
+
+
+
+
+
+
+class TimeLinePlotWidget(QtWidgets.QWidget):
+
+    """Visualizes temporal data as a line graph."""
+
+    # Pre-defined colors for eight time series
+    pens = {
+        1: QtGui.QPen(QtGui.QColor("#e41a1c")),
+        2: QtGui.QPen(QtGui.QColor("#377eb8")),
+        3: QtGui.QPen(QtGui.QColor("#4daf4a")),
+        4: QtGui.QPen(QtGui.QColor("#984ea3")),
+        5: QtGui.QPen(QtGui.QColor("#ff7f00")),
+        6: QtGui.QPen(QtGui.QColor("#ffff33")),
+        7: QtGui.QPen(QtGui.QColor("#a65628")),
+        8: QtGui.QPen(QtGui.QColor("#f781bf")),
+    }
+    for pen in pens.values():
+        pen.setWidth(2)
+    pens[0] = QtGui.QPen(QtGui.QColor("#c0c0c0"))
+    pens[0].setWidth(1)
+
+    def __init__(self, parent=None):
+        """Creates a new instance.
+
+        :param parent the parent of this widget
+        """
+        super().__init__(parent)
+
+        self._render_flags = QtGui.QPainter.Antialiasing |  QtGui.QPainter.SmoothPixmapTransform
+
+        # Plotting canvas
+        self._pixmap = QtGui.QPixmap(1000, 200)
+        self._pixmap.fill()
+
+        # Grid drawing variables
+        self._horizontal_steps = 0
+        self._vertical_timestep = time.time()
+
+        # Last recorded value for a data series
+        self._series = {}
+
+        # Step size per update
+        self._step_size = 1
+
+        interval = int(1000/60)
+
+        # Update the plot
+        self._update_timer = QtCore.QTimer(self)
+        self._update_timer.timeout.connect(self._update_pixmap)
+        self._update_timer.start(interval)
+
+        # Redrawing of the widget
+        self._repaint_timer = QtCore.QTimer(self)
+        self._repaint_timer.timeout.connect(self.update)
+        self._repaint_timer.start(interval)
+
+    def resizeEvent(self, event):
+        """Handles resizing this widget.
+
+        :param event the resize event
+        """
+        self._pixmap = QtGui.QPixmap(event.size())
+        self._pixmap.fill()
+        self._horizontal_steps = 0
+        self._vertical_timestep = time.time()
+
+    def minimumSizeHint(self):
+        """Returns the minimum size of this widget.
+
+        :return the widget's minimum size
+        """
+        return QtCore.QSize(400, 150)
+
+    def paintEvent(self, event):
+        """Refreshes the timeline view.
+
+        :param event the paint event
+        """
+        widget_painter = QtGui.QPainter(self)
+        widget_painter.drawPixmap(0, 0, self._pixmap)
+
+    def add_point(self, value, series_id=0):
+        """Adds a data point to a time series.
+
+        :param value the value to add
+        :param series_id the series to which to add the value
+        """
+        if series_id not in self._series:
+            self._series[series_id] = [value, value]
+        self._series[series_id][1] = value
+
+    def _update_pixmap(self):
+        """Updates the pixmap that contains the moving timeline."""
+        pixmap_painter = QtGui.QPainter(self._pixmap)
+        pixmap_painter.setRenderHint(self._render_flags)
+
+        self._pixmap.scroll(
+            -self._step_size,
+            0,
+            QtCore.QRect(0, 0, self._pixmap.width(), self._pixmap.height())
+        )
+        pixmap_painter.eraseRect(
+            self._pixmap.width() - self._step_size,
+            0,
+            1,
+            self._pixmap.height()
+        )
+
+        # Draw vertical line in one second intervals
+        pixmap_painter.setPen(TimeLinePlotWidget.pens[0])
+        if self._vertical_timestep < time.time()-1:
+            pixmap_painter.drawLine(
+                self._pixmap.width()-1,
+                0,
+                self._pixmap.width() - 1,
+                self._pixmap.height()
+            )
+            self._vertical_timestep = time.time()
+        self._horizontal_steps += 1
+        if self._horizontal_steps <= 5:
+            quarter = int(self._pixmap.height() / 4)
+            x = self._pixmap.width()-1
+            pixmap_painter.drawPoint(x, quarter)
+            pixmap_painter.drawPoint(x, 2*quarter)
+            pixmap_painter.drawPoint(x, 3*quarter)
+        elif self._horizontal_steps > 10:
+            self._horizontal_steps = 0
+
+        # Draw onto the pixmap all series data that has been accumulated
+        for key, value in self._series.items():
+            pixmap_painter.setPen(TimeLinePlotWidget.pens[key])
+            pixmap_painter.drawLine(
+                self._pixmap.width()-self._step_size-1,
+                int(2 + (self._pixmap.height()-4) * (value[0] + 1) / 2.0),
+                self._pixmap.width()-1,
+                int(2 + (self._pixmap.height()-4) * (value[1] + 1) / 2.0)
+            )
+            value[0] = value[1]
+
+
+
+class JoystickDeviceWidget(QtWidgets.QWidget):
+
+    """Widget visualization joystick data."""
+
+    def __init__(self, device_data, vis_type, parent=None):
+        """Creates a new instance.
+
+        :param device_data information about the device itself
+        :param vis_type the visualization type to use
+        :param parent the parent of this widget
+        """
+        super().__init__(parent)
+
+        self.device_data = device_data
+        self.device_guid = device_data.device_guid
+        self.vis_type = vis_type
+        self.widgets = []
+        self.setLayout(QtWidgets.QHBoxLayout())
+
+        # self.setMinimumSize(QtCore.QSize(200, 200))
+        # self.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding,
+        #                                          QtWidgets.QSizePolicy.MinimumExpanding))
+
+        el = gremlin.event_handler.EventListener()
+        if vis_type == VisualizationType.AxisCurrent:
+            self._create_current_axis()
+            el.joystick_event.connect(self._current_axis_update)
+        elif vis_type == VisualizationType.AxisTemporal:
+            self._create_temporal_axis()
+            el.joystick_event.connect(self._temporal_axis_update)
+        elif vis_type == VisualizationType.ButtonHat:
+            self._create_button_hat()
+            el.joystick_event.connect(self._button_hat_update)
+
+    def minimumSizeHint(self):
+        """Returns the minimum size of this widget.
+
+        :return minimum size of this widget
+        """
+        width = 0
+        height = 0
+        for widget in self.widgets:
+            hint = widget.minimumSizeHint()
+            height = max(height, hint.height())
+            width += hint.width()
+        return QtCore.QSize(width, height)
+
+    def _create_button_hat(self):
+        """Creates display for button and hat data."""
+        self.widgets = [
+            ButtonState(self.device_data),
+            HatState(self.device_data)
+        ]
+        for widget in self.widgets:
+            self.layout().addWidget(widget)
+        self.layout().addStretch(1)
+
+    def _create_current_axis(self):
+        """Creates display for current axes data."""
+        self.widgets = [AxesCurrentState(self.device_data)]
+        for widget in self.widgets:
+            self.layout().addWidget(widget)
+
+    def _create_temporal_axis(self):
+        """Creates display for temporal axes data."""
+        self.widgets = [AxesTimeline(self.device_data)]
+        for widget in self.widgets:
+            self.layout().addWidget(widget)
+
+    def _button_hat_update(self, event):
+        """Updates the button and hat display.
+
+        :param event the event to use in the update
+        """
+        if self.device_guid != event.device_guid:
+            return
+
+        for widget in self.widgets:
+            widget.process_event(event)
+
+    def _current_axis_update(self, event):
+        if self.device_guid != event.device_guid:
+            return
+
+        for widget in self.widgets:
+            widget.process_event(event)
+
+    def _temporal_axis_update(self, event):
+        """Updates the temporal axes display.
+
+        :param event the event to use in the update
+        """
+        if self.device_guid != event.device_guid:
+            return
+
+        if event.event_type == InputType.JoystickAxis:
+            for widget in self.widgets:
+                widget.add_point(event.value, event.identifier)
+
+
+class ButtonState(QtWidgets.QGroupBox):
+
+    """Widget representing the state of a device's buttons."""
+
+    style_sheet = """
+        QPushButton {
+            border: 2px solid #8f8f91;
+            border-radius: 15px;
+            background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                              stop: 0 #f6f7fa, stop: 1 #dadbde);
+            min-width: 30px;
+            min-height: 30px;
+            max-width: 30px;
+            max-height: 30px;
+        }
+
+        QPushButton:pressed {
+            background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                              stop: 0 #e5342d, stop: 1 #b22823);
+            border-color: #661714;
+        }
+
+        QPushButton:flat {
+            border: none; /* no border for a flat push button */
+        }
+        
+        QPushButton:!enabled
+        {
+             color: #000000;
+        }
+        """
+
+    def __init__(self, device, parent=None):
+        """Creates a new instance.
+
+        :param device the device of which to display the button sate
+        :param parent the parent of this widget
+        """
+        super().__init__(parent)
+
+        self._event_times = {}
+
+        if device.is_virtual:
+            self.setTitle(f"{device.name} #{device.vjoy_id:d} - Buttons")
+        else:
+            self.setTitle(f"{device.name} - Buttons")
+
+        self.buttons = [None]
+        button_layout = QtWidgets.QGridLayout()
+        for i in range(device.button_count):
+            btn = QtWidgets.QPushButton(str(i+1))
+            btn.setStyleSheet(ButtonState.style_sheet)
+            btn.setDisabled(True)
+            self.buttons.append(btn)
+            button_layout.addWidget(btn, int(i / 10), int(i % 10))
+        button_layout.setColumnStretch(10, 1)
+        self.setLayout(button_layout)
+
+    def process_event(self, event):
+        """Updates state visualization based on the given event.
+
+        :param event the event with which to update the state display
+        """
+        if event.event_type == InputType.JoystickButton:
+            state = event.is_pressed if event.is_pressed is not None else False
+            self.buttons[event.identifier].setDown(state)
+            self._event_times[event.identifier] = time.time()
 

@@ -872,7 +872,7 @@ class Configuration:
     @midi_enabled.setter
     def midi_enabled(self, value):
         self._data["midi_enabled"] = value
-        self.save
+        self.save()
 
     @property
     def osc_enabled(self):
@@ -882,7 +882,7 @@ class Configuration:
     @osc_enabled.setter
     def osc_enabled(self, value):
         self._data["osc_enabled"] = value
-        self.save
+        self.save()
 
     @property
     def osc_port(self):
@@ -892,4 +892,45 @@ class Configuration:
     @osc_port.setter
     def osc_port(self, value):
         self._data["osc_port"] = value
-        self.save
+        self.save()
+
+
+    @property
+    def show_scancodes(self):
+        ''' hide/show scan codes for keyboard related inputs '''
+        return self._data.get("show_scancodes", False)
+    
+    @show_scancodes.setter
+    def show_scancodes(self, value):
+        self._data["show_scancodes"] = value
+        self.save()
+
+    @property
+    def show_input_axis(self):
+        ''' shows input axis values for axis inputs '''
+        return self._data.get("show_axis_input",False)
+    
+    @show_input_axis.setter
+    def show_input_axis(self, value):
+        self._data["show_axis_input"] = value
+        self.save()
+
+    @property
+    def last_tab_guid(self):
+        ''' last selected tab device guid '''
+        return self._data.get("last_tab_guid",None)
+    
+    @last_tab_guid.setter
+    def last_tab_guid(self, value):
+        self._data["last_tab_guid"] = str(value)
+        self.save()
+       
+
+    @property
+    def last_tab_input_id(self):
+        ''' last selected id on the tab '''
+        return self._data.get("last_tab_input_id",None)
+    @last_tab_input_id.setter
+    def last_tab_input_id(self, value):
+        self._data["last_tab_input_id"] = value
+        self.save()

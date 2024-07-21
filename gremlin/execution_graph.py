@@ -366,12 +366,17 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
         # Reorder action set entries such that if any remap action is
         # present it is executed last
         ordered_action_set = []
+        if verbose: 
+            logging.getLogger("system").info("Ordering action sets:")
         for action in action_set:
             # if not isinstance(action, action_plugins.remap.Remap):
             priority = 0
             if hasattr(action, "priority"):
                 priority = action.priority
             ordered_action_set.append((priority, action))
+            if verbose:
+                logging.getLogger("system").info(f"\tadding action: {type(action)} priority: {priority} data: {str(action)}" )
+
 
         if len(ordered_action_set) > 1:
             ordered_action_set.sort(key = lambda x: x[0])
@@ -379,12 +384,12 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
 
 
         if verbose: 
-            logging.getLogger("system").debug("Action order:")
+            logging.getLogger("system").info("Action order:")
             for index, action in enumerate(ordered_action_set):
                 input_item = action.get_input_item()
                 input_id = input_item.input_id
                 input_stub = str(input_id)
-                logging.getLogger("system").debug(f"{index}: input type: {input_item.input_type} {input_stub} action: {type(action)}  data: {str(action)} ")
+                logging.getLogger("system").info(f"\t{index}: input type: {input_item.input_type} {input_stub} action: {type(action)}  data: {str(action)} ")
 
 
         # Create functors

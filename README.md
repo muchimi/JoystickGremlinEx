@@ -128,6 +128,9 @@ This release adds major new features, including some minor changes in UI functio
 - Options dialog has a close button (QOL)
 - Options dialog saves profile mapping information on close (QOL)
 - Pressing F5 in the UI will activate the current profile (QOL)
+- New configuration dialog for the loaded profile, separate from the global options (QOL).  This lets you quickly set profile activation options.
+- New option to force numlock off when a profile starts to help with the more complex latching that use numpad keys.
+- Added joystick input value display on axis inputs - shows an axis bar with the current axis value in the input (QOL) - can be toggled in options.
 
 6/6/24 - 13.40.13ex (h) **potentially breaking change**
 
@@ -518,9 +521,19 @@ Use the action and container copy/paste feature to duplicate actions between inp
 
 #### Scan Codes
 
-The scan codes are the keyboard scan codes in hexadecimal that will be listened to to trigger this action.  The "_EX" means the scan code is extended.  This list is important because GremlinEx will only be able to trigger the actions if it "hears" these scan codes in pressed state at the same time.  
+Gremlin Ex has an option to display keyboard scan codes that will be heard by GremlinEx to help troubleshoot the more complex key latching use cases.  The scan codes are the keyboard scan codes in hexadecimal that will be listened to to trigger this action.  The "_EX" means the scan code is extended.  This list is important because GremlinEx will only be able to trigger the actions if it "hears" these scan codes in pressed state at the same time.  
 
-Some keys are special - such as the Right Alt key or the numpad keys. For example, the numpad numbers change scan codes based on the state of the numlock key.
+Many keys are special - such as the Right Alt key or the numpad keys. For example, the numpad numbers change scan codes based on the state of the numlock key and shift states.
+
+### Numlock state
+
+The keyboard's numlock state alters the hardware codes sent by the numeric keypad (numpad) keys and can in fact caused the keyboard to return the same low level key presses for different physical keys. This happens for example with arrow keys. When this happens, there is no current way in the low level API used to tell which key was pressed because the codes are the same at the hardware level. Because this is usually enabled by the numlock state, Gremlin Ex offers an option as of 13.40.14ex to turn off numlock if it was on when a profile starts.
+
+This does not eliminate the problem entirely as there are still certain key combinations that will report duplicated keys at the hardware level, without GremlinEx able to tell the difference between keys.
+
+If a key combination is not detected, you can use a keyboard scanner to see if the key windows sees is different from what you expect.  There is an option in GremlinEx to display the key scan codes corresponding to a particular key combination, and the keyboard must be able to produce these codes for GremlinEx to act on them.
+
+A free utility to view keyboard scan codes is available [here](https://dennisbabkin.com/kbdkeyinfo)
 
 <!-- TOC --><a name="virtual-keyboard"></a>
 ### Virtual Keyboard
@@ -529,6 +542,7 @@ For input simplicity, GremlinEx now uses a virtual keyboard to show which keys a
 
 
 ![](virtual_keyboard.png)
+
 
 
 Currently only US layout (QWERTY) is supported for visualization. GremlinEx uses scan-codes (physical keys) on the keyboard so what the key actually says doesn't matter and is only for visualization purposes. I do plan to add localization in a future release so the keys show the correct key name for the current keyboard layout in use.

@@ -387,7 +387,6 @@ class EventListener(QtCore.QObject):
 			# Keep this thread alive until we are done
 			time.sleep(0.1)
 
-
 	def _joystick_event_handler(self, data):
 		"""Callback for joystick events.
 
@@ -400,8 +399,8 @@ class EventListener(QtCore.QObject):
 		from gremlin.util import dill_hat_lookup
 		verbose = config.Configuration().verbose_mode_joystick
 		
-		if not self._running:
-			return True
+		# if not self._running:
+		# 	return True
 		
 		event = dinput.InputEvent(data)
 		if event.input_type == dinput.InputType.Axis:
@@ -884,58 +883,66 @@ class EventHandler(QtCore.QObject):
 		:param new_mode the new mode to use
 		"""
 
-		current_profile = gremlin.shared_state.current_profile
-		if new_mode == gremlin.shared_state.current_mode:
-			# already in this mode
-			return
+		try:
+			current_profile = gremlin.shared_state.current_profile
+			if new_mode == gremlin.shared_state.current_mode:
+				# already in this mode
+				return
 
-		logging.getLogger("system").debug(f"EVENT: change mode to [{new_mode}] requested - profile '{current_profile.name}")
+			# this can take a while
+			gremlin.util.waitCursor()
 
-		mode_exists = new_mode in current_profile.get_modes()
+			logging.getLogger("system").debug(f"EVENT: change mode to [{new_mode}] requested - profile '{current_profile.name}")
 
-		
-		if not mode_exists:
-			for device in self.callbacks.values():
-				if new_mode in device:
-					mode_exists = True
+			mode_exists = new_mode in current_profile.get_modes()
 
-		if not mode_exists:
-			for device in self.osc_callbacks.values():
-				if new_mode in device:
-					mode_exists = True
-
-		if not mode_exists:
-			for device in self.midi_callbacks.values():
-				if new_mode in device:
-					mode_exists = True
-
-		if not mode_exists:
-			for device in self.latched_callbacks.values():
-				if new_mode in device:
-					mode_exists = True
 			
-		if not mode_exists:
-			# import gremlin.config
-			# verbose = gremlin.config.Configuration().verbose
-			# if verbose:
-			logging.getLogger("system").warning(
-				f"The mode \"{new_mode}\" does not exist or has no associated callbacks - profile '{current_profile.name}'"
-			)
-			return
-		
+			if not mode_exists:
+				for device in self.callbacks.values():
+					if new_mode in device:
+						mode_exists = True
+
+			if not mode_exists:
+				for device in self.osc_callbacks.values():
+					if new_mode in device:
+						mode_exists = True
+
+			if not mode_exists:
+				for device in self.midi_callbacks.values():
+					if new_mode in device:
+						mode_exists = True
+
+			if not mode_exists:
+				for device in self.latched_callbacks.values():
+					if new_mode in device:
+						mode_exists = True
+				
+			if not mode_exists:
+				# import gremlin.config
+				# verbose = gremlin.config.Configuration().verbose
+				# if verbose:
+				logging.getLogger("system").warning(
+					f"The mode \"{new_mode}\" does not exist or has no associated callbacks - profile '{current_profile.name}'"
+				)
+				return
+			
 
 
-		
-		if self._active_mode != new_mode:
-			self._previous_mode = self._active_mode
-			# remember the last mode for this profile
-			current_profile.set_last_mode(self._active_mode)
+			
+			if self._active_mode != new_mode:
+				self._previous_mode = self._active_mode
+				# remember the last mode for this profile
+				current_profile.set_last_mode(self._active_mode)
 
 
-		logging.getLogger("system").debug(f"Mode switch to: {new_mode}  Profile: {current_profile.name}")
+			logging.getLogger("system").debug(f"Mode switch to: {new_mode}  Profile: {current_profile.name}")
 
-		self._active_mode = new_mode
-		self.mode_changed.emit(self._active_mode)
+			self._active_mode = new_mode
+			self.mode_changed.emit(self._active_mode)
+
+		finally:
+
+			gremlin.util.popCursor()
 	
 
 	def resume(self):

@@ -665,8 +665,8 @@ class MidiInputConfigDialog(QtWidgets.QDialog):
         assert hasattr(parent, "input_item_list_view"),"MIDI CONFIG: Parent widget does not have required listview"
 
         self.config_widget =  QtWidgets.QWidget()
-        self.config_layout = QtWidgets.QGridLayout()
-        self.config_widget.setLayout(self.config_layout)
+        self.config_layout = QtWidgets.QGridLayout(self.config_widget)
+        
         
         self.index = index
         self.identifier = data
@@ -1323,8 +1323,7 @@ class MidiDeviceTabWidget(QtWidgets.QWidget):
         import gremlin.ui.input_item as input_item
         import gremlin.ui.ui_common as ui_common
 
-        # list of input widgets by index position
-        self._widget_map = {}
+       
 
         # Store parameters
         self.device_profile = device_profile
@@ -1371,8 +1370,8 @@ class MidiDeviceTabWidget(QtWidgets.QWidget):
         self.main_layout.addWidget(widget,3)
 
         button_container_widget = QtWidgets.QWidget()
-        button_container_layout = QtWidgets.QHBoxLayout()
-        button_container_widget.setLayout(button_container_layout)
+        button_container_layout = QtWidgets.QHBoxLayout(button_container_widget)
+        
 
         # clear inputs button
         clear_button = ui_common.ConfirmPushButton("Clear MIDI Inputs", show_callback = self._show_clear_cb)
@@ -1421,11 +1420,7 @@ class MidiDeviceTabWidget(QtWidgets.QWidget):
 
     def itemAt(self, index):
         ''' returns the input widget at the given index '''
-        if index in self._widget_map.keys():
-            return self._widget_map[index]
-        return None
-
-
+        return self.input_item_list_view.itemAt(index)
 
     def _select_item_cb(self, index):
         """Handles the selection of an input item.
@@ -1517,7 +1512,7 @@ class MidiDeviceTabWidget(QtWidgets.QWidget):
         # self.input_item_selected_cb(self.input_item_list_view.current_index)
 
 
-    def _custom_widget_handler(self, list_view, index : int, identifier, data):
+    def _custom_widget_handler(self, list_view, index : int, identifier, data, parent = None):
         ''' creates a widget for the input 
         
         the widget must have a selected property
@@ -1527,8 +1522,9 @@ class MidiDeviceTabWidget(QtWidgets.QWidget):
         :param data the data associated with this input item
         
         '''
+        import gremlin.ui.input_item
 
-        widget = gremlin.ui.input_item.InputItemWidget(identifier = identifier, populate_ui_callback = self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True)
+        widget = gremlin.ui.input_item.InputItemWidget(identifier = identifier, populate_ui_callback = self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True, parent = parent)
         input_id : MidiInputItem = identifier.input_id
         widget.create_action_icons(data)
         widget.setTitle(input_id.title_name)
@@ -1546,7 +1542,7 @@ class MidiDeviceTabWidget(QtWidgets.QWidget):
             widget.setIcon("fa.exchange")
 
         # remember what widget is at what index
-        self._widget_map[index] = widget
+        widget.index = index
 
         return widget
 
@@ -1659,13 +1655,13 @@ class MidiDeviceTabWidget(QtWidgets.QWidget):
         self._status_widget.setVisible(len(status_text)>0)
   
 
-    def _populate_input_widget_ui(self, input_widget, container_widget):
+    def _populate_input_widget_ui(self, input_widget, container_widget, data):
         ''' called when a button is created for custom content '''
 
+        layout = QtWidgets.QVBoxLayout(container_widget)
         self._status_widget = gremlin.ui.ui_common.QIconLabel()
         self._status_widget.setObjectName("status")
-        layout = QtWidgets.QVBoxLayout()
-        container_widget.setLayout(layout)
+        
         layout.addWidget(self._status_widget)
         self._status_widget.setVisible(False)
         self._update_input_widget(input_widget, container_widget)

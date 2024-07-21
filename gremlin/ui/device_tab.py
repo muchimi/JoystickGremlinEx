@@ -22,10 +22,13 @@ from PySide6 import QtWidgets, QtCore
 
 
 import gremlin
+import gremlin.config
 import gremlin.types
 from gremlin.types import DeviceType
 from gremlin.input_types import InputType
 import gremlin.util
+import gremlin.ui.input_item as input_item
+import gremlin.ui.ui_common
 
 
 class InputItemConfiguration(QtWidgets.QFrame):
@@ -386,7 +389,7 @@ class JoystickDeviceTabWidget(QtWidgets.QWidget):
         super().__init__(parent)
 
         import gremlin.plugin_manager
-        import gremlin.ui.input_item as input_item
+
 
         # Store parameters
         self.device_profile = device_profile
@@ -406,7 +409,7 @@ class JoystickDeviceTabWidget(QtWidgets.QWidget):
             device_profile,
             current_mode
         )
-        self.input_item_list_view = input_item.InputItemListView(name=device.name)
+        self.input_item_list_view = input_item.InputItemListView(name=device.name, custom_widget_handler = self._custom_widget_handler)
         self.input_item_list_view.setMinimumWidth(375)
         
 
@@ -483,7 +486,60 @@ class JoystickDeviceTabWidget(QtWidgets.QWidget):
         selected_index = self.input_item_list_view.current_index
         if selected_index is not None:
             self.input_item_selected_cb(selected_index)
+
+
+        # update display on config change
+        el.config_changed.connect(self._config_changed_cb)
+
+
+    def _config_changed_cb(self):
+        self.input_item_list_view.redraw()
+
+    def _custom_widget_handler(self, list_view : input_item.InputItemListView, index : int, identifier : input_item.InputIdentifier, data, parent = None):
+        ''' creates a widget for the input 
         
+        the widget must have a selected property
+        :param list_view The list view control the widget to create belongs to
+        :param index The index in the list starting at 0 being the top item
+        :param identifier the InpuIdentifier for the input list
+        :param data the data associated with this input item
+        
+        '''
+        
+        
+        if data.input_type == InputType.JoystickAxis:
+            widget = input_item.InputItemWidget(identifier = identifier, parent=parent,  populate_ui_callback=self._populate_axis_input_widget_ui, data = data)
+            widget.setIcon("joystick_no_frame.png",use_qta=False)
+        elif data.input_type == InputType.JoystickButton:
+            widget = input_item.InputItemWidget(identifier = identifier, parent=parent, data = data)
+            widget.setIcon("mdi.gesture-tap-button")
+        elif data.input_type == InputType.JoystickHat:
+            widget = input_item.InputItemWidget(identifier = identifier, parent=parent, data = data)
+            widget.setIcon("ei.fullscreen")
+        widget.create_action_icons(data)
+        widget.setDescription(data.description)        
+        widget.index = index
+
+        return widget
+    
+
+    def _populate_axis_input_widget_ui(self, input_widget, container_widget, data):
+        ''' called when the widget is created for an axis input  '''
+
+        if gremlin.config.Configuration().show_input_axis:
+            layout = QtWidgets.QVBoxLayout(container_widget)
+            widget = gremlin.ui.ui_common.AxisStateWidget(show_label = False, orientation=QtCore.Qt.Orientation.Horizontal, show_percentage=False)
+            widget.setWidth(10)
+            widget.setMaximumWidth(200)
+            # automatically update from the joystick
+            widget.hookDevice(data.device_guid, data.input_id)
+            
+            layout.setContentsMargins(0,0,0,0)
+            layout.addWidget(widget)
+            layout.addStretch()
+            return widget
+        return None
+                 
 
     def _device_update(self, event):
         if self.running:
@@ -509,6 +565,11 @@ class JoystickDeviceTabWidget(QtWidgets.QWidget):
             if not event.is_pressed:
                 return
 
+        config = gremlin.config.Configuration()
+        if not config.highlight_input_buttons and event.event_type == InputType.JoystickButton:
+            return
+        if not config.highlight_input:
+            return
         self.input_item_list_view.select_input(event.event_type, event.identifier)
 
         
@@ -578,7 +639,8 @@ class JoystickDeviceTabWidget(QtWidgets.QWidget):
         self.input_item_list_model.mode = mode            
 
         # Select the first input item
-        self.input_item_list_view.select_item(0, emit_signal=False)
+        #self.input_item_list_view.select_item(0, emit_signal=False)
+        self.input_item_list_view.select_item(0)
 
 
 

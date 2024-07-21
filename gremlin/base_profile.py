@@ -573,7 +573,8 @@ class InputItem:
         """
         self.parent = parent
         self._input_type = None
-        self._input_id = None
+        self._device_guid = None # hardware input ID
+        self._input_id = None # input Id on the hardware
         self.always_execute = False
         self.description = ""
         #self._containers = base_classes.TraceableList(callback = self._container_change_cb) # container
@@ -605,6 +606,13 @@ class InputItem:
     @input_id.setter
     def input_id(self, value):
         self._input_id = value
+
+    @property
+    def device_guid(self):
+        return self._device_guid
+    @device_guid.setter
+    def device_guid(self, value):
+        self._device_guid = value
 
     @property
     def data(self):
@@ -1646,6 +1654,7 @@ class Mode:
         for child in node:
             item = InputItem(self)
             item.from_xml(child)
+            item.device_guid = self.parent.device_guid
 
             store_item = True
             # This can fail if the device in question is not connected, in

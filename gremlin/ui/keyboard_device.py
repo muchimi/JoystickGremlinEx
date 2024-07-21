@@ -228,9 +228,7 @@ class KeyboardInputItem():
             self._display_tooltip = ""
             return
         
-        # if self._key._virtual_code > 0:
-        #     message_key = f"{self._key._virtual_code:x}"
-        # else:
+    
         message_key = f"{self._key._scan_code:x}{1 if self.key._is_extended else 0}"
         
         key : Key
@@ -239,8 +237,9 @@ class KeyboardInputItem():
             #     message_key += f"|{key._virtual_code:x}"
             # else:
             message_key += f"|{key._scan_code:x}{1 if key._is_extended else 0}"
-            
+        
         self._message_key = message_key
+    
         is_latched = self._key.is_latched
         self._title_name = f"Key input {'(latched)'if is_latched else ''}"
 
@@ -297,6 +296,7 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         :param parent the parent of this widget
         """
         super().__init__(parent)
+        
 
         # Store parameters
         self.device_profile = device_profile
@@ -315,7 +315,7 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         )
 
 
-        self.input_item_list_view = input_item.InputItemListView(custom_widget_handler=self.custom_widget_handler, parent=self)
+        self.input_item_list_view = input_item.InputItemListView(custom_widget_handler=self._custom_widget_handler, parent=self)
         self.input_item_list_view.setMinimumWidth(350)
 
         # Input type specific setups
@@ -325,9 +325,10 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         self.input_item_list_view.item_selected.connect(self._select_item_cb)
         self.input_item_list_view.item_edit.connect(self._edit_item_cb)
         
-        
         self.left_panel_layout.addWidget(self.input_item_list_view)
         self.main_layout.addLayout(self.left_panel_layout,1)
+
+
 
         # add a blank input configuration if nothing is selected - the configuration widget is always the second widget of the main layout
         right_panel = self.main_layout.takeAt(1)
@@ -341,8 +342,9 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         self.main_layout.addWidget(widget,3)
 
         button_container_widget = QtWidgets.QWidget()
-        button_container_layout = QtWidgets.QHBoxLayout()
-        button_container_widget.setLayout(button_container_layout)
+        button_container_layout = QtWidgets.QHBoxLayout(button_container_widget)
+
+
 
         # key clear button
         
@@ -367,7 +369,13 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         if selected_index != -1:
             self._select_item_cb(selected_index)
 
+        # refresh on configuration change
+        el = gremlin.event_handler.EventListener()
+        el.config_changed.connect(self._config_changed_cb)
 
+
+    def _config_changed_cb(self):
+        self.input_item_list_view.redraw()
         
     @property
     def model(self):
@@ -548,7 +556,7 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         """Refreshes the current selection, ensuring proper synchronization."""
         self._select_item_cb(self.input_item_list_view.current_index)
 
-    def custom_widget_handler(self, list_view : InputItemListView, index : int, identifier : InputIdentifier, data):
+    def _custom_widget_handler(self, list_view : InputItemListView, index : int, identifier : InputIdentifier, data, parent = None):
         ''' creates a widget for the input 
         
         the widget must have a selected property
@@ -559,7 +567,7 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         
         '''
 
-        widget = InputItemWidget(identifier = identifier, populate_ui_callback=self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True, parent=list_view)
+        widget = InputItemWidget(identifier = identifier, populate_ui_callback=self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True, parent=parent)
         widget.create_action_icons(data)
         widget.setDescription(data.description)
         widget.setIcon("fa.keyboard-o")
@@ -585,7 +593,7 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
         if data.key is None:
             is_warning = True
             status_text = "Not configured"
-        else:
+        elif gremlin.config.Configuration().show_scancodes:
             status_text = data.key.latched_code
  
         if is_warning:
@@ -597,16 +605,16 @@ class KeyboardDeviceTabWidget(QtWidgets.QWidget):
 
 
 
-    def _populate_input_widget_ui(self, input_widget, container_widget):
+    def _populate_input_widget_ui(self, input_widget, container_widget, data):
         ''' called when a button is created for custom content '''
 
-        self._status_widget = gremlin.ui.ui_common.QIconLabel()
-        self._status_widget.setObjectName("status")
-        layout = QtWidgets.QVBoxLayout()
-        layout.setContentsMargins(0,0,0,0)
-        container_widget.setLayout(layout)
-        layout.addWidget(self._status_widget)
+        layout = QtWidgets.QVBoxLayout(container_widget)
+        self._status_widget = gremlin.ui.ui_common.QIconLabel(parent=container_widget)
         self._status_widget.setVisible(False)
+        self._status_widget.setObjectName("status")
+        
+        layout.setContentsMargins(0,0,0,0)
+        layout.addWidget(self._status_widget)
         self._update_input_widget(input_widget, container_widget)
                 
   

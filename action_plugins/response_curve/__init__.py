@@ -1241,6 +1241,7 @@ class ResponseCurveFunctor(gremlin.base_profile.AbstractFunctor):
 
     def process_event(self, event, value):
         value.current = self.response_fn(self.deadzone_fn(value.current))
+        print ("response curve")
         return True
 
 

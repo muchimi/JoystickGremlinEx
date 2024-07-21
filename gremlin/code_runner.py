@@ -425,6 +425,9 @@ class CodeRunner:
     def stop(self):
         """Stops listening to events and unloads all callbacks."""
 
+        if not self.is_running():
+            return # nothing to do
+
         el = gremlin.event_handler.EventListener()
         eh = gremlin.event_handler.EventHandler()
 

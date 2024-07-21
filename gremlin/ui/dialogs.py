@@ -29,6 +29,7 @@ from PySide6.QtGui import QIcon as load_icon
 from PySide6.QtWidgets import QMessageBox
 from gremlin.clipboard import Clipboard
 import gremlin.config
+import gremlin.event_handler
 import gremlin.joystick_handling
 import gremlin.shared_state
 import gremlin.types
@@ -84,6 +85,7 @@ class ProfileOptionsUi(QtWidgets.QDialog):
         self.start_mode_selector = QtWidgets.QComboBox()
         self.start_mode_selector.setSizePolicy(exp_min_sp)
         self.start_mode_selector.setMinimumContentsLength(20)
+        self.start_mode_selector.setToolTip("Selects the startup mode when the profile is activated and the restore last mode option is not set")
         self.start_mode_selector.currentIndexChanged.connect(self._start_mode_changed_cb)
         self.start_container_widget = QtWidgets.QWidget()
         self.start_container_layout = QtWidgets.QHBoxLayout(self.start_container_widget)
@@ -93,7 +95,7 @@ class ProfileOptionsUi(QtWidgets.QDialog):
         self.start_container_layout.addStretch()
         
         # Restore last mode on profile activate
-        self.activate_restore_mode = QtWidgets.QCheckBox("Restore last used mode on profile activation")
+        self.activate_restore_mode = QtWidgets.QCheckBox("Restore last mode on start")
         self.activate_restore_mode.clicked.connect(self._restore_mode_cb)
         self.activate_restore_mode.setChecked(self.profile.get_restore_mode())
         self.activate_restore_mode.setToolTip("""When set, the last mode used by this profile will be set whenever the profile is activated.""")
@@ -108,6 +110,7 @@ class ProfileOptionsUi(QtWidgets.QDialog):
         close_button_layout.addWidget(self.close_button)
 
         self.main_layout.addWidget(self.numlock_widget)
+        self.main_layout.addWidget(self.activate_restore_mode)
         self.main_layout.addWidget(self.start_container_widget)
         self.main_layout.addWidget(close_button_widget)
 
@@ -243,6 +246,8 @@ class OptionsUi(ui_common.BaseDialogUi):
     def _save_on_close_cb(self):
         ''' occurs when the dialog is closed - autosave '''
         self._save_map_cb()
+        eh = gremlin.event_handler.EventListener()
+        eh.config_changed.emit()
 
     def _tab_changed_cb(self, new_index):
         ''' occurs on tab change, save the last used tab index so we can restore it later '''
@@ -300,6 +305,17 @@ class OptionsUi(ui_common.BaseDialogUi):
         )
         self.persist_clipboard.clicked.connect(self._persist_clipboard)
         self.persist_clipboard.setChecked(self._persist_clipboard_enabled())
+
+        # show scan codes
+        self.show_scancodes_widget = QtWidgets.QCheckBox("Show keyboard scancodes for keyboard inputs")
+        self.show_scancodes_widget.setChecked(self.config.show_scancodes)
+        self.show_scancodes_widget.clicked.connect(self._show_scancodes_cb)
+
+        # show scan codes
+        self.show_joystick_input_widget = QtWidgets.QCheckBox("Show axis slider for axis inputs")
+        self.show_joystick_input_widget.setChecked(self.config.show_input_axis)
+        self.show_joystick_input_widget.clicked.connect(self._show_joystick_input_cb)
+
 
         # verbose output
         self.verbose_container_widget = QtWidgets.QWidget()
@@ -465,6 +481,8 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.general_layout.addWidget(self.start_minimized)
         self.general_layout.addWidget(self.start_with_windows)
         self.general_layout.addWidget(self.persist_clipboard)
+        self.general_layout.addWidget(self.show_scancodes_widget)
+        self.general_layout.addWidget(self.show_joystick_input_widget)
         self.general_layout.addWidget(self.verbose_container_widget)
         self.general_layout.addWidget(self.runtime_ui_update)
         self.general_layout.addWidget(self.midi_enabled)
@@ -800,6 +818,16 @@ This setting is also available on a profile by profile basis on the profile tab,
     @QtCore.Slot(bool)
     def _persist_clipboard_enabled(self):
         return self.config.persist_clipboard
+    
+    @QtCore.Slot(bool)
+    def _show_scancodes_cb(self, checked):
+        self.config.show_scancodes = checked
+
+    @QtCore.Slot(bool)
+    def _show_joystick_input_cb(self, checked):
+        self.config.show_input_axis = checked        
+
+    
     
     @QtCore.Slot(bool)
     def _verbose_cb(self, checked):
