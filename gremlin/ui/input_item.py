@@ -48,7 +48,7 @@ class InputIdentifier:
 
     """Represents the identifier of a single input item."""
 
-    def __init__(self, input_type, input_id, device_type):
+    def __init__(self, input_type, device_guid, input_id, device_type):
         """Creates a new instance.
 
         :param input_type the type of input
@@ -56,10 +56,14 @@ class InputIdentifier:
         :param device_type the type of device this input belongs to
         """
         self._input_type = input_type
+        self._device_guid = device_guid
         self._input_id = input_id
         self._device_type = device_type
         self._input_guid = get_guid() # unique internal GUID for this entry
 
+    @property
+    def device_guid(self):
+        return self._device_guid
 
     @property
     def device_type(self):
@@ -151,6 +155,8 @@ class InputItemListModel(ui_common.AbstractModel):
                 sorted_keys = sorted(input_items.config[input_type].keys())
                 for data_key in sorted_keys:
                     data = input_items.config[input_type][data_key]
+                    # add hardware GUID reference to data block so we have an easier reference to it
+                    data.device_guid = self._device_data.device_guid
                     self._index_map[index] = data
                     self._item_map[data.input_id] = index
                     index += 1
@@ -436,6 +442,7 @@ class InputItemListView(ui_common.AbstractView):
 
                 identifier = InputIdentifier(
                     data.input_type,
+                    data.device_guid,
                     data.input_id,
                     data.parent.parent.type
                 )

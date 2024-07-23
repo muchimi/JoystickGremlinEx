@@ -240,11 +240,10 @@ class SimConnectData():
         self._simvars_xml =  os.path.join(gremlin.util.userprofile_path(), "simconnect_simvars.xml")
 
 
+        self._connect_attempts = 3 # number of connection attempts before giving up
 
         # list of all commands
         self._commands = [] 
-
-        
 
         # list of command blocks
         self._block_map = {}
@@ -265,6 +264,37 @@ class SimConnectData():
             # process lists
             self._commands = list(self._block_map.keys())
             self._commands.sort()
+
+    def reset(self):
+        ''' resets the connection '''
+        self._connect_attempts = 3
+
+    def is_running(self):
+        ''' true if the sim is running '''
+        return self._sm.running
+    
+    @property
+    def ok(self):
+        return self._sm.ok
+
+    def connect(self):
+        if self._sm.ok:
+            return True
+        
+        # not connected
+        try:
+            if self._connect_attempts > 0:
+                self._connect_attempts -= 1
+                self._sm.connect()
+        except:
+            pass
+        if not self._sm.ok:
+            return False
+        return True # connected
+    
+    def disconnect(self):
+        if self._sm.ok:
+            self._sm.exit()
 
     @property
     def valid(self):
@@ -529,7 +559,7 @@ class SimConnectData():
                         min_range = get_int_attribute(child,"min",throw_on_missing=True)
                         max_range = get_int_attribute(child,"max",throw_on_missing=True)
 
-                block = SimConnectBlock()
+                block = SimConnectBlock(self)
                 block.command = simvar
                 block.command_type = simvar_type
                 block.output_data_type = data_type
@@ -591,12 +621,12 @@ class SimConnectData():
     
     def ensure_running(self):
         ''' ensure simconnect is connected '''
-        if self._sm.ok:
-            if not self._sm.running:
-                self._sm.connect()
-            return self._sm.running
-        return False
-
+        if not self._sm.ok:
+            return False
+        if not self._sm.running:
+            self._sm.connect()
+        return self._sm.running
+    
     def get_category_list(self):
         ''' returns the list of supported command categories '''
         categories = self._command_category_map.keys()
@@ -633,6 +663,7 @@ class SimConnectBlock(QtCore.QObject):
             self.max_custom = 0
 
 
+
     class OutputType(enum.Enum):
         ''' output data type '''
         NotSet = 0
@@ -653,16 +684,17 @@ class SimConnectBlock(QtCore.QObject):
     range_changed = QtCore.Signal(RangeEvent) # fires when the block range values change
     value_changed = QtCore.Signal() # fires when the block output value changes
 
-    def __init__(self):
+    def __init__(self, simconnect):
         ''' creates a simconnect block object
         
         the block auto-configures itself based on the command, and determines
         range, values and options, and what type of command it is.
 
-        :param command The simconnect command (event or request)
+        :param simconnect The simconnect object
         
         '''
         super().__init__()
+        self._sm : SimConnectData = simconnect
         self._command_type = SimConnectBlock.SimConnectCommandType.NotSet
         self._description = None
         self._value_type = SimConnectBlock.OutputType.NotSet
@@ -683,7 +715,7 @@ class SimConnectBlock(QtCore.QObject):
         self._notify_enabled_count = 0 # true if notifications are enabled
         self._command = None
         self._units = ""
-
+        self._is_axis = False # true if the block is axis output enabled
 
     def enable_notifications(self, force = False):
         ''' enables data notifications from this block '''
@@ -709,6 +741,15 @@ class SimConnectBlock(QtCore.QObject):
     @command.setter
     def command(self, value):
         self._command = value
+        # update flags
+        self.is_axis = value in _simconnect_full_range
+            
+
+    @property
+    def is_axis(self):
+        ''' true if the command supports axis output '''
+        return self._is_axis
+
         
     @property
     def is_request(self) -> bool:
@@ -734,6 +775,7 @@ class SimConnectBlock(QtCore.QObject):
     @command_type.setter
     def command_type(self, value):
         self._command_type = value
+
     
     @property
     def display_block_type(self) -> str:
@@ -938,21 +980,30 @@ class SimConnectBlock(QtCore.QObject):
         block = SimConnectBlock(command)
         return block
     
+    def is_running(self):
+        ''' true if the sim is available '''
+        return self._sm.ensure_running()
+    
     def execute(self, value = None):
         ''' executes the command '''
-        # if self._command and self._sm_data.ensure_running():
-        #     if self._command_type == SimConnectBlockType.Event:
-        #         ae = AircraftEvents(self._sm_data.sm)
-        #         trigger = ae.find(self._command)
-        #         if trigger:
-        #             if self._set_value:
-        #                 trigger(value)
-        #             else:
-        #                 trigger()
 
-        #     elif self._command_type == SimConnectBlockType.Request and not self._readonly:
-        #         ar = AircraftRequests(self._sm_data.sm, _time=2000)
-        #         ar.set(self._command, value)
+        if not self._sm.ensure_running():
+            # not connected or not running
+            return False
+        
+        if self._command:
+            if self._command_type ==  SimConnectBlock.SimConnectCommandType.Event:
+                ae = AircraftEvents(self._sm_data.sm)
+                trigger = ae.find(self._command)
+                if trigger:
+                    if self._set_value:
+                        trigger(value)
+                    else:
+                        trigger()
+
+            elif self._command_type == SimConnectBlock.SimConnectCommandType.Request and not self._readonly:
+                ar = AircraftRequests(self._sm_data.sm, _time=2000)
+                ar.set(self._command, value)
 
         #     return True
         return False

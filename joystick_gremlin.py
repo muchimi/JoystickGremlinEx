@@ -31,6 +31,7 @@ import threading
 import webbrowser
 
 import dinput
+
 import gremlin.ui.keyboard_device
 import gremlin.ui.midi_device
 import gremlin.ui.osc_device
@@ -40,15 +41,17 @@ import gremlin.util
 import PySide6
 from PySide6 import QtCore, QtGui, QtWidgets
 
-import gremlin.event_handler 
-import gremlin.shared_state
+
+
 from gremlin.input_types import InputType
 from gremlin.types import DeviceType
 
-
-
-import gremlin.config
 from gremlin.util import load_icon, load_pixmap, userprofile_path, find_file, waitCursor, popCursor
+import gremlin.shared_state
+import gremlin.base_profile
+import gremlin.event_handler
+import gremlin.config
+
 
 
 import gremlin.code_runner
@@ -106,7 +109,10 @@ class GremlinUi(QtWidgets.QMainWindow):
 
     """Main window of the Joystick Gremlin user interface."""
 
-
+    # UUID of the plugins tab
+    plugins_tab_guid = gremlin.util.parse_guid('dbce0add-460c-480f-9912-31f905a84247')
+    # UUID of the settings tab
+    settings_tab_guid = gremlin.util.parse_guid('5b70b5ba-bded-41a8-bd91-d8a209b8e981')
 
     ui = None
     
@@ -235,6 +241,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         if self.tabs:
             device_guid = list(self.tabs.keys())[index]
             gremlin.config.Configuration().last_tab_guid = device_guid
+
 
 
     def _profile_changed_cb(self, new_profile):
@@ -794,6 +801,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.ui.tray_icon.setContextMenu(self.ui.tray_menu)
         self.ui.tray_icon.show()
 
+    
+
     def _create_tabs(self, activate_tab=None):
         """Creates the tabs of the configuration dialog representing
         the different connected devices.
@@ -801,6 +810,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.ui.devices.clear()
         self.tabs = {}
         self.tab_guids = []
+        device_name_map = gremlin.shared_state.device_guid_to_name_map
         self.last_tab_index = 0
         last_guid = gremlin.config.Configuration().last_tab_guid
         last_input_index = gremlin.config.Configuration().last_tab_input_id
@@ -826,14 +836,11 @@ class GremlinUi(QtWidgets.QMainWindow):
                 self.current_mode,
             )
             self.tabs[device.device_guid] = widget
-            
             tab_label = device.name.strip()
+            device_name_map[device.device_guid] = tab_label
             self.ui.devices.addTab(widget, tab_label)
 
-        
-
         # Create vJoy as input device tabs
-
         for device in sorted(vjoy_devices, key=lambda x: x.vjoy_id):
             # Ignore vJoy as output devices
             if not self._profile.settings.vjoy_as_input.get(device.vjoy_id, False):
@@ -854,6 +861,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             self.tabs[device.device_guid] = widget
             tab_label = device.name.strip()
             tab_label += f" #{device.vjoy_id:d}"
+            device_name_map[device.device_guid] = tab_label    
             self.ui.devices.addTab(widget, tab_label)
             index += 1
 
@@ -870,6 +878,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.tabs[dinput.GUID_Keyboard] = widget
         self.tab_guids.append(str(dinput.GUID_Keyboard))
         self.ui.devices.addTab(widget, "Keyboard")
+        device_name_map[dinput.GUID_Keyboard] = "Keyboard"
 
         device_profile = self._profile.get_device_modes(
             gremlin.ui.midi_device.MidiDeviceTabWidget.device_guid,
@@ -888,6 +897,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.tab_guids.append(device_guid)
         if device_guid == last_guid:
             self.last_tab_index = index
+        device_name_map[gremlin.ui.midi_device.MidiDeviceTabWidget.device_guid] = "MIDI"
 
         
         device_profile = self._profile.get_device_modes(
@@ -907,6 +917,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.ui.devices.addTab(widget, "OSC")
         device_guid = str(gremlin.ui.osc_device.OscDeviceTabWidget.device_guid)
         self.tab_guids.append(device_guid)
+        device_name_map[gremlin.ui.osc_device.OscDeviceTabWidget.device_guid] = "OSC"
 
         # Create the vjoy as output device tab
         for device in sorted(vjoy_devices, key=lambda x: x.vjoy_id):
@@ -928,7 +939,9 @@ class GremlinUi(QtWidgets.QMainWindow):
                 self.current_mode
             )
             self.tabs[device.device_guid] = widget
-            self.ui.devices.addTab(widget,f"{device.name} #{device.vjoy_id:d}")
+            tab_label = f"{device.name} #{device.vjoy_id:d}"
+            self.ui.devices.addTab(widget,tab_label)
+            device_name_map[device.device_guid] = tab_label
 
         # Add profile configuration tab
         widget = gremlin.ui.profile_settings.ProfileSettingsWidget(
@@ -936,14 +949,17 @@ class GremlinUi(QtWidgets.QMainWindow):
         )
         widget.changed.connect(lambda: self._create_tabs("Settings"))
         self.ui.devices.addTab(widget, "Settings")
-        self.tab_guids.append("settings")
+        self.tab_guids.append(str(GremlinUi.settings_tab_guid))
+        self.tabs[GremlinUi.settings_tab_guid] = widget
+        device_name_map[GremlinUi.settings_tab_guid] = "(Settings)"
 
         # Add a custom modules tab
-        self.mm = gremlin.ui.user_plugin_management.ModuleManagementController(
-            self._profile
-        )
-        self.ui.devices.addTab(self.mm.view, "Plugins")
-        self.tab_guids.append("plugins")
+        self.mm = gremlin.ui.user_plugin_management.ModuleManagementController(self._profile)
+        widget = self.mm.view
+        self.ui.devices.addTab(widget, "Plugins")
+        self.tab_guids.append(str(GremlinUi.plugins_tab_guid))
+        self.tabs[GremlinUi.plugins_tab_guid] = widget
+        device_name_map[GremlinUi.plugins_tab_guid] = "(Plugins)"
 
         if last_guid in self.tab_guids:
             index = self.tab_guids.index(last_guid)
@@ -965,6 +981,11 @@ class GremlinUi(QtWidgets.QMainWindow):
                     if self.ui.devices.tabText(i) == activate_tab:
                         with QtCore.QSignalBlocker(self.ui.devices):
                             self.ui.devices.setCurrentIndex(i)
+
+
+        # virtual device (not displayed)
+        device_name_map[dinput.GUID_Virtual] = "(VirtualButton)"
+        device_name_map[dinput.GUID_Invalid] = "(Invalid)"
 
 
 
@@ -1382,7 +1403,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         if update:
             with QtCore.QSignalBlocker(self.mode_selector):
                 for tab in self.tabs.values():
-                    tab.set_mode(new_mode)
+                    if hasattr(tab,"set_mode"):
+                        tab.set_mode(new_mode)
 
         
         

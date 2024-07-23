@@ -51,6 +51,14 @@ is_running = False
 # true if UI keyboard should be ignored (such as, when listening to keys)
 _suspend_ui_keyinput = 0
 
+# list of device names to their GUID
+device_guid_to_name_map = {} 
+
+def get_device_name(guid):
+    ''' gets the device name from the UUID'''
+    if not guid in device_guid_to_name_map.keys():
+        return "[Unknown]"
+    return device_guid_to_name_map[guid]
 
 def ui_keyinput_suspended():
     global _suspend_ui_keyinput

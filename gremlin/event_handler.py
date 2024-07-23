@@ -23,6 +23,7 @@ import queue
 from threading import Thread, Timer
 
 
+
 import gremlin.threading
 
 from PySide6 import QtCore, QtWidgets
@@ -31,14 +32,14 @@ import dinput
 import gremlin.config
 from gremlin.input_types import InputType
 import gremlin.shared_state
-from gremlin.singleton_decorator import SingletonDecorator
+
 
 import gremlin.util
-from . import config, error, joystick_handling, windows_event_hook
+from . import config, joystick_handling, windows_event_hook
 
 import gremlin.keyboard
 import gremlin.ui
-
+import gremlin.singleton_decorator
 
 
 class Event:
@@ -190,7 +191,7 @@ class StateChangeEvent:
 
 
 
-@SingletonDecorator
+@gremlin.singleton_decorator.SingletonDecorator
 class EventListener(QtCore.QObject):
 
 	"""Listens for keyboard and joystick events and publishes them
@@ -244,8 +245,14 @@ class EventListener(QtCore.QObject):
 		QtCore.QObject.__init__(self)
 		self.keyboard_hook = windows_event_hook.KeyboardHook()
 		self.keyboard_hook.register(self._keyboard_handler)
-		self.mouse_hook = windows_event_hook.MouseHook()
-		self.mouse_hook.register(self._mouse_handler)
+		
+		# if in debug mode - don't hook the mouse
+		if not gremlin.config.Configuration().is_debug:
+			self.mouse_hook = windows_event_hook.MouseHook()
+			self.mouse_hook.register(self._mouse_handler)
+		else:
+			logging.getLogger("system").warning("************ DEBUG MODE - MOUSE HOOKS ARE DISABLED ")
+			self.mouse_hook = None
 
 		# Calibration function for each axis of all devices
 		self._calibrations = {}
@@ -348,13 +355,15 @@ class EventListener(QtCore.QObject):
 
 	def start(self):
 		''' starts the non regular listener '''
-		self.mouse_hook.start()
+		if self.mouse_hook:
+			self.mouse_hook.start()
 		self._key_listener_stop_requested = False
 		self.start_key_listener()
 
 
 	def stop(self):
-		self.mouse_hook.stop()
+		if self.mouse_hook:
+			self.mouse_hook.stop()
 		self.stop_key_listener()
 
 
@@ -362,7 +371,8 @@ class EventListener(QtCore.QObject):
 		"""Stops the loop from running."""
 		self._running = False
 		self.keyboard_hook.stop()
-		self.mouse_hook.stop()
+		if self.mouse_hook:
+			self.mouse_hook.stop()
 
 	def reload_calibrations(self):
 		"""Reloads the calibration data from the configuration file."""
@@ -379,13 +389,16 @@ class EventListener(QtCore.QObject):
 
 	def _run(self):
 		"""Starts the event loop."""
+		
 		if not dinput.DILL.initalized:
 			dinput.DILL.init()
+		logging.getLogger("system").info("DILL: input start listen")			
 		dinput.DILL.set_device_change_callback(self._joystick_device_handler)
 		dinput.DILL.set_input_event_callback(self._joystick_event_handler)
 		while self._running:
 			# Keep this thread alive until we are done
 			time.sleep(0.1)
+		logging.getLogger("system").info("DILL: input stop listen")
 
 	def _joystick_event_handler(self, data):
 		"""Callback for joystick events.
@@ -398,9 +411,6 @@ class EventListener(QtCore.QObject):
 
 		from gremlin.util import dill_hat_lookup
 		verbose = config.Configuration().verbose_mode_joystick
-		
-		# if not self._running:
-		# 	return True
 		
 		event = dinput.InputEvent(data)
 		if event.input_type == dinput.InputType.Axis:
@@ -593,7 +603,7 @@ class EventListener(QtCore.QObject):
 				)
 
 
-@SingletonDecorator
+@gremlin.singleton_decorator.SingletonDecorator
 class EventHandler(QtCore.QObject):
 
 	"""Listens to the inputs from multiple different input devices."""
@@ -646,17 +656,62 @@ class EventHandler(QtCore.QObject):
 		if plugin.keyword not in self.plugins:
 			self.plugins[plugin.keyword] = plugin
 
+	def dump_exectree(self, device_guid, mode, event):
+		from types import FunctionType, MethodType
+		get_device_name = gremlin.shared_state.get_device_name
+		logger = logging.getLogger("system")
+		for callbacks in self.callbacks[device_guid][mode][event]:
+			for callback in callbacks:
+				if not hasattr(callback,"execution_graph"):
+					logger.debug(f"\tDevice ID: {device_guid} ({get_device_name(device_guid)}) mode: {mode} event: {event} - skip callback - missing execution graph - don't know how to handle {type(callback)} *********")
+					continue
+
+				for callback_functor in callback.execution_graph.functors:
+					for functor in callback_functor.action_set.functors:
+						action_data = functor.action_data if hasattr(functor, "action_data") else None
+						logger.debug(f"\tDevice ID: {device_guid} ({get_device_name(device_guid)}) mode: {mode} event: {event} hash: {hash(event):X} type: {type(functor)}")
+						if action_data:
+							# dump member variables only
+							logger.debug("\t\tData block:")
+							for attr in dir(action_data):
+								if not attr.startswith("_"):
+									item = getattr(action_data,attr)
+									
+									if not (isinstance(item, FunctionType) or isinstance(item, MethodType) or inspect.isabstract(item) or inspect.isclass(item)):
+										logger.debug(f"\t\t\t{attr}: {item}")
+								
+
+
+
+
 	def dump_callbacks(self):
 		# dump latched events
 		import gremlin.ui.keyboard_device
+		import gremlin.shared_state
+
+		
+		get_device_name = gremlin.shared_state.get_device_name
+		logger = logging.getLogger("system")
+		logger.debug("------------ Latched Events ----------------")
 		for device_guid in self.latched_events.keys():
 			for mode in self.latched_events[device_guid].keys():
 				for key_pair in self.latched_events[device_guid][mode]:
 					identifier = self.latched_events[device_guid][mode][key_pair]
 					if isinstance(identifier, gremlin.ui.keyboard_device.KeyboardInputItem):
-						logging.getLogger("system").debug(f"Device ID: {device_guid} mode: {mode} pair: {key_pair} data: {identifier.to_string()}")
+						if isinstance(key_pair, tuple):
+							scan_code, is_extended = key_pair
+							key_data = f"scan code: 0x{scan_code:X}  extended: {is_extended}"
+						else:
+							key_data = str(key_pair)
+						logger.debug(f"\tDevice ID: {device_guid} ({get_device_name(device_guid)}) mode: {mode} pair: {key_data} data: {identifier.to_string()}")
 
+		logger.debug("------------ Execution callbacks ----------------")
+		for device_guid in self.callbacks.keys():
+			for mode in self.callbacks[device_guid].keys():
+				for event in self.callbacks[device_guid][mode]:
+					self.dump_exectree(device_guid, mode, event)
 
+				
 
 	def add_callback(self, device_guid, mode, event, callback, permanent=False):
 		"""Installs the provided callback for the given event.
@@ -1074,7 +1129,9 @@ class EventHandler(QtCore.QObject):
 
 
 	def _trigger_callbacks(self, callbacks, event):
-		#verbose = gremlin.config.Configuration().verbose
+		#verbose = gremlin.config.Configuration().verbose'
+		if event.event_type == InputType.JoystickAxis:
+			pass
 		for cb in callbacks:
 			try:
 				# if verbose:
@@ -1131,12 +1188,30 @@ class EventHandler(QtCore.QObject):
 		:return a list of all callbacks registered and valid for the
 			given event
 		"""
+
+		verbose = gremlin.config.Configuration().verbose
+
 		# Obtain callbacks matching the event
 		callback_list = []
-		if event.device_guid in self.callbacks:
-			callback_list = self.callbacks[event.device_guid].get(
-				self._active_mode, {}
-			).get(event, [])
+		device_guid = event.device_guid
+		if device_guid in self.callbacks:
+			mode = self._active_mode
+			if mode in self.callbacks[device_guid].keys():
+				if event in self.callbacks[device_guid][mode].keys():
+					callback_list = self.callbacks[device_guid][mode][event]
+					if verbose:
+						self.dump_exectree(device_guid, mode, event)
+
+			# callback_list = self.callbacks[event.device_guid].get(
+			# 	self._active_mode, {}
+			# ).get(event, [])
+
+
+		if verbose:
+			logging.getLogger("system").debug(f"device: {gremlin.shared_state.get_device_name(event.device_guid)} mode: {self._active_mode} found: {len(callback_list)}")
+			if callback_list:
+				pass
+
 
 		# Filter events when the system is paused
 		if not self.process_callbacks:

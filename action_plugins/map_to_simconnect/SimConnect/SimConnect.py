@@ -10,7 +10,7 @@ import threading
 
 _library_path = os.path.splitext(os.path.abspath(__file__))[0] + '.dll'
 
-LOGGER = logging.getLogger(__name__)
+LOGGER = logging.getLogger("system")
 
 
 def millis():
@@ -25,17 +25,17 @@ class SimConnect:
 
 	def handle_id_event(self, event):
 		uEventID = event.uEventID
-		if uEventID == self.dll.EventID.EVENT_SIM_START:
+		if uEventID == self._dll.EventID.EVENT_SIM_START:
 			LOGGER.info("SIM START")
 			self.running = True
-		if uEventID == self.dll.EventID.EVENT_SIM_STOP:
+		if uEventID == self._dll.EventID.EVENT_SIM_STOP:
 			LOGGER.info("SIM Stop")
 			self.running = False
 		# Unknow whay not reciving
-		if uEventID == self.dll.EventID.EVENT_SIM_PAUSED:
+		if uEventID == self._dll.EventID.EVENT_SIM_PAUSED:
 			LOGGER.info("SIM Paused")
 			self.paused = True
-		if uEventID == self.dll.EventID.EVENT_SIM_UNPAUSED:
+		if uEventID == self._dll.EventID.EVENT_SIM_UNPAUSED:
 			LOGGER.info("SIM Unpaused")
 			self.paused = False
 
@@ -129,42 +129,42 @@ class SimConnect:
 
 		self.Requests = {}
 		self.Facilities = []
-		self.dll = SimConnectDll(library_path)
-		self.hSimConnect = HANDLE()
+		self._dll = SimConnectDll(library_path)
+		self._hSimConnect = HANDLE()
 		self.quit = 0
 		self.ok = False
 		self.running = False
 		self.paused = False
 		self.DEFINITION_POS = None
 		self.DEFINITION_WAYPOINT = None
-		self.my_dispatch_proc_rd = self.dll.DispatchProc(self.my_dispatch_proc)
+		self._my_dispatch_proc_rd = self._dll.DispatchProc(self.my_dispatch_proc)
 		if auto_connect:
 			self.connect()
 
 	def connect(self):
 		try:
-			err = self.dll.Open(
-				byref(self.hSimConnect), LPCSTR(b"Request Data"), None, 0, 0, 0
+			err = self._dll.Open(
+				byref(self._hSimConnect), LPCSTR(b"Request Data"), None, 0, 0, 0
 			)
 			if self.IsHR(err, 0):
 				LOGGER.debug("Connected to Flight Simulator!")
 				# Request an event when the simulation starts
 
 				# The user is in control of the aircraft
-				self.dll.SubscribeToSystemEvent(
-					self.hSimConnect, self.dll.EventID.EVENT_SIM_START, b"SimStart"
+				self._dll.SubscribeToSystemEvent(
+					self._hSimConnect, self._dll.EventID.EVENT_SIM_START, b"SimStart"
 				)
 				# The user is navigating the UI.
-				self.dll.SubscribeToSystemEvent(
-					self.hSimConnect, self.dll.EventID.EVENT_SIM_STOP, b"SimStop"
+				self._dll.SubscribeToSystemEvent(
+					self._hSimConnect, self._dll.EventID.EVENT_SIM_STOP, b"SimStop"
 				)
 				# Request a notification when the flight is paused
-				self.dll.SubscribeToSystemEvent(
-					self.hSimConnect, self.dll.EventID.EVENT_SIM_PAUSED, b"Paused"
+				self._dll.SubscribeToSystemEvent(
+					self._hSimConnect, self._dll.EventID.EVENT_SIM_PAUSED, b"Paused"
 				)
 				# Request a notification when the flight is un-paused.
-				self.dll.SubscribeToSystemEvent(
-					self.hSimConnect, self.dll.EventID.EVENT_SIM_UNPAUSED, b"Unpaused"
+				self._dll.SubscribeToSystemEvent(
+					self._hSimConnect, self._dll.EventID.EVENT_SIM_UNPAUSED, b"Unpaused"
 				)
 				self.timerThread = threading.Thread(target=self._run)
 				self.timerThread.daemon = True
@@ -178,26 +178,29 @@ class SimConnect:
 	def _run(self):
 		while self.quit == 0:
 			try:
-				self.dll.CallDispatch(self.hSimConnect, self.my_dispatch_proc_rd, None)
+				self._dll.CallDispatch(self._hSimConnect, self._my_dispatch_proc_rd, None)
 				time.sleep(.002)
-			except OSError as err:
-					print("OS error: {0}".format(err))
+			except:
+				pass
 
 	def exit(self):
 		self.quit = 1
 		self.timerThread.join()
-		self.dll.Close(self.hSimConnect)
+		try:
+			self._dll.Close(self._hSimConnect)
+		except:
+			pass
 
 	def map_to_sim_event(self, name):
-		for m in self.dll.EventID:
+		for m in self._dll.EventID:
 			if name.decode() == m.name:
 				LOGGER.debug("Already have event: ", m)
 				return m
 
-		names = [m.name for m in self.dll.EventID] + [name.decode()]
-		self.dll.EventID = Enum(self.dll.EventID.__name__, names)
-		evnt = list(self.dll.EventID)[-1]
-		err = self.dll.MapClientEventToSimEvent(self.hSimConnect, evnt.value, name)
+		names = [m.name for m in self._dll.EventID] + [name.decode()]
+		self._dll.EventID = Enum(self._dll.EventID.__name__, names)
+		evnt = list(self._dll.EventID)[-1]
+		err = self._dll.MapClientEventToSimEvent(self._hSimConnect, evnt.value, name)
 		if self.IsHR(err, 0):
 			return evnt
 		else:
@@ -205,21 +208,21 @@ class SimConnect:
 			return None
 
 	def add_to_notification_group(self, group, evnt, bMaskable=False):
-		self.dll.AddClientEventToNotificationGroup(
-			self.hSimConnect, group, evnt, bMaskable
+		self._dll.AddClientEventToNotificationGroup(
+			self._hSimConnect, group, evnt, bMaskable
 		)
 
 	def request_data(self, _Request):
 		_Request.outData = None
-		self.dll.RequestDataOnSimObjectType(
-			self.hSimConnect,
+		self._dll.RequestDataOnSimObjectType(
+			self._hSimConnect,
 			_Request.DATA_REQUEST_ID.value,
 			_Request.DATA_DEFINITION_ID.value,
 			0,
 			SIMCONNECT_SIMOBJECT_TYPE.SIMCONNECT_SIMOBJECT_TYPE_USER,
 		)
 		temp = DWORD(0)
-		self.dll.GetLastSentPacketID(self.hSimConnect, temp)
+		self._dll.GetLastSentPacketID(self._hSimConnect, temp)
 		_Request.LastID = temp.value
 
 	def set_data(self, _Request):
@@ -234,8 +237,8 @@ class SimConnect:
 		pObjData = cast(
 			dataarray, c_void_p
 		)
-		err = self.dll.SetDataOnSimObject(
-			self.hSimConnect,
+		err = self._dll.SetDataOnSimObject(
+			self._hSimConnect,
 			_Request.DATA_DEFINITION_ID.value,
 			SIMCONNECT_SIMOBJECT_TYPE.SIMCONNECT_SIMOBJECT_TYPE_USER,
 			0,
@@ -263,8 +266,8 @@ class SimConnect:
 		return True
 
 	def send_event(self, evnt, data=DWORD(0)):
-		err = self.dll.TransmitClientEvent(
-			self.hSimConnect,
+		err = self._dll.TransmitClientEvent(
+			self._hSimConnect,
 			SIMCONNECT_OBJECT_ID_USER,
 			evnt.value,
 			data,
@@ -279,26 +282,26 @@ class SimConnect:
 			return False
 
 	def new_def_id(self):
-		_name = "Definition" + str(len(list(self.dll.DATA_DEFINITION_ID)))
-		names = [m.name for m in self.dll.DATA_DEFINITION_ID] + [_name]
+		_name = "Definition" + str(len(list(self._dll.DATA_DEFINITION_ID)))
+		names = [m.name for m in self._dll.DATA_DEFINITION_ID] + [_name]
 
-		self.dll.DATA_DEFINITION_ID = Enum(self.dll.DATA_DEFINITION_ID.__name__, names)
-		DEFINITION_ID = list(self.dll.DATA_DEFINITION_ID)[-1]
+		self._dll.DATA_DEFINITION_ID = Enum(self._dll.DATA_DEFINITION_ID.__name__, names)
+		DEFINITION_ID = list(self._dll.DATA_DEFINITION_ID)[-1]
 		return DEFINITION_ID
 
 	def new_request_id(self):
-		name = "Request" + str(len(self.dll.DATA_REQUEST_ID))
-		names = [m.name for m in self.dll.DATA_REQUEST_ID] + [name]
-		self.dll.DATA_REQUEST_ID = Enum(self.dll.DATA_REQUEST_ID.__name__, names)
-		REQUEST_ID = list(self.dll.DATA_REQUEST_ID)[-1]
+		name = "Request" + str(len(self._dll.DATA_REQUEST_ID))
+		names = [m.name for m in self._dll.DATA_REQUEST_ID] + [name]
+		self._dll.DATA_REQUEST_ID = Enum(self._dll.DATA_REQUEST_ID.__name__, names)
+		REQUEST_ID = list(self._dll.DATA_REQUEST_ID)[-1]
 
 		return REQUEST_ID
 
 	def add_waypoints(self, _waypointlist):
 		if self.DEFINITION_WAYPOINT is None:
 			self.DEFINITION_WAYPOINT = self.new_def_id()
-			err = self.dll.AddToDataDefinition(
-				self.hSimConnect,
+			err = self._dll.AddToDataDefinition(
+				self._hSimConnect,
 				self.DEFINITION_WAYPOINT.value,
 				b'AI WAYPOINT LIST',
 				b'number',
@@ -316,8 +319,8 @@ class SimConnect:
 		)
 		sx = int(sizeof(ctypes.c_double) * (len(pyarr) / len(_waypointlist)))
 		return
-		hr = self.dll.SetDataOnSimObject(
-			self.hSimConnect,
+		hr = self._dll.SetDataOnSimObject(
+			self._hSimConnect,
 			self.DEFINITION_WAYPOINT.value,
 			SIMCONNECT_OBJECT_ID_USER,
 			0,
@@ -353,8 +356,8 @@ class SimConnect:
 
 		if self.DEFINITION_POS is None:
 			self.DEFINITION_POS = self.new_def_id()
-			err = self.dll.AddToDataDefinition(
-				self.hSimConnect,
+			err = self._dll.AddToDataDefinition(
+				self._hSimConnect,
 				self.DEFINITION_POS.value,
 				b'Initial Position',
 				b'',
@@ -363,8 +366,8 @@ class SimConnect:
 				SIMCONNECT_UNUSED,
 			)
 
-		hr = self.dll.SetDataOnSimObject(
-			self.hSimConnect,
+		hr = self._dll.SetDataOnSimObject(
+			self._hSimConnect,
 			self.DEFINITION_POS.value,
 			SIMCONNECT_OBJECT_ID_USER,
 			0,
@@ -378,14 +381,14 @@ class SimConnect:
 			return False
 
 	def load_flight(self, flt_path):
-		hr = self.dll.FlightLoad(self.hSimConnect, flt_path.encode())
+		hr = self._dll.FlightLoad(self._hSimConnect, flt_path.encode())
 		if self.IsHR(hr, 0):
 			return True
 		else:
 			return False
 
 	def load_flight_plan(self, pln_path):
-		hr = self.dll.FlightPlanLoad(self.hSimConnect, pln_path.encode())
+		hr = self._dll.FlightPlanLoad(self._hSimConnect, pln_path.encode())
 		if self.IsHR(hr, 0):
 			return True
 		else:
@@ -400,7 +403,7 @@ class SimConnect:
 		flt_mission_location='Custom departure',
 		flt_original_flight='',
 		flt_flight_type='NORMAL'):
-		hr = self.dll.FlightSave(self.hSimConnect, flt_path.encode(), flt_title.encode(), flt_description.encode(), 0)
+		hr = self._dll.FlightSave(self._hSimConnect, flt_path.encode(), flt_title.encode(), flt_description.encode(), 0)
 		if not self.IsHR(hr, 0):
 			return False
 
@@ -421,9 +424,9 @@ class SimConnect:
 		return False
 
 	def get_paused(self):
-		hr = self.dll.RequestSystemState(
-			self.hSimConnect,
-			self.dll.EventID.EVENT_SIM_PAUSED,
+		hr = self._dll.RequestSystemState(
+			self._hSimConnect,
+			self._dll.EventID.EVENT_SIM_PAUSED,
 			b"Sim"
 		)
 
@@ -455,8 +458,8 @@ class SimConnect:
 		pyarr = bytearray(text.encode())
 		dataarray = (ctypes.c_char * len(pyarr))(*pyarr)
 		pObjData = cast(dataarray, c_void_p)
-		self.dll.Text(
-			self.hSimConnect,
+		self._dll.Text(
+			self._hSimConnect,
 			TEXT_TYPE,
 			timeSeconds,
 			0,
@@ -474,8 +477,8 @@ class SimConnect:
 		simInitPos.Heading = hdg
 		simInitPos.OnGround = gnd
 		simInitPos.Airspeed = speed
-		self.dll.AICreateSimulatedObject(
-			self.hSimConnect,
+		self._dll.AICreateSimulatedObject(
+			self._hSimConnect,
 			name.encode(),
 			simInitPos,
 			rqst.value

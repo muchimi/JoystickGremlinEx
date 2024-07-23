@@ -5,6 +5,7 @@ import logging
 from xml.etree import ElementTree
 from gremlin.input_types import InputType
 
+
 from gremlin.util import *
 
 class ActivationRule(enum.Enum):
@@ -293,6 +294,18 @@ class AbstractFunctor(metaclass=ABCMeta):
         :param instance the object which contains the information needed to
             execute it later on
         """
+        import gremlin.event_handler
+        
+        # hook profile start/stop events to reset the functor
+        eh = gremlin.event_handler.EventListener()
+        eh.profile_start.connect(self._profile_start)
+        eh.profile_stop.connect(self._profile_stop)
+
+    def _profile_start(self):
+        self.profile_start()
+
+    def _profile_stop(self):
+        self.profile_stop()
         
     @abstractmethod
     def process_event(self, event, value):
@@ -310,6 +323,13 @@ class AbstractFunctor(metaclass=ABCMeta):
         ''' returns any extra inputs as a list of (device_guid, input_id) to latch to this action (trigger on change) '''
         return []
 
+    def profile_start(self):
+        ''' occurs on profile start - override in functor '''
+        pass
+
+    def profile_stop(self):
+        ''' occurs on profile stop - override in functor '''
+        pass
 
 class ActivationCondition:
 

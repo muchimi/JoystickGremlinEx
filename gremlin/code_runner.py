@@ -240,6 +240,7 @@ class CodeRunner:
                             verbose = config.verbose
                             if verbose:
                                 self.event_handler.dump_callbacks()
+                                
 
             # Create merge axis callbacks
             for entry in profile.merge_axes:

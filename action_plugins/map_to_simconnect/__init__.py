@@ -518,15 +518,34 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractFunctor):
         self.action_data : MapToSimConnect = action
         self.command = action.command # the command to execute
         self.value = action.value # the value to send (None if no data to send)
-        self.block = SimConnectData().block(self.command)
+        self.sm = SimConnectData()
+        self.block = self.sm.block(self.command)
     
+    def profile_start(self):
+        ''' occurs when the profile starts '''
+        self.sm.connect()
+        
+
+    def profile_stop(self):
+        ''' occurs wen the profile stops'''
+        self.sm.disconnect()
+    
+
     def process_event(self, event, value):
+
+        logging.getLogger("system").info(f"SC FUNCTOR: {event}  {value}")
+
+        if not self.sm.ok:
+            return True
 
         if not self.block or not self.block.valid:
             # invalid command
-            return False
-
-        if event.is_axis:
+            return True
+        
+        
+        
+   
+        if event.is_axis and self.block.is_axis:
             # value is a ranged input value
             if self.action_data.mode == SimConnectActionMode.Ranged:
                 # come up with a default mode for the selected command if not set
@@ -544,7 +563,8 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractFunctor):
             
         elif value.current:
             # non joystick input (button)
-            return self.block.execute(self.value)
+            if not self.block.is_axis: 
+                return self.block.execute(self.value)
         
         return True
     
@@ -623,10 +643,7 @@ class MapToSimConnect(gremlin.base_profile.AbstractAction):
         :return True if an activation condition is required for this particular
             action instance, False otherwise
         """
-        return self.get_input_type() in [
-            InputType.JoystickAxis,
-            InputType.JoystickHat
-        ]
+        return False
 
     def _parse_xml(self, node):
         """Reads the contents of an XML node to populate this instance.
@@ -678,7 +695,6 @@ class MapToSimConnect(gremlin.base_profile.AbstractAction):
 
         :return True if the action is configured correctly, False otherwise
         """
-        #return False
         return True
 
 

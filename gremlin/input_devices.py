@@ -45,9 +45,7 @@ import socketserver, socket, msgpack
 import enum
 
 import gremlin.singleton_decorator
-#from gremlin.singleton_decorator import SingletonDecorator
 import gremlin.event_handler
-#from gremlin.event_handler import Event, EventHandler, EventListener
 
 
 syslog = logging.getLogger("system")
@@ -259,8 +257,6 @@ class RemoteControl():
         el.broadcast_changed.connect(self._broadcast_changed)
         
     def _update(self, value):
-
-        from gremlin.event_handler import StateChangeEvent, EventListener
         
         is_local = self._is_local
         is_remote = self._is_remote
@@ -300,8 +296,9 @@ class RemoteControl():
             # status changed
             self._is_local = is_local
             self._is_remote = is_remote
-            el = EventListener()
-            el.broadcast_changed.emit(StateChangeEvent(self._is_local, self._is_remote, self._is_broadcast))
+            
+            el = gremlin.event_handler.EventListener()
+            el.broadcast_changed.emit(gremlin.event_handler.StateChangeEvent(self._is_local, self._is_remote, self._is_broadcast))
 
         if self._is_paired != is_paired:
             # pairing mode changed
@@ -315,12 +312,12 @@ class RemoteControl():
 
     def _config_changed(self):
         ''' called when broadcast config item changes '''
-        from gremlin.event_handler import StateChangeEvent, EventListener
+        
         config = gremlin.config.Configuration()
         if self._is_broadcast != config.enable_remote_broadcast:
             self._is_broadcast = config.enable_remote_broadcast
-            el = EventListener()
-            el.broadcast_changed.emit(StateChangeEvent(self._is_local, self._is_remote, self._is_broadcast))
+            el = gremlin.event_handler.EventListener()
+            el.broadcast_changed.emit(gremlin.event_handler.StateChangeEvent(self._is_local, self._is_remote, self._is_broadcast))
 
     def say(self, msg):
         speech = InternalSpeech()
@@ -1695,7 +1692,7 @@ class Keyboard(QtCore.QObject):
         QtCore.QObject.__init__(self)
         self._keyboard_state = {} # holds the state of the keys
 
-    @QtCore.Slot(gremlin.event_handler.Event)
+    @QtCore.Slot(object)
     def keyboard_event(self, event):
         """Handles keyboard events and updates state.
 
