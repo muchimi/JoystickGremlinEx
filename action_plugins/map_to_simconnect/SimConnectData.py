@@ -273,9 +273,17 @@ class SimConnectData():
         ''' true if the sim is running '''
         return self._sm.running
     
+    def is_connected(self):
+        ''' true if connected'''
+        return self._sm.is_connected()
+    
     @property
     def ok(self):
         return self._sm.ok
+    
+    @property
+    def sm(self):
+        return self._sm
 
     def connect(self):
         if self._sm.ok:
@@ -623,8 +631,6 @@ class SimConnectData():
         ''' ensure simconnect is connected '''
         if not self._sm.ok:
             return False
-        if not self._sm.running:
-            self._sm.connect()
         return self._sm.running
     
     def get_category_list(self):
@@ -670,21 +676,40 @@ class SimConnectBlock(QtCore.QObject):
         FloatNumber = 1
         IntNumber = 2
 
+
+
     class SimConnectCommandType(enum.Enum):
         NotSet = 0
         Event = 1
         Request = 2
         LVar = 3
         AVar = 4
+        SimVar = 5
+
+        @staticmethod
+        def from_string(value):
+            value = value.lower()
+            if value in SimConnectBlock._command_type_to_string_map.keys():
+                return SimConnectBlock._command_type_to_string_map[value]
+            return None
         
 
+        
+    _command_type_to_string_map = {
+        "notset": SimConnectCommandType.NotSet,
+        "event": SimConnectCommandType.Event,
+        "request" : SimConnectCommandType.Request,
+        "lvar": SimConnectCommandType.LVar,
+        "avar": SimConnectCommandType.AVar,
+        "simvar" : SimConnectCommandType.SimVar
+    }
 
 
 
     range_changed = QtCore.Signal(RangeEvent) # fires when the block range values change
     value_changed = QtCore.Signal() # fires when the block output value changes
 
-    def __init__(self, simconnect):
+    def __init__(self, simconnect_data):
         ''' creates a simconnect block object
         
         the block auto-configures itself based on the command, and determines
@@ -694,7 +719,7 @@ class SimConnectBlock(QtCore.QObject):
         
         '''
         super().__init__()
-        self._sm : SimConnectData = simconnect
+        self._simconnect_data : SimConnectData = simconnect_data
         self._command_type = SimConnectBlock.SimConnectCommandType.NotSet
         self._description = None
         self._value_type = SimConnectBlock.OutputType.NotSet
@@ -716,6 +741,11 @@ class SimConnectBlock(QtCore.QObject):
         self._command = None
         self._units = ""
         self._is_axis = False # true if the block is axis output enabled
+
+    @property
+    def sm(self):
+        ''' simconnect object '''
+        return self._simconnect_data.sm
 
     def enable_notifications(self, force = False):
         ''' enables data notifications from this block '''
@@ -774,6 +804,10 @@ class SimConnectBlock(QtCore.QObject):
         return self._command_type
     @command_type.setter
     def command_type(self, value):
+        if isinstance(value, str):
+            value = SimConnectBlock.SimConnectCommandType.from_string(value)
+        elif isinstance(value, int):
+            value = SimConnectBlock.SimConnectCommandType(value)
         self._command_type = value
 
     
@@ -980,20 +1014,17 @@ class SimConnectBlock(QtCore.QObject):
         block = SimConnectBlock(command)
         return block
     
-    def is_running(self):
-        ''' true if the sim is available '''
-        return self._sm.ensure_running()
-    
+     
     def execute(self, value = None):
         ''' executes the command '''
 
-        if not self._sm.ensure_running():
-            # not connected or not running
+        if not self._simconnect_data.is_connected():
+            # not connected
             return False
         
         if self._command:
             if self._command_type ==  SimConnectBlock.SimConnectCommandType.Event:
-                ae = AircraftEvents(self._sm_data.sm)
+                ae = AircraftEvents(self.sm)
                 trigger = ae.find(self._command)
                 if trigger:
                     if self._set_value:
@@ -1002,7 +1033,7 @@ class SimConnectBlock(QtCore.QObject):
                         trigger()
 
             elif self._command_type == SimConnectBlock.SimConnectCommandType.Request and not self._readonly:
-                ar = AircraftRequests(self._sm_data.sm, _time=2000)
+                ar = AircraftRequests(self.sm, _time=2000)
                 ar.set(self._command, value)
 
         #     return True

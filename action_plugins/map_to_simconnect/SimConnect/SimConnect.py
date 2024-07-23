@@ -1,3 +1,4 @@
+import ctypes
 from ctypes import *
 from ctypes.wintypes import *
 import logging
@@ -26,18 +27,22 @@ class SimConnect:
 	def handle_id_event(self, event):
 		uEventID = event.uEventID
 		if uEventID == self._dll.EventID.EVENT_SIM_START:
-			LOGGER.info("SIM START")
+			LOGGER.info("SimConnect: event: SIM START")
 			self.running = True
-		if uEventID == self._dll.EventID.EVENT_SIM_STOP:
-			LOGGER.info("SIM Stop")
+		elif uEventID == self._dll.EventID.EVENT_SIM_STOP:
+			LOGGER.info("SimConnect: event: SIM Stop")
 			self.running = False
 		# Unknow whay not reciving
-		if uEventID == self._dll.EventID.EVENT_SIM_PAUSED:
-			LOGGER.info("SIM Paused")
+		elif uEventID == self._dll.EventID.EVENT_SIM_PAUSED:
+			LOGGER.info("SimConnect: event: SIM Paused")
 			self.paused = True
-		if uEventID == self._dll.EventID.EVENT_SIM_UNPAUSED:
-			LOGGER.info("SIM Unpaused")
+		elif uEventID == self._dll.EventID.EVENT_SIM_UNPAUSED:
+			LOGGER.info("SimConnect: event: SIM Unpaused")
 			self.paused = False
+		elif uEventID == self._dll.EventID.EVENT_SIM_RUNNING:
+			LOGGER.info("SimConnect: event: SIM Running")
+			state = event.dwData
+			self.running = state != 0
 
 	def handle_simobject_event(self, ObjData):
 		dwRequestID = ObjData.dwRequestID
@@ -52,7 +57,7 @@ class SimConnect:
 					ObjData.dwData, POINTER(c_double * len(_request.definitions))
 				).contents[0]
 		else:
-			LOGGER.warn("Event ID: %d Not Handled." % (dwRequestID))
+			LOGGER.warn(f"SimConnect: Event ID: {dwRequestID} is not handled")
 
 	def handle_exception_event(self, exc):
 		_exception = SIMCONNECT_EXCEPTION(exc.dwException).name
@@ -65,13 +70,13 @@ class SimConnect:
 		for _reqin in self.Requests:
 			_request = self.Requests[_reqin]
 			if _request.LastID == _unsendid:
-				LOGGER.warn("%s: in %s" % (_exception, _request.definitions[0]))
+				LOGGER.warn(f"SimConnect: error: {_exception} {_request.definitions[0]}")
 				return
 
 		LOGGER.warn(_exception)
 
-	def handle_state_event(self, pData):
-		print("I:", pData.dwInteger, "F:", pData.fFloat, "S:", pData.szString)
+	def handle_state_event(self, pData : SIMCONNECT_RECV_SYSTEM_STATE):
+		LOGGER.info(f"SimConnect: state event: int: {pData.dwInteger} float: {pData.fFloat} str: {pData.szString}")
 
 	# TODO: update callbackfunction to expand functions.
 	def my_dispatch_proc(self, pData, cbData, pContext):
@@ -92,7 +97,7 @@ class SimConnect:
 			self.handle_simobject_event(pObjData)
 
 		elif dwID == SIMCONNECT_RECV_ID.SIMCONNECT_RECV_ID_OPEN:
-			LOGGER.info("SIM OPEN")
+			LOGGER.info("Simconnect: SIM OPEN")
 			self.ok = True
 
 		elif dwID == SIMCONNECT_RECV_ID.SIMCONNECT_RECV_ID_EXCEPTION:
@@ -166,6 +171,11 @@ class SimConnect:
 				self._dll.SubscribeToSystemEvent(
 					self._hSimConnect, self._dll.EventID.EVENT_SIM_UNPAUSED, b"Unpaused"
 				)
+				# Request a notification when the flight is un-paused.
+				self._dll.SubscribeToSystemEvent(
+					self._hSimConnect, self._dll.EventID.EVENT_SIM_RUNNING, b"Sim"
+				)
+
 				self.timerThread = threading.Thread(target=self._run)
 				self.timerThread.daemon = True
 				self.timerThread.start()
@@ -190,6 +200,9 @@ class SimConnect:
 			self._dll.Close(self._hSimConnect)
 		except:
 			pass
+
+	def is_connected(self):
+		return self.ok
 
 	def map_to_sim_event(self, name):
 		for m in self._dll.EventID:
@@ -429,6 +442,7 @@ class SimConnect:
 			self._dll.EventID.EVENT_SIM_PAUSED,
 			b"Sim"
 		)
+
 
 	def dic_to_flight(self, dic, fpath):
 		with open(fpath, "w") as tempfile:

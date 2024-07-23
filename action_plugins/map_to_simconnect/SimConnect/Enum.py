@@ -319,10 +319,12 @@ class SIMCONNECT_DATA_REQUEST_ID(AutoName):  # client-defined request data ID
 
 
 class SIMCONNECT_CLIENT_EVENT_ID(AutoName):  # client-defined client event ID
+	# https://docs.flightsimulator.com/html/Programming_Tools/SimConnect/API_Reference/Events_And_Data/SimConnect_SubscribeToSystemEvent.htm
 	EVENT_SIM_START = auto()
 	EVENT_SIM_STOP = auto()
 	EVENT_SIM_PAUSED = auto()
 	EVENT_SIM_UNPAUSED = auto()
+	EVENT_SIM_RUNNING = auto()
 	pass
 
 
@@ -510,21 +512,15 @@ class SIMCONNECT_RECV_CLOUD_STATE(SIMCONNECT_RECV):
 	]
 
 
-class SIMCONNECT_RECV_ASSIGNED_OBJECT_ID(
-	SIMCONNECT_RECV
-):  # when dwID == SIMCONNECT_RECV_ID_ASSIGNED_OBJECT_ID
+class SIMCONNECT_RECV_ASSIGNED_OBJECT_ID(SIMCONNECT_RECV):  # when dwID == SIMCONNECT_RECV_ID_ASSIGNED_OBJECT_ID
 	_fields_ = [("dwRequestID", DWORD), ("dwObjectID", DWORD)]
 
 
-class SIMCONNECT_RECV_RESERVED_KEY(
-	SIMCONNECT_RECV
-):  # when dwID == SIMCONNECT_RECV_ID_RESERVED_KEY
+class SIMCONNECT_RECV_RESERVED_KEY(SIMCONNECT_RECV):  # when dwID == SIMCONNECT_RECV_ID_RESERVED_KEY
 	_fields_ = [("szChoiceReserved", c_char * 30), ("szReservedKey", c_char * 30)]
 
 
-class SIMCONNECT_RECV_SYSTEM_STATE(
-	SIMCONNECT_RECV
-):  # when dwID == SIMCONNECT_RECV_ID_SYSTEM_STATE
+class SIMCONNECT_RECV_SYSTEM_STATE(SIMCONNECT_RECV):  # when dwID == SIMCONNECT_RECV_ID_SYSTEM_STATE
 	_fields_ = [
 		("dwRequestID", DWORD),
 		("dwInteger", DWORD),

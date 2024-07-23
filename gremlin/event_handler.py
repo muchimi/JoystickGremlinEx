@@ -1123,9 +1123,11 @@ class EventHandler(QtCore.QObject):
 
 		
 
-		if verbose and m_list:
-			logging.getLogger("system").info(f"TRIGGER: mode: [{self._active_mode}] callbacks: {len(m_list)} event: {event}")
-		self._trigger_callbacks(m_list, event)			
+		
+		if m_list:
+			if verbose:
+				logging.getLogger("system").info(f"TRIGGER: mode: [{self._active_mode}] callbacks: {len(m_list)} event: {event}")
+			self._trigger_callbacks(m_list, event)			
 
 
 	def _trigger_callbacks(self, callbacks, event):
@@ -1189,7 +1191,7 @@ class EventHandler(QtCore.QObject):
 			given event
 		"""
 
-		verbose = gremlin.config.Configuration().verbose
+		verbose = gremlin.config.Configuration().verbose_mode_details
 
 		# Obtain callbacks matching the event
 		callback_list = []
