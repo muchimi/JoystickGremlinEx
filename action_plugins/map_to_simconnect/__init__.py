@@ -26,6 +26,7 @@ import gremlin.event_handler
 from gremlin.input_types import InputType
 from gremlin.input_devices import ButtonReleaseActions
 import gremlin.macro
+import gremlin.shared_state
 import gremlin.ui.ui_common
 import gremlin.ui.input_item
 import enum
@@ -73,20 +74,32 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         
         self.action_data : MapToSimConnect = action_data
         self.block = None
+        self._sm_data = SimConnectData()
 
         # call super last because it will call create_ui and populate_ui so the vars must exist
         super().__init__(action_data, parent=parent)
+
+                
 
 
 
     def _create_ui(self):
         """Creates the UI components."""
 
-        self._sm_data = SimConnectData()
+
+        # mode from aircraft button - grabs the aicraft name as a mode
+        self._mode_from_aircraft_button_widget = QtWidgets.QPushButton("Mode from Aicraft")
+        self._mode_from_aircraft_button_widget.clicked.connect(self._mode_from_aircraft_button_cb)
+        
+        self._toolbar_container_widget = QtWidgets.QWidget()
+        self._toolbar_container_layout = QtWidgets.QHBoxLayout(self._toolbar_container_widget)
+        self._toolbar_container_layout.addWidget(self._mode_from_aircraft_button_widget)
+        self._toolbar_container_layout.addStretch()
 
         # command selector
         self._action_container_widget = QtWidgets.QWidget()
         self._action_container_layout = QtWidgets.QVBoxLayout(self._action_container_widget)
+
         self._action_selector_widget = QtWidgets.QWidget()
         self._action_selector_layout = QtWidgets.QHBoxLayout(self._action_selector_widget)
 
@@ -117,14 +130,13 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._output_mode_widget = QtWidgets.QWidget()
         self._output_mode_layout = QtWidgets.QHBoxLayout(self._output_mode_widget)
         
+        self._output_mode_readonly_widget = QtWidgets.QRadioButton("Read/Only")
+        self._output_mode_readonly_widget.setEnabled(False)
 
         # set range of values output mode (axis input only)
         self._output_mode_ranged_widget = QtWidgets.QRadioButton("Ranged")
         self._output_mode_ranged_widget.clicked.connect(self._mode_ranged_cb)
 
-        # set value output mode (output value only)
-        self._output_mode_set_value_widget = QtWidgets.QRadioButton("Value")
-        self._output_mode_set_value_widget.clicked.connect(self._mode_value_cb)
 
         # trigger output mode (event trigger only)
         self._output_mode_trigger_widget = QtWidgets.QRadioButton("Trigger")
@@ -132,17 +144,20 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self._output_mode_description_widget = QtWidgets.QLabel()
         self._output_mode_layout.addWidget(QtWidgets.QLabel("Output mode:"))
+
+
+        # set value output mode (output value only)
+        self._output_mode_set_value_widget = QtWidgets.QRadioButton("Value")
+        self._output_mode_set_value_widget.clicked.connect(self._mode_value_cb)
+
+        self._output_mode_layout.addWidget(self._output_mode_readonly_widget)
         self._output_mode_layout.addWidget(self._output_mode_ranged_widget)
         self._output_mode_layout.addWidget(self._output_mode_trigger_widget)
         self._output_mode_layout.addWidget(self._output_mode_set_value_widget)
-        self._output_mode_layout.addWidget(self._output_mode_description_widget)
+        self._output_mode_layout.addStretch()
 
         self.output_readonly_status_widget = QtWidgets.QLabel("Read only")
         self._output_mode_layout.addWidget(self.output_readonly_status_widget)
-
-        self._output_block_type_description_widget = QtWidgets.QLabel()
-        self._output_mode_layout.addWidget(self._output_block_type_description_widget)
-        self._output_mode_layout.addStretch(1)
 
         self._output_invert_axis_widget = QtWidgets.QCheckBox("Invert axis")
         self._output_invert_axis_widget.setChecked(self.action_data.invert_axis)
@@ -157,9 +172,12 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         
         self._output_data_type_label_widget = QtWidgets.QLabel("Not Set")
 
+        # self._output_block_type_description_widget = QtWidgets.QLabel()
+
         self._output_data_type_layout.addWidget(QtWidgets.QLabel("Output type:"))
         self._output_data_type_layout.addWidget(self._output_data_type_label_widget)
-
+        self._output_data_type_layout.addWidget(self._output_mode_description_widget)
+        self._output_data_type_layout.addStretch()
 
 
         # output range UI
@@ -257,6 +275,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         # hide output layout by default until we have a valid command
         self._output_container_widget.setVisible(False)
 
+        self.main_layout.addWidget(self._toolbar_container_widget)
         self.main_layout.addWidget(self._action_container_widget)
         self.main_layout.addWidget(self._output_container_widget)
         self.main_layout.addWidget(self._input_container_widget)
@@ -267,6 +286,17 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         # hook the joystick input for axis input repeater
         el = gremlin.event_handler.EventListener()
         el.joystick_event.connect(self._joystick_event_cb)
+
+    @QtCore.Slot()
+    def _mode_from_aircraft_button_cb(self):
+        ''' mode from aicraft button '''
+        profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
+        modes = profile.get_modes()
+        aircraft, model, title = self._sm_data.get_aircraft_data()
+        logging.getLogger("system").info(f"Aircraft: {aircraft} model: {model} title: {title}")
+        if not title in modes:
+            profile.add_mode(title)
+        
 
     @QtCore.Slot(Event)
     def _joystick_event_cb(self, event):
@@ -362,8 +392,37 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         input_type = self.action_data.get_input_type()
         
+        input_desc = ""
+        if input_type == InputType.JoystickAxis:
+            input_desc = "axis"
+        elif input_type in (InputType.JoystickButton, InputType.VirtualButton):
+            input_desc = "button"
+        elif input_type == InputType.JoystickHat:
+            input_desc = "hat"
+        elif input_type in (InputType.Keyboard, InputType.KeyboardLatched):
+            input_desc = "key"
+        elif input_type in (InputType.Midi, InputType.OpenSoundControl):
+            input_desc = "button or slider"
+
+
+
+        if self.action_data.mode == SimConnectActionMode.Ranged:
+            desc = f"Maps an input {input_desc} to a SimConnect ranged event, such as an axis"
+        elif self.action_data.mode == SimConnectActionMode.Trigger:
+            desc = f"Maps an input {input_desc} to a SimConnect triggered event, such as an on/off or toggle function."
+        elif self.action_data.mode == SimConnectActionMode.SetValue:
+            desc = f"Maps an input {input_desc} to a Simconnect event and sends it the specified value."
+        else:
+            desc = ""
+
+        self._output_mode_description_widget.setText(desc)
+
+        
         if block and block.valid:
             self._output_container_widget.setVisible(True)
+
+
+            self.output_readonly_status_widget.setText("Block: read/only" if block.is_readonly else "Block: read/write")
 
             self.status_text_widget.setText("Command selected")
 
@@ -385,7 +444,9 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.description_text_widget.setText(block.description)
 
             # update UI based on block information ``
-            self._output_block_type_description_widget.setText(block.display_block_type)
+            self._output_data_type_label_widget.setText(block.display_block_type)
+
+            output_mode_enabled = not block.is_readonly
 
             if self.action_data.mode == SimConnectActionMode.NotSet:
                 # come up with a default mode for the selected command if not set
@@ -395,7 +456,21 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
                     if block.is_value:
                         self.action_data.mode = SimConnectActionMode.SetValue
                     else:    
-                        self.action_data.mode = SimConnectActionMode.Trigger
+                        self.action_data.mode = SimConnectActionMode.Trigger            
+
+            if not output_mode_enabled:
+                self._output_mode_readonly_widget.setChecked(True)
+                self.action_data.mode = SimConnectActionMode.NotSet
+            elif self._output_mode_readonly_widget.isChecked():
+                if input_type == InputType.JoystickAxis:
+                    self.action_data.mode = SimConnectActionMode.Ranged
+                elif block.is_value:
+                    self.action_data.mode = SimConnectActionMode.SetValue
+        
+            self._output_mode_ranged_widget.setEnabled(output_mode_enabled)
+            self._output_mode_set_value_widget.setEnabled(output_mode_enabled)
+            self._output_mode_trigger_widget.setEnabled(output_mode_enabled)
+
                 
             if self.action_data.mode == SimConnectActionMode.Trigger:
                 with QtCore.QSignalBlocker(self._output_mode_trigger_widget):
@@ -406,9 +481,6 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
             elif self.action_data.mode == SimConnectActionMode.Ranged:
                 with QtCore.QSignalBlocker(self._output_mode_ranged_widget):
                     self._output_mode_ranged_widget.setChecked(True)
-            
-                
-            
             
             self._output_data_type_label_widget.setText(block.display_data_type)
             self.output_readonly_status_widget.setText("(command is Read/Only)" if block.is_readonly else '')
@@ -452,6 +524,8 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         range_visible = self.action_data.mode == SimConnectActionMode.Ranged
         trigger_visible = self.action_data.mode == SimConnectActionMode.Trigger
         setvalue_visible = self.action_data.mode == SimConnectActionMode.SetValue
+
+        
 
         self._output_range_container_widget.setVisible(range_visible)
         self.output_trigger_container_widget.setVisible(trigger_visible)
@@ -635,7 +709,8 @@ class MapToSimConnect(gremlin.base_profile.AbstractAction):
 
         :return icon representing this action
         """
-        return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
+        return "mdi.airplane"
+        
 
     def requires_virtual_button(self):
         """Returns whether or not an activation condition is needed.

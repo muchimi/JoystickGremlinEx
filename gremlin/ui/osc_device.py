@@ -227,9 +227,9 @@ def get_string(dgram: bytes, start_index: int) -> Tuple[str, int]:
         data_str = dgram[start_index:start_index + offset]
         return data_str.replace(b'\x00', b'').decode('utf-8'), start_index + offset
     except IndexError as ie:
-        raise OscParseError('Could not parse datagram %s' % ie)
+        raise OscParseError(f'Could not parse datagram {ie}')
     except TypeError as te:
-        raise OscParseError('Could not parse datagram %s' % te)
+        raise OscParseError(f'Could not parse datagram {te}')
 
 
 def write_int(val: int) -> bytes:
@@ -265,7 +265,7 @@ def get_int(dgram: bytes, start_index: int) -> Tuple[int, int]:
                         dgram[start_index:start_index + _INT_DGRAM_LEN])[0],
             start_index + _INT_DGRAM_LEN)
     except (struct.error, TypeError) as e:
-        raise OscParseError('Could not parse datagram %s' % e)
+        raise OscParseError(f"Could not parse datagram {e}")
 
 
 def write_int64(val: int) -> bytes:
@@ -277,7 +277,7 @@ def write_int64(val: int) -> bytes:
     try:
         return struct.pack('>q', val)
     except struct.error as e:
-        raise OscBuildError('Wrong argument value passed: {}'.format(e))
+        raise OscBuildError(f'Wrong argument value passed: {e}')
 
 
 def get_int64(dgram: bytes, start_index: int) -> Tuple[int, int]:
@@ -301,7 +301,7 @@ def get_int64(dgram: bytes, start_index: int) -> Tuple[int, int]:
                         dgram[start_index:start_index + _INT64_DGRAM_LEN])[0],
             start_index + _INT64_DGRAM_LEN)
     except (struct.error, TypeError) as e:
-        raise OscParseError('Could not parse datagram %s' % e)
+        raise OscParseError(f"Could not parse datagram {e}")
 
 
 def get_uint64(dgram: bytes, start_index: int) -> Tuple[int, int]:
@@ -325,7 +325,7 @@ def get_uint64(dgram: bytes, start_index: int) -> Tuple[int, int]:
                         dgram[start_index:start_index + _UINT64_DGRAM_LEN])[0],
             start_index + _UINT64_DGRAM_LEN)
     except (struct.error, TypeError) as e:
-        raise OscParseError('Could not parse datagram %s' % e)
+        raise OscParseError(f'Could not parse datagram {e}')
 
 
 def get_timetag(dgram: bytes, start_index: int) -> Tuple[Tuple[datetime, int], int]:
@@ -357,7 +357,7 @@ def get_timetag(dgram: bytes, start_index: int) -> Tuple[Tuple[datetime, int], i
 
         return (utc, fraction), start_index + _TIMETAG_DGRAM_LEN
     except (struct.error, TypeError) as e:
-        raise OscParseError('Could not parse datagram %s' % e)
+        raise OscParseError(f'Could not parse datagram {e}')
 
 
 def write_float(val: float) -> bytes:
@@ -396,7 +396,7 @@ def get_float(dgram: bytes, start_index: int) -> Tuple[float, int]:
                         dgram[start_index:start_index + _FLOAT_DGRAM_LEN])[0],
             start_index + _FLOAT_DGRAM_LEN)
     except (struct.error, TypeError) as e:
-        raise OscParseError('Could not parse datagram %s' % e)
+        raise OscParseError(f'Could not parse datagram {e}')
 
 
 def write_double(val: float) -> bytes:
@@ -549,7 +549,7 @@ def get_rgba(dgram: bytes, start_index: int) -> Tuple[bytes, int]:
                         dgram[start_index:start_index + _INT_DGRAM_LEN])[0],
             start_index + _INT_DGRAM_LEN)
     except (struct.error, TypeError) as e:
-        raise OscParseError('Could not parse datagram %s' % e)
+        raise OscParseError(f'Could not parse datagram {e}')
 
 
 def write_midi(val: MidiPacket) -> bytes:
@@ -593,7 +593,7 @@ def get_midi(dgram: bytes, start_index: int) -> Tuple[MidiPacket, int]:
             tuple((val & 0xFF << 8 * i) >> 8 * i for i in range(3, -1, -1)))
         return (midi_msg, start_index + _INT_DGRAM_LEN)
     except (struct.error, TypeError) as e:
-        raise OscParseError('Could not parse datagram %s' % e)
+        raise OscParseError(f'Could not parse datagram {e}')
 
 
 
@@ -773,8 +773,8 @@ class OscPacket(object):
                 raise OscParseError(
                     'OSC Packet should at least contain an OscMessage or an '
                     'OscBundle.')
-        except (OscParseError, OscParseError) as pe:
-            raise OscParseError('Could not parse packet %s' % pe)
+        except (OscParseError, OscParseError) as e:
+            raise OscParseError(f'Could not parse packet {e}')
 
     @property
     def messages(self) -> List:
@@ -810,8 +810,8 @@ class OscBundle(object):
         index = len(_BUNDLE_PREFIX)
         try:
             self._timestamp, index = get_date(self._dgram, index)
-        except OscParseError as pe:
-            raise OscParseError("Could not get the date from the datagram: %s" % pe)
+        except OscParseError as e:
+            raise OscParseError(f"Could not get the date from the datagram: {e}")
         # Get the contents as a list of OscBundle and OscMessage.
         self._contents = self._parse_contents(index)
 
@@ -836,10 +836,9 @@ class OscBundle(object):
                 elif OscMessage.dgram_is_message(content_dgram):
                     contents.append(OscMessage(content_dgram))
                 else:
-                    logging.warning(
-                        "Could not identify content type of dgram %r" % content_dgram)
+                    logging.warning(f"Could not identify content type of dgram {content_dgram}")
         except (OscParseError, OscParseError, IndexError) as e:
-            raise OscParseError("Could not parse a content datagram: %s" % e)
+            raise OscParseError(f"Could not parse a content datagram: {e}")
 
         return contents
 
@@ -1249,7 +1248,7 @@ class OscDispatcher(object):
                 self._map[address].remove(Handler(handler, list(args), needs_reply_address))
         except ValueError as e:
             if str(e) == "list.remove(x): x not in list":
-                raise ValueError("Address '%s' doesn't have handler '%s' mapped to it" % (address, handler)) from e
+                raise ValueError(f"Address '{address}' doesn't have handler '{handler}' mapped to it") from e
 
     def handlers_for_address(self, address_pattern: str):
         """Yields handlers matching an address

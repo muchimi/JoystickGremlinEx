@@ -885,8 +885,9 @@ class VerboseMode(enum.IntFlag):
     Joystick = enum.auto() # joystick input 
     Inputs = enum.auto() # list inputs
     Mouse = enum.auto() # mouse input
+    SimConnect = enum.auto() # simconnect interface
     Details = enum.auto() # user interface details
-    All = Keyboard | Joystick | Inputs | Mouse | Details
+    All = Keyboard | Joystick | Inputs | Mouse | Details | SimConnect
 
     def __contains__(self, item):
         return  (self.value & item.value) == item.value

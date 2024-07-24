@@ -74,6 +74,7 @@ class Clipboard(QtCore.QObject):
                     # validate the data is something we recognize
             except:
                 # bad data - just ignore
+                self.set_windows_clipboard_text(None)
                 pass
 
         if data and isinstance(data, AbstractContainer) \
@@ -117,7 +118,8 @@ class Clipboard(QtCore.QObject):
         # method 1
         clipboard = QApplication.clipboard()
         clipboard.clear(mode = QClipboard.Mode.Clipboard)
-        clipboard.setText(value, mode = QClipboard.Mode.Clipboard)
+        if value is not None:
+            clipboard.setText(value, mode = QClipboard.Mode.Clipboard)
         
         # method 2
         # win32clipboard.OpenClipboard()

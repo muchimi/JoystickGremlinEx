@@ -1558,7 +1558,7 @@ class ModeManagerUi(ui_common.BaseDialogUi):
     """Enables the creation of modes and configuring their inheritance."""
 
     # Signal emitted when mode configuration changes
-    modes_changed = QtCore.Signal()
+    # modes_changed = QtCore.Signal()
 
     def __init__(self, profile_data, parent=None):
         """Creates a new instance.
@@ -1805,7 +1805,9 @@ The setting can be overriden by the global mode reload option set in Options for
                     inherit = None
                 device.ensure_mode_exists(mode)
                 device.modes[mode].inherit = inherit
-            self.modes_changed.emit()
+
+        eh = gremlin.event_handler.EventListener()
+        eh.modes_changed.emit()
 
     def _rename_mode(self, mode_name):
         """Asks the user for the new name for the given mode.
@@ -1883,7 +1885,8 @@ The setting can be overriden by the global mode reload option set in Options for
         self._populate_mode_layout()
         self.modes_changed.emit()
 
-    def _add_mode_cb(self, checked):
+    @QtCore.Slot()
+    def _add_mode_cb(self):
         """Asks the user for a new mode to add.
 
         If the user provided name for the mode is invalid no mode is
@@ -1906,6 +1909,7 @@ The setting can be overriden by the global mode reload option set in Options for
 
             self._populate_mode_layout()
 
+    @QtCore.Slot(int)
     def _change_default_mode_cb(self, index):
         ''' occurs when the default mode is changed '''
         mode = self.mode_default_selector.currentText()

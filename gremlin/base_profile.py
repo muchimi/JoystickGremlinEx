@@ -1214,7 +1214,73 @@ class Profile():
         self._force_numlock_off = value
         self.save()
 
+    def mode_list(self):
+        """Returns a list of all modes based on the given node.
 
+        :param node a node from a profile tree
+        :return list of mode names
+        """
+        # Get profile root node
+        parent = self
+        while parent.parent is not None:
+            parent = parent.parent
+        assert(type(parent) == Profile)
+        # Generate list of modes
+        mode_names = []
+        for device in parent.devices.values():
+            mode_names.extend(device.modes.keys())
+
+        return sorted(list(set(mode_names)), key=lambda x: x.lower())
+
+
+
+    def add_mode(self, name):
+        import gremlin.event_handler
+        ''' adds a new mode'''
+        if name in self.mode_list():
+            logging.getLogger("system").warning(f"Add Mode: error: mode {name} already exists")
+            return False
+        for device in self.devices.values():
+            new_mode = Mode(device)
+            new_mode.name = name
+            new_mode.parent = self.get_default_mode()
+            device.modes[name] = new_mode
+
+        eh = gremlin.event_handler.EventListener()
+        eh.modes_changed.emit()
+        return True
+    
+    def remove_mode(self, name):
+        ''' removes a mode from this profile '''
+        from PySide6.QtWidgets import QMessageBox
+        import gremlin.event_handler
+        mode_list = self.mode_list()
+        if not name in self.mode_list():
+            logging.getLogger("system").warning(f"Remove Mode: error: mode {name} not found")
+            return False
+                
+        if len(mode_list.keys()) == 1:
+            QMessageBox.warning(self, "Warning","Cannot delete last mode - one mode must exist")
+            return False
+
+        parent_of_deleted = None
+        for mode in list(self.devices.values())[0].modes.values():
+            if mode.name == name:
+                parent_of_deleted = mode.inherit
+
+        # Assign the inherited mode of the the deleted one to all modes that
+        # inherit from the mode to be deleted
+        for device in self.devices.values():
+            for mode in device.modes.values():
+                if mode.inherit == name:
+                    mode.inherit = parent_of_deleted
+
+        # Remove the mode from the profile
+        for device in self.devices.values():
+            del device.modes[name]
+
+        eh = gremlin.event_handler.EventListener()
+        eh.modes_changed.emit()
 
     def get_root_modes(self):
         """Returns a list of root modes.

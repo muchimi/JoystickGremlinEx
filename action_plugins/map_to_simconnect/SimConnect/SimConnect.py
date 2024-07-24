@@ -62,9 +62,9 @@ class SimConnect:
 	def handle_exception_event(self, exc):
 		_exception = SIMCONNECT_EXCEPTION(exc.dwException).name
 		_unsendid = exc.UNKNOWN_SENDID
-		_sendid = exc.dwSendID
-		_unindex = exc.UNKNOWN_INDEX
-		_index = exc.dwIndex
+		# _sendid = exc.dwSendID
+		# _unindex = exc.UNKNOWN_INDEX
+		# _index = exc.dwIndex
 
 		# request exceptions
 		for _reqin in self.Requests:
@@ -76,7 +76,9 @@ class SimConnect:
 		LOGGER.warn(_exception)
 
 	def handle_state_event(self, pData : SIMCONNECT_RECV_SYSTEM_STATE):
-		LOGGER.info(f"SimConnect: state event: int: {pData.dwInteger} float: {pData.fFloat} str: {pData.szString}")
+		if self.verbose:
+			LOGGER.info(f"SimConnect: state event: int: {pData.dwInteger} float: {pData.fFloat} str: {pData.szString}")
+		
 
 	# TODO: update callbackfunction to expand functions.
 	def my_dispatch_proc(self, pData, cbData, pContext):
@@ -127,13 +129,15 @@ class SimConnect:
 		elif dwID == SIMCONNECT_RECV_ID.SIMCONNECT_RECV_ID_QUIT:
 			self.quit = 1
 		else:
-			LOGGER.debug("Received:", SIMCONNECT_RECV_ID(dwID))
+			if self.verbose:
+				LOGGER.debug("Simconnect: Received:", SIMCONNECT_RECV_ID(dwID))
 		return
 
-	def __init__(self, auto_connect=True, library_path=_library_path):
+	def __init__(self, auto_connect=True, library_path=_library_path, verbose = False):
 
 		self.Requests = {}
 		self.Facilities = []
+		self.verbose = verbose
 		self._dll = SimConnectDll(library_path)
 		self._hSimConnect = HANDLE()
 		self.quit = 0
@@ -143,6 +147,7 @@ class SimConnect:
 		self.DEFINITION_POS = None
 		self.DEFINITION_WAYPOINT = None
 		self._my_dispatch_proc_rd = self._dll.DispatchProc(self.my_dispatch_proc)
+		
 		if auto_connect:
 			self.connect()
 
@@ -152,7 +157,7 @@ class SimConnect:
 				byref(self._hSimConnect), LPCSTR(b"Request Data"), None, 0, 0, 0
 			)
 			if self.IsHR(err, 0):
-				LOGGER.debug("Connected to Flight Simulator!")
+				LOGGER.info("Simconnect: Connected to Flight Simulator!")
 				# Request an event when the simulation starts
 
 				# The user is in control of the aircraft
@@ -182,7 +187,7 @@ class SimConnect:
 				while self.ok is False:
 					pass
 		except OSError:
-			LOGGER.debug("Did not find Flight Simulator running.")
+			LOGGER.info("Simconnect: Did not find Flight Simulator running.")
 			raise ConnectionError("Did not find Flight Simulator running.")
 
 	def _run(self):
@@ -192,14 +197,18 @@ class SimConnect:
 				time.sleep(.002)
 			except:
 				pass
+		# close the connection
+		try:
+			self._dll.Close(self._hSimConnect)
+			self._hSimConnect = 0
+			if self.verbose:
+				LOGGER.info("Simconnect: Close connection")
+		except:
+			pass
 
 	def exit(self):
 		self.quit = 1
 		self.timerThread.join()
-		try:
-			self._dll.Close(self._hSimConnect)
-		except:
-			pass
 
 	def is_connected(self):
 		return self.ok
@@ -207,7 +216,8 @@ class SimConnect:
 	def map_to_sim_event(self, name):
 		for m in self._dll.EventID:
 			if name.decode() == m.name:
-				LOGGER.debug("Already have event: ", m)
+				if self.verbose:
+					LOGGER.debug(f"Simconnect: Already have event: {name} {m}")
 				return m
 
 		names = [m.name for m in self._dll.EventID] + [name.decode()]
@@ -217,7 +227,7 @@ class SimConnect:
 		if self.IsHR(err, 0):
 			return evnt
 		else:
-			LOGGER.error("Error: MapToSimEvent")
+			LOGGER.error(f"Simconnect: Error: MapToSimEvent: event: {name}")
 			return None
 
 	def add_to_notification_group(self, group, evnt, bMaskable=False):
@@ -267,13 +277,13 @@ class SimConnect:
 
 	def get_data(self, _Request):
 		self.request_data(_Request)
-		# self.run()
-		attemps = 0
-		while _Request.outData is None and attemps < _Request.attemps:
-			# self.run()
+		retries = 0
+		while _Request.outData is None and retries < _Request.attemps:
 			time.sleep(.01)
-			attemps += 1
+			retries += 1
 		if _Request.outData is None:
+			if self.verbose:
+				LOGGER.warning(f"Simconnect: warning: timeout in request {_Request}")
 			return False
 
 		return True
@@ -332,19 +342,19 @@ class SimConnect:
 		)
 		sx = int(sizeof(ctypes.c_double) * (len(pyarr) / len(_waypointlist)))
 		return
-		hr = self._dll.SetDataOnSimObject(
-			self._hSimConnect,
-			self.DEFINITION_WAYPOINT.value,
-			SIMCONNECT_OBJECT_ID_USER,
-			0,
-			len(_waypointlist),
-			sx,
-			pObjData
-		)
-		if self.IsHR(err, 0):
-			return True
-		else:
-			return False
+		# hr = self._dll.SetDataOnSimObject(
+		# 	self._hSimConnect,
+		# 	self.DEFINITION_WAYPOINT.value,
+		# 	SIMCONNECT_OBJECT_ID_USER,
+		# 	0,
+		# 	len(_waypointlist),
+		# 	sx,
+		# 	pObjData
+		# )
+		# if self.IsHR(err, 0):
+		# 	return True
+		# else:
+		# 	return False
 
 	def set_pos(
 		self,
@@ -447,9 +457,9 @@ class SimConnect:
 	def dic_to_flight(self, dic, fpath):
 		with open(fpath, "w") as tempfile:
 			for root in dic:
-				tempfile.write("\n[%s]\n" % root)
+				tempfile.write(f"\n[{root}]\n")
 				for member in dic[root]:
-					tempfile.write("%s=%s\n" % (member, dic[root][member]))
+					tempfile.write(f"{member}={dic[root][member]}\n")
 
 	def flight_to_dic(self, fpath):
 		while not os.path.isfile(fpath):

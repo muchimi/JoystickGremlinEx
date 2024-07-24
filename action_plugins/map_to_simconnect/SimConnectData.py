@@ -6,6 +6,7 @@ from lxml import etree
 from PySide6 import QtWidgets, QtCore, QtGui
 
 import gremlin.base_profile
+import gremlin.config
 from gremlin.input_types import InputType
 from gremlin.input_devices import ButtonReleaseActions
 import gremlin.macro
@@ -233,7 +234,7 @@ class SimConnectData():
     ''' holds simconnect data '''
 
     def __init__(self) -> None:
-        self._sm = SimConnect(auto_connect =False)
+        self._sm = SimConnect(auto_connect =False, verbose = gremlin.config.Configuration().verbose_mode_simconnect)
         self._aircraft_events = AircraftEvents(self._sm)
         self._aircraft_requests = AircraftRequests(self._sm)
 
@@ -315,8 +316,34 @@ class SimConnectData():
             return self._block_map[command]
         return None
 
+    def get_aircraft_data(self):
+        ''' returns the current aircraft information 
+            (aircraft, model, title)
+        '''
+        ar = AircraftRequests(self._sm)
+        trigger = ar.find("ATC_TYPE")
+        aircraft = trigger.get()
+        if aircraft:
+            aircraft = aircraft.decode()
+        trigger = ar.find("ATC_MODEL")
+        model = trigger.get()
+        if model:
+            model = model.decode()
+        trigger = ar.find("TITLE")
+        title = trigger.get()
+        if title:
+            title = title.decode()
+        return (aircraft, model, title)
+    
+    def get_aircraft(self):
+        ''' gets the aircraft title '''
+        ar = AircraftRequests(self._sm)
+        trigger = ar.find("TITLE")
+        title = trigger.get()
+        if title:
+            title = title.decode()
+        return title
 
-                    
     def _write_default_xml(self, xml_file):
         ''' writes a default XML file from the base data in the simconnect module '''
 
@@ -725,7 +752,7 @@ class SimConnectBlock(QtCore.QObject):
         self._value_type = SimConnectBlock.OutputType.NotSet
         self._category = SimConnectEventCategory.NotSet
         self._output_data_type = SimConnectBlock.OutputType.NotSet
-        self._command = None
+        self._command = None # the command text
         self._set_value = False # true if the item can set a value
         self._readonly = False # if readonly - the request cannot be triggered
         self._is_axis = False # true if the output is an axis variable
@@ -773,13 +800,11 @@ class SimConnectBlock(QtCore.QObject):
         self._command = value
         # update flags
         self.is_axis = value in _simconnect_full_range
-            
 
     @property
     def is_axis(self):
         ''' true if the command supports axis output '''
         return self._is_axis
-
         
     @property
     def is_request(self) -> bool:
@@ -791,12 +816,12 @@ class SimConnectBlock(QtCore.QObject):
         ''' true if the block is an event '''
         return self._command_type == SimConnectBlock.SimConnectCommandType.Event
     
-    
     @property
     def is_value(self):
         ''' true if the command supports a value output to simconnect '''
         return self._is_value
     
+
     
     @property
     def command_type(self):
@@ -809,16 +834,15 @@ class SimConnectBlock(QtCore.QObject):
         elif isinstance(value, int):
             value = SimConnectBlock.SimConnectCommandType(value)
         self._command_type = value
-
     
     @property
     def display_block_type(self) -> str:
         ''' returns the display string for the block type '''
         
         if self._command_type == SimConnectBlock.SimConnectCommandType.Request:
-            return "Request"
+            return "Simconnect Request"
         elif self._command_type == SimConnectBlock.SimConnectCommandType.Event:
-            return "Event"
+            return "Simconnect Event"
         return F"Unknown command type: {self._command_type}"
     
     @property
@@ -829,8 +853,6 @@ class SimConnectBlock(QtCore.QObject):
     @output_data_type.setter
     def output_data_type(self, value):
         self._output_data_type = value
-
-        
     
     @property
     def category(self) -> str:
@@ -866,7 +888,6 @@ class SimConnectBlock(QtCore.QObject):
     @is_indexed.setter
     def is_indexed(self, value):
         self._indexed = value
-
 
     @property
     def units(self) -> str:
@@ -1027,16 +1048,19 @@ class SimConnectBlock(QtCore.QObject):
                 ae = AircraftEvents(self.sm)
                 trigger = ae.find(self._command)
                 if trigger:
-                    if self._set_value:
-                        trigger(value)
-                    else:
+                    if self.is_readonly:
+                        # no param to set
                         trigger()
+                    else:
+                        # send data
+                        trigger(value)
+                    return True
 
             elif self._command_type == SimConnectBlock.SimConnectCommandType.Request and not self._readonly:
                 ar = AircraftRequests(self.sm, _time=2000)
                 ar.set(self._command, value)
+                return True
 
-        #     return True
         return False
                 
 

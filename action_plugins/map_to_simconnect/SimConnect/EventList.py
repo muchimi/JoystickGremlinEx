@@ -6,7 +6,7 @@ class Event(object):
 	def __call__(self, value=0):
 		if self.event is None:
 			self.event = self.sm.map_to_sim_event(self.deff)
-		self.sm.send_event(self.event, DWORD(value))
+		self.sm.send_event(self.event, DWORD(int(value)))
 
 	def __init__(self, _deff, _sm, _dec=''):
 		self.deff = _deff

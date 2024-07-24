@@ -194,6 +194,9 @@ class GremlinUi(QtWidgets.QMainWindow):
         el.profile_start.connect(lambda: self._update_status_bar_active(True))
         el.profile_stop.connect(lambda: self._update_status_bar_active(False))
 
+        # hook mode change
+        el.modes_changed.connect(self._mode_configuration_changed)
+
         # hook changes
         eh = gremlin.event_handler.EventHandler()
         eh.profile_changed.connect(self._profile_changed_cb)
@@ -362,9 +365,9 @@ class GremlinUi(QtWidgets.QMainWindow):
         """Opens the mode management window."""
         self.modal_windows["mode_manager"] = \
             gremlin.ui.dialogs.ModeManagerUi(self._profile)
-        self.modal_windows["mode_manager"].modes_changed.connect(
-            self._mode_configuration_changed
-        )
+        # self.modal_windows["mode_manager"].modes_changed.connect(
+        #     self._mode_configuration_changed
+        # )
         self.modal_windows["mode_manager"].show()
         self.modal_windows["mode_manager"].closed.connect(
             lambda: self._remove_modal_window("mode_manager")

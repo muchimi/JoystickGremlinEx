@@ -1232,6 +1232,9 @@ class ActionLabel(QtWidgets.QLabel):
         """
         QtWidgets.QLabel.__init__(self, parent)
         icon = action_entry.icon()
+        if isinstance(icon, str):
+            # convert to icon if a path is given
+            icon = load_icon(icon)
         if isinstance(icon, QtGui.QIcon):
             self.setPixmap(QtGui.QPixmap(icon.pixmap(20)))
         else:

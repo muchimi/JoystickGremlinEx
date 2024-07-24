@@ -517,6 +517,8 @@ class JoystickDeviceTabWidget(QtWidgets.QWidget):
             widget = input_item.InputItemWidget(identifier = identifier, parent=parent, data = data)
             widget.setIcon("ei.fullscreen")
         widget.create_action_icons(data)
+        widget.disable_close()
+        widget.disable_edit()
         widget.setDescription(data.description)        
         widget.index = index
 

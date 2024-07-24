@@ -63,8 +63,8 @@ class Request(object):
 
 	def redefine(self):
 		if self.DATA_DEFINITION_ID is not None:
-			self.sm.dll.ClearDataDefinition(
-				self.sm.hSimConnect,
+			self.sm._dll.ClearDataDefinition(
+				self.sm._hSimConnect,
 				self.DATA_DEFINITION_ID.value,
 			)
 			self.defined = False
@@ -74,6 +74,11 @@ class Request(object):
 			self.sm.get_data(self)
 
 	def _deff_test(self):
+		if not self.sm.ok:
+			# auto connect
+			self.sm.connect()
+		if not self.sm.ok:
+			return False
 		if ':index' in str(self.definitions[0][0]):
 			self.lastIndex = b':index'
 			return False
@@ -91,8 +96,8 @@ class Request(object):
 			rtype = None
 			DATATYPE = SIMCONNECT_DATATYPE.SIMCONNECT_DATATYPE_STRINGV
 
-		err = self.sm.dll.AddToDataDefinition(
-			self.sm.hSimConnect,
+		err = self.sm._dll.AddToDataDefinition(
+			self.sm._hSimConnect,
 			self.DATA_DEFINITION_ID.value,
 			self.definitions[0][0],
 			rtype,
@@ -103,7 +108,7 @@ class Request(object):
 		if self.sm.IsHR(err, 0):
 			self.defined = True
 			temp = DWORD(0)
-			self.sm.dll.GetLastSentPacketID(self.sm.hSimConnect, temp)
+			self.sm._dll.GetLastSentPacketID(self.sm._hSimConnect, temp)
 			self.LastID = temp.value
 			return True
 		else:
@@ -112,22 +117,22 @@ class Request(object):
 
 
 class RequestHelper:
-	def __init__(self, _sm, _time=10, _attemps=10):
+	def __init__(self, _sm, _time=10, _attempts=10):
 		self.sm = _sm
 		self.dic = []
 		self.time = _time
-		self.attemps = _attemps
+		self.attempts = _attempts
 
-	def __getattribute__(self, _name):
-		return super().__getattribute__(_name)
-
+	# def __getattribute__(self, _name):
+	# 	return super().__getattribute__(_name)
+		
 	def __getattr__(self, _name):
 		if _name in self.list:
 			key = self.list.get(_name)
 			setable = False
 			if key[3] == 'Y':
 				setable = True
-			ne = Request((key[1], key[2]), self.sm, _dec=key[0], _settable=setable, _time=self.time, _attemps=self.attemps)
+			ne = Request((key[1], key[2]), self.sm, _dec=key[0], _settable=setable, _time=self.time, _attemps=self.attempts)
 			setattr(self, _name, ne)
 			return ne
 		return None

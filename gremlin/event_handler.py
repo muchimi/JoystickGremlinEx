@@ -237,6 +237,9 @@ class EventListener(QtCore.QObject):
 	# occurs on broadcast mode change
 	broadcast_changed = QtCore.Signal(StateChangeEvent)
 
+	# occurs on mode change
+	modes_changed = QtCore.Signal()
+
 	
 		
 
