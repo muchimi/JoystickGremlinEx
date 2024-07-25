@@ -1555,6 +1555,21 @@ class QDataPushButton(QtWidgets.QPushButton):
         self._data = value
 
 
+class QDataLineEdit(QtWidgets.QLineEdit):
+    ''' a checkbox that has a data property to track an object associated with the checkbox '''
+    def __init__(self, text = None, data = None, parent = None):
+        super().__init__(text, parent)
+        self._data = data
+
+    @property
+    def data(self):
+        return self._data
+    
+    @data.setter
+    def data(self, value):
+        self._data = value
+
+
 class QDataComboBox(QtWidgets.QComboBox):
     ''' a combo box that has a data property to track an object associated with the checkbox '''
     def __init__(self, data = None, parent = None):
@@ -2400,3 +2415,9 @@ class ButtonState(QtWidgets.QGroupBox):
             self.buttons[event.identifier].setDown(state)
             self._event_times[event.identifier] = time.time()
 
+
+
+
+
+
+    

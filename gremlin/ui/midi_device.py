@@ -749,8 +749,8 @@ class MidiInputConfigDialog(QtWidgets.QDialog):
         self.cancel_widget.clicked.connect(self._cancel_button_cb)
 
         self.button_widget = QtWidgets.QWidget()
-        self.button_layout = QtWidgets.QHBoxLayout()
-        self.button_widget.setLayout(self.button_layout)
+        self.button_layout = QtWidgets.QHBoxLayout(self.button_widget)
+        
 
         # listen all ports button 
         self.listen_widget = QtWidgets.QPushButton("Listen (All)")

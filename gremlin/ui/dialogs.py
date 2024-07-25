@@ -1555,9 +1555,6 @@ class ModeManagerUi(ui_common.BaseDialogUi):
 
     """Enables the creation of modes and configuring their inheritance."""
 
-    # Signal emitted when mode configuration changes
-    # modes_changed = QtCore.Signal()
-
     def __init__(self, profile_data, parent=None):
         """Creates a new instance.
 
@@ -1844,7 +1841,6 @@ The setting can be overriden by the global mode reload option set in Options for
                 if mode_name == gremlin.shared_state.current_profile.get_start_mode():
                     gremlin.shared_state.current_profile.set_start_mode(name)
 
-                self.modes_changed.emit()
 
             self._populate_mode_layout()
 
