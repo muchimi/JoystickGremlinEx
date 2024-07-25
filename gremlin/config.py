@@ -120,6 +120,9 @@ class Configuration:
         """
         if profile_path is None or mode_name is None:
             return
+        item = self._data.get("last_mode", None)
+        if not item:
+            self._data["last_mode"] = {}
         self._data["last_mode"][profile_path] = mode_name
         self.save()
 
@@ -129,7 +132,37 @@ class Configuration:
         :param profile_path profile path for which to return the mode
         :return name of the mode if present, None otherwise
         """
-        return self._data["last_mode"].get(profile_path, None)
+        item = self._data.get("last_mode", None)
+        if item:
+            return item.get(profile_path, None)
+        return None
+    
+
+    def set_last_edit_mode(self, profile_path, mode_name):
+        """Stores the last active mode of the given profile.
+
+        :param profile_path profile path for which to store the mode
+        :param mode_name name of the active mode
+        """
+        if profile_path is None or mode_name is None:
+            return
+        item = self._data.get("last_edit_mode", None)
+        if not item:
+            self._data["last_edit_mode"] = {}
+        self._data["last_edit_mode"][profile_path] = mode_name
+        self.save()
+
+    def get_last_edit_mode(self, profile_path):
+        """Returns the last active mode of the given profile.
+
+        :param profile_path profile path for which to return the mode
+        :return name of the mode if present, None otherwise
+        """
+
+        item = self._data.get("last_edit_mode", None)
+        if item:
+            return item.get(profile_path, None)
+        return None
 
     def set_profile_last_mode(self, mode_name):
         ''' sets the profile's last used mode '''
@@ -143,6 +176,20 @@ class Configuration:
         if fname:
             return self.get_last_mode(fname)
         return None
+    
+    def set_profile_last_edit_mode(self, mode_name):
+        ''' sets the profile's last used mode '''
+        fname = self.last_profile
+        if fname:
+            self.set_last_edit_mode(fname, mode_name)
+
+    def get_profile_last_edit_mode(self):
+        ''' gets the save last used profile mode '''
+        fname = self.last_profile
+        if fname:
+            return self.get_last_edit_mode(fname)
+        return None
+    
     
     @property
     def initial_load_mode_tts(self):

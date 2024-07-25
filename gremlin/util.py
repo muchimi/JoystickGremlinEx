@@ -493,8 +493,30 @@ def get_guid(strip=True):
         return guid.replace("-",'')
     return guid
     
+def find_files(root_folder, source_pattern = "*") -> list:
+    ''' runs native file search to find files without blowing up on borked sym links in windows unlike rglob - returns full paths to the found file pattern '''
+    import subprocess
+    if not os.path.isdir(root_folder):
+        return []
+    
+    wd = os.getcwd()
+    os.chdir(root_folder)
+    process = subprocess.Popen(["cmd", "/c", "dir", source_pattern, "/b","/s"],stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    out, err = process.communicate()
+    os.chdir(wd)
+    encoding = 'utf-8'
+    # the link will be in square brackets
+    if out:
+        lines = str(out,encoding)
+        if lines:
+            lines = lines.replace('\r','')
+            lines = lines.split('\n')
+            lines = [l for l in lines if l]
+            return lines
 
+    return []
 
+                    
 def find_file(file_path, root_folder = None):
     ''' finds a file '''
 
@@ -936,13 +958,25 @@ def isSignalConnected(q_object, signature):
 
 def waitCursor():
     ''' sets the app to a wait cursor '''
-    QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.CursorShape.WaitCursor)
-    QtWidgets.QApplication.processEvents()
+    pushCursor()
+
+_cursor_push = 0
+
+def pushCursor():
+    global _cursor_push
+    if _cursor_push == 0:
+        QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.CursorShape.WaitCursor)
+        QtWidgets.QApplication.processEvents()
+    _cursor_push+=1
 
 def popCursor():
     ''' restores form wait cusor '''
-    QtWidgets.QApplication.restoreOverrideCursor()
-    QtWidgets.QApplication.processEvents()
+    global _cursor_push
+    if _cursor_push > 0:
+        _cursor_push -= 1    
+        if _cursor_push == 0:
+            QtWidgets.QApplication.restoreOverrideCursor()
+            QtWidgets.QApplication.processEvents()
     
 
 def compare_path(a, b):

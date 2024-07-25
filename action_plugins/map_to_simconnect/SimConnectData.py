@@ -508,7 +508,7 @@ class SimConnectData():
             tree = etree.ElementTree(root)
             tree.write(xml_file, pretty_print=True,xml_declaration=True,encoding="utf-8")
         except Exception as err:
-            logging.getLogger("system").error(f"SimconnectData: unable to create XML simvars: {xml_file}")
+            logging.getLogger("system").error(f"SimconnectData: unable to create XML simvars: {xml_file}: {err}")
 
     def _load_xml(self, xml_source):
         ''' loads blocks from the XML file '''
@@ -683,6 +683,13 @@ class SimConnectData():
             return block.category
         return SimConnectEventCategory.NotSet
 
+
+            
+            
+
+
+
+        
 
 class SimConnectBlock(QtCore.QObject):
     ''' holds simconnect block information '''

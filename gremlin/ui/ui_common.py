@@ -23,6 +23,7 @@ import logging
 from PySide6 import QtWidgets, QtCore, QtGui
 import PySide6.QtGui
 import PySide6.QtWidgets
+import gremlin.config
 import gremlin.error
 import qtawesome as qta
 import gremlin.event_handler
@@ -1023,6 +1024,8 @@ class ModeWidget(QtWidgets.QWidget):
         #self.edit_mode_selector.clear()
         while self.edit_mode_selector.count() > 0:
             self.edit_mode_selector.removeItem(0)
+
+        
         
         mode_list = get_mode_list(profile_data)
         self.mode_list = [x[1] for x in mode_list]
@@ -1053,13 +1056,18 @@ class ModeWidget(QtWidgets.QWidget):
                 # pick the first one
                 current_mode = mode_names[0]                
 
+        last_edit_mode = gremlin.config.Configuration().get_profile_last_edit_mode()
+        if not last_edit_mode:
+            # pick the top mode if nothing was saved in the configuration
+            last_edit_mode = mode_names[0]
+
         # Add properly arranged mode names to the drop down list
         index = 0
         current_index = 0
         for display_name, mode_name in zip(display_names, mode_names):
             self.edit_mode_selector.addItem(display_name)
             self.mode_list.append(mode_name)
-            if mode_name == current_mode:
+            if mode_name == last_edit_mode:
                 current_index = index
             index += 1
 
@@ -1076,7 +1084,12 @@ class ModeWidget(QtWidgets.QWidget):
 
         :param idx id of the now selected entry
         """
-        self.edit_mode_changed.emit(self.mode_list[idx])
+        # save the setup
+        new_mode = self.mode_list[idx]
+        gremlin.config.Configuration().set_profile_last_edit_mode(new_mode)
+        self.edit_mode_changed.emit(new_mode)
+
+
 
 
     def _create_widget(self):

@@ -587,9 +587,7 @@ This setting is also available on a profile by profile basis on the profile tab,
 
         # profile map widgets
         self.container_map_widget = QtWidgets.QWidget()
-        self.container_map_layout = QtWidgets.QVBoxLayout()
-        self.container_map_widget.setLayout(self.container_map_layout)
-
+        self.container_map_layout = QtWidgets.QVBoxLayout(self.container_map_widget)
 
         self.scroll_area = QtWidgets.QScrollArea()
         self.scroll_widget = QtWidgets.QWidget()

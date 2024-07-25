@@ -1228,6 +1228,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             eh = gremlin.event_handler.EventHandler()
             eh.change_mode(new_mode)
 
+
     
 
     def _process_changed_cb(self, path):
