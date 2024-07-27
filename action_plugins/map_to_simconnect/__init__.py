@@ -66,8 +66,6 @@ class CommandValidator(QtGui.QValidator):
         for _ in filter(r.match, self.commands):
             return QtGui.QValidator.State.Intermediate
         return QtGui.QValidator.State.Invalid
-    
-
 
 class SimconnectMapItem():
     ''' holds data for an aircraft and options to mode mapping '''
@@ -98,9 +96,10 @@ class SimconnectAicraftCfgData():
         return f"{self.icao_manufacturer} {self.icao_model}"
 
 @gremlin.singleton_decorator.SingletonDecorator
-class SimconnectOptions():
+class SimconnectOptions(QtCore.QObject):
     ''' holds simconnect mapper options for all actions '''
     def __init__(self):
+        super().__init__()
         self._profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
         self._mode_list = self._profile.get_modes()
         self._xml_source = os.path.join(gremlin.util.userprofile_path(),"simconnect_config.xml")
@@ -110,6 +109,20 @@ class SimconnectOptions():
         self._titles = []
         self._community_folder = r"C:\Microsoft Flight Simulator\Community"
         self.parse_xml()
+
+
+    @property
+    def current_aircraft_folder(self):
+        if self._sm.ok:
+            return self._aircraft_folder
+        return None
+    
+    @property 
+    def current_aircraft_title(self):
+        if self._sm.ok:
+            return self._aircraft_title
+        return None
+        
 
     def validate(self):
         ''' validates options are ok '''
@@ -145,6 +158,17 @@ class SimconnectOptions():
             if item.key == key:
                 return item
         return None
+    
+    def find_title(self, title) -> SimconnectAicraftCfgData:
+        ''' finds aircraft data by the loaded aircraft title '''
+        if not title:
+            return None
+        for item in self._aircraft_entries:
+            if title in item.titles:
+                return item
+            
+        return None
+        
     
     def get_aircraft_mode(self, aircraft):
         ''' gets the mode associated with this aicraft, and the default mode if not a valid mode '''
@@ -317,7 +341,18 @@ class SimconnectOptions():
         ''' scans MSFS folders for the list of aircraft names '''
         
         def fix_entry(value):
-            value = re.sub(r'[^0-9a-zA-Z\s]+', '', value)
+            if "\"" in value:
+                # remove double quotes
+                matches = re.findall('"(.*?)"', value)
+                if matches:
+                    value = matches.pop()
+                # remove single quote
+                matches = re.findall('(.*?)"', value)
+                if matches:
+                    value = matches.pop()
+
+            # value = re.sub(r'[^0-9a-zA-Z\s_-]+', '', value)
+            
             return value.strip()
 
 
@@ -328,14 +363,11 @@ class SimconnectOptions():
             return
         #gremlin.util.pushCursor()
 
-        progress = QtWidgets.QProgressDialog(parent = owner, labelText ="Scanning folders...", cancelButtonText = "Cancel", minimum = 0, maximum= 100, flags = QtCore.Qt.FramelessWindowHint)
+        progress = QtWidgets.QProgressDialog(parent = owner, labelText ="Scanning folders...", cancelButtonText = "Cancel", minimum = 0, maximum= 100) #, flags = QtCore.Qt.FramelessWindowHint)
         progress.setWindowModality(QtCore.Qt.WindowModality.WindowModal)
         progress.setValue(0)
         progress.show()
         QtWidgets.QApplication.processEvents()
-
-        # progress.percent = 0
-        # progress.message = "Scanning Folders..."
 
         search_folder = os.path.dirname(self._community_folder)
         source_files = gremlin.util.find_files(search_folder,"aircraft.cfg")
@@ -394,6 +426,7 @@ class SimconnectOptions():
             
             if titles:
                 titles = list(set(titles))
+                titles = [fix_entry(t) for t in titles]
                 titles.sort()
             if icao_model and icao_type and icao_manuf:
                 path = os.path.dirname(file)
@@ -405,6 +438,7 @@ class SimconnectOptions():
 
         if not is_canceled:
             self._aircraft_entries = items
+        self.save()
         progress.close()
         
         #gremlin.util.popCursor()
@@ -419,29 +453,54 @@ class SimConnectAircraftSearchDialog(QtWidgets.QDialog):
         # make modal
         self.setWindowModality(QtCore.Qt.ApplicationModal)
 
+        self._options = options
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
+
+
+        container_widget = QtWidgets.QWidget()
+        container_layout = QtWidgets.QHBoxLayout(container_widget)
 
         self._selector_widget = QtWidgets.QComboBox()
         self._selector_widget.setEditable(True)
         item : SimconnectAicraftCfgData
         self._data = data
         current_index = 0
-        aircraft = data.aircraft.lower()
-        for index,item in enumerate(options._aircraft_entries):
-            if data and aircraft == item.display_name.lower():
-                current_index = index
-            self._selector_widget.addItem(item.display_name, item)
-        self.main_layout.addWidget(self._selector_widget)
-        self._aircraft_list = [item.display_name for item in options._aircraft_entries]
+        self._aircraft = data.aircraft.lower()
+        self._aircraft_list = []
 
+        
         # setup auto-completer for the command 
         completer = QtWidgets.QCompleter(self._aircraft_list, self)
         completer.setCaseSensitivity(QtGui.Qt.CaseSensitivity.CaseInsensitive)
 
         self._selector_widget.setCompleter(completer)
+
+
+        # refresh button to re-scan the aicraft list
+        self._refresh_button = QtWidgets.QPushButton()
+        self._refresh_button.setIcon(gremlin.util.load_icon("fa.refresh"))
+        self._refresh_button.setMaximumWidth(20)
+        self._refresh_button.setToolTip("Scan the MSFS folder structure for installed aicraft")
+        self._refresh_button.clicked.connect(self._refresh_button_cb)
+
+        self._sync_button = QtWidgets.QPushButton()
+        self._sync_button.setIcon(gremlin.util.load_icon("mdi.airplane"))
+        self._sync_button.setMaximumWidth(20)
+        self._sync_button.setToolTip("Use current loaded MSFS aircraft")
+        self._sync_button.clicked.connect(self._sync_button_cb)
+
         
 
+        container_layout.addWidget(QtWidgets.QLabel("Aircraft"))
+        container_layout.addWidget(self._selector_widget)
+        container_layout.addWidget(self._refresh_button)
+        container_layout.addWidget(self._sync_button)
+        
+
+        
+
+        # dialog buttons
         self.ok_widget = QtWidgets.QPushButton("Ok")
         self.ok_widget.clicked.connect(self._ok_button_cb)
 
@@ -456,20 +515,74 @@ class SimConnectAircraftSearchDialog(QtWidgets.QDialog):
         self.button_layout.addWidget(self.ok_widget)
         self.button_layout.addWidget(self.cancel_widget)
 
+        self.main_layout.addWidget(container_widget)
         self.main_layout.addWidget(self.button_widget)
 
-        self._selector_widget.setCurrentIndex(current_index)
-        self._selected =  self._selector_widget.itemData(current_index)
+        self._selected = None
+
+        self.populate_selector()
 
         self._selector_widget.currentIndexChanged.connect(self._selector_change_cb)
 
+    def populate_selector(self):
+        ''' populates the data in the selector '''
+        self._aircraft_list = [item.display_name for item in self._options._aircraft_entries]
+        aircraft = self._aircraft
+        current_index = 0
+        for index,item in enumerate(self._options._aircraft_entries):
+            if aircraft and aircraft == item.display_name.lower():
+                current_index = index
+            self._selector_widget.addItem(item.display_name, item)
+        self._selector_widget.setCurrentIndex(current_index)
+        self._selected =  self._selector_widget.itemData(current_index)
+        
+
+    @QtCore.Slot()
     def _ok_button_cb(self):
         ''' ok button pressed '''
         self.accept()
         
+    @QtCore.Slot()
     def _cancel_button_cb(self):
         ''' cancel button pressed '''
         self.reject()        
+
+    @QtCore.Slot()
+    def _refresh_button_cb(self):
+        ''' refresh installed aircraft list '''
+        self._options.scan_aircraft_config(self)
+        self.populate_selector()
+
+
+    @QtCore.Slot()
+    def _sync_button_cb(self):
+        ''' load from current aircraft in MSFS (requires Simconnect to be available) '''
+        sm = SimConnectData()
+        # sm.aircraft_loaded.connect(self._aircraft_loaded_cb)
+          
+        self._aircraft_folder = None
+        if not sm.is_connected():
+            message_box = QtWidgets.QMessageBox()
+            message_box.setText("Unable to connect to MSFS")
+            pixmap = gremlin.util.load_pixmap("warning.svg")
+            pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
+            message_box.setIconPixmap(pixmap)
+            message_box.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok)
+            message_box.exec()
+            return False
+        
+        # get the current title
+        title = sm.aircraft_title
+
+        _, _, title = sm.get_aircraft_data()
+        # find the entry from the loaded scan
+        item = self._options.find_title(title)
+        if item:
+            # found
+            index = self._selector_widget.findText(item.display_name)
+            self._selector_widget.setCurrentIndex(index)
+
+
 
 
     @QtCore.Slot(int)
@@ -517,6 +630,7 @@ class SimconnectOptionsUi(QtWidgets.QDialog):
         self.profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
         self.mode_list = self.profile.get_modes()
         self.options = SimconnectOptions()
+
 
         self.setWindowTitle("Simconnect Options")
 
@@ -598,6 +712,8 @@ class SimconnectOptionsUi(QtWidgets.QDialog):
         self.main_layout.addWidget(button_bar_widget)
         
         self.populate_map()
+
+
 
     def closeEvent(self, event):
         ''' occurs on window close '''

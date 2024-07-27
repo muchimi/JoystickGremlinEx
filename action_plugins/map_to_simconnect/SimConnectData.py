@@ -230,14 +230,28 @@ _simconnect_event_category_to_enum_lookup = {
         
 
 @SingletonDecorator
-class SimConnectData():
+class SimConnectData(QtCore.QObject):
     ''' holds simconnect data '''
 
+    aircraft_loaded = QtCore.Signal(str, str) # fires when aircraft title changes (param folder, title)
+    _aircraft_loaded_internal = QtCore.Signal(str) # fires when aircraft title changes
+
     def __init__(self) -> None:
-        self._sm = SimConnect(auto_connect =False, verbose = gremlin.config.Configuration().verbose_mode_simconnect)
+        QtCore.QObject.__init__(self)
+
+        sm = SimConnect(auto_connect = False,
+                        verbose = gremlin.config.Configuration().verbose_mode_simconnect,
+                        sim_paused_callback=self._sim_paused_cb,
+                        sim_running_callback = self._sim_running_cb,
+                        aircraft_loaded_callback= self._aicraft_loaded_cb)
+        self._sm = sm
+
         self._aircraft_events = AircraftEvents(self._sm)
         self._aircraft_requests = AircraftRequests(self._sm)
+        self._aircraft_loaded_internal.connect(self._aircraft_loaded_internal_cb)
 
+
+        self._aircraft_tile = None # current title from aircraft.cfg
         self._simvars_xml =  os.path.join(gremlin.util.userprofile_path(), "simconnect_simvars.xml")
 
 
@@ -249,7 +263,9 @@ class SimConnectData():
         # list of command blocks
         self._block_map = {}
 
-    
+        self._is_paused = False
+        self._is_running = False
+        self._aircraft_folder = None
             
         # if the data file doesn't exist, create it in the user's profile folder from the built-in data
         if not os.path.isfile(self._simvars_xml):
@@ -265,6 +281,54 @@ class SimConnectData():
             # process lists
             self._commands = list(self._block_map.keys())
             self._commands.sort()
+
+    @property
+    def is_running(self):
+        ''' true if the sim state is running '''
+        return self._is_running            
+    
+    def _sim_paused_cb(self, arg):
+        self._is_paused = arg
+
+    def _sim_running_cb(self, state):
+        self._is_running = state        
+
+
+    def _aicraft_loaded_cb(self, folder):
+        ''' occurs when a new aircraft is loaded '''
+        if folder != self._aircraft_folder:
+            self._aircraft_folder = folder
+            self._aircraft_loaded_internal.emit(folder)
+
+
+    def get_aircraft_title(self):
+        ar = AircraftRequests(self._sm)
+        trigger = ar.find("TITLE")
+        title = trigger.get()
+        if title:
+            title = title.decode()
+        self._aircraft_title = title
+        return title
+
+    def _aircraft_loaded_internal_cb(self, folder):
+        # decode the data into useful bits
+        title = self.get_aircraft_title()
+        self.aircraft_loaded.emit(folder, title)     
+
+    @property
+    def aircraft_title(self):
+        ''' currently loaded aircraft - TITLE from the aircraft.cfg file '''
+        return self._aircraft_tile
+
+    @property
+    def is_paused(self):
+        return self._is_paused
+
+    @property
+    def current_aircraft_folder(self):
+        ''' returns the path to the currently loaded folder '''
+        return self._aircraft_folder
+
 
     def reset(self):
         ''' resets the connection '''
@@ -286,7 +350,8 @@ class SimConnectData():
     def sm(self):
         return self._sm
 
-    def connect(self):
+    def sim_connect(self):
+        ''' connects to the sim (has to be different from connect() due to event processing )'''
         if self._sm.ok:
             return True
         
@@ -299,9 +364,15 @@ class SimConnectData():
             pass
         if not self._sm.ok:
             return False
+        
+        # on connection - grab the current aircraft da
+        title = self.get_aircraft_title()
+        self._aircraft_title = title
+
+
         return True # connected
     
-    def disconnect(self):
+    def sim_disconnect(self):
         if self._sm.ok:
             self._sm.exit()
 
@@ -320,20 +391,22 @@ class SimConnectData():
         ''' returns the current aircraft information 
             (aircraft, model, title)
         '''
+
+
         ar = AircraftRequests(self._sm)
         trigger = ar.find("ATC_TYPE")
-        aircraft = trigger.get()
-        if aircraft:
-            aircraft = aircraft.decode()
+        aircraft_type = trigger.get()
+        if aircraft_type:
+            aircraft_type = aircraft_type.decode() # binary string to regular string
         trigger = ar.find("ATC_MODEL")
-        model = trigger.get()
-        if model:
-            model = model.decode()
+        aircraft_model = trigger.get()
+        if aircraft_model:
+            aircraft_model = aircraft_model.decode()# binary string to regular string
         trigger = ar.find("TITLE")
         title = trigger.get()
         if title:
             title = title.decode()
-        return (aircraft, model, title)
+        return (aircraft_type, aircraft_model, title)
     
     def get_aircraft(self):
         ''' gets the aircraft title '''

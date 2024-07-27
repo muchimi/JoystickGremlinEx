@@ -8,17 +8,22 @@ from .Constants import *
 from .Attributes import *
 import os
 import threading
+from PySide6 import QtCore
 
 _library_path = os.path.splitext(os.path.abspath(__file__))[0] + '.dll'
 
 LOGGER = logging.getLogger("system")
 
 
+
+
 def millis():
 	return int(round(time.time() * 1000))
 
 
-class SimConnect:
+class SimConnect():
+
+	# events fired by SimConnect
 
 	def IsHR(self, hr, value):
 		_hr = ctypes.HRESULT(hr)
@@ -29,20 +34,36 @@ class SimConnect:
 		if uEventID == self._dll.EventID.EVENT_SIM_START:
 			LOGGER.info("SimConnect: event: SIM START")
 			self.running = True
+			if self._sim_running_callback:
+				self._sim_running_callback(True)
 		elif uEventID == self._dll.EventID.EVENT_SIM_STOP:
 			LOGGER.info("SimConnect: event: SIM Stop")
 			self.running = False
+			if self._sim_running_callback:
+				self._sim_running_callback(False)
 		# Unknow whay not reciving
 		elif uEventID == self._dll.EventID.EVENT_SIM_PAUSED:
 			LOGGER.info("SimConnect: event: SIM Paused")
 			self.paused = True
+			if self._sim_paused_callback:
+				self._sim_paused_callback(True)
 		elif uEventID == self._dll.EventID.EVENT_SIM_UNPAUSED:
 			LOGGER.info("SimConnect: event: SIM Unpaused")
 			self.paused = False
+			if self._sim_paused_callback:
+				self._sim_paused_callback(False)
 		elif uEventID == self._dll.EventID.EVENT_SIM_RUNNING:
 			LOGGER.info("SimConnect: event: SIM Running")
-			state = event.dwData
-			self.running = state != 0
+			state = event.dwData != 0
+			self.running = state
+			if self._sim_running_callback:
+				self._sim_running_callback(state)
+		elif uEventID == self._dll.EventID.EVENT_SIM_AIRCRAFT_LOADED:
+			aircraft_air = event.dwData
+			LOGGER.info(f"SimConnect: event: AIRCRAFT LOADED: {aircraft_air}")
+			folder = os.path.dirname(aircraft_air)
+			if self._aircraft_loaded_callback:
+				self._aircraft_loaded_callback(folder)
 
 	def handle_simobject_event(self, ObjData):
 		dwRequestID = ObjData.dwRequestID
@@ -121,20 +142,31 @@ class SimConnect:
 				pData, POINTER(SIMCONNECT_RECV_FACILITIES_LIST)
 			).contents
 			dwRequestID = pObjData.dwRequestID
-			for _facilitie in self.Facilities:
-				if dwRequestID == _facilitie.REQUEST_ID.value:
-					_facilitie.parent.dump(pData)
-					_facilitie.dump(pData)
+			for _facility in self.Facilities:
+				if dwRequestID == _facility.REQUEST_ID.value:
+					_facility.parent.dump(pData)
+					_facility.dump(pData)
 
 		elif dwID == SIMCONNECT_RECV_ID.SIMCONNECT_RECV_ID_QUIT:
 			self.quit = 1
+		elif dwID == SIMCONNECT_RECV_ID.SIMCONNECT_RECV_ID_EVENT_FILENAME:
+			# file name
+			pObjData = cast(pData, POINTER(SIMCONNECT_RECV_EVENT_FILENAME)).contents
+			file = pObjData.zFileName.decode()
+			folder = os.path.dirname(file)
+			if self._aircraft_loaded_callback:
+				self._aircraft_loaded_callback(folder)
+
 		else:
 			if self.verbose:
-				LOGGER.debug("Simconnect: Received:", SIMCONNECT_RECV_ID(dwID))
+				LOGGER.debug(f"Simconnect: Received: {SIMCONNECT_RECV_ID(dwID)}")
 		return
 
-	def __init__(self, auto_connect=True, library_path=_library_path, verbose = False):
-
+	def __init__(self, auto_connect=True, library_path=_library_path, verbose = False, 
+			  	sim_paused_callback = None,
+				sim_running_callback = None,
+				aircraft_loaded_callback = None):
+		
 		self.Requests = {}
 		self.Facilities = []
 		self.verbose = verbose
@@ -147,7 +179,12 @@ class SimConnect:
 		self.DEFINITION_POS = None
 		self.DEFINITION_WAYPOINT = None
 		self._my_dispatch_proc_rd = self._dll.DispatchProc(self.my_dispatch_proc)
-		
+		self._sim_paused_callback = sim_paused_callback
+		self._sim_running_callback = sim_running_callback
+		self._sim_start_callback = None
+		self._sim_stop_callback = None
+		self._aircraft_loaded_callback = aircraft_loaded_callback
+	
 		if auto_connect:
 			self.connect()
 
@@ -180,6 +217,9 @@ class SimConnect:
 				self._dll.SubscribeToSystemEvent(
 					self._hSimConnect, self._dll.EventID.EVENT_SIM_RUNNING, b"Sim"
 				)
+				self._dll.SubscribeToSystemEvent(
+					self._hSimConnect, self._dll.EventID.EVENT_SIM_AIRCRAFT_LOADED, b"AircraftLoaded"
+				)
 
 				self.timerThread = threading.Thread(target=self._run)
 				self.timerThread.daemon = True
@@ -210,7 +250,12 @@ class SimConnect:
 		self.quit = 1
 		self.timerThread.join()
 
-	def is_connected(self):
+	def is_connected(self, auto_connect = True):
+		if self.ok:
+			return True
+		# attempt to connect
+		if auto_connect:
+			self.connect()
 		return self.ok
 
 	def map_to_sim_event(self, name):
@@ -451,6 +496,15 @@ class SimConnect:
 			self._hSimConnect,
 			self._dll.EventID.EVENT_SIM_PAUSED,
 			b"Sim"
+		)
+
+
+	def get_aircraft_loaded(self):
+		''' returns the path to the loaded active aircraft '''
+		hr = self._dll.RequestSystemState(
+			self._hSimConnect,
+			self._dll.EventID.EVENT_SIM_AIRCRAFT_LOADED,
+			b"AircraftLoaded"
 		)
 
 
