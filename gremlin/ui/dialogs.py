@@ -1899,7 +1899,7 @@ The setting can be overriden by the global mode reload option set in Options for
                     new_mode = gremlin.base_profile.Mode(device)
                     new_mode.name = name
                     device.modes[name] = new_mode
-                self.modes_changed.emit()
+                
 
             self._populate_mode_layout()
 

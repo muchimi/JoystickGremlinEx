@@ -29,6 +29,8 @@ import gremlin.shared_state
 import gremlin.shared_state
 import gremlin.shared_state
 import gremlin.shared_state
+import gremlin.shared_state
+import gremlin.shared_state
 import gremlin.singleton_decorator
 import gremlin.ui.ui_common
 import gremlin.ui.input_item
@@ -38,7 +40,7 @@ from .SimConnectData import *
 import re
 from lxml import etree
 from xml.etree import ElementTree
-6
+
 
 
 
@@ -66,35 +68,43 @@ class CommandValidator(QtGui.QValidator):
         for _ in filter(r.match, self.commands):
             return QtGui.QValidator.State.Intermediate
         return QtGui.QValidator.State.Invalid
-
-class SimconnectMapItem():
-    ''' holds data for an aircraft and options to mode mapping '''
-    def __init__(self, id = None, aircraft = "", mode = ""):
-        self.aircraft = aircraft
-        self.mode = mode
-        self.id = id if id else gremlin.util.get_guid() # unique ID
-        self.key = aircraft.lower().strip() if aircraft else self.id
-        self.error_status = None
-
-    @property
-    def valid(self):
-        ''' true if the item contains valid data '''
-        return not self.error_status and self.aircraft and self.mode
     
-
-class SimconnectAicraftCfgData():
+class SimconnectAicraftDefinition():
     ''' holds the data entry for a single aicraft from the MSFS config data '''
-    def __init__(self, icao_type = None, icao_manufacturer = None, icao_model = None, titles = [], path = None):
+    def __init__(self, id = None, mode = None, icao_type = None, icao_manufacturer = None, icao_model = None, titles = [], path = None):
         self.icao_type = icao_type
         self.icao_manufacturer = icao_manufacturer
         self.icao_model = icao_model
         self.titles = titles
         self.path = path
+        self.mode = mode
+        self.key = self.display_name.lower()
+        self.id = id if id else gremlin.util.get_guid()
+        
+        # runtime item (not saved or loaded)
+        self.selected = False # for UI interation - selected mode
+        self.error_status = None
 
     @property
     def display_name(self):
         return f"{self.icao_manufacturer} {self.icao_model}"
 
+    @property
+    def valid(self):
+        ''' true if the item contains valid data '''
+        return not self.error_status and self.aircraft and self.mode    
+    
+    def __eq__(self, other):
+        ''' compares two objects '''
+        return gremlin.util.compare_nocase(self.icao_type, other.icao_type) and \
+            gremlin.util.compare_nocase(self.icao_manufacturer, other.icao_manufacturer) and \
+            gremlin.util.compare_nocase(self.icao_manufacturer, other.icao_manufacturer) and \
+            gremlin.util.compare_nocase(self.icao_model, other.icao_model)
+    
+    def __hash__(self):
+        return (self.icao_type.lower(), self.icao_manufacturer.lower(), self.icao_model.lower()).__hash__()
+   
+    
 @gremlin.singleton_decorator.SingletonDecorator
 class SimconnectOptions(QtCore.QObject):
     ''' holds simconnect mapper options for all actions '''
@@ -104,8 +114,7 @@ class SimconnectOptions(QtCore.QObject):
         self._mode_list = self._profile.get_modes()
         self._xml_source = os.path.join(gremlin.util.userprofile_path(),"simconnect_config.xml")
         self._auto_mode_select = True # if set, autoloads the mode associated with the aircraft if such a mode exists
-        self._aircraft_map = {} # list of SimconnectMapItem keyed by ID
-        self._aircraft_entries = [] # holds aicraft entries
+        self._aircraft_definitions = [] # holds aicraft entries
         self._titles = []
         self._community_folder = r"C:\Microsoft Flight Simulator\Community"
         self.parse_xml()
@@ -122,16 +131,24 @@ class SimconnectOptions(QtCore.QObject):
         if self._sm.ok:
             return self._aircraft_title
         return None
+    
+    @property
+    def community_folder(self):
+        return self._community_folder
+    @community_folder.setter
+    def community_folder(self, value):
+        self._community_folder = value
+
         
 
     def validate(self):
         ''' validates options are ok '''
         a_list = []
         valid = True
-        for item in self._aircraft_map.values():
+        for item in self._aircraft_definitions:
             item.error_status = None
             if item.key in a_list:
-                item.error_status = f"Duplicate entry found {item.aircraft}"
+                item.error_status = f"Duplicate entry found {item.display_name}"
                 valid = False
                 continue
             a_list.append(item.key)
@@ -143,52 +160,34 @@ class SimconnectOptions(QtCore.QObject):
                 item.error_status = f"Invalid mode {item.mode}"
                 valid = False
                 continue
-            if not item.aircraft:
+            if not item.display_name:
                 item.error_status = f"Aircraft name cannot be blank"
                 valid = False
 
         return valid
 
-    def find(self, aircraft):
+    def find_definition_by_aicraft(self, aircraft) -> SimconnectAicraftDefinition:
         ''' gets an item by aircraft name (not case sensitive)'''
         if not aircraft:
             return None
-        key = aircraft.lower().trim()
-        for item in self._aircraft_map.values():
+        key = aircraft.lower().strip()
+        item : SimconnectAicraftDefinition
+        for item in self._aircraft_definitions:
             if item.key == key:
                 return item
         return None
     
-    def find_title(self, title) -> SimconnectAicraftCfgData:
+    def find_definition_by_title(self, title) -> SimconnectAicraftDefinition:
         ''' finds aircraft data by the loaded aircraft title '''
         if not title:
             return None
-        for item in self._aircraft_entries:
+        for item in self._aircraft_definitions:
             if title in item.titles:
                 return item
             
         return None
         
-    
-    def get_aircraft_mode(self, aircraft):
-        ''' gets the mode associated with this aicraft, and the default mode if not a valid mode '''
-        item = self.find(aircraft)
-        if item:
-            if item.mode:
-                return item.mode
-        return self._profile.get_default_mode()
 
-    
-    def set_aircraft_mode(self, aircraft, mode):
-        ''' saves a mode with a particular aircraft '''
-        aircraft = aircraft.strip().lower()
-        self._aircraft_map[aircraft] = mode
-
-    def remove_aircraft_mode(self, aircraft):
-        aircraft = aircraft.strip().lower()
-        if aircraft in self._aircraft_map.keys():
-            del self._aircraft_map[aircraft]
-            
     
     @property
     def auto_mode_select(self):
@@ -209,8 +208,9 @@ class SimconnectOptions(QtCore.QObject):
             # options not saved yet - ignore
             return
         
+    
         self._titles = []
-        self._aircraft_map.clear()
+        
         try:
             parser = etree.XMLParser(remove_blank_text=True)
             root = etree.parse(xml_source, parser)
@@ -223,20 +223,7 @@ class SimconnectOptions(QtCore.QObject):
                     self._community_folder = safe_read(node,"community_folder", str, "")
                 break
 
-            node_mode_map = None
-            nodes = root.xpath("//mode_map")
-            for node in nodes:
-                node_mode_map = node
-                break
-
-            if node_mode_map is not None:
-                for node in node_mode_map:
-                    aircraft = safe_read(node,"aicraft", str, "")
-                    mode = safe_read(node,"mode", str, "")
-                    id = safe_read(node,"id", str, "")
-                    item = SimconnectMapItem(id, aircraft, mode)
-                    self._aircraft_map[item.id] = item
-
+            # reference items scanned from MSFS
             node_items = None
             nodes = root.xpath("//items")
             for node in nodes:
@@ -249,6 +236,8 @@ class SimconnectOptions(QtCore.QObject):
                     icao_manufacturer = safe_read(node,"manufacturer", str, "")
                     icao_type = safe_read(node,"type", str, "")
                     path = safe_read(node,"path", str, "")
+                    mode = safe_read(node,"mode", str, "")
+                    id = safe_read(node,"id", str, "")
                     titles = []
                     node_titles = None
                     for child in node:
@@ -259,14 +248,14 @@ class SimconnectOptions(QtCore.QObject):
                             titles.append(child.text)
 
                     if icao_model and icao_manufacturer and icao_type:
-                        item = SimconnectAicraftCfgData(icao_model=icao_model, 
-                                                 icao_manufacturer=icao_manufacturer, 
-                                                 icao_type=icao_type, 
-                                                 titles=titles,
-                                                 path = path)
-                        self._aircraft_entries.append(item)
-
-            
+                        item = SimconnectAicraftDefinition(id = id, 
+                                                           icao_model = icao_model, 
+                                                           icao_manufacturer = icao_manufacturer, 
+                                                           icao_type = icao_type, 
+                                                           titles = titles,
+                                                           path = path,
+                                                           mode = mode)
+                        self._aircraft_definitions.append(item)
 
             node_titles = None
             nodes = root.xpath("//titles")
@@ -281,8 +270,8 @@ class SimconnectOptions(QtCore.QObject):
                         if title:
                             self._titles.append(title)
 
-        
-        
+
+
         except Exception as err:
             logging.getLogger("system").error(f"Simconnect Config: XML read error: {xml_source}: {err}")  
             return False
@@ -299,23 +288,17 @@ class SimconnectOptions(QtCore.QObject):
             # save valid community folder
             node_options.set("community_folder", self._community_folder)
 
-        # mode maps
-        node_mode_map = etree.SubElement(root,"mode_map")
-        for item in self._aircraft_map.values():
-            node = etree.SubElement(node_mode_map,"map")
-            node.set("aicraft", item.aircraft)
-            node.set("mode", item.mode)
-            node.set("id", item.id)
-
         # scanned aicraft titles 
-        if self._aircraft_entries:
+        if self._aircraft_definitions:
             node_items = etree.SubElement(root,"items")
-            for item in self._aircraft_entries:
+            for item in self._aircraft_definitions:
                 node = etree.SubElement(node_items,"item")
                 node.set("model", item.icao_model)
                 node.set("manufacturer", item.icao_manufacturer)
                 node.set("type",item.icao_type)
                 node.set("path", item.path)
+                node.set("id", item.id)
+                node.set("mode", item.mode)
                 if item.titles:
                     node_titles = etree.SubElement(node, "titles")
                     for title in item.titles:
@@ -356,6 +339,8 @@ class SimconnectOptions(QtCore.QObject):
             return value.strip()
 
 
+        options = SimconnectOptions()
+
         from gremlin.ui import ui_common
         if not self._community_folder or not os.path.isdir(self._community_folder):
             self._community_folder = self.get_community_folder()
@@ -372,9 +357,7 @@ class SimconnectOptions(QtCore.QObject):
         search_folder = os.path.dirname(self._community_folder)
         source_files = gremlin.util.find_files(search_folder,"aircraft.cfg")
 
-      
         
-        self._aircraft_entries.clear()
         cmp_icao_type =  r'(?i)icao_type_designator\s*=\s*\"?(.*?)\"?$'
         cmp_icao_manuf =  r'(?i)icao_manufacturer\s*=\s*\"?(.*?)\"?$'
         cmp_icao_model =  r'(?i)icao_model\s*=\s*\"?(.*?)\"?$'
@@ -430,184 +413,39 @@ class SimconnectOptions(QtCore.QObject):
                 titles.sort()
             if icao_model and icao_type and icao_manuf:
                 path = os.path.dirname(file)
-                item = SimconnectAicraftCfgData(icao_type, icao_manuf, icao_model, titles, path)
+                item = SimconnectAicraftDefinition(icao_type=icao_type,
+                                                   icao_manufacturer= icao_manuf,
+                                                   icao_model= icao_model,
+                                                   titles= titles, 
+                                                   path = path)
                 if not item.display_name in keys:
                     # avoid duplicate entries
                     items.append(item)
                     keys.append(item.display_name)
 
         if not is_canceled:
-            self._aircraft_entries = items
+            # update modes that exist already so they are preserved between scans
+            mapped_modes = {}
+            for item in self._aircraft_definitions:
+                mapped_modes[item.display_name.lower()] = (item.id, item.mode)
+            self._aircraft_definitions = items
+            for item in self._aircraft_definitions:
+                display_name = item.display_name.lower()
+                if display_name in mapped_modes.keys():
+                    item.id, item.mode = mapped_modes[display_name]
+
         self.save()
         progress.close()
         
         #gremlin.util.popCursor()
         
 
-class SimConnectAircraftSearchDialog(QtWidgets.QDialog):
-    ''' shows a search box for aicraft '''
-    
-    def __init__(self, options : SimconnectOptions, data = None, parent=None):
-        super().__init__(parent)
-
-        # make modal
-        self.setWindowModality(QtCore.Qt.ApplicationModal)
-
-        self._options = options
-
-        self.main_layout = QtWidgets.QVBoxLayout(self)
-
-
-        container_widget = QtWidgets.QWidget()
-        container_layout = QtWidgets.QHBoxLayout(container_widget)
-
-        self._selector_widget = QtWidgets.QComboBox()
-        self._selector_widget.setEditable(True)
-        item : SimconnectAicraftCfgData
-        self._data = data
-        current_index = 0
-        self._aircraft = data.aircraft.lower()
-        self._aircraft_list = []
-
-        
-        # setup auto-completer for the command 
-        completer = QtWidgets.QCompleter(self._aircraft_list, self)
-        completer.setCaseSensitivity(QtGui.Qt.CaseSensitivity.CaseInsensitive)
-
-        self._selector_widget.setCompleter(completer)
-
-
-        # refresh button to re-scan the aicraft list
-        self._refresh_button = QtWidgets.QPushButton()
-        self._refresh_button.setIcon(gremlin.util.load_icon("fa.refresh"))
-        self._refresh_button.setMaximumWidth(20)
-        self._refresh_button.setToolTip("Scan the MSFS folder structure for installed aicraft")
-        self._refresh_button.clicked.connect(self._refresh_button_cb)
-
-        self._sync_button = QtWidgets.QPushButton()
-        self._sync_button.setIcon(gremlin.util.load_icon("mdi.airplane"))
-        self._sync_button.setMaximumWidth(20)
-        self._sync_button.setToolTip("Use current loaded MSFS aircraft")
-        self._sync_button.clicked.connect(self._sync_button_cb)
-
-        
-
-        container_layout.addWidget(QtWidgets.QLabel("Aircraft"))
-        container_layout.addWidget(self._selector_widget)
-        container_layout.addWidget(self._refresh_button)
-        container_layout.addWidget(self._sync_button)
-        
-
-        
-
-        # dialog buttons
-        self.ok_widget = QtWidgets.QPushButton("Ok")
-        self.ok_widget.clicked.connect(self._ok_button_cb)
-
-        self.cancel_widget = QtWidgets.QPushButton("Cancel")
-        self.cancel_widget.clicked.connect(self._cancel_button_cb)
-
-        self.button_widget = QtWidgets.QWidget()
-        self.button_layout = QtWidgets.QHBoxLayout(self.button_widget)
-        
-
-        self.button_layout.addStretch()
-        self.button_layout.addWidget(self.ok_widget)
-        self.button_layout.addWidget(self.cancel_widget)
-
-        self.main_layout.addWidget(container_widget)
-        self.main_layout.addWidget(self.button_widget)
-
-        self._selected = None
-
-        self.populate_selector()
-
-        self._selector_widget.currentIndexChanged.connect(self._selector_change_cb)
-
-    def populate_selector(self):
-        ''' populates the data in the selector '''
-        self._aircraft_list = [item.display_name for item in self._options._aircraft_entries]
-        aircraft = self._aircraft
-        current_index = 0
-        for index,item in enumerate(self._options._aircraft_entries):
-            if aircraft and aircraft == item.display_name.lower():
-                current_index = index
-            self._selector_widget.addItem(item.display_name, item)
-        self._selector_widget.setCurrentIndex(current_index)
-        self._selected =  self._selector_widget.itemData(current_index)
-        
-
-    @QtCore.Slot()
-    def _ok_button_cb(self):
-        ''' ok button pressed '''
-        self.accept()
-        
-    @QtCore.Slot()
-    def _cancel_button_cb(self):
-        ''' cancel button pressed '''
-        self.reject()        
-
-    @QtCore.Slot()
-    def _refresh_button_cb(self):
-        ''' refresh installed aircraft list '''
-        self._options.scan_aircraft_config(self)
-        self.populate_selector()
-
-
-    @QtCore.Slot()
-    def _sync_button_cb(self):
-        ''' load from current aircraft in MSFS (requires Simconnect to be available) '''
-        sm = SimConnectData()
-        # sm.aircraft_loaded.connect(self._aircraft_loaded_cb)
-          
-        self._aircraft_folder = None
-        if not sm.is_connected():
-            message_box = QtWidgets.QMessageBox()
-            message_box.setText("Unable to connect to MSFS")
-            pixmap = gremlin.util.load_pixmap("warning.svg")
-            pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
-            message_box.setIconPixmap(pixmap)
-            message_box.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok)
-            message_box.exec()
-            return False
-        
-        # get the current title
-        title = sm.aircraft_title
-
-        _, _, title = sm.get_aircraft_data()
-        # find the entry from the loaded scan
-        item = self._options.find_title(title)
-        if item:
-            # found
-            index = self._selector_widget.findText(item.display_name)
-            self._selector_widget.setCurrentIndex(index)
-
-
-
-
-    @QtCore.Slot(int)
-    def _selector_change_cb(self, index):
-        self._selected = self._selector_widget.itemData(index)
-
-    @property
-    def selected(self):
-        # returns the selected cfg object
-        return self._selected
-    
-    @property
-    def data(self):
-        ''' returns the map item'''
-        return self._data
-
-
-        
-
-
 
 class SimconnectOptionsUi(QtWidgets.QDialog):
     """UI to set individual simconnect  settings """
 
     def __init__(self, parent=None):
+        from gremlin.ui import ui_common
         super().__init__(parent)
 
         # make modal
@@ -624,13 +462,18 @@ class SimconnectOptionsUi(QtWidgets.QDialog):
 
         # Actual configuration object being managed
         self.config = gremlin.config.Configuration()
-        self.setMinimumWidth(400)
+        self.setMinimumWidth(600)
+
 
         self.mode_list = []
         self.profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
         self.mode_list = self.profile.get_modes()
-        self.options = SimconnectOptions()
+        self.default_mode = self.profile.get_default_mode()
 
+        # display name to mode pair list
+        self.mode_pair_list = gremlin.ui.ui_common.get_mode_list(self.profile)
+
+        self.options = SimconnectOptions()
 
         self.setWindowTitle("Simconnect Options")
 
@@ -641,6 +484,10 @@ class SimconnectOptionsUi(QtWidgets.QDialog):
         self._auto_mode_switch.setChecked(self.options.auto_mode_select)
         self._auto_mode_switch.clicked.connect(self._auto_mode_select_cb)
 
+        self._msfs_path_widget = ui_common.QPathLineItem(header="MSFS Community Folder", text = self.options.community_folder, dir_mode=True)
+        self._msfs_path_widget.pathChanged.connect(self._community_folder_changed_cb)
+        self._msfs_path_widget.open.connect(self._community_folder_open_cb)
+
         self._mode_from_aircraft_button_widget = QtWidgets.QPushButton("Mode from Aicraft")
         self._mode_from_aircraft_button_widget.clicked.connect(self._mode_from_aircraft_button_cb)
 
@@ -648,19 +495,14 @@ class SimconnectOptionsUi(QtWidgets.QDialog):
         self.container_bar_widget = QtWidgets.QWidget()
         self.container_bar_layout = QtWidgets.QHBoxLayout(self.container_bar_widget)
 
-        self.add_map_widget = QtWidgets.QPushButton("Add mapping")
-        self.add_map_widget.setIcon(gremlin.util.load_icon("button_add.png"))
-        self.add_map_widget.clicked.connect(self._add_map_cb)
-        self.add_map_widget.setToolTip("Adds a new aircraft to profile mode mapping entry")
-
+        
         self.scan_aircraft_widget = QtWidgets.QPushButton("Scan Aircraft")
         self.scan_aircraft_widget.setIcon(gremlin.util.load_icon("mdi.magnify-scan"))
         self.scan_aircraft_widget.clicked.connect(self._scan_aircraft_cb)
         self.scan_aircraft_widget.setToolTip("Scan MSFS aicraft folders for aircraft names")
 
 
-
-        self.container_bar_layout.addWidget(self.add_map_widget)
+        
         self.container_bar_layout.addWidget(self.scan_aircraft_widget)
         self.container_bar_layout.addStretch()
 
@@ -687,9 +529,9 @@ class SimconnectOptionsUi(QtWidgets.QDialog):
         self.scroll_area.setWidget(self.scroll_widget)
 
         self.map_widget = QtWidgets.QWidget()
-        self.map_layout = QtWidgets.QGridLayout()
+        self.map_layout = QtWidgets.QGridLayout(self.map_widget)
         self.map_layout.setContentsMargins(0,0,0,0)
-        self.map_widget.setLayout(self.map_layout)
+        
 
         self.scroll_layout.addWidget(self.map_widget)
         self.scroll_layout.setContentsMargins(6,0,6,0)
@@ -706,14 +548,36 @@ class SimconnectOptionsUi(QtWidgets.QDialog):
         button_bar_layout.addStretch()
         button_bar_layout.addWidget(self.close_button_widget)
 
+  
+
+        
+
         self.main_layout.addWidget(self._auto_mode_switch)
+        self.main_layout.addWidget(self._msfs_path_widget)
         self.main_layout.addWidget(self.container_bar_widget)
         self.main_layout.addWidget(self.container_map_widget)
         self.main_layout.addWidget(button_bar_widget)
+
+
         
-        self.populate_map()
+        self._populate_ui()
 
 
+    def _community_folder_open_cb(self, widget):
+        ''' opens the profile list '''
+        dir = QtWidgets.QFileDialog.getExistingDirectory(
+            None,
+            "Select Community Folder",
+            dir = self.options.community_folder
+        )
+        if dir and os.path.isdir(dir):
+            self.options.community_folder = dir
+            with QtCore.QSignalBlocker(widget):
+                widget.setText(dir)
+
+    def _community_folder_changed_cb(self, widget, text):
+        if os.path.isdir(text):
+            self.options.community_folder = text
 
     def closeEvent(self, event):
         ''' occurs on window close '''
@@ -726,18 +590,13 @@ class SimconnectOptionsUi(QtWidgets.QDialog):
         self.options.auto_mode_select = checked
 
     @QtCore.Slot()
-    def _add_map_cb(self):
-        ''' adds a new mapping entry '''
-        item = SimconnectMapItem()
-        self.options._aircraft_map[item.id] = item
-        self.populate_map()
-
-    @QtCore.Slot()
     def _scan_aircraft_cb(self):
         self.options.scan_aircraft_config(self)
 
         # update the aicraft drop down choices
-        self.populate_map()
+        self._populate_ui()
+
+
 
 
 
@@ -746,7 +605,9 @@ class SimconnectOptionsUi(QtWidgets.QDialog):
         ''' called when close button clicked '''
         self.close()
 
-    def populate_map(self):
+    
+
+    def _populate_ui(self):
         ''' populates the map of aircraft to profile modes '''
 
         from gremlin.ui import ui_common
@@ -756,152 +617,220 @@ class SimconnectOptionsUi(QtWidgets.QDialog):
         # figure out the size of the header part of the control so things line up
         lbl = QtWidgets.QLabel("w")
         char_width = lbl.fontMetrics().averageCharWidth()
-        headers = ["Aicraft:", "Mode:"]
+        headers = ["Aicraft:"]
         width = 0
         for header in headers:
             width = max(width, char_width*(len(header)))
 
 
-        # gets a pair list of display/value for modes with hierarchy
-        mode_pairs_list = gremlin.ui.ui_common.get_mode_list(self.profile)
-
         # clear the widgets
         ui_common.clear_layout(self.map_layout)
 
 
-        if not self.options._aircraft_map:
+
+        # display one row per aicraft found
+        if not self.options._aircraft_definitions:
              missing = QtWidgets.QLabel("No mappings found.")
              missing.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
-             self.map_layout.addWidget(missing, 0, 0)
+             self.map_layout.addWidget(missing)
              return
 
+        gremlin.util.pushCursor()
 
-        
+        item : SimconnectAicraftDefinition
 
-        for index, item in enumerate(self.options._aircraft_map.values()):
+        self._mode_selector_map = {}
+        self._selected_cb_map = {}
+        row = 0
+        display_width = width
+        for item in self.options._aircraft_definitions:
 
-            aircraft_widget = None
-            mode_selector_widget = None
-            aircraft = item.aircraft
-            mode = item.mode
+            # header row
+            if row == 0:
+      
+                select_widget = QtWidgets.QCheckBox()
+                select_widget.clicked.connect(self._global_selected_changed_cb)
+                aircraft_header_widget = QtWidgets.QWidget()
+                aircraft_header_layout = QtWidgets.QHBoxLayout(aircraft_header_widget)
 
-            if item:
-                # add a new item if it exists and either one of the profile/process entries are refined
+                self.display_header_widget = QtWidgets.QLabel("Aicraft")
+                aircraft_header_layout.addWidget(self.display_header_widget)
+                display_sort_up_widget = QtWidgets.QPushButton()
+                display_sort_up_widget.setIcon(gremlin.util.load_icon("fa.sort-asc"))
+                display_sort_up_widget.setMaximumWidth(20)
+                display_sort_up_widget.clicked.connect(self._sort_display_up_cb)
+                display_sort_up_widget.setStyleSheet("border: none;")
 
-                row = 0
+                display_sort_down_widget = QtWidgets.QPushButton()
+                display_sort_down_widget.setIcon(gremlin.util.load_icon("fa.sort-desc"))
+                display_sort_down_widget.setMaximumWidth(20)
+                display_sort_down_widget.clicked.connect(self._sort_display_down_cb)
+                display_sort_down_widget.setStyleSheet("border: none;")
 
-                container_widget = QtWidgets.QWidget()
-                container_layout = QtWidgets.QGridLayout()
-                container_layout.setColumnStretch(0,2)
-                container_layout.setColumnStretch(1,2)
-                container_layout.setContentsMargins(0,6,0,0)
-                container_widget.setLayout(container_layout)
+                aircraft_header_layout.addStretch()
+                aircraft_header_layout.addWidget(display_sort_up_widget)
+                aircraft_header_layout.addWidget(display_sort_down_widget)
 
-                aircraft_label = QtWidgets.QLabel("Aicraft:")
-                aircraft_label.setMaximumWidth(width)
-                aircraft_widget =ui_common.QDataLineEdit(aircraft, item)
-                aircraft_widget.installEventFilter(self)
+
+
+                mode_widget = QtWidgets.QLabel("Mode")
+                manufacturer_widget = QtWidgets.QLabel("Manufacturer")
+                type_widget = QtWidgets.QLabel("Type")
+                model_widget = QtWidgets.QLabel("Model")
+
+
+                row_selector = ui_common.QRowSelectorFrame()
+                row_selector.setSelectable(False)
+                spacer = ui_common.QDataWidget()
+                spacer.setMinimumWidth(3)
+                self.map_layout.addWidget(row_selector, 0, 0, 1, -1)
+                
+                self.map_layout.addWidget(spacer, 0, 1)
+                self.map_layout.addWidget(select_widget, 0, 2)
+                self.map_layout.addWidget(aircraft_header_widget, 0, 3)
+                self.map_layout.addWidget(mode_widget, 0, 4)
+                self.map_layout.addWidget(manufacturer_widget, 0, 5)
+                self.map_layout.addWidget(model_widget, 0, 6)
+                self.map_layout.addWidget(type_widget, 0, 7)
+
                 
 
-                select_button = ui_common.QDataPushButton(data = item)
-                select_button.setIcon(gremlin.util.load_icon("fa.search"))
-                select_button.clicked.connect(self._aircraft_search_cb)
-                select_button.setMaximumWidth(20)
-                select_button.setToolTip("Aircraft lookup")
-                container_layout.addWidget(aircraft_label,row,0)
-                container_layout.addWidget(aircraft_widget,row,1)
-                container_layout.addWidget(select_button,row,2)
+               
+
                 row+=1
+                continue
 
-                # add mode selector widget for this aircraft
-                mode_label = QtWidgets.QLabel("Mode:")
-                mode_label.setMaximumWidth(width)
-                mode_selector_widget = ui_common.QDataComboBox(data=item)
+            
+             # selector
+            row_selector = ui_common.QRowSelectorFrame(selected = item.selected)
+            row_selector.setMinimumHeight(30)
+            row_selector.selected_changed.connect(self._row_selector_clicked_cb)
+            selected_widget = ui_common.QDataCheckbox(data = (item, row_selector))
+            selected_widget.setChecked(item.selected)
+            selected_widget.checkStateChanged.connect(self._selected_changed_cb)
+            row_selector.data = ((item, selected_widget))
 
-                # populate mode data
-                mode_index = 0
-                current_index = 0
-                for display_name, mode_name in mode_pairs_list:
-                    mode_selector_widget.addItem(display_name, mode_name)
-                    if mode_name == mode:
-                        current_index = mode_index
-                    mode_index +=1
+            # aicraft display 
+            self.display_header_widget = ui_common.QDataLineEdit(data = (item, selected_widget))
+            self.display_header_widget.setReadOnly(True)
+            self.display_header_widget.setText(item.display_name)
+            self.display_header_widget.installEventFilter(self)
+            w = len(item.display_name)*char_width
+            if w > display_width:
+                display_width = w
 
-                mode_selector_widget.setCurrentIndex(current_index)
-                # self._mode_map_aircraft_widgets[index] = aircraft_widget
-                # self._mode_map_mode_selector_widgets[index] = mode_selector_widget
+            # manufacturer
+            manufacturer_widget = ui_common.QDataLineEdit(data = (item, selected_widget))
+            manufacturer_widget.setReadOnly(True)
+            manufacturer_widget.setText(item.icao_manufacturer)
+            manufacturer_widget.installEventFilter(self)
 
-                mode_selector_widget.currentIndexChanged.connect(self._mode_selector_changed_cb)
-                container_layout.addWidget(mode_label,row,0)
-                container_layout.addWidget(mode_selector_widget,row,1)
-                row+=1
+            # model
+            model_widget = ui_common.QDataLineEdit(data = (item, selected_widget))
+            model_widget.setReadOnly(True)
+            model_widget.setText(item.icao_model)
+            model_widget.installEventFilter(self)
 
-                active_button = ui_common.QDataPushButton()
-                active_button.setIcon(gremlin.util.load_icon("mdi.airplane"))
-                active_button.clicked.connect(self._active_button_cb)
-                active_button.data = item
+            # type
+            type_widget = ui_common.QDataLineEdit(data = (item, selected_widget))
+            type_widget.setReadOnly(True)
+            type_widget.setText(item.icao_type)
+            type_widget.installEventFilter(self)
+
+            # mode drop down
+            mode_selector = ui_common.QDataComboBox(data = (item, selected_widget))
+            for display_mode, mode in self.mode_pair_list:
+                mode_selector.addItem(display_mode, mode)
+            if not item.mode:
+                item.mode = self.default_mode
+            if not item.mode in self.mode_list:
+                item.mode = self.default_mode
+            index = mode_selector.findData(item.mode)
+            mode_selector.setCurrentIndex(index)
+            mode_selector.currentIndexChanged.connect(self._mode_selector_changed_cb)
+            self._mode_selector_map[item] = mode_selector
+            self._selected_cb_map[item] = selected_widget
+
+            self.map_layout.addWidget(row_selector, row ,0 , 1, -1)
+            
+            spacer = ui_common.QDataWidget()
+            spacer.setMinimumWidth(3)
+            spacer.installEventFilter(self)
+            
+            self.map_layout.addWidget(spacer, row, 1)
+            self.map_layout.addWidget(selected_widget, row, 2)
+            self.map_layout.addWidget(self.display_header_widget, row, 3 )
+            self.map_layout.addWidget(mode_selector, row, 4 )
+            self.map_layout.addWidget(manufacturer_widget,row, 5 )
+            self.map_layout.addWidget(model_widget,row, 6)
+            self.map_layout.addWidget(type_widget,row, 7)
+            spacer = ui_common.QDataWidget()
+            spacer.installEventFilter(self)
+            spacer.setMinimumWidth(6)
+            self.map_layout.addWidget(spacer, row, 8)
 
 
-                clear_button = ui_common.QDataPushButton()
-                clear_button.setIcon(gremlin.util.load_icon("mdi.delete"))
-                clear_button.setMaximumWidth(20)
-                clear_button.data = item
-                clear_button.clicked.connect(self._mapping_delete_cb)
-                clear_button.setToolTip("Removes this entry")
-                container_layout.addWidget(clear_button, 0, 4)
+            row += 1
 
-                duplicate_button = ui_common.QDataPushButton()
-                duplicate_button.setIcon(gremlin.util.load_icon("mdi.content-duplicate"))
-                duplicate_button.setMaximumWidth(20)
-                duplicate_button.data = aircraft
-                duplicate_button.clicked.connect(self._mapping_duplicate_cb)
-                duplicate_button.setToolTip("Duplicates this entry")
-                container_layout.addWidget(duplicate_button, 1, 4)
-                if not item.valid:
-                    status_widget = ui_common.QIconLabel("fa.warning", use_qta=True,text=item.error_status)
-                    container_layout.addWidget(status_widget,row,0,1,-1)
-                    row+=1
 
-                container_layout.addWidget(ui_common.QHLine(),row,0,1, -1)
+        self.map_layout.setColumnStretch(3,2)
+        self.map_layout.setColumnMinimumWidth(3, display_width)
 
-                self.map_layout.addWidget(container_widget, index, 0)
 
+        gremlin.util.popCursor()
+
+
+    @QtCore.Slot()
+    def _sort_display_up_cb(self):
+        self.options._aircraft_definitions.sort(key = lambda x: x.key)
+        self._populate_ui()
+        self.scroll_area.ensureVisible(0,0)
+
+    @QtCore.Slot()
+    def _sort_display_down_cb(self):
+        self.options._aircraft_definitions.sort(key = lambda x: x.key, reverse = True)
+        self._populate_ui()        
+        self.scroll_area.ensureVisible(0,0)
+
+    @QtCore.Slot(bool)
+    def _global_selected_changed_cb(self, checked):
+        for item in self._selected_cb_map.keys():
+            self._selected_cb_map[item].setChecked(checked)
+
+
+    def _get_selected(self):
+        ''' gets the items that are selected '''
+        return [item for item in self.options._aircraft_definitions if item.selected]
+
+
+    @QtCore.Slot(bool)
+    def _selected_changed_cb(self, state):
+        widget = self.sender()
+        item, row_selector = widget.data
+        checked = widget.isChecked() # param is an enum - ignore
+        item.selected = checked
+        row_selector.selected = checked
+
+    @QtCore.Slot()
+    def _row_selector_clicked_cb(self):
+        widget = self.sender()
+        checked = widget.selected
+        item, selector_widget = widget.data
+        item.selected = checked
+        with QtCore.QSignalBlocker(selector_widget):
+            selector_widget.setChecked(checked)
+
+            
 
     def eventFilter(self, widget, event):
         ''' ensure line changes are saved '''
         t = event.type()
-        if t == QtCore.QEvent.Type.FocusOut:
-            item = widget.data
-            text = widget.text()
-            if text != item.aircraft:
-                item.aircraft = text
-                self.populate_map()
+        if t == QtCore.QEvent.Type.MouseButtonPress:
+            item, selected_widget = widget.data
+            selected_widget.setChecked(not selected_widget.isChecked())
+
+
         return False
-
-
-    @QtCore.Slot()
-    def _aircraft_search_cb(self):
-        ''' search button clicked '''
-        widget = self.sender()
-        map_item = widget.data
-        dialog = SimConnectAircraftSearchDialog(self.options, data = map_item, parent = self)
-        dialog.accepted.connect(self._dialog_ok_cb)
-        dialog.rejected.connect(self._dialog_close_cb)
-        dialog.setModal(True)
-        dialog.showNormal()  
-
-    def _dialog_close_cb(self):
-        self.close()
-
-    def _dialog_ok_cb(self):
-        ''' callled when the dialog completes ''' 
-        widget = self.sender()
-        item = widget.selected
-        map_item = widget.data
-        map_item.aircraft = item.display_name
-        self.populate_map()
-
-
 
 
     @QtCore.Slot(int)
@@ -909,11 +838,20 @@ class SimconnectOptionsUi(QtWidgets.QDialog):
         ''' occurs when the mode is changed on an entry '''
         widget = self.sender()
         mode = widget.currentData()
-        item = widget.data
-        if item.mode != mode:
-            item.mode = mode
-            self.populate_map()
-        
+        item, _ = widget.data
+        items = self._get_selected()
+        if not item in items:
+            items.append(item)
+        mode_index = None
+        for item in items:
+            if item.mode != mode:
+                item.mode = mode
+                selector = self._mode_selector_map[item]
+                with QtCore.QSignalBlocker(selector):
+                    if mode_index is None:
+                        mode_index = selector.findData(mode)
+                    selector.setCurrentIndex(mode_index)
+
     @QtCore.Slot()
     def _active_button_cb(self):
         widget = self.sender()
@@ -924,37 +862,6 @@ class SimconnectOptionsUi(QtWidgets.QDialog):
             item = widget.data
             item.aircraft = aircraft
 
-    def _mapping_duplicate_cb(self):
-        ''' duplicates the current entry '''
-        widget = self.sender()
-        item = widget.data
-        dup = SimconnectMapItem(None, item.aircraft, item.mode)
-        self.options._aircraft_map[dup.id] = dup
-        self.populate_map()
-
-    def _mapping_delete_cb(self):
-        widget = self.sender()
-        item = widget.data
-        message_box = QtWidgets.QMessageBox()
-        message_box.setText("Delete confirmation")
-        message_box.setInformativeText("This will delete this association.\nAre you sure?")
-        pixmap = gremlin.util.load_pixmap("warning.svg")
-        pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
-        message_box.setIconPixmap(pixmap)
-        message_box.setStandardButtons(
-            QtWidgets.QMessageBox.StandardButton.Ok |
-            QtWidgets.QMessageBox.StandardButton.Cancel
-            )
-        message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
-        result = message_box.exec()
-        if result == QtWidgets.QMessageBox.StandardButton.Ok:
-            self._delete_confirmed_cb(item)
-
-
-    def _delete_confirmed_cb(self, item):
-        del self.options._aircraft_map[item.id]
-        self.populate_map()
-
         
     @QtCore.Slot()
     def _mode_from_aircraft_button_cb(self):
@@ -962,9 +869,15 @@ class SimconnectOptionsUi(QtWidgets.QDialog):
         aircraft, model, title = self._sm_data.get_aircraft_data()
         logging.getLogger("system").info(f"Aircraft: {aircraft} model: {model} title: {title}")
         if not title in self._mode_list:
-            profile.add_mode(title)
+            self.profile.add_mode(title)
             
-        
+
+
+
+            
+
+
+
 
 
 class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):

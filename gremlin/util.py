@@ -990,3 +990,11 @@ def compare_path(a, b):
     af = a.replace("\\","/").lower().strip()
     bf = b.replace("\\","/").lower().strip()
     return af == bf
+
+def compare_nocase(a : str, b : str):
+    ''' compares two strings - not case sensitive '''
+    if a is None and b is None:
+        return True
+    if a == "" and b == "":
+        return True
+    return a.casefold() == b.casefold()

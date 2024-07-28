@@ -1527,7 +1527,7 @@ class QIconLabel(QtWidgets.QWidget):
     
 class QDataCheckbox(QtWidgets.QCheckBox):
     ''' a checkbox that has a data property to track an object associated with the checkbox '''
-    def __init__(self, text, data = None, parent = None):
+    def __init__(self, text = None, data = None, parent = None):
         super().__init__(text, parent)
         self._data = data
 
@@ -1560,6 +1560,7 @@ class QDataLineEdit(QtWidgets.QLineEdit):
     def __init__(self, text = None, data = None, parent = None):
         super().__init__(text, parent)
         self._data = data
+        self.setStyleSheet("QLineEdit{border: #8FBC8F;}")
 
     @property
     def data(self):
@@ -1593,11 +1594,20 @@ class QPathLineItem(QtWidgets.QWidget):
 
     IconSize = QtCore.QSize(16, 16)
 
-    def __init__(self, header = None, text = None, data = None, parent = None):
+    def __init__(self, header = None, text = None, data = None, dir_mode = False, parent = None):
+        '''
+        displays the path to a file or a folder
+        :param: header - the header text
+        :param: text - the default content 
+        :data: optional data parameters
+        :dir_mode: true if the entry is a folder, false if it's a file
+        
+        '''
         super().__init__(parent)
 
         self._text = text
         self._header = header
+        self._dir_mode = dir_mode
         
 
         self._file_widget = QtWidgets.QLineEdit()
@@ -1692,7 +1702,8 @@ class QPathLineItem(QtWidgets.QWidget):
 
     def _file_changed(self):
         fname = self._file_widget.text()
-        valid = os.path.isfile(fname)
+
+        valid = os.path.isdir(fname) if self._dir_mode else os.path.isfile(fname)
         if valid:
             self._setIcon("fa.check", color="green")
         else:
@@ -2415,9 +2426,74 @@ class ButtonState(QtWidgets.QGroupBox):
             self.buttons[event.identifier].setDown(state)
             self._event_times[event.identifier] = time.time()
 
+class QDataWidget(QtWidgets.QWidget):
+    def __init__(self, data = None, parent = None):
+        super().__init__(parent)
+        self._data = data
 
-
-
-
-
+       
+    @property
+    def data(self):
+        return self._data
     
+    @data.setter
+    def data(self, value):
+        self._data = value
+ 
+
+
+class QRowSelectorFrame(QtWidgets.QFrame):
+
+    selected_changed = QtCore.Signal(object)
+
+    def __init__(self, data = None, parent = None, selected = False):
+        super().__init__(parent)
+        self._emit = False
+        self._selected = not selected # force an update to the stylesheet
+        self.selected = selected
+        self._data = data
+        self._emit = True
+        self.installEventFilter(self)
+        self._selectable = True
+
+
+    def setSelectable(self, value):
+        self._selectable = value
+    
+    def getSelectable(self):
+        return self._selectable
+
+    def eventFilter(self, widget, event):
+        ''' ensure line changes are saved '''
+        t = event.type()
+        if self._selectable and t == QtCore.QEvent.Type.MouseButtonPress:
+            self.selected = not self.selected
+        return False        
+
+    @property
+    def selected(self):
+        return self._selected
+    
+    @selected.setter
+    def selected(self, value):
+        # change selection mode
+        if value != self._selected:
+            self._selected = value
+            if value:
+                style = "QRowSelectorFrame{background-color: #8FBC8F; }"
+            else:
+                style = "QRowSelectorFrame{background-color: #E8E8E8; }"
+
+            self.setStyleSheet(style)
+            if self._emit:
+                self.selected_changed.emit(self)
+
+    @property
+    def data(self):
+        return self._data
+    
+    @data.setter
+    def data(self, value):
+        self._data = value
+
+                             
