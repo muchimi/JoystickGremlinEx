@@ -1594,7 +1594,7 @@ class QPathLineItem(QtWidgets.QWidget):
 
     IconSize = QtCore.QSize(16, 16)
 
-    def __init__(self, header = None, text = None, data = None, dir_mode = False, parent = None):
+    def __init__(self, header = None, text = None, data = None, dir_mode = False, parent = None, open_tooltip_text = "Browse"):
         '''
         displays the path to a file or a folder
         :param: header - the header text
@@ -1617,6 +1617,8 @@ class QPathLineItem(QtWidgets.QWidget):
         self._open_button = QtWidgets.QPushButton("...")
         self._open_button.setMaximumWidth(20)
         self._open_button.clicked.connect(self._open_button_cb)
+        if open_tooltip_text:
+            self._open_button.setToolTip(open_tooltip_text)
         self._icon_widget = QtWidgets.QLabel()
         self._icon_widget.setMaximumWidth(20)
         self._layout = QtWidgets.QHBoxLayout()
@@ -1831,7 +1833,7 @@ class AxisStateWidget(QtWidgets.QWidget):
         self._progress_widget.update()
         readout = ""
         if self._show_value:
-            readout = f"{value:+0.2f}"
+            readout = f"{value:+0.3f}"
         if self._show_percentage:
             percent = int(round(100 * value / (self._max_range - self._min_range)))
             if readout:
@@ -2282,13 +2284,13 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
         #                                          QtWidgets.QSizePolicy.MinimumExpanding))
 
         el = gremlin.event_handler.EventListener()
-        if vis_type == VisualizationType.AxisCurrent:
+        if vis_type == gremlin.types.VisualizationType.AxisCurrent:
             self._create_current_axis()
             el.joystick_event.connect(self._current_axis_update)
-        elif vis_type == VisualizationType.AxisTemporal:
+        elif vis_type == gremlin.types.VisualizationType.AxisTemporal:
             self._create_temporal_axis()
             el.joystick_event.connect(self._temporal_axis_update)
-        elif vis_type == VisualizationType.ButtonHat:
+        elif vis_type == gremlin.types.VisualizationType.ButtonHat:
             self._create_button_hat()
             el.joystick_event.connect(self._button_hat_update)
 
@@ -2497,3 +2499,12 @@ class QRowSelectorFrame(QtWidgets.QFrame):
         self._data = value
 
                              
+def get_text_width(text):
+    ''' gets the average text width '''
+    lbl = QtWidgets.QLabel("w")
+    char_width = lbl.fontMetrics().averageCharWidth()
+    return char_width * len(text)
+
+
+
+

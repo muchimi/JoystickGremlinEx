@@ -7,8 +7,6 @@ from PySide6 import QtWidgets, QtCore, QtGui
 
 import gremlin.base_profile
 import gremlin.config
-from gremlin.input_types import InputType
-from gremlin.input_devices import ButtonReleaseActions
 import gremlin.macro
 import gremlin.ui.ui_common
 import gremlin.ui.input_item
@@ -95,6 +93,7 @@ class SimConnectActionMode(enum.Enum):
     Ranged = 1, # output varies with input axis
     Trigger = 2, # output is a trigger (no value sent)
     SetValue = 3, # output sets a number value
+    Gated = 4, # output of axis is gated - the position of the axis is not linear
 
     @staticmethod
     def to_string(value):
@@ -109,6 +108,17 @@ class SimConnectActionMode(enum.Enum):
         if validate:
             raise gremlin.error.GremlinError(f"Invalid type in lookup: {value}")
         return SimConnectActionMode.NotSet
+    
+
+
+
+
+        
+
+        
+                
+                
+
                 
 
         
@@ -117,6 +127,7 @@ _simconnect_action_mode_to_string_lookup = {
     SimConnectActionMode.Ranged : "ranged",
     SimConnectActionMode.Trigger : "trigger",
     SimConnectActionMode.SetValue : "value",
+    SimConnectActionMode.Gated : "gated",
 }
 
 _simconnect_action_mode_to_enum_lookup = {
@@ -124,6 +135,7 @@ _simconnect_action_mode_to_enum_lookup = {
     "ranged" : SimConnectActionMode.Ranged,
     "trigger" : SimConnectActionMode.Trigger,
     "value" :SimConnectActionMode.SetValue ,
+    "gated" : SimConnectActionMode.Gated,
 }
 
 class SimConnectEventCategory(enum.Enum):

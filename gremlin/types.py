@@ -25,6 +25,19 @@ from typing import Tuple, Union
 import gremlin.error
 
 
+class VisualizationType(enum.Enum):
+
+    """Enumeration of possible visualization types."""
+
+    AxisTemporal = 1
+    AxisCurrent = 2
+    ButtonHat = 3
+
+class KeyboardOutputMode(enum.Enum):
+    Both = 0 # keyboard make and break (press/release)
+    Press = 1 # keyboard make only
+    Release = 2 # keyboard release only
+    Hold = 3 # press while held (default Gremlin behavior)   
 class ActivationRule(enum.Enum):
 
     """Activation rules for collections of conditions.

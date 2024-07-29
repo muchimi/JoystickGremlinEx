@@ -561,8 +561,6 @@ class Macro:
             self._is_remote = False
         else:
             self._is_remote = is_remote
-        
-        
 
     @property
     def id(self):

@@ -777,6 +777,14 @@ def safe_format(value, data_type, formatter=str):
         )
 
 
+def get_xml_child(node, tag : str):
+    ''' gets a specific xml child node by tag - None if not found '''
+    tag = tag.casefold()
+    for child in list(node):
+        if child.tag.casefold == tag:
+            return child
+    return None
+
 
 def parse_guid(value):
     """Reads a string GUID representation into the internal data format.

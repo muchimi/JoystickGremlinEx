@@ -1590,6 +1590,7 @@ class ModeManagerUi(ui_common.BaseDialogUi):
     def _create_ui(self):
         """Creates the required UII elements."""
         self.main_layout = QtWidgets.QVBoxLayout(self)
+
         self.scroll_area = QtWidgets.QScrollArea()
         self.scroll_widget = QtWidgets.QWidget()
         self.scroll_layout = QtWidgets.QVBoxLayout()
@@ -1614,9 +1615,11 @@ class ModeManagerUi(ui_common.BaseDialogUi):
 
         self.scroll_layout.addWidget(self.mode_widget)
 
-        self.main_layout.addWidget(self.scroll_area)
+        
         self.add_button = QtWidgets.QPushButton("Add Mode")
         self.add_button.clicked.connect(self._add_mode_cb)
+
+        self.scroll_layout.addWidget(self.add_button)
 
         label = QtWidgets.QLabel(
             "Modes are by default self contained configurations. Specifying "
@@ -1624,15 +1627,28 @@ class ModeManagerUi(ui_common.BaseDialogUi):
             "defined in the parent, unless the mode configures its own actions "
             "for specific inputs."
         )
-        label.setStyleSheet("QLabel { background-color : '#FFF4B0'; }")
+        label.setStyleSheet("QLabel { background-color : #8FBC8F; }")
         label.setWordWrap(True)
         label.setFrameShape(QtWidgets.QFrame.Box)
         label.setMargin(10)
         self.scroll_layout.addWidget(label)
 
-        self.scroll_layout.addWidget(self.add_button)
+        close_button_widget = QtWidgets.QPushButton("Close")
+        close_button_widget.clicked.connect(self._close_cb)
+        button_container_widget = QtWidgets.QWidget()
+        button_container_layout = QtWidgets.QHBoxLayout(button_container_widget)
+        button_container_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignHCenter)
+        button_container_layout.addWidget(close_button_widget)
+
+
+        self.main_layout.addWidget(self.scroll_area)
+        self.main_layout.addWidget(button_container_widget)
 
         self._populate_mode_layout()
+
+    @QtCore.Slot()
+    def _close_cb(self):
+        self.close()
 
     def _get_mode_list(self):
         mode_list = {}
@@ -1653,6 +1669,8 @@ class ModeManagerUi(ui_common.BaseDialogUi):
         self.mode_delete = {}
         self.mode_callbacks = {}
         self.mode_default = None # default startup mode
+
+        self._display_width = 0
 
         # Obtain mode names and the mode they inherit from
         mode_list = self._get_mode_list()
@@ -1687,22 +1705,30 @@ class ModeManagerUi(ui_common.BaseDialogUi):
 
             # Rename mode button
             self.mode_rename[mode] = QtWidgets.QPushButton(
-                load_icon("button_edit.png"), ""
+                load_icon("fa.edit"), ""
             )
+            self.mode_rename[mode].setMaximumWidth(20)
             self.mode_layout.addWidget(self.mode_rename[mode], row, 2)
             self.mode_rename[mode].clicked.connect(
                 self._create_rename_mode_cb(mode)
             )
+            self.mode_rename[mode].setToolTip("Edit")
+
             # Delete mode button
             self.mode_delete[mode] = QtWidgets.QPushButton(
-                load_icon("mode_delete.svg"), ""
+                load_icon("mdi.delete"), ""
             )
+            self.mode_delete[mode].setMaximumWidth(20)
+            self.mode_delete[mode].setToolTip("Delete")
             self.mode_layout.addWidget(self.mode_delete[mode], row, 3)
             self.mode_delete[mode].clicked.connect(
                 self._create_delete_mode_cb(mode)
             )
 
             self.mode_layout.addWidget(self.mode_dropdowns[mode], row, 1)
+
+            # padd right column that expands
+            self.mode_layout.addWidget(QtWidgets.QLabel(" "),row, 4)
             row += 1
 
         # add the default mode selector
@@ -1719,10 +1745,13 @@ The setting can be overriden by the global mode reload option set in Options for
         self.mode_restore_flag.setChecked(gremlin.shared_state.current_profile.get_restore_mode())
         self.mode_restore_flag.clicked.connect(self._profile_restore_flag_cb)
 
-        self.container_default_layout.addWidget(QtWidgets.QLabel("Profile start mode:"))
-        self.container_default_layout.addWidget(self.mode_default_selector)
-        self.container_default_layout.addStretch()
-        self.mode_layout.addWidget(self.container_default_widget, row, 0, 1, -1)
+
+        
+        self.mode_layout.addWidget(ui_common.QHLine(),row,0,1,-1)
+        row+=1
+        
+        self.mode_layout.addWidget(QtWidgets.QLabel("Profile start mode"), row, 0)
+        self.mode_layout.addWidget(self.mode_default_selector,row,1)
         row += 1
 
 
@@ -1732,6 +1761,11 @@ The setting can be overriden by the global mode reload option set in Options for
 
         # add the default flag
         self.mode_layout.addWidget(self.mode_restore_flag, row, 0, 1, -1)
+
+        self.mode_layout.setColumnStretch(4,4)
+        
+
+        
 
     def _profile_restore_flag_cb(self, clicked):
         ''' called when the restore last mode checked state is changed '''

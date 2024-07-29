@@ -25,14 +25,8 @@ import dinput
 import gremlin
 from . import ui_common
 from gremlin.input_types import InputType
+from gremlin.types import VisualizationType
 
-class VisualizationType(enum.Enum):
-
-    """Enumeration of possible visualization types."""
-
-    AxisTemporal = 1
-    AxisCurrent = 2
-    ButtonHat = 3
 
 
 class VisualizationSelector(QtWidgets.QWidget):

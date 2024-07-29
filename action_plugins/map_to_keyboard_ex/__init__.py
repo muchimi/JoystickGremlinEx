@@ -32,7 +32,7 @@ import enum
 from gremlin.profile import safe_format, safe_read
 from gremlin.keyboard import Key, key_from_name, key_from_code
 from gremlin.ui.virtual_keyboard import *
-from gremlin.types import MouseButton, MouseAction, MouseClickMode
+from gremlin.types import MouseButton, MouseAction, MouseClickMode, KeyboardOutputMode
 import logging
 
 
@@ -91,13 +91,13 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self.delay_box.setValue(self.action_data.delay)
 
-        if self.action_data.mode == MapToKeyboardExMode.Press:
+        if self.action_data.mode == KeyboardOutputMode.Press:
             self.rb_press.setChecked(True)
-        elif self.action_data.mode == MapToKeyboardExMode.Release:
+        elif self.action_data.mode == KeyboardOutputMode.Release:
             self.rb_release.setChecked(True)
-        elif self.action_data.mode == MapToKeyboardExMode.Hold:
+        elif self.action_data.mode == KeyboardOutputMode.Hold:
             self.rb_hold.setChecked(True)
-        elif self.action_data.mode == MapToKeyboardExMode.Both:            
+        elif self.action_data.mode == KeyboardOutputMode.Both:            
             self.rb_both.setChecked(True)
             
 
@@ -211,17 +211,17 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _mode_changed(self):
         delay_enabled = False
         if self.rb_press.isChecked():
-            mode = MapToKeyboardExMode.Press
+            mode = KeyboardOutputMode.Press
         elif self.rb_release.isChecked():
-            mode = MapToKeyboardExMode.Release
+            mode = KeyboardOutputMode.Release
         elif self.rb_hold.isChecked():
-            mode = MapToKeyboardExMode.Hold
+            mode = KeyboardOutputMode.Hold
         elif self.rb_both.isChecked():
-            mode = MapToKeyboardExMode.Both
+            mode = KeyboardOutputMode.Both
             delay_enabled = True
         else:
             # default
-            mode = MapToKeyboardExMode.Hold 
+            mode = KeyboardOutputMode.Hold 
         self.action_data.mode = mode
         self.delay_container_widget.setEnabled(delay_enabled)
 
@@ -302,46 +302,6 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
         self.release.completed_callback = self._macro_completed
         self.delay_press_release.completed_callback = self._macro_completed
 
-
-    # def _perform_mouse_button(self, button_id, is_pressed):
-    #     assert self.action.motion_input is False
-        
-    #     from gremlin.input_devices import remote_client
-    #     import gremlin.sendinput 
-    #     (is_local, is_remote) = self.get_state()
-    #     if button_id in [MouseButton.WheelDown, MouseButton.WheelUp]:
-    #         if is_pressed:
-    #             direction = -16
-    #             if self.action.button_id == MouseButton.WheelDown:
-    #                 direction = 1
-    #             if is_local:
-    #                 gremlin.sendinput.mouse_wheel(direction)
-    #             if is_remote:
-    #                 remote_client.send_mouse_wheel(direction)
-    #     else:
-    #         if self.action.click_mode == MouseClickMode.Normal:
-    #             if is_pressed:
-    #                 if is_local:
-    #                     gremlin.sendinput.mouse_press(self.action.button_id)
-    #                 if is_remote:
-    #                     remote_client.send_mouse_button(self.action.button_id.value, True)
-    #             else:
-    #                 if is_local:
-    #                     gremlin.sendinput.mouse_release(self.action.button_id)
-    #                 if is_remote:
-    #                     remote_client.send_mouse_button(self.action.button_id.value, False)
-    #         elif self.action.click_mode == MouseClickMode.Press:
-    #             if is_local:
-    #                 gremlin.sendinput.mouse_press(self.action.button_id)
-    #             if is_remote:
-    #                 remote_client.send_mouse_button(self.action.button_id.value, True)
-    #         elif self.action.click_mode == MouseClickMode.Release:
-    #             if is_local:
-    #                 gremlin.sendinput.mouse_release(self.action.button_id)
-    #             if is_remote:
-    #                 remote_client.send_mouse_button(self.action.button_id.value, False)
-
-
     def _macro_completed(self):
         ''' called when a macro is done running '''
         self.is_pressed = False
@@ -349,37 +309,31 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
     def process_event(self, event, value):
         if event.event_type == InputType.JoystickAxis or value.current:
             # joystick values or virtual button
-            if self.mode == MapToKeyboardExMode.Release:
+            if self.mode == KeyboardOutputMode.Release:
                 gremlin.macro.MacroManager().queue_macro(self.release)
-            elif self.mode == MapToKeyboardExMode.Press and not self.is_pressed:
+            elif self.mode == KeyboardOutputMode.Press and not self.is_pressed:
                 # press mode and not already triggered
                 self.is_pressed = True
                 gremlin.macro.MacroManager().queue_macro(self.press)
 
-            elif self.mode == MapToKeyboardExMode.Both:
+            elif self.mode == KeyboardOutputMode.Both:
                 # make and break with delay
                 if not self.is_pressed:
                     gremlin.macro.MacroManager().queue_macro(self.delay_press_release)
                     self.is_pressed = True
 
-            elif self.mode == MapToKeyboardExMode.Hold:
+            elif self.mode == KeyboardOutputMode.Hold:
                 gremlin.macro.MacroManager().queue_macro(self.press)
                 if self.needs_auto_release:
                     ButtonReleaseActions().register_callback(
                         lambda: gremlin.macro.MacroManager().queue_macro(self.release),
                         event
                     )
-        elif self.mode == MapToKeyboardExMode.Hold:
+        elif self.mode == KeyboardOutputMode.Hold:
             gremlin.macro.MacroManager().queue_macro(self.release)
 
         return True
 
-
-class MapToKeyboardExMode(enum.Enum):
-    Both = 0 # keyboard make and break (press/release)
-    Press = 1 # keyboard make only
-    Release = 2 # keyboard release only
-    Hold = 3 # press while held (default Gremlin behavior)
 
 class MapToKeyboardEx(gremlin.base_profile.AbstractAction):
 
@@ -410,7 +364,7 @@ class MapToKeyboardEx(gremlin.base_profile.AbstractAction):
         """
         super().__init__(parent)
         self.keys = []
-        self.mode = MapToKeyboardExMode.Both
+        self.mode = KeyboardOutputMode.Both
         self.delay = 250 # delay between make/break in milliseconds
     
 
@@ -443,13 +397,13 @@ class MapToKeyboardEx(gremlin.base_profile.AbstractAction):
         if "mode" in node.attrib:
             mode = safe_read(node, "mode", str)
             if mode == "make":
-                self.mode = MapToKeyboardExMode.Press
+                self.mode = KeyboardOutputMode.Press
             elif mode == "break":
-                self.mode = MapToKeyboardExMode.Release
+                self.mode = KeyboardOutputMode.Release
             elif mode == "both":
-                self.mode = MapToKeyboardExMode.Both
+                self.mode = KeyboardOutputMode.Both
             elif mode == "hold":
-                self.mode = MapToKeyboardExMode.Hold
+                self.mode = KeyboardOutputMode.Hold
             
         if "delay" in node.attrib:
             self.delay = safe_read(node, "delay", int) # delay in milliseconds
@@ -475,13 +429,13 @@ class MapToKeyboardEx(gremlin.base_profile.AbstractAction):
         :return XML node containing the information of this  instance
         """
         node = ElementTree.Element(MapToKeyboardEx.tag)
-        if self.mode == MapToKeyboardExMode.Both:
+        if self.mode == KeyboardOutputMode.Both:
             mode = "both"
-        elif self.mode == MapToKeyboardExMode.Press:
+        elif self.mode == KeyboardOutputMode.Press:
             mode = "make"
-        elif self.mode == MapToKeyboardExMode.Release:
+        elif self.mode == KeyboardOutputMode.Release:
             mode = "break"
-        elif self.mode == MapToKeyboardExMode.Hold:
+        elif self.mode == KeyboardOutputMode.Hold:
             mode = "hold"
 
         node.set("mode",safe_format(mode, str) )

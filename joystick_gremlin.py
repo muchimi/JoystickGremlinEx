@@ -368,6 +368,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         # self.modal_windows["mode_manager"].modes_changed.connect(
         #     self._mode_configuration_changed
         # )
+        self.modal_windows["mode_manager"].setWindowModality(QtCore.Qt.ApplicationModal)
         self.modal_windows["mode_manager"].show()
         self.modal_windows["mode_manager"].closed.connect(
             lambda: self._remove_modal_window("mode_manager")

@@ -327,3 +327,5 @@ def joystick_devices_initialization():
         _joystick_device_guid_map[device.device_guid] = device
 
     _joystick_init_lock.release()
+
+
