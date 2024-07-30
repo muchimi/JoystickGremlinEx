@@ -26,7 +26,7 @@ from xml.etree import ElementTree
 import gremlin
 import gremlin.base_profile
 from gremlin.input_types import InputType
-from gremlin.ui.ui_common import DualSlider, DynamicDoubleSpinBox
+from gremlin.ui.ui_common import DynamicDoubleSpinBox
 import gremlin.ui.input_item
 
 g_scene_size = 250.0

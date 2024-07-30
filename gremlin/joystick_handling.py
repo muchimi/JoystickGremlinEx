@@ -92,6 +92,44 @@ def vjoy_devices():
     """
     return [dev for dev in _joystick_devices if dev.is_virtual]
 
+def scale_to_range(value, source_min = -1.0, source_max = 1.0, target_min = -1.0, target_max = 1.0, invert = False):
+    ''' scales a value on one range to the new range
+    
+    value: the value to scale
+    r_min: the source value's min range 
+    r_max: the source value's max range
+    new_min: the new range's min
+    new_max: the new range's max
+    invert: true if the value should be reversed
+    '''
+    r_delta = source_max - source_min
+    if r_delta == 0:
+        # frame the value if no valid range given
+        if value < source_min:
+            value = -1.0
+        if value > source_max:
+            value = 1.0
+
+    if invert:
+        result = (((source_max - value) * (target_max - target_min)) / (source_max - source_min)) + target_min
+    else:
+        result = (((value - source_min) * (target_max - target_min)) / (source_max - source_min)) + target_min
+    return result + 0
+
+def get_axis(guid, index, normalized = True):
+    ''' gets the value of the specified axis
+     
+    :param: normalized  - if set - normalizes to -1.0 +1.0 floating point
+       
+    '''
+    value = dinput.DILL.get_axis(guid, index)
+    if normalized:
+        return gremlin.util.scale_to_range(value, source_min = -32767, source_max = 32767, target_min = -1, target_max = 1)
+
+
+
+    
+
 
 def physical_devices():
     """Returns the list of physical devices.

@@ -779,9 +779,9 @@ def safe_format(value, data_type, formatter=str):
 
 def get_xml_child(node, tag : str):
     ''' gets a specific xml child node by tag - None if not found '''
-    tag = tag.casefold()
+    value = tag.casefold()
     for child in list(node):
-        if child.tag.casefold == tag:
+        if child.tag.casefold() == value:
             return child
     return None
 
@@ -918,18 +918,16 @@ def scale_to_range(value, source_min = -1.0, source_max = 1.0, target_min = -1.0
     r_delta = source_max - source_min
     if r_delta == 0:
         # frame the value if no valid range given
-        if value < -1.0:
-            return -1.0
-        if value > 1.0:
-            return 1.0
-        return value
+        if value < source_min:
+            value = -1.0
+        if value > source_max:
+            value = 1.0
 
     if invert:
         result = (((source_max - value) * (target_max - target_min)) / (source_max - source_min)) + target_min
     else:
         result = (((value - source_min) * (target_max - target_min)) / (source_max - source_min)) + target_min
-    return result
-    
+    return result + 0
 
 def list_to_csv(data) -> str:
     ''' converts an input list to a CSV stream  - returns a single row '''

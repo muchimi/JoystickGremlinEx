@@ -19,14 +19,13 @@
 
 
 import os
-import lxml
-from lxml import etree
-
+from xml.etree import ElementTree
 from PySide6 import QtWidgets, QtCore, QtGui
 
 import gremlin.base_profile
 import gremlin.config
 from gremlin.input_types import InputType
+import gremlin.joystick_handling
 import gremlin.shared_state
 import gremlin.macro
 from gremlin.ui import ui_common
@@ -37,6 +36,7 @@ from gremlin.types import *
 
 from enum import Enum, auto
 from gremlin.macro_handler import *
+import gremlin.util
 
 
 class GateAction(Enum):
@@ -48,6 +48,8 @@ class GateAction(Enum):
 
 class GateCondition(Enum):
     ''' gate action trigger conditions'''
+    InRange = auto() # triggers when the value is in range
+    OutsideRange = auto() # triggers when the value is outside the range
     OnRangeEnter = auto() # triggers on entry in the gate range
     OnRangeEnterRepeat = auto() # triggers whenever the value changes while inside the range
     OnRangeExit = auto() # triggers on exit from the gate range
@@ -95,6 +97,8 @@ _gate_action_name = {
 }
 
 _gate_condition_to_name = {
+    GateCondition.InRange: "in_range",
+    GateCondition.OutsideRange: "outside_range",
     GateCondition.OnRangeEnter: "range_enter",
     GateCondition.OnRangeEnterRepeat: "range_enter_repeat",
     GateCondition.OnRangeExit: "range_exit",
@@ -106,6 +110,8 @@ _gate_condition_to_name = {
 }
 
 _gate_condition_from_name = {
+    "in_range": GateCondition.InRange,
+    "outside_range": GateCondition.OutsideRange,
     "range_enter": GateCondition.OnRangeEnter ,
     "range_enter_repeat": GateCondition.OnRangeEnterRepeat ,
     "range_exit": GateCondition.OnRangeExit ,
@@ -117,8 +123,10 @@ _gate_condition_from_name = {
 }
 
 _gate_condition_description = {
-    GateCondition.OnRangeEnter: "Triggers once when the input value is within the gate",
-    GateCondition.OnRangeEnterRepeat: "Triggers whenever the value changes while the input value is within the gate",
+    GateCondition.InRange: "Triggers whenever the input value is in range",
+    GateCondition.OutsideRange: "Triggers whenever the input value is outside the range",
+    GateCondition.OnRangeEnter: "Triggers once when the input value enters the gate",
+    GateCondition.OnRangeEnterRepeat: "Triggers whenever the value changes when in range",
     GateCondition.OnRangeExit: "Triggers when the input leaves the gate",
     GateCondition.OnEnterMin: "Triggers when the input enters the gate from below",
     GateCondition.OnEnterMax: "Triggers when the input enters the gate from above",
@@ -128,6 +136,8 @@ _gate_condition_description = {
 }
 
 _gate_condition_name = {
+    GateCondition.InRange: "In Range",
+    GateCondition.OutsideRange: "Outside Range",
     GateCondition.OnRangeEnter: "Range Enter",
     GateCondition.OnRangeEnterRepeat: "Range Enter (repeat)",
     GateCondition.OnRangeExit: "Range Exit",
@@ -186,6 +196,7 @@ class GateData():
         self.action = action
         self.condition = condition
         self.output_mode = mode
+        self.fixed_value = 0
         self.range_min = range_min
         self.range_max = range_max
         self.macro : gremlin.macro.Macro = None  # macro steps
@@ -198,33 +209,116 @@ class GateData():
         self.repeat = None # macro repeat
         self.force_remote = False # macro force remote
 
+    def valid_conditions(self):
+        ''' returns the list of valid conditions for the given action '''
+        if self.action in (GateAction.Ranged, GateAction.NoAction):
+            return (GateCondition.InRange, GateCondition.OutsideRange)
+        else:
+             return (GateCondition.OnRangeEnter, 
+                    GateCondition.OnRangeEnterRepeat,
+                    GateCondition.OnRangeExit, 
+                    GateCondition.OnEnterMin, 
+                    GateCondition.OnEnterMax,
+                    GateCondition.OnExitMin,
+                    GateCondition.OnExitMax,
+                    GateCondition.OnSteps)
+
+
+
+    def process_value(self, value):
+        ''' processes an axis input value through the gate options
+         
+        :param: value - the input float value -1 to +1
+           
+        '''
+        if not self.action in (GateAction.Ranged, GateAction.NoAction):
+            # not a mode we process
+            return None
+        if self.output_mode == GateRangeOutputMode.Fixed:
+            # return the fixed value for the range
+            self._output_value = self.fixed_value
+        elif self.output_mode == GateRangeOutputMode.Normal:
+            # passthrough mode
+            if self.condition == GateCondition.InRange:
+                if value < self.min or value > self.max: 
+                    # outside the range
+                    return None
+            elif self.condition == GateCondition.OutsideRange:
+                if value >= self.min and value <= self.max: 
+                    # in the range excluded
+                    return None
+            return value
+        elif self.output_mode == GateRangeOutputMode.Ranged:
+            if self.condition == GateCondition.InRange:
+                if value < self.min or value > self.max: 
+                    # outside the range
+                    return None
+                # double scale the input - to the range, then to the output range
+                range_value = gremlin.util.scale_to_range(value, target_min = self.min, target_max=self.max)
+                return gremlin.util.scale_to_range(range_value, target_min = self.range_min, target_max=self.range_max)
+        
+            if self.condition == GateCondition.OutsideRange:
+                if value >= self.min and value <= self.max: 
+                    # in the range = exclude
+                    return None
+                if value < self.min:
+                    range_value = gremlin.util.scale_to_range(value, target_min = -1, target_max = self.min)
+                elif value > self.max:
+                    range_value = gremlin.util.scale_to_range(value, target_min = self.max,  target_max = 1)
+                return gremlin.util.scale_to_range(range_value, target_min = self.range_min, target_max=self.range_max)
+
+        return None
+        
 
     def to_xml(self):
         ''' export this configuration to XML '''
-        node = etree.Element("gate")
+        node = ElementTree.Element("gate")
         node.set("action", _gate_action_to_name[self.action])
         node.set("condition", _gate_condition_to_name[self.condition])
         node.set("mode", _gate_range_to_name[self.output_mode])
         if self.action == GateAction.Ranged:
-            node.extend(self.range_to_xml(self.min, self.max,"input_range"))
-            node.extend(self.range_to_xml(self.range_min, self.range_max,"output_range"))
+            node.append(self.range_to_xml(self.min, self.max,"input_range"))
+            node.append(self.range_to_xml(self.range_min, self.range_max,"output_range"))
+            node_fixed = ElementTree.SubElement(node,"fixed_value")
+            node_fixed.text = str(self.fixed_value)
+
 
         elif self.action == GateAction.Macro:
             child = self.macro_to_xml()
-            node.extend(child)
+            node.append(child)
         elif self.action == GateAction.SendKey:
             child = self.keyboard_to_xml()
-            node.extend(child)
+            node.append(child)
 
         return node
 
     def from_xml(self, node):
         if not node.tag == "gate":
-            syslog.error(f"GateData: Invalid node type {node.tag}")
+            syslog.error(f"GateData: Invalid node type {node.tag} {node}")
             return
-        self.action = _gate_action_from_name(node.get("action"))
-        self.condition = _gate_condition_from_name(node.get("condition"))
-        self.output_mode = _gate_range_from_name(node.get("mode"))
+        action = safe_read(node, "action", str, "")
+        if not action in _gate_action_from_name.keys():
+            syslog.error(f"GateData: Invalid action type {action} {node}")
+            return
+        self.action = _gate_action_from_name[action]
+
+        condition = safe_read(node, "condition", str, "")
+        if not condition in _gate_condition_from_name.keys():
+            syslog.error(f"GateData: Invalid condition type {condition} {node}")
+            return
+        condition = _gate_condition_from_name[condition]
+        valid_conditions = self.valid_conditions()
+        if not condition in valid_conditions:
+            condition = valid_conditions[0]
+        self.condition = condition
+            
+
+
+        mode = safe_read(node,"mode",str,"")
+        if not mode in _gate_range_from_name.keys():
+            syslog.error(f"GateData: Invalid mode type {mode} {node}")
+            return
+        self.output_mode = _gate_range_from_name[mode]
 
         if self.action == GateAction.Macro:
             # read macro node
@@ -234,19 +328,23 @@ class GateData():
         elif self.action == GateAction.SendKey:
             child = get_xml_child(node, "key")
             if child is not None:
-                self.keyboard_from_xml_from_xml(child)
+                self.keyboard_from_xml(child)
         elif self.action == GateAction.Ranged:
-            child = get_xml_child("input_range")
+            child = get_xml_child(node, "input_range")
             self.min, self.max = self.range_from_xml(child)
-            child = get_xml_child("output_range")
+            child = get_xml_child(node, "output_range")
             self.range_min, self.range_max = self.range_from_xml(child)
+            child = get_xml_child(node, "fixed_value")
+            if child:
+                self.fixed_value = float(child.text)
+
 
             
 
         
             
     def range_to_xml(self, min, max, tag = "range"):
-        node = etree.Element(tag)
+        node = ElementTree.Element(tag)
         node.set("min", f"{min:0.5f}")
         node.set("max", f"{max:0.5f}")
         return node
@@ -261,7 +359,7 @@ class GateData():
 
     def keyboard_to_xml(self):
         ''' saves data to XML '''
-        node = etree.Element("key")
+        node = ElementTree.Element("key")
         if self.key_mode == KeyboardOutputMode.Both:
             mode = "both"
         elif self.key_mode == KeyboardOutputMode.Press:
@@ -295,7 +393,7 @@ class GateData():
             else:
                 assert True, f"Don't know how to handle: {code}"
             
-            key_node = etree.Element("key")
+            key_node = ElementTree.Element("key")
             key_node.set("virtual-code", str(virtual_code))
             key_node.set("scan-code", str(scan_code))
             key_node.set("extended", str(is_extended))
@@ -337,24 +435,24 @@ class GateData():
 
     
     def macro_to_xml(self, tag = "macro"):
-        node = etree.Element(tag)
-        properties = etree.Element("properties")
+        node = ElementTree.Element(tag)
+        properties = ElementTree.Element("properties")
         if self.exclusive:
-            prop_node = etree.Element("exclusive")
+            prop_node = ElementTree.Element("exclusive")
             properties.append(prop_node)
         if self.repeat:
             properties.append(self.repeat.to_xml())
         if self.force_remote:
-            prop_node = etree.Element("force_remote")
+            prop_node = ElementTree.Element("force_remote")
             properties.append(prop_node)
 
 
         node.append(properties)
 
-        action_list = etree.Element("actions")
+        action_list = ElementTree.Element("actions")
         for entry in self.sequence:
             if isinstance(entry, gremlin.macro.JoystickAction):
-                joy_node = etree.Element("joystick")
+                joy_node = ElementTree.Element("joystick")
                 joy_node.set("device-guid", write_guid(entry.device_guid))
                 joy_node.set(
                     "input-type",
@@ -364,29 +462,29 @@ class GateData():
                 joy_node.set("value", self._joy_value_to_str(entry))
                 action_list.append(joy_node)
             elif isinstance(entry, gremlin.macro.KeyAction):
-                action_node = etree.Element("key")
+                action_node = ElementTree.Element("key")
                 action_node.set("scan-code", str(entry.key.scan_code))
                 action_node.set("extended", str(entry.key.is_extended))
                 action_node.set("press", str(entry.is_pressed))
                 action_list.append(action_node)
             elif isinstance(entry, gremlin.macro.MouseButtonAction):
-                action_node = etree.Element("mouse")
+                action_node = ElementTree.Element("mouse")
                 action_node.set("button", str(entry.button.value))
                 action_node.set("press", str(entry.is_pressed))
                 action_list.append(action_node)
             elif isinstance(entry, gremlin.macro.MouseMotionAction):
-                action_node = etree.Element("mouse-motion")
+                action_node = ElementTree.Element("mouse-motion")
                 action_node.set("dx", str(entry.dx))
                 action_node.set("dy", str(entry.dy))
                 action_list.append(action_node)
             elif isinstance(entry, gremlin.macro.PauseAction):
-                pause_node = etree.Element("pause")
+                pause_node = ElementTree.Element("pause")
                 pause_node.set("duration", str(entry.duration))
                 pause_node.set("duration_max", str(entry.duration_max))
                 pause_node.set("is_random", str(entry.is_random))
                 action_list.append(pause_node)
             elif isinstance(entry, gremlin.macro.VJoyMacroAction):
-                vjoy_node = etree.Element("vjoy")
+                vjoy_node = ElementTree.Element("vjoy")
                 vjoy_node.set("vjoy-id", str(entry.vjoy_id))
                 vjoy_node.set(
                     "input-type",
@@ -398,7 +496,7 @@ class GateData():
                     vjoy_node.set("axis-type", safe_format(entry.axis_type, str))
                 action_list.append(vjoy_node)
             elif isinstance(entry, gremlin.macro.RemoteControlAction):
-                action_node = etree.Element("remote_control")
+                action_node = ElementTree.Element("remote_control")
                 action_node.set("command",entry.command.name)
                 action_list.append(action_node)
 
@@ -556,39 +654,84 @@ class GateWidget(QtWidgets.QWidget):
     delete_requested = QtCore.Signal(object) # fired when the remove button is clicked - passes the GateData to blitz
     duplicate_requested = QtCore.Signal(object) # fired when the duplicate button is clicked - passes the GateData to duplicate
 
+    slider_css = """
+QSlider::groove:horizontal {
+    border: 1px solid #565a5e;
+    height: 10px;
+    background: #eee;
+    margin: 0px;
+    border-radius: 4px;
+}
+QSlider::handle:horizontal {
+    background: #8FBC8F;
+    border: 1px solid #565a5e;
+    width: 8pxpx;
+    height: 8px;
+    border-radius: 4px;
+}
+"""
+
+
     def __init__(self, action_data, gate_data, parent = None):
 
         import gremlin.event_handler
-
+        import gremlin.joystick_handling
+        
         super().__init__(parent)
         self.gate_data : GateData = gate_data
         self.action_data = action_data
 
 
+        self.single_step = 0.01 # amount of a single step when scrolling 
+        self.decimals = 3 # number of decimals
+        self._output_value = 0
+
+        self.main_layout = QtWidgets.QGridLayout(self)
+
+
+        if action_data.hardware_input_type != InputType.JoystickAxis:
+            missing = QtWidgets.QLabel("Invalid input type - joystick axis expected")
+            self.main_layout.addWidget(missing)
+            return
+        
+        # get the curent axis normalized value -1 to +1
+        value = gremlin.joystick_handling.get_axis(action_data.hardware_device_guid, action_data.hardware_input_id)
+        self._axis_value = value 
+
         # axis input repeater
-        self._input_axis_widget = ui_common.AxisStateWidget(show_label = False, orientation=QtCore.Qt.Orientation.Horizontal, show_percentage=False, show_value=True)
+        #self.slider = QDoubleRangeSlider()
+        self.slider = ui_common.QMarkerDoubleRangeSlider()
+        self.slider.setOrientation(QtCore.Qt.Horizontal)
+        self.slider.setRange(-1,1)
+        self.slider.setValue([self.gate_data.min,self.gate_data.max]) # first value is the axis value
+        self.slider.setMarkerValue(value)
+        self.slider.valueChanged.connect(self._slider_value_changed_cb)
+        self.slider.setMinimumWidth(200)
+        self.slider.setStyleSheet("QSlider::active:{background: #8FBC8F;}")
+        #self.slider.setStyleSheet(self.slider_css)
+
+        self.test_checkbox = ui_common.QToggleText()
+        self.test_checkbox.setText("text checkbox")
+
+
 
         self.sb_min_widget = ui_common.DynamicDoubleSpinBox()
         self.sb_min_widget.setMinimum(-1.0)
         self.sb_min_widget.setMaximum(1.0)
-        self.sb_min_widget.setDecimals(3)
-        self.sb_min_widget.valueChanged.connect(self._range_min_changed_cb)
+        self.sb_min_widget.setDecimals(self.decimals)
+        self.sb_min_widget.setSingleStep(self.single_step)
+        self.sb_min_widget.setValue(self.gate_data.min)
+        self.sb_min_widget.valueChanged.connect(self._min_changed_cb)
+
+
         self.sb_max_widget = ui_common.DynamicDoubleSpinBox()
         self.sb_max_widget.setMinimum(-1.0)
         self.sb_max_widget.setMaximum(1.0)        
-        self.sb_max_widget.setDecimals(3)
-        self.sb_max_widget.valueChanged.connect(self._range_max_changed_cb)
+        self.sb_max_widget.setDecimals(self.decimals)
+        self.sb_max_widget.setSingleStep(self.single_step)
+        self.sb_max_widget.setValue(self.gate_data.max)
+        self.sb_max_widget.valueChanged.connect(self._max_changed_cb)
 
-        self.sb_range_min_widget = gremlin.ui.ui_common.DynamicDoubleSpinBox()
-        self.sb_range_min_widget.setMinimum(-1.0)
-        self.sb_range_min_widget.setMaximum(1.0)
-        self.sb_range_min_widget.setDecimals(3)
-        self.sb_range_min_widget.valueChanged.connect(self._range_min_changed_cb)
-        self.sb_range_max_widget = gremlin.ui.ui_common.DynamicDoubleSpinBox()
-        self.sb_range_max_widget.setMinimum(-1.0)
-        self.sb_range_max_widget.setMaximum(1.0)        
-        self.sb_range_max_widget.setDecimals(3)
-        self.sb_range_max_widget.valueChanged.connect(self._range_max_changed_cb)
 
         grab_icon = load_icon("mdi.record-rec",qta_color = "red")
         self.sb_min_grab_widget = ui_common.QDataPushButton()
@@ -596,95 +739,113 @@ class GateWidget(QtWidgets.QWidget):
         self.sb_min_grab_widget.setIcon(grab_icon)
         self.sb_min_grab_widget.setMaximumWidth(20)
         self.sb_min_grab_widget.clicked.connect(self._grab_cb)
+        self.sb_min_grab_widget.setToolTip("Grab axis value")
 
         self.sb_max_grab_widget = ui_common.QDataPushButton()
         self.sb_max_grab_widget.data = self.sb_max_widget # control to update
         self.sb_max_grab_widget.setIcon(grab_icon)
         self.sb_max_grab_widget.setMaximumWidth(20)
         self.sb_max_grab_widget.clicked.connect(self._grab_cb)
+        self.sb_max_grab_widget.setToolTip("Grab axis value")
 
-        self.sb_range_min_grab_widget = ui_common.QDataPushButton()
-        self.sb_range_min_grab_widget.data = self.sb_range_min_widget
-        self.sb_range_min_grab_widget.setIcon(grab_icon)
-        self.sb_range_min_grab_widget.setMaximumWidth(20)
-        self.sb_range_min_grab_widget.clicked.connect(self._grab_cb)
 
-        self.sb_range_max_grab_widget = ui_common.QDataPushButton()
-        self.sb_range_max_grab_widget.data = self.sb_range_max_widget
-        self.sb_range_max_grab_widget.setIcon(grab_icon)
-        self.sb_range_max_grab_widget.setMaximumWidth(20)
-        self.sb_range_max_grab_widget.clicked.connect(self._grab_cb)
+        self.container_slider_widget = QtWidgets.QWidget()
+        self.container_slider_layout = QtWidgets.QGridLayout(self.container_slider_widget)
+        self.container_slider_layout.addWidget(self.slider,0,0,-1,1)
+
+
+        self.container_slider_layout.addWidget(QtWidgets.QLabel("Gate Min:"), 0,1)
+        self.container_slider_layout.addWidget(self.sb_min_widget,1,1)
+        self.container_slider_layout.addWidget(self.sb_min_grab_widget,1,2)
+
+        self.container_slider_layout.addWidget(QtWidgets.QLabel("Gate Max:"),0,3)
+        self.container_slider_layout.addWidget(self.sb_max_widget, 1,3)
+        self.container_slider_layout.addWidget(self.sb_max_grab_widget,1,4)
+
+        # self.container_slider_layout.addWidget(QtWidgets.QLabel("Output Min:"),0,5)
+        # self.container_slider_layout.addWidget(self.sb_range_min_widget,1,5)
+        # #self.container_range_layout.addWidget(self.sb_range_min_grab_widget,1,5)
+
+        # self.container_slider_layout.addWidget(QtWidgets.QLabel("Output Max:"),0,6)
+        # self.container_slider_layout.addWidget(self.sb_range_max_widget,1,6)
+
+        self.container_slider_layout.addWidget(QtWidgets.QLabel(" "),0,6)
+
+        self.container_slider_layout.setColumnStretch(0,3)
+        
+        self.container_slider_widget.setContentsMargins(0,0,0,0)
+        
+
+        
+
+       
+
+    
 
         # action drop down
         self.action_selector_widget = QtWidgets.QComboBox()
         for action in GateAction:
             self.action_selector_widget.addItem(_gate_action_name[action], action)
+        index = self.action_selector_widget.findData(self.gate_data.action)
+        self.action_selector_widget.setCurrentIndex(index)
         self.action_selector_widget.currentIndexChanged.connect(self._action_changed_cb)
+        
+
+        self.action_description_widget = QtWidgets.QLabel()
+
 
         # condition drop down
         self.condition_selector_widget = QtWidgets.QComboBox()
-        for condition in GateCondition:
-            self.condition_selector_widget.addItem(_gate_condition_name[condition], condition)
+        self.condition_selector_widget.setCurrentIndex(index)
         self.condition_selector_widget.currentIndexChanged.connect(self._condition_changed_cb)
+                
 
+        self.condition_description_widget = QtWidgets.QLabel()
+
+        
         # range mode drop down
         self.range_mode_selector_widget = QtWidgets.QComboBox()
         for mode in GateRangeOutputMode:
             self.range_mode_selector_widget.addItem(_gate_range_name[mode], mode)
+        index = self.range_mode_selector_widget.findData(self.gate_data.output_mode)
+        self.range_mode_selector_widget.setCurrentIndex(index)
+
         self.range_mode_selector_widget.currentIndexChanged.connect(self._range_mode_changed_cb)
 
 
         self.container_selector_widget = QtWidgets.QWidget()
         self.container_selector_layout = QtWidgets.QHBoxLayout(self.container_selector_widget)
+        self.container_selector_widget.setContentsMargins(0,0,0,0)
 
+        self.container_selector_layout.addWidget(QtWidgets.QLabel("Action:"))
         self.container_selector_layout.addWidget(self.action_selector_widget)
+        self.container_selector_layout.addWidget(QtWidgets.QLabel("Condition:"))
         self.container_selector_layout.addWidget(self.condition_selector_widget)
+        self.container_selector_layout.addWidget(QtWidgets.QLabel("Output Mode:"))
         self.container_selector_layout.addWidget(self.range_mode_selector_widget)
         self.container_selector_layout.addStretch()
 
      
-        clear_button = ui_common.QDataPushButton()
-        clear_button.setIcon(load_icon("mdi.delete"))
-        clear_button.setMaximumWidth(20)
-        clear_button.data = self.gate_data
-        clear_button.clicked.connect(self._delete_cb)
-        clear_button.setToolTip("Removes this entry")
+        self.clear_button_widget = ui_common.QDataPushButton()
+        self.clear_button_widget.setIcon(load_icon("mdi.delete"))
+        self.clear_button_widget.setMaximumWidth(20)
+        self.clear_button_widget.data = self.gate_data
+        self.clear_button_widget.clicked.connect(self._delete_cb)
+        self.clear_button_widget.setToolTip("Removes this entry")
         
 
 
-        duplicate_button = ui_common.QDataPushButton()
-        duplicate_button.setIcon(load_icon("mdi.content-duplicate"))
-        duplicate_button.setMaximumWidth(20)
-        duplicate_button.data = self.gate_data
-        duplicate_button.clicked.connect(self._duplicate_cb)
-        duplicate_button.setToolTip("Duplicates this entry")
+        self.duplicate_button_widget = ui_common.QDataPushButton()
+        self.duplicate_button_widget.setIcon(load_icon("mdi.content-duplicate"))
+        self.duplicate_button_widget.setMaximumWidth(20)
+        self.duplicate_button_widget.data = self.gate_data
+        self.duplicate_button_widget.clicked.connect(self._duplicate_cb)
+        self.duplicate_button_widget.setToolTip("Duplicates this entry")
        
-        self.container_range_widget = QtWidgets.QWidget()
-        self.container_range_layout = QtWidgets.QGridLayout(self.container_range_widget)
-        
-        self.container_range_layout.addWidget(QtWidgets.QLabel("Gate Min:"), 0,0)
-        self.container_range_layout.addWidget(self.sb_min_widget,1,0)
-        self.container_range_layout.addWidget(self.sb_min_grab_widget,1,1
-                                              )
-        self.container_range_layout.addWidget(QtWidgets.QLabel("Gate Max:"),0,2)
-        self.container_range_layout.addWidget(self.sb_max_widget, 1,2)
-        self.container_range_layout.addWidget(self.sb_max_grab_widget,1,3)
 
-        self.container_range_layout.addWidget(QtWidgets.QLabel("Output Min:"),0,4)
-        self.container_range_layout.addWidget(self.sb_range_min_widget,1,4)
-        self.container_range_layout.addWidget(self.sb_range_min_grab_widget,1,5)
-
-        self.container_range_layout.addWidget(QtWidgets.QLabel("Output Max:"),0,6)
-        self.container_range_layout.addWidget(self.sb_range_max_widget,1,6)
-        self.container_range_layout.addWidget(self.sb_range_min_grab_widget,1,8)
-
-        self.container_range_layout.addWidget(clear_button, 0, 7)
-        self.container_range_layout.addWidget(duplicate_button, 1, 7)
-
-
-        self.container_range_layout.addWidget(QtWidgets.QLabel(" "),0,7)
-        self.container_range_layout.setColumnStretch(7,3)
-        
+    
+        # ranged container
+        self._create_output_ui()
 
         # macro container
         self._macro_widget = None
@@ -693,26 +854,57 @@ class GateWidget(QtWidgets.QWidget):
         # key container
         self._create_keyboard_ui()
 
-        self.main_layout = QtWidgets.QVBoxLayout(self)
-        self.main_layout.addWidget(self.container_selector_widget)
-        self.main_layout.addWidget(self.container_macro_widget)
-        self.main_layout.addWidget(self.container_key_widget)
-        self.main_layout.addWidget(self.container_range_widget)
+        self.container_description_widget = QtWidgets.QWidget()
+        self.container_description_layout = QtWidgets.QVBoxLayout(self.container_description_widget)
+        self.container_description_layout.addWidget(self.action_description_widget)
+        self.container_description_layout.addWidget(self.condition_description_widget)
+        self.container_description_widget.setContentsMargins(0,0,0,0)
 
+
+        self.container_selector_layout.addWidget(self.clear_button_widget)
+        self.container_selector_layout.addWidget(self.duplicate_button_widget)
+
+        self.main_layout.addWidget(self.container_selector_widget,0,0)
+        
+        
+        self.main_layout.addWidget(self.container_description_widget,1,0)
+        self.main_layout.addWidget(self.container_slider_widget,2,0)
+        self.main_layout.addWidget(self.container_macro_widget,3,0)
+        self.main_layout.addWidget(self.container_key_widget,3,0)
+        self.main_layout.addWidget(self.container_output_widget,3,0)
+
+        
+        self.main_layout.setVerticalSpacing(0)
 
         # hook the joystick input for axis input repeater
         el = gremlin.event_handler.EventListener()
         el.joystick_event.connect(self._joystick_event_cb)
 
         # update visible container for the current mode
+        self._update_conditions()
         self._update_ui()
+
+    @QtCore.Slot()
+    def _slider_value_changed_cb(self):
+        ''' occurs when the slider values change '''
+        slider_value = list(self.slider.value())
+        min,max = slider_value
+        
+        with QtCore.QSignalBlocker(self.sb_min_widget):
+            self.gate_data.min = min
+            self.sb_min_widget.setValue(min)
+        with QtCore.QSignalBlocker(self.sb_max_widget):
+            self.gate_data.max = max
+            self.sb_max_widget.setValue(max)
+
+        
 
 
     @QtCore.Slot()
     def _grab_cb(self):
         ''' grab the min value from the axis position '''
         widget = self.sender().data  # the button's data field contains the widget to update
-        value = self._input_axis_widget.value()
+        value = self._axis_value
         widget.setValue(value)
 
     def _delete_cb(self):
@@ -730,6 +922,7 @@ class GateWidget(QtWidgets.QWidget):
     
     @QtCore.Slot(object)
     def _joystick_event_cb(self, event):
+        
         if self.is_running or not event.is_axis:
             # ignore if not an axis event and if the profile is running, or input for a different device
             return
@@ -744,15 +937,91 @@ class GateWidget(QtWidgets.QWidget):
         
 
         raw_value = event.raw_value
-        input_value = gremlin.util.scale_to_range(raw_value, source_min = -32767, source_max = 32767, target_min = -1, target_max = 1) + 0 # removes negative zero in python
-        self._input_axis_widget.setValue(input_value)
+        input_value = gremlin.joystick_handling.scale_to_range(raw_value, source_min = -32767, source_max = 32767, target_min = -1, target_max = 1) 
+        self._axis_value = input_value
+        self.slider.setMarkerValue(input_value)
+        self._update_output_value()
 
+
+    def _create_output_ui(self):
+        ''' creates the output line ui options '''
+
+        self.container_range_widget = QtWidgets.QWidget()
+        self.container_range_layout = QtWidgets.QHBoxLayout(self.container_range_widget)
+        self.container_range_widget.setContentsMargins(0,0,0,0)
+        
+        self.sb_range_min_widget = gremlin.ui.ui_common.DynamicDoubleSpinBox()
+        self.sb_range_min_widget.setMinimum(-1.0)
+        self.sb_range_min_widget.setMaximum(1.0)
+        self.sb_range_min_widget.setDecimals(self.decimals)
+        self.sb_range_min_widget.setSingleStep(self.single_step)
+        self.sb_range_min_widget.setValue(self.gate_data.range_min)
+        self.sb_range_min_widget.valueChanged.connect(self._range_min_changed_cb)
+
+        self.sb_range_max_widget = gremlin.ui.ui_common.DynamicDoubleSpinBox()
+        self.sb_range_max_widget.setMinimum(-1.0)
+        self.sb_range_max_widget.setMaximum(1.0)        
+        self.sb_range_max_widget.setDecimals(self.decimals)
+        self.sb_range_max_widget.setSingleStep(self.single_step)
+        self.sb_range_max_widget.setValue(self.gate_data.range_max)
+
+        # holds the output value
+        self.output_value_widget = QtWidgets.QLineEdit()
+        self.output_value_widget.setReadOnly(True)
+        
+
+        self.sb_range_max_widget.valueChanged.connect(self._range_max_changed_cb)
+
+        self.sb_fixed_value_widget = gremlin.ui.ui_common.DynamicDoubleSpinBox()
+        self.sb_fixed_value_widget.setMinimum(-1.0)
+        self.sb_fixed_value_widget.setMaximum(1.0)        
+        self.sb_fixed_value_widget.setDecimals(self.decimals)
+        self.sb_fixed_value_widget.setSingleStep(self.single_step)
+        self.sb_fixed_value_widget.setValue(self.gate_data.fixed_value)
+
+        self.container_range_layout.addWidget(QtWidgets.QLabel("Range options:"))
+        self.container_range_layout.addWidget(QtWidgets.QLabel("Range Min:"))
+        self.container_range_layout.addWidget(self.sb_range_min_widget)
+        self.container_range_layout.addWidget(QtWidgets.QLabel("Range Max:"))
+        self.container_range_layout.addWidget(self.sb_range_max_widget)
+        
+        
+
+        
+
+        
+        self.container_fixed_widget = QtWidgets.QWidget()
+        self.container_fixed_widget.setContentsMargins(0,0,0,0)
+        self.container_fixed_layout = QtWidgets.QHBoxLayout(self.container_fixed_widget)
+        self.container_fixed_layout.addWidget(QtWidgets.QLabel("Fixed Value:"))
+        self.container_fixed_layout.addWidget(self.sb_fixed_value_widget)
+
+
+        
+        
+
+        
+
+        
+        self.container_output_widget = QtWidgets.QWidget()
+        self.container_output_widget.setContentsMargins(0,0,0,0)
+        self.container_output_layout = QtWidgets.QHBoxLayout(self.container_output_widget)
+        self.container_output_layout.addWidget(self.container_range_widget)
+        self.container_output_layout.addWidget(self.container_fixed_widget)
+        self.container_output_layout.addStretch()
+        self.container_output_layout.addWidget(QtWidgets.QLabel("Output Value:"))
+        self.container_output_layout.addWidget(self.output_value_widget)
+        
+
+
+        
 
     def _create_macro_ui(self):
         ''' creates the macro ui '''
 
         self.container_macro_widget = QtWidgets.QWidget()
         self.container_macro_layout = QtWidgets.QHBoxLayout(self.container_macro_widget)
+        self.container_macro_widget.setContentsMargins(0,0,0,0)
         # delay load macro widget because it is VERY slow to load
         self._macro_widget = None
     
@@ -762,6 +1031,7 @@ class GateWidget(QtWidgets.QWidget):
         ''' creates the keyboard UI '''
         self.container_key_widget = QtWidgets.QWidget()
         self.container_key_layout = QtWidgets.QHBoxLayout(self.container_key_widget)
+        self.container_key_layout.setContentsMargins(0,0,0,0)
 
         self.key_combination = QtWidgets.QLabel()
 
@@ -871,17 +1141,51 @@ class GateWidget(QtWidgets.QWidget):
         gremlin.shared_state.pop_suspend_ui_keyinput()        
         
 
+    def _update_output_value(self):
+        value =self.gate_data.process_value(self._axis_value)
+        self._output_value = value
+        if value is None:
+            # no output value
+            self.output_value_widget.setText(f"No Output")
+        else:
+            self.output_value_widget.setText(f"{value:0.{self.decimals}f}")
+
     QtCore.Slot()
     def _range_min_changed_cb(self):
-        self.gate_data.min = self.sb_axis_min.value()
+        value = self.sb_range_min_widget.value()
+        self.gate_data.range_min = value
+        self._update_output_value()
 
     QtCore.Slot()
     def _range_max_changed_cb(self):
-        self.gate_data.min = self.sb_axis_max.value()
+        self.gate_data.range_max = self.sb_range_max_widget.value()
+        self._update_output_value()
+
+    QtCore.Slot()
+    def _min_changed_cb(self):
+        value = self.sb_min_widget.value()
+        self.gate_data.min = value
+        lv = list(self.slider.value())
+        lv[0] = value
+        with QtCore.QSignalBlocker(self.slider):
+            self.slider.setValue(lv)
+        self._update_output_value()            
+
+    QtCore.Slot()
+    def _max_changed_cb(self):
+        value = self.sb_max_widget.value()
+        self.gate_data.max = value
+        lv = list(self.slider.value())
+        lv[1] = value
+        with QtCore.QSignalBlocker(self.slider):
+            self.slider.setValue(lv)
+        self._update_output_value()
+
 
     QtCore.Slot(int)
     def _action_changed_cb(self):
         self.gate_data.action = self.action_selector_widget.currentData()
+        self._update_conditions()
         self._update_ui()
 
     QtCore.Slot(int)
@@ -895,12 +1199,39 @@ class GateWidget(QtWidgets.QWidget):
         self._update_ui()
 
 
+    def _update_conditions(self):
+        ''' updates the condition selector for conditions appropriate for the current action mode'''
+        self.condition_selector_widget.currentIndexChanged.disconnect(self._condition_changed_cb)
+        self.condition_selector_widget.clear()
+        conditions = self.gate_data.valid_conditions()
+        current_index = 0
+        for index, condition in enumerate(conditions):
+            self.condition_selector_widget.addItem(_gate_condition_name[condition], condition) 
+            if condition == self.gate_data.condition:
+                current_index = index
+        self.condition_selector_widget.setCurrentIndex(current_index)
+        self.condition_selector_widget.currentIndexChanged.connect(self._condition_changed_cb)
+
     def _update_ui(self):
+        ''' updates visibility of UI components based on the active options '''
+        self.action_description_widget.setText(_gate_action_description[self.gate_data.action])
+        self.condition_description_widget.setText(_gate_condition_description[self.gate_data.condition])
+
         macro_visible = False
         range_visible = False  
         key_visible = False
-        if self.gate_data.action == GateAction.NoAction:
-            range_visible = True
+        fixed_visible = False
+
+            
+        if self.gate_data.action in (GateAction.NoAction, GateAction.Ranged):
+            if self.gate_data.output_mode == GateRangeOutputMode.Fixed:
+                fixed_visible = True
+                range_visible = False
+            else:
+                fixed_visible = False
+                range_visible = True
+
+
         elif self.gate_data.action == GateAction.Macro:
             # delay load macro widget 
             if self._macro_widget is None:
@@ -908,14 +1239,19 @@ class GateWidget(QtWidgets.QWidget):
                 self.container_macro_layout.addWidget(self._macro_widget)
 
             macro_visible = True
-        elif self.gate_data.action == GateAction.Ranged:
-            range_visible = True
         elif self.gate_data.action == GateAction.SendKey:
             key_visible = True
 
+        
+
+        
+
+        self.container_fixed_widget.setVisible(fixed_visible)
         self.container_macro_widget.setVisible(macro_visible)
         self.container_range_widget.setVisible(range_visible)
         self.container_key_widget.setVisible(key_visible)
+
+        self._update_output_value()
 
         
     def _keyboard_mode_changed(self):
@@ -984,6 +1320,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.action_data = action_data
+        self.setMinimumHeight(300)
 
         self._gate_widgets = [] # holds the gate widgets in this map
 
@@ -1002,7 +1339,6 @@ class GatedAxisWidget(QtWidgets.QWidget):
         # start scrolling container widget definition
 
         self.container_map_widget = QtWidgets.QWidget()
-        self.container_map_widget.setMinimumHeight(200)
         self.container_map_layout = QtWidgets.QVBoxLayout(self.container_map_widget)
         self.container_map_layout.setContentsMargins(0,0,0,0)
 
@@ -1013,10 +1349,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
 
         # Configure the widget holding the layout with all the buttons
         self.scroll_widget.setLayout(self.scroll_layout)
-        self.scroll_widget.setSizePolicy(
-            QtWidgets.QSizePolicy.Expanding,
-            QtWidgets.QSizePolicy.Expanding
-        )
+        self.scroll_widget.setSizePolicy(QtWidgets.QSizePolicy.Expanding,QtWidgets.QSizePolicy.Expanding)
         self.scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
         self.scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
 
@@ -1043,7 +1376,13 @@ class GatedAxisWidget(QtWidgets.QWidget):
 
     @property
     def gates(self):
+        ''' defined gates - list of GateData items'''
         return self.action_data.gates
+    
+    @property
+    def gate_count(self):
+        ''' number of gates defined '''
+        return len(self.action_data.gates) 
 
     @QtCore.Slot()
     def _add_gate_cb(self):
@@ -1092,6 +1431,9 @@ class GatedAxisWidget(QtWidgets.QWidget):
         # clear the widgets
         ui_common.clear_layout(self.map_layout)
         self._gate_widgets = [] # holds all the gate widgets
+        gate_count = len(self.gates)
+
+        # self.container_map_widget.setMinimumHeight(200 * gate_count + 1)
 
         if not self.gates:
             # no item
@@ -1100,13 +1442,16 @@ class GatedAxisWidget(QtWidgets.QWidget):
             self.map_layout.addWidget(missing)
             return
 
-
+        
+        # default size
         for gate_data in self.gates:
             widget = GateWidget(action_data = self.action_data, gate_data=gate_data)
             widget.delete_requested.connect(self._remove_gate)
             widget.duplicate_requested.connect(self._duplicate_gate)
             self._gate_widgets.append(widget)
             self.map_layout.addWidget(widget)
+            if gate_count > 1:
+                self.map_layout.addWidget(ui_common.QHLine())
 
     
 

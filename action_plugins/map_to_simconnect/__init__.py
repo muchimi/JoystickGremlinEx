@@ -982,10 +982,6 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         # call super last because it will call create_ui and populate_ui so the vars must exist
         super().__init__(action_data, parent=parent)
 
-                
-
-
-
     def _create_ui(self):
         """Creates the UI components."""
         import gremlin.gated_handler
@@ -1191,6 +1187,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self._gates_widget = gremlin.gated_handler.GatedAxisWidget(action_data = self.action_data)
         self._output_gated_container_layout.addWidget(self._gates_widget)
+        self._output_gated_container_widget.setMinimumHeight(min(200, self._gates_widget.gate_count * 200))
 
         # status widget
         self.status_text_widget = QtWidgets.QLabel()
@@ -1694,7 +1691,7 @@ class MapToSimConnect(gremlin.base_profile.AbstractAction):
         self.gates = []
         gate_node = gremlin.util.get_xml_child(node,"gates")
         if gate_node:
-            for child in node:
+            for child in gate_node:
                 gate_data = gremlin.gated_handler.GateData()
                 gate_data.from_xml(child)
                 self.gates.append(gate_data)
@@ -1707,7 +1704,7 @@ class MapToSimConnect(gremlin.base_profile.AbstractAction):
 
         :return XML node containing the information of this  instance
         """
-        node = etree.Element(MapToSimConnect.tag)
+        node = ElementTree.Element(MapToSimConnect.tag)
 
         # simconnect command
         command = self.command if self.command else ""
@@ -1726,10 +1723,10 @@ class MapToSimConnect(gremlin.base_profile.AbstractAction):
 
         # save gate data
         if self.gates:
-            node_gate = etree.SubElement(node, "gates")
+            node_gate = ElementTree.SubElement(node, "gates")
             for gate_data in self.gates:
                 child = gate_data.to_xml()
-                node_gate.extend(child)
+                node_gate.append(child)
 
 
         return node

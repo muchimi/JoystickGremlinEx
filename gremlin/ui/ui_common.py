@@ -33,8 +33,18 @@ import gremlin.joystick_handling
 import gremlin.keyboard
 import gremlin.shared_state
 import gremlin.types
+from qtpy.QtCore import (
+    Qt, QSize, QPoint, QPointF, QRectF,
+    QEasingCurve, QPropertyAnimation, QSequentialAnimationGroup,
+    Slot, Property)
+
+from qtpy.QtWidgets import QCheckBox
+from qtpy.QtGui import QColor, QBrush, QPaintEvent, QPen, QPainter
+
+
 
 from gremlin.util import load_pixmap
+import gremlin.util
 
 
 
@@ -249,308 +259,6 @@ class DynamicDoubleSpinBox(QtWidgets.QDoubleSpinBox):
         except (ValueError, IndexError):
             return super().validate(text, pos)
 
-
-class DualSlider(QtWidgets.QWidget):
-
-    """Slider widget which provides two sliders to define a range. The
-    lower and upper slider cannot pass through each other."""
-
-    # Signal emitted when a value changes. (Handle, Value)
-    valueChanged = QtCore.Signal(int, int)
-    # Signal emitted when a handle is pressed (Handle)
-    sliderPressed = QtCore.Signal(int)
-    # Signal emitted when a handle is moved (Handle, Value)
-    sliderMoved = QtCore.Signal(int, int)
-    # Signal emitted when a handle is released (Handle)
-    sliderReleased = QtCore.Signal(int)
-
-    # Enumeration of handle codes used by the widget
-    LowerHandle = 1
-    UpperHandle = 2
-
-    def __init__(self, parent=None):
-        """Creates a new instance.
-
-        :param parent the parent widget
-        """
-        super().__init__(parent)
-
-        self._lower_position = 0
-        self._upper_position = 100
-        self._range = [0, 100]
-        self._active_handle = None
-
-    def setRange(self, min_val, max_val):
-        """Sets the range of valid values of the slider.
-
-        :param min_val the minimum value any slider can take on
-        :param max_val the maximum value any slider can take on
-        """
-        if min_val > max_val:
-            min_val, max_val = max_val, min_val
-        self._range = [min_val, max_val]
-        self._lower_position = min_val
-        self._upper_position = max_val
-
-    def range(self):
-        """Returns the range, i.e. minimum and maximum of accepted
-        values.
-
-        :return pair containing (minimum, maximum) allowed values
-        """
-        return self._range
-
-    def setPositions(self, lower, upper):
-        """Sets the position of both handles.
-
-        :param lower value of the lower handle
-        :param upper value of the upper handle
-        """
-        lower = self._constrain_value(self.LowerHandle, lower)
-        upper = self._constrain_value(self.UpperHandle, upper)
-        self._lower_position = lower
-        self._upper_position = upper
-        self.valueChanged.emit(self.LowerHandle, lower)
-        self.valueChanged.emit(self.UpperHandle, upper)
-        self.update()
-
-    def positions(self):
-        """Returns the positions of both handles.
-
-        :return tuple containing the values of (lower, upper) handle
-        """
-        return [self._lower_position, self._upper_position]
-
-    def setLowerPosition(self, value):
-        """Sets the position of the lower handle.
-
-        :param value the new value of the lower handle
-        """
-        value = self._constrain_value(self.LowerHandle, value)
-        self._lower_position = value
-        self.valueChanged.emit(self.LowerHandle, value)
-        self.update()
-
-    def setUpperPosition(self, value):
-        """Sets the position of the upper handle.
-
-        :param value the new value of the upper handle
-        """
-        value = self._constrain_value(self.UpperHandle, value)
-        self._upper_position = value
-        self.valueChanged.emit(self.UpperHandle, value)
-        self.update()
-
-    def lowerPosition(self):
-        """Returns the position of the lower handle.
-
-        :return position of the lower handle
-        """
-        return self._lower_position
-
-    def upperPosition(self):
-        """Returns the position of the upper handle.
-
-        :return position of the upper handle
-        """
-        return self._upper_position
-
-    def _get_common_option(self):
-        """Returns a QStyleOptionSlider object with the common options
-        already specified.
-
-        :return pre filled options object
-        """
-        option = QtWidgets.QStyleOptionSlider()
-        option.initFrom(self)
-        option.minimum = self._range[0]
-        option.maximum = self._range[1]
-        return option
-
-    def _constrain_value(self, handle, value):
-        """Returns a value constraint such that it is valid in the given
-        setting.
-
-        :param handle the handle for which this value is intended
-        :param value the desired value for the handle
-        :return a value constrained such that it is valid for the
-            slider's current state
-        """
-        slider = self.style().subControlRect(
-            QtWidgets.QStyle.CC_Slider,
-            self._get_common_option(),
-            QtWidgets.QStyle.SC_SliderHandle
-        )
-
-        if handle == self.LowerHandle:
-            return gremlin.util.clamp(
-                value,
-                self._range[0],
-                self._upper_position - self._width_to_logical(slider.width())
-            )
-        else:
-            return gremlin.util.clamp(
-                value,
-                self._lower_position + self._width_to_logical(slider.width()),
-                self._range[1]
-            )
-
-    def _width_to_logical(self, value):
-        """Converts a width in pixels to the logical representation.
-
-        :param value the width in pixels
-        :return logical value corresponding to the provided width
-        """
-        groove_rect = self.style().subControlRect(
-            QtWidgets.QStyle.CC_Slider,
-            self._get_common_option(),
-            QtWidgets.QStyle.SC_SliderGroove
-        )
-        return int(round(
-            (value / groove_rect.width()) * (self._range[1] - self._range[0])
-        ))
-
-    def _position_to_logical(self, pos):
-        """Converts a pixel position on a slider to it's logical
-        representation.
-
-        :param pos the pixel position on the slider
-        :return logical representation of the position on the slider
-        """
-        groove_rect = self.style().subControlRect(
-            QtWidgets.QStyle.CC_Slider,
-            self._get_common_option(),
-            QtWidgets.QStyle.SC_SliderGroove
-        )
-
-        return QtWidgets.QStyle.sliderValueFromPosition(
-            self._range[0],
-            self._range[1],
-            pos - groove_rect.left(),
-            groove_rect.right() - groove_rect.left()
-        )
-
-    def sizeHint(self):
-        """Returns the size hint for the widget in its current state.
-
-        :return hint about the correct size of this widget
-        """
-        return QtWidgets.QSlider().sizeHint()
-
-    def minimumSizeHint(self):
-        """Returns the minimal size of this widget.
-
-        :return minimal size of this widget
-        """
-        return QtCore.QSize(31, 17)
-
-    def mousePressEvent(self, evt):
-        """Tracks active state of the handles.
-
-        :param evt the mouse event
-        """
-        position = QtCore.QPoint(evt.pos().x(), evt.pos().y())
-        option = QtWidgets.QStyleOptionSlider(self._get_common_option())
-        option.sliderPosition = self._lower_position
-        option.sliderValue = self._lower_position
-        option.subControls = QtWidgets.QStyle.SC_SliderHandle
-
-        control = self.style().hitTestComplexControl(
-            QtWidgets.QStyle.CC_Slider,
-            option,
-            position
-        )
-        lower_clicked = False
-        if control == QtWidgets.QStyle.SC_SliderHandle:
-            lower_clicked = True
-
-        option.sliderPosition = self._upper_position
-        option.sliderValue = self._upper_position
-        control = self.style().hitTestComplexControl(
-            QtWidgets.QStyle.CC_Slider,
-            option,
-            position
-        )
-        upper_clicked = False
-        if control == QtWidgets.QStyle.SC_SliderHandle:
-            upper_clicked = True
-
-        if lower_clicked:
-            self._active_handle = self.LowerHandle
-            self.sliderPressed.emit(self.LowerHandle)
-        elif upper_clicked:
-            self._active_handle = self.UpperHandle
-            self.sliderPressed.emit(self.UpperHandle)
-        else:
-            self._active_handle = None
-
-        self.update()
-
-    def mouseReleaseEvent(self, evt):
-        """Ensures active handles get released.
-
-        :param evt the mouse event
-        """
-        if self._active_handle is not None:
-            self.sliderReleased.emit(self._active_handle)
-            self._active_handle = None
-            self.update()
-
-    def mouseMoveEvent(self, evt):
-        """Updates the position of the active slider if applicable.
-
-        :param evt the mouse event
-        """
-        if self._active_handle:
-            value = self._position_to_logical(evt.pos().x())
-            if self._active_handle == self.LowerHandle:
-                self._lower_position =\
-                    self._constrain_value(self.LowerHandle, value)
-                value = self._lower_position
-            elif self._active_handle == self.UpperHandle:
-                self._upper_position =\
-                    self._constrain_value(self.UpperHandle, value)
-                value = self._upper_position
-            self.valueChanged.emit(self._active_handle, value)
-            self.sliderMoved.emit(self._active_handle, value)
-            self.update()
-
-    def paintEvent(self, evt):
-        """Repaints the entire widget.
-
-        :param evt the paint event
-        """
-        painter = QtWidgets.QStylePainter(self)
-
-        common_option = self._get_common_option()
-
-        # Draw the groove for the handles to move on
-        option = QtWidgets.QStyleOptionSlider(common_option)
-        option.subControls = QtWidgets.QStyle.SC_SliderGroove
-        painter.drawComplexControl(QtWidgets.QStyle.CC_Slider, option)
-
-        # Draw lower handle
-        option_lower = QtWidgets.QStyleOptionSlider(common_option)
-        option_lower.sliderPosition = self._lower_position
-        option_lower.sliderValue = self._lower_position
-        option_lower.subControls = QtWidgets.QStyle.SC_SliderHandle
-
-        # Draw upper handle
-        option_upper = QtWidgets.QStyleOptionSlider(common_option)
-        option_upper.sliderPosition = self._upper_position
-        option_upper.sliderValue = self._upper_position
-        option_upper.subControls = QtWidgets.QStyle.SC_SliderHandle
-
-        if self._active_handle:
-            if self._active_handle == self.LowerHandle:
-                option = option_lower
-            else:
-                option = option_upper
-            option.activeSubControls = QtWidgets.QStyle.SC_SliderHandle
-            option.state |= QtWidgets.QStyle.State_Sunken
-
-        painter.drawComplexControl(QtWidgets.QStyle.CC_Slider, option_lower)
-        painter.drawComplexControl(QtWidgets.QStyle.CC_Slider, option_upper)
 
 
 class AbstractInputSelector(QtWidgets.QWidget):
@@ -1736,6 +1444,7 @@ class AxisStateWidget(QtWidgets.QWidget):
     #css_horizontal = r"QProgressBar::chunk {background: QLinearGradient( x1: 0, y1: 0, x2: 0, y2: 1,stop: 0 #78d,stop: 0.4999 #46a,stop: 0.5 #45a,stop: 1 #238 ); border-radius: 7px; border: 1px solid black;}"    
     css_horizontal = r"QProgressBar::chunk {background: QLinearGradient( x1: 0, y1: 0, x2: 0, y2: 1,stop: 0 #77a ,stop: 0.4999 #477,stop: 0.5 #45a,stop: 1 #238 ); border-radius: 7px; border: 1px solid black;}"    
     
+    valueChanged = QtCore.Signal(float)
 
     def __init__(self, axis_id = None, show_percentage = True, show_value = True, show_label = True, orientation = QtCore.Qt.Orientation.Vertical, parent=None):
         """Creates a new instance.
@@ -1754,6 +1463,7 @@ class AxisStateWidget(QtWidgets.QWidget):
         self._progress_widget = QtWidgets.QProgressBar()
         self._progress_widget.setOrientation(orientation)
         self._progress_widget.setTextVisible(False)
+
         self._orientation = orientation
         self._show_percentage = show_percentage
         self._show_value = show_value
@@ -1771,17 +1481,26 @@ class AxisStateWidget(QtWidgets.QWidget):
         self.main_layout.addWidget(self._progress_widget)
         self.main_layout.addWidget(self._readout_widget)
         self.main_layout.addStretch()
-        self._value = 0
         self._min_range = -1
         self._max_range = 1
         self._device_guid = None
         self._input_id = None
-
-
+        self._value = 0
         
         self._width = 10
         self._update_css()
         self._update_range()
+
+    
+    
+    
+
+    def _create_primitives(self):
+        self._marker = [
+            QtCore.QPoint(0,0),
+            QtCore.QPoint(-10,-5),
+            QtCore.QPoint(-5,10)
+        ]
 
     def setPercentageVisible(self, value: bool):
         ''' shows or hides the percentage value on the axis '''
@@ -1816,6 +1535,9 @@ class AxisStateWidget(QtWidgets.QWidget):
             self._width = value
             self._update_css()
 
+    def value(self):
+        return self._value
+
     def setValue(self, value):
         """Sets the value shown by the widget.
 
@@ -1840,6 +1562,7 @@ class AxisStateWidget(QtWidgets.QWidget):
                 readout += " "
             readout += f"{percent:d} %"
         self._readout_widget.setText(readout)
+        self.valueChanged.emit(self._value)
 
     def value(self):
         ''' gets the current value '''
@@ -1897,8 +1620,9 @@ class AxisStateWidget(QtWidgets.QWidget):
         self._update_value(event.raw_value)
 
     def _update_value(self, raw_value):
-        input_value = gremlin.util.scale_to_range(raw_value, source_min = -32767, source_max = 32767, target_min = -1, target_max = 1)
-        self.setValue(input_value)
+        value = gremlin.util.scale_to_range(raw_value, source_min = -32767, source_max = 32767, target_min = -1, target_max = 1)
+        self.setValue(value)
+        
 
         
 class AxesCurrentState(QtWidgets.QGroupBox):
@@ -2506,5 +2230,276 @@ def get_text_width(text):
     return char_width * len(text)
 
 
+from superqt import QDoubleRangeSlider
+
+class QMarkerDoubleRangeSlider(QDoubleRangeSlider):
+
+    indicator_up = None
+    icon_size = QtCore.QSize(16, 16)
+
+    def __init__(self, *args):
+        # for now, this class is prepared for horizontal sliders only
+        super().__init__(*args)
+        self._marker_pos = []
+        if self.__class__.indicator_up is None:
+            icon = gremlin.util.load_icon("ei.arrow-up")
+            indicator_up = icon.pixmap(self.icon_size)
+            center = self.height() / 2
+            if indicator_up.height() > center:
+                indicator_up = indicator_up.scaledToHeight(center)
+            self.__class__.indicator_up = indicator_up
+
+    def setMarkerValue(self, value):
+        if isinstance(value, float) or isinstance(value, int):
+            list_value = [value]
+        else:
+            list_value = value
+        self._marker_pos = list_value
+        source_min = self._minimum
+        source_max = self._maximum
+        target_min = self._to_qinteger_space(self._minimum) 
+        target_max = self._to_qinteger_space(self._maximum)
+        self._int_marker_pos = [((v - source_min) * (target_max - target_min)) / (source_max - source_min) + target_min for v in list_value]
+        self.repaint()
 
 
+    def paintEvent(self, ev: QtGui.QPaintEvent) -> None:
+        super().paintEvent(ev)
+        target_min = self._to_qinteger_space(self._minimum) 
+        target_max = self._to_qinteger_space(self._maximum)
+        positions = [QtWidgets.QStyle.sliderPositionFromValue(target_min, target_max, v, self.width(), False) for v in self._int_marker_pos]
+        painter = QtGui.QPainter(self)
+        center = self.height() / 2
+        margin = self.icon_size.width()/2
+        for x in positions:
+            painter.drawPixmap(x - margin, center, self.__class__.indicator_up)
+
+
+
+
+
+
+
+class QToggle(QCheckBox):
+
+    _transparent_pen = QPen(Qt.transparent)
+    _light_grey_pen = QPen(Qt.lightGray)
+
+    def __init__(self,
+        parent=None,
+        bar_color=Qt.gray,
+        checked_color="#8FBC8F",
+        handle_color=Qt.white,
+        ):
+        super().__init__(parent)
+
+        # Save our properties on the object via self, so we can access them later
+        # in the paintEvent.
+        self._bar_brush = QBrush(bar_color)
+        self._bar_checked_brush = QBrush(QColor(checked_color).lighter())
+
+        self._handle_brush = QBrush(handle_color)
+        self._handle_checked_brush = QBrush(QColor(checked_color))
+
+        # Setup the rest of the widget.
+
+        self.setContentsMargins(8, 0, 8, 0)
+        self._handle_position = 0
+
+        self.stateChanged.connect(self.handle_state_change)
+
+    def sizeHint(self):
+        return QSize(48, 32)
+
+    def hitButton(self, pos: QPoint):
+        return self.contentsRect().contains(pos)
+
+    def paintEvent(self, e: QPaintEvent):
+
+        contRect = self.contentsRect()
+        handleRadius = round(0.24 * contRect.height())
+
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+
+        p.setPen(self._transparent_pen)
+        barRect = QRectF(
+            0, 0,
+            contRect.width() - handleRadius, 0.40 * contRect.height()
+        )
+        barRect.moveCenter(contRect.center())
+        rounding = barRect.height() / 2
+
+        # the handle will move along this line
+        trailLength = contRect.width() - 2 * handleRadius
+        xPos = contRect.x() + handleRadius + trailLength * self._handle_position
+
+        if self.isChecked():
+            p.setBrush(self._bar_checked_brush)
+            p.drawRoundedRect(barRect, rounding, rounding)
+            p.setBrush(self._handle_checked_brush)
+
+        else:
+            p.setBrush(self._bar_brush)
+            p.drawRoundedRect(barRect, rounding, rounding)
+            p.setPen(self._light_grey_pen)
+            p.setBrush(self._handle_brush)
+
+        p.drawEllipse(
+            QPointF(xPos, barRect.center().y()),
+            handleRadius, handleRadius)
+
+        p.end()
+
+    @Slot(int)
+    def handle_state_change(self, value):
+        self._handle_position = 1 if value else 0
+
+    @Property(float)
+    def handle_position(self):
+        return self._handle_position
+
+    @handle_position.setter
+    def handle_position(self, pos):
+        """change the property
+        we need to trigger QWidget.update() method, either by:
+            1- calling it here [ what we're doing ].
+            2- connecting the QPropertyAnimation.valueChanged() signal to it.
+        """
+        self._handle_position = pos
+        self.update()
+
+    @Property(float)
+    def pulse_radius(self):
+        return self._pulse_radius
+
+    @pulse_radius.setter
+    def pulse_radius(self, pos):
+        self._pulse_radius = pos
+        self.update()
+
+
+
+class QAnimatedToggle(QToggle):
+
+    _transparent_pen = QPen(Qt.transparent)
+    _light_grey_pen = QPen(Qt.lightGray)
+
+    def __init__(self, *args, pulse_unchecked_color="#44999999",
+        pulse_checked_color="#4400B0EE", **kwargs):
+
+        self._pulse_radius = 0
+
+        super().__init__(*args, **kwargs)
+
+        self.animation = QPropertyAnimation(self, b"handle_position", self)
+        self.animation.setEasingCurve(QEasingCurve.InOutCubic)
+        self.animation.setDuration(200)  # time in ms
+
+        self.pulse_anim = QPropertyAnimation(self, b"pulse_radius", self)
+        self.pulse_anim.setDuration(350)  # time in ms
+        self.pulse_anim.setStartValue(10)
+        self.pulse_anim.setEndValue(20)
+
+        self.animations_group = QSequentialAnimationGroup()
+        self.animations_group.addAnimation(self.animation)
+        self.animations_group.addAnimation(self.pulse_anim)
+
+        self._pulse_unchecked_animation = QBrush(QColor(pulse_unchecked_color))
+        self._pulse_checked_animation = QBrush(QColor(pulse_checked_color))
+
+
+
+    @Slot(int)
+    def handle_state_change(self, value):
+        self.animations_group.stop()
+        if value:
+            self.animation.setEndValue(1)
+        else:
+            self.animation.setEndValue(0)
+        self.animations_group.start()
+
+    def paintEvent(self, e: QPaintEvent):
+
+        contRect = self.contentsRect()
+        handleRadius = round(0.24 * contRect.height())
+
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+
+        p.setPen(self._transparent_pen)
+        barRect = QRectF(
+            0, 0,
+            contRect.width() - handleRadius, 0.40 * contRect.height()
+        )
+        barRect.moveCenter(contRect.center())
+        rounding = barRect.height() / 2
+
+        # the handle will move along this line
+        trailLength = contRect.width() - 2 * handleRadius
+
+        xPos = contRect.x() + handleRadius + trailLength * self._handle_position
+
+        if self.pulse_anim.state() == QPropertyAnimation.Running:
+            p.setBrush(
+                self._pulse_checked_animation if
+                self.isChecked() else self._pulse_unchecked_animation)
+            p.drawEllipse(QPointF(xPos, barRect.center().y()),
+                          self._pulse_radius, self._pulse_radius)
+
+        if self.isChecked():
+            p.setBrush(self._bar_checked_brush)
+            p.drawRoundedRect(barRect, rounding, rounding)
+            p.setBrush(self._handle_checked_brush)
+
+        else:
+            p.setBrush(self._bar_brush)
+            p.drawRoundedRect(barRect, rounding, rounding)
+            p.setPen(self._light_grey_pen)
+            p.setBrush(self._handle_brush)
+
+        p.drawEllipse(
+            QPointF(xPos, barRect.center().y()),
+            handleRadius, handleRadius)
+
+        p.end()
+
+
+
+class QToggleText(QtWidgets.QWidget):
+    ''' switched checkbox  '''
+    clicked = QtCore.Signal()
+    
+    def __init__(self, text = None, parent = None):
+        super().__init__(parent)
+        self.main_layout = QtWidgets.QHBoxLayout(self)
+        self._button = QToggle()
+        self.main_layout.addWidget(self._button)
+        self._label = QtWidgets.QLabel()
+        self.main_layout.addWidget(self._label)
+        self.main_layout.addStretch()
+        if text is not None:
+            self._label.setText(text)
+        self._button.clicked.connect(self._clicked_cb)
+        
+
+    @QtCore.Slot()
+    def _clicked_cb(self):
+        self.clicked.emit()
+
+    def text(self):
+        return self._label.text()
+    def setText(self, value):
+        self._label.setText(value)
+
+    def isChecked(self):
+        return self._button.isChecked()
+    def setChecked(self, value):
+        self._button.setChecked(value)
+
+    @property
+    def value(self):
+        return self._button.isChecked()
+    @value.setter
+    def value(self, checked):
+        self._button.setChecked(checked)
