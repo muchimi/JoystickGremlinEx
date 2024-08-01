@@ -16,6 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import enum
+import time
 import threading
 import os
 from typing import Optional
@@ -2234,45 +2235,147 @@ from superqt import QDoubleRangeSlider
 
 class QMarkerDoubleRangeSlider(QDoubleRangeSlider):
 
-    indicator_up = None
     icon_size = QtCore.QSize(16, 16)
 
+    class PixmapData():
+        ''' holds a pixmap definition '''
+        def __init__(self, pixmap : QtGui.QPixmap = None, offset_x = None, offset_y = None):
+            self.pixmap = pixmap
+            self.offset_x = offset_x
+            self.offset_y = offset_y
+            if pixmap is not None:
+                self.width = pixmap.width()
+                self.height = pixmap.height()
+            else:
+                self.width = 0
+                self.height = 0
+
+
     def __init__(self, *args):
-        # for now, this class is prepared for horizontal sliders only
         super().__init__(*args)
         self._marker_pos = []
-        if self.__class__.indicator_up is None:
-            icon = gremlin.util.load_icon("ei.arrow-up")
-            indicator_up = icon.pixmap(self.icon_size)
+        self._internal_pixmaps = [] # default marker object
+        self._pixmaps = [] # list of pixmap data marker definition objects
+
+        # setup a single default marker
+        self._update_pixmaps()
+        self._update_targets()
+
+    def _get_pixmaps(self):
+        if self._pixmaps: return self._pixmaps
+        return self._internal_pixmaps
+    
+    def _update_pixmaps(self):
+        orientation = self.orientation()
+        if orientation == QtCore.Qt.Orientation.Horizontal:
+            icon = gremlin.util.load_icon("ei.chevron-up")
+            pixmap = icon.pixmap(self.icon_size)
             center = self.height() / 2
-            if indicator_up.height() > center:
-                indicator_up = indicator_up.scaledToHeight(center)
-            self.__class__.indicator_up = indicator_up
+            if pixmap.height() > center:
+                pixmap = pixmap.scaledToHeight(center)
+            pd = QMarkerDoubleRangeSlider.PixmapData(pixmap = pixmap, offset_x = -pixmap.width()/2, offset_y=0)
+        else:
+            # vertical
+            icon = gremlin.util.load_icon("ei.chevron-right")
+            pixmap = icon.pixmap(self.icon_size)
+            center = self.width() / 2
+            if pixmap.width() > center:
+                pixmap = pixmap.scaledToWidth(center)
+            pd = QMarkerDoubleRangeSlider.PixmapData(pixmap = pixmap, offset_x = 0, offset_y = -pixmap.height()/2)
+        
+        self._internal_pixmaps = [pd]
+        
+
+    def setOrientation(self, orientation : QtCore.Qt.Orientation):
+        ''' sets the widget's orientation '''
+        super().setOrientation(orientation)
+        self._update_pixmaps()
+
 
     def setMarkerValue(self, value):
+        ''' sets the marker(s) value - single float is one marker, passing a tuple creates multiple markers'''
         if isinstance(value, float) or isinstance(value, int):
             list_value = [value]
         else:
             list_value = value
         self._marker_pos = list_value
+        # compute the positions relative to the size of the widget
         source_min = self._minimum
         source_max = self._maximum
         target_min = self._to_qinteger_space(self._minimum) 
         target_max = self._to_qinteger_space(self._maximum)
         self._int_marker_pos = [((v - source_min) * (target_max - target_min)) / (source_max - source_min) + target_min for v in list_value]
+        # force a repaint to update to the new positions
         self.repaint()
+
+    def minimum(self) -> float:  # type: ignore
+        ''' gets the slider's minimum value '''
+        return self._minimum
+
+    def setMinimum(self, value: float) -> None:
+        ''' sets the slider's minimum value '''
+        super().setMinimum(value)
+        self._update_targets()
+
+    def maximum(self) -> float:  # type: ignore
+        ''' gets the slider's maximum value '''
+        return self._maximum
+
+    def setMaximum(self, value: float) -> None:
+        ''' sets the slider's maximum value '''
+        super().setMaximum(value)
+        self._update_targets()
+
+    def setRange(self, range_min, range_max):
+        ''' sets the slider's min/max values'''
+        super().setRange(range_min, range_max)
+        self._update_targets()
+
+    def _update_targets(self):
+        self._target_min = self._to_qinteger_space(self._minimum) 
+        self._target_max = self._to_qinteger_space(self._maximum)
+
+
+    def setMarkerPixmaps(self, pixmaps):
+        ''' sets the marker pixmaps if not using the default
+
+        :param: pixmaps - a single pixmadata object, or a tuple of pixmapdata objects if multiple markers
+        
+        '''
+        if isinstance(pixmaps, tuple):
+            self._pixmaps = list(pixmaps)
+        elif isinstance(pixmaps, list):
+            self._pixmaps = pixmaps
+        elif isinstance(pixmaps,QMarkerDoubleRangeSlider.PixmapData):
+            self._pixmaps = [pixmaps]
 
 
     def paintEvent(self, ev: QtGui.QPaintEvent) -> None:
-        super().paintEvent(ev)
-        target_min = self._to_qinteger_space(self._minimum) 
-        target_max = self._to_qinteger_space(self._maximum)
-        positions = [QtWidgets.QStyle.sliderPositionFromValue(target_min, target_max, v, self.width(), False) for v in self._int_marker_pos]
+        # draw the main widget
+        super().paintEvent(ev) 
+
+        # draw markers on top of the main widget
+        
         painter = QtGui.QPainter(self)
-        center = self.height() / 2
-        margin = self.icon_size.width()/2
-        for x in positions:
-            painter.drawPixmap(x - margin, center, self.__class__.indicator_up)
+        orientation = self.orientation()
+        if orientation == QtCore.Qt.Orientation.Horizontal:
+            positions = [QtWidgets.QStyle.sliderPositionFromValue(self._target_min, self._target_max, v, self.width(), False) for v in self._int_marker_pos]
+            center = self.height() / 2  
+        else:
+            # vertical
+            positions = [QtWidgets.QStyle.sliderPositionFromValue(self._target_min, self._target_max, v, self.height(), False) for v in self._int_marker_pos]
+            center = self.width() / 2
+        pixmaps = self._get_pixmaps()
+        p_count = len(pixmaps)
+        for index, value in enumerate(positions):
+            if index < p_count:
+                pd = pixmaps[index]
+                if orientation == QtCore.Qt.Orientation.Horizontal:
+                    painter.drawPixmap(value + pd.offset_x, center + pd.offset_y, pd.pixmap)
+                else:
+                    # vertical
+                    painter.drawPixmap(center + pd.offset_x, value + pd.offset_y, pd.pixmap)
+        
 
 
 

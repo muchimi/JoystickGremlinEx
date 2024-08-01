@@ -45,6 +45,7 @@ class GateAction(Enum):
     Macro = auto() # trigger a macro
     SendKey = auto() # sends a key
     Ranged = auto() # send a ranged value determined by the Ranged output mode
+    Steps = auto() # split the input into steps and fire an event at every step
 
 class GateCondition(Enum):
     ''' gate action trigger conditions'''
@@ -57,7 +58,7 @@ class GateCondition(Enum):
     OnEnterMax = auto() # trigger only when entering from above the range
     OnExitMin = auto() # trigger only when existing the low end of the range
     OnExitMax = auto() # trigger only when exiting the high end of the range
-    OnSteps = auto() # trigger for a given number of step values
+    Steps = auto() # trigger for a given number of step values
 
 class GateRangeOutputMode(Enum):
     ''' controls for ranged outputs what range is output given the gate range '''
@@ -72,28 +73,32 @@ _gate_action_from_name = {
     "no_action" : GateAction.NoAction,
     "macro" : GateAction.Macro,
     "keys": GateAction.SendKey,
-    "ranged" : GateAction.Ranged
+    "ranged" : GateAction.Ranged,
+    "steps" : GateAction.Steps,
 }
 
 _gate_action_to_name = {
     GateAction.NoAction: "no_action",
     GateAction.Macro: "macro",
     GateAction.SendKey: "keys",
-    GateAction.Ranged: "ranged"
+    GateAction.Ranged: "ranged",
+    GateAction.Steps: "steps"
 }
 
 _gate_action_description = {
     GateAction.NoAction: "Passtrhu (no action)",
     GateAction.Macro: "Executes a macro when triggered",
     GateAction.SendKey: "Sends the key when the intput enters the gate",
-    GateAction.Ranged: "Sends ranged data based on the range output mode"
+    GateAction.Ranged: "Sends ranged data based on the range output mode",
+    GateAction.Steps: "Triggers output based on stepped intervals defined for the input",
 }
 
 _gate_action_name = {
     GateAction.NoAction: "No Action",
     GateAction.Macro: "Macro",
     GateAction.SendKey: "Send Key",
-    GateAction.Ranged: "Ranged"
+    GateAction.Ranged: "Ranged",
+    GateAction.Steps: "Steps",
 }
 
 _gate_condition_to_name = {
@@ -106,7 +111,7 @@ _gate_condition_to_name = {
     GateCondition.OnEnterMax: "range_enter_high",
     GateCondition.OnExitMin: "range_exit_low",
     GateCondition.OnExitMax: "range_exit_high",
-    GateCondition.OnSteps: "steps"
+    GateCondition.Steps: "steps"
 }
 
 _gate_condition_from_name = {
@@ -119,7 +124,7 @@ _gate_condition_from_name = {
     "range_enter_high": GateCondition.OnEnterMax,
     "range_exit_low": GateCondition.OnExitMin,
     "range_exit_high": GateCondition.OnExitMax ,
-    "steps": GateCondition.OnSteps 
+    "steps": GateCondition.Steps 
 }
 
 _gate_condition_description = {
@@ -132,7 +137,7 @@ _gate_condition_description = {
     GateCondition.OnEnterMax: "Triggers when the input enters the gate from above",
     GateCondition.OnExitMin: "Triggers when the input leaves the gate lower range",
     GateCondition.OnExitMax: "Triggers when the input leaves the gate upper range",
-    GateCondition.OnSteps: "Triggers when crossing equally divided steps"
+    GateCondition.Steps: "Triggers when crossing equally divided steps"
 }
 
 _gate_condition_name = {
@@ -145,7 +150,7 @@ _gate_condition_name = {
     GateCondition.OnEnterMax: "Enter High",
     GateCondition.OnExitMin: "Exit Low",
     GateCondition.OnExitMax: "Exit High",
-    GateCondition.OnSteps: "Steps",
+    GateCondition.Steps: "Steps",
 }
 
 _gate_range_to_name = {
@@ -160,6 +165,7 @@ _gate_range_from_name = {
     "fixed": GateRangeOutputMode.Fixed,
     "ranged": GateRangeOutputMode.Ranged,
     "filter": GateRangeOutputMode.Nothing,
+   
 }
 
 _gate_range_description = {
@@ -176,13 +182,15 @@ _gate_range_name = {
     GateRangeOutputMode.Nothing: "Filter Out",
 }
 
-class GateData():
+class GateData(QtCore.QObject):
     ''' holds gated information for an axis 
     
         this object knows how to load and save itself to XML
     
     
     '''
+    steps_changed = QtCore.Signal() # signals that steps have changed 
+
     def __init__(self,
                  min = -1.0,
                  max = 1.0,
@@ -191,9 +199,10 @@ class GateData():
                  mode = GateRangeOutputMode.Normal,
                  range_min = -1.0,
                  range_max = 1.0):
-        self.min = min # gate min range
-        self.max = max # gate max range
-        self.action = action
+        super().__init__()
+        self._min = min # gate min range
+        self._max = max # gate max range
+        self._action = action
         self.condition = condition
         self.output_mode = mode
         self.fixed_value = 0
@@ -208,22 +217,101 @@ class GateData():
         self.exclusive = False # macro exclusive
         self.repeat = None # macro repeat
         self.force_remote = False # macro force remote
+        self._last_value = None # last run value - this is set whenever a profile is activated
+        self.steps = 5 # number of equally spaced steps on this axis (range -1 to +1)
+        self._interval_values = [] # list of interval trigger points when in stepped mode
+        self._interval = 0
 
     def valid_conditions(self):
         ''' returns the list of valid conditions for the given action '''
         if self.action in (GateAction.Ranged, GateAction.NoAction):
-            return (GateCondition.InRange, GateCondition.OutsideRange)
+            # for ranged or no action mode - two conditions modes
+            return [GateCondition.InRange, GateCondition.OutsideRange]
+        elif self.action == GateAction.Steps:
+            # only one condition for steps
+            return [GateCondition.Steps]
         else:
-             return (GateCondition.OnRangeEnter, 
+             # all others
+             return [GateCondition.OnRangeEnter, 
                     GateCondition.OnRangeEnterRepeat,
                     GateCondition.OnRangeExit, 
                     GateCondition.OnEnterMin, 
                     GateCondition.OnEnterMax,
                     GateCondition.OnExitMin,
                     GateCondition.OnExitMax,
-                    GateCondition.OnSteps)
+                    GateCondition.Steps]
 
 
+    def _trigger(self):
+        ''' triggers the action '''
+        pass
+
+    @property
+    def action(self):
+        return self._action
+    
+    @action.setter
+    def action(self, value):
+        self._action = value
+        self.update_steps()
+
+    @property
+    def min(self):
+        return self._min
+    @min.setter
+    def min(self, value):
+        self._min = value
+        self.update_steps()
+    
+    @property
+    def max(self):
+        return self._max
+    @max.setter
+    def max(self, value):
+        self._max = value
+        self.update_steps()
+
+    @property 
+    def steps(self):
+        return self._steps
+    
+    @steps.setter
+    def steps(self, value):
+        if value >= 1:
+            self._steps = value
+            self.update_steps()
+        
+
+    def update_steps(self):
+        ''' updates the stepped data when the range changes '''
+        values = []
+        interval_range = self.max - self.min
+        value = self._steps
+        interval = interval_range/value
+        if self.action == GateAction.Steps:
+            current = self.min
+            for _ in range(value):
+                values.append(current)
+                current += interval
+            values.append(self.max)
+
+        self._interval_values = values
+        self._interval = interval
+        self.steps_changed.emit() # indicate step data changed
+
+    @property
+    def interval_values(self):
+        # stepped mode interval gate values
+        return self._interval_values
+    
+    @property
+    def interval(self):
+        # interval spacing when using stepped mode
+        return self._interval
+
+    def pre_process(self):
+        # setup the pre-run activity
+        self._last_value = None
 
     def process_value(self, value):
         ''' processes an axis input value through the gate options
@@ -232,7 +320,50 @@ class GateData():
            
         '''
         if not self.action in (GateAction.Ranged, GateAction.NoAction):
-            # not a mode we process
+            # this gate is a trigger mode
+            last_value = self._last_value
+            last_in_range = False if last_value is None else last_value >= self.min and last_value <= self.max
+            in_range =  value >= self.min and value <= self.max
+
+            trigger = False            
+            if self.condition in (GateCondition.InRange, GateCondition.OnRangeEnter):
+                # the value entered the range since the last check
+                trigger =  in_range and not last_in_range
+            elif self.condition == GateCondition.OnEnterMax:
+                # entered range from above
+                trigger = (False if last_value is None else last_value > self.max and value <= self.max) or value == 1
+            elif self.condition == GateCondition.OnEnterMin:
+                # entered range from below
+                trigger = (False if last_value is None else last_value < self.min and value >= self.min) or value == -1
+            elif self.condition == GateCondition.OnExitMax:
+                # exited range above
+                trigger = (False if last_value is None else last_value <= self.max and value > self.max) or value == 1
+            elif self.condition == GateCondition.OnExitMin:
+                trigger = (False if last_value is None else last_value >= self.min and value < self.min) or value == -1
+            elif self.condition == GateCondition.OnRangeEnter:
+                trigger = in_range and not last_in_range
+            elif self.condition == GateCondition.OnRangeEnterRepeat:
+                # trigger while the axis is in range
+                trigger = in_range 
+            elif self.condition == GateCondition.OnRangeExit:
+                trigger = not in_range and last_in_range
+            elif self.condition == GateCondition.Steps and self.steps != 0:
+                # trigger occurs on steps
+                interval = 2.0 / self.steps
+                interval_min = -1
+                for index in range(self.steps):
+                    interval_max = interval_min + interval
+                    crossed = False if last_value is None else  value >= interval_min and value <= interval_max and (last_value < interval_min or last_value > interval_max)
+                    if crossed:
+                        break
+            elif self.condition == GateCondition.OutsideRange:
+                trigger = not in_range 
+
+            self._last_value = value
+
+            if trigger:
+                self._trigger()
+
             return None
         if self.output_mode == GateRangeOutputMode.Fixed:
             # return the fixed value for the range
@@ -276,6 +407,7 @@ class GateData():
         node.set("action", _gate_action_to_name[self.action])
         node.set("condition", _gate_condition_to_name[self.condition])
         node.set("mode", _gate_range_to_name[self.output_mode])
+        node.set("steps", str(self.steps))
         if self.action == GateAction.Ranged:
             node.append(self.range_to_xml(self.min, self.max,"input_range"))
             node.append(self.range_to_xml(self.range_min, self.range_max,"output_range"))
@@ -338,10 +470,8 @@ class GateData():
             if child:
                 self.fixed_value = float(child.text)
 
+        self.steps = safe_read(node,"steps",int,0)
 
-            
-
-        
             
     def range_to_xml(self, min, max, tag = "range"):
         node = ElementTree.Element(tag)
@@ -679,6 +809,8 @@ QSlider::handle:horizontal {
         
         super().__init__(parent)
         self.gate_data : GateData = gate_data
+        self.gate_data.steps_changed.connect(self._update_steps)
+
         self.action_data = action_data
 
 
@@ -687,7 +819,6 @@ QSlider::handle:horizontal {
         self._output_value = 0
 
         self.main_layout = QtWidgets.QGridLayout(self)
-
 
         if action_data.hardware_input_type != InputType.JoystickAxis:
             missing = QtWidgets.QLabel("Invalid input type - joystick axis expected")
@@ -713,8 +844,6 @@ QSlider::handle:horizontal {
         self.test_checkbox = ui_common.QToggleText()
         self.test_checkbox.setText("text checkbox")
 
-
-
         self.sb_min_widget = ui_common.DynamicDoubleSpinBox()
         self.sb_min_widget.setMinimum(-1.0)
         self.sb_min_widget.setMaximum(1.0)
@@ -723,7 +852,6 @@ QSlider::handle:horizontal {
         self.sb_min_widget.setValue(self.gate_data.min)
         self.sb_min_widget.valueChanged.connect(self._min_changed_cb)
 
-
         self.sb_max_widget = ui_common.DynamicDoubleSpinBox()
         self.sb_max_widget.setMinimum(-1.0)
         self.sb_max_widget.setMaximum(1.0)        
@@ -731,7 +859,6 @@ QSlider::handle:horizontal {
         self.sb_max_widget.setSingleStep(self.single_step)
         self.sb_max_widget.setValue(self.gate_data.max)
         self.sb_max_widget.valueChanged.connect(self._max_changed_cb)
-
 
         grab_icon = load_icon("mdi.record-rec",qta_color = "red")
         self.sb_min_grab_widget = ui_common.QDataPushButton()
@@ -748,11 +875,10 @@ QSlider::handle:horizontal {
         self.sb_max_grab_widget.clicked.connect(self._grab_cb)
         self.sb_max_grab_widget.setToolTip("Grab axis value")
 
-
+      
         self.container_slider_widget = QtWidgets.QWidget()
         self.container_slider_layout = QtWidgets.QGridLayout(self.container_slider_widget)
         self.container_slider_layout.addWidget(self.slider,0,0,-1,1)
-
 
         self.container_slider_layout.addWidget(QtWidgets.QLabel("Gate Min:"), 0,1)
         self.container_slider_layout.addWidget(self.sb_min_widget,1,1)
@@ -774,13 +900,6 @@ QSlider::handle:horizontal {
         self.container_slider_layout.setColumnStretch(0,3)
         
         self.container_slider_widget.setContentsMargins(0,0,0,0)
-        
-
-        
-
-       
-
-    
 
         # action drop down
         self.action_selector_widget = QtWidgets.QComboBox()
@@ -854,6 +973,10 @@ QSlider::handle:horizontal {
         # key container
         self._create_keyboard_ui()
 
+        # steps container
+        self._create_steps_ui()
+
+
         self.container_description_widget = QtWidgets.QWidget()
         self.container_description_layout = QtWidgets.QVBoxLayout(self.container_description_widget)
         self.container_description_layout.addWidget(self.action_description_widget)
@@ -871,6 +994,7 @@ QSlider::handle:horizontal {
         self.main_layout.addWidget(self.container_slider_widget,2,0)
         self.main_layout.addWidget(self.container_macro_widget,3,0)
         self.main_layout.addWidget(self.container_key_widget,3,0)
+        self.main_layout.addWidget(self.container_steps_widget,3,0)
         self.main_layout.addWidget(self.container_output_widget,3,0)
 
         
@@ -880,6 +1004,8 @@ QSlider::handle:horizontal {
         el = gremlin.event_handler.EventListener()
         el.joystick_event.connect(self._joystick_event_cb)
 
+
+
         # update visible container for the current mode
         self._update_conditions()
         self._update_ui()
@@ -888,14 +1014,16 @@ QSlider::handle:horizontal {
     def _slider_value_changed_cb(self):
         ''' occurs when the slider values change '''
         slider_value = list(self.slider.value())
-        min,max = slider_value
+
+        min_value = min(slider_value)
+        max_value = max(slider_value)
         
         with QtCore.QSignalBlocker(self.sb_min_widget):
-            self.gate_data.min = min
-            self.sb_min_widget.setValue(min)
+            self.gate_data.min = min_value
+            self.sb_min_widget.setValue(min_value)
         with QtCore.QSignalBlocker(self.sb_max_widget):
-            self.gate_data.max = max
-            self.sb_max_widget.setValue(max)
+            self.gate_data.max = max_value
+            self.sb_max_widget.setValue(max_value)
 
         
 
@@ -985,23 +1113,11 @@ QSlider::handle:horizontal {
         self.container_range_layout.addWidget(QtWidgets.QLabel("Range Max:"))
         self.container_range_layout.addWidget(self.sb_range_max_widget)
         
-        
-
-        
-
-        
         self.container_fixed_widget = QtWidgets.QWidget()
         self.container_fixed_widget.setContentsMargins(0,0,0,0)
         self.container_fixed_layout = QtWidgets.QHBoxLayout(self.container_fixed_widget)
         self.container_fixed_layout.addWidget(QtWidgets.QLabel("Fixed Value:"))
         self.container_fixed_layout.addWidget(self.sb_fixed_value_widget)
-
-
-        
-        
-
-        
-
         
         self.container_output_widget = QtWidgets.QWidget()
         self.container_output_widget.setContentsMargins(0,0,0,0)
@@ -1013,8 +1129,21 @@ QSlider::handle:horizontal {
         self.container_output_layout.addWidget(self.output_value_widget)
         
 
+    def _create_steps_ui(self):
+        ''' creates the steps UI '''
+        self.sb_steps_widget = QtWidgets.QSpinBox()
+        self.sb_steps_widget.setRange(1, 20)
+        self.sb_steps_widget.setValue(self.gate_data.steps)
+        self.sb_steps_widget.valueChanged.connect(self._steps_changed_cb)
 
-        
+        self.container_steps_widget = QtWidgets.QWidget()
+        self.container_steps_layout = QtWidgets.QHBoxLayout(self.container_steps_widget)
+        self.container_steps_widget.setContentsMargins(0,0,0,0)
+
+        self.container_steps_layout.addWidget(QtWidgets.QLabel("Number of steps:"))
+        self.container_steps_layout.addWidget(self.sb_steps_widget)
+        self.container_steps_layout.addStretch()
+
 
     def _create_macro_ui(self):
         ''' creates the macro ui '''
@@ -1024,8 +1153,6 @@ QSlider::handle:horizontal {
         self.container_macro_widget.setContentsMargins(0,0,0,0)
         # delay load macro widget because it is VERY slow to load
         self._macro_widget = None
-    
-
 
     def _create_keyboard_ui(self):
         ''' creates the keyboard UI '''
@@ -1078,8 +1205,7 @@ QSlider::handle:horizontal {
             self.rb_hold.setChecked(True)
         elif self.gate_data.key_mode == KeyboardOutputMode.Both:            
             self.rb_both.setChecked(True)
-            
-
+ 
         self.rb_press.clicked.connect(self._keyboard_mode_changed)
         self.rb_release.clicked.connect(self._keyboard_mode_changed)
         self.rb_both.clicked.connect(self._keyboard_mode_changed)
@@ -1094,7 +1220,6 @@ QSlider::handle:horizontal {
         self._options_layout.addWidget(self.rb_release)
         
         self._options_layout.addStretch(1)
-
 
         self.delay_container_layout.addWidget(delay_label)
         self.delay_container_layout.addWidget(self.delay_box)
@@ -1111,11 +1236,21 @@ QSlider::handle:horizontal {
         self.action_layout.addWidget(self.show_keyboard_widget)
         self.action_layout.addStretch(1)
 
-
         self.container_key_layout.addWidget(self.key_combination)
         self.container_key_layout.addWidget(self.action_widget)
         self.container_key_layout.addWidget(self._options_widget)
         self.container_key_layout.addWidget(self.delay_container_widget)
+
+    def _steps_changed_cb(self):
+        ''' step count changed '''
+        value = self.sb_steps_widget.value()
+        self.gate_data.steps = value
+
+    def _update_steps(self):
+        ''' updates gate steps '''
+        if self.gate_data.action == GateAction.Steps:
+            self.slider.setValue(self.gate_data.interval_values)
+        
 
     def _select_keys_cb(self):
         ''' display the keyboard input dialog '''
@@ -1169,6 +1304,8 @@ QSlider::handle:horizontal {
         lv[0] = value
         with QtCore.QSignalBlocker(self.slider):
             self.slider.setValue(lv)
+        self.gate_data.update_steps()
+        self._update_steps()
         self._update_output_value()            
 
     QtCore.Slot()
@@ -1179,6 +1316,7 @@ QSlider::handle:horizontal {
         lv[1] = value
         with QtCore.QSignalBlocker(self.slider):
             self.slider.setValue(lv)
+        self._update_steps()
         self._update_output_value()
 
 
@@ -1221,15 +1359,22 @@ QSlider::handle:horizontal {
         range_visible = False  
         key_visible = False
         fixed_visible = False
+        steps_visible = False
 
             
         if self.gate_data.action in (GateAction.NoAction, GateAction.Ranged):
+
             if self.gate_data.output_mode == GateRangeOutputMode.Fixed:
                 fixed_visible = True
                 range_visible = False
             else:
                 fixed_visible = False
                 range_visible = True
+        elif self.gate_data.action == GateAction.Steps:
+            steps_visible = True
+
+            # update the slider configuration 
+            self.slider.setValue(self.gate_data.interval_values)
 
 
         elif self.gate_data.action == GateAction.Macro:
@@ -1242,14 +1387,11 @@ QSlider::handle:horizontal {
         elif self.gate_data.action == GateAction.SendKey:
             key_visible = True
 
-        
-
-        
-
         self.container_fixed_widget.setVisible(fixed_visible)
         self.container_macro_widget.setVisible(macro_visible)
         self.container_range_widget.setVisible(range_visible)
         self.container_key_widget.setVisible(key_visible)
+        self.container_steps_widget.setVisible(steps_visible)
 
         self._update_output_value()
 
@@ -1454,5 +1596,36 @@ class GatedAxisWidget(QtWidgets.QWidget):
                 self.map_layout.addWidget(ui_common.QHLine())
 
     
+    def pre_process(self):
+        ''' before run time - pre-processes the gates to set up processing order '''
+        if self.gates:
+                
+            self._gate_low_order = [gate for gate in self.gates].sort(lambda x: x.min)
+            self._gate_high_order = [gate for gate in self.gates].sort(lambda x: x.max).reverse()
+            self._gate_min = self._gate_low_order[0]
+            self._gate_max = self._gate_high_order[0]
 
+            # reset the last gate value for a new run
+            for gate in self.gates:
+                gate.pre_process()
+
+    def process(self, value):
+        ''' processes a value through all the gates 
         
+        Gates are additive, meaning that if one gate rejects a value, but another gate accepts the value, the accepted value will be returned.
+        Processing is in order of range, ordered by where the value is vs the gates
+        
+        '''
+
+        if value <= self._gate_max:
+            # proceed using the gate order by min gate setup
+            gates = self._gate_low_order
+        else:
+            # proceed by high order
+            gates = self._gate_high_order
+
+        processed_list = [gate.process_value(value) for gate in gates]
+        
+            
+        
+            
