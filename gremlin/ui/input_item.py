@@ -1197,7 +1197,7 @@ class InputItemWidget(QtWidgets.QFrame):
         # Create the actual icons
         # FIXME: this currently ignores the containers themselves
         self._icon_layout.addStretch(1)
-        for container in profile_data.containers:
+        for container in profile_data.get_containers():
             for actions in [a for a in container.action_sets if a is not None]:
                 for action in actions:
                     if action is not None:
@@ -1639,6 +1639,25 @@ class AbstractActionWidget(QtWidgets.QFrame):
         return gremlin.shared_state.is_running
 
 
+# class AbstractContainerActionWidget(AbstractActionWidget):
+
+#     def __init__(self,
+#             action_data,
+#             layout_type=QtWidgets.QVBoxLayout,
+#             parent=None):
+#         ''' called when the profile data load is completed '''
+        
+
+#         super().__init__(action_data, layout_type, parent)
+
+
+#     def get_container_ui(self):
+#         from gremlin.ui.device_tab import InputItemConfiguration
+#         container_widget = InputItemConfiguration(self.action_data.item_data)
+
+#         return container_widget
+
+   
 class AbstractActionWrapper(QtWidgets.QDockWidget):
 
     """Base class for all action widget wrappers.

@@ -228,6 +228,9 @@ class EventListener(QtCore.QObject):
 	# signal emitted when the selected hardware device changes
 	profile_device_mapping_changed = QtCore.Signal(DeviceChangeEvent)
 
+	# signal emitted when the UI tabs are loaded and profiles are loaded - some widgets use this for post-UI initialization update that needs to occur after the UI data is completely loaded
+	tabs_loaded = QtCore.Signal()
+
 	profile_start = QtCore.Signal()
 	profile_stop = QtCore.Signal()
 	

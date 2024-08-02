@@ -9,6 +9,7 @@ import time
 import gremlin.actions
 import gremlin.base_buttons
 import gremlin.config
+import gremlin.event_handler
 import gremlin.profile
 import gremlin.shared_state
 from gremlin.util import *
@@ -329,24 +330,7 @@ class AbstractContainer(ProfileData):
                 )
             ))
         else:
-            # extra callbacks for additional inputs provided by a specific action
-            # for action_list in self.action_sets:
-            #     extra_actions = []
-            #     for action in action_list:
-            #         functor = action.functor(action)
-            #         extra_inputs = functor.latch_extra_inputs()
-            #         for device_guid, input_id in extra_inputs:
-            #             dup_action = copy.deepcopy(action)
-            #             dup_action.action_id = str(uuid.uuid4())
-            #             dup_action.hardware_device_guid = device_guid
-            #             device = gremlin.shared_state.current_profile.devices[device_guid]
-            #             dup_action.hardware_device = device
-            #             dup_action.input_id = input_id
-            #             extra_actions.append(dup_action)
-            #     if extra_actions:
-            #         # add the "new" actions to the container temporarily
-            #         action_list.extend(extra_actions)
-
+           
             callbacks.append(CallbackData(ContainerCallback(self),None))
 
 
@@ -562,15 +546,18 @@ class Device:
         return node
 
 
-class InputItem:
+class InputItem(QtCore.QObject):
 
     """Represents a single input item such as a button or axis."""
+
+    container_changed = QtCore.Signal() # fires when the container is changed
 
     def __init__(self, parent):
         """Creates a new InputItem instance.
 
         :param parent the parent mode of this input item
         """
+        super().__init__()
         self.parent = parent
         self._input_type = None
         self._device_guid = None # hardware input ID
@@ -580,6 +567,7 @@ class InputItem:
         #self._containers = base_classes.TraceableList(callback = self._container_change_cb) # container
         self._containers = []
         self._selected = False # true if the item is selected
+        self._is_action = isinstance(parent, AbstractAction)
 
 
     @property
@@ -590,9 +578,24 @@ class InputItem:
         self._selected = value
 
     @property
-    def containers(self):
-        return self._containers
+    def is_action(self):
+        return self._is_action
+
+    # @property
+    # def containers(self):
+    #     return self._containers
     
+    def add_container(self, container):
+        self._containers.append(container)
+        self.container_changed.emit()
+
+    def remove_container(self, container):
+        self._containers.remove(container)
+        self.container_changed.emit()
+
+    def get_containers(self):
+        return self._containers
+
     @property
     def input_type(self):
         return self._input_type
@@ -705,7 +708,7 @@ class InputItem:
                 continue
             entry = container_name_map[container_type](self)
             entry.from_xml(child)
-            self.containers.append(entry)
+            self.add_container(entry)
             if hasattr(entry, "action_model"):
                 entry.action_model = self.containers
             container_plugins.set_container_data(self, entry)
@@ -782,6 +785,8 @@ class InputItem:
 
     @property
     def display_name(self):
+        if self.is_action:
+            return "this action trigger"
         ''' gets a display name for this input '''
         if self._input_type == InputType.JoystickAxis:
             return f"Axis {self._input_id}"
@@ -942,7 +947,84 @@ class AbstractAction(ProfileData):
         ''' indicates an action can be saved to a profile even if it's not configured - this allows in process profile saving '''
         return True
 
+class AbstractContainerAction(AbstractAction):
+    ''' abstract action that includes a subcontainers for sub-actions '''
+    def __init__(self, parent = None):
+        
+        super().__init__(parent)
+
+        self._item_data = None
+        self._functors = []
     
+    @property
+    def item_data(self):
+        return self._item_data
+
+    def from_xml(self, node):
+        """Populates the instance with data from the given XML node.
+
+        :param node the XML node to populate fields with
+        """
+
+        super().from_xml(node)
+        child = gremlin.util.get_xml_child(node,"action_containers")
+
+        # get the input item behind the parent action
+        current = self.parent
+        while current and not isinstance(current, InputItem):
+            current = current.parent
+
+        # setup a new input item for these containers and read from config the defined containers
+        self._item_data = InputItem(self)
+        self._item_data._input_type = current._input_type
+        self._item_data._device_guid = current._device_guid
+        self._item_data._input_id = current._input_id
+        
+        if child is not None:
+            child.tag = child.get("type")
+            self._item_data.from_xml(child)
+
+
+    def to_xml(self):
+        ''' writes node out to XML '''
+        node = super().to_xml()
+        child = self._item_data.to_xml()
+        child.set("type", child.tag)
+        child.tag = "action_containers"
+        node.append(child)
+        return node
+
+
+
+
+    @property
+    def item_data(self):
+        return self._item_data
+    
+    @property
+    def functors(self):
+        ''' gets the execution graphs for each sub container '''
+        return self._functors
+
+    def add_container(self, container_name):
+        ''' adds a new container to the action '''
+        plugin_manager = gremlin.plugin_manager.ContainerPlugins()
+        container = plugin_manager.get_class(container_name)(self.item_data)
+        if hasattr(container, "action_model"):
+            container.action_model = self.action_model
+        self.action_model.add_container(container)
+        plugin_manager.set_container_data(self.item_data, container)
+        self._subcontainers.append(container)
+        return container
+    
+    def _build_graph(self):
+        ''' builds the execution graph for the sub containers '''
+        for container in self._subcontainers:
+            eg = ContainerExecutionGraph(container)
+            self._functors.extend(eg.functors)
+
+        
+
 
 class Settings:
 
@@ -2237,9 +2319,9 @@ class ContainerExecutionGraph(AbstractExecutionGraph):
         """Creates a new instance for a specific container.
 
         :param container the container data from which to generate the
-            execution graph
+            execution graph - the parent of a container can be a container or an action (for sub containers)
         """
-        assert isinstance(container, AbstractContainer)
+        assert isinstance(container, AbstractContainer) or isinstance(container, AbstractAction)
         super().__init__(container)
 
     def _build_graph(self, container):
@@ -2329,6 +2411,11 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
             if hasattr(action, "priority"):
                 priority = action.priority
             ordered_action_set.append((priority, action))
+
+            if isinstance(action, AbstractContainerAction):
+                # the action contains containers - build their execution graph
+                action._build_graph()
+                
         # for action in action_set:
         #     # if isinstance(action, action_plugins.remap.Remap):
         #     if "remap" in action.tag:
@@ -2339,14 +2426,18 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
         ordered_action_set = [x[1] for x in ordered_action_set]
 
         if verbose: 
-            logging.getLogger("system").debug("Action order:")
+            logger = logging.getLogger("system")
+            logger.debug("Action order:")
+            
             for index, action in enumerate(ordered_action_set):
                 input_item = action.get_input_item()
                 if hasattr(input_item,"to_string"):
                     input_stub = input_item.to_string()
                 else:
                     input_stub = str(input_item)
-                logging.getLogger("system").debug(f"{index}: input: {input_stub} action: {type(action)}  data: {str(action)} ")
+                logger.debug(f"{index}: input: {input_stub} action: {type(action)}  data: {str(action)} ")
+                                
+                    
 
             
 
@@ -2386,6 +2477,12 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
             # Create action functor
             self.functors.append(action.functor(action))
             sequence.append("Action")
+
+            # add the sub container functors
+            if isinstance(action, AbstractContainerAction):
+                eg : ContainerExecutionGraph
+                for eg in action.execution_graphs:
+                    self.functors.extend(eg.functors)
 
         self._create_transitions(sequence)
 

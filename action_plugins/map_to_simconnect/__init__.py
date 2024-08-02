@@ -23,6 +23,7 @@ from PySide6 import QtWidgets, QtCore, QtGui
 import gremlin.base_profile
 import gremlin.event_handler
 import gremlin.gated_handler
+import gremlin.gated_handler
 from gremlin.input_types import InputType
 from gremlin.input_devices import ButtonReleaseActions
 import gremlin.macro
@@ -475,6 +476,39 @@ class SimconnectOptions(QtCore.QObject):
         elif self._sort_mode == SimconnectSortMode.Mode:
             self._aircraft_definitions.sort(key = lambda x: (x.mode.lower(), x.key))
 
+
+class SimconnectContainerUi(QtWidgets.QDialog):
+    """UI to setup the individual action trigger containers and sub actions """
+
+    def __init__(self, item_data, parent=None):
+        from gremlin.ui import ui_common
+        super().__init__(parent)
+
+        # make modal
+        self.setWindowModality(QtCore.Qt.ApplicationModal)
+
+        min_min_sp = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Minimum,
+            QtWidgets.QSizePolicy.Minimum
+        )
+        exp_min_sp = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.MinimumExpanding,
+            QtWidgets.QSizePolicy.Minimum
+        )        
+
+        # Actual configuration object being managed
+        self.setMinimumWidth(600)
+        self.setMinimumWidth(800)
+
+        from gremlin.ui.device_tab import InputItemConfiguration
+        self.container_widget = InputItemConfiguration(item_data)
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+        self.main_layout.addWidget(self.container_widget)
+
+        
+
+
+
 class SimconnectOptionsUi(QtWidgets.QDialog):
     """UI to set individual simconnect  settings """
 
@@ -802,6 +836,8 @@ class SimconnectOptionsUi(QtWidgets.QDialog):
             type_widget.setText(item.icao_type)
             type_widget.installEventFilter(self)
 
+       
+
             # mode drop down
             mode_selector = ui_common.QDataComboBox(data = (item, selected_widget))
             for display_mode, mode in self.mode_pair_list:
@@ -986,6 +1022,8 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         """Creates the UI components."""
         import gremlin.gated_handler
         # mode from aircraft button - grabs the aicraft name as a mode
+        # policy = self.sizePolicy()
+        # policy.setVerticalPolicy(QtWidgets.QSizePolicy.Policy.Expanding)
         self._options_button_widget = QtWidgets.QPushButton("Simconnect Options")
         self._options_button_widget.setIcon(gremlin.util.load_icon("fa.gear"))
         self._options_button_widget.clicked.connect(self._show_options_dialog_cb)
@@ -996,8 +1034,11 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         # self._toolbar_container_layout.addStretch()
 
         # command selector
-        self._action_container_widget = QtWidgets.QWidget()
-        self._action_container_layout = QtWidgets.QVBoxLayout(self._action_container_widget)
+        self._command_container_widget = QtWidgets.QWidget()
+        self._command_container_layout = QtWidgets.QVBoxLayout(self._command_container_widget)
+
+        
+
 
         self._action_selector_widget = QtWidgets.QWidget()
         self._action_selector_layout = QtWidgets.QHBoxLayout(self._action_selector_widget)
@@ -1171,45 +1212,59 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._output_container_layout.addStretch(1)
 
 
-        # input repeater widgets (shows joystick axis values)
-        # self._input_axis_widget = gremlin.ui.ui_common.AxisStateWidget(show_label = False, orientation=QtCore.Qt.Orientation.Horizontal, show_percentage=False)
-        # self._output_axis_widget = gremlin.ui.ui_common.AxisStateWidget(show_label = False, orientation=QtCore.Qt.Orientation.Horizontal, show_percentage=False)
-        # self._output_axis_widget.setRange(self.action_data.min_range, self.action_data.max_range)
-        # self._input_axis_value_widget = QtWidgets.QLabel()
-        # self._output_axis_value_widget = QtWidgets.QLabel()
-        # self._input_container_widget = QtWidgets.QWidget()
-        # self._input_container_layout = QtWidgets.QGridLayout(self._input_container_widget)
-        # self._input_container_layout.addWidget(self._input_axis_widget,0,0)
-        # self._input_container_layout.addWidget(self._output_axis_widget,0,1)
-        # self._input_container_layout.addWidget(self._input_axis_value_widget,1,0)
-        # self._input_container_layout.addWidget(self._output_axis_value_widget,1,1)
-
 
         self._gates_widget = gremlin.gated_handler.GatedAxisWidget(action_data = self.action_data)
+        self._gates_widget.configure_requested.connect(self._configure_trigger_cb)
         self._output_gated_container_layout.addWidget(self._gates_widget)
         self._output_gated_container_widget.setMinimumHeight(min(200, self._gates_widget.gate_count * 200))
+    
 
         # status widget
         self.status_text_widget = QtWidgets.QLabel()
 
         
-        self._action_container_layout.addWidget(self._action_selector_widget)
+        self._command_container_layout.addWidget(self._action_selector_widget)
 
 
         # hide output layout by default until we have a valid command
         self._output_container_widget.setVisible(False)
 
+        self._create_container_ui()
+
         #self.main_layout.addWidget(self._toolbar_container_widget)
-        self.main_layout.addWidget(self._action_container_widget)
+        self.main_layout.addWidget(self._command_container_widget)
         self.main_layout.addWidget(self._output_container_widget)
+        self.main_layout.addWidget(self._action_container_widget)
         # self.main_layout.addWidget(self._input_container_widget)
         self.main_layout.addWidget(self.status_text_widget)
 
-        self.main_layout.addStretch(1)
+        #self.main_layout.addStretch(1)
 
         # # hook the joystick input for axis input repeater
         # el = gremlin.event_handler.EventListener()
         # el.joystick_event.connect(self._joystick_event_cb)
+
+    def _create_container_ui(self):
+        ''' creates the container ui for a nested container '''
+        
+        # subcontainer for action containers
+        self._action_container_widget = QtWidgets.QWidget()
+        self._action_container_layout = QtWidgets.QVBoxLayout(self._action_container_widget)
+
+        self._open_container_widget = QtWidgets.QPushButton("...")
+        self._open_container_widget.clicked.connect(self._open_container_cb)
+        self._action_container_layout.addWidget(self._open_container_widget)
+        self._action_container_layout.addStretch()
+
+
+    def _open_container_cb(self):
+        dialog = SimconnectContainerUi(self.action_data.item_data)
+        dialog.exec()
+
+    QtCore.Slot(object)
+    def _configure_trigger_cb(self, data):
+        dialog = SimconnectContainerUi(self.action_data.item_data)
+        dialog.exec()
 
 
     def _show_options_dialog_cb(self):
@@ -1516,7 +1571,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 
 
-class MapToSimConnectFunctor(gremlin.base_profile.AbstractFunctor):
+class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor):
 
     manager = gremlin.macro.MacroManager()
 
@@ -1550,7 +1605,13 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractFunctor):
 
     def process_event(self, event, value):
 
+
         logging.getLogger("system").info(f"SC FUNCTOR: {event}  {value}")
+
+        # execute the functors
+        result = super().process_event(event, value)
+        if not result:
+            return True
 
         if not self.sm.ok:
             return True
@@ -1558,11 +1619,6 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractFunctor):
         if not self.block or not self.block.valid:
             # invalid command
             return True
-        
-
-        
-        
-        
    
         if event.is_axis and self.block.is_axis:
             # value is a ranged input value
@@ -1584,13 +1640,16 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractFunctor):
             # non joystick input (button)
             if not self.block.is_axis: 
                 return self.block.execute(self.value)
+            
+
+        
         
         return True
     
 
 
 
-class MapToSimConnect(gremlin.base_profile.AbstractAction):
+class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
 
     """Action data for the map to keyboard action.
 

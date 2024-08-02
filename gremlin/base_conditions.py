@@ -331,6 +331,19 @@ class AbstractFunctor(metaclass=ABCMeta):
         ''' occurs on profile stop - override in functor '''
         pass
 
+class AbstractContainerActionFunctor(AbstractFunctor):
+    ''' used by action functors for actions that have containers '''
+    def process_event(self, event, value):
+        ''' Processes the functor using the provided event '''
+        for functor in self.action_data.functors:
+            result = functor.process_event(event, value)
+            if not result:
+                break
+
+        return result
+    
+
+
 class ActivationCondition:
 
     """Dictates under what circumstances an associated code can be executed."""

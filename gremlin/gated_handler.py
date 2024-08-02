@@ -783,6 +783,7 @@ class GateWidget(QtWidgets.QWidget):
 
     delete_requested = QtCore.Signal(object) # fired when the remove button is clicked - passes the GateData to blitz
     duplicate_requested = QtCore.Signal(object) # fired when the duplicate button is clicked - passes the GateData to duplicate
+    configure_requested = QtCore.Signal(object) # configure clicked
 
     slider_css = """
 QSlider::groove:horizontal {
@@ -936,12 +937,20 @@ QSlider::handle:horizontal {
         self.container_selector_layout = QtWidgets.QHBoxLayout(self.container_selector_widget)
         self.container_selector_widget.setContentsMargins(0,0,0,0)
 
+        # configure trigger button
+        self._configure_trigger_widget = QtWidgets.QPushButton("Configure")
+        self._configure_trigger_widget.setIcon(gremlin.util.load_icon("fa.gear"))
+        self._configure_trigger_widget.clicked.connect(self._trigger_cb)
+
+
         self.container_selector_layout.addWidget(QtWidgets.QLabel("Action:"))
         self.container_selector_layout.addWidget(self.action_selector_widget)
         self.container_selector_layout.addWidget(QtWidgets.QLabel("Condition:"))
         self.container_selector_layout.addWidget(self.condition_selector_widget)
         self.container_selector_layout.addWidget(QtWidgets.QLabel("Output Mode:"))
         self.container_selector_layout.addWidget(self.range_mode_selector_widget)
+        self.container_selector_layout.addWidget(self._configure_trigger_widget)
+
         self.container_selector_layout.addStretch()
 
      
@@ -1009,6 +1018,12 @@ QSlider::handle:horizontal {
         # update visible container for the current mode
         self._update_conditions()
         self._update_ui()
+
+    @QtCore.Slot()
+    def _trigger_cb(self):
+        ''' configure clicked '''
+        self.configure_requested.emit(self.gate_data)
+        
 
     @QtCore.Slot()
     def _slider_value_changed_cb(self):
@@ -1457,6 +1472,8 @@ class GatedAxisWidget(QtWidgets.QWidget):
     
     '''
 
+    configure_requested = QtCore.Signal(object)
+
     def __init__(self, action_data, parent = None):
         super().__init__(parent)
 
@@ -1567,6 +1584,10 @@ class GatedAxisWidget(QtWidgets.QWidget):
         self.gates.insert(index, new_data)
         self._populate_ui()
 
+    @QtCore.Slot(GateData)
+    def _configure_gate(self, data):
+        self.configure_requested.emit(data)
+
     def _populate_ui(self):
         ''' updates the container map '''
 
@@ -1590,6 +1611,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
             widget = GateWidget(action_data = self.action_data, gate_data=gate_data)
             widget.delete_requested.connect(self._remove_gate)
             widget.duplicate_requested.connect(self._duplicate_gate)
+            widget.configure_requested.connect(self._configure_gate)
             self._gate_widgets.append(widget)
             self.map_layout.addWidget(widget)
             if gate_count > 1:

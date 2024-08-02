@@ -834,6 +834,9 @@ class GremlinUi(QtWidgets.QMainWindow):
             )
             self.tab_guids.append(str(device.device_guid))
 
+            # this needs to be registered before widgets are created because widgets may need this data
+            gremlin.shared_state.device_profile_map[device_profile.device_guid] = device_profile
+
             widget = gremlin.ui.device_tab.JoystickDeviceTabWidget(
                 device,
                 device_profile,
@@ -843,6 +846,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             tab_label = device.name.strip()
             device_name_map[device.device_guid] = tab_label
             self.ui.devices.addTab(widget, tab_label)
+            
 
         # Create vJoy as input device tabs
         for device in sorted(vjoy_devices, key=lambda x: x.vjoy_id):
@@ -990,6 +994,11 @@ class GremlinUi(QtWidgets.QMainWindow):
         # virtual device (not displayed)
         device_name_map[dinput.GUID_Virtual] = "(VirtualButton)"
         device_name_map[dinput.GUID_Invalid] = "(Invalid)"
+
+
+        el = gremlin.event_handler.EventListener()
+        el.tabs_loaded.emit()
+
 
 
 

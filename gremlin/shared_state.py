@@ -54,6 +54,9 @@ _suspend_ui_keyinput = 0
 # list of device names to their GUID
 device_guid_to_name_map = {} 
 
+# map of device profiles - indexed by hardware GUID
+device_profile_map = {}
+
 def get_device_name(guid):
     ''' gets the device name from the UUID'''
     if not guid in device_guid_to_name_map.keys():
