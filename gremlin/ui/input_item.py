@@ -1197,7 +1197,7 @@ class InputItemWidget(QtWidgets.QFrame):
         # Create the actual icons
         # FIXME: this currently ignores the containers themselves
         self._icon_layout.addStretch(1)
-        for container in profile_data.get_containers():
+        for container in profile_data.containers:
             for actions in [a for a in container.action_sets if a is not None]:
                 for action in actions:
                     if action is not None:

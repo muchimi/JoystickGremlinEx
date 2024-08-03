@@ -80,7 +80,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
         else:
             self._create_dropdowns()
 
-        self.action_model = ActionContainerModel(self.item_data.get_containers(), self.item_data)
+        self.action_model = ActionContainerModel(self.item_data.containers, self.item_data)
         self.action_view = ActionContainerView()
         self.action_view.set_model(self.action_model)
         self.action_view.redraw()

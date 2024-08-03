@@ -22,8 +22,6 @@ from PySide6 import QtWidgets, QtCore, QtGui
 
 import gremlin.base_profile
 import gremlin.event_handler
-import gremlin.gated_handler
-import gremlin.gated_handler
 from gremlin.input_types import InputType
 from gremlin.input_devices import ButtonReleaseActions
 import gremlin.macro
@@ -39,7 +37,7 @@ from .SimConnectData import *
 import re
 from lxml import etree
 from xml.etree import ElementTree
-
+from gremlin.gated_handler import *
 
 
 
@@ -477,12 +475,23 @@ class SimconnectOptions(QtCore.QObject):
             self._aircraft_definitions.sort(key = lambda x: (x.mode.lower(), x.key))
 
 
-class SimconnectContainerUi(QtWidgets.QDialog):
+
+class ActionContainerUi(QtWidgets.QDialog):
     """UI to setup the individual action trigger containers and sub actions """
 
-    def __init__(self, item_data, parent=None):
-        from gremlin.ui import ui_common
+    def __init__(self, gate_data, index, is_range = False, parent=None):
+        '''
+        :param: gate_data = the gate data block 
+        :item_data: the InputItem data block holding the container and input device configuration for this gated input
+        :index: the gate number of the gated input - there will at least be two for low and high - index is an integer 
+        '''
+        
         super().__init__(parent)
+
+        self._index = index
+        self._gate_data = gate_data
+        self._item_data = gate_data.item_data
+        self._is_range = is_range
 
         # make modal
         self.setWindowModality(QtCore.Qt.ApplicationModal)
@@ -500,12 +509,61 @@ class SimconnectContainerUi(QtWidgets.QDialog):
         self.setMinimumWidth(600)
         self.setMinimumWidth(800)
 
-        from gremlin.ui.device_tab import InputItemConfiguration
-        self.container_widget = InputItemConfiguration(item_data)
-        self.main_layout = QtWidgets.QVBoxLayout(self)
-        self.main_layout.addWidget(self.container_widget)
 
+        self.action_widget = QtWidgets.QComboBox()
+        self.condition_widget = QtWidgets.QComboBox()
+        self.condition_description_widget = QtWidgets.QLabel()
+
+        self.trigger_container_widget = QtWidgets.QWidget()
+        self.trigger_condition_layout = QtWidgets.QHBoxLayout(self.trigger_container_widget)
+
+        # actions = [GateAction.NoAction, GateAction.Gate]
+        # for action in actions:
+        #     self.action_widget.addItem(GateAction.to_display_name(action), action)
+        # index = self.action_widget.findData(self._gate_data.getGateAction(self._index))
+        # self.action_widget.setCurrentIndex(index)
+        # self.action_widget.currentIndexChanged.connect(self._action_changed_cb)
+
+        if is_range:
+            self.trigger_condition_layout.addWidget(QtWidgets.QLabel(f"Range {index + 1} Configuration:"))
+        else:
+            self.trigger_condition_layout.addWidget(QtWidgets.QLabel(f"Gate {index + 1} Configuration:"))
         
+        #self.trigger_condition_layout.addWidget(self.action_widget)
+        self.trigger_condition_layout.addWidget(QtWidgets.QLabel(f"Condition:"))
+        self.trigger_condition_layout.addWidget(self.condition_widget)
+        self.trigger_condition_layout.addWidget(self.condition_description_widget)
+        self.trigger_condition_layout.addStretch()
+
+        from gremlin.ui.device_tab import InputItemConfiguration
+        self.container_widget = InputItemConfiguration(self._item_data)
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+        self.main_layout.addWidget(self.trigger_container_widget)
+
+        self.main_layout.addWidget(self.container_widget)   
+
+        self._update_ui()
+
+    # @QtCore.Slot()
+    # def _action_changed_cb(self):
+    #     self._gate_data.setGateAction(self._index, self.action_widget.currentData())
+    #     self._update_ui()
+
+    @QtCore.Slot()
+    def _condition_changed_cb(self):
+        self._gate_data.setGateCondition(self._index, self.condition_widget.currentData())
+
+    def _update_ui(self):
+        ''' updates controls based on the options '''
+        conditions = self._gate_data.getGateValidConditions(self._index)
+        with QtCore.QSignalBlocker(self.condition_widget):
+            self.condition_widget.clear()
+            for condition in conditions:
+                self.condition_widget.addItem(GateCondition.to_display_name(condition), condition)
+            condition = self._gate_data.getGateCondition(self._index)
+            index = self.condition_widget.findData(condition)
+            self.condition_widget.setCurrentIndex(index)
+            self.condition_description_widget.setText(GateCondition.to_description(condition))
 
 
 
@@ -1215,6 +1273,8 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self._gates_widget = gremlin.gated_handler.GatedAxisWidget(action_data = self.action_data)
         self._gates_widget.configure_requested.connect(self._configure_trigger_cb)
+        self._gates_widget.configure_handle_requested.connect(self._configure_handle_trigger_cb)
+        self._gates_widget.configure_range_requested.connect(self._configure_range_trigger_cb)
         self._output_gated_container_layout.addWidget(self._gates_widget)
         self._output_gated_container_widget.setMinimumHeight(min(200, self._gates_widget.gate_count * 200))
     
@@ -1229,12 +1289,9 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         # hide output layout by default until we have a valid command
         self._output_container_widget.setVisible(False)
 
-        self._create_container_ui()
-
         #self.main_layout.addWidget(self._toolbar_container_widget)
         self.main_layout.addWidget(self._command_container_widget)
         self.main_layout.addWidget(self._output_container_widget)
-        self.main_layout.addWidget(self._action_container_widget)
         # self.main_layout.addWidget(self._input_container_widget)
         self.main_layout.addWidget(self.status_text_widget)
 
@@ -1244,28 +1301,23 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         # el = gremlin.event_handler.EventListener()
         # el.joystick_event.connect(self._joystick_event_cb)
 
-    def _create_container_ui(self):
-        ''' creates the container ui for a nested container '''
-        
-        # subcontainer for action containers
-        self._action_container_widget = QtWidgets.QWidget()
-        self._action_container_layout = QtWidgets.QVBoxLayout(self._action_container_widget)
-
-        self._open_container_widget = QtWidgets.QPushButton("...")
-        self._open_container_widget.clicked.connect(self._open_container_cb)
-        self._action_container_layout.addWidget(self._open_container_widget)
-        self._action_container_layout.addStretch()
-
-
-    def _open_container_cb(self):
-        dialog = SimconnectContainerUi(self.action_data.item_data)
-        dialog.exec()
 
     QtCore.Slot(object)
     def _configure_trigger_cb(self, data):
-        dialog = SimconnectContainerUi(self.action_data.item_data)
+        self._handle_clicked_cb(data, 0)
+
+    
+
+    QtCore.Slot(object, int)
+    def _configure_handle_trigger_cb(self, data, index):
+        dialog = ActionContainerUi(data, index)
         dialog.exec()
 
+
+    QtCore.Slot(object, int)
+    def _configure_range_trigger_cb(self, data, index):
+        dialog = ActionContainerUi(data, index)
+        dialog.exec()
 
     def _show_options_dialog_cb(self):
         ''' displays the simconnect options dialog'''
@@ -1752,12 +1804,10 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         if gate_node:
             for child in gate_node:
                 gate_data = gremlin.gated_handler.GateData()
+                gate_data.item_data = self.item_data
                 gate_data.from_xml(child)
                 self.gates.append(gate_data)
     
-
-
-
     def _generate_xml(self):
         """Returns an XML node containing this instance's information.
 

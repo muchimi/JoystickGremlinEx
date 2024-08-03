@@ -7,4 +7,3 @@ mock==5.1.0
 pytest==8.2.0
 pywin32==306
 reportlab==4.1.0
-superqt

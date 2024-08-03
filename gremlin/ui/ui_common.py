@@ -42,9 +42,11 @@ from qtpy.QtCore import (
 from qtpy.QtWidgets import QCheckBox
 from qtpy.QtGui import QColor, QBrush, QPaintEvent, QPen, QPainter
 
+from .ui_sliders import QDoubleRangeSlider
 
 
-from gremlin.util import load_pixmap
+
+from gremlin.util import load_pixmap, load_icon
 import gremlin.util
 
 
@@ -213,7 +215,7 @@ class DynamicDoubleSpinBox(QtWidgets.QDoubleSpinBox):
     valid_chars = [str(v) for v in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]] + ["-"]
     decimal_point = "."
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, data = None):
         """Create a new instance with the specified parent.
 
         :param parent the parent of this widget
@@ -224,6 +226,15 @@ class DynamicDoubleSpinBox(QtWidgets.QDoubleSpinBox):
             DynamicDoubleSpinBox.valid_chars.append(
                 DynamicDoubleSpinBox.decimal_point
             )
+
+        self._data = data
+
+    @property
+    def data(self):
+        return self._data
+    @data.setter
+    def data(self, value):
+        self.data = value
 
     def validate(self, text, pos):
         """Validates the provided string.
@@ -2231,8 +2242,6 @@ def get_text_width(text):
     return char_width * len(text)
 
 
-from superqt import QDoubleRangeSlider
-
 class QMarkerDoubleRangeSlider(QDoubleRangeSlider):
 
     icon_size = QtCore.QSize(16, 16)
@@ -2249,7 +2258,6 @@ class QMarkerDoubleRangeSlider(QDoubleRangeSlider):
             else:
                 self.width = 0
                 self.height = 0
-
 
     def __init__(self, *args):
         super().__init__(*args)
@@ -2305,6 +2313,7 @@ class QMarkerDoubleRangeSlider(QDoubleRangeSlider):
         target_min = self._to_qinteger_space(self._minimum) 
         target_max = self._to_qinteger_space(self._maximum)
         self._int_marker_pos = [((v - source_min) * (target_max - target_min)) / (source_max - source_min) + target_min for v in list_value]
+        
         # force a repaint to update to the new positions
         self.repaint()
 
@@ -2375,7 +2384,9 @@ class QMarkerDoubleRangeSlider(QDoubleRangeSlider):
                 else:
                     # vertical
                     painter.drawPixmap(center + pd.offset_x, value + pd.offset_y, pd.pixmap)
-        
+
+      
+
 
 
 

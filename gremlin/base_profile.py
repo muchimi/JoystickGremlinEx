@@ -595,6 +595,10 @@ class InputItem(QtCore.QObject):
 
     def get_containers(self):
         return self._containers
+    
+    @property
+    def containers(self):
+        return self._containers
 
     @property
     def input_type(self):
@@ -953,12 +957,38 @@ class AbstractContainerAction(AbstractAction):
         
         super().__init__(parent)
 
-        self._item_data = None
+        self._item_data_map = {}
         self._functors = []
     
     @property
     def item_data(self):
-        return self._item_data
+        ''' gets the default (first) data container block '''
+        return self.get_item_data(0)
+    
+    def get_item_data(self, index, autocreate = True):
+        ''' gets the specified data container block 
+        
+        :param: autocreate - if set, creates a datablock if it does not exist
+        
+        '''
+        
+        if autocreate and not index in self._item_data_map.keys():
+            # get the input item behind the parent action
+            current = self.parent
+            while current and not isinstance(current, InputItem):
+                current = current.parent
+
+            # setup a new input item for these containers and read from config the defined containers
+            
+            item_data = InputItem(self)
+            item_data._input_type = current._input_type
+            item_data._device_guid = current._device_guid
+            item_data._input_id = current._input_id
+            self._item_data_map[index] = item_data
+            
+        if index in self._item_data_map.keys():
+            return self._item_data_map[index]
+        return None
 
     def from_xml(self, node):
         """Populates the instance with data from the given XML node.
@@ -967,39 +997,44 @@ class AbstractContainerAction(AbstractAction):
         """
 
         super().from_xml(node)
-        child = gremlin.util.get_xml_child(node,"action_containers")
 
-        # get the input item behind the parent action
-        current = self.parent
-        while current and not isinstance(current, InputItem):
-            current = current.parent
+        container_nodes = gremlin.util.get_xml_child(node,"action_containers", multiple = True)
+        for child in container_nodes:
 
-        # setup a new input item for these containers and read from config the defined containers
-        self._item_data = InputItem(self)
-        self._item_data._input_type = current._input_type
-        self._item_data._device_guid = current._device_guid
-        self._item_data._input_id = current._input_id
-        
-        if child is not None:
-            child.tag = child.get("type")
-            self._item_data.from_xml(child)
+            # get the input item behind the parent action
+            current = self.parent
+            while current and not isinstance(current, InputItem):
+                current = current.parent
 
+            # setup a new input item for these containers and read from config the defined containers
+            
+            item_data = InputItem(self)
+            item_data._input_type = current._input_type
+            item_data._device_guid = current._device_guid
+            item_data._input_id = current._input_id
+
+            if child is not None:
+                child.tag = child.get("type")
+                index = safe_read(child,"index",int,0)
+                item_data.from_xml(child)
+
+            self._item_data_map[index] = item_data
 
     def to_xml(self):
         ''' writes node out to XML '''
         node = super().to_xml()
-        child = self._item_data.to_xml()
-        child.set("type", child.tag)
-        child.tag = "action_containers"
-        node.append(child)
+
+        for index, item_data in self._item_data_map.items():
+            child = item_data.to_xml()
+            child.set("type", child.tag)
+            child.tag = "action_containers"
+            child.set("index",str(index))
+            node.append(child)
         return node
 
 
 
 
-    @property
-    def item_data(self):
-        return self._item_data
     
     @property
     def functors(self):

@@ -249,6 +249,10 @@ def log_sys(msg):
     ''' logs to the system log '''
     logging.getLogger("system").debug(str(msg))
 
+def log_info(msg):
+    ''' logs to the system log '''
+    logging.getLogger("system").info(str(msg))
+
 def log_sys_warn(msg):
     ''' logs to the system log '''
     logging.getLogger("system").warning(str(msg))
@@ -777,11 +781,23 @@ def safe_format(value, data_type, formatter=str):
         )
 
 
-def get_xml_child(node, tag : str):
-    ''' gets a specific xml child node by tag - None if not found '''
+def get_xml_child(node, tag : str, multiple = False):
+    ''' gets a specific xml child node by tag - None if not found 
+    
+    :param: multiple - if set, returns all matching subnodes as a list, blank list if nothing found - if not set, returns None or the first node found
+    
+    '''
     value = tag.casefold()
+    if multiple:
+        nodes = []
+        for child in list(node):
+            if child.tag.casefold() == value:
+                nodes.append(child)
+        return nodes
+
     for child in list(node):
         if child.tag.casefold() == value:
+
             return child
     return None
 
