@@ -1803,8 +1803,7 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         gate_node = gremlin.util.get_xml_child(node,"gates")
         if gate_node:
             for child in gate_node:
-                gate_data = gremlin.gated_handler.GateData()
-                gate_data.item_data = self.item_data
+                gate_data = gremlin.gated_handler.GateData(self)
                 gate_data.from_xml(child)
                 self.gates.append(gate_data)
     

@@ -37,7 +37,7 @@ from gremlin.types import *
 from enum import Enum, auto
 from gremlin.macro_handler import *
 import gremlin.util
-import gremlin.util
+
 
 
 class GateAction(Enum):
@@ -197,14 +197,43 @@ class GateData(QtCore.QObject):
     ''' holds gated information for an axis 
     
         this object knows how to load and save itself to XML
-    
-    
     '''
+
+    class GateInfo():
+        def __init__(self, index, value = None, item_data = None, condition = GateCondition.OnCross):
+            self.id = None
+            self.index = index
+            self.value = value
+            self.condition = condition
+            self.item_data = item_data
+            self.used = True
+
+        def __lt__(self, other):
+            return self.value < other.value
+
+    class RangeInfo():
+        def __init__(self, index, min_gate, max_gate, item_data = None, condition = GateCondition.InRange, mode = GateRangeOutputMode.Normal):
+            self.id = None
+            self.index = index
+            self.condition = condition
+            self.min_gate : GateData.GateInfo = min_gate
+            self.max_gate : GateData.GateInfo = max_gate
+            self.item_data = item_data
+            self.output_mode = mode
+            self.fixed_value = 0 # fixed value to output for this range if the condition is Fixed
+
+
+        def __str__(self):
+            if self.min_gate is None or self.max_gate is None:
+                return "N/A"
+            return f"{self.min_gate.value} {self.max_gate.value}"
+
+
     steps_changed = QtCore.Signal() # signals that steps (gate counts) have changed 
     values_changed = QtCore.Signal() # signals that values have changed (not step/gate counts)
 
     def __init__(self,
-                 item_data = None,
+                 action_data,
                  min = -1.0,
                  max = 1.0,
                  action = GateAction.NoAction,
@@ -213,13 +242,14 @@ class GateData(QtCore.QObject):
                  range_min = -1.0,
                  range_max = 1.0):
         super().__init__()
+        self._action_data = action_data
         self._min = min # gate min range
         self._max = max # gate max range
         self._action = action # primary action mode
         self.condition = condition
         self._action_map = {} # list of individual gate actions
-        self._condition_map = {} # list of individual gate conditions
-        self._value_map = {} # list of individual gate values, floating point range -1 to +1
+        self._gate_condition_map = {} # list of individual gate conditions
+        self._gate_value_map = {} # list of individual gate values, floating point range -1 to +1
         self._used_map = {} # flags to track which gate is used as the widget is edited
         self.output_mode = mode
         self.fixed_value = 0
@@ -228,15 +258,20 @@ class GateData(QtCore.QObject):
         self.macro : gremlin.macro.Macro = None  # macro steps
         self.id = gremlin.util.get_guid()
         self._last_value = None # last input value - this is set whenever a profile is activated or when it is triggered
-        self.steps = 5 # number of equally spaced steps on this axis (range -1 to +1)
-        self._item_data = item_data
+
+        # default gates
+        min_gate = GateData.GateInfo(0,min,self._new_item_data())
+        max_gate = GateData.GateInfo(1,max,self._new_item_data())
+        range_info = GateData.RangeInfo(0,min_gate, max_gate,  GateCondition.InRange, GateRangeOutputMode.Normal)
+        self._gate_item_map = {0: min_gate, 1: max_gate} # holds the input item data for gates index by gate index
+        self._range_item_map = {0: range_info} # holds the input item data for ranges indexed by range index
+        
+
 
     @property
-    def item_data(self):
-        return self._item_data
-    @item_data.setter
-    def item_data(self, value):
-        self._item_data = value
+    def steps(self):
+        # number of gates
+        return len(self._gate_item_map.keys())
 
     def setGateAction(self, index, action):
         ''' sets the action for the given gate index '''
@@ -249,12 +284,12 @@ class GateData(QtCore.QObject):
     
     def setGateCondition(self, index, condition):
         ''' sets the condition for the given gate index '''
-        self._condition_map[index] = condition
+        self._gate_condition_map[index] = condition
     def getGateCondition(self, index):
         ''' gets the condition for the given gate index '''
-        if not index in self._condition_map:
-            self._condition_map[index] = GateCondition.OnCross
-        return self._condition_map[index]
+        if not index in self._gate_condition_map:
+            self._gate_condition_map[index] = GateCondition.OnCross
+        return self._gate_condition_map[index]
     
     def _valid_condition_for_action(self, action):
         if action == GateAction.Gate:
@@ -271,29 +306,7 @@ class GateData(QtCore.QObject):
     def valid_conditions(self):
         ''' returns the list of valid conditions for the given action '''
         return self._valid_condition_for_action(self.action)
-        
-
-    def _trigger(self):
-        ''' triggers the action '''
-
-        
-        data = TriggerData()
-
-        # compute the value of the gate based on the intput axis 
-        if value < gate.min or value > gate.max:
-            return None # value is not in the gate range
-        if gate.action == GateAction.NoAction:
-            # pass through
-            data.value = value
-            data.mode = TriggerMode.Value
-            return data
-            
-        elif gate.action == GateAction.Ranged:
-            # send min value
-            data.value = self.scale_output(gate.min)
-            data.mode = TriggerMode.Value
-            return data
-        pass
+    
 
     @property
     def action(self):
@@ -319,11 +332,7 @@ class GateData(QtCore.QObject):
     def max(self, value):
         self._max = value
         self.update_steps()
-
-    @property 
-    def steps(self):
-        return self._steps
-    
+   
     @steps.setter
     def steps(self, value):
         if value < 2:
@@ -346,13 +355,23 @@ class GateData(QtCore.QObject):
     
     def setGateValue(self, index, value):
         ''' sets the value of a gate '''
-        if not index in self._value_map.keys() or self._value_map[index] != value:
-            self._value_map[index] = value
+        gate = self.getGate(index)
+        gate.value = value
+        if gate.value != value:
+            gate.value = value
             self.values_changed.emit() # indicate step data changed
 
     def getGateRanges(self):
         ''' returns the list of ranges [(v1,v2), (v2,v3), ...] '''
         return self._get_gate_ranges()
+    
+    def getGate(self, index):
+        if not index in self._gate_item_map.keys():
+            item_data = self._new_item_data()
+            gate_info = GateData.GateInfo(index, item_data)
+            self._gate_item_map[index] = gate_info
+        return self._gate_item_map[index]
+
         
     def normalize_steps(self, use_current_range = False):
         ''' normalizes gate intervals based on the number of gates 
@@ -371,7 +390,8 @@ class GateData(QtCore.QObject):
         interval = minmax_range / (self._steps-1)
         current = self._min
         for index in range(self._steps):
-            self._value_map[index] = current
+            self._gate_value_map[index] = current
+            self.getGate(index).value = current
             current += interval
         
 
@@ -390,12 +410,12 @@ class GateData(QtCore.QObject):
 
     def update_steps(self):
         ''' updates the stepped data when the range changes '''
-        value = self._steps
+        value = self.steps
 
         # add the missing steps only (re-use other steps so we don't lose their config)
         current_steps = len(self.getUsedGatesIndices())
         if current_steps < value:
-            min_value = max(self._value_map.values()) if current_steps else self._min
+            min_value = max([g.value for g in self._gate_item_map.values()]) if current_steps else self._min
             minmax_range = self._max - min_value
             interval = minmax_range / (1 + value - current_steps)
             if min_value > -1:
@@ -406,10 +426,13 @@ class GateData(QtCore.QObject):
                 index = self._get_next_index()
                 if not index in self._action_map.keys():
                     self._action_map[index] = GateAction.Gate
-                if not index in self._condition_map.keys():
-                    self._condition_map[index] = GateCondition.OnCross
-                if not index in self._value_map.keys():
-                    self._value_map[index] = min_value
+                if not index in self._gate_condition_map.keys():
+                    self._gate_condition_map[index] = GateCondition.OnCross
+                if not index in self._gate_value_map.keys():
+                    self._gate_value_map[index] = min_value
+                info = self.getGate(index)
+                info.used = True
+                info.value = min_value
                 self._used_map[index] = True
                 min_value += interval
         elif current_steps > value:
@@ -423,16 +446,16 @@ class GateData(QtCore.QObject):
         self.steps_changed.emit() # indicate step data changed
 
     def _get_used_items(self):
-        return [(index, value) for index, value in self._value_map.items() if self._used_map[index]]
+        return [(info.index, info) for info in self._gate_item_map.values() if info.used]
     
     def _get_used_values(self):
-        return [value for index, value in self._value_map.items() if self._used_map[index]]
+        return [info.index for info in self._gate_item_map.values() if info.used]
     
     def _get_used_indices(self):
-        return [index for index in self._used_map.keys() if self._used_map[index]]
+        return [info.index for info in self._gate_item_map.values() if info.used]
 
     def _get_gate_ranges(self):
-        ''' buils a list of gate ranges based on all the gates as a list of [(v1,v2), (v2,v3), ...] '''
+        ''' buils a list of gate ranges based on all the gates as a list of [(gate_1,gate_2), (gate_2,gate_3), ...] '''
         range_list = []
         value_list = self._get_used_items()
         value_list.sort(key = lambda x: x[1]) # sort by value, keep the gate index the same
@@ -553,14 +576,33 @@ class GateData(QtCore.QObject):
         node.set("mode", _gate_range_to_name[self.output_mode])
         node.set("steps", str(self.steps))
 
+        gate_info : GateData.GateInfo
+        for gate_info in self._gate_item_data_map.values():
+            child = ElementTree.SubElement(node,"handle")
+            gate_value = f"{gate_info.value:0.{_decimals}f}"
+            child.set("value", gate_value)
+            child.set("index", str(index))
+            child.set("action",_gate_action_to_name(gate_info.action))
+            child.set("condition",_gate_condition_to_name(gate_info.condition))
+
+        range_info : GateData.RangeInfo
+        for range_info in self._range_item_map.values():
+            child = ElementTree.SubElement(node,"range")
+            child.set("index", str(index))
+            child.set("condition",_gate_condition_to_name(range_info.condition))
+            child.set("min_index", str(range_info.min_gate.index))
+            child.set("max_index", str(range_info.max_gate.index))
+            child.set("mode",_gate_range_to_name(range_info.output_mode))
+            
+
         # output handle configuration
         for index in range(len(self._action_map.keys())):
             child = ElementTree.SubElement(node, "handle")
             action_name = _gate_action_to_name[self._action_map[index]]
             child.set("action", action_name)
-            condition_name = _gate_condition_to_name[self._condition_map[index]]
+            condition_name = _gate_condition_to_name[self._gate_condition_map[index]]
             child.set("condition", condition_name )
-            gate_value = f"{self._value_map[index]:0.{_decimals}f}"
+            gate_value = f"{self._gate_value_map[index]:0.{_decimals}f}"
             child.set("value", gate_value)
             child.set("index", str(index))
 
@@ -574,6 +616,21 @@ class GateData(QtCore.QObject):
 
 
         return node
+    
+    def _find_input_item(self):
+        current = self._action_data
+        while current and not isinstance(current, gremlin.base_profile.InputItem):
+            current = current.parent
+        return current
+
+    def _new_item_data(self):
+        ''' creates a new item data from the existing one '''
+        current_item_data = self._find_input_item()
+        item_data = gremlin.base_profile.InputItem(current_item_data)
+        item_data._input_type = current_item_data._input_type
+        item_data._device_guid = current_item_data._device_guid
+        item_data._input_id = current_item_data._input_id
+        return item_data
 
     def from_xml(self, node):
         if not node.tag == "gate":
@@ -594,6 +651,8 @@ class GateData(QtCore.QObject):
         if not condition in valid_conditions:
             condition = valid_conditions[0]
         self.condition = condition
+
+
             
         mode = safe_read(node,"mode",str,"")
         if not mode in _gate_range_from_name.keys():
@@ -605,7 +664,6 @@ class GateData(QtCore.QObject):
         # read individual handle configurations 
         node_handles = gremlin.util.get_xml_child(node, "handle", multiple=True)
         for child in node_handles:
-
             gate_index = safe_read(child, "index", int, 0)
             gate_value = safe_read(child, "value", float, 0.0)
             gate_action = safe_read(node, "action", str, "")
@@ -617,11 +675,37 @@ class GateData(QtCore.QObject):
                 syslog.error(f"GateData: Invalid condition type {condition} handle index: {gate_index}")
                 return
             
+            item_node = gremlin.util.get_xml_child(child, "action_containers")
+            item_data = self._new_item_data()
+            if item_node:
+                item_node.tag = item_node.get("type")
+                item_data.from_xml(item_node)
+            
             self._action_map[gate_index] = _gate_action_from_name[gate_action]
-            self._condition_map[gate_index] = _gate_condition_from_name[gate_condition]
-            self._value_map[gate_index] = gate_value
+            self._gate_condition_map[gate_index] = _gate_condition_from_name[gate_condition]
+            self._gate_value_map[gate_index] = gate_value
 
+            gate_info = GateData.GateInfo(gate_index, gate_value, item_data, gate_condition)
+            self._gate_item_map[gate_index] = gate_info
 
+        node_ranged = gremlin.util.get_xml_child(node, "range", multiple=True)
+        for child in node_ranged:
+            range_index = safe_read(child, "index", int, 0)
+            range_condition = _gate_condition_from_name[safe_read(node, "condition", str, "")]
+            range_mode = _gate_range_from_name(safe_read(node, "mode", str, ""))
+            range_min_index = safe_read(child, "min_index", int, 0)
+            range_max_index = safe_read(child, "min_index", int, 0)
+
+            item_node = gremlin.util.get_xml_child(child, "range_containers")
+            item_data = self._new_item_data()
+            if item_node:
+                item_node.tag = item_node.get("type")
+                item_data.from_xml(item_node)
+
+            min_gate = self._gate_item_map[range_min_index] 
+            max_gate = self._gate_item_map[range_max_index]
+            range_info = GateData.RangeInfo(range_index, min_gate, max_gate, item_data, range_condition, range_mode)
+            self._range_item_map[gate_index] = range_info
         
         if self.action == GateAction.Ranged:
             child = get_xml_child(node, "input_range")
@@ -658,6 +742,8 @@ class TriggerData():
         self.gate_index = None
         self.gate_value = None
 
+    def __str__(self):
+        return f"Trigger: mode: {self.mode.name} value: {self.value}  gate: {self.gate_index} gate value: {self.gate_value}"
 
 
 class GatedOutput():
@@ -921,7 +1007,7 @@ QSlider::handle:horizontal {
         self._gate_value_widget_list = []
         gremlin.util.clear_layout(self.container_gate_layout)
         items = self.gate_data.getGateValueItems()
-        for index, value in items:
+        for index, info in items:
             
             label_widget = QtWidgets.QLabel(f"Gate {index+1}:")
             sb_widget = ui_common.DynamicDoubleSpinBox(data = index)
@@ -929,7 +1015,7 @@ QSlider::handle:horizontal {
             sb_widget.setMaximum(1.0)
             sb_widget.setDecimals(self.decimals)
             sb_widget.setSingleStep(self.single_step)
-            sb_widget.setValue(value)
+            sb_widget.setValue(info.value)
             sb_widget.valueChanged.connect(self._gate_value_changed_cb)
             self._gate_value_widget_list.append(sb_widget)
 
@@ -970,14 +1056,13 @@ QSlider::handle:horizontal {
         col = 0
         row = 0
         for index, range in enumerate(range_list):
-
-            (idx1,v1),(idx2,v2) = range
-
+            (_,g1,),(_, g2) = range
+            
             label_widget = QtWidgets.QLabel(f"Range {index+1}:")
 
             range_widget = QtWidgets.QLineEdit()
             range_widget.setReadOnly(True)
-            range_widget.setText(f"[{idx1+1}:{idx2+1}] {v1:0.{self.decimals}f} to {v2:0.{self.decimals}f}")
+            range_widget.setText(f"[{g1.index+1}:{g2.index+1}] {g1.value:0.{self.decimals}f} to {g2.value:0.{self.decimals}f}")
             
             setup_widget = ui_common.QDataPushButton()
             setup_widget.data = index
@@ -1231,6 +1316,7 @@ QSlider::handle:horizontal {
         trigger : TriggerData
        
         for trigger in triggers:
+            log_info(trigger)
             # self.output_value_widget.setText(f"No Output")
             if trigger.mode == TriggerMode.FixedValue:
                 self.output_value_widget.setText(f"(Fixed output) {trigger.value:0.{self.decimals}f}")
@@ -1420,8 +1506,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
 
     @QtCore.Slot()
     def _add_gate_cb(self):
-        
-        self.gates.append(GateData())
+        self.gates.append(GateData(action_data = self.action_data))
         self._populate_ui()
 
     
