@@ -1020,3 +1020,4 @@ def compare_nocase(a : str, b : str):
     if a == "" and b == "":
         return True
     return a.casefold() == b.casefold()
+

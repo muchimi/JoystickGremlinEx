@@ -42,6 +42,7 @@ SC_NONE = QStyle.SubControl.SC_None
 SC_HANDLE = QStyle.SubControl.SC_SliderHandle
 SC_GROOVE = QStyle.SubControl.SC_SliderGroove
 SC_TICKMARKS = QStyle.SubControl.SC_SliderTickmarks
+SC_SUB = QStyle.SubControl.SC_ScrollBarSubPage
 
 CC_SLIDER = QStyle.ComplexControl.CC_Slider
 QOVERFLOW = 2**31 - 1
@@ -64,6 +65,7 @@ class _GenericSlider(QSlider):
     _fsliderMoved = Signal(int)
     _frangeChanged = Signal(int, int)
     handleRightClicked = Signal(int)
+    handleGrooveClicked = Signal(float)
 
     MAX_DISPLAY = 5000
 
@@ -256,6 +258,9 @@ class _GenericSlider(QSlider):
             self._updatePressedControl(pos)
             if self._pressedControl == SC_HANDLE:
                 self._fireHandleClicked()
+            elif self._pressedControl == SC_SUB:
+                value = self._pixelPosToRangeValue(self._pick(pos))
+                self._fireGrooveClicked(value)
         
         else:
             ev.ignore()
@@ -268,6 +273,9 @@ class _GenericSlider(QSlider):
 
     def _fireHandleClicked(self):
         self.handleRightClicked.emit(0)
+
+    def _fireGrooveClicked(self, value):
+        self.handleGrooveClicked.emit(value)
 
     def mouseMoveEvent(self, ev: QtGui.QMouseEvent) -> None:
         # TODO: add pixelMetric(QStyle::PM_MaximumDragDistance, &opt, this);

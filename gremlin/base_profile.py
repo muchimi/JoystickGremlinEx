@@ -561,6 +561,7 @@ class InputItem(QtCore.QObject):
         self.parent = parent
         self._input_type = None
         self._device_guid = None # hardware input ID
+        self._name = None # device name
         self._input_id = None # input Id on the hardware
         self.always_execute = False
         self.description = ""
@@ -580,6 +581,9 @@ class InputItem(QtCore.QObject):
     @property
     def is_action(self):
         return self._is_action
+    @is_action.setter
+    def is_action(self, value):
+        self._is_action = value
 
     # @property
     # def containers(self):
@@ -821,9 +825,19 @@ class InputItem(QtCore.QObject):
 
         :return hash of this InputItem instance
         """
+        if not self._name and not self._device_guid:
+            current = self.parent
+            while current:
+                if self._device_guid is None and hasattr(current,"device_guid"):
+                    self._device_guid = current.device_guid
+                if self._name is None and hasattr(current, "name"):
+                    self._name = current.name
+                if self._name and self._device_guid:
+                    break
+                current = current.parent
         return hash((
-            self.parent.parent.device_guid,
-            self.parent.name,
+            self._device_guid,
+            self._name,
             self.input_type,
             self.input_id)
         )
