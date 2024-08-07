@@ -37,7 +37,7 @@ import uuid
 from gremlin.util import *
 from gremlin.input_types import InputType
 import gremlin.base_classes
-from xml.etree import ElementTree
+from lxml import etree as ElementTree
 import gremlin.ui.ui_common
 
 class KeyboardInputItem():

@@ -22,7 +22,7 @@ import os
 import pytest
 import tempfile
 import uuid
-from xml.etree import ElementTree
+from lxml import etree as ElementTree
 
 import gremlin.error
 import gremlin.plugin_manager

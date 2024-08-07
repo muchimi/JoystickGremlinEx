@@ -20,7 +20,7 @@ sys.path.append(".")
 
 import pytest
 import uuid
-from xml.etree import ElementTree
+from lxml import etree as ElementTree
 
 import gremlin.error as error
 import gremlin.types as types

@@ -19,7 +19,7 @@
 import logging
 import os
 from PySide6 import QtCore, QtWidgets
-from xml.etree import ElementTree
+from lxml import etree as ElementTree
 
 import gremlin.base_profile
 from gremlin.input_types import InputType

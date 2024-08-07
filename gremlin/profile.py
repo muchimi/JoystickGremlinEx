@@ -24,7 +24,7 @@ import os
 import shutil
 import uuid
 from xml.dom import minidom
-from xml.etree import ElementTree
+from lxml import etree as ElementTree
 import gremlin.base_classes
 import gremlin.base_profile
 

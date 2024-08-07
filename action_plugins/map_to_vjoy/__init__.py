@@ -19,7 +19,7 @@
 import logging
 import threading
 import time
-from xml.etree import ElementTree
+from lxml import etree as ElementTree
 
 from PySide6 import QtWidgets, QtCore, QtGui
 from gremlin.util import load_icon

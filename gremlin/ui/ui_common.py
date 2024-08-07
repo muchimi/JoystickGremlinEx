@@ -2246,6 +2246,30 @@ class QMarkerDoubleRangeSlider(QDoubleRangeSlider):
 
     icon_size = QtCore.QSize(16, 16)
 
+    # background: #8FBC8F;  add-page is the background color of the groove 
+    
+    css = '''
+
+QSlider::groove:vertical { background: white; position: absolute; left: 8px; right: 7px; }
+
+QMarkerDoubleRangeSlider::handle:horizontal {
+    background: #8FBC8F;
+    border: 2px solid #565a5e;
+    width: 8px;
+    height: 8px;
+    border-radius: 4px;
+}
+
+QMarkerDoubleRangeSlider::sub-page:vertical { background: #8FBC8F; border-style:solid; border-color: grey;border-width:1px;border-radius:2px;}
+
+QMarkerDoubleRangeSlider::add-page:vertical { background: #979EA8; border-style:solid; border-color: grey;border-width:1px;border-radius:2px;}
+
+QMarkerDoubleRangeSlider::sub-page:horizontal { background: #8FBC8F; border-style:solid; border-color: grey;border-width:1px;border-radius:2px;}
+
+QMarkerDoubleRangeSlider::add-page:horizontal { background: #979EA8; border-style:solid; border-color: grey;border-width:1px;border-radius:2px;}
+   
+'''
+
     class PixmapData():
         ''' holds a pixmap definition '''
         def __init__(self, pixmap : QtGui.QPixmap = None, offset_x = None, offset_y = None):
@@ -2268,6 +2292,8 @@ class QMarkerDoubleRangeSlider(QDoubleRangeSlider):
         # setup a single default marker
         self._update_pixmaps()
         self._update_targets()
+
+        self.setStyleSheet(self.css)
 
     def _get_pixmaps(self):
         if self._pixmaps: return self._pixmaps

@@ -19,7 +19,7 @@ from PySide6 import QtWidgets
 
 import logging
 import time
-from xml.etree import ElementTree
+from lxml import etree as ElementTree
 
 import gremlin
 import gremlin.ui.ui_common

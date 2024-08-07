@@ -3,7 +3,7 @@
 from abc import abstractmethod, ABCMeta
 import enum
 import logging
-from xml.etree import ElementTree
+from lxml import etree as ElementTree
 from gremlin.input_types import InputType
 
 from gremlin.util import *

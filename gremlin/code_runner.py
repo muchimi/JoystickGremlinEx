@@ -294,6 +294,11 @@ class CodeRunner:
                 for aid, value in data.items():
                     vjoy_proxy.axis(linear_index=aid).set_absolute_value(value)
 
+
+            # attach sub items
+            
+
+
             # Connect signals
             evt_listener = gremlin.event_handler.EventListener()
 

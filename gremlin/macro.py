@@ -22,7 +22,7 @@ import functools
 import logging
 import time
 from threading import Event, Lock, Thread
-from xml.etree import ElementTree
+from lxml import etree as ElementTree
 
 from PySide6 import QtCore
 

@@ -18,7 +18,7 @@
 
 import os
 from PySide6 import QtCore, QtGui, QtMultimedia, QtWidgets
-from xml.etree import ElementTree
+from lxml import etree as ElementTree
 import qtawesome as qta
 
 import gremlin.base_profile

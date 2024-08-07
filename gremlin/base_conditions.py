@@ -2,7 +2,7 @@
 from abc import abstractmethod, ABCMeta
 import enum
 import logging
-from xml.etree import ElementTree
+from lxml import etree as ElementTree
 from gremlin.input_types import InputType
 
 
@@ -336,11 +336,16 @@ class AbstractContainerActionFunctor(AbstractFunctor):
     def process_event(self, event, value):
         ''' Processes the functor using the provided event '''
         for functor in self.action_data.functors:
+            # only fire the appropriate type
             result = functor.process_event(event, value)
             if not result:
                 break
 
         return result
+    
+    def profile_start(self):
+        ''' profile is started '''
+        self.action_data
     
 
 

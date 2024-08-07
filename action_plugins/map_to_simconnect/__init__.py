@@ -27,6 +27,7 @@ from gremlin.input_devices import ButtonReleaseActions
 import gremlin.macro
 import gremlin.shared_state
 
+import gremlin.shared_state
 import gremlin.singleton_decorator
 import gremlin.ui.ui_common
 import gremlin.ui.input_item
@@ -36,7 +37,7 @@ from gremlin.profile import safe_format, safe_read
 from .SimConnectData import *
 import re
 from lxml import etree
-from xml.etree import ElementTree
+from lxml import etree as ElementTree
 from gremlin.gated_handler import *
 
 
@@ -1554,7 +1555,9 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
 
         logging.getLogger("system").info(f"SC FUNCTOR: {event}  {value}")
 
-        # execute the functors
+        
+
+        # execute the nested functors for this action
         result = super().process_event(event, value)
         if not result:
             return True
@@ -1628,6 +1631,9 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
 
         :param parent the container this action is part of
         """
+
+        import gremlin.shared_state
+
         super().__init__(parent)
         self.sm = SimConnectData()
 
@@ -1644,7 +1650,9 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         self.min_range = -16383
         self.max_range = 16383
         self.keys = None # keys to send
-        self.gates = [] # list of GateData objects
+        gate_data = GateData(profile_mode = gremlin.shared_state.current_mode, action_data=self)
+        self.gates = [gate_data] # list of GateData objects
+
 
         # output mode
         self.mode = SimConnectActionMode.NotSet
@@ -1694,14 +1702,18 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         self.invert_axis = safe_read(node,"invert", bool, False)
 
         # load gate data
-        self.gates = []
+        gates = []
         gate_node = gremlin.util.get_xml_child(node,"gates")
-        if gate_node:
+        if not gate_node is None:
             for child in gate_node:
-                gate_data = gremlin.gated_handler.GateData(self)
+                gate_data = GateData(self, action_data = self)
                 gate_data.from_xml(child)
-                self.gates.append(gate_data)
-    
+                gates.append(gate_data)
+
+        if gates:
+            self.gates = gates
+        
+
     def _generate_xml(self):
         """Returns an XML node containing this instance's information.
 

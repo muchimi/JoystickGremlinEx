@@ -25,7 +25,7 @@ from gremlin.threading import AbortableThread
 from gremlin.input_types import InputType
 import gremlin.shared_state
 from gremlin.util import *
-from xml.etree import ElementTree
+from lxml import etree as ElementTree
 import enum
 
 import uuid

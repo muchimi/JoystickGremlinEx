@@ -6,7 +6,7 @@ import uuid
 import sys
 import pickle
 from xml.dom import minidom
-from xml.etree import ElementTree
+from lxml import etree as ElementTree
 
 
 def generate_file_list(root_folder):

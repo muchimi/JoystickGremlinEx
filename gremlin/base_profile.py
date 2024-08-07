@@ -16,7 +16,8 @@ from gremlin.util import *
 from gremlin.input_types import InputType
 from gremlin.types import *
 from xml.dom import minidom
-from xml.etree import ElementTree
+#from lxml import etree as ElementTree
+from lxml import etree as ElementTree
 from gremlin.types import DeviceType
 from gremlin.plugin_manager import ContainerPlugins
 from gremlin.base_conditions import *
@@ -29,7 +30,7 @@ import gremlin.input_devices
 import gremlin.plugin_manager
 import gremlin.shared_state
 from gremlin.singleton_decorator import SingletonDecorator
-from lxml import etree
+
 
 
 # Data struct representing profile information of a device
@@ -585,10 +586,6 @@ class InputItem(QtCore.QObject):
     def is_action(self, value):
         self._is_action = value
 
-    # @property
-    # def containers(self):
-    #     return self._containers
-    
     def add_container(self, container):
         self._containers.append(container)
         self.container_changed.emit()
@@ -1133,7 +1130,7 @@ class Settings:
 
         :param node the node containing the settings data
         """
-        if not node:
+        if node is None:
             return
 
         # Startup mode
@@ -2661,8 +2658,8 @@ class ProfileMapItem():
             # profile not loaded - grab the info from the profile xml
             if os.path.isfile(profile):
                 try:
-                    parser = etree.XMLParser(remove_blank_text=True)
-                    tree = etree.parse(profile, parser)
+                    parser = ElementTree.XMLParser(remove_blank_text=True)
+                    tree = ElementTree.parse(profile, parser)
                     for element in tree.xpath("//mode"):
                         mode = element.get("name")
                         mode_list.add(mode)
@@ -2803,8 +2800,8 @@ class ProfileMap():
         if os.path.isfile(fname):
             # read the xml
             try:
-                parser = etree.XMLParser(remove_blank_text=True)
-                tree = etree.parse(fname, parser)
+                parser = ElementTree.XMLParser(remove_blank_text=True)
+                tree = ElementTree.parse(fname, parser)
                 for element in tree.xpath("//map"):
                     process = element.get("process")
                     profile = element.get("profile")

@@ -18,7 +18,7 @@
 
 import os
 from PySide6 import QtWidgets, QtCore
-from xml.etree import ElementTree
+from lxml import etree as ElementTree
 import threading
 import gremlin.base_profile
 from gremlin.input_types import InputType

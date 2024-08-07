@@ -50,7 +50,7 @@ import struct
 from datetime import datetime, timedelta, date
 
 from gremlin.util import *
-from xml.etree import ElementTree
+from lxml import etree as ElementTree
 
 import enum
 

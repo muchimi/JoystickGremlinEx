@@ -17,7 +17,7 @@
 
 
 
-from xml.etree import ElementTree
+from lxml import etree as ElementTree
 from gremlin.util import *
 from gremlin.base_conditions import *
 from collections.abc import MutableSequence

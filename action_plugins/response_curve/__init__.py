@@ -21,7 +21,7 @@ import logging
 import os
 import time
 from PySide6 import QtCore, QtGui, QtWidgets
-from xml.etree import ElementTree
+from lxml import etree as ElementTree
 
 import gremlin
 import gremlin.base_profile

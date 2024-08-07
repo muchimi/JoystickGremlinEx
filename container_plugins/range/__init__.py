@@ -17,7 +17,7 @@
 
 
 import logging
-from xml.etree import ElementTree
+from lxml import etree as ElementTree
 from gremlin.input_types import InputType
 from gremlin.util import rad2deg, get_guid
 from gremlin.profile import safe_format, safe_read
