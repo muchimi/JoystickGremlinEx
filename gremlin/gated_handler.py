@@ -134,9 +134,9 @@ _gate_condition_from_name = {
 _gate_condition_description = {
     GateCondition.InRange: "Triggers whenever the input value is in range",
     GateCondition.OutsideRange: "Triggers whenever the input value is outside the range",
-    GateCondition.OnCross: "Triggers when the input crosses a gate in any direction",
-    GateCondition.OnCrossDecrease: "Triggers when the input crosses a gate while decreasing (crossing from the right/above)",
-    GateCondition.OnCrossIncrease: "Triggers when the input crosses a gate while increasing (crossing from the left/below)"
+    GateCondition.OnCross: "Triggers when the input crosses a gate",
+    GateCondition.OnCrossDecrease: "Triggers when the input crosses a gate (crossing from the right/above)",
+    GateCondition.OnCrossIncrease: "Triggers when the input crosses a gate (crossing from the left/below)"
 }
 
 _gate_range_to_name = {
@@ -176,9 +176,9 @@ _gate_range_name = {
     GateRangeOutputMode.FilterOut: "Filter Out",
 }
 
-def _is_close(a, b):
+def _is_close(a, b, tolerance = 0.0001):
     ''' compares two floating point numbers with approximate precision'''
-    return math.isclose(a, b, abs_tol=0.0001)
+    return math.isclose(a, b, abs_tol=tolerance)
 
 class GateData(QtCore.QObject):
     ''' holds gated information for an axis 
@@ -203,9 +203,14 @@ class GateData(QtCore.QObject):
             self._value = value
             self.condition = condition
             self.profile_mode = profile_mode
-            self.item_data = item_data
+            self.item_data : gremlin.base_profile.InputItem = item_data
+            # force the item data to mimic a joystick button as gates are trigger actions - this will configure actions int he container correctly for this type of input
+            self.item_data.input_type = InputType.JoystickButton
+            self.item_data.input_id = 1
+            
             self.used = True
             self.slider_index =  None # index of the gate in the slider 
+            self.delay = 250  # delay in milliseconds for the trigger duration between a press and release
 
 
         @property
@@ -411,9 +416,11 @@ class GateData(QtCore.QObject):
                  condition = GateCondition.OnCross,
                  mode = GateRangeOutputMode.Normal,
                  range_min = -1.0,
-                 range_max = 1.0):
+                 range_max = 1.0,
+                 process_callback = None):
         ''' GateData constructor '''
         super().__init__()
+
         self._action_data = action_data
         self._min = min # gate min range
         self._max = max # gate max range
@@ -426,6 +433,7 @@ class GateData(QtCore.QObject):
         self.macro : gremlin.macro.Macro = None  # macro steps
         self.id = gremlin.util.get_guid()
         self.use_default_range = True # if true, the default range is used to drive the output on the overall axis size
+        self.show_percent = False # if true, displays data as percentages
 
         self._last_value = None # last input value
         self._last_range = None # last range object
@@ -443,7 +451,144 @@ class GateData(QtCore.QObject):
         self._trigger_range_lines = [] # activity triggers
         self._trigger_gate_lines = [] # activity triggers
         self._trigger_line_count = 10 # last 10 triggers max
+
+
+        self._callbacks = {} # map of containers to their excecution graph callbacks for sub containers
+        self._process_callback = process_callback
+
         
+        # hook joystick input for runtime processing of input
+        el = gremlin.event_handler.EventListener()
+        el.joystick_event.connect(self._joystick_event_cb)
+        el.profile_start.connect(self._profile_start_cb)
+        el.profile_stop.connect(self._profile_stop_cb)
+
+    @property
+    def process_callback(self):
+        ''' the callback object '''
+        return self._process_callback
+    @process_callback.setter
+    def process_callback(self, value):
+        self._process_callback = value
+
+    @QtCore.Slot()
+    def _profile_start_cb(self):
+        ''' profile starts - build execution callbacks by defined container '''
+        callbacks_map = {}
+
+        # get all the sub containers defined by this widget
+        gates = self.getGates()
+        ranges = self.getRanges()
+        for gate in gates:
+            for container in gate.item_data.containers:
+                callbacks_map[container] = container.generate_callbacks()
+        for rng in ranges:
+            for container in rng.item_data.containers:
+                callbacks_map[container] = container.generate_callbacks()
+
+        self._callbacks = callbacks_map  # holds the callbacks for each container found
+
+ 
+    @QtCore.Slot()
+    def _profile_stop_cb(self):
+        ''' profile stops - cleanup '''
+        self._callbacks.clear()
+
+
+    @QtCore.Slot(object)
+    def _joystick_event_cb(self, event):
+        ''' handles joystick input 
+        
+        To avoid challenges with other GremlinEx functionality - we handle our own calls to our subcontainers here.
+        The idea is that we duplicate the behavior of normal actions/containers receiving data.
+
+        For gate crossings, we mimic a button push (for now) in case containers need to have a press and release
+        
+        '''
+
+        if not gremlin.shared_state.is_running:
+            return # profile is not running - nothing to do
+        
+        if not event.is_axis:
+            # ignore if not an axis event 
+            return
+
+        # mode check
+        
+
+        if self._action_data.hardware_device_guid != event.device_guid:
+            # ignore if a different input device
+            return
+            
+        if self._action_data.hardware_input_id != event.identifier:
+            # ignore if a different input axis on the input device
+            return
+
+        raw_value = event.raw_value
+        input_value = gremlin.joystick_handling.scale_to_range(raw_value, source_min = -32767, source_max = 32767, target_min = -1, target_max = 1) 
+        self._axis_value = input_value
+
+
+        # run mode - execute the functors with the gate data
+        value = gremlin.actions.Value(event.value)
+        triggers = self.gate_data.process_value(self._axis_value)
+        trigger: TriggerData
+        for trigger in triggers:
+            short_press = False
+            if trigger.mode == TriggerMode.FixedValue:
+                value.current = trigger.value
+                containers = trigger.range.item_data.containers
+            elif trigger.mode == TriggerMode.ValueInRange:
+                containers = trigger.range.item_data.containers
+                
+            elif trigger.mode == TriggerMode.ValueOutOfRange:
+                containers = trigger.range.item_data.containers
+            elif trigger.mode == TriggerMode.GateCrossed:
+                # mimic a joystick button press for a gate crossing
+                delay = trigger.gate.delay
+                event.is_axis = False
+                event.event_type = InputType.JoystickButton
+                containers = trigger.gate.item_data.containers
+                short_press = True # send a key up in 250ms
+            
+
+            # process container execution graphs
+            container: gremlin.base_profile.AbstractContainer
+            for container in containers:
+                if container in self._callbacks.keys():
+                    callbacks = self._callbacks[container]
+                    for cb in callbacks:
+                        for functor in cb.callback.execution_graph.functors:
+                            if short_press:
+                                thread = threading.Thread(target=lambda: self._short_press(functor, event, value, delay))
+                                thread.start()
+                            else:
+                                # not a momentary trigger
+                                functor.process_event(event, value)
+            
+                                
+            # process other functor callback for the action owning this gated output 
+            if self._process_callback is not None:
+                if short_press:
+                    thread = threading.Thread(target=lambda: self._short_press(self._process_callback, event, value, delay))
+                    thread.start()
+                else:
+                    self._process_callback(event, value)
+
+
+    def _short_press(self, functor, event, value, delay = 250):
+        ''' triggers a short press of a trigger (gate crossing)'''
+        print ("short press ")
+        value.current = True
+        value.is_pressed = True
+        functor.process_event(event, value)
+        time.sleep(delay/1000) # ms to seconds
+        value.current = False
+        value.is_pressed = False
+        functor.process_event(event, value)
+
+                
+
     @property
     def trigger_range_text(self):
         text = ""
@@ -576,6 +721,29 @@ class GateData(QtCore.QObject):
         ''' gets the gate corresponding to a given slider index '''
         return next((gate for gate in self._get_used_gates() if gate.slider_index == index), None)
     
+    def findGate(self, value, tolerance = 0.01):
+        ''' finds an existing gate by value - None if not found '''
+        return next((gate for gate in self._get_used_gates() if _is_close(gate.value, value, tolerance)), None)
+    
+    def getOverlappingGates(self, tolerance = 0.01):
+        ''' returns a list of overlapping gates '''
+        overlap = set()
+        gates = self._get_used_gates()
+        processed = []
+        for gate in gates:
+            sub_gates = [g for g in gates if gate != g and g not in processed]
+            for subgate in sub_gates:
+                if _is_close(gate.value, subgate.value, tolerance):
+                    overlap.add(gate)
+                    overlap.add(subgate)
+                    processed.append(subgate)
+            processed.append(gate)
+
+        return list(overlap)
+
+
+
+    
 
     def setGateValue(self, index, value):
         ''' sets the value of a gate '''
@@ -595,13 +763,18 @@ class GateData(QtCore.QObject):
             self._update_ranges()
         return self._get_ranges(include_default)
     
-    def getGate(self, id = get_guid()):
+    def getGate(self, id = None, value = -2.0):
         ''' returns a gate object for the given index - the item is created if the index does not exist and the gate is marked used '''
-        if not id in self._gate_item_map.keys():
+        if id is None or not id in self._gate_item_map.keys():
+            if id is None:
+                id = get_guid()
             item_data = self._new_item_data()
-            gate_info = GateData.GateInfo(value = 0, profile_mode = gremlin.shared_state.current_mode, item_data=item_data, parent = self)
-            gate_info.id = id
-            self._gate_item_map[id] = gate_info
+            gate = GateData.GateInfo(value = value, profile_mode = gremlin.shared_state.current_mode, item_data=item_data, parent = self)
+            gate.id = id
+            self._gate_item_map[id] = gate
+            verbose = gremlin.config.Configuration().verbose
+            if verbose:
+                syslog.info(f"Added gate: {value:0.{_decimals}f} {gate.id}")
         return self._gate_item_map[id]
     
     def getGates(self):
@@ -623,9 +796,9 @@ class GateData(QtCore.QObject):
     def getRangeForValue(self, value):
         ''' gets the range for the specified value '''
         ranges = self._get_ranges()
-        for range in ranges:
-            if range.inrange(value):
-                return range
+        for rng in ranges:
+            if rng.inrange(value):
+                return rng
             
         return None
     
@@ -649,8 +822,6 @@ class GateData(QtCore.QObject):
 
         gates = self.getGates()
         steps = len(gates)
-        assert steps >= 2
-        
 
         minmax_range = self._max - self._min
         interval = minmax_range / (steps-1)
@@ -687,7 +858,7 @@ class GateData(QtCore.QObject):
 
         ranges = self._get_ranges(include_default = False)
         self._range_list = ranges
-        verbose = True # gremlin.config.Configuration().verbose
+        verbose =  gremlin.config.Configuration().verbose
         if verbose:
             syslog.info("Updated ranges:")
             for r in ranges:
@@ -702,7 +873,7 @@ class GateData(QtCore.QObject):
 
         # add the missing steps only (re-use other steps so we don't lose their config)
         current_steps = len(self.getGates())
-        verbose = True # gremlin.config.Configuration().verbose
+        verbose = gremlin.config.Configuration().verbose
         if current_steps < value:
 
             # how many gates to add
@@ -719,8 +890,8 @@ class GateData(QtCore.QObject):
                         break
 
                 if verbose:
-                    for range in ranges:
-                        syslog.info(f"Range: {str(range)}")
+                    for rng in ranges:
+                        syslog.info(f"Range: {str(rng)}")
 
                 pairs = [r.pair() for r in ranges]
                 for pair in pairs:
@@ -820,12 +991,12 @@ class GateData(QtCore.QObject):
 
         ranges = self._get_ranges()
         result = set()
-        range : GateData.RangeInfo
-        for range in ranges:
-            if range.inrange(v1):
-                result.add(range)
-            if range.inrange(v2):
-                result.add(range)
+        rng : GateData.RangeInfo
+        for rng in ranges:
+            if rng.inrange(v1):
+                result.add(rng)
+            if rng.inrange(v2):
+                result.add(rng)
             
         return list(result)
     
@@ -1052,40 +1223,43 @@ class GateData(QtCore.QObject):
         node = ElementTree.Element("gate")
 
         node.set("use_default_range",str(self.use_default_range))
+        node.set("show_percent", str(self.show_percent))
 
         # save gate data
-        for gate_info in self.getGates():
-            if not gate_info:
-                child = ElementTree.SubElement(node, "gate")
-                child.set("condition", _gate_condition_to_name[gate_info.condition])
-                child.set("value", f"{gate_info.value:0.{_decimals}f}")
-                child.set("id", gate_info.id)
-                if gate_info.item_data.containers:
-                    item_node = gate_info.item_data.to_xml()
-                    if item_node is not None:
-                        item_node.set("type", item_node.tag)
-                        item_node.tag = "action_containers"
-                        child.append(item_node)
+        for gate in self.getGates():
+            child = ElementTree.SubElement(node, "gate")
+            if gate.is_default:
+                child.set("default",str(gate.is_default))
+            child.set("condition", _gate_condition_to_name[gate.condition])
+            child.set("value", f"{gate.value:0.{_decimals}f}")
+            child.set("id", gate.id)
+            if gate.item_data.containers:
+                item_node = gate.item_data.to_xml()
+                if item_node is not None:
+                    item_node.set("type", item_node.tag)
+                    item_node.tag = "action_containers"
+                    child.append(item_node)
 
         # save range data
-        range_info : GateData.RangeInfo
-        for range_info in self.getRanges():
+        rng : GateData.RangeInfo
+        for rng in self.getRanges():
             child = ElementTree.SubElement(node,"range")
-            child.set("default", str(range_info.is_default))
-            child.set("id", range_info.id)
-            if range_info.is_default:
-                child.set("min_id", range_info._min_gate.id)
-                child.set("max_id", range_info._max_gate.id)
-            child.set("condition",_gate_condition_to_name[range_info.condition])
-            child.set("mode",_gate_range_to_name[range_info.mode])
-            if range_info.range_max is not None:
-                child.set("range_min",  f"{range_info.range_max:0.{_decimals}f}")
-            if range_info.range_min is not None:
-                child.set("range_max",  f"{range_info.range_min:0.{_decimals}f}")
-            if range_info.fixed_value is not None:
-                child.set("fixed_value", f"{range_info.fixed_value:0.{_decimals}f}")
-            if range_info.item_data.containers:
-                item_node = range_info.item_data.to_xml()
+            if rng.is_default:
+                child.set("default", str(rng.is_default))
+            child.set("id", rng.id)
+            if not rng.is_default:
+                child.set("min_id", rng.g1.id)
+                child.set("max_id", rng.g2.id)
+            child.set("condition",_gate_condition_to_name[rng.condition])
+            child.set("mode",_gate_range_to_name[rng.mode])
+            if rng.range_max is not None:
+                child.set("range_min",  f"{rng.range_max:0.{_decimals}f}")
+            if rng.range_min is not None:
+                child.set("range_max",  f"{rng.range_min:0.{_decimals}f}")
+            if rng.fixed_value is not None:
+                child.set("fixed_value", f"{rng.fixed_value:0.{_decimals}f}")
+            if rng.item_data.containers:
+                item_node = rng.item_data.to_xml()
                 if item_node is not None:
                     item_node.set("type", item_node.tag)
                     item_node.tag = "range_containers"
@@ -1105,6 +1279,7 @@ class GateData(QtCore.QObject):
             return
     
         self.use_default_range = safe_read(node, "use_default_range", bool, True)
+        self.show_percent = safe_read(node,"show_percent", bool, False)
 
         # read gate configurations 
         node_gates = gremlin.util.get_xml_child(node, "gate", multiple=True)
@@ -1112,7 +1287,8 @@ class GateData(QtCore.QObject):
         profile_mode = self.get_xml_mode(node) # get the profile mode from the XML tree
         self.profile_mode = profile_mode
         for child in node_gates:
-            gate_id = safe_read(child, "id", int, get_guid())
+            gate_id = safe_read(child, "id", str, get_guid())
+            gate_default = safe_read(child, "default", bool, False)
             gate_value = safe_read(child, "value", float, 0.0)
             gate_condition = safe_read(child, "condition", str, "")
             if not gate_condition in _gate_condition_from_name.keys():
@@ -1126,20 +1302,26 @@ class GateData(QtCore.QObject):
                 item_node.tag = item_node.get("type")
                 item_data.from_xml(item_node)
 
-            gate_info = GateData.GateInfo(gate_value, profile_mode, item_data, gate_condition, parent = self)
-            gate_info.id = gate_id
-            self._gate_item_map[gate_id] = gate_info
+            gate = GateData.GateInfo(gate_value, profile_mode, item_data, gate_condition, parent = self)
+            gate.id = gate_id
+            gate.is_default = gate_default
+            if gate_default:
+                if gate.value == -1.0:
+                    self.default_min_gate.id = gate
+                elif gate.value == 1.0:
+                    self.default_max_gate.id = gate
+            else:
+                self._gate_item_map[gate_id] = gate
 
         # read range configuration
         node_ranged = gremlin.util.get_xml_child(node, "range", multiple=True)
         for child in node_ranged:
             range_id = safe_read(child, "id", str, get_guid())
-            range_default = child.get("default", bool, False)
+            range_default = safe_read(child, "default", bool, False)
             if range_default:
                 min_gate = self.default_min_gate
                 max_gate = self.default_max_gate
             else:
-                range_index = int(range_index)
                 min_id = safe_read(child, "min_id", str, "")
                 max_id = safe_read(child, "max_id", str, "")
                 min_gate = self._gate_item_map[min_id] if min_id in self._gate_item_map.keys() else None
@@ -1152,13 +1334,13 @@ class GateData(QtCore.QObject):
 
             range_condition = safe_read(child, "condition", str, "")
             if not range_condition in _gate_condition_from_name.keys():
-                syslog.error(f"GateData: Invalid condition type {range_condition} range index: {range_index}")
+                syslog.error(f"GateData: Invalid condition type {range_condition} range: {range_id}")
                 return
             range_condition = _gate_condition_from_name[range_condition]
 
             range_mode = safe_read(child, "mode", str, "")
             if not range_mode in _gate_range_from_name.keys():
-                syslog.error(f"GateData: Invalid mode {range_mode} range index: {range_index}")
+                syslog.error(f"GateData: Invalid mode {range_mode} range: {range_id}")
                 return
             range_mode = _gate_range_from_name[range_mode]
        
@@ -1248,16 +1430,31 @@ class GateWidget(QtWidgets.QWidget):
     delete_requested = QtCore.Signal(object) # fired when the remove button is clicked - passes the GateData to blitz
     duplicate_requested = QtCore.Signal(object) # fired when the duplicate button is clicked - passes the GateData to duplicate
     configure_requested = QtCore.Signal(object) # configure clicked
-    configure_range_requested = QtCore.Signal(object, int) # configure range - gatedata, range index
-    configure_gate_requested = QtCore.Signal(object, int) # fires when a slider handle is right clicked, sends the GateData and the index of the handle
+    configure_range_requested = QtCore.Signal(object) # configure range - data = range object
+    configure_gate_requested = QtCore.Signal(object) # configure gate - data = gate object
+
 
     def __init__(self, action_data, gate_data, parent = None):
+        '''
+        
+        :param: action_data = the AbstractContainerAction derived object holding the configuration data for the action
+        :param: gate_data = the gated axis configuration object
+        :param: process_callback = the optional callback executed when the gated axis receives input at runtime (similar to process_events for functors)
+
+
+        The callback is necessary because the gate widget does not use the usual event handler method for GremlinEx because it has special handling of sub-actions specific to an axis input.
+        The control will automatically process input from the hardware axis it's attached do and call the callback because it may have different values based on the options setup on the gated axis.
+
+        
+        '''
 
         import gremlin.event_handler
         import gremlin.joystick_handling
         
         super().__init__(parent)
         self.gate_data : GateData = gate_data
+
+
         self.gate_data.stepsChanged.connect(self._update_steps)
         self.gate_data.valueChanged.connect(self._update_values)
 
@@ -1275,12 +1472,15 @@ class GateWidget(QtWidgets.QWidget):
             self.main_layout.addWidget(missing)
             return
         
+
+        self._grab_icon = load_icon("mdi.record-rec",qta_color = "red")
+        self._setup_icon = load_icon("fa.gear")
+        
         # get the curent axis normalized value -1 to +1
         value = gremlin.joystick_handling.get_axis(action_data.hardware_device_guid, action_data.hardware_input_id)
         self._axis_value = value 
 
-        # axis input repeater
-        #self.slider = QDoubleRangeSlider()
+        # axis input gate widget
         self.slider = ui_common.QMarkerDoubleRangeSlider()
      
         self.slider.setOrientation(QtCore.Qt.Horizontal)
@@ -1288,17 +1488,15 @@ class GateWidget(QtWidgets.QWidget):
         self.slider.setMarkerValue(value)
         self.slider.valueChanged.connect(self._slider_value_changed_cb)
         self.slider.setMinimumWidth(200)
-        #self.slider.setStyleSheet("QSlider::active:{background: #8FBC8F;}")
         self.slider.handleRightClicked.connect(self._slider_handle_clicked_cb)
         self.slider.handleGrooveClicked.connect(self._slider_groove_clicked_cb)
-        #self.slider.setStyleSheet(self.slider_css)
-
+        
+        self.warning_widget = ui_common.QIconLabel("fa.warning", text="", use_qta = True,  icon_color="red")
+        self.warning_widget.setVisible(False)
       
         self.container_slider_widget = QtWidgets.QWidget()
         self.container_slider_layout = QtWidgets.QGridLayout(self.container_slider_widget)
         self.container_slider_layout.addWidget(self.slider,0,0,-1,1)
-        #self.container_slider_layout.addWidget(self.test)
-
 
         self.container_slider_layout.addWidget(QtWidgets.QLabel(" "),0,6)
 
@@ -1310,7 +1508,7 @@ class GateWidget(QtWidgets.QWidget):
 
         # configure trigger button
         self._configure_trigger_widget = QtWidgets.QPushButton("Configure")
-        self._configure_trigger_widget.setIcon(gremlin.util.load_icon("fa.gear"))
+        self._configure_trigger_widget.setIcon(self._setup_icon)
         self._configure_trigger_widget.clicked.connect(self._trigger_cb)
 
         # manual and grab value widgets
@@ -1327,12 +1525,19 @@ class GateWidget(QtWidgets.QWidget):
         self.container_options_layout = QtWidgets.QHBoxLayout(self.container_options_widget)
         self.container_options_widget.setContentsMargins(0,0,0,0)
 
-        self._use_default_range_widget = ui_common.QToggleText("Use default range for axis output")
+        self._use_default_range_widget = QtWidgets.QCheckBox("Use default range for axis output")
         self._use_default_range_widget.setChecked(self.gate_data.use_default_range)
         self._use_default_range_widget.clicked.connect(self._use_default_range_changed_cb)
         self._use_default_range_widget.setToolTip("When set, the axis output uses the default range setting for value output, sub-ranges can still be used to trigger actions based on entry/exit of ranges")
 
+        self._display_percent_widget = QtWidgets.QCheckBox("Show as percent")
+        self._display_percent_widget.setChecked(self.gate_data.show_percent)
+        self._display_percent_widget.clicked.connect(self._show_percent_cb)
+        self._display_percent_widget.setToolTip("Display values as percentages")
+
+
         self.container_options_layout.addWidget(self._use_default_range_widget)
+        self.container_options_layout.addWidget(self._display_percent_widget)
         self.container_options_layout.addStretch()
 
 
@@ -1348,15 +1553,17 @@ class GateWidget(QtWidgets.QWidget):
         row = 1
         self.main_layout.addWidget(self.container_slider_widget,row,0,1,-1)
         row+=1
+        self.main_layout.addWidget(self.container_steps_widget,row,0,1,-1)
+        row+=1
         self.main_layout.addWidget(self.container_gate_widget,row,0,1,-1)
         row+=1
         self.main_layout.addWidget(self.container_options_widget,row,0,1,-1)
         row+=1
         self.main_layout.addWidget(self.container_range_widget,row,0,1,-1)
         row+=1
-        self.main_layout.addWidget(self.container_steps_widget,row,0,1,-1)
-        row+=1
         self.main_layout.addWidget(self.container_output_widget,row,0,1,-1)
+        row+=1
+        self.main_layout.addWidget(self.warning_widget,row,0,1,-1)
         self.main_layout.setVerticalSpacing(0)
         self.main_layout.setRowStretch(row, 3)
         
@@ -1365,10 +1572,6 @@ class GateWidget(QtWidgets.QWidget):
         el = gremlin.event_handler.EventListener()
         el.joystick_event.connect(self._joystick_event_cb)
 
-        # profile start/stop events to setup callbacks
-        el.profile_start.connect(self._profile_start_cb)
-        el.profile_stop.connect(self._profile_stop_cb)
-
 
         # update visible container for the current mode
         #self._update_conditions()
@@ -1376,12 +1579,17 @@ class GateWidget(QtWidgets.QWidget):
         self._update_values()
 
 
+
+    def _helper(self):
+        helper = ui_common.QHelper()
+        helper.show_percent = self.gate_data.show_percent
+        return helper
+    
     def _update_gates_ui(self):
         ''' creates the gate data for each gate '''
         
         
-        grab_icon = load_icon("mdi.record-rec",qta_color = "red")
-        setup_icon = load_icon("fa.gear")
+        
         self._gate_value_widget_map = {}
         gremlin.util.clear_layout(self.container_gate_layout)
         items = self.gate_data.getGateValueItems()
@@ -1394,29 +1602,26 @@ class GateWidget(QtWidgets.QWidget):
 
         label_width = ui_common.get_text_width("Range MM")
         value_width = ui_common.get_text_width("1234567 MM")
+        helper = self._helper()
+
         for id, info in items:
             label_widget = QtWidgets.QLabel(f"Gate {info.slider_index + 1}:")
             label_widget.setMaximumWidth(label_width)
-            sb_widget = ui_common.DynamicDoubleSpinBox(data = id)
-            sb_widget.setMinimum(-1.0)
-            sb_widget.setMaximum(1.0)
-            sb_widget.setDecimals(self.decimals)
-            sb_widget.setSingleStep(self.single_step)
-            sb_widget.setValue(info.value)
+            sb_widget = helper.get_double_spinbox(id, info.value)
             sb_widget.valueChanged.connect(self._gate_value_changed_cb)
             sb_widget.setMaximumWidth(value_width)
             self._gate_value_widget_map[info.id] = sb_widget
 
             grab_widget = ui_common.QDataPushButton()
             grab_widget.data = (info, sb_widget) # gate and control to update
-            grab_widget.setIcon(grab_icon)
+            grab_widget.setIcon(self._grab_icon)
             grab_widget.setMaximumWidth(20)
             grab_widget.clicked.connect(self._grab_cb)
             grab_widget.setToolTip("Grab axis value")
 
             setup_widget = ui_common.QDataPushButton()
             setup_widget.data = id
-            setup_widget.setIcon(setup_icon)
+            setup_widget.setIcon(self._setup_icon)
             setup_widget.setMaximumWidth(20)
             setup_widget.clicked.connect(self._setup_cb)
             setup_widget.setToolTip(f"Setup actions for gate {id}")
@@ -1446,21 +1651,21 @@ class GateWidget(QtWidgets.QWidget):
 
         # ranges between the gates
         gremlin.util.clear_layout(self.container_range_layout)
-        range_list = self.gate_data.getRanges()
+        range_list = self.gate_data.getRanges(include_default = self.gate_data.use_default_range)
         range_count_widget = QtWidgets.QLabel(f"Defined ranges: {len(range_list)}")
         self.container_range_layout.addWidget(range_count_widget,0,0)
         row = 1
         col = 0
         self._range_readout_widgets = {}
-        range_info : GateData.RangeInfo
+        rng : GateData.RangeInfo
         
         edit_width = ui_common.get_text_width("[+0.000 to +0.000]M")
         display_index = 0
-        for range_info in range_list:
-            id = range_info.id
-            g1 : GateData.GateInfo = range_info.g1
-            g2 : GateData.GateInfo= range_info.g2
-            if range_info.is_default:
+        for rng in range_list:
+            id = rng.id
+            g1 : GateData.GateInfo = rng.g1
+            g2 : GateData.GateInfo= rng.g2
+            if rng.is_default:
                 # default range
                 label_widget = QtWidgets.QLabel(f"Default:")
             else:
@@ -1471,17 +1676,18 @@ class GateWidget(QtWidgets.QWidget):
 
             range_widget = ui_common.QDataLineEdit()
             range_widget.setReadOnly(True)
-            range_widget.setText(f"[{g1.value:0.{self.decimals}f} to {g2.value:0.{self.decimals}f}]")
+            g1v = helper.to_value(g1.value)
+            g2v = helper.to_value(g2.value)
+            range_widget.setText(f"[{g1v:0.{helper.decimals}f} to {g2v:0.{helper.decimals}f}]")
             range_widget.setMaximumWidth(edit_width)
 
             self._range_readout_widgets[id] = range_widget
-            range_widget.data = (range_info, range_widget)
-            range_info.valueChanged.connect(self._range_changed_cb)
+            range_widget.data = (rng, range_widget)
+            rng.valueChanged.connect(self._range_changed_cb)
             
             
-            setup_widget = ui_common.QDataPushButton()
-            setup_widget.data = id
-            setup_widget.setIcon(setup_icon)
+            setup_widget = ui_common.QDataPushButton(data = rng)
+            setup_widget.setIcon(self._setup_icon)
             setup_widget.setMaximumWidth(20)
             setup_widget.clicked.connect(self._setup_range_cb)
             setup_widget.setToolTip(f"Setup actions for range {id}")
@@ -1500,6 +1706,15 @@ class GateWidget(QtWidgets.QWidget):
             if col > 4:
                 row+=1
                 col = 0
+
+
+        # look for any warnings - updated: slider won't allow overlaps so this check is not needed
+        # overlaps = self.gate_data.getOverlappingGates()                
+        # if overlaps:
+        #     self.warning_widget.setText("Overlapping gates detected")
+        #     self.warning_widget.setVisible(True)
+        # else:
+        #     self.warning_widget.setVisible(False)
             
         max_col = self.container_range_layout.columnCount() + 2
         self.container_range_layout.addWidget(QtWidgets.QLabel(" "), 0,max_col)            
@@ -1513,18 +1728,30 @@ class GateWidget(QtWidgets.QWidget):
         g1 : GateData.GateInfo = range_info.g1
         g2 : GateData.GateInfo= range_info.g2
         ''' updates the display for a range item '''
-        range_widget.setText(f"{g1.value:0.{self.decimals}f} to {g2.value:0.{self.decimals}f}")
+        
+        helper = self._helper()
+        g1v = helper.to_value(g1.value)
+        g2v = helper.to_value(g2.value)
+        range_widget.setText(f"[{g1v:0.{helper.decimals}f} to {g2v:0.{helper.decimals}f}]")
         
     @QtCore.Slot()
     def _gate_value_changed_cb(self):
         widget = self.sender()
-        index = widget.data
-        #with QtCore.QSignalBlocker(self.gate_data):
-        self.gate_data.setGateValue(index, widget.value())
+        id = widget.data
+        helper = self._helper()
+        value = helper.from_value(widget.value())
+        self.gate_data.setGateValue(id, value )
 
     @QtCore.Slot(bool)
     def _use_default_range_changed_cb(self, checked):
         self.gate_data.use_default_range = checked
+        self._update_gates_ui()
+    
+    @QtCore.Slot(bool)
+    def _show_percent_cb(self, checked):
+        self.gate_data.show_percent = checked
+        self._update_gates_ui()
+
 
     @QtCore.Slot()
     def _trigger_cb(self):
@@ -1534,7 +1761,8 @@ class GateWidget(QtWidgets.QWidget):
     @QtCore.Slot(int)
     def _slider_handle_clicked_cb(self, handle_index):
         ''' handle right clicked - pass event along '''
-        self.configure_gate_requested.emit(self.gate_data, handle_index)
+        gate = self.gate_data.getGateSliderIndex(handle_index)
+        self.configure_gate_requested.emit(gate)
 
     @QtCore.Slot(float)
     def _slider_groove_clicked_cb(self, value):
@@ -1555,18 +1783,20 @@ class GateWidget(QtWidgets.QWidget):
     def _slider_value_changed_cb(self):
         ''' occurs when the slider values change '''
         values = list(self.slider.value())
-
-        # update ui
-        self._update_gates_ui()
         
         # update the gate data
         for index, value in enumerate(values):
             gate = self.gate_data.getGateSliderIndex(index)
             if gate:
                 gate.value = value
-                widget = self._gate_value_widget_map[gate.id]
-                with QtCore.QSignalBlocker(widget):
-                    widget.setValue(value)
+                # if gate.id in self._gate_value_widget_map.keys():
+                #     # exists
+                #     widget = self._gate_value_widget_map[gate.id]
+                #     with QtCore.QSignalBlocker(widget):
+                #         widget.setValue(value)
+
+        # update ui
+        self._update_gates_ui()                    
         
 
     def _set_slider_gate_value(self, index, value):
@@ -1574,8 +1804,16 @@ class GateWidget(QtWidgets.QWidget):
         values = list(self.slider.value())
         if value != values[index]:
             values[index] = value
-            self.slider.setValue(values)
+        self._set_slider(values)
 
+    def _set_slider(self, values):
+        verbose = gremlin.config.Configuration().verbose
+        if verbose:
+            sv = "Slider: "
+            for idx, v in enumerate(values):
+                sv += f"[{idx}] {v:0.{_decimals}f} "
+            syslog.info(sv)
+        self.slider.setValue(values)
 
     @QtCore.Slot()
     def _grab_cb(self):
@@ -1584,22 +1822,22 @@ class GateWidget(QtWidgets.QWidget):
         info, widget = self.sender().data  # the button's data field contains the widget to update
         value = self._axis_value
         info.value = value
-        self._set_slider_gate_value(info.index, value)
+        self._set_slider_gate_value(info.slider_index, value)
         
 
     @QtCore.Slot()
     def _setup_cb(self):
         ''' open the configuration dialog '''
         widget = self.sender()  # the button's data field contains the widget to update
-        handle_index = widget.data
-        self.configure_gate_requested.emit(self.gate_data, handle_index)
+        gate = widget.data
+        self.configure_gate_requested.emit(gate)
         
     @QtCore.Slot()
     def _setup_range_cb(self):
         ''' open the configuration dialog for ranges '''
         widget = self.sender()  # the button's data field contains the widget to update
-        range_index = widget.data
-        self.configure_range_requested.emit(self.gate_data, range_index)
+        rng = widget.data
+        self.configure_range_requested.emit(rng)
 
     QtCore.Slot()
     def _delete_cb(self):
@@ -1611,29 +1849,14 @@ class GateWidget(QtWidgets.QWidget):
         ''' duplicate requested '''
         self.duplicate_requested.emit(self.gate_data)
             
-    @property
-    def is_running(self):
-        ''' true if the profile is running '''
-        return gremlin.shared_state.is_running
-    
-    @QtCore.Slot()
-    def _profile_start_cb(self):
-        ''' profile starts - build callbacks '''
-        # gate callbacks
-        profile = gremlin.shared_state.current_profile
-        config = gremlin.config.Configuration()
-        
-
-
-    @QtCore.Slot()
-    def _profile_stop_cb(self):
-        ''' profile stops - cleanup '''
-        pass
-
     
     @QtCore.Slot(object)
     def _joystick_event_cb(self, event):
+        ''' handles joystick input 
         
+        grab real time hardware input to update the widget
+        
+        '''
         
         if not event.is_axis:
             # ignore if not an axis event and if the profile is running, or input for a different device
@@ -1650,36 +1873,10 @@ class GateWidget(QtWidgets.QWidget):
         raw_value = event.raw_value
         input_value = gremlin.joystick_handling.scale_to_range(raw_value, source_min = -32767, source_max = 32767, target_min = -1, target_max = 1) 
         self._axis_value = input_value
-
-        if gremlin.shared_state.is_running:
-            # run mode - execute the functors with the gate data
-            triggers = self.gate_data.process_value(self._axis_value)
-            trigger: TriggerData
-            for trigger in trigger:
-                if trigger.mode == TriggerMode.FixedValue:
-                    event.current = trigger.value
-                    containers = trigger.range.item_data.containers
-                elif trigger.mode == TriggerMode.ValueInRange:
-                    containers = trigger.range.item_data.containers
-                elif trigger.mode == TriggerMode.ValueOutOfRange:
-                    containers = trigger.range.item_data.containers
-                elif trigger.mode == TriggerMode.GateCrossed:
-                    # mimic a joystick button press
-                    event.current = True # pressed
-                    event.is_axis = False
-                    event.event_type = InputType.JoystickButton
-                    event.is_pressed = True
-                    containers = trigger.gate.item_data.containers
-                for container in containers:
-                    pass
-
-                
-                    
-          
-
-
         self.slider.setMarkerValue(input_value)
         self._update_output_value()
+
+
 
 
     def _create_output_ui(self):
@@ -1704,9 +1901,17 @@ class GateWidget(QtWidgets.QWidget):
     def _create_steps_ui(self):
         ''' creates the steps UI '''
         self.sb_steps_widget = QtWidgets.QSpinBox()
-        self.sb_steps_widget.setRange(1, 20)
-        self.sb_steps_widget.setValue(self.gate_data.steps)
-        # self.sb_steps_widget.valueChanged.connect(self._steps_changed_cb)
+        self.sb_steps_widget.setRange(2, 20) # min steps is 2
+        count = self.gate_data.steps
+        if count < 2:
+            # gates may not be created yet
+            count = 2
+        self.sb_steps_widget.setValue(count)
+
+        self.add_gate_widget = QtWidgets.QPushButton("Add")
+        self.add_gate_widget.setToolTip("Adds a gate at the current input position")
+        self.add_gate_widget.setIcon(self._grab_icon)
+        self.add_gate_widget.clicked.connect(self._add_gate_cb)
 
         self.set_steps_widget = QtWidgets.QPushButton("Set")
         self.set_steps_widget.setToolTip("Sets the number of gates")
@@ -1726,13 +1931,38 @@ class GateWidget(QtWidgets.QWidget):
         self.container_steps_layout = QtWidgets.QHBoxLayout(self.container_steps_widget)
         self.container_steps_widget.setContentsMargins(0,0,0,0)
 
+
         self.container_steps_layout.addWidget(QtWidgets.QLabel("Number of gates:"))
         self.container_steps_layout.addWidget(self.sb_steps_widget)
+        self.container_steps_layout.addWidget(self.add_gate_widget)
         self.container_steps_layout.addWidget(self.set_steps_widget)
         self.container_steps_layout.addWidget(self.normalize_widget)
         self.container_steps_layout.addWidget(self.normalize_reset_widget)
         self.container_steps_layout.addWidget(QtWidgets.QLabel("Right-click range to add new gate, right click gate for configuration"))
         self.container_steps_layout.addStretch()
+
+
+    @QtCore.Slot()
+    def _add_gate_cb(self):
+        ''' adds a new gate at the current input position '''
+        value = self._axis_value
+        gate = self.gate_data.findGate(value)
+        if gate:
+            # display a warning a gate is already there
+            message_box = QtWidgets.QMessageBox()
+            message_box.setText("A gate already exists at this location")
+            pixmap = load_pixmap("warning.svg")
+            pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
+            message_box.setIconPixmap(pixmap)
+            message_box.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok)
+            message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
+            message_box.exec()
+            return
+        
+        # add the gate
+        gate = self.gate_data.getGate(value = value)
+        self._update_ui()
+
 
     @QtCore.Slot()
     def _set_steps_cb(self):
@@ -1774,7 +2004,8 @@ class GateWidget(QtWidgets.QWidget):
         values = self.gate_data.getGateValues()
         if values != self.slider.value():
             with QtCore.QSignalBlocker(self.slider):
-                self.slider.setValue(values)
+                self._set_slider(values)
+                
 
     def _update_output_value(self):
         triggers = self.gate_data.process_value(self._axis_value)
@@ -1799,7 +2030,8 @@ class GateWidget(QtWidgets.QWidget):
         lv = list(self.slider.value())
         lv[0] = value
         with QtCore.QSignalBlocker(self.slider):
-            self.slider.setValue(lv)
+            self._set_slider(lv)
+            
         
         self._update_steps()
         self._update_output_value()            
@@ -1811,7 +2043,7 @@ class GateWidget(QtWidgets.QWidget):
         lv = list(self.slider.value())
         lv[1] = value
         with QtCore.QSignalBlocker(self.slider):
-            self.slider.setValue(lv)
+            self._set_slider(lv)
         self._update_steps()
         self._update_output_value()
 
@@ -1819,8 +2051,7 @@ class GateWidget(QtWidgets.QWidget):
     def _update_ui(self):
         ''' updates visibility of UI components based on the active options '''
         # update the slider configuration 
-        self.slider.setValue(self.gate_data.getGateValues())
-
+        self._set_slider(self.gate_data.getGateValues())
         self._update_output_value()
 
 
@@ -1836,23 +2067,20 @@ class ActionContainerUi(QtWidgets.QDialog):
 
     delete_requested = QtCore.Signal(object) # fired when the remove button is clicked - passes the GateData to blitz
 
-    def __init__(self, gate_data, index, is_range = False, parent=None):
+    def __init__(self, gate_data, data, parent=None):
         '''
-        :param: gate_data = the gate data block 
+        :param: data = the gate or range data block
         :item_data: the InputItem data block holding the container and input device configuration for this gated input
         :index: the gate number of the gated input - there will at least be two for low and high - index is an integer 
         '''
         
         super().__init__(parent)
 
-        self._index = index
-        self._gate_data : GateData = gate_data
-        if is_range:
-            self._info = gate_data.getRange(index)
-        else:
-            self._info = gate_data.getGate(index)
+        is_range = isinstance(data, GateData.RangeInfo)
+        self._info = data
     
-        self._item_data = self._info.item_data
+        self._item_data = data.item_data
+        self._gate_data = gate_data
         self._is_range = is_range
 
         # make modal
@@ -1872,9 +2100,19 @@ class ActionContainerUi(QtWidgets.QDialog):
         self.setMinimumWidth(800)
 
         
+        decimals = gate_data.decimals
+        single_step = gate_data.single_step
 
+
+        self.trigger_container_widget = QtWidgets.QWidget()
+        self.trigger_condition_layout = QtWidgets.QHBoxLayout(self.trigger_container_widget)        
+
+    
         if is_range:
             # range has an output mode for how to handle the output value for the range
+
+            self.trigger_condition_layout.addWidget(QtWidgets.QLabel(f"Range Configuration:"))
+
             self.output_widget = QtWidgets.QComboBox()
             self.output_container_widget = QtWidgets.QWidget()
             self.output_container_widget.setContentsMargins(0,0,0,0)
@@ -1895,26 +2133,28 @@ class ActionContainerUi(QtWidgets.QDialog):
             self.sb_range_min_widget = ui_common.DynamicDoubleSpinBox()
             self.sb_range_min_widget.setMinimum(-1.0)
             self.sb_range_min_widget.setMaximum(1.0)
-            self.sb_range_min_widget.setDecimals(gate_data.decimals)
-            self.sb_range_min_widget.setSingleStep(gate_data.single_step)
-            self.sb_range_min_widget.setValue(gate_data.range_min)
+            self.sb_range_min_widget.setDecimals(decimals)
+            self.sb_range_min_widget.setSingleStep(single_step)
+            self.sb_range_min_widget.setValue(data.range_min)
             self.sb_range_min_widget.valueChanged.connect(self._range_min_changed_cb)
 
             self.sb_range_max_widget = ui_common.DynamicDoubleSpinBox()
             self.sb_range_max_widget.setMinimum(-1.0)
             self.sb_range_max_widget.setMaximum(1.0)        
-            self.sb_range_max_widget.setDecimals(gate_data.decimals)
-            self.sb_range_max_widget.setSingleStep(gate_data.single_step)
-            self.sb_range_max_widget.setValue(gate_data.range_max)
+            self.sb_range_max_widget.setDecimals(decimals)
+            self.sb_range_max_widget.setSingleStep(single_step)
+            self.sb_range_max_widget.setValue(data.range_max)
 
             self.sb_range_max_widget.valueChanged.connect(self._range_max_changed_cb)
 
             self.sb_fixed_value_widget = ui_common.DynamicDoubleSpinBox()
             self.sb_fixed_value_widget.setMinimum(-1.0)
             self.sb_fixed_value_widget.setMaximum(1.0)        
-            self.sb_fixed_value_widget.setDecimals(gate_data.decimals)
-            self.sb_fixed_value_widget.setSingleStep(gate_data.single_step)
-            self.sb_fixed_value_widget.setValue(gate_data.fixed_value)
+            self.sb_fixed_value_widget.setDecimals(decimals)
+            self.sb_fixed_value_widget.setSingleStep(single_step)
+            if data.fixed_value is None:
+                data.fixed_value = data.v1
+            self.sb_fixed_value_widget.setValue(data.fixed_value)
 
             self.container_output_range_layout.addWidget(QtWidgets.QLabel("Range options:"))
             self.container_output_range_layout.addWidget(QtWidgets.QLabel("Range Min:"))
@@ -1928,17 +2168,35 @@ class ActionContainerUi(QtWidgets.QDialog):
             self.container_fixed_layout.addWidget(QtWidgets.QLabel("Fixed Value:"))
             self.container_fixed_layout.addWidget(self.sb_fixed_value_widget)
 
+        else:
+            # gate configuration
+            self.trigger_condition_layout.addWidget(QtWidgets.QLabel(f"Gate {self._info.slider_index + 1} Configuration:"))
+
+            # delay 
+            self.delay_widget = QtWidgets.QSpinBox()
+            self.delay_widget.setRange(0,5000)
+            self.delay_widget.setValue(self._info.delay)
+            self.delay_widget.setToolTip("Delay in milliseconds between a press and release event for gate crossings")
+            self.delay_widget.valueChanged.connect(self._delay_changed_cb)
+            self.trigger_condition_layout.addWidget(QtWidgets.QLabel("Trigger Delay:"))
+            self.trigger_condition_layout.addWidget(self.delay_widget)
+
+                
+
+        
 
         self.condition_widget = QtWidgets.QComboBox()
         self.condition_description_widget = QtWidgets.QLabel()
 
-        self.trigger_container_widget = QtWidgets.QWidget()
-        self.trigger_condition_layout = QtWidgets.QHBoxLayout(self.trigger_container_widget)
 
-        if is_range:
-            self.trigger_condition_layout.addWidget(QtWidgets.QLabel(f"Range {index + 1} Configuration:"))
-        else:
-            self.trigger_condition_layout.addWidget(QtWidgets.QLabel(f"Gate {index + 1} Configuration:"))
+
+        #self.trigger_condition_layout.addWidget(self.action_widget)
+        self.trigger_condition_layout.addWidget(QtWidgets.QLabel(f"Condition:"))
+        self.trigger_condition_layout.addWidget(self.condition_widget)
+        self.trigger_condition_layout.addWidget(self.condition_description_widget)
+        self.trigger_condition_layout.addStretch()
+
+        if not is_range:
 
             # gates can be deleted (ranges cannot since they are defined by gates)
             self.clear_button_widget = ui_common.QDataPushButton()
@@ -1947,18 +2205,11 @@ class ActionContainerUi(QtWidgets.QDialog):
             self.clear_button_widget.data = self._info
             self.clear_button_widget.clicked.connect(self._delete_cb)
             self.clear_button_widget.setToolTip("Removes this entry")
-        
-        #self.trigger_condition_layout.addWidget(self.action_widget)
-        self.trigger_condition_layout.addWidget(QtWidgets.QLabel(f"Condition:"))
-        self.trigger_condition_layout.addWidget(self.condition_widget)
-        self.trigger_condition_layout.addWidget(self.condition_description_widget)
-        self.trigger_condition_layout.addStretch()
 
-        if not is_range:
             self.trigger_condition_layout.addWidget(self.clear_button_widget)
 
         from gremlin.ui.device_tab import InputItemConfiguration
-        self.container_widget = InputItemConfiguration(self._item_data)
+        self.container_widget = InputItemConfiguration(self._info.item_data)
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.main_layout.addWidget(self.trigger_container_widget)
         if is_range:
@@ -1967,6 +2218,11 @@ class ActionContainerUi(QtWidgets.QDialog):
         
 
         self._update_ui()
+
+    QtCore.Slot()
+    def _delay_changed_cb(self):
+        ''' delay value changed for gates '''
+        self._info.delay = self.delay_widget.value()
 
     QtCore.Slot()
     def _delete_cb(self):

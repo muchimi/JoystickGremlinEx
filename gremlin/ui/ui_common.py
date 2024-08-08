@@ -2261,11 +2261,8 @@ QMarkerDoubleRangeSlider::handle:horizontal {
 }
 
 QMarkerDoubleRangeSlider::sub-page:vertical { background: #8FBC8F; border-style:solid; border-color: grey;border-width:1px;border-radius:2px;}
-
-QMarkerDoubleRangeSlider::add-page:vertical { background: #979EA8; border-style:solid; border-color: grey;border-width:1px;border-radius:2px;}
-
 QMarkerDoubleRangeSlider::sub-page:horizontal { background: #8FBC8F; border-style:solid; border-color: grey;border-width:1px;border-radius:2px;}
-
+QMarkerDoubleRangeSlider::add-page:vertical { background: #979EA8; border-style:solid; border-color: grey;border-width:1px;border-radius:2px;}
 QMarkerDoubleRangeSlider::add-page:horizontal { background: #979EA8; border-style:solid; border-color: grey;border-width:1px;border-radius:2px;}
    
 '''
@@ -2293,7 +2290,7 @@ QMarkerDoubleRangeSlider::add-page:horizontal { background: #979EA8; border-styl
         self._update_pixmaps()
         self._update_targets()
 
-        self.setStyleSheet(self.css)
+        #self.setStyleSheet(self.css)
 
     def _get_pixmaps(self):
         if self._pixmaps: return self._pixmaps
@@ -2643,3 +2640,61 @@ class QToggleText(QtWidgets.QWidget):
     @value.setter
     def value(self, checked):
         self._button.setChecked(checked)
+
+import gremlin.singleton_decorator
+@gremlin.singleton_decorator.SingletonDecorator
+class QHelper():
+    
+    def __init__(self, show_percent = False, decimals = 3, single_step = 0.01):
+        self._show_percent = show_percent
+        self._decimals = decimals
+        self._single_step = single_step
+
+    def to_value(self, value):
+        if self.show_percent:
+            return (value + 1) / 2.0 * 100.0
+        return value
+
+    def from_value(self, value):
+        if self.show_percent:
+            # percent -> float
+            return 2.0 * value / 100.0 - 1.0
+        return value
+    
+    @property
+    def decimals(self):
+        if self.show_percent:
+            return 2
+        return self._decimals
+    
+    @property
+    def single_step(self):
+        if self.show_percent:
+            return 0.1
+        return self._single_step
+    
+    @property
+    def show_percent(self):
+        return self._show_percent
+    @show_percent.setter
+    def show_percent(self, value):
+        self._show_percent = value
+    
+    def get_double_spinbox(self, data, value) -> DynamicDoubleSpinBox:
+        ''' creates a double spin box formatted for the display mode '''
+        show_percent = self.show_percent
+        sb_widget = DynamicDoubleSpinBox(data = data)
+        if show_percent:
+            sb_widget.setMinimum(0)
+            sb_widget.setMaximum(100)
+            sb_widget.setDecimals(2)
+            sb_widget.setSingleStep(0.1)
+        else:
+            sb_widget.setMinimum(-1.0)
+            sb_widget.setMaximum(1.0)
+            sb_widget.setDecimals(self.decimals)
+            sb_widget.setSingleStep(self.single_step)
+
+        sb_widget.setValue(self.to_value(value))
+
+        return sb_widget

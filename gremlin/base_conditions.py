@@ -335,6 +335,7 @@ class AbstractContainerActionFunctor(AbstractFunctor):
     ''' used by action functors for actions that have containers '''
     def process_event(self, event, value):
         ''' Processes the functor using the provided event '''
+        result = True
         for functor in self.action_data.functors:
             # only fire the appropriate type
             result = functor.process_event(event, value)

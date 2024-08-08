@@ -1189,7 +1189,10 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._gates_container_widget.setStyleSheet('.QFrame{background-color: lightgray;}')
         self._gates_container_layout = QtWidgets.QVBoxLayout(self._gates_container_widget)
 
-        self._gates_widget = gremlin.gated_handler.GateWidget(action_data = self.action_data, gate_data=self.action_data.gates[0])
+        self._gates_widget = gremlin.gated_handler.GateWidget(action_data = self.action_data,
+                                                              gate_data = self.action_data.gate_data,
+                                                              process_callback = self.action_data.gated_callback
+                                                              )
         self._gates_widget.configure_requested.connect(self._configure_trigger_cb)
         self._gates_widget.configure_gate_requested.connect(self._configure_gate_trigger_cb)
         self._gates_widget.configure_range_requested.connect(self._configure_range_trigger_cb)
@@ -1225,13 +1228,14 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     QtCore.Slot(object)
     def _configure_trigger_cb(self, data):
-        self._handle_clicked_cb(data, 0)
+        self._show_options_dialog_cb()
 
     
 
     QtCore.Slot(object, int)
-    def _configure_gate_trigger_cb(self, data, index):
-        dialog = ActionContainerUi(data, index, is_range = False)
+    def _configure_gate_trigger_cb(self, data):
+        dialog = ActionContainerUi(self.action_data.gate_data, data)
+        # gates can be deleted 
         dialog.delete_requested.connect(self._delete_gate_cb)
         dialog.exec()
 
@@ -1241,8 +1245,8 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._gates_widget.deleteGate(data)
 
     QtCore.Slot(object, int)
-    def _configure_range_trigger_cb(self, data, index):
-        dialog = ActionContainerUi(data, index, is_range=True)
+    def _configure_range_trigger_cb(self, data):
+        dialog = ActionContainerUi(self.action_data.gate_data, data)
         dialog.exec()
 
     def _show_options_dialog_cb(self):
@@ -1532,36 +1536,24 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
     
     def profile_start(self):
         ''' occurs when the profile starts '''
-        self.sm.connect()
+        self.sm.sim_connect()
+        self.action_data.gate_data.process_callback = self.process_gated_event
         
 
     def profile_stop(self):
         ''' occurs wen the profile stops'''
         self.sm.disconnect()
-
-
-
-
-
-                
     
 
     def scale_output(self, value):
         ''' scales an output value for the output range '''
         return gremlin.util.scale_to_range(value, target_min = self.action_data.min_range, target_max = self.action_data.max_range, invert=self.action_data.invert_axis) 
-
-    def process_event(self, event, value):
-
+    
+    def process_gated_event(self, event, value):
+        ''' handles gated input data '''
 
         logging.getLogger("system").info(f"SC FUNCTOR: {event}  {value}")
-
         
-
-        # execute the nested functors for this action
-        result = super().process_event(event, value)
-        if not result:
-            return True
-
         if not self.sm.ok:
             return True
 
@@ -1570,8 +1562,8 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
             return True
    
         if event.is_axis and self.block.is_axis:
-            # value is a ranged input value
-
+            # axis event to axis block mapping
+            
             if self.action_data.mode == SimConnectActionMode.Ranged:
                 # come up with a default mode for the selected command if not set
                 target = value.current
@@ -1584,15 +1576,30 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
             elif self.action_data.mode == SimConnectActionMode.SetValue:
                 target = self.action_data.value
                 return self.block.execute(target)
-                pass
             
-        elif value.current:
-            # non joystick input (button)
+        elif value.is_pressed:
+            # momentary trigger - trigger on press - such as from gate crossings 
+            return self.block.execute(value.is_pressed)
+                    
+
+    def process_event(self, event, value):
+        ''' handles default input data '''
+
+        # execute the nested functors for this action
+        super().process_event(event, value)
+
+        if not self.sm.ok:
+            return True
+
+        if not self.block or not self.block.valid:
+            # invalid command
+            return True
+
+        elif not event.is_axis and value.is_pressed:
+            # regular input mapping to simconnect
             if not self.block.is_axis: 
                 return self.block.execute(self.value)
-            
-
-        
+                    
         
         return True
     
@@ -1640,6 +1647,8 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         # the current command category if the command is an event
         self.category = SimConnectEventCategory.NotSet
 
+        self.gated_callback = None
+
         # the current command name
         self.command = None
 
@@ -1652,6 +1661,7 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         self.keys = None # keys to send
         gate_data = GateData(profile_mode = gremlin.shared_state.current_mode, action_data=self)
         self.gates = [gate_data] # list of GateData objects
+        self.gate_data = gate_data
 
 
         # output mode
