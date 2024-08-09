@@ -30,6 +30,7 @@ class TextToSpeech:
 
     def __init__(self):
         """Creates a new instance."""
+        # constants : win32com.client.constants SVSFlagsAsync
         self._speaker = win32com.client.Dispatch("SAPI.SpVoice")
         self._speak("")
 

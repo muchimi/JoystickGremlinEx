@@ -213,6 +213,7 @@ class OptionsUi(ui_common.BaseDialogUi):
 
     def confirmClose(self, event):        
         ''' override ability to close '''
+        import gremlin.util
         self._profile_mapper.validate()
         if self._profile_mapper.valid:
             event.accept()
@@ -235,6 +236,7 @@ class OptionsUi(ui_common.BaseDialogUi):
                 QtWidgets.QMessageBox.StandardButton.Cancel | 
                 QtWidgets.QMessageBox.StandardButton.Discard 
             )
+            gremlin.util.centerDialog(message_box)
             result = message_box.exec()
             if result == QtWidgets.QMessageBox.StandardButton.Discard:
                 event.accept()
@@ -1250,6 +1252,7 @@ This setting is also available on a profile by profile basis on the profile tab,
 
 
     def _mapping_delete_cb(self):
+        import gremlin.util
         widget = self.sender()
         item = widget.data
         message_box = QtWidgets.QMessageBox()
@@ -1263,6 +1266,7 @@ This setting is also available on a profile by profile basis on the profile tab,
             QtWidgets.QMessageBox.StandardButton.Cancel
             )
         message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
+        gremlin.util.centerDialog(message_box)
         result = message_box.exec()
         if result == QtWidgets.QMessageBox.StandardButton.Ok:
             self._delete_confirmed_cb(item)

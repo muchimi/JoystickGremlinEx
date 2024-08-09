@@ -349,6 +349,7 @@ class RangeContainerWidget(AbstractContainerWidget):
 
     def _replace_range(self):
         ''' replaces current containers with new containers '''
+        import gremlin.util
 
         # do a confirmation box just in case
         message_box = QtWidgets.QMessageBox()
@@ -359,6 +360,7 @@ class RangeContainerWidget(AbstractContainerWidget):
             QtWidgets.QMessageBox.StandardButton.Cancel | 
             QtWidgets.QMessageBox.StandardButton.Ok 
         )
+        gremlin.util.centerDialog(message_box)
         result = message_box.exec()
         if result == QtWidgets.QMessageBox.StandardButton.Cancel:
             return

@@ -788,6 +788,133 @@ The commands are only available to button bindings at this time.
 | Command      | Description |
 | ----------- | ----------- |
 | Axis To Button     | Maps a raw input range to a specific button.  While the raw input is in that range, the button will be output.  Combine multiples of those to create more than one trigger.  Use-case: detent programming based on axis position.  | |
+# Gated axis action
+
+This plugin is an experimental axis input filtering plugin that defines a raw axis input in terms of gates and ranges.  The gated axis plugin combines multiple other features of JGEX and while it's possible to accomplish what the gated axis plugin does, it is often not very simple and has been often the realm of a user-plugin rather than doing it just by plugins, conditions and virtual buttons.
+
+The gated axis plugin is another tool in the toolkit as JGEX can accomplish the same thing different ways - but this can be a much simpler approach to very complex output scenarios in a single action plugin.
+
+It's primary purpose is to easily deal with latching scenarios when the output needs to understand and trigger an action at specific ranges or when crossing certain input values.
+
+The gated axis plugin can only be associated with axis hardware inputs.
+
+![](doc/gate_axis_diagram_1.png)
+
+A gate is a point along the input axis with a specific floating point value in the range -1 to +1.
+
+A range is defined by two gates and are automatically added or removed based on the number of gates.
+
+
+The gated axis plugin lets you define triggers that can fire when the input axis is either crossing a gate, or within the bounds of a range between two gates.
+
+These actions are configured as sub-containers of the action.  Each gate or range has its own set of configured triggers accessible via the configure button.
+
+The top visual is a horizontal representation of the input axis and the configured gates and ranges on it.   The lowest value is on the left, the highest is on the right.
+
+## Gates
+
+A gate is a point along the axis and has a unique floating point value.
+
+
+Gates are always organized from lowest to highest, and as gates are added, they are always re-ordered in sequence.
+
+Gates cannot overlap.
+
+At least two gates must be defined.
+
+When gates are added or removed, the gates are always re-ordered in linear fashion from smallest to highest.
+
+Gates can be added by specifying the number of gates you would like and pressing the "set" button (this also removes gates if needed).
+
+A gate can be added by right clicking any range without a gate.
+
+A gate can also be added by moving the input hardware to the desired location and clicking the add button (noting that a gate cannot be added on top of another gate).
+
+The value of a gate can be changed by dragging the gate to a new location, or manually entering the numeric value for that gate, or moving the input the new desired location and clicking the record button for that gate.
+
+
+Each gate has a configuration panel that allows you to add one or more actions JGEX should take whenever the input axis value crosses the gate.  The configuration panel allows you to add containers and action to the gate, just like you can add containers and actions to input hardware.  The difference is that the actions and containers will use filtered data based on the gated axis, and not the raw input data.
+
+The configuration panel can be opened by clicking the configure button for that gate, or right-clicking the gate itself (be sure to click on the gate as if you right click on the range it will add a new gate there).
+
+Gate can be deleted by clicking the delete button for each gate, or clicking the delete button on the gate's configure panel, or by reducing the number of gates (set button).  A deleted gate will also delete its configuration including any configured actions, and deletions needs to be confirmed as it can result in data loss.
+
+Gate crossings can be bidirectional (the value crosses the gate in either direction), or directional (the value crosses the grate as it increases, or decreases).  The directional feature is used when you need to trigger an action when entering or exiting a range, but not both.  The bidirectional feature is the default, and will trigger whenever the input value crosses the gate.
+
+Gates are triggered once so if the input does not change and sits on a gate, the gate will only trigger once.  Another way to put this is a gate will only trigger if the input changes.
+
+
+| Condition      | Description |
+| ----------- | ----------- |
+| Cross | The gate will trigger whenever the input crosses the gate |
+| Cross (inc) | The gate will trigger if the gate is crossed from left to right, or in increasing value |
+| Cross (dec) | The gate will trigger if the gate is crossed from right to left, or decreasing value |
+
+
+A gate can be edited by right clicking on a gate or by clicking the configuration (gear) button for that gate.
+
+A gate value can be set by dragging the gate on the control, or by manually entering the data on the input for that gate using a floating point value in the range -1 to +1.
+
+
+
+The recommended workflow is to define the gates you want first, then add configurations to them.  This is because when you add or remove gates, while JGEX will do its best to keep configurations saved for removed gates and restore them later, as you add/remove gates, the gate order may change so the actions defined for that gate may no longer be the right gate (an example of this is - you inserted a gate between two other gates).  Of course you can use the copy/paste action between gate configurations.   This will result is a lot less editing.  What I'm saying is that if you delete a gate, it will likely delete the config for that gate, so if you decided you wanted the gate after-all and re-add it, you'll need to reconfigure the gate.  JGEX will confirm deletions.
+
+### Gate Delay
+
+The delay is a value in milliseconds that determines how much time elapses between a press and release action.  Internally a gate will mimic a button press, so will send two specific events to sub-actions on a gate, a press action, followed by a release action.  Setting this to zero means the two are instant.  The default value is 250 milliseconds (1/4 second) which is enough time for most games to capture the input, either a keyboard press or a button press.
+
+### Gate Actions
+
+Gate containers and actions will see the input as a joystick button.  The value of the button should not be used by the action because the trigger will occur whenever the gate is crossed and the hardware input button will always be the same for all gates.
+
+However each gate keeps it own set of containers of actions for that gate only - the configuration is not shared by multiple gates.
+
+A gate that has no containers defined is just ignored.
+
+
+## Ranges
+
+A range is defined by the area between two gates.  A range has modes that define the behavior of the output value when the input is in that range:
+
+| Mode      | Description |
+| ----------- | ----------- |
+| Normal | The value is output as is (this is the default) |
+| Fixed | The value is set to a constant output - this value will be output whenever the input is this range |
+| Ranged | The value is scaled to the range's defined minimum and maximum - this mode allows you to scale the output to a new set of values |
+| Filtered Out | No value is output in this mode - use this to prevent a value from being output whenever the input is in the range |
+
+
+Ranges cannot overlap (one exception - the default range).
+
+Whenever you add or remove gates, ranges are added or removed as well.  It is recommended you don't configure ranges until you have the number of gates finalized to avoid inadvertently loosing configured actions because a range was deleted as you removed a gate.  JGEX will confirm deletions.
+
+### Default range
+
+The default range is a special range that is used for how the gated output should behave when the input is not in configured range.   A configured range is a range that has actions and modes defined. The default range is used when a range exists, but is not configured to do something special.
+
+You can use the default range to your advantage by only configuring special ranges in the input axis - and let the default range handle what happens when the input is not in the special ranges you've defined.
+
+### Range actions
+
+Containers and actions added to a range will see the input as an axis.
+
+A range without defined containers is ignored and will use the settings of the default range (if default actions are defined).
+
+## Use-cases and scenarios for gated output
+
+The gated axis plugin can be useful for a number of scenarios where more sophistication is needed on input axis data.
+
+The plugin can be used for complex axis to button mapping, for establishing complex setups for latched output, and for scaling purposes.
+
+A use-case for this is to exclude a specific input range from the output.  In this scenario, you'd define the default output using the default range, and only configure the special range to override the default that turn the output off whenever the input is in a given range. This is helpful to fix a value or prevent a value from being output at specific points on the input axis, also known as latches or deadzones.
+
+For example you can setup a filter range if your input flutters to prevent it from being output. To setup a deadzone at the latch point on the axis, for example the middle.  You can define a small range near the middle of the axis and set it to not output any value.  You can then setup the two side ranges to "range" the output so that you still get the full range of output values, but you have a deadzone where the middle range is concerned.
+
+A gate can be configured to send an action when it is crossed, for example, entering beta mode on a turbo-prop throttle, or activating engine reversers.   The gate mechanism is very helpful to map to simulators that have gated throttles as it becomes easy to send the appropriate values and commands as the input lever is moved.
+
+The gated axis can be setup to send two different axes based on two (or more) ranges, including inverting ranges or sub-scaling them.
+
+
 
 <!-- TOC --><a name="map-to-mouse-ex-action"></a>
 # Map to mouse EX action

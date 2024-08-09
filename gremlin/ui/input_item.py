@@ -596,6 +596,7 @@ class InputItemListView(ui_common.AbstractView):
                 QtWidgets.QMessageBox.StandardButton.Cancel
                 )
             message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
+            gremlin.util.centerDialog(message_box)
             result = message_box.exec()
             if result == QtWidgets.QMessageBox.StandardButton.Ok:
                 self._confirmed_close(index)

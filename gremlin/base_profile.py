@@ -16,7 +16,6 @@ from gremlin.util import *
 from gremlin.input_types import InputType
 from gremlin.types import *
 from xml.dom import minidom
-#from lxml import etree as ElementTree
 from lxml import etree as ElementTree
 from gremlin.types import DeviceType
 from gremlin.plugin_manager import ContainerPlugins
@@ -2716,8 +2715,8 @@ class ProfileMapItem():
         if os.path.isfile(profile):
             # write the xml
             try:
-                parser = etree.XMLParser(remove_blank_text=True)
-                tree = etree.parse(profile, parser)
+                parser = ElementTree.XMLParser(remove_blank_text=True)
+                tree = ElementTree.parse(profile, parser)
                 for element in tree.xpath("//profile"):
                     element.set("restore_last", str(self._restore_mode))
                     if self._default_mode:
@@ -2741,9 +2740,9 @@ class ProfileMapItem():
                     # add the settings node
 
                     if settings_node is None:
-                        settings_node = etree.SubElement(profile_node, "settings")
+                        settings_node = ElementTree.SubElement(profile_node, "settings")
 
-                    startup_node = etree.SubElement(settings_node,"startup-mode")
+                    startup_node = ElementTree.SubElement(settings_node,"startup-mode")
                     startup_node.text = str(self._default_mode)
 
 
@@ -2824,15 +2823,15 @@ class ProfileMap():
             # blitz
             os.unlink(fname)
         
-        root = etree.Element("mappings")
+        root = ElementTree.Element("mappings")
         for item in self._items:
             if item.valid:
                 # print (f"Saving item: process: {item.process} profile: {item.profile}")
-                etree.SubElement(root,"map", profile = item.profile, process = item.process, startup_mode = item.default_mode)
+                ElementTree.SubElement(root,"map", profile = item.profile, process = item.process, startup_mode = item.default_mode)
 
         try:    
             # save the file
-            tree = etree.ElementTree(root)
+            tree = ElementTree.ElementTree(root)
             tree.write(fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
             logging.getLogger("system").info(f"PROC MAP: saved preferences to {fname}")
 

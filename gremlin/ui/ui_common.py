@@ -1152,6 +1152,7 @@ class ConfirmPushButton(QtWidgets.QPushButton):
             QtWidgets.QMessageBox.StandardButton.Cancel
             )
         message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
+        gremlin.util.centerDialog(message_box)
         result = message_box.exec()
         if result == QtWidgets.QMessageBox.StandardButton.Ok:
             self.confirmed.emit(self)

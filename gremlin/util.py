@@ -28,6 +28,7 @@ import shutil
 import uuid
 import dinput
 import qtawesome as qta
+from lxml import etree as ElementTree
 
 
 from PySide6 import QtCore, QtWidgets, QtGui
@@ -787,12 +788,14 @@ def get_xml_child(node, tag : str, multiple = False):
     :param: multiple - if set, returns all matching subnodes as a list, blank list if nothing found - if not set, returns None or the first node found
     
     '''
+
     value = tag.casefold()
     if multiple:
         nodes = []
         for child in list(node):
-            if child.tag.casefold() == value:
-                nodes.append(child)
+            if not child.tag is ElementTree.Comment:
+                if child.tag.casefold() == value:
+                    nodes.append(child)
         return nodes
 
     for child in list(node):
@@ -1021,3 +1024,37 @@ def compare_nocase(a : str, b : str):
         return True
     return a.casefold() == b.casefold()
 
+def getSignal (oObject : QtCore.QObject, signal_name : str):
+    ''' gets a reference to an object signal  '''
+    oMetaObj = oObject.metaObject()
+    for i in range (oMetaObj.methodCount()):
+        oMetaMethod = oMetaObj.method(i)
+        if not oMetaMethod.isValid():
+            continue
+        if oMetaMethod.methodType () == QtCore.QMetaMethod.Signal and \
+            oMetaMethod.name() == signal_name:
+            return oMetaMethod
+    return None
+
+def isSignalConnected(oObject : QtCore.QObject, signal_name : str):
+    ''' true if a signal is connected '''
+    return oObject.isSignalConnected(getSignal(oObject, signal_name))
+
+def centerDialog(dialog, width = 300, height = 150):
+    ''' centers the dialog on top of the UI '''
+    # Display the dialog centered in the middle of the UI
+    
+    root = dialog
+    if not root.parent():
+        import gremlin.shared_state
+        geom = gremlin.shared_state.ui.geometry()
+    else:
+        while root.parent():
+            root = root.parent()
+        geom = root.geometry()
+    dialog.setGeometry(
+        int(geom.x() + geom.width() / 2 - width/2),
+        int(geom.y() + geom.height() / 2 - height/2),
+        width,
+        height
+    )

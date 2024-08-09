@@ -94,7 +94,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.14ex (l)"
+APPLICATION_VERSION = "13.40.14ex (m)"
 
 # the main ui
 ui = None
@@ -1623,7 +1623,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                 QtWidgets.QMessageBox.StandardButton.Cancel
             )
             message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Save)
-
+            gremlin.util.centerDialog(message_box)
             response = message_box.exec()
             if response == QtWidgets.QMessageBox.StandardButton.Save:
                 self.save_profile()

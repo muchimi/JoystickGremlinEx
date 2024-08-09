@@ -1182,25 +1182,23 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._output_container_layout.addStretch(1)
 
 
+        # show the gated axis widget only if the input is an axis
+        self._gates_container_widget = None
+        input_type = self.action_data.get_input_type()
+        if input_type == InputType.JoystickAxis:
+            self._gates_container_widget = QtWidgets.QFrame()
+            self._gates_container_widget.setFrameShape(QtWidgets.QFrame.Shape.Box)
+            self._gates_container_widget.setStyleSheet('.QFrame{background-color: lightgray;}')
+            self._gates_container_layout = QtWidgets.QVBoxLayout(self._gates_container_widget)
 
-        #self._gates_widget = gremlin.gated_handler.GatedAxisWidget(action_data = self.action_data)
-        self._gates_container_widget = QtWidgets.QFrame()
-        self._gates_container_widget.setFrameShape(QtWidgets.QFrame.Shape.Box)
-        self._gates_container_widget.setStyleSheet('.QFrame{background-color: lightgray;}')
-        self._gates_container_layout = QtWidgets.QVBoxLayout(self._gates_container_widget)
+            self._gates_widget = gremlin.gated_handler.GateWidget(action_data = self.action_data,
+                                                                gate_data = self.action_data.gate_data,
+                                                                )
+            #self._gates_widget.configure_requested.connect(self._configure_trigger_cb)
 
-        self._gates_widget = gremlin.gated_handler.GateWidget(action_data = self.action_data,
-                                                              gate_data = self.action_data.gate_data,
-                                                              process_callback = self.action_data.gated_callback
-                                                              )
-        self._gates_widget.configure_requested.connect(self._configure_trigger_cb)
-        self._gates_widget.configure_gate_requested.connect(self._configure_gate_trigger_cb)
-        self._gates_widget.configure_range_requested.connect(self._configure_range_trigger_cb)
+            self._gates_container_layout.addWidget(self._gates_widget)
 
-        self._gates_container_layout.addWidget(self._gates_widget)
-
-        self._output_gated_container_layout.addWidget(self._gates_container_widget)
-        #self._output_gated_container_widget.setMinimumHeight(min(200, self._gates_widget.gate_count * 200))
+            self._output_gated_container_layout.addWidget(self._gates_container_widget)
     
 
         # status widget
@@ -1219,35 +1217,6 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         # self.main_layout.addWidget(self._input_container_widget)
         self.main_layout.addWidget(self.status_text_widget)
 
-        #self.main_layout.addStretch(1)
-
-        # # hook the joystick input for axis input repeater
-        # el = gremlin.event_handler.EventListener()
-        # el.joystick_event.connect(self._joystick_event_cb)
-
-
-    QtCore.Slot(object)
-    def _configure_trigger_cb(self, data):
-        self._show_options_dialog_cb()
-
-    
-
-    QtCore.Slot(object, int)
-    def _configure_gate_trigger_cb(self, data):
-        dialog = ActionContainerUi(self.action_data.gate_data, data)
-        # gates can be deleted 
-        dialog.delete_requested.connect(self._delete_gate_cb)
-        dialog.exec()
-
-    QtCore.Slot(object, GateData.GateInfo)
-    def _delete_gate_cb(self, data):
-        ''' delete the gate '''
-        self._gates_widget.deleteGate(data)
-
-    QtCore.Slot(object, int)
-    def _configure_range_trigger_cb(self, data):
-        dialog = ActionContainerUi(self.action_data.gate_data, data)
-        dialog.exec()
 
     def _show_options_dialog_cb(self):
         ''' displays the simconnect options dialog'''
@@ -1542,7 +1511,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
 
     def profile_stop(self):
         ''' occurs wen the profile stops'''
-        self.sm.disconnect()
+        self.sm.sim_disconnect()
     
 
     def scale_output(self, value):
@@ -1647,8 +1616,6 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         # the current command category if the command is an event
         self.category = SimConnectEventCategory.NotSet
 
-        self.gated_callback = None
-
         # the current command name
         self.command = None
 
@@ -1658,7 +1625,7 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         # the block for the command
         self.min_range = -16383
         self.max_range = 16383
-        self.keys = None # keys to send
+        
         gate_data = GateData(profile_mode = gremlin.shared_state.current_mode, action_data=self)
         self.gates = [gate_data] # list of GateData objects
         self.gate_data = gate_data
@@ -1722,6 +1689,7 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
 
         if gates:
             self.gates = gates
+            self.gate_data = gates[0]
         
 
     def _generate_xml(self):
