@@ -132,6 +132,7 @@ This release adds major new features, including some minor changes in UI functio
 - New configuration dialog for the loaded profile, separate from the global options (QOL).  This lets you quickly set profile activation options.
 - New option to force numlock off when a profile starts to help with the more complex latching that use numpad keys.
 - Added joystick input value display on axis inputs - shows an axis bar with the current axis value in the input (QOL) - can be toggled in options.
+- Update to Python 3.12.5
 
 6/6/24 - 13.40.13ex (h) **potentially breaking change**
 

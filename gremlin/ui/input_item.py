@@ -955,6 +955,7 @@ class InputItemWidget(QtWidgets.QFrame):
         self._title_container_widget = QtWidgets.QWidget()
         self._title_container_layout = QtWidgets.QGridLayout(self._title_container_widget)
         self._title_container_layout.setContentsMargins(0,0,0,0)
+        self._title_container_layout.setVerticalSpacing(0)
 
         self.identifier = identifier
         self._selected = False
@@ -989,6 +990,7 @@ class InputItemWidget(QtWidgets.QFrame):
         self._title_container_layout.addWidget(self._title_widget, data_row, 0) # title
         self._title_container_layout.addWidget(self._icon_widget, data_row, 1) # container icons
         self._title_container_layout.setContentsMargins(0,0,0,0)
+        
 
         # action buttons
         self._edit_button_widget = QtWidgets.QPushButton(qta.icon("fa.gear"),"") 
@@ -1036,8 +1038,9 @@ class InputItemWidget(QtWidgets.QFrame):
         
         if self._multi_row:
 
-            self.custom_container_widget = QtWidgets.QWidget()    
-            # self.custom_container_widget.setVisible(False)
+            self.custom_container_widget = QtWidgets.QWidget() 
+            self.custom_container_widget.setContentsMargins(0,0,0,0)
+            self.custom_container_widget.setMaximumHeight(32)
             self.populate_ui(self, self.custom_container_widget, self.data)
         else:
             self.custom_container_widget = None

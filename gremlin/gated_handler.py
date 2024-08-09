@@ -180,6 +180,261 @@ def _is_close(a, b, tolerance = 0.0001):
     ''' compares two floating point numbers with approximate precision'''
     return math.isclose(a, b, abs_tol=tolerance)
 
+
+class GateInfo(QtCore.QObject):
+    ''' holds gate data information '''
+
+    valueChanged = QtCore.Signal() # fires when the value changes
+
+    def __init__(self, id = None, value = None, profile_mode = None, item_data = None, condition = GateCondition.OnCross, parent = None, is_default = False, delay = 250):
+        super().__init__()
+
+        assert parent is not None, "Gates must be parented to a GateData object " # = must provide this parameter
+        self.parent : GateData = parent
+        
+        self.is_default = is_default # default gate setups (not saved)
+        self._id = get_guid() if id is None else id
+        assert isinstance(self._id,str)
+        self._value = value if value is not None else 0
+        self.condition = condition
+        self.profile_mode = profile_mode
+        self.item_data : gremlin.base_profile.InputItem = item_data
+        # force the item data to mimic a joystick button as gates are trigger actions - this will configure actions int he container correctly for this type of input
+        self.item_data.input_type = InputType.JoystickButton
+        self.item_data.input_id = 1
+        
+        self.used = True
+        self.slider_index =  None # index of the gate in the slider 
+        self.delay = delay  # delay in milliseconds for the trigger duration between a press and release
+        if not is_default:
+            # do not register default gates
+            self.parent.registerGate(self)
+
+
+    @property
+    def value(self):
+        return self._value
+    
+    @value.setter
+    def value(self, data):
+        if data < -1.0:
+            data = -1.0
+        if data > 1.0:
+            data = 1.0
+        if data != self._value:
+            self._value = data
+            self.parent._update_gate_index() # re-index based on value so the gate is always in sequence
+            self.valueChanged.emit()
+
+    @property
+    def condition(self):
+        return self._condition
+    @condition.setter
+    def condition(self, value):
+        assert value in [c for c in GateCondition]
+        self._condition = value
+
+    @property
+    def id(self):
+        return self._id
+    @id.setter
+    def id(self, value):
+        assert isinstance(value,str)
+        self._id = value
+
+    def __lt__(self, other):
+        return self._value < other._value
+    
+    def __str__(self):
+        return f"Gate {self.display_index} [{self.index}]  {self.value:0.{_decimals}f} cond: {self.condition} used: {self.used}"
+
+
+
+class RangeInfo(QtCore.QObject):
+    valueChanged = QtCore.Signal() # fires when either of the gate values change
+
+    def __init__(self, id = None, min_gate = None, max_gate = None, profile_mode = None, item_data = None, condition = GateCondition.InRange, 
+                    mode = GateRangeOutputMode.Normal, range_min = -1, range_max = 1, parent = None,  is_default = False):
+        super().__init__()
+
+        assert parent is not None, "Ranges must be parented to a GateData object " # = must provide this parameter
+        #assert min_gate is not None and max_gate is not None, "Gates must be provided on range object"
+        self.parent = parent
+        self._id = get_guid() if id is None else id
+        self.is_default = is_default
+        self.profile_mode = profile_mode
+        self._output_mode = None
+        self._condition = None
+        self.condition = condition
+        self._min_gate : GateInfo = min_gate
+        if self._min_gate is not None:
+            self._min_gate.valueChanged.connect(self._gate_value_changed_cb)
+            
+        self._max_gate : GateInfo = max_gate
+        if self._max_gate is not None:
+            self._max_gate.valueChanged.connect(self._gate_value_changed_cb)
+
+        self.item_data = item_data
+        self.mode = mode # output mode determines what we do with the input data 
+        self._fixed_value = None # fixed value to output for this range if the condition is Fixed
+        self.range_min = range_min # ranged mode output min
+        self.range_max = range_max  # ranged mode output max
+        self._swap_gates()
+
+
+    def copy_from(self, rng):
+        ''' copies data from another range object '''
+        self.profile_mode = rng.profile_mode
+        self._condition = rng._condition
+        self._output_mode = rng._output_mode
+        self._fixed_value = rng._fixed_value
+        self.range_min = rng.range_min
+        self.range_max = rng.range_max
+        self.is_default = rng.is_default
+
+    @property
+    def id(self):
+        return self._id
+    @id.setter
+    def id(self, value):
+        self._id = value            
+
+    @property
+    def condition(self):
+        return self._condition
+    @condition.setter
+    def condition(self, value):
+        assert value in [c for c in GateCondition]
+        self._condition = value
+
+    @property
+    def mode(self):
+        return self._output_mode
+    @mode.setter
+    def mode(self, value):
+        assert value in [c for c in GateRangeOutputMode]
+        self._output_mode = value
+
+    @property
+    def fixed_value(self):
+        return self._fixed_value
+    
+    @fixed_value.setter
+    def fixed_value(self, data):
+        if data < -1.0:
+            data = -1.0
+        if data > 1.0:
+            data = 1.0
+        if self._fixed_value is None or data != self._fixed_value:
+            self._fixed_value = data
+
+
+    @property
+    def g1(self):
+        return self._min_gate
+    @g1.setter
+    def g1(self, value):
+        if self._min_gate != value:
+            if self._min_gate is not None:
+                self._min_gate.valueChanged.disconnect(self._gate_value_changed_cb)
+            self._min_gate = value
+            self._swap_gates()
+            if self._min_gate is not None:
+                self._min_gate.valueChanged.connect(self._gate_value_changed_cb)
+            self._gate_value_changed_cb()
+    @property
+    def g2(self):
+        return self._max_gate
+    @g2.setter
+    def g2(self, value):
+        if self._max_gate != value:
+            if self._max_gate is not None:
+                    self._max_gate.valueChanged.disconnect(self._gate_value_changed_cb)
+            self._max_gate = value
+            self._swap_gates()
+            if self._max_gate is not None:
+                self._max_gate.valueChanged.connect(self._gate_value_changed_cb)
+            self._gate_value_changed_cb()
+
+    @QtCore.Slot()
+    def _gate_value_changed_cb(self):
+        ''' occurs when either gate values change or gates are changed '''
+        self.valueChanged.emit()
+
+
+    @property
+    def v1(self):
+        ''' gets the min value of the range '''
+        if self._min_gate:
+            return self._min_gate.value
+        return None
+    
+    @property
+    def v2(self):
+        ''' gets the max value of the range '''
+        if self._max_gate:
+            return self._max_gate.value
+        return None
+    
+    def inrange(self, value):
+        v1,v2 = self.v1, self.v2
+        if value > v1 and value < v2:
+            return True
+        if _is_close(value,v1) or _is_close(value,v2):
+            return True
+        return False
+    
+
+    def _swap_gates(self):
+        ''' ensures gates are in the order min/max '''
+        if self._max_gate is not None and self._min_gate is not None:
+            if self._max_gate.value < self._min_gate.value:
+                g1, g2 = self._min_gate, self._max_gate
+                g1, g2 = g2, g1
+                self._min_gate = g1
+                self._max_gate = g2
+                
+
+    def range(self):
+        ''' gets the distance between gates'''
+        if self._max_gate and self._min_gate:
+            return self._max_gate.value - self._min_gate.value
+        return 0
+    
+    def range_values(self):
+        ''' returns the tuple of range values '''
+        if self._max_gate and self._min_gate:
+            return (self._max_gate.value, self._min_gate.value)
+        return (None, None)
+    
+    def range_display(self):
+        ''' gets a range display string for this range '''
+        return f"{self.v1:0.{_decimals}f},{self.v2:0.{_decimals}f}"
+
+    def pair(self):
+        return (self.v1, self.v2)
+    
+    def to_percent(self, value):
+        ''' converts the value to a percent for this range '''
+        v1 = self.v1
+        v2 = self.v2
+        return gremlin.util.scale_to_range(value,v1,v2,0,100)
+
+    def __str__(self):
+        if self.v1 is None or self.v2 is None:
+            rr = f"N/A"
+        else:
+            rr = self.range_display()
+        return f"Range [{rr}] mode: {self.mode}  id: {self.id}"
+    
+    def __eq__(self, other):
+        ''' compares to range objects by range value '''
+        return _is_close(self.v1, other.v1) and _is_close(self.v2, other.v2)
+    
+    def __hash__(self):
+        return hash(self.range_values())
+    
+
 class GateData(QtCore.QObject):
     ''' holds gated information for an axis 
     
@@ -188,257 +443,6 @@ class GateData(QtCore.QObject):
 
     stepsChanged = QtCore.Signal() # signals that steps (gate counts) have changed 
     valueChanged = QtCore.Signal() # signals when the gate data changes
-
-    class GateInfo(QtCore.QObject):
-        ''' holds gate data information '''
-
-        valueChanged = QtCore.Signal() # fires when the value changes
-
-        def __init__(self, id = None, value = None, profile_mode = None, item_data = None, condition = GateCondition.OnCross, parent = None, is_default = False, delay = 250):
-            super().__init__()
-
-            assert parent is not None, "Gates must be parented to a GateData object " # = must provide this parameter
-            self.parent : GateData = parent
-            
-            self.is_default = is_default # default gate setups (not saved)
-            self._id = get_guid() if id is None else id
-            assert isinstance(self._id,str)
-            self._value = value if value is not None else 0
-            self.condition = condition
-            self.profile_mode = profile_mode
-            self.item_data : gremlin.base_profile.InputItem = item_data
-            # force the item data to mimic a joystick button as gates are trigger actions - this will configure actions int he container correctly for this type of input
-            self.item_data.input_type = InputType.JoystickButton
-            self.item_data.input_id = 1
-            
-            self.used = True
-            self.slider_index =  None # index of the gate in the slider 
-            self.delay = delay  # delay in milliseconds for the trigger duration between a press and release
-            if not is_default:
-                # do not register default gates
-                self.parent.registerGate(self)
-
-
-        @property
-        def value(self):
-            return self._value
-        
-        @value.setter
-        def value(self, data):
-            if data < -1.0:
-                data = -1.0
-            if data > 1.0:
-                data = 1.0
-            if data != self._value:
-                self._value = data
-                self.parent._update_gate_index() # re-index based on value so the gate is always in sequence
-                self.valueChanged.emit()
-
-        @property
-        def condition(self):
-            return self._condition
-        @condition.setter
-        def condition(self, value):
-            assert value in [c for c in GateCondition]
-            self._condition = value
-
-        @property
-        def id(self):
-            return self._id
-        @id.setter
-        def id(self, value):
-            assert isinstance(value,str)
-            self._id = value
-
-        def __lt__(self, other):
-            return self._value < other._value
-        
-        def __str__(self):
-            return f"Gate {self.display_index} [{self.index}]  {self.value:0.{_decimals}f} cond: {self.condition} used: {self.used}"
-
-    class RangeInfo(QtCore.QObject):
-        valueChanged = QtCore.Signal() # fires when either of the gate values change
-
-        def __init__(self, id = None, min_gate = None, max_gate = None, profile_mode = None, item_data = None, condition = GateCondition.InRange, 
-                     mode = GateRangeOutputMode.Normal, range_min = -1, range_max = 1, parent = None,  is_default = False):
-            super().__init__()
-
-            assert parent is not None, "Ranges must be parented to a GateData object " # = must provide this parameter
-            #assert min_gate is not None and max_gate is not None, "Gates must be provided on range object"
-            self.parent = parent
-            self._id = get_guid() if id is None else id
-            self.is_default = is_default
-            self.profile_mode = profile_mode
-            self._output_mode = None
-            self._condition = None
-            self.condition = condition
-            self._min_gate : GateData.GateInfo = min_gate
-            if self._min_gate is not None:
-                self._min_gate.valueChanged.connect(self._gate_value_changed_cb)
-                
-            self._max_gate : GateData.GateInfo = max_gate
-            if self._max_gate is not None:
-                self._max_gate.valueChanged.connect(self._gate_value_changed_cb)
-
-            self.item_data = item_data
-            self.mode = mode # output mode determines what we do with the input data 
-            self._fixed_value = None # fixed value to output for this range if the condition is Fixed
-            self.range_min = range_min # ranged mode output min
-            self.range_max = range_max  # ranged mode output max
-            self._swap_gates()
-
-
-        def copy_from(self, rng):
-            ''' copies data from another range object '''
-            self.profile_mode = rng.profile_mode
-            self._condition = rng._condition
-            self._output_mode = rng._output_mode
-            self._fixed_value = rng._fixed_value
-            self.range_min = rng.range_min
-            self.range_max = rng.range_max
-            self.is_default = rng.is_default
-
-        @property
-        def id(self):
-            return self._id
-        @id.setter
-        def id(self, value):
-            self._id = value            
-
-        @property
-        def condition(self):
-            return self._condition
-        @condition.setter
-        def condition(self, value):
-            assert value in [c for c in GateCondition]
-            self._condition = value
-
-        @property
-        def mode(self):
-            return self._output_mode
-        @mode.setter
-        def mode(self, value):
-            assert value in [c for c in GateRangeOutputMode]
-            self._output_mode = value
-
-        @property
-        def fixed_value(self):
-            return self._fixed_value
-        
-        @fixed_value.setter
-        def fixed_value(self, data):
-            if data < -1.0:
-                data = -1.0
-            if data > 1.0:
-                data = 1.0
-            if self._fixed_value is None or data != self._fixed_value:
-                self._fixed_value = data
-
-
-        @property
-        def g1(self):
-            return self._min_gate
-        @g1.setter
-        def g1(self, value):
-            if self._min_gate != value:
-                if self._min_gate is not None:
-                    self._min_gate.valueChanged.disconnect(self._gate_value_changed_cb)
-                self._min_gate = value
-                self._swap_gates()
-                if self._min_gate is not None:
-                    self._min_gate.valueChanged.connect(self._gate_value_changed_cb)
-                self._gate_value_changed_cb()
-        @property
-        def g2(self):
-            return self._max_gate
-        @g2.setter
-        def g2(self, value):
-            if self._max_gate != value:
-                if self._max_gate is not None:
-                        self._max_gate.valueChanged.disconnect(self._gate_value_changed_cb)
-                self._max_gate = value
-                self._swap_gates()
-                if self._max_gate is not None:
-                    self._max_gate.valueChanged.connect(self._gate_value_changed_cb)
-                self._gate_value_changed_cb()
-
-        @QtCore.Slot()
-        def _gate_value_changed_cb(self):
-            ''' occurs when either gate values change or gates are changed '''
-            self.valueChanged.emit()
-
-
-        @property
-        def v1(self):
-            ''' gets the min value of the range '''
-            if self._min_gate:
-                return self._min_gate.value
-            return None
-        
-        @property
-        def v2(self):
-            ''' gets the max value of the range '''
-            if self._max_gate:
-                return self._max_gate.value
-            return None
-        
-        def inrange(self, value):
-            v1,v2 = self.v1, self.v2
-            if value > v1 and value < v2:
-                return True
-            if _is_close(value,v1) or _is_close(value,v2):
-                return True
-            return False
-        
-
-        def _swap_gates(self):
-            ''' ensures gates are in the order min/max '''
-            if self._max_gate is not None and self._min_gate is not None:
-                if self._max_gate.value < self._min_gate.value:
-                    g1, g2 = self._min_gate, self._max_gate
-                    g1, g2 = g2, g1
-                    self._min_gate = g1
-                    self._max_gate = g2
-                    
-
-        def range(self):
-            ''' gets the distance between gates'''
-            if self._max_gate and self._min_gate:
-                return self._max_gate.value - self._min_gate.value
-            return 0
-        
-        def range_values(self):
-            ''' returns the tuple of range values '''
-            if self._max_gate and self._min_gate:
-                return (self._max_gate.value, self._min_gate.value)
-            return (None, None)
-
-        def pair(self):
-            return (self.v1, self.v2)
-        
-        def to_percent(self, value):
-            ''' converts the value to a percent for this range '''
-            v1 = self.v1
-            v2 = self.v2
-            return gremlin.util.scale_to_range(value,v1,v2,0,100)
-            
-            
-
-
-        def __str__(self):
-            if self.v1 is None or self.v2 is None:
-                rr = f"N/A"
-            else:
-                rr = f"{self.v1:0.{_decimals}f},{self.v2:0.{_decimals}f}"
-            return f"Range [{rr}] mode: {self.mode}  id: {self.id}"
-        
-        def __eq__(self, other):
-            ''' compares to range objects by range value '''
-            return _is_close(self.v1, other.v1) and _is_close(self.v2, other.v2)
-        
-        def __hash__(self):
-            return hash(self.range_values())
-
 
 
     def __init__(self,
@@ -483,21 +487,21 @@ class GateData(QtCore.QObject):
 
 
         # default gates and range
-        min_gate = GateData.GateInfo(value = min, profile_mode = profile_mode, item_data = self._new_item_data(), is_default = True, parent = self)
-        max_gate = GateData.GateInfo(value = max, profile_mode = profile_mode, item_data = self._new_item_data(), is_default = True, parent = self)
-        range_info = GateData.RangeInfo(min_gate = min_gate, max_gate = max_gate, profile_mode=profile_mode, item_data = self._new_item_data(), condition= GateCondition.InRange, mode= GateRangeOutputMode.Normal, is_default = True, parent = self)
+        min_gate = GateInfo(value = min, profile_mode = profile_mode, item_data = self._new_item_data(), is_default = True, parent = self)
+        max_gate = GateInfo(value = max, profile_mode = profile_mode, item_data = self._new_item_data(), is_default = True, parent = self)
+        def_range = RangeInfo(min_gate = min_gate, max_gate = max_gate, profile_mode=profile_mode, item_data = self._new_item_data(), condition= GateCondition.InRange, mode= GateRangeOutputMode.Normal, parent = self, is_default=True)
 
-        # non default gates - all maps have at least two gates defined
-        g1 = GateData.GateInfo(value = -1.0, profile_mode = self.profile_mode, item_data = self._new_item_data(), parent=self)
-        g2 = GateData.GateInfo(value = 1.0, profile_mode = self.profile_mode, item_data = self._new_item_data(), parent=self)
-        range_info = GateData.RangeInfo(min_gate = g1, max_gate = g2, profile_mode=profile_mode, item_data = self._new_item_data(), condition= GateCondition.InRange, mode= GateRangeOutputMode.Normal, parent = self)
-        self._range_item_map[range_info.id] = range_info
-        
-        
-
-        self.default_range = range_info
+        self.default_range = def_range
         self.default_min_gate = min_gate
         self.default_max_gate = max_gate
+
+        # non default gates - all maps have at least two gates defined
+        g1 = GateInfo(value = -1.0, profile_mode = self.profile_mode, item_data = self._new_item_data(), parent=self)
+        g2 = GateInfo(value = 1.0, profile_mode = self.profile_mode, item_data = self._new_item_data(), parent=self)
+        r1 = RangeInfo(min_gate = g1, max_gate = g2, profile_mode=profile_mode, item_data = self._new_item_data(), condition= GateCondition.InRange, mode= GateRangeOutputMode.Normal, parent = self)
+        self._range_item_map[r1.id] = r1
+
+        
 
         
         # hook joystick input for runtime processing of input
@@ -731,8 +735,8 @@ class GateData(QtCore.QObject):
         gates = self._get_used_gates()
         if not gates:
             # create a pair of gates for new ranges
-            g1 = GateData.GateInfo(value = -1.0, profile_mode = self.profile_mode, item_data = self._new_item_data(), parent=self)
-            g2 = GateData.GateInfo(value = 1.0, profile_mode = self.profile_mode, item_data = self._new_item_data(), parent=self)
+            g1 = GateInfo(value = -1.0, profile_mode = self.profile_mode, item_data = self._new_item_data(), parent=self)
+            g2 = GateInfo(value = 1.0, profile_mode = self.profile_mode, item_data = self._new_item_data(), parent=self)
             gates = [g1, g2]
         data = [(info.slider_index, info.value) for info in gates]
         data.sort(key = lambda x: x[0])
@@ -802,7 +806,7 @@ class GateData(QtCore.QObject):
             if id is None:
                 id = get_guid()
             item_data = self._new_item_data()
-            gate = GateData.GateInfo(id = id, value = value, profile_mode = gremlin.shared_state.current_mode, item_data=item_data, parent = self)
+            gate = GateInfo(id = id, value = value, profile_mode = gremlin.shared_state.current_mode, item_data=item_data, parent = self)
             return gate
             
         return self._gate_item_map[id]
@@ -836,7 +840,7 @@ class GateData(QtCore.QObject):
             id = get_guid()
         if not id in self._range_item_map.keys():
             item_data = self._new_item_data()
-            range_info = GateData.RangeInfo(min_gate = None, max_gate = None, profile_mode = gremlin.shared_state.current_mode, item_data=item_data, parent = self)
+            range_info = RangeInfo(min_gate = None, max_gate = None, profile_mode = gremlin.shared_state.current_mode, item_data=item_data, parent = self)
             range_info.id = id
             self._range_item_map[id] = range_info
         return self._range_item_map[id]    
@@ -1075,7 +1079,7 @@ class GateData(QtCore.QObject):
 
         ranges = self._get_ranges()
         result = set()
-        rng : GateData.RangeInfo
+        rng : RangeInfo
         for rng in ranges:
             if rng.inrange(v1):
                 result.add(rng)
@@ -1118,7 +1122,7 @@ class GateData(QtCore.QObject):
     
     def _get_range_for_value(self, value, include_default = False):
         ''' returns (v1,v2,idx1,idx12) where v1 = lower range, v2 = higher range, idx1 = gate index for v1, idx2 = gate index for v2 '''
-        info : GateData.RangeInfo
+        info : RangeInfo
         #print ("------")
         for info in self._get_ranges(include_default = include_default):
             #print (f"{value:0.4f} - range: {info.index} {info.v1:0.4f} {info.v2:0.4f} in range: {info.inrange(value)}")
@@ -1128,7 +1132,7 @@ class GateData(QtCore.QObject):
     
     def _get_filtered_range_value(self, range_info, value):
         ''' gets a range filtered value '''
-        range_info : GateData.RangeInfo
+        range_info : RangeInfo
         if value < range_info.v1 or value > range_info.v2:
             # not in range
             return None
@@ -1177,11 +1181,11 @@ class GateData(QtCore.QObject):
         value_changed = last_value is None or last_value != current_value
         if not value_changed:
             return # nothing to do if the axix didn't move
-        current_range: GateData.RangeInfo 
+        current_range: RangeInfo 
         current_range = self._get_range_for_value(current_value, include_default=False) # gets the range of the current value
         if current_range is None or not current_range.item_data.containers:
             # no range container found - use default
-            current_range = GateData.RangeInfo = self._get_range_for_value(current_value, include_default=True) # gets the range of the current value
+            current_range = RangeInfo = self._get_range_for_value(current_value, include_default=True) # gets the range of the current value
 
         if current_range is not None:
             if current_range.condition == GateCondition.InRange and current_range.item_data.containers:
@@ -1221,7 +1225,7 @@ class GateData(QtCore.QObject):
 
 
         # process any the gate triggers
-        gate : GateData.GateInfo
+        gate : GateInfo
 
         for gate in crossed_gates:
             # check for one way gates we passed
@@ -1309,7 +1313,7 @@ class GateData(QtCore.QObject):
         node.set("show_percent", str(self.show_percent))
 
         # save gate data
-        gate : GateData.GateInfo
+        gate : GateInfo
         for gate in self.getGates():
             child = ElementTree.SubElement(node, "gate")
             if gate.is_default:
@@ -1326,7 +1330,7 @@ class GateData(QtCore.QObject):
                     child.append(item_node)
 
         # save range data
-        rng : GateData.RangeInfo
+        rng : RangeInfo
         for rng in self.getRanges():
             child_comment = ElementTree.Comment(f"Range: [{rng.v1:0.{_decimals}f},{rng.v2:0.{_decimals}f}]  Gates: [{rng.g1.slider_index}/{rng.g2.slider_index}] Condition: [{_gate_condition_to_display_name[rng.condition]}] Mode: [{_gate_range_to_display_name[rng.mode]}]")
             node.append(child_comment)
@@ -1402,7 +1406,7 @@ class GateData(QtCore.QObject):
                 del self._gate_item_map[gate_id] # remove existing gate ID 
 
 
-            gate = GateData.GateInfo(id = gate_id,
+            gate = GateInfo(id = gate_id,
                                      value = gate_value,
                                      profile_mode = profile_mode,
                                      item_data= item_data,
@@ -1458,7 +1462,7 @@ class GateData(QtCore.QObject):
             range_min = safe_read(child,"range_min", float, -1.0)
             range_max = safe_read(child,"range_max", float, 1.0)
             
-            range_info = GateData.RangeInfo(id = range_id, 
+            range_info = RangeInfo(id = range_id, 
                                             min_gate = min_gate,
                                             max_gate = max_gate, 
                                             profile_mode = profile_mode,
@@ -1806,14 +1810,14 @@ class GateWidget(QtWidgets.QWidget):
         row = 1
         col = 0
         self._range_readout_widgets = {}
-        rng : GateData.RangeInfo
+        rng : RangeInfo
         
         edit_width = ui_common.get_text_width("[+0.000 to +0.000]M")
         display_index = 0
         for rng in range_list:
             id = rng.id
-            g1 : GateData.GateInfo = rng.g1
-            g2 : GateData.GateInfo= rng.g2
+            g1 : GateInfo = rng.g1
+            g2 : GateInfo= rng.g2
             if rng.is_default:
                 # default range
                 label_widget = QtWidgets.QLabel(f"Default:")
@@ -1875,8 +1879,8 @@ class GateWidget(QtWidgets.QWidget):
         range_info = self.sender()
         if range_info.id in self._range_readout_widgets.keys():
             range_widget = self._range_readout_widgets[range_info.id]
-            g1 : GateData.GateInfo = range_info.g1
-            g2 : GateData.GateInfo= range_info.g2
+            g1 : GateInfo = range_info.g1
+            g2 : GateInfo= range_info.g2
             ''' updates the display for a range item '''
             
             helper = self._helper()
@@ -1963,7 +1967,7 @@ class GateWidget(QtWidgets.QWidget):
     @QtCore.Slot()
     def _grab_cb(self):
         ''' grab the min value from the axis position '''
-        info : GateData.GateInfo
+        info : GateInfo
         info, widget = self.sender().data  # the button's data field contains the widget to update
         value = self._axis_value
         info.value = value
@@ -2000,7 +2004,7 @@ class GateWidget(QtWidgets.QWidget):
             dialog.delete_requested.connect(self._delete_gate_cb)
             dialog.exec()
 
-    QtCore.Slot(object, GateData.GateInfo)
+    QtCore.Slot(object, GateInfo)
     def _delete_gate_confirm_cb(self):
         ''' delete requested '''
         widget = self.sender()
@@ -2027,7 +2031,7 @@ class GateWidget(QtWidgets.QWidget):
     def _delete_confirmed_cb(self, gate):
          self.deleteGate(gate)    
 
-    QtCore.Slot(object, GateData.GateInfo)
+    QtCore.Slot(object, GateInfo)
     def _delete_gate_cb(self, gate):
         ''' delete the gate '''
         self.deleteGate(gate)
@@ -2312,7 +2316,7 @@ class ActionContainerUi(QtWidgets.QDialog):
         
         super().__init__(parent)
 
-        is_range = data is GateData.RangeInfo
+        is_range = isinstance(data, RangeInfo)
         self._info = data
     
         self._item_data = data.item_data
@@ -2337,7 +2341,7 @@ class ActionContainerUi(QtWidgets.QDialog):
         if is_range:
             # range has an output mode for how to handle the output value for the range
 
-            self.trigger_condition_layout.addWidget(QtWidgets.QLabel(f"Range Configuration:"))
+            self.trigger_condition_layout.addWidget(QtWidgets.QLabel(f"Range Configuration: {data.range_display()}"))
 
             self.output_widget = QtWidgets.QComboBox()
             self.output_container_widget = QtWidgets.QWidget()

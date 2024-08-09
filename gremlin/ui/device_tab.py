@@ -520,7 +520,7 @@ class JoystickDeviceTabWidget(QtWidgets.QWidget):
             widget = input_item.InputItemWidget(identifier = identifier, parent=parent,  populate_ui_callback=self._populate_axis_input_widget_ui, data = data)
             widget.setIcon("joystick_no_frame.png",use_qta=False)
         elif data.input_type == InputType.JoystickButton:
-            widget = input_item.InputItemWidget(identifier = identifier, parent=parent, data = data)
+            widget = input_item.InputItemWidget(identifier = identifier, parent=parent, populate_ui_callback=self._populate_button_input_widget_ui, data = data)
             widget.setIcon("mdi.gesture-tap-button")
         elif data.input_type == InputType.JoystickHat:
             widget = input_item.InputItemWidget(identifier = identifier, parent=parent, data = data)
@@ -550,6 +550,20 @@ class JoystickDeviceTabWidget(QtWidgets.QWidget):
             layout.addStretch()
             return widget
         return None
+    
+    def _populate_button_input_widget_ui(self, input_widget, container_widget, data):
+        ''' called when the widget is created for a button input  '''
+        if gremlin.config.Configuration().show_input_axis:
+            layout = QtWidgets.QVBoxLayout(container_widget)
+            widget = gremlin.ui.ui_common.ButtonStateWidget()
+            #widget.setMaximumWidth(20)
+            # automatically update from the joystick
+            widget.hookDevice(data.device_guid, data.input_id)
+
+            layout.setContentsMargins(0,0,0,0)
+            layout.addWidget(widget)
+            layout.addStretch()
+            return widget
                  
 
     def _device_update(self, event):

@@ -1449,6 +1449,56 @@ class QPathLineItem(QtWidgets.QWidget):
         self._data = value
 
 
+class ButtonStateWidget(QtWidgets.QWidget):
+    ''' visualizes the state of a button '''
+    
+    def __init__(self, parent = None):
+        super().__init__(parent)
+        icon_size = QtCore.QSize(16,16)
+        self._button_widget = QtWidgets.QLabel()
+        self._button_widget.setContentsMargins(0,0,0,0)
+        on_icon = load_icon("mdi.record",use_qta=True,qta_color="red")
+        self._on_pixmap = on_icon.pixmap(icon_size)
+        off_icon = load_icon("mdi.record",use_qta=True,qta_color="#979EA8")
+        self._off_pixmap = off_icon.pixmap(icon_size)
+        self.main_layout = QtWidgets.QHBoxLayout(self)
+        self.main_layout.addWidget(self._button_widget)
+        self.setContentsMargins(0,0,0,0)
+
+        
+    def hookDevice(self, device_guid, input_id):
+        ''' hooks an axis '''
+        self._device_guid = device_guid
+        self._input_id = input_id
+        
+
+        # read the current value
+        is_pressed = gremlin.joystick_handling.dinput.DILL().get_button(device_guid, input_id)
+        eh = gremlin.event_handler.EventListener()
+        eh.joystick_event.connect(self._event_handler)
+        self._update_value(is_pressed)
+
+    def unhookDevice(self):
+        eh = gremlin.event_handler.EventListener()
+        eh.joystick_event.disconnect(self._event_handler)
+
+    def _event_handler(self, event):
+        if gremlin.shared_state.is_running or event.is_axis:
+            return
+        if self._device_guid != event.device_guid or self._input_id != event.identifier:
+            return
+        self._update_value(event.is_pressed)
+
+    def _update_value(self, is_pressed):
+        if is_pressed:
+            self._button_widget.setPixmap(self._on_pixmap)
+            #self._button_widget.setText("pressed")
+        else:
+            self._button_widget.setPixmap(self._off_pixmap)
+            #self._button_widget.setText(" ")
+
+
+
 
 class AxisStateWidget(QtWidgets.QWidget):
 
