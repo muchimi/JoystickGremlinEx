@@ -50,51 +50,6 @@ class ActivationRule(enum.Enum):
     Any = 2
 
 
-class InputType(enum.Enum):
-
-    """Enumeration of possible input types."""
-
-    Keyboard = 1
-    JoystickAxis = 2
-    JoystickButton = 3
-    JoystickHat = 4
-    Mouse = 5
-    VirtualButton = 6
-
-    @staticmethod
-    def to_string(value: InputType) -> str:
-        try:
-            return _InputType_to_string_lookup[value]
-        except KeyError:
-            raise gremlin.error.GremlinError("Invalid type in lookup")
-
-    @staticmethod
-    def to_enum(value: str) -> InputType:
-        try:
-            return _InputType_to_enum_lookup[value]
-        except KeyError:
-            raise gremlin.error.GremlinError("Invalid type in lookup")
-
-
-_InputType_to_string_lookup = {
-    InputType.JoystickAxis: "axis",
-    InputType.JoystickButton: "button",
-    InputType.JoystickHat: "hat",
-    InputType.Keyboard: "key",
-    InputType.Mouse: "mouse",
-    InputType.VirtualButton: "virtual_button"
-}
-
-_InputType_to_enum_lookup = {
-    "axis": InputType.JoystickAxis,
-    "button": InputType.JoystickButton,
-    "hat": InputType.JoystickHat,
-    "key": InputType.Keyboard,
-    "mouse": InputType.Mouse,
-    "virtual_button": InputType.VirtualButton,
-
-}
-
 
 class AxisNames(enum.Enum):
 

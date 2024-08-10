@@ -489,14 +489,14 @@ class SimconnectOptionsUi(QtWidgets.QDialog):
         # make modal
         self.setWindowModality(QtCore.Qt.ApplicationModal)
 
-        min_min_sp = QtWidgets.QSizePolicy(
-            QtWidgets.QSizePolicy.Minimum,
-            QtWidgets.QSizePolicy.Minimum
-        )
-        exp_min_sp = QtWidgets.QSizePolicy(
-            QtWidgets.QSizePolicy.MinimumExpanding,
-            QtWidgets.QSizePolicy.Minimum
-        )        
+        # min_min_sp = QtWidgets.QSizePolicy(
+        #     QtWidgets.QSizePolicy.Minimum,
+        #     QtWidgets.QSizePolicy.Minimum
+        # )
+        # exp_min_sp = QtWidgets.QSizePolicy(
+        #     QtWidgets.QSizePolicy.MinimumExpanding,
+        #     QtWidgets.QSizePolicy.Minimum
+        # )        
 
         # Actual configuration object being managed
         self.config = gremlin.config.Configuration()
@@ -1500,11 +1500,15 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         self.action_data : MapToSimConnect = action
         self.command = action.command # the command to execute
         self.value = action.value # the value to send (None if no data to send)
-        self.sm = SimConnectData()
-        self.block = self.sm.block(self.command)
+        self.sm = None
+
     
     def profile_start(self):
         ''' occurs when the profile starts '''
+        if self.sm is None:
+            self.sm = SimConnectData()
+            self.block = self.sm.block(self.command)
+
         self.sm.sim_connect()
         self.action_data.gate_data.process_callback = self.process_gated_event
         
@@ -1640,6 +1644,9 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         # invert axis input (axis inputs only)
         self.invert_axis = False
 
+    def display_name(self):
+        ''' returns a string for this action for display purposes '''
+        return f"Command: {self.command}  Mode: [{self.mode.name}]"
       
 
     def icon(self):

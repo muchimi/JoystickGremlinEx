@@ -469,7 +469,7 @@ class MapToMouse(gremlin.base_profile.AbstractAction):
         # Flag whether or not this is mouse motion or button press
         self.motion_input = False
         # Mouse button enum
-        self.button_id = gremlin.types.MouseButton.Left
+        self.button_id = MouseButton.Left
         # Angle of motion, 0 is up and 90 is right, etc.
         self.direction = 0
         # Minimum motion speed in pixels / sec
@@ -479,6 +479,10 @@ class MapToMouse(gremlin.base_profile.AbstractAction):
         # Time to reach maximum speed in sec
         self.time_to_max_speed = 1.0
 
+    def display_name(self):
+        ''' returns a display string for the current configuration '''
+        return f"[{self.button_id.name}]"
+    
     def icon(self):
         """Returns the icon to use for this action.
 

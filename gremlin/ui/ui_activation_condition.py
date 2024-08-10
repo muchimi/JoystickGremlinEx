@@ -261,30 +261,9 @@ class KeyboardConditionWidget(AbstractConditionWidget):
         if self.condition_data.input_item:
             sequence = self.condition_data.input_item.sequence
         self._keyboard_dialog = InputKeyboardDialog(sequence = sequence, parent = self, select_single = False, index = -1)
+        self._keyboard_dialog.setModal(True)
         self._keyboard_dialog.accepted.connect(self._dialog_ok_cb)
         self._keyboard_dialog.showNormal()  
-
-
-        # self.button_press_dialog = ui_common.InputListenerWidget(
-        #     self._key_pressed_cb,
-        #     [InputType.Keyboard],
-        #     return_kb_event=True,
-        #     multi_keys=False
-        # )
-
-        # # Display the dialog centered in the middle of the UI
-        # root = self
-        # while root.parent():
-        #     root = root.parent()
-        # geom = root.geometry()
-
-        # self.button_press_dialog.setGeometry(
-        #     int(geom.x() + geom.width() / 2 - 150),
-        #     int(geom.y() + geom.height() / 2 - 75),
-        #     300,
-        #     150
-        # )
-        # self.button_press_dialog.show()
 
     def _dialog_ok_cb(self):
         ''' callled when the dialog completes '''

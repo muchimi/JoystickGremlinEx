@@ -172,6 +172,10 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         self.sound_file = None
         self.volume = 50
 
+    def display_name(self):
+        ''' returns a display string for the current configuration '''
+        return f"Play: [{self.sound_file}]"
+
     def requires_virtual_button(self):
         return self.get_input_type() in [
             InputType.JoystickAxis,

@@ -69,6 +69,7 @@ import gremlin.control_action
 import gremlin.tts
 
 from gremlin.util import log_sys_error, compare_path
+import gremlin.util
 
 
 
@@ -327,9 +328,9 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.modal_windows["calibration"] = \
             gremlin.ui.axis_calibration.CalibrationUi()
         self.modal_windows["calibration"].show()
-        gremlin.shared_state.set_suspend_input_highlighting(True)
+        gremlin.shared_state.push_suspend_highlighting()
         self.modal_windows["calibration"].closed.connect(
-            lambda: gremlin.shared_state.set_suspend_input_highlighting(False)
+            lambda: gremlin.shared_state.pop_suspend_highlighting()
         )
         self.modal_windows["calibration"].closed.connect(
             lambda: self._remove_modal_window("calibration")
@@ -387,13 +388,14 @@ class GremlinUi(QtWidgets.QMainWindow):
         """Opens the options dialog."""
         self.modal_windows["options"] = gremlin.ui.dialogs.OptionsUi()
         self.modal_windows["options"].setWindowModality(QtCore.Qt.ApplicationModal)
-        self.modal_windows["options"].show()
         self.modal_windows["options"].closed.connect(
             lambda: self.apply_user_settings(ignore_minimize=True)
         )
         self.modal_windows["options"].closed.connect(
             lambda: self._remove_modal_window("options")
         )
+        self.modal_windows["options"].show()
+       
 
     def profile_creator(self):
         """Opens the UI used to create a profile from an existing one."""
@@ -412,9 +414,9 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.modal_windows["profile_creator"] = \
             gremlin.ui.profile_creator.ProfileCreator(profile_data)
         self.modal_windows["profile_creator"].show()
-        gremlin.shared_state.set_suspend_input_highlighting(True)
+        gremlin.shared_state.push_suspend_highlighting()
         self.modal_windows["profile_creator"].closed.connect(
-            lambda: gremlin.shared_state.set_suspend_input_highlighting(False)
+            lambda: gremlin.shared_state.pop_suspend_highlighting()
         )
         self.modal_windows["profile_creator"].closed.connect(
             lambda: self._remove_modal_window("profile_creator")
@@ -742,6 +744,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.ui.actionPDFCheatsheet.triggered.connect(
             lambda: self._create_cheatsheet()
         )
+        self.ui.actionViewInput.triggered.connect(lambda: self._view_input_map())
         self.ui.actionOptions.triggered.connect(self.options_dialog)
         self.ui.actionLogDisplay.triggered.connect(
             self.log_window
@@ -1127,13 +1130,17 @@ class GremlinUi(QtWidgets.QMainWindow):
 
             self.locked = True
 
-            if event.event_type == InputType.Keyboard:
-                # ignore keyboard inputs
+            if not event.event_type in ( InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat):
+                # ignore non joystick inputs
                 return
+            
             if self.runner.is_running() or self.current_mode is None:
                 return
-            if gremlin.shared_state.suspend_input_highlighting():
+            
+            if gremlin.shared_state.is_highlighting_suspended():
+                # skip if auto highlight of tabs/inputs is disabled
                 return
+            
             
 
             # Get device id of the event and check if this matches the currently
@@ -1510,6 +1517,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         :param file_format the format of the cheatsheet, html or pdf
         """
+        import gremlin.cheatsheet
         fname, _ = QtWidgets.QFileDialog.getSaveFileName(
             None,
             "Save cheatsheet",
@@ -1518,6 +1526,15 @@ class GremlinUi(QtWidgets.QMainWindow):
         )
         if len(fname) > 0:
             gremlin.cheatsheet.generate_cheatsheet(fname, self._profile)
+
+    def _view_input_map(self):
+        ''' display input map dialog '''
+        import gremlin.cheatsheet
+        import gremlin.util
+        dialog = gremlin.cheatsheet.ViewInput(parent = self)
+        dialog.setMinimumHeight(600)
+        gremlin.util.centerDialog(dialog)
+        dialog.show()
 
     def _create_load_profile_function(self, fname):
         """Creates a callback to load a specific profile.
@@ -1903,6 +1920,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
+    gremlin.shared_state.ui_ready = False
 
     # Path manging to ensure Gremlin starts independent of the CWD
     sys.path.insert(0, gremlin.util.userprofile_path())
@@ -2030,6 +2048,7 @@ if __name__ == "__main__":
 
     # Run UI
     syslog.info("GremlinEx UI launching")
+    gremlin.shared_state.ui_ready = True
     app.exec()
     syslog.info("GremlinEx UI terminated")
 

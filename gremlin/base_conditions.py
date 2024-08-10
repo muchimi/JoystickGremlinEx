@@ -295,17 +295,41 @@ class AbstractFunctor(metaclass=ABCMeta):
             execute it later on
         """
         import gremlin.event_handler
-        
-        # hook profile start/stop events to reset the functor
+        self._enabled = False
+        self._name = instance.name
         eh = gremlin.event_handler.EventListener()
-        eh.profile_start.connect(self._profile_start)
         eh.profile_stop.connect(self._profile_stop)
+
+    def setEnabled(self, value):
+        ''' enables or disables the functor - a disabled functor will not receive the start profile event nor will the process_event be called 
+        
+        This is done to make sure that functors only get called if the plugin is referenced in a profile's execution graph to avoid unecessary initializations
+        
+        '''
+        import gremlin.event_handler
+        if self._enabled == value:
+            return # nothing to do
+        self._enabled = value
+        eh = gremlin.event_handler.EventListener()
+        if value:
+            # hook profile start/stop events to reset the functor
+            eh.profile_start.connect(self._profile_start)
+            logging.getLogger("system").info(f"Functor: {self._name} enabled")
+        else:
+            eh.profile_start.disconnect(self._profile_start)
+
 
     def _profile_start(self):
         self.profile_start()
 
     def _profile_stop(self):
-        self.profile_stop()
+        if self._enabled:
+            self.profile_stop()
+            self._enabled = False # disable until the next start
+    
+    @property
+    def enabled(self):
+        return self._enabled
         
     @abstractmethod
     def process_event(self, event, value):
@@ -338,15 +362,13 @@ class AbstractContainerActionFunctor(AbstractFunctor):
         result = True
         for functor in self.action_data.functors:
             # only fire the appropriate type
-            result = functor.process_event(event, value)
-            if not result:
-                break
+            if functor.enabled:
+                # only fire if the functor is enabled (functor is enabled when the plugin is found in the execution structure when a profile starts)
+                result = functor.process_event(event, value)
+                if not result:
+                    break
 
         return result
-    
-    def profile_start(self):
-        ''' profile is started '''
-        self.action_data
     
 
 

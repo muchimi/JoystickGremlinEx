@@ -168,23 +168,10 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _populate_ui(self):
         """Populates the UI components."""
         text = "<b>Current key combination:</b> "
-        names = []
-        for code in self.action_data.keys:
-            if isinstance(code, tuple):
-                key = gremlin.keyboard.KeyMap.find(code[0], code[1])
-            elif isinstance(code, int):
-                key = gremlin.keyboard.KeyMap.find_virtual(code)
-            elif isinstance(code, Key):
-                key = code
-            else:
-                assert True, f"Don't know how to handle: {code}"
-            if key:
-                names.append(key.name)                
-
-
-        text += " + ".join(names)
-
+        text += f" + {self.action_data._get_display_keys()}"
         self.key_combination.setText(text)
+
+    
 
     def _update_keys(self, keys):
         """Updates the storage with a new set of keys.
@@ -367,6 +354,29 @@ class MapToKeyboardEx(gremlin.base_profile.AbstractAction):
         self.mode = KeyboardOutputMode.Both
         self.delay = 250 # delay between make/break in milliseconds
     
+
+    def _get_display_keys(self):
+        text = ''
+        names = []
+
+        for code in self.keys:
+            key = None
+            if isinstance(code, tuple):
+                key = gremlin.keyboard.KeyMap.find(code[0], code[1])
+            elif isinstance(code, int):
+                key = gremlin.keyboard.KeyMap.find_virtual(code)
+            elif isinstance(code, Key):
+                key = code
+            else:
+                assert True, f"Don't know how to handle: {code}"
+            if key:
+                names.append(key.name)                
+        text += " + ".join(names)
+        return text
+    
+    def display_name(self):
+        return self._get_display_keys()
+
 
     def icon(self):
         """Returns the icon to use for this action.

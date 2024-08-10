@@ -178,7 +178,7 @@ class InputListenerModel(QtCore.QObject):
         """
         # Ensure input highlighting is turned off, even if input request
         # dialogs are spawned in quick succession
-        shared_state.set_suspend_input_highlighting(True)
+        shared_state.push_suspend_highlighting()
 
         # Only react to events we're interested in
         if event.event_type not in self._event_types:

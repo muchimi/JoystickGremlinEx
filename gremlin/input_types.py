@@ -59,7 +59,12 @@ class InputType(enum.Enum):
         if not include_virtualbutton:
             data.remove(InputType.VirtualButton)
         return data
-
+    
+    @staticmethod
+    def to_display_name(value) -> str:
+        if value in _InputType_to_display_lookup.keys():
+            return _InputType_to_string_lookup[value]
+        return f"Unknown type: {value}"
 
 _InputType_to_string_lookup = {
     InputType.NotSet: "none",
@@ -72,6 +77,17 @@ _InputType_to_string_lookup = {
     InputType.Midi: "midi",
 }
 
+_InputType_to_display_lookup = {
+    InputType.JoystickAxis: "Axis",
+    InputType.JoystickButton: "Button",
+    InputType.JoystickHat: "Hat",
+    InputType.Keyboard: "Key",
+    InputType.KeyboardLatched: "Latched Key",
+    InputType.OpenSoundControl: "OSC",
+    InputType.Midi: "MIDI",
+}
+
+
 _InputType_to_enum_lookup = {
     "none": InputType.NotSet,
     "axis": InputType.JoystickAxis,
@@ -82,3 +98,4 @@ _InputType_to_enum_lookup = {
     "osc": InputType.OpenSoundControl,
     "midi": InputType.Midi
 }
+

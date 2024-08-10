@@ -77,6 +77,10 @@ class ResumeAction(gremlin.base_profile.AbstractAction):
     def __init__(self, parent):
         super().__init__(parent)
 
+    def display_name(self):
+        ''' returns a display string for the current configuration '''
+        return "Resume"
+
     def requires_virtual_button(self):
         return self.get_input_type() in [
             InputType.JoystickAxis,

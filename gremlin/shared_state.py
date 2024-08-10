@@ -30,6 +30,7 @@ root_path = None # root path
 # Flag indicating whether or not input highlighting should be
 # prevented even if it is enabled by the user
 _suspend_input_highlighting = False
+_suspend_input_highlighting_enabled = 0
 
 # Timer used to disable input highlighting with a delay
 _suspend_timer = None
@@ -38,6 +39,8 @@ _suspend_timer = None
 current_profile = None
 
 current_mode = None
+
+ui_ready = False
 
 # holds the main UI reference
 ui = None
@@ -78,15 +81,17 @@ def pop_suspend_ui_keyinput():
     if _suspend_ui_keyinput > 0:
         _suspend_ui_keyinput -= 1
 
-def suspend_input_highlighting():
+def is_highlighting_suspended():
     """Returns whether or not input highlighting is suspended.
 
-    :return True if input's are not automatically selected, False otherwise
+    :return True if input highlighting is SUSPENDED
     """
-    return _suspend_input_highlighting
+    global _suspend_input_highlighting, _suspend_input_highlighting_enabled
+    suspended = not ui_ready and _suspend_input_highlighting or _suspend_input_highlighting_enabled > 0
+    return suspended
 
 
-def set_suspend_input_highlighting(value):
+def _set_input_highlighting_state(value):
     """Sets the input highlighting behaviour.
 
     :param value if True disables automatic selection of used inputs, if False
@@ -98,6 +103,33 @@ def set_suspend_input_highlighting(value):
     _suspend_input_highlighting = value
 
 
+
+def push_suspend_highlighting():
+    ''' push a suspend state '''
+    global _suspend_input_highlighting_enabled
+    if _suspend_input_highlighting_enabled == 0:
+        _set_input_highlighting_state(False)
+    _suspend_input_highlighting_enabled += 1
+    
+
+def pop_suspend_highlighting(force = False):
+    ''' pops a suspend state
+     
+    :param: force = forces a reset (enables)
+       
+    '''
+    global _suspend_input_highlighting_enabled
+    if _suspend_input_highlighting_enabled > 0:
+        _suspend_input_highlighting_enabled -= 1
+    if force:
+        _suspend_input_highlighting_enabled = 0
+    if _suspend_input_highlighting_enabled == 0:
+        _set_input_highlighting_state(False)
+    
+
+
+    
+
 def delayed_input_highlighting_suspension():
     """Disables input highlighting with a delay."""
     global _suspend_timer
@@ -106,7 +138,7 @@ def delayed_input_highlighting_suspension():
 
     _suspend_timer = threading.Timer(
             2,
-            lambda: set_suspend_input_highlighting(False)
+            lambda: pop_suspend_highlighting()
     )
     _suspend_timer.start()
 

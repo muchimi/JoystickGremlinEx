@@ -86,6 +86,10 @@ class SwitchMode(gremlin.base_profile.AbstractAction):
         super().__init__(parent)
         self.mode_name = ""
 
+    def display_name(self):
+        ''' returns a display string for the current configuration '''
+        return f"Switch to: {self.mode_name}"
+
     def icon(self):
         return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
     

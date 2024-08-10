@@ -32,6 +32,11 @@ class PauseActionWidget(gremlin.ui.input_item.AbstractActionWidget):
         super().__init__(action_data, parent=parent)
         assert(isinstance(action_data, PauseAction))
 
+
+    def display_name(self):
+        ''' returns a display string for the current configuration '''
+        return "Pause Action"
+
     def _create_ui(self):
         self.label = QtWidgets.QLabel("Pauses callback execution")
         self.main_layout.addWidget(self.label)

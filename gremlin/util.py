@@ -1058,3 +1058,44 @@ def centerDialog(dialog, width = 300, height = 150):
         width,
         height
     )
+
+
+def swapext(path, ext = None, prefix= '', suffix = ''):
+    ''' replaces a file extension with a different one with an additional prefix / suffix'''
+    dirname, filename = os.path.split(path)
+    base, old_ext = os.path.splitext(filename)
+    if ext:
+        if ext != '' and not ext.startswith('.'):
+            ext = "." + ext
+    else:
+        ext = old_ext
+    if dirname:
+        return os.path.join(dirname, prefix + base + suffix + ext).lower()
+    return (prefix + base + suffix + ext).lower()
+
+def get_ext(path):
+    # gets an extension
+    _, filename = os.path.split(path)
+    _, ext = os.path.splitext(filename)
+    if ext:
+        return ext.lower()
+    return None
+
+def strip_ext(path):
+    if path:
+        tokens = path.split(".")
+        return tokens[0]
+    return ''
+
+def swap_ext(path, ext = None, prefix= '', suffix = ''):
+    return swapext(path, ext, prefix, suffix)
+
+
+def display_file(path):
+    ''' opens a file in the current editor associated with the extension '''
+    import subprocess
+    import webbrowser
+    if os.path.isfile(path):
+        webbrowser.open(path)
+    else:
+        logging.getLogger("system").error(f"DISPLAYFILE: warning: file not found: {path}")    

@@ -32,6 +32,10 @@ class NoOpActionWidget(AbstractActionWidget):
         super().__init__(action_data, parent=parent)
         assert(isinstance(action_data, NoOpAction))
 
+    def display_name(self):
+        ''' returns a display string for the current configuration '''
+        return "Noop"
+
     def _create_ui(self):
         self.label = QtWidgets.QLabel("NoOp")
         self.main_layout.addWidget(self.label)

@@ -133,6 +133,10 @@ class TextToSpeech(gremlin.base_profile.AbstractAction):
         self.volume = 100
         self.rate = 0
 
+    def display_name(self):
+        ''' returns a display string for the current configuration '''
+        return f"Say: [{self.text}]"        
+
     def icon(self):
         return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
 

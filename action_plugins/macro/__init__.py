@@ -93,6 +93,11 @@ class Macro(gremlin.base_profile.AbstractAction):
         self.repeat = None
         self.force_remote = False
 
+    def display_name(self):
+        ''' returns a display string for the current configuration '''
+        #TODO: build something more meaningful
+        return f"Macro sequence"
+
     def icon(self):
         return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
 

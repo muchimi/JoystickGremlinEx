@@ -38,7 +38,7 @@ import gremlin.ui
 import gremlin.ui.ui_about as ui_about
 import gremlin.ui.ui_common as ui_common
 
-from gremlin.util import load_icon, userprofile_path, load_pixmap
+from gremlin.util import load_icon, userprofile_path, load_pixmap, pushCursor, popCursor
 import logging
 from gremlin.input_types import InputType
 import gremlin.base_profile
@@ -243,6 +243,7 @@ class OptionsUi(ui_common.BaseDialogUi):
             else:
                 event.ignore()
 
+        
             
 
     def _save_on_close_cb(self):
@@ -250,6 +251,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         self._save_map_cb()
         eh = gremlin.event_handler.EventListener()
         eh.config_changed.emit()
+
 
     def _tab_changed_cb(self, new_index):
         ''' occurs on tab change, save the last used tab index so we can restore it later '''
@@ -1048,10 +1050,12 @@ This setting is also available on a profile by profile basis on the profile tab,
 
     def _save_map_cb(self):
         ''' saves the current mappings and options '''
+        pushCursor()
         for item in self._profile_mapper.items():
             item.save()
 
         self._profile_mapper.save_profile_map()
+        popCursor()
 
     def populate_map(self):
         ''' populates the map of executables to profiles '''
@@ -1400,11 +1404,13 @@ class ProcessWindow(ui_common.BaseDialogUi):
         self.close()
 
 
+
     def _selection_changed(self, index):
         self._current_selection_qindex = index
 
     def _select(self):
         """Emits the process_signal when the select button is pressed."""
+        
         self.process_selected.emit(self.list_view.currentIndex().data())
         self.close()
 

@@ -898,7 +898,6 @@ class InputListenerWidget(QtWidgets.QFrame):
         :param parent the parent widget of this widget
         """
         super().__init__(parent)
-        from gremlin.shared_state import set_suspend_input_highlighting
         from gremlin.keyboard import key_from_code, key_from_name
         self._event_types = event_types
         self._return_kb_event = return_kb_event
@@ -924,9 +923,10 @@ class InputListenerWidget(QtWidgets.QFrame):
         palette = QtGui.QPalette()
         palette.setColor(QtGui.QPalette.ColorRole.Window, QtGui.QColorConstants.DarkGray)
         self.setPalette(palette)
+        
 
         # Disable ui input selection on joystick input
-        set_suspend_input_highlighting(True)
+        gremlin.shared_state.push_suspend_highlighting()
 
         # Start listening to user key presses
         event_listener = gremlin.event_handler.EventListener()
@@ -948,10 +948,6 @@ class InputListenerWidget(QtWidgets.QFrame):
 
         :param event the keypress event to be processed
         """
-        # Ensure input highlighting is turned off, even if input request
-        # dialogs are spawned in quick succession
-        gremlin.shared_state.set_suspend_input_highlighting(True)
-
         # Only react to events we're interested in
         if event.event_type not in self._event_types:
             return
@@ -1050,17 +1046,15 @@ class InputListenerWidget(QtWidgets.QFrame):
         elif InputType.Mouse in self._event_types:
             event_listener.mouse_event.disconnect(self._mouse_event_cb)
 
-        
         # Stop mouse hook in case it is running
         gremlin.windows_event_hook.MouseHook().stop()
 
-        # Delay un-suspending input highlighting to allow an axis that's being
-        # moved to return to its center without triggering an input highlight
-        gremlin.shared_state.delayed_input_highlighting_suspension()
+        # restore highlighting
+        gremlin.shared_state.pop_suspend_highlighting()
 
         # print ("input widget close")
         super().closeEvent(evt)
-        #self.destroy(True)
+        
 
 
     def _valid_event_types_string(self):

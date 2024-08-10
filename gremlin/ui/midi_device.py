@@ -616,7 +616,7 @@ class MidiInputListenerWidget(QtWidgets.QFrame):
         self.setPalette(palette)
 
         # Disable ui input selection on joystick input
-        set_suspend_input_highlighting(True)
+        push_suspend_highlighting()
 
         # listen for the escape key
         event_listener = gremlin.event_handler.EventListener()

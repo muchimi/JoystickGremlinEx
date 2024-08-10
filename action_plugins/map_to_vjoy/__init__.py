@@ -2025,28 +2025,23 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         self.start_pressed = False # true if a button starts as pressed when the profile is loaded
         self.target_value = 0.0
         self.target_value_valid = True
+
+    def display_name(self):
+        ''' display name for this action '''
+        if self.action_mode == VjoyAction.VJoyAxis:
+            return f"VJoy #{self._vjoy_device_id} Axis: {self.vjoy_axis_id}"            
+        elif self.action_mode == VjoyAction.VJoyButton:
+            return f"VJoy #{self._vjoy_device_id} Button: {self.vjoy_button_id}"
+        elif self.action_mode == VjoyAction.VJoyHat:
+            return f"VJoy #{self._vjoy_device_id} Hat: {self.vjoy_hat_id}"
+        else:
+            return f"VJoy #{self._vjoy_device_id} Mode: {self.action_mode}"
+        
         
     def input_is_axis(self):
         ''' true if the input is an axis type input '''
         is_axis = hasattr(self.hardware_input_id, "is_axis") and self.hardware_input_id.is_axis
         return is_axis or self.input_type == InputType.JoystickAxis
-            
-        
-
-
-    # @property
-    # def merge_device_b_guid(self):
-    #     return self._merge_device_b_guid
-    # @merge_device_b_guid.setter
-    # def merge_device_b_guid(self, value):
-    #     self._merge_device_b_guid = value        
-
-    # @property
-    # def merge_device_b_axis(self):
-    #     return self._merge_device_b_axis 
-    # @merge_device_b_axis.setter
-    # def merge_device_b_axis(self, value):
-    #     self._merge_device_b_axis = value
 
     @property
     def exec_on_release(self):

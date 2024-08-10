@@ -899,6 +899,10 @@ class AbstractAction(ProfileData):
         ''' type name of this action '''
         return self._action_type
     
+    def display_name(self):
+        ''' display name for this action '''
+        return "N/A"
+    
 
     def from_xml(self, node):
         """Populates the instance with data from the given XML node.
@@ -2391,14 +2395,16 @@ class ContainerExecutionGraph(AbstractExecutionGraph):
             )
             sequence.append("Condition")
 
+
+
         functor = container.functor(container)
+        functor.setEnabled(True)
         container_plugins = gremlin.plugin_manager.ContainerPlugins()
         container_plugins.register_functor(functor)
 
         functors.append(functor)
 
         self.functors = functors
-
         
         sequence.append("Action")
 

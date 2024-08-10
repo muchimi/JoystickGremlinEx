@@ -1619,7 +1619,7 @@ class MacroWidget(QtWidgets.QWidget):
             gremlin.windows_event_hook.MouseHook().start()
 
             # Record keystrokes
-            gremlin.shared_state.set_suspend_input_highlighting(True)
+            gremlin.shared_state.push_suspend_highlighting()
             self._recording = True
             el = gremlin.event_handler.EventListener()
             el.joystick_event.connect(self._create_joystick_action)
@@ -1627,7 +1627,7 @@ class MacroWidget(QtWidgets.QWidget):
             el.mouse_event.connect(self._create_mouse_action)
         else:
             # Stop recording keystrokes
-            gremlin.shared_state.set_suspend_input_highlighting(False)
+            gremlin.shared_state.pop_suspend_highlighting()
             self._recording = False
             el = gremlin.event_handler.EventListener()
             el.joystick_event.disconnect(self._create_joystick_action)

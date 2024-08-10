@@ -20,6 +20,7 @@ import gremlin.ui.input_item
 import gremlin.sendinput
 from gremlin import input_devices
 
+
 import enum, threading,time, random
 
 
@@ -795,7 +796,7 @@ class MapToMouseEx(gremlin.base_profile.AbstractAction):
         # Flag whether or not this is mouse motion or button press
         self.motion_input = False
         # Mouse button enum
-        self.button_id = gremlin.types.MouseButton.Left
+        self.button_id = MouseButton.Left
         # Angle of motion, 0 is up and 90 is right, etc.
         self.direction = 0
         # Minimum motion speed in pixels / sec
@@ -814,6 +815,10 @@ class MapToMouseEx(gremlin.base_profile.AbstractAction):
 
         self.click_mode = MouseClickMode.Normal
 
+
+    def display_name(self):
+        ''' returns a display string for the current configuration '''
+        return f"[{self.button_id.name}]"
 
     def icon(self):
         """Returns the icon to use for this action.
