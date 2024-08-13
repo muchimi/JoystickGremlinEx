@@ -73,7 +73,7 @@ class TogglePauseAction(gremlin.base_profile.AbstractAction):
 
     def __init__(self, parent):
         super().__init__(parent)
-
+        self.parent = parent
 
     def display_name(self):
         ''' returns a display string for the current configuration '''

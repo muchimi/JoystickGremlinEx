@@ -78,6 +78,7 @@ class PauseAction(gremlin.base_profile.AbstractAction):
 
     def __init__(self, parent):
         super().__init__(parent)
+        self.parent = parent
 
     def icon(self):
         return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"

@@ -54,7 +54,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
         """
         super().__init__(parent)
 
-        self.item_data = item_data
+        self.item_data : gremlin.base_profile.InputItem = item_data
 
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
@@ -71,11 +71,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
             # only draw description if not a sub action item
             self._create_description()
         
-        item = self.item_data
-        while item.parent and not isinstance(item, gremlin.base_profile.Device):
-            item = item.parent
-
-        if isinstance(item, gremlin.base_profile.Device) and item.type == DeviceType.VJoy:
+        if self.item_data.device_type == DeviceType.VJoy:
             self._create_vjoy_dropdowns()
         else:
             self._create_dropdowns()
@@ -411,7 +407,7 @@ class JoystickDeviceTabWidget(QtWidgets.QWidget):
         # the main layout has a left input selection panel and a right configuration panel, two widgets, the last one is always the configuration panel
         self.main_layout = QtWidgets.QHBoxLayout(self)
         self.left_panel_layout = QtWidgets.QVBoxLayout()
-        self.device_profile.ensure_mode_exists(self.current_mode, self.device)
+        self.device_profile.ensure_mode_exists(current_mode, self.device)
 
         # List of inputs
         self.input_item_list_model = input_item.InputItemListModel(

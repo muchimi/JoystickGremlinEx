@@ -350,6 +350,7 @@ class MapToKeyboardEx(gremlin.base_profile.AbstractAction):
         :param parent the container this action is part of
         """
         super().__init__(parent)
+        self.parent = parent
         self.keys = []
         self.mode = KeyboardOutputMode.Both
         self.delay = 250 # delay between make/break in milliseconds

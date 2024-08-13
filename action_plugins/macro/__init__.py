@@ -88,6 +88,7 @@ class Macro(gremlin.base_profile.AbstractAction):
         :param parent the parent profile.ItemAction of this macro action
         """
         super().__init__(parent)
+        self.parent = parent
         self.sequence = []
         self.exclusive = False
         self.repeat = None

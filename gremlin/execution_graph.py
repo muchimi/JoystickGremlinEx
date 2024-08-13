@@ -179,21 +179,24 @@ class AbstractExecutionGraph(metaclass=ABCMeta):
 
         while self.current_index is not None and len(self.functors) > 0:
             functor = self.functors[self.current_index]
+            if functor.enabled:
+                result = functor.process_event(event, value)
+                if result is None or not result and not isinstance(functor, gremlin.actions.ActivationCondition):
+                    logging.getLogger("system").warning(f"Process event returned no data or FALSE - functor: {type(functor).__name__}")
 
-            result = functor.process_event(event, value)
+                if isinstance(functor, gremlin.actions.AxisButton):
+                    process_again = functor.forced_activation
 
-            if isinstance(functor, gremlin.actions.AxisButton):
-                process_again = functor.forced_activation
-
-            self.current_index = self.transitions.get(
-                (self.current_index, result),
-                None
+                self.current_index = self.transitions.get(
+                    (self.current_index, result),
+                    None
             )
         self.current_index = 0
 
         if process_again:
             time.sleep(0.05)
             self.process_event(event, value)
+        return True
 
     @abstractmethod
     def _build_graph(self, instance):
@@ -313,6 +316,11 @@ class ContainerExecutionGraph(AbstractExecutionGraph):
             sequence.append("Condition")
 
         functor = container.functor(container)
+        verbose = gremlin.config.Configuration().verbose
+        if verbose:
+            logging.getLogger("system").info(f"Enable functor: {type(functor).__name__}")
+        functor.setEnabled(True)
+
         container_plugins = gremlin.plugin_manager.ContainerPlugins()
         container_plugins.register_functor(functor)
         self.functors.append(functor)
@@ -425,7 +433,9 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
                 sequence.append("Condition")
 
             # Create action functor
-            self.functors.append(action.functor(action))
+            functor = action.functor(action)
+            functor.setEnabled(True)
+            self.functors.append(functor)
             sequence.append("Action")
 
         self._create_transitions(sequence)

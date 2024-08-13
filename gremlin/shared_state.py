@@ -17,6 +17,27 @@
 
 
 import threading
+import sys
+
+def module_property(func):
+    """Decorator to turn module functions into properties.
+    Function names must be prefixed with an underscore."""
+    module = sys.modules[func.__module__]
+
+    def base_getattr(name):
+        raise AttributeError(
+            f"module '{module.__name__}' has no attribute '{name}'")
+
+    old_getattr = getattr(module, '__getattr__', base_getattr)
+
+    def new_getattr(name):
+        if f'_{name}' == func.__name__:
+            return func()
+        else:
+            return old_getattr(name)
+
+    module.__getattr__ = new_getattr
+    return func
 
 
 """Stores global state that needs to be shared between various
@@ -38,7 +59,13 @@ _suspend_timer = None
 # Holds the currently active profile
 current_profile = None
 
-current_mode = None
+@module_property
+def _current_mode():
+    import gremlin.event_handler
+    return gremlin.event_handler.EventHandler().active_mode
+
+
+
 
 ui_ready = False
 

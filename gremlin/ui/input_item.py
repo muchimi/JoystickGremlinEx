@@ -444,7 +444,7 @@ class InputItemListView(ui_common.AbstractView):
                     data.input_type,
                     data.device_guid,
                     data.input_id,
-                    data.parent.parent.type
+                    data.device_type,
                 )
 
                 if self.custom_widget_handler:
@@ -1290,9 +1290,9 @@ class ContainerSelector(QtWidgets.QWidget):
         self.paste_button.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Minimum)
         self.paste_button.setToolTip("Paste container")
 
-        clipboard = Clipboard()
-        clipboard.clipboard_changed.connect(self._clipboard_changed)
-        self._clipboard_changed(clipboard)
+        # clipboard = Clipboard()
+        # clipboard.clipboard_changed.connect(self._clipboard_changed)
+        # self._clipboard_changed(clipboard)
 
 
         self.main_layout.addWidget(self.container_dropdown)

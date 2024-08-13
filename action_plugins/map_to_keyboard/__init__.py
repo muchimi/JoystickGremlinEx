@@ -155,6 +155,7 @@ class MapToKeyboard(gremlin.base_profile.AbstractAction):
         """
         super().__init__(parent)
         self.keys = []
+        self.parent = parent
 
     def icon(self):
         """Returns the icon to use for this action.

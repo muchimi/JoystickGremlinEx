@@ -92,15 +92,15 @@ class SimconnectAicraftDefinition():
         ''' true if the item contains valid data '''
         return not self.error_status and self.aircraft and self.mode    
     
-    def __eq__(self, other):
-        ''' compares two objects '''
-        return gremlin.util.compare_nocase(self.icao_type, other.icao_type) and \
-            gremlin.util.compare_nocase(self.icao_manufacturer, other.icao_manufacturer) and \
-            gremlin.util.compare_nocase(self.icao_manufacturer, other.icao_manufacturer) and \
-            gremlin.util.compare_nocase(self.icao_model, other.icao_model)
+    # def __eq__(self, other):
+    #     ''' compares two objects '''
+    #     return gremlin.util.compare_nocase(self.icao_type, other.icao_type) and \
+    #         gremlin.util.compare_nocase(self.icao_manufacturer, other.icao_manufacturer) and \
+    #         gremlin.util.compare_nocase(self.icao_manufacturer, other.icao_manufacturer) and \
+    #         gremlin.util.compare_nocase(self.icao_model, other.icao_model)
     
-    def __hash__(self):
-        return (self.icao_type.lower(), self.icao_manufacturer.lower(), self.icao_model.lower()).__hash__()
+    # def __hash__(self):
+    #     return (self.icao_type.lower(), self.icao_manufacturer.lower(), self.icao_model.lower()).__hash__()
    
     
 class SimconnectSortMode(Enum):
@@ -1501,21 +1501,27 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         self.command = action.command # the command to execute
         self.value = action.value # the value to send (None if no data to send)
         self.sm = None
+        eh = gremlin.event_handler.EventListener()
+        eh.profile_start.connect(self.profile_start)
+        eh.profile_stop.connect(self.profile_stop)
 
     
     def profile_start(self):
         ''' occurs when the profile starts '''
-        if self.sm is None:
-            self.sm = SimConnectData()
-            self.block = self.sm.block(self.command)
+        if self.enabled:
+            if self.sm is None:
+                self.sm = SimConnectData()
+                self.block = self.sm.block(self.command)
 
-        self.sm.sim_connect()
-        self.action_data.gate_data.process_callback = self.process_gated_event
+            self.sm.sim_connect()
+            self.action_data.gate_data.process_callback = self.process_gated_event
         
 
     def profile_stop(self):
         ''' occurs wen the profile stops'''
-        self.sm.sim_disconnect()
+        if self.enabled:
+            if not self.sm is None:
+                self.sm.sim_disconnect()
     
 
     def scale_output(self, value):
@@ -1616,6 +1622,7 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
 
         super().__init__(parent)
         self.sm = SimConnectData()
+        self.parent = parent
 
         # the current command category if the command is an event
         self.category = SimConnectEventCategory.NotSet

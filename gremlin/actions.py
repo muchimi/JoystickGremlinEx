@@ -115,6 +115,7 @@ class ActivationCondition:
     def __init__(self, conditions, rule):
         self._conditions = conditions
         self._rule = rule
+        self.enabled = True # always enabled
 
     def process_event(self, event, value):
         """Returns whether or not a condition is satisfied, i.e. true.

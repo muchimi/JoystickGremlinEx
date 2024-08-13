@@ -301,6 +301,7 @@ class ActionPlugins:
         ''' duplicates an action and gives it a unique ID '''
         from gremlin.util import get_guid
         dup = copy.deepcopy(action)
+        dup.parent = action.parent
         dup.action_id = get_guid()
         return dup
     

@@ -285,7 +285,8 @@ class EventListener(QtCore.QObject):
 		''' processes an item the keyboard buffer queue '''
 		item, is_pressed = self._keyboard_queue.get()
 		verbose = gremlin.config.Configuration().verbose_mode_keyboard
-		print (f"process_queue: found item: {item} is presseD: {is_pressed}")
+		if verbose:
+			print (f"process_queue: found item: {item} is presseD: {is_pressed}")
 
 		if isinstance(item, int):
 			virtual_code = item
@@ -614,14 +615,17 @@ class EventHandler(QtCore.QObject):
 
 	"""Listens to the inputs from multiple different input devices."""
 
-	# Signal emitted when the mode is changed
-	mode_changed = QtCore.Signal(str)
+	
+	mode_changed = QtCore.Signal(str) # Signal emitted when the mode is changed at design time
+	runtime_mode_changed = QtCore.Signal(str)  # mode change specific to runtime
 
 	# signal emitted when the profile is changed
 	profile_changed = QtCore.Signal(str)
 
 	# Signal emitted when the application is pause / resumed
 	is_active = QtCore.Signal(bool)
+
+	
 
 	def __init__(self):
 		"""Initializes the EventHandler instance."""
@@ -938,73 +942,78 @@ class EventHandler(QtCore.QObject):
 		if new_profile != gremlin.shared_state.current_profile:
 			self.profile_change.emit(new_profile)
 
-	def change_mode(self, new_mode):
-		"""Changes the currently active mode.
+
+	def set_mode(self, new_mode):
+		''' update global mode '''
+		self._active_mode = new_mode
+
+
+	def change_mode(self, new_mode, emit = True):
+		"""Changes the GremlinEx currently active mode.
 
 		:param new_mode the new mode to use
 		"""
+		verbose = gremlin.config.Configuration().verbose
+		current_profile = gremlin.shared_state.current_profile
 
-		try:
-			current_profile = gremlin.shared_state.current_profile
-			if new_mode == gremlin.shared_state.current_mode:
-				# already in this mode
-				return
+		if verbose:
+			logging.getLogger("system").debug(f"EVENT: change mode to [{new_mode}] requested - current: [{self._active_mode}]  shared state mode: [{gremlin.shared_state.current_mode}] profile '{current_profile.name}'")
 
-			# this can take a while
-			gremlin.util.waitCursor()
 
-			logging.getLogger("system").debug(f"EVENT: change mode to [{new_mode}] requested - profile '{current_profile.name}")
+		if new_mode == self._active_mode:
+			# already in this mode
+			return
+		
+		mode_exists = new_mode in current_profile.get_modes()
 
-			mode_exists = new_mode in current_profile.get_modes()
+		
+		if not mode_exists:
+			for device in self.callbacks.values():
+				if new_mode in device:
+					mode_exists = True
 
+		if not mode_exists:
+			for device in self.osc_callbacks.values():
+				if new_mode in device:
+					mode_exists = True
+
+		if not mode_exists:
+			for device in self.midi_callbacks.values():
+				if new_mode in device:
+					mode_exists = True
+
+		if not mode_exists:
+			for device in self.latched_callbacks.values():
+				if new_mode in device:
+					mode_exists = True
 			
-			if not mode_exists:
-				for device in self.callbacks.values():
-					if new_mode in device:
-						mode_exists = True
+		if not mode_exists:
+			# import gremlin.config
+			# verbose = gremlin.config.Configuration().verbose
+			# if verbose:
+			logging.getLogger("system").warning(
+				f"The mode \"{new_mode}\" does not exist or has no associated callbacks - profile '{current_profile.name}'"
+			)
+			return
 
-			if not mode_exists:
-				for device in self.osc_callbacks.values():
-					if new_mode in device:
-						mode_exists = True
+		if self._active_mode != new_mode:
+			self._previous_mode = self._active_mode
+			# remember the last mode for this profile
+			current_profile.set_last_mode(self._active_mode)
+		
+		self._active_mode = new_mode
 
-			if not mode_exists:
-				for device in self.midi_callbacks.values():
-					if new_mode in device:
-						mode_exists = True
+		if gremlin.shared_state.is_running:
+			# runtime event (prevents UI from reloading)
+			logging.getLogger("system").debug(f"Profile: {current_profile.name} - Runtime Mode switch to: {new_mode}")
+			if emit:
+				self.runtime_mode_changed.emit(self._active_mode)	
+		else:
+			# non-runtime
+			logging.getLogger("system").debug(f"Profile: {current_profile.name} - Design time Mode switch to: {new_mode}")
+			if emit:
+				self.mode_changed.emit(self._active_mode)
 
-			if not mode_exists:
-				for device in self.latched_callbacks.values():
-					if new_mode in device:
-						mode_exists = True
-				
-			if not mode_exists:
-				# import gremlin.config
-				# verbose = gremlin.config.Configuration().verbose
-				# if verbose:
-				logging.getLogger("system").warning(
-					f"The mode \"{new_mode}\" does not exist or has no associated callbacks - profile '{current_profile.name}'"
-				)
-				return
-			
-
-
-			
-			if self._active_mode != new_mode:
-				self._previous_mode = self._active_mode
-				# remember the last mode for this profile
-				current_profile.set_last_mode(self._active_mode)
-
-
-			logging.getLogger("system").debug(f"Mode switch to: {new_mode}  Profile: {current_profile.name}")
-
-			self._active_mode = new_mode
-			self.mode_changed.emit(self._active_mode)
-
-		finally:
-
-			gremlin.util.popCursor()
-	
 
 	def resume(self):
 		"""Resumes the processing of callbacks."""
@@ -1029,7 +1038,7 @@ class EventHandler(QtCore.QObject):
 		self.osc_callbacks = {}
 
 	@QtCore.Slot(Event)
-	def process_event(self, event):
+	def process_event(self, event : Event):
 		"""Processes a single event by passing it to all callbacks
 		registered for this event.
 
@@ -1045,7 +1054,9 @@ class EventHandler(QtCore.QObject):
 
 		
 		
-		verbose = False
+		verbose = gremlin.config.Configuration().verbose
+		if verbose and event.event_type != InputType.JoystickAxis:
+			logging.getLogger("system").info(f"process event - mode [{self._active_mode}] event: {str(event)}")
 
 		# filter latched keyboard or mouse events
 		if event.event_type in (InputType.Keyboard, InputType.KeyboardLatched, InputType.Mouse):

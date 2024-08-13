@@ -87,6 +87,10 @@ class CodeRunner:
         self._inheritance_tree = inheritance_tree
         self._reset_state()
 
+        # indicate we're in run mode
+        self._running = True
+        gremlin.shared_state.is_running = True
+
         # clear any startup routines
         gremlin.input_devices.start_registry.clear()
         gremlin.input_devices.stop_registry.clear()
@@ -281,7 +285,7 @@ class CodeRunner:
 
             # Create vJoy response curve setups
             self._vjoy_curves.profile_data = profile.vjoy_devices
-            self.event_handler.mode_changed.connect(
+            self.event_handler.runtime_mode_changed.connect(
                 self._vjoy_curves.mode_changed
             )
 
@@ -365,7 +369,7 @@ class CodeRunner:
 
 
             # hook mode change callbacks
-            self.event_handler.mode_changed.connect(
+            self.event_handler.runtime_mode_changed.connect(
                 gremlin.input_devices.mode_registry.mode_changed
             )
 
@@ -384,7 +388,6 @@ class CodeRunner:
             gremlin.macro.MacroManager().start()
 
             # determine the profile start mode
-            verbose = True
             mode = start_mode
             if config.restore_profile_mode_on_start or profile.get_restore_mode():
                 # restore the profile mode 
@@ -397,29 +400,29 @@ class CodeRunner:
                         logging.getLogger("system").error(f"Unable to restore profile mode: '{mode}' no longer exists - using '{start_mode}' instead.")
                         mode = start_mode
 
-            
+
+            sendinput.MouseController().start()
+
+
             if not mode in mode_list:
                 logging.getLogger("system").error(f"Unable to select startup mode: '{mode}' no longer exists")
             else:                
                 if verbose:
                     logging.getLogger("system").info(f"Using profile start mode: '{mode}'")
                 self.event_handler.change_mode(mode)
-                
-            self._running = True
-            gremlin.shared_state.is_running = True
 
-            sendinput.MouseController().start()
 
-            # start listen
+           
+
+           # tell listener profiles are starting
+                       # start listen
             evt_listener.start()
 
-            # tell listener profiles are starting
             el = gremlin.event_handler.EventListener()
             el.profile_start.emit()
 
             #print ("resume!")
             self.event_handler.resume()
-
 
 
         except Exception as e:
@@ -433,6 +436,9 @@ class CodeRunner:
 
         if not self.is_running():
             return # nothing to do
+        
+        self._running = False
+        gremlin.shared_state.is_running = False
 
         el = gremlin.event_handler.EventListener()
         eh = gremlin.event_handler.EventHandler()
@@ -464,30 +470,22 @@ class CodeRunner:
 
         # Disconnect all signals
 
-        is_running = self._running
-        if is_running:
-            evt_lst = gremlin.event_handler.EventListener()
+        kb = gremlin.input_devices.Keyboard()
+        el.keyboard_event.disconnect(self.event_handler.process_event)
+        el.joystick_event.disconnect(self.event_handler.process_event)
+        el.virtual_event.disconnect(self.event_handler.process_event)
+        el.midi_event.disconnect(self.event_handler.process_event)
+        el.osc_event.disconnect(self.event_handler.process_event)
 
-            # tell listeners profile is stopping
-            evt_lst.profile_stop.emit()
-
-            kb = gremlin.input_devices.Keyboard()
-            evt_lst.keyboard_event.disconnect(self.event_handler.process_event)
-            evt_lst.joystick_event.disconnect(self.event_handler.process_event)
-            evt_lst.virtual_event.disconnect(self.event_handler.process_event)
-            evt_lst.midi_event.disconnect(self.event_handler.process_event)
-            evt_lst.osc_event.disconnect(self.event_handler.process_event)
-
-            evt_lst.keyboard_event.disconnect(kb.keyboard_event)
-            evt_lst.gremlin_active = False
-            self.event_handler.mode_changed.disconnect(
-                self._vjoy_curves.mode_changed
-            )
-            
+        el.keyboard_event.disconnect(kb.keyboard_event)
+        el.gremlin_active = False
+        self.event_handler.runtime_mode_changed.disconnect(
+            self._vjoy_curves.mode_changed
+        )
+        
 
 
-        self._running = False
-        gremlin.shared_state.is_running = False
+
 
 
         # Empty callback registry

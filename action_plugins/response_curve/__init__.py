@@ -1273,6 +1273,7 @@ class ResponseCurve(gremlin.base_profile.AbstractAction):
         :param parent the parent profile.InputItem of this instance
         """
         super().__init__(parent)
+        self.parent = parent
         self.deadzone = [-1, 0, 0, 1]
         self.sensitivity = 1.0
         self.mapping_type = "cubic-spline"

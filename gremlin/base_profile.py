@@ -8,8 +8,10 @@ import logging
 import time
 import gremlin.actions
 import gremlin.base_buttons
+import gremlin.base_profile
 import gremlin.config
 import gremlin.event_handler
+import gremlin.execution_graph
 import gremlin.profile
 import gremlin.shared_state
 from gremlin.util import *
@@ -40,6 +42,22 @@ ProfileDeviceInformation = collections.namedtuple(
 
 CallbackData = collections.namedtuple("ContainerCallback", ["callback", "event"])
 
+
+
+def _get_input_item(parent):
+    ''' gets the InputItem parent hierarchy if it exists '''
+    while parent is not None:
+        if isinstance(parent, InputItem):
+            break
+        if hasattr(parent,"parent"):
+            parent = parent.parent
+        else:
+            parent = None
+           
+    if parent is not None:
+        return parent
+    return None
+
 class ProfileData(metaclass=ABCMeta):
 
     """Base class for all items holding profile data.
@@ -53,15 +71,17 @@ class ProfileData(metaclass=ABCMeta):
 
         :param parent the parent item of this instance in the profile tree
         """
-        self.parent = parent
+        assert parent is not None
         self.code = None
         self._id = None  # unique ID for this entry
-
+        self._input_item : gremlin.base_profile.InputItem = _get_input_item(parent)
+        
+        
         generic_icon = os.path.join(os.path.dirname(__file__),"generic.png")
         if os.path.isfile(generic_icon):
             self._generic_icon = generic_icon
         else:
-            self._generic_icon = None            
+            self._generic_icon = None       
 
     def icon(self):
         ''' gets the default icon'''
@@ -95,37 +115,43 @@ class ProfileData(metaclass=ABCMeta):
         
         :return InputType of this entry
         """
-        item = self.parent
-        while not isinstance(item, InputItem):
-            item = item.parent
-        return item.input_type
-    
-    def get_input_item(self):
-        ''' the input owner'''
-        item = self.parent
-        while not isinstance(item, InputItem):
-            item = item.parent
-        return item
+        if self._input_item is not None:
+            return self._input_item.input_type
+        return None
+
+    def get_input_id(self):
+        ''' gets the input id'''
+        if self._input_item is not None:
+            return self._input_item.input_id
+        return None
+
 
     def get_mode(self):
         """Returns the Mode this data entry belongs to.
 
         :return Mode instance this object belongs to
         """
-        item = self.parent
-        while not isinstance(item, Mode):
-            item = item.parent
-        return item
+        if self._input_item is not None:
+            return self._input_item.profile_mode
+        return None
 
     def get_device_type(self):
         """Returns the DeviceType of this data entry.
         
         :return DeviceType of this entry
         """
-        item = self.parent
-        while not isinstance(item, Device):
-            item = item.parent
-        return item.type
+        if self._input_item is not None:
+            return self._input_item.device_type
+        return None
+
+    def get_device_guid(self):
+        """Returns the DeviceType of this data entry.
+        
+        :return DeviceType of this entry
+        """
+        if self._input_item is not None:
+            return self._input_item.device_type
+        return None
 
     def get_settings(self):
         """Returns the Settings data of the profile.
@@ -137,6 +163,30 @@ class ProfileData(metaclass=ABCMeta):
         while not isinstance(item, Profile):
             item = item.parent
         return item.settings
+    
+    
+    @property
+    def hardware_device(self):
+        ''' gets the hardware device attached to this action '''
+        profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
+        device_guid = self.get_device_guid()
+        if device_guid in profile.devices.keys():
+            return profile.devices[device_guid]
+        return None
+    
+    @property
+    def hardware_input_id(self):
+        ''' gets the input id on the hardware device attached to this '''
+        return self.get_input_id()
+    
+    @property
+    def hardware_input_type(self):
+        ''' gets the type of hardware device attached to this '''
+        return self.get_input_type()
+    
+    @property
+    def hardware_device_guid(self):
+        return self.get_device_guid()
 
     @abstractmethod
     def _parse_xml(self, node):
@@ -190,6 +240,7 @@ class AbstractContainer(ProfileData):
         :parent the InputItem which is the parent to this action
         """
         super().__init__(parent)
+        self.parent = parent
         self.action_sets = []
         self.custom_action_sets = False # true if the container uses custom action sets (need a converter to product action_sets)
         self._condition_enabled = True
@@ -203,26 +254,19 @@ class AbstractContainer(ProfileData):
         self.current_view_type = None
 
         # attached hardware device to this container
-        self.device = self._get_hardware_device(parent)
-        if self.device:
-            self.device_guid = self.device.device_guid
-            self.device_input_id = parent.input_id
-            self.device_input_type = parent.input_type
+
+        input_item = _get_input_item(parent)
+        assert input_item is not None
+        if input_item is not None:
+            self.device_guid = input_item.device_guid
+            self.device_input_id = input_item.input_id
+            self.device_input_type = input_item.input_type
         else:
             self.device_guid = None
             self.device_input_id = None
             self.device_input_type = None
 
 
-
-
-    def _get_hardware_device(self, parent):
-        ''' gets the hardware device attached to this action '''
-        while parent and not isinstance(parent, Device):
-            parent = parent.parent
-        if parent:
-            return parent
-        return None
     
     @property
     def condition_enabled(self):
@@ -316,11 +360,11 @@ class AbstractContainer(ProfileData):
 
         if self._virtual_button_enabled and self.virtual_button is not None:
             callbacks.append(CallbackData(
-                VirtualButtonProcess(self.virtual_button),
+                gremlin.execution_graph.VirtualButtonProcess(self.virtual_button),
                 None
             ))
             callbacks.append(CallbackData(
-                VirtualButtonCallback(self),
+                gremlin.execution_graph.VirtualButtonCallback(self),
                 Event(
                     InputType.VirtualButton,
                     callbacks[-1].callback.virtual_button.identifier,
@@ -331,7 +375,7 @@ class AbstractContainer(ProfileData):
             ))
         else:
            
-            callbacks.append(CallbackData(ContainerCallback(self),None))
+            callbacks.append(CallbackData(gremlin.execution_graph.ContainerCallback(self),None))
 
 
         return callbacks
@@ -476,7 +520,7 @@ class Device:
 
         :param parent the parent profile of this device
         """
-        self.parent = parent
+        self.parent = parent  # profile
         self.name = None
         self.label = ""
         self.device_guid = None
@@ -546,19 +590,17 @@ class Device:
         return node
 
 
-class InputItem(QtCore.QObject):
+class InputItem():
 
     """Represents a single input item such as a button or axis."""
 
-    container_changed = QtCore.Signal() # fires when the container is changed
-
-    def __init__(self, parent):
+    def __init__(self, parent = None):
         """Creates a new InputItem instance.
 
         :param parent the parent mode of this input item
         """
-        super().__init__()
-        self.parent = parent
+        
+        #self.parent = parent 
         self._input_type = None
         self._device_guid = None # hardware input ID
         self._name = None # device name
@@ -568,7 +610,34 @@ class InputItem(QtCore.QObject):
         #self._containers = base_classes.TraceableList(callback = self._container_change_cb) # container
         self._containers = []
         self._selected = False # true if the item is selected
-        self._is_action = isinstance(parent, AbstractAction)
+        self._is_action = False # true if the object is a sub-item for a sub-action (GateHandler for example)
+        if parent is not None:
+            # find the missing properties from the parenting hierarchy
+            self._is_action = isinstance(parent, AbstractAction)
+            item = parent 
+            while True:
+                if isinstance(item, Mode):
+                    self._profile_mode = item.name
+                elif isinstance(item, Device):
+                    self._device_type = item.type
+                    self._device_name = item.name
+                    self._device_guid = item.device_guid
+                if not hasattr(item, "parent"):
+                    break
+                item = item.parent
+                
+      
+
+    # def __getstate__(self) -> object:
+    #     # eliminate the parent from serialization
+    #     state = self.__dict__.copy()
+    #     del state['parent'] # remove circular reference
+    #     return state
+    
+    # def __setstate__(self, state):
+    #     self.__dict__.update(state)
+    #     self.parent = None
+
 
 
     @property
@@ -587,11 +656,9 @@ class InputItem(QtCore.QObject):
 
     def add_container(self, container):
         self._containers.append(container)
-        self.container_changed.emit()
 
     def remove_container(self, container):
         self._containers.remove(container)
-        self.container_changed.emit()
 
     def get_containers(self):
         return self._containers
@@ -620,6 +687,27 @@ class InputItem(QtCore.QObject):
     @device_guid.setter
     def device_guid(self, value):
         self._device_guid = value
+
+    @property
+    def profile_mode(self):
+        return self._profile_mode
+    @profile_mode.setter
+    def profile_mode(self, value):
+        self._profile_mode = value
+    
+    @property 
+    def device_type(self):
+        return self._device_type
+    @device_type.setter
+    def device_type(self, value):
+        self._device_type = value
+    
+    @property
+    def device_name(self):
+        return self._device_name
+    @device_name.setter
+    def device_name(self, value):
+        self._device_name = value
 
     @property
     def data(self):
@@ -775,10 +863,15 @@ class InputItem(QtCore.QObject):
 
         :return DeviceType of this entry
         """
-        item = self.parent
-        while not isinstance(item, Device):
-            item = item.parent
-        return item.type
+        return self._device_name
+
+    def get_device_type(self):
+        """Returns the DeviceType of this input item.
+
+        :return DeviceType of this entry
+        """
+        return self._device_type
+        
 
     def get_input_type(self):
         """Returns the type of this input.
@@ -806,12 +899,12 @@ class InputItem(QtCore.QObject):
             return f"Midi {self._input_id}"
         return f"Unknown input: {self._input_type}"
 
-    def __eq__(self, other):
-        """Checks whether or not two InputItem instances are identical.
+    # def __eq__(self, other):
+    #     """Checks whether or not two InputItem instances are identical.
 
-        :return True if they are identical, False otherwise
-        """
-        return self.__hash__() == other.__hash__()
+    #     :return True if they are identical, False otherwise
+    #     """
+    #     return self.__hash__() == other.__hash__()
 
     def __hash__(self):
         """Returns the hash of this input item.
@@ -856,31 +949,13 @@ class AbstractAction(ProfileData):
 
         :parent the container which is the parent to this action
         """
-        assert isinstance(parent, AbstractContainer)
+        # assert isinstance(parent, AbstractContainer)
         super().__init__(parent)
 
         self.activation_condition = None
         self._id = None
         self._action_type = None 
 
-    @property
-    def hardware_device(self):
-        ''' gets the hardware device attached to this action '''
-        return self.parent.hardware_device
-    
-    @property
-    def hardware_input_id(self):
-        ''' gets the input id on the hardware device attached to this '''
-        return self.parent.hardware_input_id
-    
-    @property
-    def hardware_input_type(self):
-        ''' gets the type of hardware device attached to this '''
-        return self.parent.hardware_input_type
-    
-    @property
-    def hardware_device_guid(self):
-        return self.parent.hardware_device_guid
 
     @property
     def action_id(self):
@@ -1046,7 +1121,16 @@ class AbstractContainerAction(AbstractAction):
             node.append(child)
         return node
 
+    # copy/paste exclusions
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        del state["item_data"]
+        return state
 
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self.item_data = InputItem(self)
+        
 
 
     
@@ -1069,7 +1153,7 @@ class AbstractContainerAction(AbstractAction):
     def _build_graph(self):
         ''' builds the execution graph for the sub containers '''
         for container in self._subcontainers:
-            eg = ContainerExecutionGraph(container)
+            eg = gremlin.execution_graph.ContainerExecutionGraph(container)
             self._functors.extend(eg.functors)
 
         
@@ -1360,8 +1444,9 @@ class Profile():
         mode_names = []
         for device in parent.devices.values():
             mode_names.extend(device.modes.keys())
-
-        return sorted(list(set(mode_names)), key=lambda x: x.lower())
+        mode_names = list(set(mode_names))
+        mode_names.sort(key=lambda x: x.lower())
+        return mode_names
 
 
 
@@ -2107,438 +2192,7 @@ class PluginVariable:
 
 
 
-class ContainerCallback:
-
-    """Callback object that can perform the actions associated with an input.
-
-    The object uses the concept of a execution graph to handle conditional
-    and chained actions.
-    """
-
-    def __init__(self, container):
-        """Creates a new instance based according to the given input item.
-
-        :param container the container instance for which to build th
-            execution graph base callback
-        """
-        self.execution_graph = ContainerExecutionGraph(container)
-
-    def __call__(self, event):
-        """Executes the callback based on the event's content.
-
-        Creates a Value object from the event and passes the two through the
-        execution graph until every entry has run or it is aborted.
-        """
-        if event.is_axis or event.event_type in [
-            InputType.JoystickAxis,
-            InputType.JoystickHat
-        ]:
-            value = gremlin.actions.Value(event.value)
-        elif event.event_type in [
-            InputType.JoystickButton,
-            InputType.Keyboard,
-            InputType.KeyboardLatched,
-            InputType.Mouse,
-            InputType.Midi,
-            InputType.OpenSoundControl,
-            InputType.VirtualButton,
-            
-        ]:
-            value = gremlin.actions.Value(event.is_pressed)
-        else:
-            raise error.GremlinError("Invalid event type")
-
-        # Containers representing a virtual button get their individual
-        # value instance, all others share one to propagate changes across
-        shared_value = copy.deepcopy(value)
-
-        if event == InputType.VirtualButton:
-            # TODO: remove this at a future stage
-            logging.getLogger("system").error(
-                "Virtual button code path being used"
-            )
-        else:
-            self.execution_graph.process_event(event, shared_value)
-
-
-
-
-class VirtualButtonCallback:
-
-    """VirtualButton event based callback class."""
-
-    def __init__(self, container):
-        """Creates a new instance.
-
-        :param container the container to execute when called
-        """
-        self._execution_graph = ContainerExecutionGraph(container)
-
-    def __call__(self, event):
-        """Executes the container's content when called.
-
-        :param event the event triggering the callback
-        """
-        self._execution_graph.process_event(
-            event,
-            gremlin.actions.Value(event.is_pressed)
-        )
-
-
-class VirtualButtonProcess:
-
-    """Callback that is responsible for emitting press and release events
-    for a virtual button."""
-
-    def __init__(self, data):
-        """Creates a new instance for the given container.
-
-        :param container the container using a virtual button configuration
-        """
-        self.virtual_button = None
-
-        if isinstance(data, gremlin.base_buttons.VirtualAxisButton):
-            self.virtual_button = gremlin.actions.AxisButton(
-                data.lower_limit,
-                data.upper_limit,
-                data.direction
-            )
-        elif isinstance(data, gremlin.base_buttons.VirtualHatButton):
-            self.virtual_button = gremlin.actions.HatButton(
-                data.directions
-            )
-        else:
-            raise error.GremlinError("Invalid virtual button data provided")
-
-    def __call__(self, event):
-        """Processes the provided event through the virtual button instance.
-
-        :param event the input event being processed
-        """
-        self.virtual_button.process_event(event)
-
-
-class AbstractExecutionGraph(metaclass=ABCMeta):
-
-    """Abstract base class for all execution graph type classes.
-
-    An execution graph consists of nodes which represent actions to execute and
-    links which are transitions between nodes. Each node's execution returns
-    a boolean value, indicating success or failure. The links allow skipping
-    of nodes based on the outcome of a node's execution.
-
-    When there is no link for a given node and outcome combination the
-    graph terminates.
-    """
-
-    def __init__(self, instance):
-        """Creates a new execution graph based on the provided data.
-
-        :param instance the object to use in order to generate the graph
-        """
-        self.functors = []
-        self.transitions = {}
-        self.current_index = 0
-
-        self._build_graph(instance)
-
-    def process_event(self, event, value):
-        """Executes the graph with the provided data.
-
-        :param event the raw event that caused the execution of this graph
-        :param value the possibly modified value extracted from the event
-        """
-        
-
-        # Processing an event twice is needed when a virtual axis button has
-        # "jumped" over it's activation region without triggering it. Once
-        # this is detected the "press" event is sent and the second run ensures
-        # a "release" event is sent.
-        process_again = False
-
-        while self.current_index is not None and len(self.functors) > 0:
-            functor = self.functors[self.current_index]
-
-            result = functor.process_event(event, value)
-
-            if isinstance(functor, gremlin.actions.AxisButton):
-                process_again = functor.forced_activation
-
-            self.current_index = self.transitions.get(
-                (self.current_index, result),
-                None
-            )
-        self.current_index = 0
-
-        if process_again:
-            time.sleep(0.05)
-            self.process_event(event, value)
-
-    @abstractmethod
-    def _build_graph(self, instance):
-        """Builds the graph structure based on the given object's content.
-
-        :param instance the object to use in order to generate the graph
-        """
-        pass
-
-    def _create_activation_condition(self, activation_condition):
-        """Creates activation condition objects base on the given data.
-
-        :param activation_condition data about activation condition to be
-            used in order to generate executable nodes
-        """
-        conditions = []
-        for condition in activation_condition.conditions:
-            if isinstance(condition, KeyboardCondition):
-                conditions.append(
-                    gremlin.actions.KeyboardCondition(
-                        condition.scan_code,
-                        condition.is_extended,
-                        condition.comparison, 
-                        condition.input_item
-                    )
-                )
-            elif isinstance(condition, JoystickCondition):
-                conditions.append(
-                    gremlin.actions.JoystickCondition(condition)
-                )
-            elif isinstance(condition, VJoyCondition):
-                conditions.append(
-                    gremlin.actions.VJoyCondition(condition)
-                )
-            elif isinstance(condition, InputActionCondition):
-                conditions.append(
-                    gremlin.actions.InputActionCondition(condition.comparison)
-                )
-            else:
-                raise error.GremlinError("Invalid condition provided")
-
-        return gremlin.actions.ActivationCondition(
-            conditions,
-            activation_condition.rule
-        )
-
-    def _contains_input_action_condition(self, activation_condition):
-        """Returns whether or not an input action condition is present.
-
-        :param activation_condition condition data to check for the existence
-            of an input action
-        :return return True if an input action is present, False otherwise
-        """
-        if activation_condition:
-            return any([
-                isinstance(cond, gremlin.actions.InputActionCondition)
-                for cond in activation_condition.conditions
-            ])
-        else:
-            return False
-
-    def _create_transitions(self, sequence):
-        """Creates node transition based on the node type sequence information.
-
-        :param sequence the sequence of nodes
-        """
-        seq_count = len(sequence)
-        self.transitions = {}
-        for i, seq in enumerate(sequence):
-            if seq == "Condition":
-                # On success, transition to the next node of any type in line
-                self.transitions[(i, True)] = i+1
-                offset = i + 1
-                # On failure, transition to the condition node after the
-                # next action node
-                while offset < seq_count:
-                    if sequence[offset] == "Action":
-                        if offset+1 < seq_count:
-                            self.transitions[(i, False)] = offset+1
-                            break
-                    offset += 1
-            elif seq == "Action" and i+1 < seq_count:
-                # Transition to the next node irrespective of failure or success
-                self.transitions[(i, True)] = i+1
-                self.transitions[(i, False)] = i + 1
-
-
-class ContainerExecutionGraph(AbstractExecutionGraph):
-
-    """Execution graph for the content of a single container."""
-
-    def __init__(self, container):
-        """Creates a new instance for a specific container.
-
-        :param container the container data from which to generate the
-            execution graph - the parent of a container can be a container or an action (for sub containers)
-        """
-        assert isinstance(container, AbstractContainer) or isinstance(container, AbstractAction)
-        super().__init__(container)
-
-    def _build_graph(self, container):
-        """Builds the graph structure based on the container's content.
-
-        :param container data to use in order to generate the graph
-        """
-        sequence = []
-
-        # Add virtual button transform as the first functor if present
-        # if container.virtual_button:
-        #     self.functors.append(self._create_virtual_button(container))
-        #     sequence.append("Condition")
-
-        # If container based conditions exist add them before any actions
-
-        functors = []
-
-        if container.activation_condition_type == "container":
-            functors.append(
-                self._create_activation_condition(container.activation_condition)
-            )
-            sequence.append("Condition")
-
-
-
-        functor = container.functor(container)
-        functor.setEnabled(True)
-        container_plugins = gremlin.plugin_manager.ContainerPlugins()
-        container_plugins.register_functor(functor)
-
-        functors.append(functor)
-
-        self.functors = functors
-        
-        sequence.append("Action")
-
-        self._create_transitions(sequence)
-
-
-class ActionSetExecutionGraph(AbstractExecutionGraph):
-
-    """Execution graph for the content of a set of actions."""
-
-    comparison_map = {
-        (True, True): "always",
-        (True, False): "pressed",
-        (False, True): "released"
-    }
-
-    def __init__(self, action_set):
-        """Creates a new instance for a specific set of actions.
-
-        :param action_set the set of actions from which to generate the
-            execution graph
-        """
-        super().__init__(action_set)
-
-    def _build_graph(self, action_set):
-        """Builds the graph structure based on the content of the action set.
-
-        :param action_set data to use in order to generate the graph
-        """
-        # The action set shouldn't be empty, but in case this happens
-        # nonetheless we abort
-        if len(action_set) == 0:
-            return
-        
-        verbose = gremlin.config.Configuration().verbose
-
-        sequence = []
-
-        condition_type = action_set[0].parent.activation_condition_type
-        add_default_activation = True
-        if condition_type is None:
-            add_default_activation = True
-        elif condition_type == "container":
-            add_default_activation = not self._contains_input_action_condition(
-                action_set[0].parent.activation_condition
-            )
-
-        # Reorder action set entries such that if any remap action is
-        # present it is executed last
-        ordered_action_set = []
-
-        for action in action_set:
-            # if not isinstance(action, action_plugins.remap.Remap):
-            priority = 0
-            if hasattr(action, "priority"):
-                priority = action.priority
-            ordered_action_set.append((priority, action))
-
-            if isinstance(action, AbstractContainerAction):
-                # the action contains containers - build their execution graph
-                action._build_graph()
-                
-        # for action in action_set:
-        #     # if isinstance(action, action_plugins.remap.Remap):
-        #     if "remap" in action.tag:
-        #         ordered_action_set.append(action)
-
-        if len(ordered_action_set) > 1:
-            ordered_action_set.sort(key = lambda x: x[0])
-        ordered_action_set = [x[1] for x in ordered_action_set]
-
-        if verbose: 
-            logger = logging.getLogger("system")
-            logger.debug("Action order:")
-            
-            for index, action in enumerate(ordered_action_set):
-                input_item = action.get_input_item()
-                if hasattr(input_item,"to_string"):
-                    input_stub = input_item.to_string()
-                else:
-                    input_stub = str(input_item)
-                logger.debug(f"{index}: input: {input_stub} action: {type(action)}  data: {str(action)} ")
-                                
-                    
-
-            
-
-
-        # Create functors
-        for action in ordered_action_set:
-            # Create conditions for each action if needed
-            if action.activation_condition is not None:
-                # Only add a condition if we truly have conditions
-                if len(action.activation_condition.conditions) > 0:
-                    self.functors.append(
-                        self._create_activation_condition(
-                            action.activation_condition
-                        )
-                    )
-                    sequence.append("Condition")
-
-            # Create default activation condition if needed
-            has_input_action = self._contains_input_action_condition(
-                action.activation_condition
-            )
-
-            if add_default_activation and not has_input_action:
-                condition = gremlin.actions.InputActionCondition()
-                condition.comparison = ActionSetExecutionGraph.comparison_map[
-                    action.default_button_activation
-                ]
-                activation_condition = gremlin.actions.ActivationCondition(
-                    [condition],
-                    gremlin.actions.ActivationRule.All
-                )
-                self.functors.append(
-                    self._create_activation_condition(activation_condition)
-                )
-                sequence.append("Condition")
-
-            # Create action functor
-            self.functors.append(action.functor(action))
-            sequence.append("Action")
-
-            # add the sub container functors
-            if isinstance(action, AbstractContainerAction):
-                eg : ContainerExecutionGraph
-                for eg in action.execution_graphs:
-                    self.functors.extend(eg.functors)
-
-        self._create_transitions(sequence)
-
-
-class ProfileData():
+class ProfileOptionsData():
     ''' data block returned by the get_profile_data function'''
     def __init__(self):
         self.mode_list = []
@@ -2633,7 +2287,7 @@ class ProfileMapItem():
     def last_mode(self, value):
         self._last_mode = value
 
-    def get_profile_data(self) -> ProfileData:
+    def get_profile_data(self) -> ProfileOptionsData:
         ''' gets the list of profile modes in a given profile 
         :returns tuple (mode_list, default_mode, last_mode, restore_mode_flag)
         '''
@@ -2647,7 +2301,7 @@ class ProfileMapItem():
         current_profile : Profile = gremlin.shared_state.current_profile
         profile = self.profile
         force_numlock_off = True
-        pd = ProfileData()
+        pd = ProfileOptionsData()
 
         if profile:
         

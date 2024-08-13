@@ -297,8 +297,7 @@ class AbstractFunctor(metaclass=ABCMeta):
         import gremlin.event_handler
         self._enabled = False
         self._name = instance.name
-        eh = gremlin.event_handler.EventListener()
-        eh.profile_stop.connect(self._profile_stop)
+        
 
     def setEnabled(self, value):
         ''' enables or disables the functor - a disabled functor will not receive the start profile event nor will the process_event be called 
@@ -306,26 +305,11 @@ class AbstractFunctor(metaclass=ABCMeta):
         This is done to make sure that functors only get called if the plugin is referenced in a profile's execution graph to avoid unecessary initializations
         
         '''
-        import gremlin.event_handler
         if self._enabled == value:
             return # nothing to do
         self._enabled = value
-        eh = gremlin.event_handler.EventListener()
         if value:
-            # hook profile start/stop events to reset the functor
-            eh.profile_start.connect(self._profile_start)
             logging.getLogger("system").info(f"Functor: {self._name} enabled")
-        else:
-            eh.profile_start.disconnect(self._profile_start)
-
-
-    def _profile_start(self):
-        self.profile_start()
-
-    def _profile_stop(self):
-        if self._enabled:
-            self.profile_stop()
-            self._enabled = False # disable until the next start
     
     @property
     def enabled(self):
@@ -347,13 +331,6 @@ class AbstractFunctor(metaclass=ABCMeta):
         ''' returns any extra inputs as a list of (device_guid, input_id) to latch to this action (trigger on change) '''
         return []
 
-    def profile_start(self):
-        ''' occurs on profile start - override in functor '''
-        pass
-
-    def profile_stop(self):
-        ''' occurs on profile stop - override in functor '''
-        pass
 
 class AbstractContainerActionFunctor(AbstractFunctor):
     ''' used by action functors for actions that have containers '''

@@ -34,6 +34,7 @@ import gremlin.ui.input_item
 from gremlin.profile import safe_format, safe_read
 from gremlin.ui.input_item import AbstractContainerWidget, AbstractActionWidget
 from gremlin.base_profile import AbstractContainer
+import gremlin.execution_graph
 
 
 

@@ -155,12 +155,18 @@ class GremlinUi(QtWidgets.QMainWindow):
             [],
             self._update_statusbar_repeater
         )
-        self.runner.event_handler.mode_changed.connect(
+        self.runner.event_handler.runtime_mode_changed.connect(
             self._update_status_bar_mode
+        )
+        self.runner.event_handler.mode_changed.connect(
+            self._update_mode_change
         )
         self.runner.event_handler.is_active.connect(
             self._update_status_bar_active
         )
+        
+
+        
 
         self.mode_selector = gremlin.ui.ui_common.ModeWidget()
         self.mode_selector.edit_mode_changed.connect(self._edit_mode_changed_cb)
@@ -316,7 +322,7 @@ class GremlinUi(QtWidgets.QMainWindow):
     @property
     def current_mode(self) -> str:
         ''' returns the current active profile mode '''
-        return gremlin.shared_state.current_mode
+        return gremlin.event_handler.EventHandler().active_mode
     
     @property
     def current_profile(self) -> gremlin.base_profile.Profile:
@@ -820,7 +826,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         device_name_map = gremlin.shared_state.device_guid_to_name_map
         self.last_tab_index = 0
         last_guid = gremlin.config.Configuration().last_tab_guid
-        last_input_index = gremlin.config.Configuration().last_tab_input_id
+        #last_input_index = gremlin.config.Configuration().last_tab_input_id
 
         # Device lists
         phys_devices = gremlin.joystick_handling.physical_devices()
@@ -1409,13 +1415,17 @@ class GremlinUi(QtWidgets.QMainWindow):
             log_sys_error(f"Unable to update status bar event: {event}")
             log_sys_error(e)
 
+    def _update_mode_change(self, new_mode):
+        self._update_status_bar_mode(new_mode)
+        self._mode_configuration_changed(new_mode)
+
     def _update_status_bar_mode(self, new_mode):
         """ called when the profile mode changes 
 
         :param mode the now current mode
         """
-        
-        gremlin.shared_state.current_mode = new_mode
+
+
         update = True
         is_running = gremlin.shared_state.is_running
         if is_running:
@@ -1431,8 +1441,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         
         # update the status bar on mode change
         try:
-            self.status_bar_mode.setVisible(is_running)
-            self.status_bar_mode.setText(f"<b>Mode:</b> {new_mode if new_mode else "n/a"}")
+            #self.status_bar_mode.setVisible(True)
+            self.status_bar_mode.setText(f"<b>Active Mode:</b> {new_mode if new_mode else "n/a"}")
             if self.config.mode_change_message:
                 self.ui.tray_icon.showMessage(f"Mode: {new_mode if new_mode else "n/a"}","",QtWidgets.QSystemTrayIcon.MessageIcon.NoIcon,250)
         except Exception as err:
@@ -1569,8 +1579,10 @@ class GremlinUi(QtWidgets.QMainWindow):
             self._profile_fname = fname
             self._update_window_title()
             gremlin.shared_state.current_profile = self._profile
-            current_mode = sorted(self._profile.get_root_modes())[0]
-            gremlin.shared_state.current_mode = current_mode
+            modes = self._profile.get_root_modes()
+            modes.sort()
+            current_mode = modes[0]
+            gremlin.event_handler.EventHandler().set_mode(current_mode)
             self._create_tabs()
 
             # Make the first root node the default active mode
@@ -1696,10 +1708,14 @@ class GremlinUi(QtWidgets.QMainWindow):
         self._do_load_profile(fname)
         self._create_recent_profiles()
 
-    def _mode_configuration_changed(self):
+    def _mode_configuration_changed(self, new_mode = None):
         """Updates the mode configuration of the selector and profile."""
-        self.mode_selector.populate_selector(self._profile,gremlin.shared_state.current_mode)
+        if new_mode is None or gremlin.shared_state.current_mode != new_mode:
+            return
+        gremlin.util.pushCursor()
+        self.mode_selector.populate_selector(self._profile, new_mode)
         self.ui.devices.widget(self.ui.devices.count()-1).refresh_ui()
+        gremlin.util.popCursor()
 
     def _sanitize_profile(self, profile_data):
         """Validates a profile file before actually loading it.

@@ -1099,3 +1099,64 @@ def display_file(path):
         webbrowser.open(path)
     else:
         logging.getLogger("system").error(f"DISPLAYFILE: warning: file not found: {path}")    
+
+
+def debug_pickle(instance, exception=None, string='', first_only=True):
+    """
+    Recursively go through all attributes of instance and return a list of whatever
+    can't be pickled.
+
+    Set first_only to only print the first problematic element in a list, tuple or
+    dict (otherwise there could be lots of duplication).
+    """
+    problems = []
+    import dill
+    if isinstance(instance, tuple) or isinstance(instance, list):
+        for k, v in enumerate(instance):
+            try:
+                dill.dumps(v)
+            except BaseException as e:
+                problems.extend(debug_pickle(v, e, string + f'[{k}]'))
+                if first_only:
+                    break
+    elif isinstance(instance, dict):
+        for k in instance:
+            try:
+                dill.dumps(k)
+            except BaseException as e:
+                problems.extend(debug_pickle(
+                    k, e, string + f'[key type={type(k).__name__}]'
+                ))
+                if first_only:
+                    break
+        for v in instance.values():
+            try:
+                dill.dumps(v)
+            except BaseException as e:
+                problems.extend(debug_pickle(
+                    v, e, string + f'[val type={type(v).__name__}]'
+                ))
+                if first_only:
+                    break
+    else:
+        try:
+            for k, v in instance.__dict__.items():
+                try:
+                    dill.dumps(v)
+                except BaseException as e:
+                    print (k)
+                    problems.extend(debug_pickle(v, e, string + '.' + k))
+        except:
+            # ignore types that have no attributes
+            pass
+        
+
+    # if we get here, it means pickling instance caused an exception (string is not
+    # empty), yet no member was a problem (problems is empty), thus instance itself
+    # is the problem.
+    if string != '' and not problems:
+        problems.append(
+            string + f" (Type '{type(instance).__name__}' caused: {exception})"
+        )
+
+    return problems

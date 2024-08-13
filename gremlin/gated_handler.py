@@ -615,13 +615,14 @@ class GateData(QtCore.QObject):
                     callbacks = self._callbacks[container]
                     for cb in callbacks:
                         for functor in cb.callback.execution_graph.functors:
-                            if short_press:
-                                thread = threading.Thread(target=lambda: self._short_press(functor, event, value, delay))
-                                thread.start()
-                            else:
-                                # not a momentary trigger
-                                #print (f"trigger mode: {trigger.mode} sending event value: {value.current}")
-                                functor.process_event(event, value)
+                            if functor.enabled:
+                                if short_press:
+                                    thread = threading.Thread(target=lambda: self._short_press(functor, event, value, delay))
+                                    thread.start()
+                                else:
+                                    # not a momentary trigger
+                                    #print (f"trigger mode: {trigger.mode} sending event value: {value.current}")
+                                    functor.process_event(event, value)
             
                                 
             # process user provided functor callback if set (this is used by actions that must act on the modified output of the gated axis rather than the raw hardware input - example: simconnect action)
@@ -1275,19 +1276,18 @@ class GateData(QtCore.QObject):
 
         
     def _find_input_item(self):
-        current = self._action_data
-        while current and not isinstance(current, gremlin.base_profile.InputItem):
-            current = current.parent
-        return current
+        return gremlin.base_profile._get_input_item(self._action_data)
 
     def _new_item_data(self, is_action = True):
         ''' creates a new item data from the existing one '''
         current_item_data = self._find_input_item()
-        item_data = gremlin.base_profile.InputItem(current_item_data)
+        item_data = gremlin.base_profile.InputItem()
         item_data._input_type = current_item_data._input_type
         item_data._device_guid = current_item_data._device_guid
         item_data._input_id = current_item_data._input_id
         item_data._is_action = is_action
+        item_data._profile_mode = current_item_data._profile_mode
+        item_data._device_name = current_item_data._device_name
 
         # add the input data to the profile 
 

@@ -60,7 +60,7 @@ class SwitchModeFunctor(gremlin.base_profile.AbstractFunctor):
     def process_event(self, event, value):
         import gremlin.control_action
         import logging
-        if value.current:
+        if event.is_pressed or value.current:
             logging.getLogger("system").info(f"ACTION SWITCH: mode switch to [{self.mode_name}] requested")
             if self.mode_name:
                 gremlin.control_action.switch_mode(self.mode_name)
@@ -84,6 +84,7 @@ class SwitchMode(gremlin.base_profile.AbstractAction):
 
     def __init__(self, parent):
         super().__init__(parent)
+        self.parent = parent
         self.mode_name = ""
 
     def display_name(self):

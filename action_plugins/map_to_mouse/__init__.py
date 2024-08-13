@@ -465,7 +465,7 @@ class MapToMouse(gremlin.base_profile.AbstractAction):
         :param parent the container this action is part of
         """
         super().__init__(parent)
-
+        self.parent = parent
         # Flag whether or not this is mouse motion or button press
         self.motion_input = False
         # Mouse button enum

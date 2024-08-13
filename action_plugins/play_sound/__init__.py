@@ -169,6 +169,7 @@ class PlaySound(gremlin.base_profile.AbstractAction):
 
     def __init__(self, parent):
         super().__init__(parent)
+        self.parent = parent
         self.sound_file = None
         self.volume = 50
 

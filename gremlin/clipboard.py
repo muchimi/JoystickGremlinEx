@@ -2,14 +2,39 @@
 import dill
 import base64
 import os
-
+import lxml
 import logging
 from PySide6 import QtCore
 from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QClipboard
+import lxml.etree
+import jsonpickle
+import importlib
+import msgpack
 
 
+import gremlin.base_profile
 from gremlin.singleton_decorator import SingletonDecorator
+
+class ObjectEncoder():
+    ''' helper class to encode objects '''
+    def __init__(self, obj, data):
+        cls = type(obj)
+        self._name = cls.__name__
+        self._module = cls.__module__
+        self._data =data
+
+    @property
+    def data(self):
+        return self._data
+    
+    @property
+    def module(self):
+        return self._module
+    
+    @property
+    def name(self):
+        return self._name
 
 @SingletonDecorator
 class Clipboard(QtCore.QObject):
@@ -29,7 +54,7 @@ class Clipboard(QtCore.QObject):
         self._persist_to_file = config.persist_clipboard
         self._clipboard_file = os.path.join(userprofile_path(),"clipboard.data")
 
-        self._decode() # initialize windows clipboard data if any
+        #self._decode() # initialize windows clipboard data if any
 
         # user profile path
         
@@ -68,9 +93,15 @@ class Clipboard(QtCore.QObject):
         else:
             try:
                 pickled = self.get_windows_clipboard_text()
-                if pickled and pickled.endswith("="):
-                    # attempt to decode data into python object
-                    data = dill.loads(base64.b64decode(pickled)).encode()
+                if pickled:
+                    try:
+                        if pickled.endswith("="):
+                            data = dill.loads(base64.b64decode(pickled)).encode()
+                
+                    except:
+                        # attempt json pickle
+                        data = dill.loads(pickled)
+
                     # validate the data is something we recognize
             except:
                 # bad data - just ignore
@@ -80,9 +111,13 @@ class Clipboard(QtCore.QObject):
         if data and isinstance(data, AbstractContainer) \
             or isinstance(data, AbstractAction):
             self._data = data
+
+
+
     
     @data.setter
     def data(self, value):
+        import gremlin.util
         if self.enabled:
             self._data = value
             # indicate the clipboard was changed so UI can be updated
@@ -105,13 +140,12 @@ class Clipboard(QtCore.QObject):
             else:
                 # persist to windows clipboard
                 try:
-                    data = dill.dumps(value)
-                    pickled = base64.b64encode(data).decode('ascii')
-                    self.set_windows_clipboard_text(pickled)
-                    
-                except:
-                    # unable to encode
-                    pass
+                    pickled = dill.dumps(value) # binary
+                    packed = base64.b64encode(pickled).decode('ascii') # text encoded
+                    self.set_windows_clipboard_text(packed)
+                except Exception as error:
+                        logging.getLogger("system").error(f"DILL serializationf failed: {error}")        
+
 
     def set_windows_clipboard_text(self, value):
         ''' sets the windows clipboard text '''

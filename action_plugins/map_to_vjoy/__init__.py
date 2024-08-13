@@ -1982,7 +1982,7 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
     def __init__(self, parent):
         """ vjoyremap action block """
         super().__init__(parent)
-
+        self.parent = parent
         # Set vjoy ids to None so we know to pick the next best one
         # automatically
         self._vjoy_device_id = 1

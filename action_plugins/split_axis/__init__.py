@@ -212,7 +212,7 @@ class SplitAxis(gremlin.base_profile.AbstractAction):
 
     def __init__(self, parent):
         super().__init__(parent)
-
+        self.parent = parent
         self.center_point = 0.0
         self.device_low_axis = None
         self.device_low_vjoy_id = None

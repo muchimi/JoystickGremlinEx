@@ -166,6 +166,7 @@ class CycleModes(gremlin.base_profile.AbstractAction):
 
     def __init__(self, parent):
         super().__init__(parent)
+        self.parent = parent
         self.mode_list = []
 
     def icon(self):

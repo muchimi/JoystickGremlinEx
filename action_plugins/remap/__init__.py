@@ -349,6 +349,7 @@ class Remap(gremlin.base_profile.AbstractAction):
 
         # Set vjoy ids to None so we know to pick the next best one
         # automatically
+        self.parent = parent
         self.vjoy_device_id = None
         self.vjoy_input_id = None
         self.input_type = self.parent.parent.input_type

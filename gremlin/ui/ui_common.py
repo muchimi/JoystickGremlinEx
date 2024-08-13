@@ -571,9 +571,9 @@ class ActionSelector(QtWidgets.QWidget):
         self.paste_button.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Minimum)
         self.paste_button.setToolTip("Paste Action")
 
-        clipboard = Clipboard()
-        clipboard.clipboard_changed.connect(self._clipboard_changed)
-        self._clipboard_changed(clipboard)
+        #clipboard = Clipboard()
+        #clipboard.clipboard_changed.connect(self._clipboard_changed)
+        #self._clipboard_changed(clipboard)
 
         self.main_layout.addWidget(self.action_dropdown)
         self.main_layout.addWidget(self.add_button)
@@ -737,65 +737,62 @@ class ModeWidget(QtWidgets.QWidget):
         """
         # To prevent emitting lots of change events the slot is first
         # disconnected and then at the end reconnected again.
-        self.edit_mode_selector.currentIndexChanged.disconnect(self._edit_mode_changed_cb)
-        self.profile = profile_data
+        with QtCore.QSignalBlocker(self.edit_mode_selector):
+            self.profile = profile_data
 
-        # Remove all existing items in QT6 clear() doesn't always work
-        #self.edit_mode_selector.clear()
-        while self.edit_mode_selector.count() > 0:
-            self.edit_mode_selector.removeItem(0)
+            # Remove all existing items in QT6 clear() doesn't always work
+            #self.edit_mode_selector.clear()
+            while self.edit_mode_selector.count() > 0:
+                    self.edit_mode_selector.removeItem(0)
 
-        
-        
-        mode_list = get_mode_list(profile_data)
-        self.mode_list = [x[1] for x in mode_list]
-        # Create mode name labels visualizing the tree structure
-        inheritance_tree = self.profile.build_inheritance_tree()
-        labels = []
-        _inheritance_tree_to_labels(labels, inheritance_tree, 0)
+            
+            
+            mode_list = get_mode_list(profile_data)
+            self.mode_list = [x[1] for x in mode_list]
+            # Create mode name labels visualizing the tree structure
+            inheritance_tree = self.profile.build_inheritance_tree()
+            labels = []
+            _inheritance_tree_to_labels(labels, inheritance_tree, 0)
 
-        # Filter the mode names such that they only occur once below
-        # their correct parent
-        mode_names = []
-        display_names = []
-        for entry in labels:
-            if entry[0] in mode_names:
-                idx = mode_names.index(entry[0])
-                if len(entry[1]) > len(display_names[idx]):
-                    del mode_names[idx]
-                    del display_names[idx]
+            # Filter the mode names such that they only occur once below
+            # their correct parent
+            mode_names = []
+            display_names = []
+            for entry in labels:
+                if entry[0] in mode_names:
+                    idx = mode_names.index(entry[0])
+                    if len(entry[1]) > len(display_names[idx]):
+                        del mode_names[idx]
+                        del display_names[idx]
+                        mode_names.append(entry[0])
+                        display_names.append(entry[1])
+                else:
                     mode_names.append(entry[0])
                     display_names.append(entry[1])
-            else:
-                mode_names.append(entry[0])
-                display_names.append(entry[1])
 
-        # Select currently active mode
-        if len(mode_names) > 0:
-            if current_mode is None or current_mode not in self.mode_list:
-                # pick the first one
-                current_mode = mode_names[0]                
+            # Select currently active mode
+            if len(mode_names) > 0:
+                if current_mode is None or current_mode not in self.mode_list:
+                    # pick the first one
+                    current_mode = mode_names[0]                
 
-        last_edit_mode = gremlin.config.Configuration().get_profile_last_edit_mode()
-        if not last_edit_mode:
-            # pick the top mode if nothing was saved in the configuration
-            last_edit_mode = mode_names[0]
+            last_edit_mode = gremlin.config.Configuration().get_profile_last_edit_mode()
+            if not last_edit_mode:
+                # pick the top mode if nothing was saved in the configuration
+                last_edit_mode = mode_names[0]
 
-        # Add properly arranged mode names to the drop down list
-        index = 0
-        current_index = 0
-        for display_name, mode_name in zip(display_names, mode_names):
-            self.edit_mode_selector.addItem(display_name)
-            self.mode_list.append(mode_name)
-            if mode_name == last_edit_mode:
-                current_index = index
-            index += 1
+            # Add properly arranged mode names to the drop down list
+            index = 0
+            current_index = 0
+            for display_name, mode_name in zip(display_names, mode_names):
+                self.edit_mode_selector.addItem(display_name)
+                self.mode_list.append(mode_name)
+                if mode_name == last_edit_mode:
+                    current_index = index
+                index += 1
 
-        self.edit_mode_selector.setCurrentIndex(current_index)
-        self._edit_mode_changed_cb(current_index)
-
-        # Reconnect change signal
-        self.edit_mode_selector.currentIndexChanged.connect(self._edit_mode_changed_cb)
+            self.edit_mode_selector.setCurrentIndex(current_index)
+            self._edit_mode_changed_cb(current_index)
 
 
     @QtCore.Slot(int)
@@ -806,8 +803,9 @@ class ModeWidget(QtWidgets.QWidget):
         """
         # save the setup
         new_mode = self.mode_list[idx]
-        gremlin.config.Configuration().set_profile_last_edit_mode(new_mode)
-        self.edit_mode_changed.emit(new_mode)
+        if new_mode != gremlin.shared_state.current_mode:
+            gremlin.config.Configuration().set_profile_last_edit_mode(new_mode)
+            self.edit_mode_changed.emit(new_mode)
 
 
 
@@ -833,17 +831,18 @@ class ModeWidget(QtWidgets.QWidget):
 
 
         # Create mode selector and related widgets
-        self.edit_label = QtWidgets.QLabel("Edit Mode")
+        self.edit_label = QtWidgets.QLabel("Active Edit Mode")
         self.edit_label.setSizePolicy(min_min_sp)
         self.edit_mode_selector = QtWidgets.QComboBox()
         self.edit_mode_selector.setSizePolicy(exp_min_sp)
         self.edit_mode_selector.setMinimumContentsLength(20)
+        self.edit_mode_selector.setToolTip("Selects the active profile mode being edited")
         
 
         # add the mode change button
         self.mode_change = QtWidgets.QPushButton()
         self.mode_change.setIcon(load_icon("manage_modes.svg"))
-        self.mode_change.setToolTip("Manage Modes")
+        self.mode_change.setToolTip("Manage Profile Modes")
         self.mode_change.clicked.connect(self._manage_modes_cb)
 
         # Connect signal
