@@ -25,6 +25,7 @@ import gremlin
 import gremlin.base_profile
 import gremlin.config
 import gremlin.profile
+import gremlin.shared_state
 import gremlin.types
 from gremlin.types import DeviceType
 from gremlin.input_types import InputType
@@ -373,7 +374,8 @@ class ActionContainerView(gremlin.ui.ui_common.AbstractView):
         return lambda: self.model.remove_container(widget.profile_data)
 
 
-class JoystickDeviceTabWidget(QtWidgets.QWidget):
+from gremlin.ui.qdatawidget import QDataWidget
+class JoystickDeviceTabWidget(QDataWidget):
 
     """Widget used to configure a single joystick input device."""
 
@@ -480,10 +482,9 @@ class JoystickDeviceTabWidget(QtWidgets.QWidget):
         # listen to device changes
         el = gremlin.event_handler.EventListener()
         el.joystick_event.connect(self._device_update)
-        el.profile_start.connect(self._profile_start)
-        el.profile_stop.connect(self._profile_stop)
+        # el.profile_start.connect(self._profile_start)
+        # el.profile_stop.connect(self._profile_stop)
 
-        self.running = False
         self.updating = False
         self.last_event = None
 
@@ -560,7 +561,10 @@ class JoystickDeviceTabWidget(QtWidgets.QWidget):
             layout.addWidget(widget)
             layout.addStretch()
             return widget
-                 
+        
+    @property
+    def running(self):
+        return gremlin.shared_state.is_running         
 
     def _device_update(self, event):
         if self.running:
@@ -593,14 +597,7 @@ class JoystickDeviceTabWidget(QtWidgets.QWidget):
             return
         self.input_item_list_view.select_input(event.event_type, event.identifier)
 
-        
-
-    def _profile_start(self):
-        self.running = True
-
-    def _profile_stop(self):
-        self.running = False
-
+    
     def input_item_selected_cb(self, index):
         """Handles the selection of an input item.
 

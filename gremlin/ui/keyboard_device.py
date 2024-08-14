@@ -275,8 +275,8 @@ class KeyboardInputItem():
         return self.to_string()
             
 
-
-class KeyboardDeviceTabWidget(QtWidgets.QWidget):
+from gremlin.ui.qdatawidget import QDataWidget
+class KeyboardDeviceTabWidget(QDataWidget):
 
     """Widget used to configure keyboard inputs """
 

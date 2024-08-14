@@ -90,6 +90,11 @@ class TemporaryModeSwitch(gremlin.base_profile.AbstractAction):
         self.mode_name = self.get_mode()
         self.parent = parent
 
+    @property
+    def priority(self):
+        # priority relative to other actions in this sequence - 0 is the default for all actions unless specified - the highest number runs last
+        return 999        
+
     def display_name(self):
         ''' returns a display string for the current configuration '''
         return f"Switch to: {self.mode_name}"

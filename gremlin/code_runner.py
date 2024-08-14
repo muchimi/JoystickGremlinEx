@@ -58,19 +58,29 @@ class CodeRunner:
         self.event_handler.add_plugin(gremlin.input_devices.VJoyPlugin())
         self.event_handler.add_plugin(gremlin.input_devices.KeyboardPlugin())
 
+        eh = gremlin.event_handler.EventListener()
+        eh.action_created.connect(self._action_created_cb)
+        
+
         self._inheritance_tree = None
         self._vjoy_curves = VJoyCurves()
         self._merge_axes = []
-        self._running = False
         self._startup_profile = None
         self._startup_mode = None
+        self._actions = [] # tracks functors in this profile
+
+
+    def _action_created_cb(self, action):
+        if not action in self._actions:
+            self._actions.append(action)
+        
 
     def is_running(self):
         """Returns whether or not the code runner is executing code.
 
         :return True if code is being executed, False otherwise
         """
-        return self._running
+        return gremlin.shared_state.is_running
     
 
 
@@ -83,13 +93,16 @@ class CodeRunner:
         :param start_mode the mode in which to start Gremlin
         :param profile the profile to use when generating all the callbacks
         """
+
+        el = gremlin.event_handler.EventListener()
+
+
+        # indicate we're in run mode
+        gremlin.shared_state.is_running = True
+
         # Reset states to their default values
         self._inheritance_tree = inheritance_tree
         self._reset_state()
-
-        # indicate we're in run mode
-        self._running = True
-        gremlin.shared_state.is_running = True
 
         # clear any startup routines
         gremlin.input_devices.start_registry.clear()
@@ -192,6 +205,8 @@ class CodeRunner:
             mode_source = gremlin.shared_state.current_profile.traverse_mode()
             mode_source.sort(key = lambda x: x[0]) # sort parent to child
             mode_list = [mode for (_,mode) in mode_source] # parent mode first
+
+
 
             # Create input callbacks based on the profile's content
             for device in profile.devices.values():
@@ -298,9 +313,15 @@ class CodeRunner:
                 for aid, value in data.items():
                     vjoy_proxy.axis(linear_index=aid).set_absolute_value(value)
 
-
-            # attach sub items
             
+
+
+            for action in self._actions:
+                logging.getLogger("system").info(f"ACTION DATA: {action.name} {type(action).__name__}  enabled: {action.enabled}")
+
+            # tell callbacks they are starting
+            el.profile_start.emit()
+
 
 
             # Connect signals
@@ -418,8 +439,7 @@ class CodeRunner:
                        # start listen
             evt_listener.start()
 
-            el = gremlin.event_handler.EventListener()
-            el.profile_start.emit()
+            
 
             #print ("resume!")
             self.event_handler.resume()
@@ -434,11 +454,8 @@ class CodeRunner:
     def stop(self):
         """Stops listening to events and unloads all callbacks."""
 
-        if not self.is_running():
-            return # nothing to do
-        
-        self._running = False
-        gremlin.shared_state.is_running = False
+        if not gremlin.shared_state.is_running:
+            return # not running - nothing to do
 
         el = gremlin.event_handler.EventListener()
         eh = gremlin.event_handler.EventHandler()
@@ -459,7 +476,7 @@ class CodeRunner:
         gremlin.input_devices.remote_server.stop()
 
         # call stop function in plugins
-        gremlin.input_devices.stop_registry.start()
+        #gremlin.input_devices.stop_registry.start()
         gremlin.input_devices.stop_registry.stop()
         gremlin.input_devices.stop_registry.clear()
         gremlin.input_devices.mode_registry.clear()
@@ -483,10 +500,6 @@ class CodeRunner:
             self._vjoy_curves.mode_changed
         )
         
-
-
-
-
 
         # Empty callback registry
         gremlin.input_devices.callback_registry.clear()
@@ -512,6 +525,8 @@ class CodeRunner:
             eh.change_profile(self._startup_profile)
         if self._startup_mode:
             eh.change_mode(self._startup_mode)
+        
+        gremlin.shared_state.is_running = False
 
 
     def _reset_state(self):

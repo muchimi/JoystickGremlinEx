@@ -31,6 +31,7 @@ import gremlin.input_devices
 import gremlin.plugin_manager
 import gremlin.shared_state
 from gremlin.singleton_decorator import SingletonDecorator
+import gremlin.util
 
 
 
@@ -955,7 +956,33 @@ class AbstractAction(ProfileData):
         self.activation_condition = None
         self._id = None
         self._action_type = None 
+        self._enabled = False # true if the action is enabled
+        eh = gremlin.event_handler.EventListener()
+        eh.action_created.emit(self)
+        
 
+    def setEnabled(self, value):
+        ''' enables or disables the functor - a disabled functor will not receive the start profile event nor will the process_event be called 
+        
+        This is done to make sure that functors only get called if the plugin is referenced in a profile's execution graph to avoid unecessary initializations
+        
+        '''
+        import gremlin.event_handler
+        
+        if self._enabled == value:
+            return # nothing to do
+        self._enabled = value
+        
+        
+        if value:
+            logging.getLogger("system").info(f"Functor: {self.name} {type(self).__name__} enabled")
+
+        
+
+    @property
+    def enabled(self):
+        return self._enabled
+        
 
     @property
     def action_id(self):
@@ -1578,6 +1605,16 @@ class Profile():
             del vjoy[act.vjoy_device_id][type_name][idx]
 
         return vjoy
+    
+    @property
+    def profile_file(self):
+        return self._profile_fname
+    
+    def get_default_mode(self):
+        ''' gets the default mode for this profile - this is the mode used if the default startup mode is not specified '''
+        modes = self.get_root_modes()
+        if modes:
+            return modes[0]    
 
     def from_xml(self, fname):
         """Parses the global XML document into the profile data structure.
@@ -1611,6 +1648,8 @@ class Profile():
 
         if "force_numlock" in root.attrib:
             self._force_numlock_off = safe_read(root, "force_numlock", bool, True)
+
+
 
 
         # Parse each device into separate DeviceConfiguration objects
@@ -1681,15 +1720,7 @@ class Profile():
 
         return profile_was_updated
     
-    @property
-    def profile_file(self):
-        return self._profile_fname
-    
-    def get_default_mode(self):
-        ''' gets the default mode for this profile - this is the mode used if the default startup mode is not specified '''
-        modes = self.get_root_modes()
-        if modes:
-            return modes[0]
+
 
     def to_xml(self, fname):
         """Generates XML code corresponding to this profile.
@@ -1703,6 +1734,7 @@ class Profile():
         root.set("default_mode", self.get_default_start_mode())
         root.set("restore_last", str(self._restore_last_mode))
         root.set("force_numlock", str(self._force_numlock_off))
+
 
         # Device settings
         devices = ElementTree.Element("devices")

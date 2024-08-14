@@ -731,6 +731,107 @@ A typical OSC command will thus be /my_command_1, number  where number is:
 
 If an input already has mapping containers attached, GremlinEx will prevent switching from an axis mode to a button/change mode and vice versa.  This is because containers and actions, when added to an input, are tailored to the type of input it is, and it's not possible to change it after the fact to avoid mapping problems and odd behaviors.
 
+# Profile
+
+A profile holds a mapping of inputs to action. 
+
+
+## Profile association
+
+A profile can be associated with an executable in options, and GremlinEx can automatically switch to that profile when the associated process receives the focus.  By default this is not enabled as loading processes automatically can create a bit of lag while the process is loaded, especially if a large / complex profile, but the feature is available.   The other recommendation is to not automate this while setting up or tweaking a profile to simplify the editing process especially if you constantly switch focus between processes.
+
+## Profile modes
+
+A profile can have mode, the default mode being called "Default" and is the starting mode.  The "Default" profile can be renamed if needed.
+
+Modes can be nested, meaning that a mode can itself contain other modes.  A child node inherits actions from a parent mode if the child mode does not define these inputs.
+
+If this behavior is not desired, the mode can also be a mode without a parent, in which case it will be a standalone mode without inheritance.
+
+Modes can be added or deleted.  Deletions can cause a loss of data as mappings are attached not only to an input, but a specific mode, so avoid deleting modes.
+
+
+
+## General mapping process
+
+GremlinEx shows near the top of the UI a tabbed list of all detected HID hardware, including non-hardware input items like MIDI and OSC which also function as inputs.
+
+For complex profiles, the first order of business is typically to setup the modes for the profile if you have complex mappings to do, typically if you need to have multiple mappings for the same inputs - this can be for example a "flight" vs a "walking" mode, or a "turret" mode vs a "cockpit" mode.  You create modes in the mode configuration dialog.   There is however no requirement to do modes first as modes can be added later if need be.
+
+Select the editing mode at the top right of the UI from the drop down which will select the profile mode being edited.  All mappings will be attached to this mapping.  
+
+Mappings for another mode will not be displayed from another mode.
+
+The general idea is you will select one of the input tabs, selecting the hardware or virtual input device.  GremlinEx will show the detected inputs for the selected device.  If the device is a keyboard or MIDI or OSC, the input will also need to be defined.  Joystick inputs will show detected axes and buttons and hats for that input as they are reported by the hardware.
+
+VJOY devices can also be used as input devices if so configured in the settings tab. VJOY devices cannot be used in GremlinEx concurrently for input and output.  
+
+Once you have selected the input (or created one) on the left side of the UI, you can add one or more containers to that input.  
+
+Remember to save changes via the save button as profile changes are not saved automatically.   The profile is saved to an XML file in the default Gremlin Ex user folder.  The folder can be opened directly in Windows Explorer from the file menu so it's easier to locate.
+
+It's possible to manually edit the XML file if you'd like, however if you do, make a backup of the original XML file in case an error occurs.
+
+# User plugins
+
+User plugins are Python files that can be attached to a profile via the settings tab.  Python programming opens the door to very complex scenarios not easily achievable via the built-in container and action types, and recommended for advanced users only.  However user plugins are often the fastest and easiest way (depending on your perspective) to achieve very complex logical mappings in GremlinEx.
+
+Note: plugins are reloaded every time a profile starts which allows for fast bug fixing.  Exceptions will be output to the dialog.   However if the plugin references other modules, these may not be reloaded until GremlinEx is completely reloaded due to the way Python bindings work.   GremlinEx has no control over this.
+
+
+
+
+
+# Containers
+
+Containers contain actions.  Containers are attached to an input selected on the left of the UI
+
+# Actions
+
+Actions are added to containers for each input type. In GremlinEx, some actions are compound actions, meaning, they create their own inputs based on the input they receive, so these actions can have their own containers.  An example of this is the Gated Axis action - which can trigger additional actions based on the position of an input axis.
+
+Actions are aware of the type of input they are being attached to, and not all actions support all input types.  Some actions work only with joystick axis input (example, Gated Axis) while others only work with button or keyboard inputs (example, mode switch).
+
+## Action priorities
+
+Some actions are special - meaning - they need to occur after other prior actions in the execution sequence for a given input.   The priority is currently hardcoded in each action plugin which will be fine for all the provided actions.  For example, a joystick axis mapping action must occur after a response curve action (that changes the input to a new value), and a mode switch action occurs after all other actions.
+
+## General Action Types
+
+The default set of actions for GremlinEx grows all the time but includes in general:
+
+- Map to VJOY Joystick (Ex version recommended)
+- Map to Keyboard (Ex version recommended) - the EX version does both keyboard and mouse combination (complex input trigger like holding 4 keys down concurrently to trigger) mappings and supports special output keys like F13 to F24)
+- Map to Mouse (EX version recommended)
+- Text to speech (converts text to speech)
+- Play sound (plays a sound clip)
+- Change profile mode
+- Change profile mode temporarily (while input is pressed)
+- Cycle profile mode (advance in sequence)
+- Gated Axis (lets you defined arbitrary action points based on input position
+- Response curve (curves the input axis so it's not linear)
+- SimConnect (for MSFS output)
+- Macro (combination of various actions)
+- Pause/resume profile actions
+
+## Profile edit time vs runtime behavior
+
+When the profile is activated (either manually or automatically by process for example) changes the behavior of GremlinEx.
+
+### Edit time
+
+GremlinEx, as of 13.40.14ex includes a hardware repeater directly into the UI to visualize the input state at design time.  This is true for axes and buttons (not hats presently).
+
+### Run time
+
+When a profile runs, GremlinEx will stop updating the majority of the UI for performance reasons, especially for things like mode changes and repeating input. It is thus completely possible for the run time mode to not be displayed in the UI when a profile is running - this is normal.  
+
+However the status bar (bottom left) will always reflect the active run modes of GremlinEx including the remote/local state and active run time profile mode and the toolbar (top left) will always reflect the run mode (green when active).
+
+## Profile map visualization
+
+GremlinEx has a dialog visualizer to show, in text form, the current mappings and modes for the profile.  This text can be copied to the clipboard and pasted as plain text.
+
 
 
 <!-- TOC --><a name="vjoyremap-action"></a>

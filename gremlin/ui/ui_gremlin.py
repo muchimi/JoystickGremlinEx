@@ -18,6 +18,7 @@ class Ui_Gremlin(object):
         self.horizontalLayout.setObjectName("horizontalLayout")
         self.devices = QtWidgets.QTabWidget(self.main)
         self.devices.setObjectName("devices")
+
        
         self.tab = QtWidgets.QWidget()
         self.tab.setObjectName("tab")

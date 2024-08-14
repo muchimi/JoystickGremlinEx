@@ -984,3 +984,13 @@ class Configuration:
     def last_tab_input_id(self, value):
         self._data["last_tab_input_id"] = value
         self.save()
+
+
+    @property
+    def tab_list(self):
+        ''' tab order for the UI devices as set by the user '''
+        return self._data.get("tab_order", None)
+    @tab_list.setter
+    def tab_list(self, value):
+        self._data["tab_order"] = value
+        self.save()

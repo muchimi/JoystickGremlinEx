@@ -179,18 +179,15 @@ class AbstractExecutionGraph(metaclass=ABCMeta):
 
         while self.current_index is not None and len(self.functors) > 0:
             functor = self.functors[self.current_index]
-            if functor.enabled:
-                result = functor.process_event(event, value)
-                if result is None or not result and not isinstance(functor, gremlin.actions.ActivationCondition):
-                    logging.getLogger("system").warning(f"Process event returned no data or FALSE - functor: {type(functor).__name__}")
+        
+            result = functor.process_event(event, value)
+            if result is None or not result and not isinstance(functor, gremlin.actions.ActivationCondition):
+                logging.getLogger("system").warning(f"Process event returned no data or FALSE - functor: {type(functor).__name__}")
 
-                if isinstance(functor, gremlin.actions.AxisButton):
-                    process_again = functor.forced_activation
+            if isinstance(functor, gremlin.actions.AxisButton):
+                process_again = functor.forced_activation
 
-                self.current_index = self.transitions.get(
-                    (self.current_index, result),
-                    None
-            )
+            self.current_index = self.transitions.get((self.current_index, result),None)
         self.current_index = 0
 
         if process_again:
@@ -319,7 +316,7 @@ class ContainerExecutionGraph(AbstractExecutionGraph):
         verbose = gremlin.config.Configuration().verbose
         if verbose:
             logging.getLogger("system").info(f"Enable functor: {type(functor).__name__}")
-        functor.setEnabled(True)
+        
 
         container_plugins = gremlin.plugin_manager.ContainerPlugins()
         container_plugins.register_functor(functor)
@@ -372,7 +369,7 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
             )
 
         # Reorder action set entries such that if any remap action is
-        # present it is executed last
+        # present it is executed last (after a curving action for example) (unless it's a mode switch action - mode switching must happen last because it changes the action list)
         ordered_action_set = []
         if verbose: 
             logging.getLogger("system").info("Ordering action sets:")
@@ -434,7 +431,7 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
 
             # Create action functor
             functor = action.functor(action)
-            functor.setEnabled(True)
+            action.setEnabled(True)
             self.functors.append(functor)
             sequence.append("Action")
 

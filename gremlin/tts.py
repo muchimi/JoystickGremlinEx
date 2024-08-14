@@ -21,8 +21,8 @@ to speech system.
 """
 
 import logging
-import win32com.client
-import threading
+import time
+import gremlin.threading
 from . import event_handler, util
 import pyttsx3
 import gremlin.singleton_decorator
@@ -52,25 +52,37 @@ class TextToSpeech:
             self.engine.say(text)
             
         except Exception as err:
-            logging.getLogger(f"system").error("Error in TTS: {err}")
+            logging.getLogger(f"system").error(f"Error in TTS: {err}")
 
     def stop(self):
         ''' stops any speech '''
         try:
             self.engine.stop()
         except Exception as err:
-            logging.getLogger(f"system").error("Error in TTS: {err}")
+            logging.getLogger(f"system").error(f"Error in TTS: {err}")
 
     def start(self):
         ''' starts the loop '''
         if not self._started:
-            self.engine.startLoop()
+            self._tts_thread = gremlin.threading.AbortableThread(target = self._tts_runner)
+            self._tts_thread.start()
             self._started = True
+            
+    def _tts_runner(self):
+        ''' runner thread for the TTS engine '''
+        self.engine.startLoop(False)
+        while not self._tts_thread.stopped():
+            time.sleep(0.1)
+            self.engine.iterate()
+            continue
+        self.engine.endLoop()
+
 
     def end(self):
         ''' ends the loop '''
         if self._started:
-            self.engine.endLoop()
+            self._tts_thread.stop()
+            self._tts_thread.join()
             self._started = False
         
 

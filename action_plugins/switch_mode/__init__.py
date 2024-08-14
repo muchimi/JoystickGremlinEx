@@ -96,8 +96,8 @@ class SwitchMode(gremlin.base_profile.AbstractAction):
     
     @property
     def priority(self):
-        # priority relative to other actions in this sequence - 0 is the default for all actions unless specified
-        return 10
+        # priority relative to other actions in this sequence - 0 is the default for all actions unless specified - higher numbers run last
+        return 999
 
     def requires_virtual_button(self):
         return self.get_input_type() in [

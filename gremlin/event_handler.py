@@ -231,8 +231,9 @@ class EventListener(QtCore.QObject):
 	# signal emitted when the UI tabs are loaded and profiles are loaded - some widgets use this for post-UI initialization update that needs to occur after the UI data is completely loaded
 	tabs_loaded = QtCore.Signal()
 
-	profile_start = QtCore.Signal()
-	profile_stop = QtCore.Signal()
+	profile_reset = QtCore.Signal() # issues the reset signal (when runtime for a profile needs to reset)
+	profile_start = QtCore.Signal() # issues the start signal (when a profile starts)
+	profile_stop = QtCore.Signal() # issues the stop signal (when a profile stops)
 	
 	# occurs on broadcast configuration change
 	config_changed =  QtCore.Signal()
@@ -243,8 +244,8 @@ class EventListener(QtCore.QObject):
 	# occurs on mode change
 	modes_changed = QtCore.Signal()
 
-	
-		
+	# functor enable flag changed
+	action_created = QtCore.Signal(object) # runs when an action is created
 
 	def __init__(self):
 		"""Creates a new instance."""

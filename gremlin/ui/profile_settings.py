@@ -22,8 +22,8 @@ import gremlin.joystick_handling
 import gremlin.shared_state
 import gremlin.ui.ui_common
 
-
-class ProfileSettingsWidget(QtWidgets.QWidget):
+from gremlin.ui.qdatawidget import QDataWidget
+class ProfileSettingsWidget(QDataWidget):
 
     """Widget allowing changing profile specific settings."""
 

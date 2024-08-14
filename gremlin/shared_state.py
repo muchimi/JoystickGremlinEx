@@ -65,8 +65,6 @@ def _current_mode():
     return gremlin.event_handler.EventHandler().active_mode
 
 
-
-
 ui_ready = False
 
 # holds the main UI reference

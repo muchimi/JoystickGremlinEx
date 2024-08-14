@@ -295,26 +295,10 @@ class AbstractFunctor(metaclass=ABCMeta):
             execute it later on
         """
         import gremlin.event_handler
-        self._enabled = False
         self._name = instance.name
+
         
 
-    def setEnabled(self, value):
-        ''' enables or disables the functor - a disabled functor will not receive the start profile event nor will the process_event be called 
-        
-        This is done to make sure that functors only get called if the plugin is referenced in a profile's execution graph to avoid unecessary initializations
-        
-        '''
-        if self._enabled == value:
-            return # nothing to do
-        self._enabled = value
-        if value:
-            logging.getLogger("system").info(f"Functor: {self._name} enabled")
-    
-    @property
-    def enabled(self):
-        return self._enabled
-        
     @abstractmethod
     def process_event(self, event, value):
         """Processes the functor using the provided event and value data.

@@ -39,7 +39,7 @@ import re
 from lxml import etree
 from lxml import etree as ElementTree
 from gremlin.gated_handler import *
-
+from gremlin.ui.qdatawidget import QDataWidget
 
 
 class QHLine(QtWidgets.QFrame):
@@ -750,7 +750,7 @@ class SimconnectOptionsUi(QtWidgets.QDialog):
 
                 row_selector = ui_common.QRowSelectorFrame()
                 row_selector.setSelectable(False)
-                spacer = ui_common.QDataWidget()
+                spacer = QDataWidget()
                 spacer.setMinimumWidth(3)
                 self.map_layout.addWidget(row_selector, 0, 0, 1, -1)
                 
@@ -824,7 +824,7 @@ class SimconnectOptionsUi(QtWidgets.QDialog):
 
             self.map_layout.addWidget(row_selector, row ,0 , 1, -1)
             
-            spacer = ui_common.QDataWidget()
+            spacer = QDataWidget()
             spacer.setMinimumWidth(3)
             spacer.installEventFilter(self)
             
@@ -835,7 +835,7 @@ class SimconnectOptionsUi(QtWidgets.QDialog):
             self.map_layout.addWidget(manufacturer_widget,row, 5 )
             self.map_layout.addWidget(model_widget,row, 6)
             self.map_layout.addWidget(type_widget,row, 7)
-            spacer = ui_common.QDataWidget()
+            spacer = QDataWidget()
             spacer.installEventFilter(self)
             spacer.setMinimumWidth(6)
             self.map_layout.addWidget(spacer, row, 8)
@@ -1501,14 +1501,11 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         self.command = action.command # the command to execute
         self.value = action.value # the value to send (None if no data to send)
         self.sm = None
-        eh = gremlin.event_handler.EventListener()
-        eh.profile_start.connect(self.profile_start)
-        eh.profile_stop.connect(self.profile_stop)
 
     
     def profile_start(self):
         ''' occurs when the profile starts '''
-        if self.enabled:
+        if self.action_data.enabled:
             if self.sm is None:
                 self.sm = SimConnectData()
                 self.block = self.sm.block(self.command)
@@ -1519,7 +1516,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
 
     def profile_stop(self):
         ''' occurs wen the profile stops'''
-        if self.enabled:
+        if self.action_data.enabled:
             if not self.sm is None:
                 self.sm.sim_disconnect()
     
@@ -1610,6 +1607,7 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
 
     @property
     def priority(self):
+        # default priority is 0 - the higher the number the earlier the action runs compared to others
         return 9
 
     def __init__(self, parent):

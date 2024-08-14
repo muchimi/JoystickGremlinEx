@@ -1295,11 +1295,8 @@ class MidiInputConfigDialog(QtWidgets.QDialog):
         ''' current input mode '''
         return self._mode
         
-        
-            
-
-
-class MidiDeviceTabWidget(QtWidgets.QWidget):
+from gremlin.ui.qdatawidget import QDataWidget
+class MidiDeviceTabWidget(QDataWidget):
 
     """Widget used to configure open sound control (OSC) inputs """
 

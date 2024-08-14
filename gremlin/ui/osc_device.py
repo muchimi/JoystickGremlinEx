@@ -2495,9 +2495,10 @@ class OscInputConfigDialog(QtWidgets.QDialog):
     def data(self, value):
         self._command_data = value
         self._update_display()  
-        
 
-class OscDeviceTabWidget(QtWidgets.QWidget):
+from gremlin.ui.qdatawidget import QDataWidget
+
+class OscDeviceTabWidget(QDataWidget):
 
     """Widget used to configure open sound control (OSC) inputs """
     

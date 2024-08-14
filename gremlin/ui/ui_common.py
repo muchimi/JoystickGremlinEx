@@ -2208,20 +2208,7 @@ class ButtonState(QtWidgets.QGroupBox):
             self.buttons[event.identifier].setDown(state)
             self._event_times[event.identifier] = time.time()
 
-class QDataWidget(QtWidgets.QWidget):
-    def __init__(self, data = None, parent = None):
-        super().__init__(parent)
-        self._data = data
 
-       
-    @property
-    def data(self):
-        return self._data
-    
-    @data.setter
-    def data(self, value):
-        self._data = value
- 
 
 
 class QRowSelectorFrame(QtWidgets.QFrame):
