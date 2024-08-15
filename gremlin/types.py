@@ -859,3 +859,17 @@ class VerboseMode(enum.IntFlag):
 
     def __contains__(self, item):
         return  (self.value & item.value) == item.value
+
+
+@enum.unique 
+class TabDeviceType(int, enum.Enum):
+    ''' types of devices shown on device tabs '''
+    NotSet = 0
+    Joystick = 1
+    Keyboard = 2
+    Midi = 3
+    Osc = 4
+    VjoyInput = 5
+    VjoyOutput = 6
+    Settings = 7
+    Plugins = 8

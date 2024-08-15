@@ -994,3 +994,12 @@ class Configuration:
     def tab_list(self, value):
         self._data["tab_order"] = value
         self.save()
+
+    @property
+    def show_output_vjoy(self):
+        ''' determines if VJOY output devices are displayed on the device tabs '''
+        return self._data.get("show_vjoy_ouput", False)
+    @show_output_vjoy.setter
+    def show_output_vjoy(self, value):
+        self._data["show_vjoy_output"] = value
+        self.save()

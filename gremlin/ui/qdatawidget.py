@@ -13,5 +13,7 @@ class QDataWidget(QtWidgets.QWidget):
     
     @data.setter
     def data(self, value):
+        if self._data is not None:
+            pass
         self._data = value
  

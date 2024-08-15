@@ -112,6 +112,9 @@ Joystick Gremlin EX
 
 This release adds major new features, including some minor changes in UI functionality, and a few more QOL (quality of life) enhancements.
 
+- **New device reorder** It is now possible to re-order the hardware device tabs.  The order is persisted from one session to the next.  Right click on the tab to sort the input back to default.
+- **New device substitution** It is not possible to associate one or more device hardware IDs with a single input so long as the input is not duplicated.  This is a requested feature if your hardware IDs change frequently (a rare condition).  The substitution map lets you add a new device ID and GremlinEx will respond to that new ID as well as the old one.
+
 - **New virtual keyboard** dialog to simplify key and mouse button selection. The updated editor supports hidden keys such as F13 to F24 and enables mouse buttons to be used as any "key" input to simplify mapping. (QOL)
 - Revamped keyboard input device and UI with virtual keyboard with mouse input support with multiple key latching.  Profiles using the old style should convert automatically to the new style.  Inputs can be added, edited and removed.  Latching (concurrent keys pressed) allows for complex and unusual keyboard input combinations to trigger actions including latching with mouse button and mouse wheel inputs.
 - Revamped keyboard conditions on actions or containers:  a keyboard condition now uses the new virtual keyboard editor and allows for multiple latched keys and mouse button triggers. (QOL)

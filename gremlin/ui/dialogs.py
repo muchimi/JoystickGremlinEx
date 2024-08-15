@@ -2157,7 +2157,7 @@ class SwapDevicesUi(ui_common.BaseDialogUi):
 
     """UI Widget that allows users to swap identical devices."""
 
-    def __init__(self, profile, parent=None):
+    def __init__(self, parent=None):
         """Creates a new instance.
 
         :param profile the current profile
@@ -2165,7 +2165,7 @@ class SwapDevicesUi(ui_common.BaseDialogUi):
         """
         super().__init__(parent)
 
-        self.profile = profile
+        self.profile = gremlin.shared_state.current_profile
 
         # Create UI elements
         self.setWindowTitle("Swap Devices")
@@ -2269,3 +2269,48 @@ class SwapDevicesUi(ui_common.BaseDialogUi):
             150
         )
         self.input_dialog.show()
+
+
+class SubstituteDialog(QtWidgets.QDialog):
+    ''' device substitution - allows the swap of one device_guid for another '''
+
+    def __init__(self, device_guid, device_name, parent = None):
+        super().__init__(self, parent)
+
+        self.main_layout = QtWidgets.QVBoxLayout()
+        self._device_guid = device_guid # current device GUID
+
+        # get current profile
+        profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
+
+        device_guids = list(profile.devices.keys())
+
+        self.current_device_name_widget = QtWidgets.QLineEdit()
+        self.current_device_name_widget.setReadOnly(True)
+        self.current_device_name_widget.setText(device_name)
+
+        self.current_device_guid_widget = QtWidgets.QLineEdit()
+        self.current_device_guid_widget.setReadOnly(True)
+        self.current_device_guid_widget.setText(device_guid)
+        
+        self.new_device_guid_widget = QtWidgets.QLineEdit()
+
+        self.current_container_widget = QtWidgets.QWidget()
+        self.current_container_layout = QtWidgets.QHBoxLayout(self.current_container_widget)
+
+        self.current_container_layout.addWidget(QtWidgets.QLabel("Current device: "))
+        self.current_container_layout.addWidget(self.current_device_name_widget)
+        self.current_container_layout.addWidget(self.current_device_guid_widget)
+        self.current_container_layout.addStretch()
+
+        self.swap_container_widget = QtWidgets.QWidget()
+        self.swap_container_layout = QtWidgets.QHBoxLayout(self.swap_container_widget)
+        self.swap_container_layout.addWidget(QtWidgets.QLabel("New device GUID: "))
+        self.swap_container_layout.addWidget(self.new_device_guid_widget)
+
+
+        self.main_layout.addWidget(self.current_container_widget)
+        self.main_layout.addWidget(self.swap_container_widget)
+
+
+

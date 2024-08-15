@@ -1471,8 +1471,10 @@ class Profile():
         mode_names = []
         for device in parent.devices.values():
             mode_names.extend(device.modes.keys())
-        mode_names = list(set(mode_names))
-        mode_names.sort(key=lambda x: x.lower())
+        mode_names = [mode for mode in mode_names if mode is not None]
+        if mode_names:
+            mode_names = list(set(mode_names))
+            mode_names.sort(key=lambda x: x.casefold())
         return mode_names
 
 
