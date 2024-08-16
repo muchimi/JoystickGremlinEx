@@ -1720,6 +1720,8 @@ class Profile():
         name, _ = os.path.splitext(os.path.basename(fname))
         self._profile_name = name
 
+        
+
         return profile_was_updated
     
 

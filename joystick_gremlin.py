@@ -276,6 +276,16 @@ class GremlinUi(QtWidgets.QMainWindow):
 
     def _tab_context_menu_cb(self, pos):
         ''' tab context menu '''
+        tab_index = self.ui.devices.tabBar().tabAt(pos)
+        self._context_menu_tab_index = tab_index
+        widget = self.ui.devices.widget(self._context_menu_tab_index)
+        device_type, device_guid = widget.data
+        # substitution is only available if the profile has been saved (a new profile matches the current devices by definition)
+        is_enabled = device_type == TabDeviceType.Joystick \
+            and self._profile is not None\
+            and self._profile.profile_file is not None\
+            and os.path.isfile(self._profile.profile_file)
+        self._actionTabSubstitute.setEnabled(is_enabled)
         menu = QtWidgets.QMenu(self)
         menu.addAction(self._actionTabSort)
         menu.addAction(self._actionTabSubstitute)
@@ -286,10 +296,21 @@ class GremlinUi(QtWidgets.QMainWindow):
         self._sort_tabs()
 
 
-    def _tab_substitute_cb(self):
+    def _tab_substitute_cb(self, pos):
         ''' substitution dialog for devices '''
-        dialog = gremlin.ui.dialogs.SubstituteDialog(self)
+        widget = self.ui.devices.widget(self._context_menu_tab_index)
+        _, device_guid = widget.data
+        device_name = self.ui.devices.tabText(self._context_menu_tab_index)
+        dialog = gremlin.ui.dialogs.SubstituteDialog(device_guid=device_guid, device_name=device_name, parent = self)
+        dialog.setModal(True)
+        dialog.accepted.connect(self._substitute_complete_cb)
+        gremlin.util.centerDialog(dialog)
         dialog.show()
+
+    def _substitute_complete_cb(self):
+        ''' substitution complete - reload profile '''
+        profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
+        self.load_profile(profile.profile_file)
 
 
     def _profile_changed_cb(self, new_profile):

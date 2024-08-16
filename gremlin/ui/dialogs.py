@@ -16,6 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
+import shutil
 import subprocess
 import sys
 import winreg
@@ -42,7 +43,10 @@ from gremlin.util import load_icon, userprofile_path, load_pixmap, pushCursor, p
 import logging
 from gremlin.input_types import InputType
 import gremlin.base_profile
-
+import uuid
+from lxml import etree
+import dinput
+import gremlin.util
 
 class ProfileOptionsUi(QtWidgets.QDialog):
     """UI to set individual profile settings """
@@ -2271,46 +2275,174 @@ class SwapDevicesUi(ui_common.BaseDialogUi):
         self.input_dialog.show()
 
 
+
+
 class SubstituteDialog(QtWidgets.QDialog):
     ''' device substitution - allows the swap of one device_guid for another '''
 
     def __init__(self, device_guid, device_name, parent = None):
-        super().__init__(self, parent)
+        super().__init__(parent)
 
-        self.main_layout = QtWidgets.QVBoxLayout()
+        self.main_layout = QtWidgets.QVBoxLayout(self)
         self._device_guid = device_guid # current device GUID
+        self._device_name = device_name # current device name
+        self.setMinimumSize(700,200)
+
+        fm = QtGui.QFontMetrics(self.font())
+        
+        
 
         # get current profile
         profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
 
-        device_guids = list(profile.devices.keys())
-
-        self.current_device_name_widget = QtWidgets.QLineEdit()
-        self.current_device_name_widget.setReadOnly(True)
-        self.current_device_name_widget.setText(device_name)
-
-        self.current_device_guid_widget = QtWidgets.QLineEdit()
-        self.current_device_guid_widget.setReadOnly(True)
-        self.current_device_guid_widget.setText(device_guid)
         
-        self.new_device_guid_widget = QtWidgets.QLineEdit()
+        self.profile_device_widget = QtWidgets.QComboBox()
+        self.hardware_device_widget = QtWidgets.QComboBox()
+        
 
-        self.current_container_widget = QtWidgets.QWidget()
-        self.current_container_layout = QtWidgets.QHBoxLayout(self.current_container_widget)
+        self.replace_button_widget = QtWidgets.QPushButton("Replace")
+        self.replace_button_widget.clicked.connect(self._replace_cb)
+        
+        self.header_container_widget = QtWidgets.QWidget()
+        self.header_container_layout = QtWidgets.QGridLayout(self.header_container_widget)
 
-        self.current_container_layout.addWidget(QtWidgets.QLabel("Current device: "))
-        self.current_container_layout.addWidget(self.current_device_name_widget)
-        self.current_container_layout.addWidget(self.current_device_guid_widget)
-        self.current_container_layout.addStretch()
-
-        self.swap_container_widget = QtWidgets.QWidget()
-        self.swap_container_layout = QtWidgets.QHBoxLayout(self.swap_container_widget)
-        self.swap_container_layout.addWidget(QtWidgets.QLabel("New device GUID: "))
-        self.swap_container_layout.addWidget(self.new_device_guid_widget)
+        self.header_container_layout.addWidget(QtWidgets.QLabel("Profile device: "),0,0)
+        self.header_container_layout.addWidget(self.profile_device_widget,0,1)
 
 
-        self.main_layout.addWidget(self.current_container_widget)
-        self.main_layout.addWidget(self.swap_container_widget)
+        self.header_container_layout.addWidget(QtWidgets.QLabel("Replace with: "),1,0)
+        self.header_container_layout.addWidget(self.hardware_device_widget,1,1)
+        
+
+        self.header_container_layout.addWidget(self.replace_button_widget,1,2)
+        self.header_container_layout.addWidget(QtWidgets.QLabel(" "),0,3)
+        self.header_container_layout.setColumnStretch(3,2)
+
+        self.main_layout.addWidget(QtWidgets.QLabel("Device substitution enables the replacement of one device ID with another<br/>in case the hardware ID has changed since the profile was created."))
+        self.main_layout.addWidget(self.header_container_widget)
+        self.main_layout.addStretch()
+
+        self._profile_devices = [device for device in profile.devices.values() if device.type == gremlin.types.DeviceType.Joystick]
+        self._profile_devices.sort(key = lambda x: x.name.casefold())
+
+        # populate devices currently connected
+        self._hardware_devices = []
+        device_count = dinput.DILL.get_device_count()
+        for index in range(device_count):
+            info : dinput.DeviceSummary = dinput.DILL.get_device_information_by_index(index)
+            if not info.is_virtual:
+                # skip vjoy devices
+                self._hardware_devices.append(info)
+
+        # sort
+        self._hardware_devices.sort(key = lambda x: x.name.casefold())
+        for info in self._hardware_devices:
+            self.hardware_device_widget.addItem(f"[{str(info.device_guid)}] {info.name}", info)
+
+        for info in self._profile_devices:
+            self.profile_device_widget.addItem(f"[{str(info.device_guid)}] {info.name}", info)
+
+        self.hardware_device_widget.currentIndexChanged.connect(self._validate)
+        self.profile_device_widget.currentIndexChanged.connect(self._validate)
+
+        self._validate()
 
 
+    def _ok_message_box(self, content):
+        message_box = QtWidgets.QMessageBox()
+        message_box.setIcon(QtWidgets.QMessageBox.Icon.Warning)
+        message_box.setText(content)
+        message_box.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok)
+        gremlin.util.centerDialog(message_box)
+        result = message_box.exec()
+
+    def _confirm_message_box(self, content):
+        message_box = QtWidgets.QMessageBox()
+        message_box.setIcon(QtWidgets.QMessageBox.Icon.Warning)
+        message_box.setText(content)
+        message_box.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok | QtWidgets.QMessageBox.StandardButton.Cancel)
+        gremlin.util.centerDialog(message_box)
+        result = message_box.exec()
+        return result == QtWidgets.QMessageBox.StandardButton.Ok
+
+    def _validate(self):
+        self._hardware_device_guid = str(self.hardware_device_widget.currentData().device_guid)
+        self._profile_device_guid = str(self.profile_device_widget.currentData().device_guid)
+        is_enabled = self._hardware_device_guid != self._profile_device_guid
+        self.replace_button_widget.setEnabled(is_enabled)
+
+
+    @QtCore.Slot()
+    def _replace_cb(self):
+
+        current_guid = self._profile_device_guid
+        current_name = self.profile_device_widget.currentData().name
+        new_device_guid = self._hardware_device_guid
+        new_device_name = self.hardware_device_widget.currentData().name
+
+        if self._confirm_message_box(f"Replace ID '{current_guid}' with '{new_device_guid}' (no undo?)"):
+            # read the XML as a text file
+
+            profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
+
+            # make a backup of the profile just in case ... roundrobin file name ... 
+            xml_file =  profile.profile_file
+            backup_file = profile.profile_file
+            dirname, base_file = os.path.split(backup_file)
+            basename, ext = os.path.splitext(base_file)
+            max_count = 5
+            count = 0
+            file_list = []
+            while os.path.isfile(backup_file) and count < max_count:
+                backup_file = os.path.join(dirname, f"{basename}_{count:02d}.xml")
+                if os.path.isfile(backup_file):
+                    file_list.append((backup_file, os.path.getmtime(backup_file)))
+                count+=1
+            if count == max_count:
+                # ran out of roundrobin option - blitz the oldest file 
+                file_list.sort(key = lambda x: x[1])
+                backup_file = file_list[-1][0]
+                os.unlink(backup_file)
+
+            try:
+               shutil.copyfile(xml_file, backup_file)
+            except Exception as err:
+                logging.getLogger("system").error(f"Error backing up profile to :{backup_file}\n{err}")
+                self._ok_message_box("Error backing up the profile")
+                return
+
+
+            parser = etree.XMLParser(remove_blank_text=True)
+            root = etree.parse(xml_file, parser)
+
+            nodes = root.xpath(f'//device') # iterate through all because we need to compare case for guid
+            for node in nodes:
+                tmp_guid = node.get("device-guid")
+                if tmp_guid.casefold() == current_guid.casefold():
+                    node.set("device-guid", new_device_guid)
+                    node.set("name", new_device_name)
+                    node_comment = etree.Comment(f"Substituted: [{current_guid}] {current_name} with [{new_device_guid}] {new_device_name}")
+                    previous_node = node.getprevious()
+                    if previous_node is not None:
+                        previous_node.append(node_comment)
+                    else:
+                        parent_node = node.getparent()
+                        parent_node.insert(0, node_comment)
+                    
+
+            try:
+                # save the file
+                tree = root
+                out_file = xml_file
+                # dirname, basename = os.path.split(xml_file)
+                # out_file = os.path.join(dirname, f"sub_{basename}")
+                tree.write(out_file, pretty_print=True,xml_declaration=True,encoding="utf-8")
+            except Exception as err:
+                logging.getLogger("system").error(f"Error writing updated profile: {out_file}\n{err}")
+                self._ok_message_box("Error writing new profile")
+                return
+        
+            # reload the profile with the new changes
+            self.accept()
+            self.close()
 
