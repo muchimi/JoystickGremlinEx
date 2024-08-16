@@ -170,6 +170,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         
         # TABs setups        
         #self.ui.devices.setTabBar(QFrozenTabBar())
+        self._context_menu_tab_index = None
         self.ui.devices.currentChanged.connect(self._current_tab_changed)
         self.ui.devices.setMovable(True) # allow tabs to be re-ordered
         self.devices_tab_bar = self.ui.devices.tabBar()
@@ -177,12 +178,9 @@ class GremlinUi(QtWidgets.QMainWindow):
         
         
         
-        # context menu for device tabs
-        self._tab_create_actions()
+        # context menu for device tabs (actions created by setupUI)
         self.ui.devices.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.ui.devices.customContextMenuRequested.connect(self._tab_context_menu_cb)
-        
-
 
         self.mode_selector = gremlin.ui.ui_common.ModeWidget()
         self.mode_selector.edit_mode_changed.connect(self._edit_mode_changed_cb)
@@ -266,13 +264,19 @@ class GremlinUi(QtWidgets.QMainWindow):
     def _current_tab_changed(self, index):
         device_guid = self._get_tab_guid(index)
         if device_guid is not None:
+            print (f"last tab: {self.ui.devices.tabText(index)} {device_guid}")
             gremlin.config.Configuration().last_tab_guid = device_guid
 
-    def _tab_create_actions(self):
-        self._actionTabSort = QtGui.QAction("Sort", self, triggered = self._tab_sort_cb)
-        self._actionTabSort.setToolTip("Sorts device tabs in alphabetical order")
+    def add_custom_tools_menu(self, menuTools):
+        ''' adds custom tools to the menu '''
+        self._actionTabSort = QtGui.QAction("Sort Devices", self, triggered = self._tab_sort_cb)
+        self._actionTabSort.setToolTip("Sorts input hardware devices in alphabetical order")
         self._actionTabSubstitute = QtGui.QAction("Device Substitution...", self, triggered = self._tab_substitute_cb)
         self._actionTabSubstitute.setToolTip("Substitute device GUIDs")
+        menuTools.addSeparator()
+        menuTools.addAction(self._actionTabSort)
+        menuTools.addAction(self._actionTabSubstitute)
+
 
     def _tab_context_menu_cb(self, pos):
         ''' tab context menu '''
@@ -298,8 +302,23 @@ class GremlinUi(QtWidgets.QMainWindow):
 
     def _tab_substitute_cb(self, pos):
         ''' substitution dialog for devices '''
+        if self._context_menu_tab_index is None:
+            # not setup yet - use the first discovered device in the profile
+            profile = gremlin.shared_state.current_profile
+            if len(profile.devices) > 0:
+                self._context_menu_tab_index = 0
+                
+        if self._context_menu_tab_index is None:
+            # no hardware tab found
+            gremlin.ui.dialogs.ok_message_box("No input hardware was found to substitute.")
+            return
+        
+        # verify we have hardware to substitute with
+
+        
         widget = self.ui.devices.widget(self._context_menu_tab_index)
         _, device_guid = widget.data
+
         device_name = self.ui.devices.tabText(self._context_menu_tab_index)
         dialog = gremlin.ui.dialogs.SubstituteDialog(device_guid=device_guid, device_name=device_name, parent = self)
         dialog.setModal(True)
@@ -899,6 +918,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.ui.devices.clear()
         self.tab_guids = []
         device_name_map = gremlin.shared_state.device_guid_to_name_map
+        restore_tab_guid = self.config.last_tab_guid
         self.last_tab_index = 0
 
         # Device lists
@@ -1081,7 +1101,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         # reorder the tabs based on user preferences if a tab order was previously saved
 
         tab_map = self._get_tab_map()
-        self.tab_guids = [device_guid for device_guid, _, _ in tab_map.values()]
+        self.tab_guids = [device_guid for device_guid, _, _, _ in tab_map.values()]
         self._dump_tab_map(tab_map)
 
         # map of device_guid to widgets
@@ -1098,30 +1118,37 @@ class GremlinUi(QtWidgets.QMainWindow):
         tab_map = self.config.tab_list
         if tab_map is not None:
             # make sure the ids are still found in the current set
+            valid_map = {}
             valid_list = []
             saved_guids = []
-            for device_guid, device_name, tab_type in tab_map.values():
+            
+            for device_guid, device_name, tab_type, tab_index in tab_map.values():
                 #if not tab_type in (TabDeviceType.Plugins, TabDeviceType.Settings) and device_guid in self._tab_widget_map.keys():
                 if device_guid in self._tab_widget_map.keys():
-                        valid_list.append((device_guid, device_name, self._tab_widget_map[device_guid]))
-                        saved_guids.append(device_guid)
+                    valid_list.append((device_guid, device_name, self._tab_widget_map[device_guid], tab_index))
+                    saved_guids.append(device_guid)
+            
+            current_index = len(valid_list)
 
             # add any missing ids that are not in the saved list (the devices may be new and the plugins/settings tab that are always last
             for index, device_guid in enumerate(all_guids):
                 if not device_guid in saved_guids:
-                    valid_list.append((device_guid, self.ui.devices.tabText(index), self._tab_widget_map[device_guid]))
+                    valid_list.append((device_guid, self.ui.devices.tabText(index), self._tab_widget_map[device_guid], current_index))
+                    current_index+=1
+
+            valid_list.sort(key = lambda x: x[3]) # sort by stored tab index                    
 
             # rebuild the tabs
             with QtCore.QSignalBlocker(self.devices_tab_bar):
 
                 self.ui.devices.clear()
-                for device_guid, device_name, widget in valid_list:
+                for device_guid, device_name, widget, _ in valid_list:
                     # find the current index
                     self.ui.devices.addTab(widget, device_name)
 
 
         # select the tab that was last selected (if it exists)
-        self._select_last_tab()
+        self._select_tab(restore_tab_guid)
 
         # virtual device (not displayed)
         device_name_map[dinput.GUID_Virtual] = "(VirtualButton)"
@@ -1133,7 +1160,11 @@ class GremlinUi(QtWidgets.QMainWindow):
 
 
     def _get_tab_map(self):
-        ''' gets tab configuration data as a dictionary indexed by tab index holding device id, device name and device widget type '''
+        ''' gets tab configuration data as a dictionary indexed by tab index holding device id, device name and device widget type
+         
+          
+        :returns:  list of (device_guid, device_name, tabdevice_type, tab_index)
+        '''
         tab_count = self.ui.devices.count()
         data = {}
         for index in range(tab_count):
@@ -1141,7 +1172,11 @@ class GremlinUi(QtWidgets.QMainWindow):
             if hasattr(widget,"data"):
                 tab_type, device_guid = widget.data
                 device_name = self.ui.devices.tabText(index)
-                data[index] = (device_guid, device_name, tab_type)
+                data[index] = (device_guid, device_name, tab_type, index)
+
+       
+        for index, (device_guid, device_name, tab_type, tab_index) in data.items():
+            print (f"[{index}] [{tab_index}] {device_name}")
         return data
 
     def _find_tab_data(self, search_widget_type : TabDeviceType):
@@ -1192,34 +1227,38 @@ class GremlinUi(QtWidgets.QMainWindow):
         tab_count = self.ui.devices.count()
         return [self.ui.devices.widget(index) for index in range(tab_count)]
 
-        
-    def _select_last_tab(self):
-        ''' restore the last selected tab '''
-        last_guid = self.config.last_tab_guid
-        if last_guid is not None:
-            index = self._find_tab_index(last_guid)
+    def _select_tab(self, search_guid):
+        ''' selects a tab by guid '''
+        if search_guid is not None:
+            index = self._find_tab_index(search_guid)
             if index is not None:
                 with QtCore.QSignalBlocker(self.ui.devices):
                     self.ui.devices.setCurrentIndex(index)
+        
+    def _select_last_tab(self):
+        ''' restore the last selected tab '''
+        self._select_tab(self.config.last_tab_guid)
+        
     
-    def _find_tab_index(self, device_guid : str):
-        for index in range(self.ui.devices.count()):
-            widget = self.ui.devices.widget(index)
-            if widget.data[1].casefold() == device_guid.casefold():
-                return index
+    def _find_tab_index(self, search_guid : str):
+        tab_map = self._get_tab_map()
+        for device_guid, device_name, device_class, tab_index in tab_map.values():
+            if device_guid.casefold() == search_guid.casefold():
+                # print (f"Found tab index {tab_index} for guid {search_guid} {device_name}")
+                return tab_index
         return None
     
     def _get_tab_guid(self, index : int):
         ''' gets the tab GUID from its index '''
         widget = self.ui.devices.widget(index)
         if hasattr(widget, "data"):
-            return widget.data
+            return widget.data[1] # id is index 1
         return None
 
     
     def _dump_tab_map(self, tab_map):
-        for index, (device_guid, device_name, device_class) in tab_map.items():
-            print(f"[{index}] {device_name} {device_class} {device_guid}")    
+        for index, (device_guid, device_name, device_class, tab_index) in tab_map.items():
+            print(f"[{index}] Tab index: [{tab_index}] {device_name} {device_class} {device_guid}")    
 
 
     def _sort_tabs(self):

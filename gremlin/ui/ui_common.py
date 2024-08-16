@@ -831,7 +831,7 @@ class ModeWidget(QtWidgets.QWidget):
 
 
         # Create mode selector and related widgets
-        self.edit_label = QtWidgets.QLabel("Active Edit Mode")
+        self.edit_label = QtWidgets.QLabel("Profile Edit Mode")
         self.edit_label.setSizePolicy(min_min_sp)
         self.edit_mode_selector = QtWidgets.QComboBox()
         self.edit_mode_selector.setSizePolicy(exp_min_sp)
@@ -2729,3 +2729,19 @@ class QHelper():
         sb_widget.setValue(self.to_value(value))
 
         return sb_widget
+    
+
+class QDoubleClickSpinBox(QtWidgets.QSpinBox):
+    ''' double click to reset spinbox '''
+    doubleClick = QtCore.Signal()
+
+    def __init__(self, parent = None):
+        super().__init__(parent = None)
+        self.installEventFilter(self)
+
+    def eventFilter(self, object, event):
+        t = event.type()
+        if t == QtCore.QEvent.Type.MouseButtonDblClick:
+            self.doubleClick.emit()
+        return False
+

@@ -314,7 +314,7 @@ There are three options that control this behavior in the GremlinEx options pane
 | Highlight currently used buttons | Detects button changes only (axis movement is ignored but can be overriden - see below (this is recommended) | 
 | Highlight swaps device tabs | Changes input tabs automatically (this is a recommended) |
 
-
+As of 13.40.14ex, GremlinEx also has an option to display input repeaters as well for all joystick hardware inputs showing live axis position as well as button state.
 
 
 <!-- TOC --><a name="button-detect-only-overrides"></a>
@@ -461,19 +461,36 @@ When automatic profile load is enabled, GremlinEx has the option to override the
 
 In addition to this, the profile itself provides actions that can switch modes.
 
+# Profile device substitution and input order
+
+Windows is notorious for changing the order of gaming controllers and to this end, GremlinEx does not use the sequence of controllers.  GremlinEx tracks input controllers by their hardware ID, a "guid" or globally unique identifier that includes the manufacturer hardware code, and unique to a device.   This approach avoids the device re-order issue, but walks right into, what happens when the hardware ID changes?
+
+The hardware ID is saved with a profile, and mappings are tied to that hardware ID.
+
+On occasion, hardware IDs for HID devices can change as reported by Windows.  This can happen when:
+
+- the input is programmable and lets you change the hardware ID (example, Arduino, Rasberry Pi custom hardware controllers)
+- the manufacturer provides a firmware update changing the input ID
+- the input is wireless and the ID resets on device reconnect
+- two inputs have the same ID (example, plugging in two identical joysticks), and the hardware driver assigns a new ID - which is usually a sequence.
+
+
+## Substitution
+
+To help with situations where the hardware ID must be changed, while it's always possible to manually edit the profile XML with a text editor such as Notepad++, GremlinEx as of 13.40.14ex includes a small substitution dialog that lets you swap out device IDs.  This is accessible by right-clicking on a device tab and selecting device substitutions, or from the tools menu.
 
 <!-- TOC --><a name="caveats-with-automation"></a>
-## Caveats with automation
+## Caveats with profile automation
 
-GremlinEx is not aware of anything except what process has the current focus, and what you've configured in the profile options.  It's completely possible that you will experience conflicts if you have programmed these in, or constant loading/reloading.
+GremlinEx only has information about which process has the focus from the operating system, and the configuration options. As such, it is completely possible that you will experience conflicts if you have programmed these in, or constant loading/reloading, frequently changing process and otherwise attempting to break the detection logic.  One reason for this is large profiles take a while to load and if the target process is changed while a load is in motion, it may trigger a delay and GremlinEx may not immediately respond to changes
 
-To guard against this behavior, here are things that are not recommended:
+Recommended configurations to avoid:
 
-- have two processes (such as games) each associated with an automatic load profile and constantly changing focus between the two. This will cause a profile reload/reset and new mode activation whenever the focus changes.
+- have two (or more) processes running concurrently with each associated with an automatic load profile and constantly changing focus between them rapidly. This will cause a profile reload/reset and new mode activation whenever the focus changes.  Some optimizations were made to the profile load - caching is planned for a future release to avoid load delays.
 
-- attach a profile to a non-game, such as a background process.
+- attach a profile to a non-game process, such as a background process.
 
-The recommended approach is to only run one mapped process at a time, ensure the profile remains active if you alt-tab or switch to another window on multi-monitor setups.
+The recommended approach is to only execute one mapped process at a time, and to ensure the profile remains active when the process loses focus, such as when alt-tab or switch to another window on multi-monitor setups.  Automatic profile loading is also not recommended while you are designing a profile.  Only automate profiles that are not being actively edited/modified to avoid Gremlin activating the profile while you are editing it.
 
 <!-- TOC --><a name="caveats-with-loading-to-the-prior-mode"></a>
 ## Caveats with loading to the prior mode

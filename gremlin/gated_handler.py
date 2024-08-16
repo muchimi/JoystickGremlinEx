@@ -636,7 +636,7 @@ class GateData(QtCore.QObject):
 
     def _short_press(self, functor, event, value, delay = 250):
         ''' triggers a short press of a trigger (gate crossing)'''
-        print ("short press ")
+        # print ("short press ")
         value.current = True
         value.is_pressed = True
         functor.process_event(event, value)

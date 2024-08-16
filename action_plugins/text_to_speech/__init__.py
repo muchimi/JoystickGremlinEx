@@ -24,6 +24,7 @@ import gremlin.base_profile
 from gremlin.input_types import InputType
 import gremlin.ui.input_item
 import gremlin.tts
+import gremlin.ui.ui_common
 import gremlin.util
 
 
@@ -51,6 +52,7 @@ class TextToSpeechWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.voice_widget.currentIndexChanged.connect(self._voice_change_cb)
 
         self.text_field = QtWidgets.QPlainTextEdit()
+        self.text_field.setPlainText(self.action_data.text)
         self.text_field.textChanged.connect(self._content_changed_cb)
         self.text_field.installEventFilter(self)
 
@@ -58,10 +60,17 @@ class TextToSpeechWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.volume_widget.setRange(0, 100)
         self.volume_widget.valueChanged.connect(self._volume_changed_cb)
                                                 
-        self.rate_widget = QtWidgets.QSpinBox()
-        
-        self.rate_widget.setRange(-10, 10)
+        self.rate_widget = gremlin.ui.ui_common.QDoubleClickSpinBox()
+        self.rate_widget.setRange(tts.rate_offset_min, tts.rate_offset_max)
         self.rate_widget.valueChanged.connect(self._rate_changed_cb)
+        self.rate_widget.doubleClick.connect(self._rate_reset_cb)
+
+        self.play_widget = QtWidgets.QPushButton("Play")
+        self.play_widget.setIcon(gremlin.util.load_icon("fa.play",qta_color="green"))
+        self.play_widget.setToolTip("Plays the audio as configured")
+        self.play_widget.clicked.connect(self._play_cb)
+
+
         self.container_widget = QtWidgets.QWidget()
         self.container_layout = QtWidgets.QHBoxLayout()
         self.container_widget.setLayout(self.container_layout)
@@ -74,16 +83,25 @@ class TextToSpeechWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self.container_layout.addWidget(QtWidgets.QLabel("Playback rate:"))
         self.container_layout.addWidget(self.rate_widget)
+
+        self.container_layout.addWidget(self.play_widget)
+
         self.container_layout.addStretch()
 
         self.main_layout.addWidget(self.text_field)
         self.main_layout.addWidget(self.container_widget)
+
+        self._content_changed_cb() # update buttons
 
     def eventFilter(self, object, event):
         t = event.type()
         if t == QtCore.QEvent.Type.FocusOut:
             self.action_data.text = self.text_field.toPlainText()
         return False
+    
+    @QtCore.Slot()
+    def _rate_reset_cb(self):
+        self.rate_widget.setValue(0)
     
     @QtCore.Slot()
     def _voice_change_cb(self):
@@ -93,6 +111,7 @@ class TextToSpeechWidget(gremlin.ui.input_item.AbstractActionWidget):
     @QtCore.Slot()
     def _content_changed_cb(self):
         self.action_data.text = self.text_field.toPlainText()
+        self.play_widget.setEnabled(self.action_data.text != '')
 
     def _populate_ui(self):
         self.text_field.setPlainText(self.action_data.text)
@@ -110,6 +129,16 @@ class TextToSpeechWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.action_data.rate = value
 
 
+    @QtCore.Slot()
+    def _play_cb(self):
+        tts = gremlin.tts.TextToSpeech()
+        voice = tts.getVoices()[self.action_data.voice_index]
+        tts.set_voice(voice)
+        tts.set_volume(self.action_data.volume)
+        tts.set_rate(self.action_data.rate)
+        tts.speak_single(self.action_data.text) 
+
+
 class TextToSpeechFunctor(gremlin.base_profile.AbstractFunctor):
     
     tts = gremlin.tts.TextToSpeech()
@@ -124,13 +153,11 @@ class TextToSpeechFunctor(gremlin.base_profile.AbstractFunctor):
 
     def _speak(self):
         if self.tts is not None:
-            self.tts.stop()
             voice = self.tts.getVoices()[self.action_data.voice_index]
             self.tts.set_voice(voice)
             self.tts.set_volume(self.action_data.volume)
             self.tts.set_rate(self.action_data.rate)
             self.tts.speak(self.action_data.text)
-
     
     def profile_start(self):
         if self.action_data.enabled:
@@ -173,10 +200,17 @@ class TextToSpeech(gremlin.base_profile.AbstractAction):
     def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
-        self.text = ""
+        self._text = ""
         self.volume = 100
         self.rate = 0
         self.voice_index = 0
+
+    @property
+    def text(self):
+        return self._text
+    @text.setter
+    def text(self, value):
+        self._text = value
 
 
     def display_name(self):
@@ -193,9 +227,9 @@ class TextToSpeech(gremlin.base_profile.AbstractAction):
         ]
 
     def _parse_xml(self, node):
-        self.text = node.get("text")
+        
         voice_id = None
-        tts = gremlin.tts.TextToSpeech()
+        
         if "voice_id" in node.attrib:
             voice_id = node.get("voice_id")
             if voice_id.isdigit():
@@ -212,6 +246,10 @@ class TextToSpeech(gremlin.base_profile.AbstractAction):
             self.rate = int(node.get("rate"))
         else:
             self.rate = 0
+        if "text" in node.attrib:
+            self.text = node.get("text")
+            pass
+            
 
     def _generate_xml(self):
         node = ElementTree.Element("text-to-speech")

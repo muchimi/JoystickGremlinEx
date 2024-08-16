@@ -287,7 +287,7 @@ class EventListener(QtCore.QObject):
 		item, is_pressed = self._keyboard_queue.get()
 		verbose = gremlin.config.Configuration().verbose_mode_keyboard
 		if verbose:
-			print (f"process_queue: found item: {item} is presseD: {is_pressed}")
+			logging.getLogger("system").info(f"process_queue: found item: {item} is presseD: {is_pressed}")
 
 		if isinstance(item, int):
 			virtual_code = item

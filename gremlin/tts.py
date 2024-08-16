@@ -31,6 +31,10 @@ import gremlin.singleton_decorator
 @gremlin.singleton_decorator.SingletonDecorator
 class TextToSpeech:
 
+    rate_playback = 200 # default playback rate
+    rate_offset_min = -175 # max slow
+    rate_offset_max = 100 # max fast
+
     def __init__(self):
         """Creates a new instance."""
         self.engine = pyttsx3.init()
@@ -53,6 +57,16 @@ class TextToSpeech:
             
         except Exception as err:
             logging.getLogger(f"system").error(f"Error in TTS: {err}")
+
+    def speak_single(self, text):
+        ''' speaks the test as a single event (don't use this inside an event loop)'''
+        try:
+            text = self.text_substitution(text)
+            self.engine.say(text)
+            self.engine.runAndWait()
+        except Exception as err:
+            logging.getLogger(f"system").error(f"Error in TTS: {err}")
+
 
     def stop(self):
         ''' stops any speech '''
@@ -103,7 +117,7 @@ class TextToSpeech:
         :param value the new speaking rate
         """
         # default is 200 words per minute
-        rate = 200 + int(util.clamp(value, -10, 10))
+        rate = self.rate_playback + int(util.clamp(value, self.rate_offset_min, self.rate_offset_max))
         self.engine.setProperty('rate', rate )
         
 

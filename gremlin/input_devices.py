@@ -666,8 +666,10 @@ class StateChangeRegistry():
         :return new callback with plugins installed
         """
         signature = inspect.signature(callback).parameters
-        for item in signature:
-            print(item)
+        verbose = gremlin.config.Configuration().verbose
+        if verbose:
+            for item in signature:
+                logging.getLogger("system").info(item)
         partial_fn = functools.partial
         if "self" in signature:
             partial_fn = functools.partialmethod

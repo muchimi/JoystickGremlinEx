@@ -147,7 +147,7 @@ class Backend(QtCore.QObject):
             )
             return InputItemModel(item, self)
         except error.ProfileError as e:
-            print(e)
+            logging.getLogger("system").error(e)
 
     @Slot(str, result=bool)
     def isActionExpanded(self, uuid_str: str) -> bool:

@@ -2286,7 +2286,6 @@ class SubstituteDialog(QtWidgets.QDialog):
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self._device_guid = device_guid # current device GUID
         self._device_name = device_name # current device name
-        self.setMinimumSize(700,200)
 
         fm = QtGui.QFontMetrics(self.font())
         
@@ -2299,7 +2298,6 @@ class SubstituteDialog(QtWidgets.QDialog):
         self.profile_device_widget = QtWidgets.QComboBox()
         self.hardware_device_widget = QtWidgets.QComboBox()
         
-
         self.replace_button_widget = QtWidgets.QPushButton("Replace")
         self.replace_button_widget.clicked.connect(self._replace_cb)
         
@@ -2317,6 +2315,7 @@ class SubstituteDialog(QtWidgets.QDialog):
         self.header_container_layout.addWidget(self.replace_button_widget,1,2)
         self.header_container_layout.addWidget(QtWidgets.QLabel(" "),0,3)
         self.header_container_layout.setColumnStretch(3,2)
+
 
         self.main_layout.addWidget(QtWidgets.QLabel("Device substitution enables the replacement of one device ID with another<br/>in case the hardware ID has changed since the profile was created."))
         self.main_layout.addWidget(self.header_container_widget)
@@ -2342,13 +2341,24 @@ class SubstituteDialog(QtWidgets.QDialog):
         for info in self._profile_devices:
             self.profile_device_widget.addItem(f"[{str(info.device_guid)}] {info.name}", info)
 
+
         self.hardware_device_widget.currentIndexChanged.connect(self._validate)
         self.profile_device_widget.currentIndexChanged.connect(self._validate)
 
         self._validate()
 
+        self.setSizePolicy(
+            QtWidgets.QSizePolicy.Expanding,
+            QtWidgets.QSizePolicy.Expanding
+        )
 
-    def _ok_message_box(self, content):
+        self.ensurePolished()
+        self.adjustSize()
+
+    def sizeHint(self):
+        return QtCore.QSize(700,150)
+
+    def ok_message_box(self, content):
         message_box = QtWidgets.QMessageBox()
         message_box.setIcon(QtWidgets.QMessageBox.Icon.Warning)
         message_box.setText(content)
@@ -2356,7 +2366,7 @@ class SubstituteDialog(QtWidgets.QDialog):
         gremlin.util.centerDialog(message_box)
         result = message_box.exec()
 
-    def _confirm_message_box(self, content):
+    def confirm_message_box(self, content):
         message_box = QtWidgets.QMessageBox()
         message_box.setIcon(QtWidgets.QMessageBox.Icon.Warning)
         message_box.setText(content)
@@ -2380,7 +2390,7 @@ class SubstituteDialog(QtWidgets.QDialog):
         new_device_guid = self._hardware_device_guid
         new_device_name = self.hardware_device_widget.currentData().name
 
-        if self._confirm_message_box(f"Replace ID '{current_guid}' with '{new_device_guid}' (no undo?)"):
+        if self.confirm_message_box(f"Replace ID '{current_guid}' with '{new_device_guid}' (no undo?)"):
             # read the XML as a text file
 
             profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
@@ -2408,7 +2418,7 @@ class SubstituteDialog(QtWidgets.QDialog):
                shutil.copyfile(xml_file, backup_file)
             except Exception as err:
                 logging.getLogger("system").error(f"Error backing up profile to :{backup_file}\n{err}")
-                self._ok_message_box("Error backing up the profile")
+                self.ok_message_box("Error backing up the profile")
                 return
 
 
@@ -2439,7 +2449,7 @@ class SubstituteDialog(QtWidgets.QDialog):
                 tree.write(out_file, pretty_print=True,xml_declaration=True,encoding="utf-8")
             except Exception as err:
                 logging.getLogger("system").error(f"Error writing updated profile: {out_file}\n{err}")
-                self._ok_message_box("Error writing new profile")
+                self.ok_message_box("Error writing new profile")
                 return
         
             # reload the profile with the new changes
