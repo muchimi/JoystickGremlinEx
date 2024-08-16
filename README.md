@@ -5,7 +5,7 @@ Joystick Gremlin EX
 
 ## Contents
 
-<!-- TOC start (generated with https://github.com/derlin/bitdowntoc) -->
+<!-- TOC start (generated with https://github.com/derlin/bitdowntoc)  -->
 
 - [Changelog](#changelog)
 - [Virus false-positives](#virus-false-positives)
