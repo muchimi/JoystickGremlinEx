@@ -480,7 +480,14 @@ class Configuration:
         self._data["restore_mode_on_start"] = value
         self.save()
 
-    
+    @property
+    def highlight_autoswitch(self):
+        ''' true if in design mode and tab switching is allowed on input detect change '''
+        return self._data.get("highlight_switch", False)
+    @highlight_autoswitch.setter
+    def highlight_autoswitch(self, value):
+        self._data["highlight_switch"] = value
+        self.save()
 
 
     @property
@@ -492,7 +499,7 @@ class Configuration:
 
         :return True if the feature is enabled, False otherwise
         """
-        return self._data.get("highlight_input", True)
+        return self._data.get("highlight_input", False)
 
     @highlight_input.setter
     def highlight_input(self, value):
@@ -873,7 +880,7 @@ class Configuration:
     def verbose_set_mode(self, mode, enabled):
         ''' enables the specified verbose mode '''
         if not "verbose_mode" in self._data:
-            self._data["verbose_mode"] = VerboseMode.All
+            self._data["verbose_mode"] = 0 # none 
         value = self._data["verbose_mode"]
         if enabled:
             value |= mode

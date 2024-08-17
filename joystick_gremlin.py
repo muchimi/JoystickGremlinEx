@@ -196,6 +196,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         # Input selection storage
         self._last_input_timestamp = time.time()
         self._last_input_event = None
+        self._last_input_identifier = None # input id of the last triggered device
+        self._last_device_guid = None # string representation of the last GUID of the last triggered device
         self._last_tab_switch = None
         self._input_delay = 0.25
         self._event_process_registry = {}
@@ -946,12 +948,15 @@ class GremlinUi(QtWidgets.QMainWindow):
                 device_profile,
                 self.current_mode,
             )
+
             device_guid = str(device.device_guid)
             widget.data = (TabDeviceType.Joystick, device_guid)
             self._joystick_device_guids.append(device_guid)
             tab_label = device.name.strip()
             device_name_map[device.device_guid] = tab_label
             self.ui.devices.addTab(widget, tab_label)
+
+            widget.inputChanged.connect(self._device_input_changed_cb)
             
             
         self._vjoy_input_device_guids = []
@@ -1411,8 +1416,11 @@ class GremlinUi(QtWidgets.QMainWindow):
                    logging.getLogger("system").info(f"Device change end") 
                 self.device_change_locked = False
             
-        
-            
+    @QtCore.Slot()
+    def _device_input_changed_cb(self, device_guid, identifier):
+        ''' called when device input changed '''
+        self._last_device_guid = device_guid
+        self._last_input_identifier = identifier
 
     
 
@@ -1448,8 +1456,17 @@ class GremlinUi(QtWidgets.QMainWindow):
             
         
             # Switch to the tab corresponding to the event's device if the option
-            widget = self._get_tab_widget_guid(event.device_guid)
-            tab_switch_needed = self.ui.devices.currentWidget() != widget 
+            # widget = self._get_tab_widget_guid(event.device_guid)
+            
+            device_guid = str(event.device_guid)
+            widget = self.ui.devices.currentWidget()
+            (_, tab_device_guid) = widget.data
+            tab_switch_needed = tab_device_guid != device_guid
+
+            if tab_switch_needed and not config.highlight_autoswitch:
+                # not setup to auto change tabs
+                return
+            
             
             if verbose and tab_switch_needed:
                 device_name = self._get_tab_name_guid(event.device_guid)
@@ -1481,11 +1498,15 @@ class GremlinUi(QtWidgets.QMainWindow):
                 if verbose:
                     logging.getLogger("system").info(f"Event: highlight button input ignored (option off)")
                 return        
+            
+            input_changed = not self._last_device_guid or not self._last_input_identifier or self._last_device_guid != device_guid or self._last_input_identifier != event.identifier
 
-
-            process_input = tab_switch_needed or self._should_process_input(event, widget, buttons_only)
+            process_input = input_changed or self._should_process_input(event, widget, buttons_only)
             if verbose:
                 logging.getLogger("system").info(f"Event: process input {'ok' if process_input else 'ignored'}")
+
+            self._last_input_identifier = event.identifier
+            self._last_device_guid = device_guid
             
             if not process_input:
                 return

@@ -268,16 +268,23 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.general_layout = QtWidgets.QVBoxLayout()
         self.general_page.setLayout(self.general_layout)
 
-        # Highlight input option
-        self.highlight_input = QtWidgets.QCheckBox(
-            "Highlight currently used input (axis + buttons)"
+        # highlight autoswitch
+        self.highlight_autoswitch = QtWidgets.QCheckBox(
+            "Switch to new device on input highlight trigger"
         )
-        self.highlight_input.clicked.connect(self._highlight_input)
-        self.highlight_input.setChecked(self.config.highlight_input)
+        self.highlight_autoswitch.clicked.connect(self._highlight_autoswitch)
+        self.highlight_autoswitch.setChecked(self.config.highlight_autoswitch)
+
+        # Highlight input option
+        self.highlight_input_axis = QtWidgets.QCheckBox(
+            "Highlight currently triggered axis"
+        )
+        self.highlight_input_axis.clicked.connect(self._highlight_input)
+        self.highlight_input_axis.setChecked(self.config.highlight_input)
 
         # Highlight input option buttons
         self.highlight_input_buttons = QtWidgets.QCheckBox(
-            "Highlight currently used buttons"
+            "Highlight currently triggered button"
         )
         self.highlight_input_buttons.clicked.connect(self._highlight_input_buttons)
         self.highlight_input_buttons.setChecked(self.config.highlight_input_buttons)
@@ -481,8 +488,8 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.runtime_ui_update.clicked.connect(self._runtime_ui_update)
         self.runtime_ui_update.setToolTip("When set, Joystick Gremlin Ex will update the UI on profile or mode changes at runtime - this can be turned off to enhance performance at runtime")
 
-        
-        self.general_layout.addWidget(self.highlight_input)
+        self.general_layout.addWidget(self.highlight_autoswitch)
+        self.general_layout.addWidget(self.highlight_input_axis)
         self.general_layout.addWidget(self.highlight_input_buttons)
         self.general_layout.addWidget(self.highlight_device)
         self.general_layout.addWidget(self.close_to_systray)
@@ -898,6 +905,13 @@ This setting is also available on a profile by profile basis on the profile tab,
         return False
 
 
+    @QtCore.Slot(bool)
+    def _highlight_autoswitch(self, clicked):
+        """Stores preference for input highlighting  """
+        self.config.highlight_autoswitch = clicked
+
+
+
 
     @QtCore.Slot(bool)
     def _highlight_input(self, clicked):
@@ -906,7 +920,6 @@ This setting is also available on a profile by profile basis on the profile tab,
         :param clicked whether or not the checkbox is ticked
         """
         self.config.highlight_input = clicked
-        self.config.save()
 
     @QtCore.Slot(bool)
     def _highlight_input_buttons(self, clicked):
@@ -915,7 +928,6 @@ This setting is also available on a profile by profile basis on the profile tab,
         :param clicked whether or not the checkbox is ticked
         """
         self.config.highlight_input_buttons = clicked
-        self.config.save()
 
 
 

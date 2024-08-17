@@ -378,6 +378,7 @@ from gremlin.ui.qdatawidget import QDataWidget
 class JoystickDeviceTabWidget(QDataWidget):
 
     """Widget used to configure a single joystick input device."""
+    inputChanged = QtCore.Signal(str, object) # indicates the input selection changed sends (device_guid string, identifier object)
 
     def __init__(
             self,
@@ -623,12 +624,18 @@ class JoystickDeviceTabWidget(QDataWidget):
 
         widget = InputItemConfiguration(item_data)                 
         self.main_layout.addWidget(widget,3)
-
+        
         if item_data is not None:
             
             change_cb = self._create_change_cb(index)
             widget.action_model.data_changed.connect(change_cb)
             widget.description_changed.connect(change_cb)
+
+        # indicate the input changed
+        device_guid = str(item_data.device_guid)
+        identifier = item_data.input_id
+        self.inputChanged.emit(device_guid, identifier)
+
 
 
     def set_mode(self, mode):
