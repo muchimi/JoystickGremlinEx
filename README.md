@@ -1,6 +1,7 @@
 Joystick Gremlin EX
 ================
 
+Latest releases (may be a pre-release):  https://github.com/muchimi/JoystickGremlinEx/releases
 
 
 ## Contents
