@@ -320,7 +320,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.show_scancodes_widget.clicked.connect(self._show_scancodes_cb)
 
         # show scan codes
-        self.show_joystick_input_widget = QtWidgets.QCheckBox("Show axis slider for axis inputs")
+        self.show_joystick_input_widget = QtWidgets.QCheckBox("Show live joystick inputs")
         self.show_joystick_input_widget.setChecked(self.config.show_input_axis)
         self.show_joystick_input_widget.clicked.connect(self._show_joystick_input_cb)
 
