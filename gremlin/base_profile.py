@@ -151,7 +151,7 @@ class ProfileData(metaclass=ABCMeta):
         :return DeviceType of this entry
         """
         if self._input_item is not None:
-            return self._input_item.device_type
+            return self._input_item.device_guid
         return None
 
     def get_settings(self):

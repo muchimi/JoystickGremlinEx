@@ -1573,51 +1573,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             lbl = self.icon_map[id]
             lbl.setPixmap(used_pixmap if used else unused_pixmap)
 
-    # def _populate_hardware(self):
-    #     ''' populates hardware inputs UI 
-        
-    #         this will show all possible hardware inputs if they have an axis
-    #         and defaults to the one mapped to this action
-        
-    #     '''
-    #     import gremlin.joystick_handling
-    #     phys_devices = gremlin.joystick_handling.physical_devices()
-    #     # filter out devices with axis input only
-    #     axis_devices = [d for d in phys_devices if d.axis_count > 0]
-    #     # self.hardware_device.clear()
-    #     current_guid = self.action_data.hardware_device_guid
-    #     current_device = next((d for d in axis_devices if d.device_guid == current_guid), None)
-    #     # if axis_devices:
-    #     #     with QtCore.QSignalBlocker(self.hardware_device):
-    #     #         for device in axis_devices:
-    #     #             self.hardware_device.addItem(device.name, device)
-
-    #     # if current_device:
-    #     #     index = self.hardware_device.findData(current_device)
-    #     #     self.hardware_device.setCurrentIndex(index)
-
-                    
-
-
-    # def _populate_hardware_axis(self):
-    #     ''' fills the axis drop down based on the current hardware device selected '''
-    #     index = self.hardware_device.currentIndex()
-    #     if index != -1:
-    #         device = self.hardware_device.itemData(index)
-    #         self.hardware_axis.clear()
-            
-    #         current_guid = self.action_data.hardware_device_guid
-    #         current_axis = -1
-    #         if current_guid == device.device_guid:
-    #             # current selected input device is the same as the device mapped to this action
-    #             current_axis = self.action_data.hardware_input_id
-    #         with QtCore.QSignalBlocker(self.hardware_axis):
-    #             for axis in range(1,device.axis_count+1):
-    #                 if axis != current_axis:
-    #                     # add axis only if it's not already the one mapped to this action
-    #                     self.hardware_axis.addItem(f"Axis {self.get_axis_name(axis)} ({axis})", axis)
-
-
+   
 
 
 
