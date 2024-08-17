@@ -169,6 +169,9 @@ class _GenericSlider(QSlider):
             self.rangeChanged.emit(self._minimum, self._maximum)
             self.setValue(self._value)  # re-bound
 
+    def range(self):
+        return (self._minimum, self._maximum)
+
     def tickInterval(self) -> float:  # type: ignore
         return self._tickInterval
 
