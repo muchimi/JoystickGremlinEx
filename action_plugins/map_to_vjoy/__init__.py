@@ -1022,7 +1022,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
                 
             elif self.action_data.input_type == InputType.JoystickHat:
                 # hat mode is the only mode
-                actions = (VjoyAction.VJoyHat)
+                actions = [VjoyAction.VJoyHat]
 
             else:
                 log_sys_warn(f"VJOYREMAP: don't know what actions to load for input type: {self.action_data.input_type}")

@@ -160,10 +160,12 @@ class ProfileData(metaclass=ABCMeta):
         :return Settings object of this profile
         """
 
-        item = self.parent
-        while not isinstance(item, Profile):
-            item = item.parent
-        return item.settings
+        return gremlin.shared_state.current_profile.settings
+
+        # item = self.parent
+        # while not isinstance(item, Profile):
+        #     item = item.parent
+        # return item.settings
     
     
     @property
@@ -601,7 +603,7 @@ class InputItem():
         :param parent the parent mode of this input item
         """
         
-        #self.parent = parent 
+        self.parent = parent 
         self._input_type = None
         self._device_guid = None # hardware input ID
         self._name = None # device name
@@ -1308,8 +1310,10 @@ def extract_remap_actions(action_sets):
     remap_actions = []
     for actions in [a for a in action_sets if a is not None]:
         for action in actions:
-            if isinstance(action, gremlin.action_plugins.remap.Remap):
+            if hasattr(action,"name") and action.name == "remap":
                 remap_actions.append(action)
+            # if isinstance(action, gremlin.action_plugins.remap.Remap):
+            #     remap_actions.append(action)
     return remap_actions
 
 

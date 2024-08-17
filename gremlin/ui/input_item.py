@@ -1633,7 +1633,7 @@ class AbstractActionWidget(QtWidgets.QFrame):
         :return root Profile instance
         """
         root = self.action_data
-        while not isinstance(root, gremlin.profile.Profile):
+        while not isinstance(root, gremlin.base_profile.Profile):
             root = root.parent
         return root
     
