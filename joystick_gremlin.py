@@ -39,8 +39,9 @@ import gremlin.ui.osc_device
 import gremlin.util
 
 # Import QtMultimedia so pyinstaller doesn't miss it
+
 import PySide6
-from PySide6 import QtCore, QtGui, QtWidgets
+from PySide6 import QtCore, QtGui, QtWidgets, QtMultimedia
 from gremlin.types import TabDeviceType
 #from gremlin.ui.qfrozentabbar import QFrozenTabBar
 
