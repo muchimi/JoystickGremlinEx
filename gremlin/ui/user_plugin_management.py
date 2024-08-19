@@ -21,12 +21,13 @@ from PySide6 import QtCore, QtGui, QtWidgets
 
 
 from gremlin.common import PluginVariableType
-from gremlin.util import load_icon
+from gremlin.util import load_icon, userprofile_path
 import gremlin.base_profile
 from gremlin.input_types import InputType
 import gremlin.user_plugin
 import gremlin.ui.ui_common
 import os
+
 
 
 class ModuleManagementController(QtCore.QObject):
@@ -276,13 +277,23 @@ class ModuleManagementView(QtWidgets.QSplitter):
 
     def _prompt_user_for_module(self):
         """Asks the user to select the path to the module to add."""
-
+        import gremlin.config
+        config = gremlin.config.Configuration()
+        dir = config.last_plugin_folder
+        if dir is None or not os.path.isdir(dir):
+            dir = userprofile_path()
         fname, _ = QtWidgets.QFileDialog.getOpenFileName(
             None,
             "Path to Python plugin",
-            "C:\\",
+            dir,
             "Python (*.py)"
         )
+        if os.path.isfile(fname):
+            dirname,_ = os.path.split(fname)
+            config.last_plugin_folder = dirname
+
+
+            
         self.add_module.emit(fname)
 
 

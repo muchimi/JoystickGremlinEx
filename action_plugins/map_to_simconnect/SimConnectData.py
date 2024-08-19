@@ -312,7 +312,6 @@ class SimConnectData(QtCore.QObject):
             self._aircraft_folder = folder
             self._aircraft_loaded_internal.emit(folder)
 
-
     def get_aircraft_title(self):
         ar = AircraftRequests(self._sm)
         trigger = ar.find("TITLE")

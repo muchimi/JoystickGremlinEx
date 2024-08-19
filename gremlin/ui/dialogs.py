@@ -2173,7 +2173,7 @@ class SwapDevicesUi(ui_common.BaseDialogUi):
 
     """UI Widget that allows users to swap identical devices."""
 
-    def __init__(self, parent=None):
+    def __init__(self, profile, parent=None):
         """Creates a new instance.
 
         :param profile the current profile
@@ -2181,7 +2181,7 @@ class SwapDevicesUi(ui_common.BaseDialogUi):
         """
         super().__init__(parent)
 
-        self.profile = gremlin.shared_state.current_profile
+        self.profile = profile
 
         # Create UI elements
         self.setWindowTitle("Swap Devices")

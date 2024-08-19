@@ -980,6 +980,7 @@ class Configuration:
     @last_tab_guid.setter
     def last_tab_guid(self, value):
         self._data["last_tab_guid"] = str(value)
+        # print(f"config: last tab set: {value}")
         self.save()
        
 
@@ -1010,3 +1011,21 @@ class Configuration:
     def show_output_vjoy(self, value):
         self._data["show_vjoy_output"] = value
         self.save()
+
+    @property
+    def last_plugin_folder(self):
+        ''' last folder used for plugins '''
+        return self._data.get("last_plugin_folder",None)
+    @last_plugin_folder.setter
+    def last_plugin_folder(self, value):
+        self._data["last_plugin_folder"]=value
+
+    @property
+    def last_sound_folder(self):
+        ''' last folder used for sounds '''
+        return self._data.get("last_sound_folder",None)
+    @last_sound_folder.setter
+    def last_sound_folder(self, value):
+        self._data["last_sound_folder"]=value 
+
+           

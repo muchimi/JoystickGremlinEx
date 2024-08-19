@@ -539,7 +539,7 @@ class ViewInput(QtWidgets.QDialog):
                     else:
                         mode_node = QtWidgets.QTreeWidgetItem([mode_name])
 
-                    device_node = QtWidgets.QTreeWidgetItem([dev.name])
+                    device_node = QtWidgets.QTreeWidgetItem([f"Device: '{dev.name}'"])
 
                     has_containers = False
                     for entry in mode_data.values():
@@ -560,7 +560,7 @@ class ViewInput(QtWidgets.QDialog):
         else:
             # display data by device                
             for dev, dev_data in  self._map_data.items():
-                device_node = QtWidgets.QTreeWidgetItem([dev.name])
+                device_node = QtWidgets.QTreeWidgetItem([f"Device: '{dev.name}'"])
                 nodes.append(device_node)
                 
                 for mode_name, mode_data in dev_data.items():
@@ -568,8 +568,7 @@ class ViewInput(QtWidgets.QDialog):
                     if len(mode_data.values()) == 0:
                         continue
                     mode_node = QtWidgets.QTreeWidgetItem([f"Mode: [{mode_name}]"])
-
-                    device_node.addChild(mode_node)
+                    
                     has_containers = False
                     for entry in mode_data.values():
                         if entry.input_item.containers:
@@ -577,12 +576,14 @@ class ViewInput(QtWidgets.QDialog):
                                 for action_set in container.action_sets:
                                     for action in action_set:
                                         action_node = QtWidgets.QTreeWidgetItem([action.name, action.display_name()])
-                                        device_node.addChild(action_node)
+                                        mode_node.addChild(action_node)
                             has_containers = True
 
                     if has_containers:
                         # has data
-                        mode_node.addChild(device_node)
+                        device_node.addChild(mode_node)
+                        if not device_node in nodes:
+                            nodes.append(device_node)
 
         self._tree_widget.clear()     
         self._tree_widget.insertTopLevelItems(0, nodes)

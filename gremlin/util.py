@@ -1002,6 +1002,11 @@ def popCursor():
         if _cursor_push == 0:
             QtWidgets.QApplication.restoreOverrideCursor()
             QtWidgets.QApplication.processEvents()
+
+def isCursorActive():
+    ''' true if the cursor stack is not empty '''
+    global _cursor_push
+    return _cursor_push > 0
     
 
 def compare_path(a, b):
@@ -1038,7 +1043,8 @@ def getSignal (oObject : QtCore.QObject, signal_name : str):
 
 def isSignalConnected(oObject : QtCore.QObject, signal_name : str):
     ''' true if a signal is connected '''
-    return oObject.isSignalConnected(getSignal(oObject, signal_name))
+    mm = getSignal(oObject, signal_name)
+    return mm is not None and oObject.isSignalConnected(mm)
 
 def centerDialog(dialog, width = 300, height = 150):
     ''' centers the dialog on top of the UI '''

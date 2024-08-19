@@ -1165,6 +1165,16 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._output_trigger_container_widget.setLayout(self._output_trigger_container_layout)
         self._output_trigger_container_widget.setContentsMargins(0,0,0,0)
                 
+        self._output_trigger_bool_toggle_widget = QtWidgets.QRadioButton("Toggle")
+        self._output_trigger_bool_on_widget = QtWidgets.QRadioButton("On")
+        self._output_trigger_bool_off_widget = QtWidgets.QRadioButton("Off")
+
+        self._output_trigger_bool_container_widget = QtWidgets.QWidget()
+        self._output_trigger_bool_container_layout = QtWidgets.QHBoxLayout(self._output_trigger_bool_container_widget)
+        self._output_trigger_bool_container_layout.addWidget(self._output_trigger_bool_toggle_widget)
+        self._output_trigger_bool_container_layout.addWidget(self._output_trigger_bool_on_widget)
+        self._output_trigger_bool_container_layout.addWidget(self._output_trigger_bool_off_widget)
+
 
 
         # output options container - shows below selector - visible when a command is selected and changes with the active mode
@@ -1430,6 +1440,22 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._output_trigger_container_widget.setVisible(trigger_visible)
         self._output_value_container_widget.setVisible(setvalue_visible)
         self._output_gated_container_widget.setVisible(gated_visible)
+
+
+        # trigger mode display
+        if trigger_visible:
+            self._update_trigger()
+
+
+    def _update_trigger(self):
+        ''' updates trigger mode '''
+        if self.block.units == SimConnectBlock.units == "Bool":
+            pass
+
+
+        #if self.block.output_data_type == SimConnectBlock.OutputType.IntNumber amd
+            # boolean
+
 
     def _range_changed_cb(self, event : SimConnectBlock.RangeEvent):
         ''' called when range information changes on the current simconnect command block '''

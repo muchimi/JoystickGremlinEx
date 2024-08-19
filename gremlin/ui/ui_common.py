@@ -649,7 +649,7 @@ class BaseDialogUi(QtWidgets.QWidget):
 
         :param parent the parent of this widget
         """
-        QtWidgets.QWidget.__init__(self, parent)
+        super().__init__(parent)
 
     def closeEvent(self, event):
         """Closes the calibration window.
@@ -744,8 +744,6 @@ class ModeWidget(QtWidgets.QWidget):
             #self.edit_mode_selector.clear()
             while self.edit_mode_selector.count() > 0:
                     self.edit_mode_selector.removeItem(0)
-
-            
             
             mode_list = get_mode_list(profile_data)
             self.mode_list = [x[1] for x in mode_list]
@@ -866,6 +864,24 @@ class ModeWidget(QtWidgets.QWidget):
         import gremlin.ui.dialogs
         dialog = gremlin.ui.dialogs.ProfileOptionsUi()
         dialog.exec()
+
+    def currentIndex(self):
+        return self.edit_mode_selector.currentIndex()
+    
+    def setCurrentIndex(self, index):
+        self.edit_mode_selector.setCurrentIndex(index)
+
+    def setShowModeEdit(self, value):
+        ''' determines if the mode edit button is visible or not '''
+        self.mode_change.setVisible(value)
+
+    def setShowProfileOptions(self, value):
+        ''' determines if the profile option button is visible or not '''
+        self.profile_options_button_widget.setVisible(value)
+
+    def setLabelText(self, text):
+        ''' changes the label text if needed '''
+        self.edit_label.setText(text)
 
 
 class InputListenerWidget(QtWidgets.QFrame):

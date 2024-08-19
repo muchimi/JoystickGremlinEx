@@ -34,6 +34,7 @@ import gremlin.types
 from dinput import DILL, GUID, GUID_Invalid
 import gremlin.util
 from gremlin.util import get_guid
+import gremlin.input_types
 
 from . import error
 import gremlin.joystick_handling
@@ -1394,7 +1395,7 @@ def register_callback(callback, device, input_type, input_id):
     device : JoystickDecorator
         Joystick decorator specifying the device and mode in which to execute
         the callback
-    input_type : gremlin.types.InputType
+    input_type : gremlin.input_types.InputType
         Type of input on which to execute the callback
     input_id : int
         Index of the input on which to execute the callback
@@ -2028,7 +2029,7 @@ def _button(button_id, device_guid, mode, always_execute=False):
             callback(*args, **kwargs)
 
         event = gremlin.event_handler.Event(
-            event_type=gremlin.types.InputType.JoystickButton,
+            event_type=gremlin.input_types.InputType.JoystickButton,
             device_guid=device_guid,
             identifier=button_id
         )
@@ -2056,7 +2057,7 @@ def _hat(hat_id, device_guid, mode, always_execute=False):
             callback(*args, **kwargs)
 
         event = gremlin.event_handler.Event(
-            event_type=gremlin.types.InputType.JoystickHat,
+            event_type=gremlin.input_types.InputType.JoystickHat,
             device_guid=device_guid,
             identifier=hat_id
         )
@@ -2084,7 +2085,7 @@ def _axis(axis_id, device_guid, mode, always_execute=False):
             callback(*args, **kwargs)
 
         event = gremlin.event_handler.Event(
-            event_type=gremlin.types.InputType.JoystickAxis,
+            event_type=gremlin.input_types.InputType.JoystickAxis,
             device_guid=device_guid,
             identifier=axis_id
         )

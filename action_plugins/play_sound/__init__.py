@@ -22,8 +22,9 @@ from lxml import etree as ElementTree
 import qtawesome as qta
 
 import gremlin.base_profile
+import gremlin.config
 from gremlin.input_types import InputType
-from gremlin.util import load_icon
+from gremlin.util import load_icon, userprofile_path
 import gremlin.ui.input_item
 
 
@@ -43,10 +44,17 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.file_path.textChanged.connect(self._file_changed)
         self.edit_path = QtWidgets.QPushButton()
         self.edit_path.setIcon(load_icon("gfx/button_edit.png"))
-        self.edit_path.clicked.connect(self._new_executable)
+        self.edit_path.clicked.connect(self._new_sound_file)
         self.volume = QtWidgets.QSpinBox()
         self.volume.setRange(0, 100)
         self.volume.valueChanged.connect(self._volume_changed)
+
+        self.play_widget = QtWidgets.QPushButton("Play")
+        self.play_widget.setIcon(load_icon("fa.play",qta_color="green"))
+        self.play_widget.setToolTip("Plays the audio as configured")
+        self.play_widget.clicked.connect(self._play_cb)
+
+
 
         self.layout.addWidget(self.icon_widget)
         self.layout.addWidget(self.file_path)
@@ -54,7 +62,7 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.layout.addWidget(QtWidgets.QLabel("Volume"))
         self.layout.addWidget(self.volume)
         self.main_layout.addLayout(self.layout)
-
+        
 
     def eventFilter(self, object, event):
         t = event.type()
@@ -77,6 +85,7 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
             self._setIcon("fa.check", color="green")
         else:
             self._setIcon("fa.exclamation-circle", color="red")
+        self.play_widget.setEnabled(valid)
 
     def _setIcon(self, icon_path = None, use_qta = True, color = None):
         import qtawesome as qta
@@ -100,27 +109,40 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
             # clear the pixmap
             self.icon_widget.setPixmap(QtGui.QPixmap())
 
-    def _new_executable(self):
-        """Prompts the user to select a new executable to add to the
-        profile.
-        """
-
+    @QtCore.Slot()
+    def _new_sound_file(self):
+        """Prompts the user to select a new sound file to add to the profile.  """
+        config = gremlin.config.Configuration()
         fname = self.file_path.text() # current entry
         if os.path.isfile(fname):
             dir = os.path.dirname(fname)
         elif os.path.isdir(fname):
             dir = fname
         else:
-            dir = "C:\\"
+            dir = config.last_sound_folder
+            if dir is None or not os.path.isdir(dir):
+                dir = userprofile_path()
         fname, _ = QtWidgets.QFileDialog.getOpenFileName(
             None,
             "Path to sound file",
             dir,
             "All Files (*)"
         )
-        if fname != "":
+        if os.path.isfile(fname):
             self.action_data.sound_file = fname
+            dirname,_ = os.path.split(fname)
+            config.last_sound_folder = dirname
+            # refresh the UI
             self._populate_ui()
+        
+
+    @QtCore.Slot()
+    def _play_cb(self):
+        if os.path.isfile(self.action_data.sound_file):
+            media = QtCore.QUrl(self.action_data.sound_file)
+            PlaySoundFunctor.player.setSource(media)
+            PlaySoundFunctor.audio.setVolume(self.volume/100) # 0 to 1
+            PlaySoundFunctor.player.play()           
 
 
 class PlaySoundFunctor(gremlin.base_profile.AbstractFunctor):
@@ -137,10 +159,11 @@ class PlaySoundFunctor(gremlin.base_profile.AbstractFunctor):
 
 
     def process_event(self, event, value):
-        media = QtCore.QUrl(self.sound_file)
-        PlaySoundFunctor.player.setSource(media)
-        PlaySoundFunctor.audio.setVolume(self.volume/100) # 0 to 1
-        PlaySoundFunctor.player.play()
+        if os.path.isfile(self.sound_file):
+            media = QtCore.QUrl(self.sound_file)
+            PlaySoundFunctor.player.setSource(media)
+            PlaySoundFunctor.audio.setVolume(self.volume/100) # 0 to 1
+            PlaySoundFunctor.player.play()
         return True
 
 

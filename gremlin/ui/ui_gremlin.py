@@ -167,7 +167,7 @@ class Ui_Gremlin(object):
         self.toolBar.setWindowTitle(_translate("GremlinEx", "toolBar"))
         self.actionSave.setText(_translate("GremlinEx", "Save"))
         self.actionOpen.setText(_translate("GremlinEx", "Load"))
-        self.actionLoadProfile.setText(_translate("GremlinEx", "&Load Profile"))
+        self.actionLoadProfile.setText(_translate("GremlinEx", "&Open Profile"))
         self.actionActivate.setText(_translate("GremlinEx", "Activate"))
         self.actionNewProfile.setText(_translate("GremlinEx", "&New Profile"))
         self.actionSaveProfile.setText(_translate("GremlinEx", "&Save Profile"))
