@@ -1007,9 +1007,9 @@ class InputListenerWidget(QtWidgets.QFrame):
             elif not event.is_pressed and \
                     InputType.Keyboard in self._event_types:
                 if not self._return_kb_event:
-                    self.self.item_selected.emit(key)
+                    self.item_selected.emit(key)
                 else:
-                    self.self.item_selected.emit(event)
+                    self.item_selected.emit(event)
                 self._abort_timer.cancel()
                 self.close()
         # Record all key presses and return on the first key release
@@ -1735,7 +1735,7 @@ class AxesCurrentState(QtWidgets.QGroupBox):
                 self.device.axis_map,
                 event.identifier
             )
-            self.axes[axis_id].set_value(event.value)
+            self.axes[axis_id].setValue(event.value)
 
 
 class HatWidget(QtWidgets.QWidget):

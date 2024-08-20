@@ -624,14 +624,15 @@ class MacroActionEditor(QtWidgets.QWidget):
         else:
             callback = self._modify_joystick
 
-        self.button_press_dialog = gremlin.ui.ui_common.InputListenerWidget(
-            callback,
-            input_types,
+
+
+        dialog = gremlin.ui.ui_common.InputListenerWidget(
+            event_types = input_types,
             return_kb_event=True
         )
 
-
-
+        dialog.item_selected.connect(callback)
+        self.button_press_dialog = dialog
 
         # Display the dialog centered in the middle of the UI
         root = self
@@ -1265,9 +1266,10 @@ class MacroSettingsWidget(QtWidgets.QWidget):
             self.group_layout.addWidget(self.repeat_widget)
 
 
-class MacroWidget(QtWidgets.QWidget):
+class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     """Widget which allows creating and editing of macros."""
+    
 
     from gremlin.util import get_icon_path
 
@@ -1279,14 +1281,13 @@ class MacroWidget(QtWidgets.QWidget):
         "gfx"
     )
 
-    def __init__(self, data, parent=None):
+    def __init__(self, action_data, parent=None):
         """Creates a new UI widget.
 
         :param action_data the data of the macro action
         :param parent the parent of the widget
         """
-        super().__init__(parent=parent)
-        self.data = data
+        super().__init__(action_data, parent=parent)
 
         self._polling_rate = \
             gremlin.config.Configuration().macro_axis_polling_rate
@@ -1311,7 +1312,7 @@ class MacroWidget(QtWidgets.QWidget):
 
             MacroWidget.locked = True
 
-            self.model = MacroListModel(self.data.sequence)
+            self.model = MacroListModel(self.action_data.sequence)
 
             # Replace the default vertical with a horizontal layout
             QtWidgets.QWidget().setLayout(self.layout())
@@ -1335,7 +1336,7 @@ class MacroWidget(QtWidgets.QWidget):
 
             # Create editor as well as settings place holder widgets
             self.editor_widget = QtWidgets.QWidget()
-            self.settings_widget = MacroSettingsWidget(self.data)
+            self.settings_widget = MacroSettingsWidget(self.action_data)
             self.editor_settings_layout.addWidget(self.editor_widget)
             self.editor_settings_layout.addWidget(self.settings_widget)
             self.editor_settings_layout.addStretch()
@@ -1502,7 +1503,7 @@ class MacroWidget(QtWidgets.QWidget):
 
     def _populate_ui(self):
         """Populate the UI with content from the data."""
-        self.model = MacroListModel(self.data.sequence)
+        self.model = MacroListModel(self.action_data.sequence)
         self.list_view.setModel(self.model)
         self.list_view.setCurrentIndex(self.model.index(0, 0))
         self._edit_action(self.model.index(0, 0))
@@ -1649,9 +1650,9 @@ class MacroWidget(QtWidgets.QWidget):
     def _delete_cb(self):
         """Callback executed when the delete button is pressed."""
         idx = self.list_view.currentIndex().row()
-        if 0 <= idx < len(self.data.sequence):
-            del self.data.sequence[idx]
-            new_idx = min(len(self.data.sequence), max(0, idx - 1))
+        if 0 <= idx < len(self.action_data.sequence):
+            del self.action_data.sequence[idx]
+            new_idx = min(len(self.action_data.sequence), max(0, idx - 1))
             self.list_view.setCurrentIndex(
                 self.model.index(new_idx, 0, QtCore.QModelIndex())
             )

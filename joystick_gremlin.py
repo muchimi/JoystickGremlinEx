@@ -99,7 +99,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.14ex (m5)"
+APPLICATION_VERSION = "13.40.14ex (m6)"
 
 # the main ui
 ui = None
@@ -726,6 +726,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             return
 
         self._profile = gremlin.base_profile.Profile()
+        gremlin.shared_state.current_profile = self._profile
 
         # For each connected device create a new empty device entry
         # in the new profile
@@ -758,7 +759,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         # Update profile information
         self._profile_fname = None
         self._update_window_title()
-        gremlin.shared_state.current_profile = self._profile
+        
 
         # Create a default mode
         for device in self._profile.devices.values():
@@ -1913,6 +1914,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         # Attempt to load the new profile
         try:
             new_profile = gremlin.base_profile.Profile()
+            self._profile = new_profile
+            gremlin.shared_state.current_profile = new_profile
             profile_updated = new_profile.from_xml(fname)
 
             profile_folder = os.path.dirname(fname)
@@ -1921,10 +1924,10 @@ class GremlinUi(QtWidgets.QMainWindow):
                 sys.path.insert(0, profile_folder)
 
             self._sanitize_profile(new_profile)
-            self._profile = new_profile
+            
             self._profile_fname = fname
             self._update_window_title()
-            gremlin.shared_state.current_profile = self._profile
+            
             modes = self._profile.get_root_modes()
             modes.sort()
             current_mode = modes[0]

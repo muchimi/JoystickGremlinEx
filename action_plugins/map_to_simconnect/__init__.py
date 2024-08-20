@@ -1165,15 +1165,23 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._output_trigger_container_widget.setLayout(self._output_trigger_container_layout)
         self._output_trigger_container_widget.setContentsMargins(0,0,0,0)
                 
+        self._output_trigger_description_widget = QtWidgets.QLabel()
         self._output_trigger_bool_toggle_widget = QtWidgets.QRadioButton("Toggle")
+        self._output_trigger_bool_toggle_widget.clicked.connect(self._trigger_toggle_changed_cb)
         self._output_trigger_bool_on_widget = QtWidgets.QRadioButton("On")
+        self._output_trigger_bool_on_widget.clicked.connect(self._trigger_turnon_cb)
         self._output_trigger_bool_off_widget = QtWidgets.QRadioButton("Off")
+        self._output_trigger_bool_off_widget.clicked.connect(self._trigger_turnoff_cb)
+
 
         self._output_trigger_bool_container_widget = QtWidgets.QWidget()
         self._output_trigger_bool_container_layout = QtWidgets.QHBoxLayout(self._output_trigger_bool_container_widget)
         self._output_trigger_bool_container_layout.addWidget(self._output_trigger_bool_toggle_widget)
         self._output_trigger_bool_container_layout.addWidget(self._output_trigger_bool_on_widget)
         self._output_trigger_bool_container_layout.addWidget(self._output_trigger_bool_off_widget)
+        self._output_trigger_bool_container_layout.addWidget(self._output_trigger_description_widget)
+        self._output_trigger_bool_container_layout.addStretch()
+
 
 
 
@@ -1224,6 +1232,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         #self.main_layout.addWidget(self._toolbar_container_widget)
         self.main_layout.addWidget(self._command_container_widget)
         self.main_layout.addWidget(self._output_container_widget)
+        self.main_layout.addWidget(self._output_trigger_bool_container_widget)
         # self.main_layout.addWidget(self._input_container_widget)
         self.main_layout.addWidget(self.status_text_widget)
 
@@ -1413,9 +1422,9 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
                     self._output_max_range_widget.setValue(self.action_data.max_range)  
 
                 # update the output data type
-            if block.output_data_type == SimConnectBlock.OutputType.FloatNumber:
+            if block.output_data_type == OutputType.FloatNumber:
                 self._output_data_type_label_widget.setText("Number (float)")
-            elif block.output_data_type == SimConnectBlock.OutputType.IntNumber:
+            elif block.output_data_type == OutputType.IntNumber:
                 self._output_data_type_label_widget.setText("Number (int)")
             else:
                 self._output_data_type_label_widget.setText("N/A")
@@ -1449,15 +1458,37 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _update_trigger(self):
         ''' updates trigger mode '''
-        if self.block.units == SimConnectBlock.units == "Bool":
-            pass
+        mode = self.action_data.trigger_mode
+        if mode == SimConnectTriggerMode.Toggle:
+            with QtCore.QSignalBlocker(self._output_trigger_bool_toggle_widget):
+                self._output_trigger_bool_toggle_widget.setChecked(True)
+                self._output_trigger_description_widget.setText("A trigger will toggle the command state")
+        elif mode == SimConnectTriggerMode.TurnOff:
+            with QtCore.QSignalBlocker(self._output_trigger_bool_off_widget):
+                self._output_trigger_bool_off_widget.setChecked(True)
+                self._output_trigger_description_widget.setText("A trigger will set the command state to off")
+        elif mode == SimConnectTriggerMode.TurnOn:
+            with QtCore.QSignalBlocker(self._output_trigger_bool_on_widget):
+                self._output_trigger_bool_on_widget.setChecked(True)
+                self._output_trigger_description_widget.setText("A trigger will set the command state to on")
+
+    @QtCore.Slot(bool)
+    def _trigger_toggle_changed_cb(self, checked):
+        if checked:
+            self.action_data.trigger_mode = SimConnectTriggerMode.Toggle
+
+    @QtCore.Slot(bool)
+    def _trigger_turnon_cb(self, checked):
+        if checked:
+            self.action_data.trigger_mode = SimConnectTriggerMode.TurnOn
+
+    @QtCore.Slot(bool)
+    def _trigger_turnoff_cb(self, checked):
+        if checked:
+            self.action_data.trigger_mode = SimConnectTriggerMode.TurnOff
 
 
-        #if self.block.output_data_type == SimConnectBlock.OutputType.IntNumber amd
-            # boolean
-
-
-    def _range_changed_cb(self, event : SimConnectBlock.RangeEvent):
+    def _range_changed_cb(self, event : RangeEvent):
         ''' called when range information changes on the current simconnect command block '''
         self._output_min_range_widget.setValue(event.min)
         self._output_max_range_widget.setValue(event.max)
@@ -1669,6 +1700,9 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         # output mode
         self.mode = SimConnectActionMode.NotSet
 
+        # trigger mode
+        self.trigger_mode = SimConnectTriggerMode.Toggle
+
         # readonly mode
         self.is_readonly = False
 
@@ -1713,6 +1747,10 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         mode = safe_read(node,"mode", str, "none")
         self.mode = SimConnectActionMode.to_enum(mode)
 
+        # trigger mode for singleton vars
+        mode = safe_read(node,"trigger", str, "none")
+        self.mode = SimConnectTriggerMode.to_enum(mode)
+
         # axis inversion
         self.invert_axis = safe_read(node,"invert", bool, False)
 
@@ -1747,7 +1785,11 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
 
         # action mode
         mode = SimConnectActionMode.to_string(self.mode)
-        node.set("mode",safe_format(mode, str))
+        node.set("mode",mode)
+
+        # trigger mode
+        mode = SimConnectTriggerMode.to_string(self.trigger_mode)
+        node.set("trigger", mode)
 
         # axis inversion
         node.set("invert",str(self.invert_axis))

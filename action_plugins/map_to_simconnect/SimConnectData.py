@@ -97,23 +97,99 @@ class SimConnectActionMode(enum.Enum):
 
     @staticmethod
     def to_string(value):
-        try:
+        if value in _simconnect_action_mode_to_string_lookup.keys():
             return _simconnect_action_mode_to_string_lookup[value]
-        except KeyError:
-            raise gremlin.error.GremlinError(f"Invalid type in lookup: {value}")
+        return "none"
     @staticmethod
     def to_enum(value, validate = True):
         if value in _simconnect_action_mode_to_enum_lookup.keys():
             return _simconnect_action_mode_to_enum_lookup[value]
         if validate:
-            raise gremlin.error.GremlinError(f"Invalid type in lookup: {value}")
+            raise gremlin.error.GremlinError(f"Invalid type in action mode lookup: {value}")
         return SimConnectActionMode.NotSet
     
 
 
+class SimConnectTriggerMode(enum.Enum):
+    ''' trigger modes for boolean actions '''
+    NotSet = 0 # not set
+    TurnOn = 1 # enable or turn on 
+    TurnOff = 2 # disable or turn off
+    Toggle = 3 # toggle 
+
+    @staticmethod
+    def to_string(value):
+        if value in _trigger_mode_name.keys():
+            return _trigger_mode_name[value]
+        return "none"
+    @staticmethod
+    def to_enum(value, validate = True):
+        if value in _trigger_mode_to_enum.keys():
+            return _trigger_mode_to_enum[value]
+        if validate:
+            raise gremlin.error.GremlinError(f"Invalid type in trigger lookup: {value}")
+        return SimConnectTriggerMode.NotSet
+
+_trigger_mode_name = {
+    SimConnectTriggerMode.NotSet : "none",
+    SimConnectTriggerMode.Toggle : "toggle",
+    SimConnectTriggerMode.TurnOff : "off",
+    SimConnectTriggerMode.TurnOn : "on"
+}
+
+_trigger_mode_to_enum = {
+    "none" : SimConnectTriggerMode.NotSet,
+    "toggle" : SimConnectTriggerMode.Toggle,
+    "off" : SimConnectTriggerMode.TurnOff,
+    "on" : SimConnectTriggerMode.TurnOn 
+}
 
 
+
+class RangeEvent():
+    def __init__(self):
         
+        self.min = 0
+        self.min_custom = 0
+        self.max = 0
+        self.max_custom = 0
+
+
+
+class OutputType(enum.Enum):
+    ''' output data type '''
+    NotSet = 0
+    FloatNumber = 1
+    IntNumber = 2
+
+
+
+class SimConnectCommandType(enum.Enum):
+    NotSet = 0
+    Event = 1
+    Request = 2
+    LVar = 3
+    AVar = 4
+    SimVar = 5
+
+    @staticmethod
+    def from_string(value):
+        value = value.lower()
+        if value in _command_type_to_string_map.keys():
+            return _command_type_to_string_map[value]
+        return None
+    
+
+    
+_command_type_to_string_map = {
+    "notset": SimConnectCommandType.NotSet,
+    "event": SimConnectCommandType.Event,
+    "request" : SimConnectCommandType.Request,
+    "lvar": SimConnectCommandType.LVar,
+    "avar": SimConnectCommandType.AVar,
+    "simvar" : SimConnectCommandType.SimVar
+}
+    
 
         
                 
@@ -656,11 +732,11 @@ class SimConnectData(QtCore.QObject):
                 is_toggle = False
                 value = get_attribute(node,"datatype")
                 if value == "int":
-                    data_type = SimConnectBlock.OutputType.IntNumber
+                    data_type = OutputType.IntNumber
                 elif value == "float":
-                    data_type = SimConnectBlock.OutputType.FloatNumber
+                    data_type = OutputType.FloatNumber
                 else:
-                    data_type == SimConnectBlock.OutputType.NotSet
+                    data_type == OutputType.NotSet
                 simvar = get_attribute(node,"value",throw_on_missing=True)
                 simvar_type = get_attribute(node,"type",throw_on_missing=True) 
                 units = get_attribute(node,"units",throw_on_missing=True)
@@ -767,61 +843,8 @@ class SimConnectData(QtCore.QObject):
             return block.category
         return SimConnectEventCategory.NotSet
 
-
-            
-            
-
-
-
-        
-
 class SimConnectBlock(QtCore.QObject):
     ''' holds simconnect block information '''
-    
-    class RangeEvent():
-        def __init__(self):
-            
-            self.min = 0
-            self.min_custom = 0
-            self.max = 0
-            self.max_custom = 0
-
-
-
-    class OutputType(enum.Enum):
-        ''' output data type '''
-        NotSet = 0
-        FloatNumber = 1
-        IntNumber = 2
-
-
-
-    class SimConnectCommandType(enum.Enum):
-        NotSet = 0
-        Event = 1
-        Request = 2
-        LVar = 3
-        AVar = 4
-        SimVar = 5
-
-        @staticmethod
-        def from_string(value):
-            value = value.lower()
-            if value in SimConnectBlock._command_type_to_string_map.keys():
-                return SimConnectBlock._command_type_to_string_map[value]
-            return None
-        
-
-        
-    _command_type_to_string_map = {
-        "notset": SimConnectCommandType.NotSet,
-        "event": SimConnectCommandType.Event,
-        "request" : SimConnectCommandType.Request,
-        "lvar": SimConnectCommandType.LVar,
-        "avar": SimConnectCommandType.AVar,
-        "simvar" : SimConnectCommandType.SimVar
-    }
-
 
 
     range_changed = QtCore.Signal(RangeEvent) # fires when the block range values change
@@ -838,11 +861,11 @@ class SimConnectBlock(QtCore.QObject):
         '''
         super().__init__()
         self._simconnect_data : SimConnectData = simconnect_data
-        self._command_type = SimConnectBlock.SimConnectCommandType.NotSet
+        self._command_type = SimConnectCommandType.NotSet
         self._description = None
-        self._value_type = SimConnectBlock.OutputType.NotSet
+        self._value_type = OutputType.NotSet
         self._category = SimConnectEventCategory.NotSet
-        self._output_data_type = SimConnectBlock.OutputType.NotSet
+        self._output_data_type = OutputType.NotSet
         self._command = None # the command text
         self._set_value = False # true if the item can set a value
         self._readonly = False # if readonly - the request cannot be triggered
@@ -850,6 +873,7 @@ class SimConnectBlock(QtCore.QObject):
         self._is_indexed = False # true if the output is indexed using the :index 
         self._min_range = -16383
         self._max_range = 16383
+        self._trigger_mode = SimConnectTriggerMode.Toggle # default for on/off type blocks
         
         self._value = 0 # output value
         self._is_value = False # true if the command supports an output value
@@ -900,39 +924,37 @@ class SimConnectBlock(QtCore.QObject):
     @property
     def is_request(self) -> bool:
         ''' true if the block is a request '''
-        return self._command_type == SimConnectBlock.SimConnectCommandType.Request
+        return self._command_type == SimConnectCommandType.Request
     
     @property
     def is_event(self) -> bool:
         ''' true if the block is an event '''
-        return self._command_type == SimConnectBlock.SimConnectCommandType.Event
+        return self._command_type == SimConnectCommandType.Event
     
     @property
     def is_value(self):
         ''' true if the command supports a value output to simconnect '''
         return self._is_value
     
-
-    
     @property
-    def command_type(self):
+    def command_type(self) -> SimConnectCommandType:
         ''' returns the command type '''
         return self._command_type
     @command_type.setter
-    def command_type(self, value):
+    def command_type(self, value : SimConnectCommandType):
         if isinstance(value, str):
-            value = SimConnectBlock.SimConnectCommandType.from_string(value)
+            value = SimConnectCommandType.from_string(value)
         elif isinstance(value, int):
-            value = SimConnectBlock.SimConnectCommandType(value)
+            value = SimConnectCommandType(value)
         self._command_type = value
     
     @property
     def display_block_type(self) -> str:
         ''' returns the display string for the block type '''
         
-        if self._command_type == SimConnectBlock.SimConnectCommandType.Request:
+        if self._command_type == SimConnectCommandType.Request:
             return "Simconnect Request"
-        elif self._command_type == SimConnectBlock.SimConnectCommandType.Event:
+        elif self._command_type == SimConnectCommandType.Event:
             return "Simconnect Event"
         return F"Unknown command type: {self._command_type}"
     
@@ -991,9 +1013,9 @@ class SimConnectBlock(QtCore.QObject):
     @property
     def display_data_type(self) -> str:
         ''' returns a displayable data type even if none is set '''
-        if self._value_type == SimConnectBlock.OutputType.IntNumber:
+        if self._value_type == OutputType.IntNumber:
             return "Number (int)"
-        elif self._value_type == SimConnectBlock.OutputType.FloatNumber:
+        elif self._value_type == OutputType.FloatNumber:
             return "Number (float)"
         return "N/A"
     
@@ -1016,6 +1038,15 @@ class SimConnectBlock(QtCore.QObject):
         self._max_range = value
 
     @property
+    def trigger_mode(self) -> SimConnectTriggerMode:
+        ''' block trigger mode if the action mode is in trigger mode  '''
+        return self._trigger_mode
+    
+    @trigger_mode.setter
+    def trigger_mode(self, value : SimConnectTriggerMode):
+        self._trigger_mode = value
+
+    @property
     def is_toggle(self):
         ''' true if the range output is only two values - min or max'''
         return self._is_toggle
@@ -1034,7 +1065,7 @@ class SimConnectBlock(QtCore.QObject):
         ''' fires a range changed event '''
 
         if self.notifications_enabled:
-            event = SimConnectBlock.RangeEvent()
+            event = RangeEvent()
             event.max = self._max_range
             event.max_custom = self._max_range_custom
             event.min = self._min_range
@@ -1135,7 +1166,7 @@ class SimConnectBlock(QtCore.QObject):
             return False
         
         if self._command:
-            if self._command_type ==  SimConnectBlock.SimConnectCommandType.Event:
+            if self._command_type ==  SimConnectCommandType.Event:
                 ae = AircraftEvents(self.sm)
                 trigger = ae.find(self._command)
                 if trigger:
@@ -1147,7 +1178,7 @@ class SimConnectBlock(QtCore.QObject):
                         trigger(value)
                     return True
 
-            elif self._command_type == SimConnectBlock.SimConnectCommandType.Request and not self._readonly:
+            elif self._command_type == SimConnectCommandType.Request and not self._readonly:
                 ar = AircraftRequests(self.sm, _time=2000)
                 ar.set(self._command, value)
                 return True
