@@ -331,6 +331,11 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.show_joystick_input_widget.setChecked(self.config.show_input_axis)
         self.show_joystick_input_widget.clicked.connect(self._show_joystick_input_cb)
 
+        # allow partial plugin configurations
+        self.partial_plugin_save = QtWidgets.QCheckBox("Save partial user plugin data")
+        self.partial_plugin_save.setChecked(self.config.partial_plugin_save)
+        self.partial_plugin_save.clicked.connect(self._partial_plugin_save)
+
 
         # verbose output
         self.verbose_container_widget = QtWidgets.QWidget()
@@ -497,6 +502,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.general_layout.addWidget(self.start_with_windows)
         self.general_layout.addWidget(self.persist_clipboard)
         self.general_layout.addWidget(self.show_scancodes_widget)
+        self.general_layout.addWidget(self.partial_plugin_save)
         self.general_layout.addWidget(self.show_joystick_input_widget)
         self.general_layout.addWidget(self.verbose_container_widget)
         self.general_layout.addWidget(self.runtime_ui_update)
@@ -840,6 +846,9 @@ This setting is also available on a profile by profile basis on the profile tab,
     def _show_joystick_input_cb(self, checked):
         self.config.show_input_axis = checked        
 
+    @QtCore.Slot(bool)
+    def _partial_plugin_save(self, checked):
+        self.config.partial_plugin_save = checked        
     
     
     @QtCore.Slot(bool)
@@ -1596,6 +1605,7 @@ class ModeManagerUi(ui_common.BaseDialogUi):
         self.mode_rename = {}
         self.mode_delete = {}
         self.mode_callbacks = {}
+        self.is_modified = False # true if the modes were modified
 
         self._create_ui()
 
@@ -1610,6 +1620,7 @@ class ModeManagerUi(ui_common.BaseDialogUi):
         """
         # Re-enable keyboard event handler
         el = gremlin.event_handler.EventListener()
+        el.modes_changed.emit()
         el.keyboard_hook.start()
         super().closeEvent(event)
 
@@ -1695,6 +1706,8 @@ class ModeManagerUi(ui_common.BaseDialogUi):
         self.mode_delete = {}
         self.mode_callbacks = {}
         self.mode_default = None # default startup mode
+
+        
 
         self._display_width = 0
 
@@ -1901,8 +1914,13 @@ The setting can be overriden by the global mode reload option set in Options for
                 if mode_name == gremlin.shared_state.current_profile.get_start_mode():
                     gremlin.shared_state.current_profile.set_start_mode(name)
 
-
             self._populate_mode_layout()
+            self._fire_mode_change()
+
+    def _fire_mode_change(self):
+        eh = gremlin.event_handler.EventListener()
+        eh.modes_changed.emit()
+
 
     def _delete_mode(self, mode_name):
         """Removes the specified mode.
@@ -1937,7 +1955,7 @@ The setting can be overriden by the global mode reload option set in Options for
 
         # Update the ui
         self._populate_mode_layout()
-        self.modes_changed.emit()
+        self._fire_mode_change()
 
     @QtCore.Slot()
     def _add_mode_cb(self):
@@ -1962,6 +1980,7 @@ The setting can be overriden by the global mode reload option set in Options for
                 
 
             self._populate_mode_layout()
+            self._fire_mode_change()
 
     @QtCore.Slot(int)
     def _change_default_mode_cb(self, index):

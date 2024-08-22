@@ -37,6 +37,8 @@ class InputType(enum.Enum):
 
     @staticmethod
     def to_string(value):
+        if value is None:
+            value = InputType.NotSet
         try:
             return _InputType_to_string_lookup[value]
         except KeyError:
@@ -45,6 +47,8 @@ class InputType(enum.Enum):
     @staticmethod
     def to_enum(value):
         try:
+            if value is None:
+                return InputType.NotSet
             return _InputType_to_enum_lookup[value]
         except KeyError:
             raise ValueError("Invalid type in lookup")

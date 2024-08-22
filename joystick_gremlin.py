@@ -55,6 +55,8 @@ import gremlin.shared_state
 import gremlin.base_profile
 import gremlin.event_handler
 import gremlin.config
+import gremlin.macro_handler
+import gremlin.gated_handler
 
 
 
@@ -99,7 +101,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.14ex (m6)"
+APPLICATION_VERSION = "13.40.14ex (m7)"
 
 # the main ui
 ui = None
@@ -185,6 +187,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         self.mode_selector = gremlin.ui.ui_common.ModeWidget()
         self.mode_selector.edit_mode_changed.connect(self._edit_mode_changed_cb)
+        self.mode_selector.setRuntimeDisabled(True)
 
         self.ui.toolBar.addWidget(self.mode_selector)
 
@@ -1593,6 +1596,10 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         :param new_mode the name of the new current mode
         """
+
+        # refresh the modes
+
+
         if self.current_mode != new_mode:
             # change the profile if different 
             eh = gremlin.event_handler.EventHandler()
@@ -2065,12 +2072,20 @@ class GremlinUi(QtWidgets.QMainWindow):
 
     def _mode_configuration_changed(self, new_mode = None):
         """Updates the mode configuration of the selector and profile."""
-        if new_mode is None or gremlin.shared_state.current_mode != new_mode:
-            return
-        gremlin.util.pushCursor()
-        self.mode_selector.populate_selector(self._profile, new_mode)
-        self.ui.devices.widget(self.ui.devices.count()-1).refresh_ui()
-        gremlin.util.popCursor()
+
+        try:
+            gremlin.util.pushCursor()
+
+            if new_mode is None:
+                new_mode = gremlin.shared_state.current_mode
+            
+            self.mode_selector.populate_selector(self._profile, new_mode)
+
+            if gremlin.shared_state.current_mode == new_mode:
+                return
+            self.ui.devices.widget(self.ui.devices.count()-1).refresh_ui()
+        finally:
+            gremlin.util.popCursor()
 
     def _sanitize_profile(self, profile_data):
         """Validates a profile file before actually loading it.

@@ -41,6 +41,9 @@ class ModuleManagementController(QtCore.QObject):
         # The view managed by the controller
         self.view = ModuleManagementView()
 
+        # stores a map of instance widgets by instance
+        self.instance_widget_map = {}
+
         self.view.add_module.connect(self.new_module)
         self.refresh_module_list()
 
@@ -112,6 +115,26 @@ class ModuleManagementController(QtCore.QObject):
 
         layout = self.view.right_panel.layout()
         gremlin.ui.ui_common.clear_layout(layout)
+
+
+        # add the name of the instance being configured
+        header_container_widget = QtWidgets.QWidget()
+        header_container_layout = QtWidgets.QHBoxLayout(header_container_widget)
+        header_container_widget.setContentsMargins(0,0,0,0)
+        header_container_layout.setContentsMargins(0,0,0,0)
+
+
+        instance_name_widget = gremlin.ui.ui_common.QDataLineEdit(text=instance.name)
+        instance_name_widget.setStyleSheet("border-style: solid;border-width: 1px;")
+        instance_name_widget.data = instance
+        instance_name_widget.textChanged.connect(self._update_instance_name_cb)
+        header_container_layout.addWidget(QtWidgets.QLabel("Instance:"))
+        header_container_layout.addWidget(instance_name_widget)
+        #header_container_layout.addStretch()
+
+        layout.addWidget(header_container_widget)
+        layout.addWidget(gremlin.ui.ui_common.QHLine())
+
         for var in variables:
             if type(var) in [
                 gremlin.user_plugin.BoolVariable,
@@ -139,6 +162,7 @@ class ModuleManagementController(QtCore.QObject):
 
                 instance.set_variable(var.label, profile_var)
 
+                
 
                 ui_element = var.create_ui_element(profile_var.value)
                 var.value_changed.connect(
@@ -156,6 +180,14 @@ class ModuleManagementController(QtCore.QObject):
                 )
                 layout.addWidget(QtWidgets.QLabel(var.label))
         layout.addStretch()
+
+    @QtCore.Slot()
+    def _update_instance_name_cb(self):
+        widget = self.sender()
+        instance = widget.data
+        name = widget.text()
+        instance_widget = self.instance_widget_map[instance]
+        self.rename_instance(instance, instance_widget, name )
 
     def _update_value_variable(self, data, widget, variable):
         if variable.type in [
@@ -189,10 +221,12 @@ class ModuleManagementController(QtCore.QObject):
     def _create_module_widget(self, module_data):
         # Create the module widget
         module_widget = ModuleWidget(module_data.file_name)
+        self.instance_widget_map.clear()
         for instance in module_data.instances:
             instance_widget = InstanceWidget(instance.name)
             self._connect_instance_signals(instance, instance_widget)
             module_widget.add_instance(instance_widget)
+            self.instance_widget_map[instance] = instance_widget
 
         module_widget.btn_delete.clicked.connect(
             lambda x: self.remove_module(module_data.file_name)

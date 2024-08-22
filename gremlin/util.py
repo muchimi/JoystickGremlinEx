@@ -365,6 +365,31 @@ def clear_layout(layout):
             child.widget().deleteLater()
         layout.removeItem(child)
 
+def layout_contains(layout, widget):
+    ''' true if widget is contained in the given layout '''
+    while layout.count() > 0:
+        child = layout.takeAt(0)
+        if child.layout():
+            # sublayout
+            if layout_contains(child.layout(), widget):
+                return True
+        if widget == child:
+            return True
+    return False
+
+def layout_remove(layout, widget):
+    ''' removes widget from the layout if the layout includes that widget '''
+    while layout.count() > 0:
+        child = layout.takeAt(0)
+        if child.layout():
+            # sublayout
+            if layout_contains(child.layout(), widget):
+                return True
+        if widget == child:
+            layout.removeWidget(widget)
+            return True
+    return False
+
 
 dill_hat_lookup = {
     -1: (0, 0),
@@ -747,6 +772,7 @@ def safe_read(node, key, type_cast=None, default_value=None):
             raise error.ProfileError(msg)
     else:
         value = node.get(key)
+        
 
     if type_cast is not None:
         try:
@@ -754,7 +780,10 @@ def safe_read(node, key, type_cast=None, default_value=None):
                     value = value.strip().lower()
                     value = value == "true"
             else:
-                value = type_cast(value)
+                if value == "none":
+                    value = None
+                else:
+                    value = type_cast(value)
         except ValueError:
             msg = f"Failed casting '{value}' to type '{str(type_cast)}'"
             logging.getLogger("system").error(msg)
@@ -774,6 +803,8 @@ def safe_format(value, data_type, formatter=str):
     :param formatter function to format value with
     :return value formatted according to formatter
     """
+    if value is None:
+        return "none"
     if isinstance(value, data_type):
         return formatter(value)
     else:

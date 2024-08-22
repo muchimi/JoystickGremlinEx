@@ -241,7 +241,7 @@ class EventListener(QtCore.QObject):
 	# occurs on broadcast mode change
 	broadcast_changed = QtCore.Signal(StateChangeEvent)
 
-	# occurs on mode change
+	# occurs on mode edit/update/delete
 	modes_changed = QtCore.Signal()
 
 	# functor enable flag changed

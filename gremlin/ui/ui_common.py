@@ -729,6 +729,31 @@ class ModeWidget(QtWidgets.QWidget):
         self.main_layout = QtWidgets.QHBoxLayout(self)
         self._create_widget()
 
+
+    def setRuntimeDisabled(self, value):
+        ''' enables or disables profile runtime behavior'''
+
+        el = gremlin.event_handler.EventListener()
+        try:
+            if value:
+                # hook the profile start/stop to enable/disable at runtime
+                el.profile_start.connect(self._profile_start_cb)
+                el.profile_stop.connect(self._profile_stop_cb)
+            else:
+                el.profile_start.disconnect(self._profile_start_cb)
+                el.profile_stop.disconnect(self._profile_stop_cb)
+        except:
+            pass
+    
+
+    @QtCore.Slot()
+    def _profile_start_cb(self):
+        self.setEnabled(False)
+    @QtCore.Slot()
+    def _profile_stop_cb(self):
+        self.setEnabled(True)
+
+
     def populate_selector(self, profile_data, current_mode=None, startup_mode=None):
         """Adds entries for every mode present in the profile.
 
@@ -1512,6 +1537,7 @@ class ButtonStateWidget(QtWidgets.QWidget):
 class AxisStateWidget(QtWidgets.QWidget):
 
     """Visualizes the current state of an axis."""
+    
     css_vertical = r"QProgressBar::chunk {background: QLinearGradient( x1: 0, y1: 0, x2: 1, y2: 0,stop: 0 #78d,stop: 0.4999 #46a,stop: 0.5 #45a,stop: 1 #238 ); border-radius: 7px; border: 1px solid black;}"
     #css_horizontal = r"QProgressBar::chunk {background: QLinearGradient( x1: 0, y1: 0, x2: 0, y2: 1,stop: 0 #78d,stop: 0.4999 #46a,stop: 0.5 #45a,stop: 1 #238 ); border-radius: 7px; border: 1px solid black;}"    
     css_horizontal = r"QProgressBar::chunk {background: QLinearGradient( x1: 0, y1: 0, x2: 0, y2: 1,stop: 0 #77a ,stop: 0.4999 #477,stop: 0.5 #45a,stop: 1 #238 ); border-radius: 7px; border: 1px solid black;}"    
@@ -2058,7 +2084,7 @@ class TimeLinePlotWidget(QtWidgets.QWidget):
 
 class JoystickDeviceWidget(QtWidgets.QWidget):
 
-    """Widget visualization joystick data."""
+    """ joystick visualization widget  """
 
     def __init__(self, device_data, vis_type, parent=None):
         """Creates a new instance.
@@ -2073,12 +2099,12 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
         self.device_guid = device_data.device_guid
         self.vis_type = vis_type
         self.widgets = []
-        self.setLayout(QtWidgets.QHBoxLayout())
+        layout = QtWidgets.QHBoxLayout()
+        layout.setContentsMargins(0,0,0,0)
+        self.setLayout(layout)
+        
 
-        # self.setMinimumSize(QtCore.QSize(200, 200))
-        # self.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding,
-        #                                          QtWidgets.QSizePolicy.MinimumExpanding))
-
+        
         el = gremlin.event_handler.EventListener()
         if vis_type == gremlin.types.VisualizationType.AxisCurrent:
             self._create_current_axis()

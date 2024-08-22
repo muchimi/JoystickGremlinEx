@@ -252,7 +252,9 @@ class PluginVariableType(enum.Enum):
     @staticmethod
     def to_string(value: PluginVariableType) -> str:
         try:
-            return _PluginVariableType_to_string_lookup[value]
+            v = value.value
+            data = next((item for item in PluginVariableType if item.value == v),None)
+            return _PluginVariableType_to_string_lookup[data]
         except KeyError:
             raise gremlin.error.GremlinError(
                 "Invalid PluginVariableType in lookup"

@@ -1019,6 +1019,7 @@ class Configuration:
     @last_plugin_folder.setter
     def last_plugin_folder(self, value):
         self._data["last_plugin_folder"]=value
+        self.save()
 
     @property
     def last_sound_folder(self):
@@ -1026,6 +1027,15 @@ class Configuration:
         return self._data.get("last_sound_folder",None)
     @last_sound_folder.setter
     def last_sound_folder(self, value):
-        self._data["last_sound_folder"]=value 
-
+        self._data["last_sound_folder"] = value 
+        self.save()
            
+    @property
+    def partial_plugin_save(self):
+        ''' true if partial plugin configuration saving is ok = false nothing will be saved - true partial values will be saved '''
+        return self._data.get("partial_plugin_init_ok",True)
+    
+    @partial_plugin_save.setter
+    def partial_plugin_save(self, value):
+        self._data["partial_plugin_init_ok"] = value 
+        self.save()

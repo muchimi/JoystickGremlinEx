@@ -19,6 +19,7 @@ import enum
 from PySide6 import QtWidgets, QtCore, QtGui
 
 import gremlin
+import gremlin.config
 import gremlin.shared_state
 import gremlin.ui.midi_device
 from gremlin.util import load_icon, load_pixmap
@@ -337,8 +338,10 @@ class InputItemListView(ui_common.AbstractView):
         # Create required UI items
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.scroll_area = QtWidgets.QScrollArea()
+
         self.scroll_widget = QtWidgets.QWidget()
         self.scroll_layout = QtWidgets.QVBoxLayout(self.scroll_widget)
+        self.scroll_layout.setContentsMargins(2,2,2,2)
 
         # Configure the scroll area
         self.scroll_area.setWidgetResizable(True)
@@ -419,8 +422,6 @@ class InputItemListView(ui_common.AbstractView):
 
             row_count = self.model.rows()
             device_name = self.current_device.name
-            #if self.current_device.name == "keyboard":
-
             
             selected_index = - 1 # nothing selected
 
@@ -583,7 +584,7 @@ class InputItemListView(ui_common.AbstractView):
 
         # select the widget if it's not selected
         data = self.model.data(index)
-        if data and data.containers:
+        if data and data.containers or data.input_type == InputType.KeyboardLatched:
             # prompt confirm
             message_box = QtWidgets.QMessageBox()
             message_box.setText("Delete confirmation")
@@ -939,21 +940,21 @@ class InputItemWidget(QtWidgets.QFrame):
         """
         import gremlin.ui.ui_common
         super().__init__()
-        #QtWidgets.QFrame.__init__(self)
         self.parent = parent
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
-        #self.setLayout(self.main_layout)
         self.main_layout.setSpacing(0)
         self.setObjectName("main_layout")
         self.main_layout.setContentsMargins(8,2,2,2)
 
         self._container_widget = QtWidgets.QWidget()
-        self._container_layout = QtWidgets.QVBoxLayout(self._container_widget)
+        self._container_layout = QtWidgets.QGridLayout(self._container_widget)
+        self._container_widget.setContentsMargins(0,0,0,0)
         self._container_layout.setContentsMargins(0,0,0,0)
 
         self._title_container_widget = QtWidgets.QWidget()
         self._title_container_layout = QtWidgets.QGridLayout(self._title_container_widget)
+        self._title_container_widget.setContentsMargins(0,0,0,0)
         self._title_container_layout.setContentsMargins(0,0,0,0)
         self._title_container_layout.setVerticalSpacing(0)
 
@@ -989,75 +990,78 @@ class InputItemWidget(QtWidgets.QFrame):
         #self.container_layout.addWidget(QtWidgets.QWidget(), data_row, 0) # spacer
         self._title_container_layout.addWidget(self._title_widget, data_row, 0) # title
         self._title_container_layout.addWidget(self._icon_widget, data_row, 1) # container icons
-        self._title_container_layout.setContentsMargins(0,0,0,0)
-        
+                
 
         # action buttons
         self._edit_button_widget = QtWidgets.QPushButton(qta.icon("fa.gear"),"") 
-        # self._edit_button_widget.setVisible(False)
         self._edit_button_widget.setToolTip("Configure")
         self._edit_button_widget.setFixedSize(24,16)
         self._edit_button_widget.clicked.connect(self._edit_button_cb)
-        # self._edit_button_widget.setVisible(False) # not visible by default
 
         self._title_container_layout.addWidget(self._edit_button_widget, data_row, 2)
 
         self._close_button_widget = QtWidgets.QPushButton(qta.icon("mdi.delete"),"")
-        # self._close_button_widget.setVisible(False)
+        
         self._close_button_widget.setFixedSize(16,16)
         self._close_button_widget.clicked.connect(self._close_button_cb)
-        # self._close_button_widget.setVisible(False) # not visible by default
-
 
         self._title_container_layout.addWidget(self._close_button_widget, data_row, 3)
         self._title_container_layout.addWidget(QtWidgets.QLabel(" "), data_row, 4)        
+        self._title_container_widget.setMinimumHeight(20)
 
         
         self._description_widget = gremlin.ui.ui_common.QIconLabel()
-        # self._description_widget.setVisible(False)
         self._description_widget.setObjectName("description")
         self._description_widget.setTextMinWidth(280)
-        # self._description_widget.setVisible(False)
-
-                
+        
         self._comment_widget = gremlin.ui.ui_common.QIconLabel()
-        # self._comment_widget.setVisible(False)
         self._comment_widget.setObjectName("comment")
         self._comment_widget.setTextMinWidth(280)
-        # self._comment_widget.setVisible(False)
-
 
         self._input_description_widget =gremlin.ui.ui_common.QIconLabel()
-        # self._input_description_widget.setVisible(False)
         self._input_description_widget.setObjectName("input_description")
         self._input_description_widget.setTextMinWidth(280)
+
+        self.main_layout.addWidget(self._title_container_widget)
+
         
-         
+        row = 0
+        self._row_description = row + 0
+        self._row_input_description = row + 1
+        self._row_custom_content = row + 2
+        self._row_comment = row + 3
         
-        
+        config = gremlin.config.Configuration()
+        if self.identifier.input_type in (InputType.JoystickAxis, InputType.JoystickButton) and config.show_input_axis:
+            self._container_input_axis_widget = QtWidgets.QWidget()
+            self._container_input_axis_layout = QtWidgets.QHBoxLayout(self._container_input_axis_widget)
+            self._container_input_axis_widget.setContentsMargins(0,0,0,0)
+            self._container_input_axis_layout.setContentsMargins(0,0,0,0)
+            if self.identifier.input_type == InputType.JoystickAxis:
+                widget = gremlin.ui.ui_common.AxisStateWidget(show_label = False, orientation=QtCore.Qt.Orientation.Horizontal, show_percentage=False)
+            else:
+                widget = gremlin.ui.ui_common.ButtonStateWidget()
+            widget.setMaximumWidth(200)
+            widget.hookDevice(identifier.device_guid, identifier.input_id)
+            self._container_input_axis_layout.addWidget(widget)
+            self._container_input_axis_layout.addStretch()
+            self.main_layout.addWidget(self._container_input_axis_widget)
         
         if self._multi_row:
 
             self.custom_container_widget = QtWidgets.QWidget() 
             self.custom_container_widget.setContentsMargins(0,0,0,0)
             self.custom_container_widget.setMaximumHeight(32)
+            # the layout is set in populate UI
             self.populate_ui(self, self.custom_container_widget, self.data)
         else:
             self.custom_container_widget = None
 
 
-        self._container_layout.addWidget(self._title_container_widget) # title bar
-        self._container_layout.addWidget(self._description_widget) # description bar - hidden if none
-        #self._description_widget.setStyleSheet("Background-color: yellow;")
-
-        self._container_layout.addWidget(self._input_description_widget) # input description - hidden if none
-        #self._input_description_widget.setStyleSheet("Background-color: orange;")
-        self._container_layout.setContentsMargins(0,0,0,0)
 
         if self.custom_container_widget:
-            self._container_layout.addWidget(self.custom_container_widget) # custom container
+            self._container_layout.addWidget(self.custom_container_widget,self._row_custom_content,0) # custom container
         
-        self._container_layout.addWidget(self._comment_widget)
        
         self.setMinimumWidth(300)
 
@@ -1101,9 +1105,9 @@ class InputItemWidget(QtWidgets.QFrame):
         ''' sets the title of the input widget '''
         if value:
             self._input_description_widget.setText(value)
-            self._input_description_widget.setVisible(True)
+            self._container_layout.addWidget(self._input_description_widget, self._row_input_description,0)
         else:
-            self._input_description_widget.setVisible(False)
+            layout_remove(self._container_layout, self._input_description_widget)
         
 
     def setInputDescriptionIcon(self, icon_path, use_qta = True):
@@ -1114,17 +1118,18 @@ class InputItemWidget(QtWidgets.QFrame):
         ''' sets the description of the input widget '''
         if value:
             self._description_widget.setText(f"<i>{value}</i>")
-            self._description_widget.setVisible(True)
+            self._container_layout.addWidget(self._description_widget, self._row_description,0)
         else:
-            self._description_widget.setVisible(False)
+            layout_remove(self._container_layout, self._description_widget)
+            
 
     def setComment(self, value):
         ''' sets the comment field of the input widget '''
         if value:
             self._comment_widget.setText(f"<i>{value}</i>")
-            self._comment_widget.setVisible(True)
+            self._container_layout.addWidget(self._comment_widget, self._row_comment,0)
         else:
-            self._comment_widget.setVisible(False)
+            layout_remove(self._container_layout, self._comment_widget)
 
 
     def setDescriptionIcon(self, icon_path, use_qta = True):
@@ -1239,10 +1244,13 @@ class ActionLabel(QtWidgets.QLabel):
         if isinstance(icon, str):
             # convert to icon if a path is given
             icon = load_icon(icon)
+        
         if isinstance(icon, QtGui.QIcon):
-            self.setPixmap(QtGui.QPixmap(icon.pixmap(20)))
+            pixmap = icon.pixmap(16)
         else:
-            self.setPixmap(QtGui.QPixmap(icon))
+            pixmap = QtGui.QPixmap(icon)
+        pixmap = pixmap.scaled(16, 16, QtCore.Qt.KeepAspectRatio)
+        self.setPixmap(pixmap)
 
         self.action_entry = action_entry
 

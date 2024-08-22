@@ -567,12 +567,15 @@ class KeyboardDeviceTabWidget(QDataWidget):
         
         '''
 
-        widget = InputItemWidget(identifier = identifier, populate_ui_callback=self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True, parent=parent)
+        widget = InputItemWidget(identifier = identifier, populate_ui_callback=self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True, parent=parent, data=data)
         widget.create_action_icons(data)
         widget.setDescription(data.description)
+
         widget.setIcon("fa.keyboard-o")
         widget.enable_close()
         widget.enable_edit()
+
+        self._update_input_widget(widget, widget.parent)
 
         return widget
     

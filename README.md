@@ -108,7 +108,7 @@ Joystick Gremlin EX
 # Changelog
 
 
-13.40.14ex
+13.40.14ex (as of pre-release m7)
 
 This release adds major new features, including some minor changes in UI functionality, and a few more QOL (quality of life) enhancements.
 
@@ -137,6 +137,8 @@ This release adds major new features, including some minor changes in UI functio
 - New option to force numlock off when a profile starts to help with the more complex latching that use numpad keys.
 - Added joystick input value display on axis inputs - shows an axis bar with the current axis value in the input (QOL) - can be toggled in options.
 - Update to Python 3.12.5
+- Profile mode change is now disabled when the profile runs to avoid conflicts.  Use the new profile startup profile option to pick a profile when the profile is loaded if the profile mode needs to be changed when the profile runs.
+- User plugins that use plugin variables now support partial save.  This can be enabled or disabled in options.  When enabled, plugin instance configurations setup in user-plugin tab will save in-progress work at edit time to the profile when the profile is saved.  Instances that are not fully configured will not be active at profile runtime and a log entry will be issued as a warning to skip the instance load.  This is on a per instance basis.
 
 6/6/24 - 13.40.13ex (h) **potentially breaking change**
 

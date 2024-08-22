@@ -146,10 +146,13 @@ class CodeRunner:
                     plugin.file_name
                 )
 
+                _, plugin_basename = os.path.split(plugin.file_name)
+
                 # Process each instance in turn
                 for instance in plugin.instances:
                     # Skip all instances that are not fully configured
                     if not instance.is_configured():
+                        logging.getLogger("system").warn(f"Warning: User plugin '{plugin_basename}': instance '{instance.name}' reports not configured - skipping runtime activation")
                         continue
 
                     # Store variable values in the registry

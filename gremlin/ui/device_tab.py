@@ -377,7 +377,8 @@ class ActionContainerView(gremlin.ui.ui_common.AbstractView):
 from gremlin.ui.qdatawidget import QDataWidget
 class JoystickDeviceTabWidget(QDataWidget):
 
-    """Widget used to configure a single joystick input device."""
+    """Widget used to display the input joystick device."""
+
     inputChanged = QtCore.Signal(str, object) # indicates the input selection changed sends (device_guid string, identifier object)
 
     def __init__(
@@ -447,9 +448,11 @@ class JoystickDeviceTabWidget(QDataWidget):
         line_edit.setText(device_profile.label)
         line_edit.textChanged.connect(self.update_device_label)
         label_layout.addWidget(line_edit)
+        
 
         self.left_panel_layout.addLayout(label_layout)
         self.left_panel_layout.addWidget(self.input_item_list_view)
+        self.left_panel_layout.setContentsMargins(0,0,0,0)
 
         # Add a help text for the purpose of the vJoy tab
         if device is not None and \
@@ -483,8 +486,7 @@ class JoystickDeviceTabWidget(QDataWidget):
         # listen to device changes
         el = gremlin.event_handler.EventListener()
         el.joystick_event.connect(self._device_update)
-        # el.profile_start.connect(self._profile_start)
-        # el.profile_stop.connect(self._profile_stop)
+
 
         self.updating = False
         self.last_event = None
@@ -515,10 +517,12 @@ class JoystickDeviceTabWidget(QDataWidget):
         
         
         if data.input_type == InputType.JoystickAxis:
-            widget = input_item.InputItemWidget(identifier = identifier, parent=parent,  populate_ui_callback=self._populate_axis_input_widget_ui, data = data)
+            #widget = input_item.InputItemWidget(identifier = identifier, parent=parent,  populate_ui_callback=self._populate_axis_input_widget_ui, data = data)
+            widget = input_item.InputItemWidget(identifier = identifier, parent=parent, data = data)
             widget.setIcon("joystick_no_frame.png",use_qta=False)
         elif data.input_type == InputType.JoystickButton:
-            widget = input_item.InputItemWidget(identifier = identifier, parent=parent, populate_ui_callback=self._populate_button_input_widget_ui, data = data)
+            #widget = input_item.InputItemWidget(identifier = identifier, parent=parent, populate_ui_callback=self._populate_button_input_widget_ui, data = data)
+            widget = input_item.InputItemWidget(identifier = identifier, parent=parent, data = data)
             widget.setIcon("mdi.gesture-tap-button")
         elif data.input_type == InputType.JoystickHat:
             widget = input_item.InputItemWidget(identifier = identifier, parent=parent, data = data)
@@ -542,7 +546,7 @@ class JoystickDeviceTabWidget(QDataWidget):
             widget.setMaximumWidth(200)
             # automatically update from the joystick
             widget.hookDevice(data.device_guid, data.input_id)
-            
+            widget.setContentsMargins(0,0,0,0)
             layout.setContentsMargins(0,0,0,0)
             layout.addWidget(widget)
             layout.addStretch()
@@ -557,7 +561,7 @@ class JoystickDeviceTabWidget(QDataWidget):
             #widget.setMaximumWidth(20)
             # automatically update from the joystick
             widget.hookDevice(data.device_guid, data.input_id)
-
+            widget.setContentsMargins(0,0,0,0)
             layout.setContentsMargins(0,0,0,0)
             layout.addWidget(widget)
             layout.addStretch()

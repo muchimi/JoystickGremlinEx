@@ -2111,10 +2111,16 @@ class PluginInstance:
         self.variables = {}
 
     def is_configured(self):
-        is_configured = True
+        
+        # get the configuration flag for edit mode
+        if not gremlin.shared_state.is_running:
+            partial_plugin_ok = gremlin.config.Configuration().partial_plugin_save
+            if partial_plugin_ok:
+                return True
         for var in [var for var in self.variables.values() if not var.is_optional]:
-            is_configured &= var.value is not None
-        return is_configured
+            if not var.is_configured:
+                return False
+        return True
 
     def has_variable(self, name):
         return name in self.variables
@@ -2158,71 +2164,113 @@ class PluginVariable:
         self.value = None
         self.is_optional = False
 
+    @property
+    def is_configured(self):
+        ''' true if the variable is configured'''
+        if self.type is None or self.name is None:
+            return False
+        if self.type == PluginVariableType.PhysicalInput:
+            return self.value["device_id"] is not None
+        
+        if self.type != PluginVariableType.String:
+            return self.value is not None
+        
+        return True
+        
+        
+
     def from_xml(self, node):
+        ''' save user plugin variable data '''
         self.name = safe_read(node, "name", str, "")
         self.type = PluginVariableType.to_enum(
             safe_read(node, "type", str, "String")
         )
         self.is_optional = read_bool(node, "is-optional")
 
+        value = None
+        if "value" in node.attrib:
+            value = node.get("value")
+            if value == "none":
+                value = None
+
+        self.value = value
         # Read variable content based on type information
         if self.type == PluginVariableType.Int:
-            self.value = safe_read(node, "value", int, 0)
+            self.value = 0 if value is None else safe_read(node, "value", int, 0)
         elif self.type == PluginVariableType.Float:
-            self.value = safe_read(node, "value", float, 0.0)
+            self.value = 0.0 if value is None else safe_read(node, "value", float, 0.0)
         elif self.type == PluginVariableType.Selection:
-            self.value = safe_read(node, "value", str, "")
+            self.value = "" if value is None else safe_read(node, "value", str, "")
         elif self.type == PluginVariableType.String:
-            self.value = safe_read(node, "value", str, "")
+            self.value = "" if value is None else safe_read(node, "value", str, "")
         elif self.type == PluginVariableType.Bool:
-            self.value = read_bool(node, "value", False)
+            self.value = False if value is None else read_bool(node, "value", False)
         elif self.type == PluginVariableType.Mode:
-            self.value = safe_read(node, "value", str, "")
+            self.value = "" if value is None else safe_read(node, "value", str, "")
         elif self.type == PluginVariableType.PhysicalInput:
-            self.value = {
-                "device_id": parse_guid(node.attrib["device-guid"]),
-                "device_name": safe_read(node, "device-name", str, ""),
-                "input_id": safe_read(node, "input-id", int, None),
-                "input_type": InputType.to_enum(
-                    safe_read(node, "input-type", str, None)
-                )
-            }
+            if not "device_id" in node.attrib:
+                # partial data save
+                self.value = {
+                    "device_id": None,
+                    "device_name": "",
+                    "input_id": None,
+                    "input_type": None}
+            else:
+                self.value = {
+                    "device_id": parse_guid(node.attrib["device-guid"]),
+                    "device_name": safe_read(node, "device-name", str, ""),
+                    "input_id": safe_read(node, "input-id", int, None),
+                    "input_type": InputType.to_enum(
+                        safe_read(node, "input-type", str, None)
+                    )
+                }
         elif self.type == PluginVariableType.VirtualInput:
-            self.value = {
-                "device_id": safe_read(node, "vjoy-id", int, None),
-                "input_id": safe_read(node, "input-id", int, None),
-                "input_type": InputType.to_enum(
-                    safe_read(node, "input-type", str, None)
-                )
-            }
+            if not "vjoy-id" in node.attrib:
+                # partial data save
+                self.value = {
+                "device_id": None,
+                "input_id": None,
+                "input_type": None
+                  }
+            else:
+                self.value = {
+                    "device_id": safe_read(node, "vjoy-id", int, None),
+                    "input_id": safe_read(node, "input-id", int, None),
+                    "input_type": InputType.to_enum(
+                        safe_read(node, "input-type", str, None)
+                    )
+                }
 
     def to_xml(self):
-        if self.value is None:
-            return None
+        ''' read user plugin saved variable data '''
 
         node = ElementTree.Element("variable")
         node.set("name", safe_format(self.name, str))
         node.set("type", PluginVariableType.to_string(self.type))
         node.set("is-optional", safe_format(self.is_optional, bool, str))
 
-        # Write out content based on the type
-        if self.type in [
-            PluginVariableType.Int, PluginVariableType.Float,
-            PluginVariableType.Mode, PluginVariableType.Selection,
-            PluginVariableType.String,
-        ]:
-            node.set("value", str(self.value))
-        elif self.type == PluginVariableType.Bool:
-            node.set("value", "1" if self.value else "0")
-        elif self.type == PluginVariableType.PhysicalInput:
-            node.set("device-guid", write_guid(self.value["device_id"]))
-            node.set("device-name", safe_format(self.value["device_name"], str))
-            node.set("input-id", safe_format(self.value["input_id"], int))
-            node.set("input-type", InputType.to_string(self.value["input_type"]))
-        elif self.type == PluginVariableType.VirtualInput:
-            node.set("vjoy-id", safe_format(self.value["device_id"], int))
-            node.set("input-id", safe_format(self.value["input_id"], int))
-            node.set("input-type", InputType.to_string(self.value["input_type"]))
+        if self.value is None:
+            node.set("value", "none")
+        else:
+
+            # Write out content based on the type
+            if self.type in [
+                PluginVariableType.Int, PluginVariableType.Float,
+                PluginVariableType.Mode, PluginVariableType.Selection,
+                PluginVariableType.String,
+            ]:
+                node.set("value", str(self.value))
+            elif self.type == PluginVariableType.Bool:
+                node.set("value", "1" if self.value else "0")
+            elif self.type == PluginVariableType.PhysicalInput:
+                node.set("device-guid", write_guid(self.value["device_id"]))
+                node.set("device-name", safe_format(self.value["device_name"], str))
+                node.set("input-id", safe_format(self.value["input_id"], int))
+                node.set("input-type", InputType.to_string(self.value["input_type"]))
+            elif self.type == PluginVariableType.VirtualInput:
+                node.set("vjoy-id", safe_format(self.value["device_id"], int))
+                node.set("input-id", safe_format(self.value["input_id"], int))
+                node.set("input-type", InputType.to_string(self.value["input_type"]))
 
         return node
 
