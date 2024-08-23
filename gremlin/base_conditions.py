@@ -296,6 +296,7 @@ class AbstractFunctor(metaclass=ABCMeta):
         """
         import gremlin.event_handler
         self._name = instance.name
+        self.enabled = True
 
         
 

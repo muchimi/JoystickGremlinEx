@@ -44,7 +44,6 @@ ProfileDeviceInformation = collections.namedtuple(
 CallbackData = collections.namedtuple("ContainerCallback", ["callback", "event"])
 
 
-
 def _get_input_item(parent):
     ''' gets the InputItem parent hierarchy if it exists '''
     while parent is not None:
@@ -83,6 +82,7 @@ class ProfileData(metaclass=ABCMeta):
             self._generic_icon = generic_icon
         else:
             self._generic_icon = None       
+
 
     def icon(self):
         ''' gets the default icon'''
@@ -166,6 +166,11 @@ class ProfileData(metaclass=ABCMeta):
         # while not isinstance(item, Profile):
         #     item = item.parent
         # return item.settings
+
+
+    @property
+    def input_item(self):
+        return self._input_item
     
     
     @property
@@ -614,6 +619,7 @@ class InputItem():
         self._containers = []
         self._selected = False # true if the item is selected
         self._is_action = False # true if the object is a sub-item for a sub-action (GateHandler for example)
+        self._device_type = None
         if parent is not None:
             # find the missing properties from the parenting hierarchy
             self._is_action = isinstance(parent, AbstractAction)
@@ -886,7 +892,7 @@ class InputItem():
     @property
     def display_name(self):
         if self.is_action:
-            return "this action trigger"
+            return "this action"
         ''' gets a display name for this input '''
         if self._input_type == InputType.JoystickAxis:
             return f"Axis {self._input_id}"

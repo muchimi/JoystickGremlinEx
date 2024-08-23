@@ -206,8 +206,8 @@ class ModuleManagementController(QtCore.QObject):
             button = widget.itemAtPosition(0, 1).widget()
             input_id = f"{data["input_id"]:d}"
             if data["input_type"] == InputType.JoystickAxis:
-                input_id = gremlin.common.AxisNames.to_string(
-                    gremlin.common.AxisNames(data["input_id"])
+                input_id = gremlin.types.AxisNames.to_string(
+                    gremlin.types.AxisNames(data["input_id"])
                 )
             button.setText(
                 f"{data["device_name"]} {InputType.to_string(data["input_type"]).capitalize()} {input_id}"

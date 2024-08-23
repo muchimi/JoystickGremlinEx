@@ -54,7 +54,7 @@ class GatedAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
         pass
 
 
-class GatedAxisFunctor(gremlin.base_profile.AbstractFunctor):
+class GatedAxisFunctor(gremlin.base_profile.AbstractContainerActionFunctor):
 
     def __init__(self, action):
         super().__init__(action)

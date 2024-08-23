@@ -2310,8 +2310,7 @@ class ActionContainerUi(QtWidgets.QDialog):
     def __init__(self, gate_data, data, parent=None):
         '''
         :param: data = the gate or range data block
-        :item_data: the InputItem data block holding the container and input device configuration for this gated input
-        :index: the gate number of the gated input - there will at least be two for low and high - index is an integer 
+        
         '''
         
         super().__init__(parent)
@@ -2328,7 +2327,7 @@ class ActionContainerUi(QtWidgets.QDialog):
 
         # Actual configuration object being managed
         self.setMinimumWidth(600)
-        self.setMinimumWidth(800)
+        self.setMinimumHeight(800)
         
         decimals = gate_data.decimals
         single_step = gate_data.single_step

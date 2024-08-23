@@ -81,6 +81,10 @@ class AxisNames(enum.Enum):
             raise gremlin.error.GremlinError(
                 f"Invalid AxisName lookup, {value}"
             )
+        
+    @staticmethod
+    def to_list():
+        return [axis for axis in AxisNames]        
 
 
 _AxisNames_to_string_lookup = {

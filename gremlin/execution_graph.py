@@ -391,7 +391,7 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
         if verbose: 
             logging.getLogger("system").info("Action order:")
             for index, action in enumerate(ordered_action_set):
-                input_item = action.get_input_item()
+                input_item = action.input_item # get_input_item()
                 input_id = input_item.input_id
                 input_stub = str(input_id)
                 logging.getLogger("system").info(f"\t{index}: input type: {input_item.input_type} {input_stub} action: {type(action)}  data: {str(action)} ")

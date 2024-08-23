@@ -24,97 +24,9 @@ import sys
 from PySide6 import QtGui
 
 from gremlin.input_types import InputType
+import gremlin.types
 import gremlin.keyboard
 
-
-class AxisNames(enum.Enum):
-
-    X = 1
-    Y = 2
-    Z = 3
-    RX = 4
-    RY = 5
-    RZ = 6
-    SLIDER = 7
-    DIAL = 8
-
-    @staticmethod
-    def to_string(value):
-        try:
-            return _AxisNames_to_string_lookup[value]
-        except KeyError:
-            raise gremlin.error.GremlinError(f"Invalid AxisName lookup, {value}")
-
-    @staticmethod
-    def to_enum(value):
-        try:
-            return _AxisNames_to_enum_lookup[value]
-        except KeyError:
-            raise gremlin.error.GremlinError(f"Invalid AxisName lookup, {value}")
-
-
-_AxisNames_to_string_lookup = {
-    AxisNames.X: "X Axis (1)",
-    AxisNames.Y: "Y Axis (2)",
-    AxisNames.Z: "Z Axis (3)",
-    AxisNames.RX: "X Rotation (4)",
-    AxisNames.RY: "Y Rotation (5)",
-    AxisNames.RZ: "Z Rotation (6)",
-    AxisNames.SLIDER: "Slider (7)",
-    AxisNames.DIAL: "Dial (8)"
-}
-
-_AxisNames_to_enum_lookup = {
-    "X Axis (1)": AxisNames.X,
-    "Y Axis (2)": AxisNames.Y,
-    "Z Axis (3)": AxisNames.Z,
-    "X Rotation (4)": AxisNames.RX,
-    "Y Rotation (5)": AxisNames.RY,
-    "Z Rotation (6)": AxisNames.RZ,
-    "Slider (7)": AxisNames.SLIDER,
-    "Dial (8)": AxisNames.DIAL
-}
-
-
-class AxisButtonDirection(enum.Enum):
-
-    """Possible activation directions for axis button instances."""
-
-    Anywhere = 1
-    Below = 2
-    Above = 3
-
-    @staticmethod
-    def to_string(value):
-        try:
-            return _AxisButtonDirection_to_string_lookup[value]
-        except KeyError:
-            raise gremlin.error.GremlinError(
-                f"Invalid AxisButtonDirection lookup, {value}"
-            )
-
-    @staticmethod
-    def to_enum(value):
-        try:
-            return _AxisButtonDirection_to_enum_lookup[value]
-        except KeyError:
-            raise gremlin.error.GremlinError(
-                f"Invalid AxisButtonDirection lookup, {value}"
-            )
-
-
-_AxisButtonDirection_to_string_lookup = {
-    AxisButtonDirection.Anywhere: "anywhere",
-    AxisButtonDirection.Above: "above",
-    AxisButtonDirection.Below: "below"
-}
-
-
-_AxisButtonDirection_to_enum_lookup = {
-    "anywhere": AxisButtonDirection.Anywhere,
-    "above": AxisButtonDirection.Above,
-    "below": AxisButtonDirection.Below
-}
 
 
 def input_to_ui_string(input_type, input_id):
@@ -135,7 +47,7 @@ def input_to_ui_string(input_type, input_id):
 
     if input_type == InputType.JoystickAxis:
         try:
-            return AxisNames.to_string(AxisNames(input_id))
+            return gremlin.types.AxisNames.to_string(gremlin.types.AxisNames(input_id))
         except gremlin.error.GremlinError:
             return f"Axis {input_id:d}"
     elif input_type == InputType.KeyboardLatched:

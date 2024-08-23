@@ -116,12 +116,11 @@ class Backend(QtCore.QObject):
             return 0
 
         try:
-            item = self.profile.get_input_item(
-                identifier.device_guid,
-                identifier.input_type,
-                identifier.input_id,
-                False
-            )
+            import gremlin.base_profile
+            item = gremlin.base_profile.InputItem()
+            item.device_guid = identifier.device_guid
+            item.input_type = identifier.input_type
+            item.input_id = identifier.input_id
             return len(item.action_configurations)
         except error.ProfileError as e:
             return 0

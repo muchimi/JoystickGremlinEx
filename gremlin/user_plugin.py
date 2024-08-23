@@ -727,8 +727,8 @@ class PhysicalInputVariable(AbstractVariable):
         if value is not None:
             input_id = f"{value["input_id"]:d}"
             if value["input_type"] == InputType.JoystickAxis:
-                input_id = gremlin.common.AxisNames.to_string(
-                    gremlin.common.AxisNames(value["input_id"])
+                input_id = gremlin.types.AxisNames.to_string(
+                    gremlin.types.AxisNames(value["input_id"])
                 )
             value_widget.setText(
                 f"{value["device_name"]} {InputType.to_string(value["input_type"]).capitalize()} {input_id}"

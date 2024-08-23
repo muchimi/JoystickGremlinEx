@@ -138,8 +138,6 @@ class GUID:
             Mapping of a C struct representing a device GUID
         """
 
-
-        
         if isinstance(guid, uuid.UUID):
             # convert to ctypes structure using the integer value if the class is given a regular python UUID
             guid = _GUID(guid.int)
@@ -163,8 +161,7 @@ class GUID:
                self._ctypes_guid.Data2 == 0 and \
                self._ctypes_guid.Data3 == 0 and \
                self._ctypes_guid.Data4 == 0)
-
-
+    
     @property
     def ctypes(self):
         """Returns the object mapping the C structure.

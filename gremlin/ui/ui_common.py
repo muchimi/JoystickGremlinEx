@@ -313,7 +313,7 @@ class AbstractInputSelector(QtWidgets.QWidget):
             input_type = self._input_type_registry[device_index][input_index]
 
             if input_type == InputType.JoystickAxis:
-                input_id = gremlin.common.AxisNames.to_enum(input_value).value
+                input_id = gremlin.types.AxisNames.to_enum(input_value).value
             else:
                 input_id = int(input_value.split()[-1])
 
@@ -347,6 +347,8 @@ class AbstractInputSelector(QtWidgets.QWidget):
             with QtCore.QSignalBlocker(entry):
                 entry.setVisible(True)
                 entry.setCurrentIndex(entry_id)
+
+
 
     def _update_device(self, index):
         # Hide all selection dropdowns
@@ -440,6 +442,9 @@ class AbstractInputSelector(QtWidgets.QWidget):
     def _execute_callback(self):
         self.change_cb(self.get_selection())
 
+    def sync(self):
+        ''' forces the change cb to be called to update dependents based on values '''
+        self._execute_callback()
 
 
 
@@ -808,7 +813,7 @@ class ModeWidget(QtWidgets.QWidget):
             index = 0
             current_index = 0
             for display_name, mode_name in zip(display_names, mode_names):
-                self.edit_mode_selector.addItem(display_name)
+                self.edit_mode_selector.addItem(display_name, mode_name)
                 self.mode_list.append(mode_name)
                 if mode_name == last_edit_mode:
                     current_index = index
@@ -895,6 +900,13 @@ class ModeWidget(QtWidgets.QWidget):
     
     def setCurrentIndex(self, index):
         self.edit_mode_selector.setCurrentIndex(index)
+
+    def setCurrentMode(self, current_mode):
+        index = self.edit_mode_selector.findData(current_mode)
+        if index != -1:
+            self.setCurrentIndex(index)
+        else:
+            logging.getLogger("system").error(f"SetModeError: mode '{current_mode}' is not defined")
 
     def setShowModeEdit(self, value):
         ''' determines if the mode edit button is visible or not '''
@@ -1191,6 +1203,43 @@ class ConfirmPushButton(QtWidgets.QPushButton):
         if result == QtWidgets.QMessageBox.StandardButton.Ok:
             self.confirmed.emit(self)
         
+class ConfirmBox():
+    def __init__(self, title = "Confirmation Required", prompt = "Are you sure?", parent = None):
+
+        from gremlin.util import load_pixmap
+        self._message_box = QtWidgets.QMessageBox(parent = parent)
+        pixmap = load_pixmap("warning.svg")
+        pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio) 
+        self._message_box.setIconPixmap(pixmap)
+        self._message_box.setText(title)
+        self._message_box.setInformativeText(prompt)
+        self._message_box.setStandardButtons(
+            QtWidgets.QMessageBox.StandardButton.Ok |
+            QtWidgets.QMessageBox.StandardButton.Cancel
+            )
+        self._message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
+        gremlin.util.centerDialog(self._message_box)
+
+    def show(self):
+        return self._message_box.exec()
+
+class MessageBox():
+    def __init__(self, title = "Notice", prompt = "Operation", parent = None):
+
+        from gremlin.util import load_pixmap
+        self._message_box = QtWidgets.QMessageBox(parent = parent)
+        pixmap = load_pixmap("warning.svg")
+        pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio) 
+        self._message_box.setIconPixmap(pixmap)
+        self._message_box.setText(title)
+        self._message_box.setInformativeText(prompt)
+        self._message_box.setStandardButtons(
+            QtWidgets.QMessageBox.StandardButton.Ok 
+            )
+        self._message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
+        gremlin.util.centerDialog(self._message_box)
+        self._message_box.show()
+    
 
 
 
