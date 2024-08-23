@@ -1238,7 +1238,7 @@ class MessageBox():
             )
         self._message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
         gremlin.util.centerDialog(self._message_box)
-        self._message_box.show()
+        self._message_box.exec()
     
 
 

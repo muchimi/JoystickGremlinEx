@@ -83,6 +83,34 @@ class CodeRunner:
         return gremlin.shared_state.is_running
     
 
+    def setUIState(self, enabled):
+        ui = gremlin.shared_state.ui.ui
+        ui.devices.setEnabled(enabled)
+        ui.actionNewProfile.setEnabled(enabled)
+        ui.actionOpen.setEnabled(enabled)
+        ui.actionLoadProfile.setEnabled(enabled)
+        ui.actionRecent.setEnabled(enabled)
+        ui.actionManageModes.setEnabled(enabled)
+        ui.actionOptions.setEnabled(enabled)
+        ui.actionCreate1to1Mapping.setEnabled(enabled)
+        ui.actionMergeAxis.setEnabled(enabled)
+        ui.actionSwapDevices.setEnabled(enabled)
+        ui.actionModifyProfile.setEnabled(enabled)
+        
+
+
+
+
+
+    def disableUi(self):
+        ''' disables UI '''
+        self.setUIState(False)
+        
+        
+
+    def enableUI(self):
+        ''' enables UI '''
+        self.setUIState(True)
 
     def start(self, inheritance_tree, settings, start_mode, profile):
         """Starts listening to events and loads all existing callbacks.
@@ -95,6 +123,8 @@ class CodeRunner:
         """
 
         el = gremlin.event_handler.EventListener()
+
+        self.disableUi()
 
 
         # indicate we're in run mode
@@ -450,8 +480,13 @@ class CodeRunner:
 
         except Exception as e:
             msg = f"Unable to launch user plugin due to an error: {e}"
+            # re-enable tabs
+            self.enableUI()
             syslog.debug(msg)
             gremlin.util.display_error(msg)
+            
+            
+
             
 
     def stop(self):
@@ -465,6 +500,9 @@ class CodeRunner:
 
         # stop listen
         el.stop()
+
+        # re-enable tabs
+        self.enableUI()
 
         el.profile_stop.emit()
 

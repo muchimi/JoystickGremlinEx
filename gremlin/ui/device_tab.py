@@ -669,7 +669,10 @@ class JoystickDeviceTabWidget(QDataWidget):
 
         # Select the first input item
         #self.input_item_list_view.select_item(0, emit_signal=False)
+        
+        self.input_item_list_view.redraw()
         self.input_item_list_view.select_item(0)
+        
 
 
 

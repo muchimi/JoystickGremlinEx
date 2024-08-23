@@ -1778,18 +1778,19 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         :param mode the now current mode
         """
-
-
+        
         update = True
         is_running = gremlin.shared_state.is_running
         if is_running:
             update = self.config.runtime_ui_update
             
         if update:
+            gremlin.util.pushCursor()
             with QtCore.QSignalBlocker(self.mode_selector):
                 for tab in self._get_tab_widgets():
                     if hasattr(tab,"set_mode"):
                         tab.set_mode(new_mode)
+            gremlin.util.popCursor()
 
         
         
@@ -2388,14 +2389,10 @@ if __name__ == "__main__":
         logging.getLogger("system").info(f"\tFound {vjoy_count} vjoy device(s)")
 
         if not vjoy_working:
-            logging.getLogger("system").error(
-                "vJoy is not present or incorrectly setup."
-            )
-            raise gremlin.error.GremlinError(
-                "vJoy is not present or incorrectly setup."
-            )
-        
-        
+            msg = "No configured VJOY devices were found<br>This could be related to a different error scanning devices, check log in verbose mode"
+            logging.getLogger("system").error(msg)
+            gremlin.ui.ui_common.MessageBox("Error Scanning Devices", msg)
+            # raise gremlin.error.GremlinError(msg)
 
     except (gremlin.error.GremlinError, dinput.DILLError) as e:
         error_display = QtWidgets.QMessageBox(

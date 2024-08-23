@@ -1080,10 +1080,11 @@ def isSignalConnected(oObject : QtCore.QObject, signal_name : str):
 def centerDialog(dialog, width = 300, height = 150):
     ''' centers the dialog on top of the UI '''
     # Display the dialog centered in the middle of the UI
-    
+    import gremlin.shared_state
+    if gremlin.shared_state.ui is None:
+        return # no UI yet
     root = dialog
     if not root.parent():
-        import gremlin.shared_state
         geom = gremlin.shared_state.ui.geometry()
     else:
         while root.parent():
