@@ -29,6 +29,7 @@ class Ui_Gremlin(object):
         self.tab_2.setObjectName("tab_2")
         self.devices.addTab(self.tab_2, "")
         self.horizontalLayout.addWidget(self.devices)
+        
         main_window.setCentralWidget(self.main)
         self.menubar = QtWidgets.QMenuBar(main_window)
         self.menubar.setGeometry(QtCore.QRect(0, 0, 800, 21))

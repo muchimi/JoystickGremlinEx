@@ -22,6 +22,7 @@ to speech system.
 
 import logging
 import time
+import gremlin.shared_state
 import gremlin.threading
 from . import event_handler, util
 import pyttsx3
@@ -128,6 +129,5 @@ class TextToSpeech:
         :param text the text to substitute parts of
         :return original text with parts substituted
         """
-        eh = event_handler.EventHandler()
-        text = text.replace("${current_mode}", eh.active_mode)
+        text = text.replace("${current_mode}", gremlin.shared_state.active_mode)
         return text

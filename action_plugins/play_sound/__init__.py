@@ -42,7 +42,10 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
         assert isinstance(action_data, PlaySound)
 
     def _create_ui(self):
-        content_layout = QtWidgets.QHBoxLayout(self)
+        content_widget = QtWidgets.QWidget()
+        content_widget.setContentsMargins(0,0,0,0)
+        content_layout = QtWidgets.QHBoxLayout(content_widget)
+        content_layout.setContentsMargins(0,0,0,0)
         self.icon_widget = QtWidgets.QLabel()
         self.file_path_widget = QtWidgets.QLineEdit()
         self.file_path_widget.installEventFilter(self)
@@ -68,7 +71,7 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
         content_layout.addWidget(self.volume_widget)
         content_layout.addWidget(self.play_widget)
         
-        self.main_layout.addLayout(content_layout)
+        self.main_layout.addWidget(content_widget)
 
         self.player.setAudioOutput(self.audio)
         

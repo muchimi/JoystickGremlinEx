@@ -56,13 +56,11 @@ _suspend_input_highlighting_enabled = 0
 # Timer used to disable input highlighting with a delay
 _suspend_timer = None
 
-# Holds the currently active profile
-current_profile = None
 
-@module_property
-def _current_mode():
-    import gremlin.event_handler
-    return gremlin.event_handler.EventHandler().active_mode
+# @module_property
+# def _current_mode():
+#     import gremlin.event_handler
+#     return gremlin.event_handler.EventHandler().active_mode
 
 
 ui_ready = False
@@ -70,8 +68,6 @@ ui_ready = False
 # holds the main UI reference
 ui = None
 
-# holds debug information for callbacks
-_callback_map = {}
 
 # true if a profile is running
 is_running = False
@@ -84,6 +80,26 @@ device_guid_to_name_map = {}
 
 # map of device profiles - indexed by hardware GUID
 device_profile_map = {}
+
+# Holds the currently active profile
+current_profile = None
+
+# holds the active mode
+active_mode = None
+
+# holds teh current mode
+current_mode = None
+
+# previous mode
+previous_mode = None
+
+def resetState():
+    device_guid_to_name_map.clear()
+    device_profile_map.clear()
+    current_profile = None
+    active_mode = None
+    current_mode = None
+    
 
 def get_device_name(guid):
     ''' gets the device name from the UUID'''
@@ -168,6 +184,20 @@ def delayed_input_highlighting_suspension():
     _suspend_timer.start()
 
 
+_tab_input_map = {}
+
+def update_last_selection(device_guid, input_type, input_id):
+    ''' tracks the last selection per device guid '''
+    key = str(device_guid)
+    _tab_input_map[key] = (input_type, input_id)
+
+def last_input_id(device_guid):
+    ''' retrieves the last input id for a given input guid (input_type, input_id) of the last selection for this device '''
+    key = str(device_guid)
+    if key in _tab_input_map.keys():
+        return _tab_input_map[key]
+    return None, None
+
 _icon_path_cache = {}
 
 def _get_root_path():
@@ -192,3 +222,5 @@ def _get_root_path():
     return application_path
 
 _get_root_path()
+
+

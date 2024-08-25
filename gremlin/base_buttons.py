@@ -43,7 +43,7 @@ class VirtualAxisButton(AbstractVirtualButton):
         :param lower_limit the lower limit of the virtual button
         :param upper_limit the upper limit of the virtual button
         """
-        from gremlin.common import AxisButtonDirection
+        from gremlin.types import AxisButtonDirection
         super().__init__()
         self.lower_limit = lower_limit
         self.upper_limit = upper_limit
@@ -54,7 +54,7 @@ class VirtualAxisButton(AbstractVirtualButton):
 
         :param node the node containing data for this instance
         """
-        from gremlin.common import AxisButtonDirection
+        from gremlin.types import AxisButtonDirection
         self.lower_limit = safe_read(node, "lower-limit", float)
         self.upper_limit = safe_read(node, "upper-limit", float)
         self.direction = AxisButtonDirection.to_enum(
@@ -66,7 +66,7 @@ class VirtualAxisButton(AbstractVirtualButton):
 
         :return XML node containing the instance's data
         """
-        from gremlin.common import AxisButtonDirection
+        from gremlin.types import AxisButtonDirection
         node = ElementTree.Element("virtual-button")
         node.set("lower-limit", str(self.lower_limit))
         node.set("upper-limit", str(self.upper_limit))

@@ -30,6 +30,7 @@ from PySide6 import QtCore
 
 import gremlin.config
 import gremlin.keyboard
+import gremlin.shared_state
 import gremlin.types
 from dinput import DILL, GUID, GUID_Invalid
 import gremlin.util
@@ -1795,9 +1796,8 @@ class ButtonReleaseActions(QtCore.QObject):
         el.joystick_event.connect(self._input_event_cb)
         el.keyboard_event.connect(self._input_event_cb)
         el.virtual_event.connect(self._input_event_cb)
-        eh = gremlin.event_handler.EventHandler()
-        self._current_mode = eh.active_mode
-        eh.runtime_mode_changed.connect(self._mode_changed_cb)
+        self._current_mode = gremlin.shared_state.active_mode
+        el.runtime_mode_changed.connect(self._mode_changed_cb)
 
     def register_callback(
         self,

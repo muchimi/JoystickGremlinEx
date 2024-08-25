@@ -79,6 +79,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
 
         self.action_model = ActionContainerModel(self.item_data.containers, self.item_data)
         self.action_view = ActionContainerView()
+        self.action_view.setContentsMargins(0,0,0,0)
         self.action_view.set_model(self.action_model)
         self.action_view.redraw()
 
@@ -189,6 +190,13 @@ class InputItemConfiguration(QtWidgets.QFrame):
         import gremlin.ui.ui_common as ui_common
         self.action_layout = QtWidgets.QHBoxLayout()
 
+        # repeat the current active mode for editing
+        mode_widget = QtWidgets.QLineEdit(text=gremlin.shared_state.active_mode)
+        mode_widget.setReadOnly(True)
+
+        self.action_layout.addWidget(QtWidgets.QLabel("Mode:"))
+        self.action_layout.addWidget(mode_widget)
+
         self.action_selector = ui_common.ActionSelector(
             self.item_data.input_type
         )
@@ -205,6 +213,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
         self.always_execute.stateChanged.connect(self._always_execute_cb)
 
         self.action_layout.addWidget(self.action_selector)
+        self.action_layout.addStretch()
         self.action_layout.addWidget(self.container_selector)
         self.action_layout.addWidget(self.always_execute)
         self.main_layout.addLayout(self.action_layout)
@@ -326,6 +335,8 @@ class ActionContainerView(gremlin.ui.ui_common.AbstractView):
 
         # Create required UI items
         self.main_layout = QtWidgets.QVBoxLayout(self)
+        self.main_layout.setContentsMargins(0,0,0,0)
+
         self.scroll_area = QtWidgets.QScrollArea()
         self.scroll_widget = QtWidgets.QWidget()
         self.scroll_layout = QtWidgets.QVBoxLayout()
@@ -500,6 +511,14 @@ class JoystickDeviceTabWidget(QDataWidget):
         # update display on config change
         el.config_changed.connect(self._config_changed_cb)
 
+    def clear_layout(self):
+        ''' clear data references '''
+        self.input_item_list_model = None
+        self.input_item_list_view = None
+        gremlin.util.clear_layout(self.main_layout)
+        
+        
+        
 
     def _config_changed_cb(self):
         self.input_item_list_view.redraw()

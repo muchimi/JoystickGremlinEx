@@ -46,6 +46,7 @@ class TextToSpeechWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         try:
             self.voice_widget.setCurrentIndex(self.action_data.voice_index)
+            self.action_data.voice_name = self.voice_widget.currentText()
         except:
             pass
         
@@ -107,6 +108,7 @@ class TextToSpeechWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _voice_change_cb(self):
         self.action_data.voice = self.voice_widget.currentData()
         self.action_data.voice_index = self.voice_widget.currentIndex()
+        self.action_data.voice_name = self.voice_widget.currentText()
 
     @QtCore.Slot()
     def _content_changed_cb(self):
@@ -204,6 +206,7 @@ class TextToSpeech(gremlin.base_profile.AbstractAction):
         self.volume = 100
         self.rate = 0
         self.voice_index = 0
+        self.voice_name = ''
 
     @property
     def text(self):
@@ -215,7 +218,8 @@ class TextToSpeech(gremlin.base_profile.AbstractAction):
 
     def display_name(self):
         ''' returns a display string for the current configuration '''
-        return f"Say: [{self.text}] Voice: [{self.voice.name}]"
+
+        return f"Say: [{self.text}] Voice: [{self.voice_name}]"
 
     def icon(self):
         return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"

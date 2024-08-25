@@ -19,7 +19,7 @@
 
 import enum
 
-class InputType(enum.Enum):
+class InputType(enum.IntEnum):
 
     """Enumeration of possible input types."""
 
@@ -69,6 +69,9 @@ class InputType(enum.Enum):
         if value in _InputType_to_display_lookup.keys():
             return _InputType_to_string_lookup[value]
         return f"Unknown type: {value}"
+    
+    # JSON serializer
+
 
 _InputType_to_string_lookup = {
     InputType.NotSet: "none",

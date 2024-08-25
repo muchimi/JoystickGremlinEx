@@ -12,6 +12,7 @@ import gremlin.base_profile
 import gremlin.config
 import gremlin.event_handler
 import gremlin.execution_graph
+import gremlin.keyboard
 import gremlin.profile
 import gremlin.shared_state
 from gremlin.util import *
@@ -542,6 +543,8 @@ class Device:
         :param mode_name the name of the mode being checked
         :param device a device to initialize for this mode if specified
         """
+        if not mode_name: 
+            pass
         if mode_name in self.modes:
             mode = self.modes[mode_name]
         else:
@@ -1335,7 +1338,7 @@ class Profile():
         """Constructor creating a new instance."""
 
         
-        self.devices = {}
+        self.devices = {} # holds devices attached to this profile
         self.vjoy_devices = {}
         self.merge_axes = []
         self.plugins = []
@@ -1343,12 +1346,15 @@ class Profile():
         self.parent = parent
         self._profile_fname = None # the file name of this profile
         self._profile_name = None # the friendly name of this profile
-        self._start_mode = None # startup mode for this profile (this will be either the default mode, or the last used mode)
-        self._default_start_mode = None # default startup mode for this profile
-        self._last_mode = None # last active mode
+        self._start_mode = "Default" # startup mode for this profile (this will be either the default mode, or the last used mode)
+        self._default_start_mode = "Default"  # default startup mode for this profile
+        self._last_mode = "Default" # last active mode
         self._restore_last_mode = False # True if the profile should start with the last active mode (profile specific)
         self._dirty = False # dirty flag - indicates the profile data was changed but not saved yet
         self._force_numlock_off = True # if set, forces numlock to be off if it isn't so numpad keys report the correct scan codes
+
+
+
 
     @property
     def dirty(self):
@@ -1396,9 +1402,9 @@ class Profile():
         :return tree encoding mode inheritance
         """
         tree = {}
-        for dev_id, device in self.devices.items():
+        for _, device in self.devices.items():
             for mode_name, mode in device.modes.items():
-                if mode.inherit is None and mode_name not in tree:
+                if mode.inherit is None and mode_name and mode_name not in tree:
                     tree[mode_name] = {}
                 elif mode.inherit:
                     stack = [mode_name, ]

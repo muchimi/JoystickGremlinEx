@@ -572,9 +572,9 @@ class CodeRunner:
 
     def _reset_state(self):
         """Resets all states to their default values."""
-        self.event_handler._active_mode =\
+        self.event_handler.active_mode =\
             list(self._inheritance_tree.keys())[0]
-        self.event_handler._previous_mode =\
+        self.event_handler.previous_mode =\
             list(self._inheritance_tree.keys())[0]
         gremlin.input_devices.callback_registry.clear()
 

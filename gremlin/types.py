@@ -196,7 +196,7 @@ _MouseButton_to_enum_lookup = {
 
 
 
-class DeviceType(enum.Enum):
+class DeviceType(enum.IntEnum):
 
     """Enumeration of the different possible input types."""
 
@@ -240,7 +240,7 @@ _DeviceType_to_enum_lookup = {
 }
 
 
-class PluginVariableType(enum.Enum):
+class PluginVariableType(enum.IntEnum):
 
     """Enumeration of all supported variable types."""
 

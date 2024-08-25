@@ -30,6 +30,7 @@ import qtawesome as qta
 import gremlin.event_handler
 from gremlin.input_types import InputType
 from  gremlin.clipboard import Clipboard
+import gremlin.input_types
 import gremlin.joystick_handling
 import gremlin.keyboard
 import gremlin.shared_state
@@ -592,12 +593,12 @@ class ActionSelector(QtWidgets.QWidget):
         :return list of valid action names
         """
         action_list = []
-        if self.input_type == gremlin.types.DeviceType.VJoy:
-            action_list.append("Response Curve")
-        else:
-            for entry in gremlin.plugin_manager.ActionPlugins().repository.values():
-                if self.input_type in entry.input_types:
-                    action_list.append(entry.name)
+        # if self.input_type == InputType.JoystickAxis:
+        #     action_list.append("Response Curve")
+        # else:
+        for entry in gremlin.plugin_manager.ActionPlugins().repository.values():
+            if self.input_type in entry.input_types:
+                action_list.append(entry.name)
         return sorted(action_list)
 
     def _add_action(self, clicked=False):
@@ -831,9 +832,7 @@ class ModeWidget(QtWidgets.QWidget):
         """
         # save the setup
         new_mode = self.mode_list[idx]
-        if new_mode != gremlin.shared_state.current_mode:
-            gremlin.config.Configuration().set_profile_last_edit_mode(new_mode)
-            self.edit_mode_changed.emit(new_mode)
+        self.edit_mode_changed.emit(new_mode)
 
 
 

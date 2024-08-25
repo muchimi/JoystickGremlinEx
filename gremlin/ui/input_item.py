@@ -501,7 +501,9 @@ class InputItemListView(ui_common.AbstractView):
 
     def _widget_selection_change_cb(self, widget):
         ''' called when a widget selection changes '''
-        self.select_item(widget.index)
+        self.select_item(widget.index, user_selected=True)
+
+
 
 
     def itemAt(self, index):
@@ -558,7 +560,7 @@ class InputItemListView(ui_common.AbstractView):
         ''' selects an entry based on input type and ID'''
         for index in range(self.model.rows()):
             data = self.model.data(index)
-            if data.input_type != input_type:
+            if input_type is not None and data.input_type != input_type:
                 continue
             if data.input_id == identifier:
                 self.select_item(index)
@@ -640,7 +642,7 @@ class InputItemListView(ui_common.AbstractView):
             widget.update_display()
         
 
-    def select_item(self, index, emit_signal=True, force = True):
+    def select_item(self, index, emit_signal=True, force = True, user_selected = False):
         """Handles selecting a specific item.  this is called whenever an input item is selected
 
         :param index the index of the item being selected
@@ -695,7 +697,10 @@ class InputItemListView(ui_common.AbstractView):
         event.device_input_id = data.input_id if data else None
         el.profile_device_changed.emit(event)
         self._current_index = index
-        gremlin.config.Configuration().last_tab_input_id = index
+
+        if user_selected:
+            # save what was last selected
+            gremlin.shared_state.update_last_selection(event.device_guid, event.device_input_type, event.device_input_id)
 
         widget = self.itemAt(index)
         if widget:

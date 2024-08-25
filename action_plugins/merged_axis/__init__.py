@@ -570,7 +570,7 @@ class MergedAxis(gremlin.base_profile.AbstractAction):
             
             break
         item_node = gremlin.util.get_xml_child(node, "action_containers")
-        if item_node:
+        if item_node is not None:
             item_node.tag = item_node.get("type")
             self.item_data.from_xml(item_node)
             

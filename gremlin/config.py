@@ -984,14 +984,6 @@ class Configuration:
         self.save()
        
 
-    @property
-    def last_tab_input_id(self):
-        ''' last selected id on the tab '''
-        return self._data.get("last_tab_input_id",None)
-    @last_tab_input_id.setter
-    def last_tab_input_id(self, value):
-        self._data["last_tab_input_id"] = value
-        self.save()
 
 
     @property
@@ -1039,3 +1031,5 @@ class Configuration:
     def partial_plugin_save(self, value):
         self._data["partial_plugin_init_ok"] = value 
         self.save()
+
+
