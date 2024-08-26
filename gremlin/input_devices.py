@@ -1797,7 +1797,9 @@ class ButtonReleaseActions(QtCore.QObject):
         el.keyboard_event.connect(self._input_event_cb)
         el.virtual_event.connect(self._input_event_cb)
         self._current_mode = gremlin.shared_state.active_mode
-        el.runtime_mode_changed.connect(self._mode_changed_cb)
+
+        eh = gremlin.event_handler.EventHandler()
+        eh.runtime_mode_changed.connect(self._mode_changed_cb)
 
     def register_callback(
         self,
