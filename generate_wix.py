@@ -5,7 +5,7 @@ import os
 import uuid
 import sys
 import pickle
-from xml.dom import minidom
+#from xml.dom import minidom
 from lxml import etree as ElementTree
 
 
@@ -417,11 +417,15 @@ def write_xml(node, fname):
     :param node node of the XML document
     :param fname the file to store the XML document in
     """
-    ugly_xml = ElementTree.tostring(node, encoding="unicode")
-    dom_xml = minidom.parseString(ugly_xml)
-    with open(fname, "w") as out:
-        out.write(dom_xml.toprettyxml(indent="    "))
 
+    # ugly_xml = ElementTree.tostring(node, encoding="unicode")
+    # dom_xml = minidom.parseString(ugly_xml)
+    # with open(fname, "w") as out:
+    #     out.write(dom_xml.toprettyxml(indent="    "))
+
+    
+    tree = ElementTree.ElementTree(node)
+    tree.write(fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
 
 def main():
     # Command line arguments

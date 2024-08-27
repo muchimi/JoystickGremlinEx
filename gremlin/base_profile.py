@@ -18,7 +18,7 @@ import gremlin.shared_state
 from gremlin.util import *
 from gremlin.input_types import InputType
 from gremlin.types import *
-from xml.dom import minidom
+#from xml.dom import minidom
 from lxml import etree as ElementTree
 from gremlin.types import DeviceType
 from gremlin.plugin_manager import ContainerPlugins
@@ -1805,10 +1805,12 @@ class Profile():
         root.append(plugins)
 
         # Serialize XML document
-        ugly_xml = ElementTree.tostring(root, encoding="utf-8")
-        dom_xml = minidom.parseString(ugly_xml)
-        with codecs.open(fname, "w", "utf-8-sig") as out:
-            out.write(dom_xml.toprettyxml(indent="    "))
+        tree = ElementTree.ElementTree(root)
+        tree.write(fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
+        #ugly_xml = ElementTree.tostring(root, encoding="utf-8")
+        # dom_xml = minidom.parseString(ugly_xml)
+        # with codecs.open(fname, "w", "utf-8-sig") as out:
+        #     out.write(dom_xml.toprettyxml(indent="    "))
 
     def get_device_modes(self, device_guid, device_type, device_name=None):
         """Returns the modes associated with the given device.
@@ -2118,7 +2120,7 @@ class PluginInstance:
     """Instantiation of a custom module with its own set of parameters."""
 
     def __init__(self, parent):
-        self.parent = parent
+        self.parent = parent # parent holds the module instance
         self.name = None
         self.variables = {}
 
@@ -2149,11 +2151,17 @@ class PluginInstance:
         return self.variables[name]
 
     def from_xml(self, node):
+        verbose = gremlin.config.Configuration().verbose
         self.name = safe_read(node, "name", str, "")
         for child in node.iter("variable"):
             variable = PluginVariable(self)
             variable.from_xml(child)
             self.variables[variable.name] = variable
+            if verbose:
+                log = logging.getLogger("system")
+                log.info(str(variable))
+        pass
+            
 
     def to_xml(self):
         node = ElementTree.Element("instance")
@@ -2172,9 +2180,36 @@ class PluginVariable:
     def __init__(self, parent):
         self.parent = parent
         self.name = None
-        self.type = None
-        self.value = None
+        self._type = None
+        self._value = None
         self.is_optional = False
+
+    def duplicate(self):
+        dup = PluginVariable(self.parent)
+        dup.name = self.name
+        dup._type = self._type
+        dup._value = self._value
+        dup.is_optional = self.is_optional
+        return dup
+
+
+    @property
+    def type(self) -> PluginVariableType:
+        return self._type
+    @type.setter
+    def type(self, value : PluginVariableType):
+        if value is None:
+            pass
+        self._type = value
+
+    @property
+    def value(self):
+        return self._value
+    @value.setter
+    def value(self, v):
+        if v is None:
+            pass
+        self._value = v
 
     @property
     def is_configured(self):
@@ -2199,28 +2234,29 @@ class PluginVariable:
         )
         self.is_optional = read_bool(node, "is-optional")
 
-        value = None
-        if "value" in node.attrib:
-            value = node.get("value")
-            if value == "none":
-                value = None
-
-        self.value = value
         # Read variable content based on type information
         if self.type == PluginVariableType.Int:
-            self.value = 0 if value is None else safe_read(node, "value", int, 0)
+            value = safe_read(node,"value", str, "none")
+            if value == "none":
+                self.value = 0
+            else:
+                self.value = int(value)
         elif self.type == PluginVariableType.Float:
-            self.value = 0.0 if value is None else safe_read(node, "value", float, 0.0)
+            value = safe_read(node,"value", str, "none")
+            if value == "none":
+                self.value = 0
+            else:
+                self.value = float(value)
         elif self.type == PluginVariableType.Selection:
-            self.value = "" if value is None else safe_read(node, "value", str, "")
+            self.value = safe_read(node, "value", str, "")
         elif self.type == PluginVariableType.String:
-            self.value = "" if value is None else safe_read(node, "value", str, "")
+            self.value = safe_read(node, "value", str, "")
         elif self.type == PluginVariableType.Bool:
-            self.value = False if value is None else read_bool(node, "value", False)
+            self.value = read_bool(node, "value", False)
         elif self.type == PluginVariableType.Mode:
-            self.value = "" if value is None else safe_read(node, "value", str, "")
+            self.value = safe_read(node, "value", str, "")
         elif self.type == PluginVariableType.PhysicalInput:
-            if not "device_id" in node.attrib:
+            if not "device-guid" in node.attrib:
                 # partial data save
                 self.value = {
                     "device_id": None,
@@ -2232,10 +2268,9 @@ class PluginVariable:
                     "device_id": parse_guid(node.attrib["device-guid"]),
                     "device_name": safe_read(node, "device-name", str, ""),
                     "input_id": safe_read(node, "input-id", int, None),
-                    "input_type": InputType.to_enum(
-                        safe_read(node, "input-type", str, None)
-                    )
+                    "input_type": InputType.to_enum(safe_read(node, "input-type", str, None))
                 }
+
         elif self.type == PluginVariableType.VirtualInput:
             if not "vjoy-id" in node.attrib:
                 # partial data save
@@ -2248,10 +2283,7 @@ class PluginVariable:
                 self.value = {
                     "device_id": safe_read(node, "vjoy-id", int, None),
                     "input_id": safe_read(node, "input-id", int, None),
-                    "input_type": InputType.to_enum(
-                        safe_read(node, "input-type", str, None)
-                    )
-                }
+                    "input_type": InputType.to_enum(safe_read(node, "input-type", str, None))}
 
     def to_xml(self):
         ''' read user plugin saved variable data '''
@@ -2261,25 +2293,24 @@ class PluginVariable:
         node.set("type", PluginVariableType.to_string(self.type))
         node.set("is-optional", safe_format(self.is_optional, bool, str))
 
-        if self.value is None:
-            node.set("value", "none")
-        else:
-
-            # Write out content based on the type
-            if self.type in [
-                PluginVariableType.Int, PluginVariableType.Float,
-                PluginVariableType.Mode, PluginVariableType.Selection,
-                PluginVariableType.String,
-            ]:
-                node.set("value", str(self.value))
-            elif self.type == PluginVariableType.Bool:
-                node.set("value", "1" if self.value else "0")
-            elif self.type == PluginVariableType.PhysicalInput:
+        # Write out content based on the type
+        if self.type in [
+            PluginVariableType.Int, PluginVariableType.Float,
+            PluginVariableType.Mode, PluginVariableType.Selection,
+            PluginVariableType.String,
+        ]:
+            node.set("value", "none" if self.value is None else str(self.value))
+        elif self.type == PluginVariableType.Bool:
+            value = False if self.value is None else self.value
+            node.set("value", "1" if value else "0")
+        elif self.type == PluginVariableType.PhysicalInput:
+            if self.value is not None:
                 node.set("device-guid", write_guid(self.value["device_id"]))
                 node.set("device-name", safe_format(self.value["device_name"], str))
                 node.set("input-id", safe_format(self.value["input_id"], int))
                 node.set("input-type", InputType.to_string(self.value["input_type"]))
-            elif self.type == PluginVariableType.VirtualInput:
+        elif self.type == PluginVariableType.VirtualInput:
+            if self.value is not None:
                 node.set("vjoy-id", safe_format(self.value["device_id"], int))
                 node.set("input-id", safe_format(self.value["input_id"], int))
                 node.set("input-type", InputType.to_string(self.value["input_type"]))
@@ -2287,6 +2318,8 @@ class PluginVariable:
         return node
 
 
+    def __str__(self):
+        return f"Plugin variable: name: {self.name}  type: {self.type} value: {self.value}"
 
 
 

@@ -194,7 +194,17 @@ _MouseButton_to_enum_lookup = {
     "Wheel Down": MouseButton.WheelDown,
 }
 
-
+class xIntEnum(enum.IntEnum):
+    def __eq__(self, other):
+        if type(self).__name__ == type(other).__name__:
+            return self.value == other.value
+        if other is int:
+            return self.value == other
+        return False
+    
+    def __hash__(self) -> int:
+        return hash(self.value)
+        
 
 class DeviceType(enum.IntEnum):
 
@@ -240,7 +250,7 @@ _DeviceType_to_enum_lookup = {
 }
 
 
-class PluginVariableType(enum.IntEnum):
+class PluginVariableType(xIntEnum):
 
     """Enumeration of all supported variable types."""
 
@@ -272,6 +282,8 @@ class PluginVariableType(enum.IntEnum):
             raise gremlin.error.GremlinError(
                 "Invalid PluginVariableType in lookup"
             )
+        
+    
 
 
 _PluginVariableType_to_string_lookup = {

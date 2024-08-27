@@ -382,6 +382,9 @@ class NumericalVariable(AbstractVariable):
             self.min_value,
             self.max_value
         )
+    
+    def __str__(self):
+        return f"NumericalVariable: {self.description} min: {self.min_value} max: {self.max_value} value: {self.value}"
 
 
 class IntegerVariable(NumericalVariable):
@@ -409,6 +412,7 @@ class IntegerVariable(NumericalVariable):
 
         _init_numerical(self, 0, 0, 10)
         self._load_from_registry(self._get_identifier())
+
 
 
 class FloatVariable(NumericalVariable):
@@ -487,6 +491,9 @@ class BoolVariable(AbstractVariable):
 
     def _process_registry_value(self, value):
         return value
+    
+    def __str__(self):
+        return f"BoolVariable: {self.description} value: {self.value}"
 
 
 class StringVariable(AbstractVariable):
@@ -667,6 +674,8 @@ class VirtualInputVariable(AbstractVariable):
     def _process_registry_value(self, value):
         return value
 
+    def __str__(self):
+        return f"VirtualInputVariable: {self.value}  vjoy_id: {self.vjoy_id} input_id: {self.input_id} description: {self.description}"
 
 class PhysicalInputVariable(AbstractVariable):
 
@@ -697,6 +706,13 @@ class PhysicalInputVariable(AbstractVariable):
             return self.value.get("input_id", 0)
         else:
             return 0
+
+    @property
+    def device_name(self):
+        if isinstance(self.value, dict):
+            return self.value.get("device_name", None)
+        else:
+            return None
 
     @property
     def device_guid(self):
@@ -771,6 +787,8 @@ class PhysicalInputVariable(AbstractVariable):
     def _process_registry_value(self, value):
         return value
 
+    def __str__(self):
+        return f"PhysicalInputVariable: device_name: {self.device_name}  device_id: {str(self.device_guid)}  input_id: {self.input_id}"
 
 class SelectionVariable(AbstractVariable):
 
@@ -826,3 +844,6 @@ class SelectionVariable(AbstractVariable):
         layout.setColumnMinimumWidth(0, 150)
 
         return layout
+    
+    def __str__(self):
+        return f"SelectionVariable: description: {self.description} values: {self.options}"

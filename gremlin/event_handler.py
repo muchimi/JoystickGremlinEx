@@ -677,6 +677,11 @@ class EventHandler(QtCore.QObject):
 
 	def dump_exectree(self, device_guid, mode, event):
 		from types import FunctionType, MethodType
+
+		verbose = gremlin.config.Configuration().verbose
+		if not verbose:
+			return
+		
 		get_device_name = gremlin.shared_state.get_device_name
 		logger = logging.getLogger("system")
 		for callbacks in self.callbacks[device_guid][mode][event]:
@@ -684,20 +689,24 @@ class EventHandler(QtCore.QObject):
 				if not hasattr(callback,"execution_graph"):
 					logger.debug(f"\tDevice ID: {device_guid} ({get_device_name(device_guid)}) mode: {mode} event: {event} - skip callback - missing execution graph - don't know how to handle {type(callback)} *********")
 					continue
-
+				
 				for callback_functor in callback.execution_graph.functors:
-					for functor in callback_functor.action_set.functors:
-						action_data = functor.action_data if hasattr(functor, "action_data") else None
-						logger.debug(f"\tDevice ID: {device_guid} ({get_device_name(device_guid)}) mode: {mode} event: {event} hash: {hash(event):X} type: {type(functor)}")
-						if action_data:
-							# dump member variables only
-							logger.debug("\t\tData block:")
-							for attr in dir(action_data):
-								if not attr.startswith("_"):
-									item = getattr(action_data,attr)
-									
-									if not (isinstance(item, FunctionType) or isinstance(item, MethodType) or inspect.isabstract(item) or inspect.isclass(item)):
-										logger.debug(f"\t\t\t{attr}: {item}")
+					if hasattr(callback_functor,"action_set"):
+						for functor in callback_functor.action_set.functors:
+							action_data = functor.action_data if hasattr(functor, "action_data") else None
+							logger.debug(f"\tDevice ID: {device_guid} ({get_device_name(device_guid)}) mode: {mode} event: {event} hash: {hash(event):X} type: {type(functor)}")
+							if action_data:
+								# dump member variables only
+								logger.debug("\t\tData block:")
+								for attr in dir(action_data):
+									if not attr.startswith("_"):
+										item = getattr(action_data,attr)
+										
+										if not (isinstance(item, FunctionType) or isinstance(item, MethodType) or inspect.isabstract(item) or inspect.isclass(item)):
+											logger.debug(f"\t\t\t{attr}: {item}")
+					else:
+						logger.debug(f"\tFunctor '{type(callback_functor).__name__} does not define an action set")
+					
 								
 
 

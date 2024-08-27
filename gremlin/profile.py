@@ -23,7 +23,7 @@ import logging
 import os
 import shutil
 import uuid
-from xml.dom import minidom
+#from xml.dom import minidom
 from lxml import etree as ElementTree
 import gremlin.base_classes
 import gremlin.base_profile
@@ -119,11 +119,15 @@ class ProfileConverter:
 
         if new_root is not None:
             # Save converted version
-            ugly_xml = ElementTree.tostring(new_root, encoding="unicode")
-            ugly_xml = "".join([line.strip() for line in ugly_xml.split("\n")])
-            dom_xml = minidom.parseString(ugly_xml)
-            with open(fname, "w") as out:
-                out.write(dom_xml.toprettyxml(indent="    ", newl="\n"))
+            
+            # ugly_xml = ElementTree.tostring(new_root, encoding="unicode")
+            # ugly_xml = "".join([line.strip() for line in ugly_xml.split("\n")])
+            # dom_xml = minidom.parseString(ugly_xml)
+            # with open(fname, "w") as out:
+            #     out.write(dom_xml.toprettyxml(indent="    ", newl="\n"))
+
+            tree = ElementTree.tostring(new_root)
+            tree.write(fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
         else:
             raise error.ProfileError("Failed to convert profile")
 
