@@ -1627,11 +1627,12 @@ class AxisStateWidget(QtWidgets.QWidget):
         self.main_layout.addWidget(self._progress_widget)
         self.main_layout.addWidget(self._readout_widget)
         self.main_layout.addStretch()
-        self._min_range = -1
-        self._max_range = 1
+        self._min_range = -1.0
+        self._max_range = 1.0
         self._device_guid = None
         self._input_id = None
         self._value = 0
+        self._reverse = False
         
         self._width = 10
         self._update_css()
@@ -1717,9 +1718,7 @@ class AxisStateWidget(QtWidgets.QWidget):
     def setRange(self, min = -1.0, max = 1.0):
         ''' sets the range of the widget '''
         if min > max:
-            tmp = min
-            min = max
-            max = tmp
+            max, min = min, max
         self._min_range = min
         self._max_range = max
         self._update_range()
@@ -1738,6 +1737,13 @@ class AxisStateWidget(QtWidgets.QWidget):
     def setMinimum(self, value):
         ''' sets the lower range value'''
         self.setRange(value, self._max_range)
+
+    def setReverse(self, value):
+        self._reverse = value
+
+    def reverse(self):
+        ''' reverse flag '''
+        return self._reverse
 
     def hookDevice(self, device_guid, input_id):
         ''' hooks an axis '''
@@ -1766,7 +1772,9 @@ class AxisStateWidget(QtWidgets.QWidget):
         self._update_value(event.raw_value)
 
     def _update_value(self, raw_value):
-        value = gremlin.util.scale_to_range(raw_value, source_min = -32767, source_max = 32767, target_min = -1, target_max = 1)
+        # invert the input if needed
+        target = -raw_value if self._reverse else raw_value
+        value = gremlin.util.scale_to_range(target, source_min = -32767, source_max = 32767, target_min = self._min_range, target_max = self._max_range)
         self.setValue(value)
         
 

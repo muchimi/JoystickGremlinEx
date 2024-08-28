@@ -16,6 +16,7 @@ from .SimConnect.Enum import *
 from gremlin.singleton_decorator import SingletonDecorator
 import enum
 
+
 ''' full axis range commands -16883 to + 16383 '''
 _simconnect_full_range = [
                         "AXIS_THROTTLE_SET",
@@ -868,6 +869,7 @@ class SimConnectBlock(QtCore.QObject):
         self._value_type = OutputType.NotSet
         self._category = SimConnectEventCategory.NotSet
         self._output_data_type = OutputType.NotSet
+        self._output_mode = SimConnectActionMode.NotSet
         self._command = None # the command text
         self._set_value = False # true if the item can set a value
         self._readonly = False # if readonly - the request cannot be triggered
@@ -876,7 +878,7 @@ class SimConnectBlock(QtCore.QObject):
         self._min_range = -16383
         self._max_range = 16383
         self._trigger_mode = SimConnectTriggerMode.Toggle # default for on/off type blocks
-        
+        self._invert = False # true if the axis output should be inverted
         self._value = 0 # output value
         self._is_value = False # true if the command supports an output value
         self._is_ranged = False # true if the command is ranged
@@ -961,6 +963,15 @@ class SimConnectBlock(QtCore.QObject):
         return F"Unknown command type: {self._command_type}"
     
     @property
+    def output_mode(self):
+        ''' output mode '''
+        return self._output_mode
+    
+    @output_mode.setter
+    def output_mode(self, value):
+        self._output_mode = value
+    
+    @property
     def output_data_type(self):
         ''' block output data type'''
         return self._output_data_type
@@ -1020,6 +1031,14 @@ class SimConnectBlock(QtCore.QObject):
         elif self._value_type == OutputType.FloatNumber:
             return "Number (float)"
         return "N/A"
+    
+    @property
+    def invert_axis(self):
+        ''' inverts output (axis input only) '''
+        return self._invert 
+    @invert_axis.setter
+    def invert_axis(self, value):
+        self._invert = value
     
     @property
     def min_range(self):
@@ -1187,6 +1206,46 @@ class SimConnectBlock(QtCore.QObject):
 
         return False
                 
+
+    def to_xml(self):
+        ''' writes to an xml node block '''
+        node = etree.Element("block")
+
+        node.set("command",self.command)
+        node.set("trigger", SimConnectTriggerMode.to_string(self.trigger_mode))
+        node.set("mode", SimConnectActionMode.to_string(self.output_mode))
+        node.set("invert", str(self.invert_axis))
+        value = self.value if self.value else 0.0
+        node.set("value", gremlin.util.safe_format(value, float))
+        node.set("min_range", gremlin.util.safe_format(self.min_range, float))
+        node.set("max_range", gremlin.util.safe_format(self.max_range, float))
+
+        return node
+    
+    def from_xml(self, node):
+        ''' reads from an xml node block '''
+        command = gremlin.util.safe_read(node,"command", str)
+        if not command:
+            command = SimConnectData().get_default_command()
+        self.command = command
+        self.value = gremlin.util.safe_read(node,"value", float, 0)
+        mode = gremlin.util.safe_read(node,"mode", str, "none")
+        self.output_mode = SimConnectActionMode.to_enum(mode)
+        
+        # trigger mode for singleton vars
+        trigger_mode = gremlin.util.safe_read(node,"trigger", str, "none")
+        self.trigger_mode = SimConnectTriggerMode.to_enum(trigger_mode)
+
+        # axis inversion
+        self.invert_axis = gremlin.util.safe_read(node,"invert", bool, False)
+
+        self.min_range = gremlin.util.safe_read(node,"min_range", float, -16383)
+        self.max_range = gremlin.util.safe_read(node,"max_range", float, 16383)
+
+        
+
+
+
 
                 
 

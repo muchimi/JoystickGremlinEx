@@ -805,6 +805,8 @@ def safe_format(value, data_type, formatter=str):
     """
     if value is None:
         return "none"
+    if data_type is float:
+        value = float(value)
     if isinstance(value, data_type):
         return formatter(value)
     else:

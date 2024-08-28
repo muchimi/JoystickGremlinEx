@@ -709,6 +709,7 @@ class GateData(QtCore.QObject):
     def setGateCondition(self, index, condition):
         ''' sets the condition for the given gate index '''
         self._gate_condition_map[index] = condition
+
     def getGateCondition(self, index):
         ''' gets the condition for the given gate index '''
         if not index in self._gate_condition_map:
@@ -721,10 +722,20 @@ class GateData(QtCore.QObject):
         gates = self.getGates()
         return gates[0].value
     
+    
     @property
     def max(self):
         gates = self.getGates()
         return gates[-1].value
+    
+    def setRange(self, min, max):
+        ''' sets the values for the first and last gates '''
+        if min > max:
+            min, max = max, min
+        gates = self.getGates()
+        gates[0].value = min
+        gates[-1].value = max
+        
             
     @property
     def steps(self):
