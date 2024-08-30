@@ -84,21 +84,28 @@ device_profile_map = {}
 # Holds the currently active profile
 current_profile = None
 
-# holds the active mode
+# holds the active (runtime) mode
 active_mode = None
 
-# holds teh current mode
-current_mode = None
+# holds the edit mode 
+edit_mode = None
 
-# previous mode
+# previous runtime mode
 previous_mode = None
+
+@module_property
+def _current_mode():
+    if is_running:
+        return active_mode
+    return edit_mode
 
 def resetState():
     device_guid_to_name_map.clear()
     device_profile_map.clear()
     current_profile = None
     active_mode = None
-    current_mode = None
+    edit_mode = None
+
     
 
 def get_device_name(guid):

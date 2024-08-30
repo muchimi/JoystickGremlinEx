@@ -1049,6 +1049,10 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._output_mode_gated_widget.clicked.connect(self._mode_gated_cb)
         self._output_mode_gated_widget.setToolTip("Set the output as an axis to with or without gates.<br>The gate maps determine what axes and triggers occur based on the input axis value.")
 
+        self._output_mode_sync_widget = QtWidgets.QPushButton("Sync")
+        self._output_mode_sync_widget.clicked.connect(self._mode_sync_cb)
+        self._output_mode_sync_widget.setToolTip("Synchronizes the command with the gate range")
+
 
         # trigger output mode (event trigger only)
         self._output_mode_trigger_widget = QtWidgets.QRadioButton("Trigger")
@@ -1069,6 +1073,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._output_mode_container_layout.addWidget(self._output_mode_set_value_widget)
         self._output_mode_container_layout.addWidget(self._output_mode_ranged_widget)
         self._output_mode_container_layout.addWidget(self._output_mode_gated_widget)
+        self._output_mode_container_layout.addWidget(self._output_mode_sync_widget)
         self._output_mode_container_layout.addStretch()
 
         self.output_readonly_status_widget = QtWidgets.QLabel("Read only")
@@ -1215,11 +1220,11 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
             self._gates_container_widget.setStyleSheet('.QFrame{background-color: lightgray;}')
             self._gates_container_layout = QtWidgets.QVBoxLayout(self._gates_container_widget)
 
-            self._gates_widget = gremlin.gated_handler.GateWidget(action_data = self.action_data,
+            self._gated_axis_widget = gremlin.gated_handler.GatedAxisWidget(action_data = self.action_data,
                                                                 gate_data = self.action_data.gate_data,
                                                                 )
 
-            self._gates_container_layout.addWidget(self._gates_widget)
+            self._gates_container_layout.addWidget(self._gated_axis_widget)
 
             self._output_gated_container_layout.addWidget(self._gates_container_widget)
     
@@ -1301,11 +1306,29 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
                 self.status_text_widget.setIcon("fa.warning",True, color="red")
 
             
+    @QtCore.Slot()
+    def _mode_sync_cb(self):
+        ''' sync mode clicked '''
+        if self.action_data.block.output_mode == SimConnectActionMode.Gated:
+            if self.action_data.block.min_range != self.action_data.block.command_min_range or \
+                self.action_data.block.max_range != self.action_data.block.command_max_range:
+                # change detected - restore the original range
+                self.action_data.block.min_range = self.action_data.block.command_min_range
+                self.action_data.block.max_range = self.action_data.block.command_max_range
+                self._update_axis_range()
+                self._update_block_ui()
+                        
 
     def _update_axis_range(self):
         ''' updates the output range for the axis repeater'''
-        self._output_axis_widget.setRange(self.action_data.block.min_range, self.action_data.block.max_range)
-        self._gates_widget.gate_data.setRange(self.action_data.block.min_range, self.action_data.block.max_range)
+        # update decimals based on range
+        min_range = self.action_data.block.min_range
+        max_range = self.action_data.block.max_range
+        #range = max_range - min_range
+
+        # self._output_axis_widget.setRange(min_range, max_range)
+        self._gated_axis_widget.setDisplayRange(min_range, max_range)
+
 
     def _min_range_changed_cb(self):
         value = self._output_min_range_widget.value()
@@ -1487,7 +1510,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
                 if self.action_data.block.output_mode in (SimConnectActionMode.NotSet, SimConnectActionMode.Trigger):
                     # come up with a default mode for the selected command if not set
                     self.action_data.mode = SimConnectActionMode.Gated
-                self._gates_widget.setVisible(True)
+                self._gated_axis_widget.setVisible(True)
                 
                 # self._output_mode_ranged_widget.setVisible(True)
                 with QtCore.QSignalBlocker(self._output_invert_axis_widget):
@@ -1589,6 +1612,8 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         if value:
             self.action_data.block.output_mode = SimConnectActionMode.Gated
             self._update_ui_container_visibility()
+
+ 
 
     @QtCore.Slot(bool)
     def _mode_value_cb(self, value):

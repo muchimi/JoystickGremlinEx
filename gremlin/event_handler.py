@@ -651,9 +651,25 @@ class EventHandler(QtCore.QObject):
 		:return name of the currently active mode
 		"""
 		return gremlin.shared_state.active_mode
+	
 	@active_mode.setter
 	def active_mode(self, value):
 		gremlin.shared_state.active_mode = value
+
+	@property
+	def edit_mode(self):
+		return gremlin.shared_state.edit_mode
+	
+	@edit_mode.setter
+	def edit_mode(self, value):
+		gremlin.shared_state.edit_mode = value
+
+	@property
+	def current_mode(self):
+		''' gets the current mode (edit or runtime)'''
+		if gremlin.shared_state.is_running:
+			return gremlin.shared_state.active_mode
+		return gremlin.shared_state.edit_mode
 
 	@property
 	def previous_mode(self):
@@ -949,7 +965,7 @@ class EventHandler(QtCore.QObject):
 		
 
 
-	def change_mode(self, new_mode, emit = True):
+	def change_mode(self, new_mode, emit = True, force_update = False):
 		"""Changes the GremlinEx currently active mode.
 
 		:param new_mode the new mode to use
@@ -961,7 +977,7 @@ class EventHandler(QtCore.QObject):
 			logging.getLogger("system").debug(f"EVENT: change mode to [{new_mode}] requested - active mode: [{gremlin.shared_state.active_mode}]  current mode: [{gremlin.shared_state.current_mode}] profile '{current_profile.name}'")
 
 
-		if new_mode == self.active_mode:
+		if new_mode == self.active_mode and not force_update:
 			# already in this mode
 			return
 		
@@ -997,25 +1013,26 @@ class EventHandler(QtCore.QObject):
 			)
 			return
 
-		if self.active_mode != new_mode:
-			self.previous_mode = self.active_mode
-			# remember the last mode for this profile
-			current_profile.set_last_mode(self.active_mode)
-			gremlin.config.Configuration().set_profile_last_edit_mode(new_mode)
-
-		
-		self.active_mode = new_mode
-
 		if gremlin.shared_state.is_running:
 			# runtime event (prevents UI from reloading)
-			logging.getLogger("system").debug(f"Profile: {current_profile.name} - Runtime Mode switch to: {new_mode}")
-			if emit:
-				self.runtime_mode_changed.emit(self.active_mode)	
+			if self.active_mode != new_mode or force_update:
+				self.previous_mode = self.active_mode
+				# remember the last mode for this profile
+				current_profile.set_last_mode(self.active_mode)
+				self.previous_mode = self.active_mode
+				self.active_mode = new_mode
+				logging.getLogger("system").debug(f"Profile: {current_profile.name} - Runtime Mode switch to: {new_mode}")
+				if emit:
+					self.runtime_mode_changed.emit(self.active_mode)	
 		else:
 			# non-runtime
-			logging.getLogger("system").debug(f"Profile: {current_profile.name} - Design time Mode switch to: {new_mode}")
-			if emit:
-				self.mode_changed.emit(self.active_mode)
+
+			if self.edit_mode != new_mode or force_update:
+				gremlin.config.Configuration().set_profile_last_edit_mode(new_mode)
+				self.edit_mode = new_mode
+				logging.getLogger("system").debug(f"Profile: {current_profile.name} - Design time Mode switch to: {new_mode}")
+				if emit:
+					self.mode_changed.emit(self.edit_mode)
 
 
 	def resume(self):

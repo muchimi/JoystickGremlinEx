@@ -766,10 +766,12 @@ class SimConnectData(QtCore.QObject):
                 block.is_readonly = not settable
                 block.is_axis = axis
                 block.is_indexed = indexed
-                block.description = description
-                block.is_ranged = is_ranged
-                block.min_range = min_range
-                block.max_range = max_range
+                block._description = description
+                block._is_ranged = is_ranged
+                block._min_range = min_range  # can be modified by the user
+                block._max_range = max_range  # can be modified by the user
+                block._command_min_range = min_range # original range - cannot be modified
+                block._command_max_range = max_range # original range - cannot be modified
                 block.is_toggle = is_toggle
 
                 if simvar in self._block_map.keys():
@@ -875,8 +877,10 @@ class SimConnectBlock(QtCore.QObject):
         self._readonly = False # if readonly - the request cannot be triggered
         self._is_axis = False # true if the output is an axis variable
         self._is_indexed = False # true if the output is indexed using the :index 
-        self._min_range = -16383
+        self._min_range = -16383 # user modifieable range
         self._max_range = 16383
+        self._command_min_range = -16383 # command range (cannot be modified)
+        self._command_max_range = 16383
         self._trigger_mode = SimConnectTriggerMode.Toggle # default for on/off type blocks
         self._invert = False # true if the axis output should be inverted
         self._value = 0 # output value
@@ -1057,6 +1061,18 @@ class SimConnectBlock(QtCore.QObject):
     @max_range.setter
     def max_range(self, value):
         self._max_range = value
+
+    @property
+    def command_min_range(self):
+        ''' current min range '''
+        return self._command_min_range
+    
+    
+    @property
+    def command_max_range(self):
+        ''' current max range '''
+        return self._command_max_range
+    
 
     @property
     def trigger_mode(self) -> SimConnectTriggerMode:

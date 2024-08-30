@@ -254,14 +254,19 @@ class DynamicDoubleSpinBox(QtWidgets.QDoubleSpinBox):
                     pos -= 1
 
             # Replace empty parts with the value 0
-            parts = text.split(self.locale().decimalPoint())
-            for part in parts:
-                if len(part) == 0:
-                    part = "0"
+            point = self.locale().decimalPoint()
+            if point in text:
+                parts = text.split(point)
+                for part in parts:
+                    if len(part) == 0:
+                        part = "0"
+                value_string = f"{parts[0]}.{parts[1]}"
+            else:
+                value_string = text
 
             # Convert number to a string representation we can convert to
             # a float so we can truncate the decimal places as required
-            value_string = f"{parts[0]}.{parts[1]}"
+            
             format_string = f"{{:.{self.decimals():d}f}}"
             value_string = format_string.format(float(value_string))
 
@@ -1633,6 +1638,7 @@ class AxisStateWidget(QtWidgets.QWidget):
         self._input_id = None
         self._value = 0
         self._reverse = False
+        self_decimals = 3
         
         self._width = 10
         self._update_css()
@@ -1715,12 +1721,13 @@ class AxisStateWidget(QtWidgets.QWidget):
         ''' gets the current value '''
         return self._value
 
-    def setRange(self, min = -1.0, max = 1.0):
+    def setRange(self, min = -1.0, max = 1.0, decimals = 3):
         ''' sets the range of the widget '''
         if min > max:
             max, min = min, max
         self._min_range = min
         self._max_range = max
+        self._decimals = decimals
         self._update_range()
 
     def _update_range(self):
@@ -2778,23 +2785,19 @@ class QHelper():
         self._show_percent = show_percent
         self._decimals = decimals
         self._single_step = single_step
+        self._min_range = -1.0
+        self._max_range = 1.0
 
-    def to_value(self, value):
-        if self.show_percent:
-            return (value + 1) / 2.0 * 100.0
-        return value
 
-    def from_value(self, value):
-        if self.show_percent:
-            # percent -> float
-            return 2.0 * value / 100.0 - 1.0
-        return value
-    
     @property
     def decimals(self):
         if self.show_percent:
             return 2
         return self._decimals
+    
+    @decimals.setter
+    def decimals(self, value):
+        self._decimals = value
     
     @property
     def single_step(self):
@@ -2803,28 +2806,46 @@ class QHelper():
         return self._single_step
     
     @property
+    def min_range(self):
+        ''' current min range '''
+        return self._min_range
+    
+    @min_range.setter
+    def min_range(self, value):
+        self._min_range = value
+    
+    @property
+    def max_range(self):
+        ''' current max range '''
+        return self._max_range
+    
+    @max_range.setter
+    def max_range(self, value):
+        self._max_range = value    
+    
+    @property
     def show_percent(self):
         return self._show_percent
     @show_percent.setter
     def show_percent(self, value):
         self._show_percent = value
     
-    def get_double_spinbox(self, data, value) -> DynamicDoubleSpinBox:
+    def get_double_spinbox(self, id, value, min_range = -1.0, max_range = 1.0) -> DynamicDoubleSpinBox:
         ''' creates a double spin box formatted for the display mode '''
         show_percent = self.show_percent
-        sb_widget = DynamicDoubleSpinBox(data = data)
+        assert isinstance(id, str)
+        sb_widget = DynamicDoubleSpinBox(data = id)
         if show_percent:
             sb_widget.setMinimum(0)
             sb_widget.setMaximum(100)
             sb_widget.setDecimals(2)
             sb_widget.setSingleStep(0.1)
         else:
-            sb_widget.setMinimum(-1.0)
-            sb_widget.setMaximum(1.0)
+            sb_widget.setRange(min_range, max_range)
             sb_widget.setDecimals(self.decimals)
             sb_widget.setSingleStep(self.single_step)
 
-        sb_widget.setValue(self.to_value(value))
+        sb_widget.setValue(value)
 
         return sb_widget
     
@@ -3146,3 +3167,118 @@ class DualSlider(QtWidgets.QWidget):
         painter.drawComplexControl(QtWidgets.QStyle.CC_Slider, option_lower)
         painter.drawComplexControl(QtWidgets.QStyle.CC_Slider, option_upper)
 
+class QFlowLayout(QtWidgets.QLayout):
+    def __init__(self, parent=None, margin=-1, hspacing=-1, vspacing=-1):
+        super().__init__(parent)
+        self._hspacing = hspacing
+        self._vspacing = vspacing
+        self._items = []
+        self.setContentsMargins(margin, margin, margin, margin)
+
+    def __del__(self):
+        del self._items[:]
+
+    def addItem(self, item):
+        self._items.append(item)
+
+    def horizontalSpacing(self):
+        if self._hspacing >= 0:
+            return self._hspacing
+        else:
+            return self.smartSpacing(
+                QtWidgets.QStyle.PM_LayoutHorizontalSpacing)
+
+    def verticalSpacing(self):
+        if self._vspacing >= 0:
+            return self._vspacing
+        else:
+            return self.smartSpacing(
+                QtWidgets.QStyle.PM_LayoutVerticalSpacing)
+
+    def count(self):
+        return len(self._items)
+
+    def itemAt(self, index):
+        if 0 <= index < len(self._items):
+            return self._items[index]
+
+    def takeAt(self, index):
+        if 0 <= index < len(self._items):
+            return self._items.pop(index)
+
+    def expandingDirections(self):
+        return QtCore.Qt.Orientations(0)
+
+    def hasHeightForWidth(self):
+        return True
+
+    def heightForWidth(self, width):
+        return self.doLayout(QtCore.QRect(0, 0, width, 0), True)
+
+    def setGeometry(self, rect):
+        super().setGeometry(rect)
+        self.doLayout(rect, False)
+
+    def sizeHint(self):
+        return self.minimumSize()
+
+    def minimumSize(self):
+        size = QtCore.QSize()
+        for item in self._items:
+            size = size.expandedTo(item.minimumSize())
+        left, top, right, bottom = self.getContentsMargins()
+        size += QtCore.QSize(left + right, top + bottom)
+        return size
+
+    def doLayout(self, rect, testonly):
+        left, top, right, bottom = self.getContentsMargins()
+        effective = rect.adjusted(+left, +top, -right, -bottom)
+        x = effective.x()
+        y = effective.y()
+        lineheight = 0
+        for item in self._items:
+            widget = item.widget()
+            hspace = self.horizontalSpacing()
+            if hspace == -1:
+                hspace = widget.style().layoutSpacing(
+                    QtWidgets.QSizePolicy.PushButton,
+                    QtWidgets.QSizePolicy.PushButton, QtCore.Qt.Horizontal)
+            vspace = self.verticalSpacing()
+            if vspace == -1:
+                vspace = widget.style().layoutSpacing(
+                    QtWidgets.QSizePolicy.PushButton,
+                    QtWidgets.QSizePolicy.PushButton, QtCore.Qt.Vertical)
+            nextX = x + item.sizeHint().width() + hspace
+            if nextX - hspace > effective.right() and lineheight > 0:
+                x = effective.x()
+                y = y + lineheight + vspace
+                nextX = x + item.sizeHint().width() + hspace
+                lineheight = 0
+            if not testonly:
+                item.setGeometry(
+                    QtCore.QRect(QtCore.QPoint(x, y), item.sizeHint()))
+            x = nextX
+            lineheight = max(lineheight, item.sizeHint().height())
+        return y + lineheight - rect.y() + bottom
+
+    def smartSpacing(self, pm):
+        parent = self.parent()
+        if parent is None:
+            return -1
+        elif parent.isWidgetType():
+            return parent.style().pixelMetric(pm, None, parent)
+        else:
+            return parent.spacing()
+
+class QBubble(QtWidgets.QLabel):
+    def __init__(self, text):
+        super(QBubble, self).__init__(text)
+        self.word = text
+        self.setContentsMargins(5, 5, 5, 5)
+
+    def paintEvent(self, event):
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        painter.drawRoundedRect(
+            0, 0, self.width() - 1, self.height() - 1, 5, 5)
+        super(QBubble, self).paintEvent(event)

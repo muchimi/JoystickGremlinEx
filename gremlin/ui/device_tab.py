@@ -664,9 +664,7 @@ class JoystickDeviceTabWidget(QDataWidget):
     def set_mode(self, mode):
         ''' changes the mode of the tab '''
 
-        if self.current_mode == mode:
-            # nothing to do
-            return 
+
             
         self.current_mode = mode
         self.device_profile.ensure_mode_exists(self.current_mode, self.device)

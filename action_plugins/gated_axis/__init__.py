@@ -42,7 +42,7 @@ class GatedAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.container_widget.setContentsMargins(0,0,0,0)
 
         
-        self.gate_widget = gremlin.gated_handler.GateWidget(action_data = self.action_data,
+        self.gate_widget = gremlin.gated_handler.GatedAxisWidget(action_data = self.action_data,
                                                             gate_data = self.action_data.gate_data,
                                                             show_configuration=False
                                                             )

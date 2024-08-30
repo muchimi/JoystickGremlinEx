@@ -174,6 +174,8 @@ class GremlinUi(QtWidgets.QMainWindow):
             self._update_status_bar_active
         )
         
+        eh = gremlin.event_handler.EventHandler()
+        eh.mode_changed.connect(self._update_mode_change)
 
 
 
@@ -326,6 +328,8 @@ class GremlinUi(QtWidgets.QMainWindow):
     def _tab_context_menu_cb(self, pos):
         ''' tab context menu '''
         tab_index = self.ui.devices.tabBar().tabAt(pos)
+        if tab_index == -1:
+            return
         self._context_menu_tab_index = tab_index
         widget = self.ui.devices.widget(self._context_menu_tab_index)
         device_type, device_guid = widget.data
@@ -2168,8 +2172,8 @@ class GremlinUi(QtWidgets.QMainWindow):
             
             self.mode_selector.populate_selector(self.profile, new_mode)
 
-            if gremlin.shared_state.current_mode == new_mode:
-                return
+            # if gremlin.shared_state.current_mode == new_mode:
+            #     return
             
             self.ui.devices.widget(self.ui.devices.count()-1).refresh_ui()
             self._select_last_input() # restore the last input on mode change if possible

@@ -561,13 +561,14 @@ class CodeRunner:
         # Remove all claims on VJoy devices
         gremlin.joystick_handling.VJoyProxy.reset()
 
-        # restore any mode 
+        # restore the startup mode and profile
+        gremlin.shared_state.is_running = False
         if self._startup_profile and gremlin.shared_state.current_profile != self._startup_profile:
             eh.change_profile(self._startup_profile)
-        if self._startup_mode:
-            eh.change_mode(self._startup_mode)
+        # change back to edit mode
+        eh.change_mode(gremlin.shared_state.edit_mode, emit=True, force_update = True)
         
-        gremlin.shared_state.is_running = False
+      
 
 
     def _reset_state(self):
