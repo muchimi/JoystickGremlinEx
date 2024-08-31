@@ -467,10 +467,11 @@ class JoystickSelector(AbstractInputSelector):
         :param parent the parent of this widget
         """
         super().__init__(change_cb, valid_types, parent)
+        
 
     def _initialize(self):
         potential_devices = sorted(
-            gremlin.joystick_handling.physical_devices(),
+            gremlin.joystick_handling.joystick_devices(),
             key=lambda x: (x.name, x.device_guid)
         )
         for dev in potential_devices:
@@ -549,6 +550,7 @@ class ActionSelector(QtWidgets.QWidget):
     # Signal emitted when an action is going to be added
     action_added = QtCore.Signal(str)
     action_paste = QtCore.Signal(object)
+    
 
     def __init__(self, input_type, parent=None):
         """Creates a new selector instance.
@@ -570,7 +572,8 @@ class ActionSelector(QtWidgets.QWidget):
         for name in self._valid_action_list():
             self.action_dropdown.addItem(name)
         cfg = gremlin.config.Configuration()
-        self.action_dropdown.setCurrentText(cfg.default_action)
+        self.action_dropdown.setCurrentText(cfg.last_action)
+        self.action_dropdown.currentIndexChanged.connect(self._action_changed)
         self.add_button = QtWidgets.QPushButton("Add")
         self.add_button.clicked.connect(self._add_action)
 
@@ -591,6 +594,23 @@ class ActionSelector(QtWidgets.QWidget):
         self.main_layout.addWidget(self.paste_button)
         self.main_layout.addStretch(1)
 
+        eh = gremlin.event_handler.EventHandler()
+        eh.last_action_changed.connect(self._last_action_changed)
+
+    @QtCore.Slot(object, str)
+    def _last_action_changed(self, widget, name):
+        if widget != self.action_dropdown:
+            with QtCore.QSignalBlocker(self.action_dropdown):
+                self.action_dropdown.setCurrentText(name)
+
+    def _action_changed(self):
+        ''' remember the last selection '''
+        name = self.action_dropdown.currentText()
+        config = gremlin.config.Configuration()
+        config.last_action = name
+        if config.sync_last_selection:
+            eh = gremlin.event_handler.EventHandler()
+            eh.last_action_changed.emit(self.action_dropdown, name) 
 
     def _valid_action_list(self):
         """Returns a list of valid actions for this InputItemWidget.
@@ -605,6 +625,7 @@ class ActionSelector(QtWidgets.QWidget):
             if self.input_type in entry.input_types:
                 action_list.append(entry.name)
         return sorted(action_list)
+    
 
     def _add_action(self, clicked=False):
         """Handles selecting of an action to be added.

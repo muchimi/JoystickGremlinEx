@@ -408,6 +408,10 @@ class DeviceSummary:
         for i in range(8):
             self.axis_map.append(AxisMap(data.axis_map[i]))
         self.vjoy_id = -1
+        if self.vendor_id == 0x1234:
+            # add a marker with axis/buttons/hat to distinguish them
+            self.name += f" {self.axis_count}/{self.button_count}/{self.hat_count}"
+        pass
 
     @property
     def is_virtual(self):

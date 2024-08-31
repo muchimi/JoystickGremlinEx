@@ -20,6 +20,7 @@ from PySide6 import QtWidgets, QtCore, QtGui
 
 import gremlin
 import gremlin.config
+import gremlin.event_handler
 import gremlin.shared_state
 import gremlin.ui.midi_device
 from gremlin.util import load_icon, load_pixmap
@@ -1294,6 +1295,10 @@ class ContainerSelector(QtWidgets.QWidget):
             self.container_dropdown.addItem(name)
         self.add_button = QtWidgets.QPushButton("Add")
         self.add_button.clicked.connect(self._add_container)
+        default_container = gremlin.config.Configuration().last_container
+        self.container_dropdown.setCurrentText(default_container)
+        self.container_dropdown.currentIndexChanged.connect(self._container_changed)
+
 
         # clipboard
         self.paste_button = QtWidgets.QPushButton()
@@ -1312,6 +1317,23 @@ class ContainerSelector(QtWidgets.QWidget):
         self.main_layout.addWidget(self.add_button)
         self.main_layout.addWidget(self.paste_button)
 
+        eh = gremlin.event_handler.EventHandler()
+        eh.last_container_changed.connect(self._last_container_changed)
+
+    @QtCore.Slot(object, str)
+    def _last_container_changed(self, widget, name):
+        if widget != self.container_dropdown:
+            with QtCore.QSignalBlocker(self.container_dropdown):
+                self.container_dropdown.setCurrentText(name)
+
+    def _container_changed(self):
+        ''' remember the selection '''
+        name = self.container_dropdown.currentText()
+        config = gremlin.config.Configuration()
+        config.last_container = name
+        if config.sync_last_selection:
+            eh = gremlin.event_handler.EventHandler()
+            eh.last_container_changed.emit(self.container_dropdown, name)
 
     def _valid_container_list(self):
         """Returns a list of valid actions for this InputItemWidget.

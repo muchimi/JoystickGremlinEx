@@ -626,6 +626,9 @@ class EventHandler(QtCore.QObject):
 	# Signal emitted when the application is pause / resumed
 	is_active = QtCore.Signal(bool)
 
+	last_action_changed = QtCore.Signal(object, str) # fires when the action changes in the selector (drop_down, name) 
+	last_container_changed = QtCore.Signal(object, str) # fires when the action changes in the selector (drop_down, name)
+
 	
 
 	def __init__(self):

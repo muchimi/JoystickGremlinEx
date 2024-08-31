@@ -121,6 +121,7 @@ class Configuration:
         if profile_path is None or mode_name is None:
             return
         
+        profile_path = os.path.normpath(profile_path).casefold()
         item = self._data.get("last_mode", None)
         if not item:
             self._data["last_mode"] = {}
@@ -147,6 +148,8 @@ class Configuration:
         """
         if profile_path is None or mode_name is None:
             return
+        
+        profile_path = os.path.normpath(profile_path).casefold()
         item = self._data.get("last_edit_mode", None)
         if not item:
             self._data["last_edit_mode"] = {}
@@ -730,6 +733,38 @@ class Configuration:
         self.save()
 
     @property
+    def last_action(self):
+        """Returns the default action to show in action drop downs.
+
+        :return default action to show in action selection drop downs
+        """
+        return self._data.get("last_action", Configuration().default_action)
+    
+    @last_action.setter
+    def last_action(self, value):
+        """Sets the default action to show in action drop downs.
+
+        :param value the name of the default action to show
+        """
+        self._data["last_action"] = str(value)
+        self.save()
+
+    @property
+    def last_container(self):
+        """Returns the last container to show in container drop downs."""
+        return self._data.get("last_container", "basic")
+    
+    @last_container.setter
+    def last_container(self, value):
+        """Sets the last container to show in container drop downs.
+
+        :param value the name of the default container to show
+        """
+        self._data["last_container"] = str(value)
+        self.save()
+
+
+    @property
     def macro_axis_polling_rate(self):
         """Returns the polling rate to use when recording axis macro actions.
 
@@ -1047,3 +1082,14 @@ class Configuration:
     def runtime_ui_active(self, value):
         self._data["runtime_ui_active"] = value 
         self.save()
+
+    @property
+    def sync_last_selection(self):
+        ''' synchronizes the actions and container drop downs when enabled '''
+        return self._data.get("sync_last_selection",True)
+    
+    @sync_last_selection.setter
+    def sync_last_selection(self, value):
+        self._data["sync_last_selection"] = value 
+        self.save()
+        

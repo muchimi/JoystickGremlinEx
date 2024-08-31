@@ -199,7 +199,11 @@ class OptionsUi(ui_common.BaseDialogUi):
         
         self._create_general_page()
         self._create_profile_page()
-        self._create_hidguardian_page()
+
+        # do not create the page for now as this serves no purpose with new version of HID guardian
+        # self._create_hidguardian_page()
+
+        
 
         # closing bar
         close_button = QtWidgets.QPushButton("Close")
@@ -274,12 +278,14 @@ class OptionsUi(ui_common.BaseDialogUi):
         )
         self.highlight_autoswitch.clicked.connect(self._highlight_autoswitch)
         self.highlight_autoswitch.setChecked(self.config.highlight_autoswitch)
+        self.highlight_autoswitch.setToolTip("This option enables automatic device tab switching on device input triggers (physical hardware only)")
 
         # Highlight input option
         self.highlight_input_axis = QtWidgets.QCheckBox(
             "Highlight currently triggered axis"
         )
         self.highlight_input_axis.clicked.connect(self._highlight_input)
+        self.highlight_input_axis.setToolTip("This otion will enable automatic selection and highlighting of device inputs when they are triggered.")
         self.highlight_input_axis.setChecked(self.config.highlight_input)
 
         # Highlight input option buttons
@@ -301,9 +307,15 @@ class OptionsUi(ui_common.BaseDialogUi):
 
         # enable ui at runtime
         self.enable_ui_runtime = QtWidgets.QCheckBox("Keep UI enabled when profile is active")
+        self.enable_ui_runtime.setToolTip("When enabled, the UI will remain interactable while a profile is running.<br>This can create conflicts if the profile or mode is changed while a profile is running,<b>use caution.</b>")
         self.enable_ui_runtime.clicked.connect(self._runtime_ui_active)
         self.enable_ui_runtime.setChecked(self.config.runtime_ui_active)
         
+        # synchronize action/container drop downs
+        self.sync_last_selection = QtWidgets.QCheckBox("Sync action &amp; container selections")
+        self.sync_last_selection.setToolTip("When enabled, action and container drop downs will remain synchronized with the last selected entry")
+        self.sync_last_selection.clicked.connect(self._sync_last_selection)
+        self.sync_last_selection.setChecked(self.config.sync_last_selection)
 
 
         # Start minimized option
@@ -329,22 +341,26 @@ class OptionsUi(ui_common.BaseDialogUi):
 
         # show scan codes
         self.show_scancodes_widget = QtWidgets.QCheckBox("Show keyboard scancodes for keyboard inputs")
+        self.show_scancodes_widget.setToolTip("When enabled, keyboard hexadecimal scan codes will be displayed in the keyboard input UI")
         self.show_scancodes_widget.setChecked(self.config.show_scancodes)
         self.show_scancodes_widget.clicked.connect(self._show_scancodes_cb)
 
         # show scan codes
         self.show_joystick_input_widget = QtWidgets.QCheckBox("Show live joystick inputs")
+        self.show_joystick_input_widget.setToolTip("When enabled, current state of hardware inputs will be displayed in the UI")
         self.show_joystick_input_widget.setChecked(self.config.show_input_axis)
         self.show_joystick_input_widget.clicked.connect(self._show_joystick_input_cb)
 
         # allow partial plugin configurations
         self.partial_plugin_save = QtWidgets.QCheckBox("Save partial user plugin data")
+        self.partial_plugin_save.setToolTip("When enabled, user-plugin configuration will be saved even if one or more input variable reports not-configured.<br>This feature allows saving of the configuration to date.<br>Incomplete configurations will not be activated at runtime even if this feature is used.")
         self.partial_plugin_save.setChecked(self.config.partial_plugin_save)
         self.partial_plugin_save.clicked.connect(self._partial_plugin_save)
 
 
         # verbose output
         self.verbose_container_widget = QtWidgets.QWidget()
+        self.verbose_container_widget.setContentsMargins(0,0,0,0)
         self.verbose_container_layout = QtWidgets.QGridLayout()
         self.verbose_container_layout.setContentsMargins(0,0,0,0)
         self.verbose_container_widget.setLayout(self.verbose_container_layout)
@@ -403,7 +419,10 @@ class OptionsUi(ui_common.BaseDialogUi):
 
         # remote control section
         self.remote_control_widget = QtWidgets.QWidget()
+        self.remote_control_widget.setContentsMargins(0,0,0,0)
         self.remote_control_layout = QtWidgets.QHBoxLayout(self.remote_control_widget)
+        self.remote_control_layout.setContentsMargins(0,0,0,0)
+
         self.remote_control_label = QtWidgets.QLabel("Remote control")
 
         self.enable_remote_control = QtWidgets.QCheckBox("Enable remote control")
@@ -448,8 +467,10 @@ class OptionsUi(ui_common.BaseDialogUi):
 
         # Default action selection
         self.default_action_widget = QtWidgets.QWidget()
-        self.default_action_layout = QtWidgets.QHBoxLayout()
-        self.default_action_widget.setLayout(self.default_action_layout)
+        self.default_action_widget.setContentsMargins(0,0,0,0)
+        self.default_action_layout = QtWidgets.QHBoxLayout(self.default_action_widget)
+        self.default_action_layout.setContentsMargins(0,0,0,0)
+        
 
         self.default_action_label = QtWidgets.QLabel("Default action")
         self.default_action_dropdown = QtWidgets.QComboBox()
@@ -460,7 +481,9 @@ class OptionsUi(ui_common.BaseDialogUi):
 
         # Macro axis polling rate
         self.macro_axis_polling_widget = QtWidgets.QWidget()
+        self.macro_axis_polling_widget.setContentsMargins(0,0,0,0)
         self.macro_axis_polling_layout = QtWidgets.QHBoxLayout(self.macro_axis_polling_widget)
+        self.macro_axis_polling_layout.setContentsMargins(0,0,0,0)
 
         self.macro_axis_polling_label = QtWidgets.QLabel("Macro axis polling rate")
         self.macro_axis_polling_value = ui_common.DynamicDoubleSpinBox()
@@ -479,8 +502,9 @@ class OptionsUi(ui_common.BaseDialogUi):
 
         # Macro axis minimum change value
         self.macro_axis_minimum_change_widget = QtWidgets.QWidget()
+        self.macro_axis_minimum_change_widget.setContentsMargins(0,0,0,0)
         self.macro_axis_minimum_change_layout = QtWidgets.QHBoxLayout(self.macro_axis_minimum_change_widget)
-        
+        self.macro_axis_minimum_change_layout.setContentsMargins(0,0,0,0)
 
         self.macro_axis_minimum_change_label = QtWidgets.QLabel("Macro axis minimum change value")
         self.macro_axis_minimum_change_value = ui_common.DynamicDoubleSpinBox()
@@ -499,21 +523,53 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.runtime_ui_update.clicked.connect(self._runtime_ui_update)
         self.runtime_ui_update.setToolTip("When set, Joystick Gremlin Ex will update the UI on profile or mode changes at runtime - this can be turned off to enhance performance at runtime")
 
-        self.general_layout.addWidget(self.highlight_autoswitch)
-        self.general_layout.addWidget(self.highlight_input_axis)
-        self.general_layout.addWidget(self.highlight_input_buttons)
-        self.general_layout.addWidget(self.highlight_device)
-        self.general_layout.addWidget(self.close_to_systray)
-        self.general_layout.addWidget(self.enable_ui_runtime)
-        self.general_layout.addWidget(self.start_minimized)
-        self.general_layout.addWidget(self.start_with_windows)
-        self.general_layout.addWidget(self.persist_clipboard)
-        self.general_layout.addWidget(self.show_scancodes_widget)
-        self.general_layout.addWidget(self.partial_plugin_save)
-        self.general_layout.addWidget(self.show_joystick_input_widget)
-        self.general_layout.addWidget(self.verbose_container_widget)
-        self.general_layout.addWidget(self.runtime_ui_update)
-        self.general_layout.addWidget(self.midi_enabled)
+        self.column_widget = QtWidgets.QWidget()
+        self.column_widget.setContentsMargins(0,0,0,0)
+        self.column_layout = QtWidgets.QGridLayout(self.column_widget)
+        self.column_layout.setContentsMargins(0,0,0,0)
+
+
+        # column 1
+        col = 0
+        row = 0
+        self.column_layout.addWidget(self.highlight_autoswitch, row, col)
+        row+=1
+        self.column_layout.addWidget(self.highlight_input_axis, row, col)
+        row+=1
+        self.column_layout.addWidget(self.highlight_input_buttons, row, col)
+        row+=1
+        self.column_layout.addWidget(self.highlight_device, row, col)
+        row+=1
+        self.column_layout.addWidget(self.sync_last_selection, row, col)
+        row+=1
+        self.column_layout.addWidget(self.close_to_systray, row, col)
+        row+=1
+        self.column_layout.addWidget(self.enable_ui_runtime, row, col)
+        row+=1
+        self.column_layout.addWidget(self.start_minimized, row, col)
+        row+=1
+        self.column_layout.addWidget(self.start_with_windows, row, col)
+
+
+        # column 2
+        col = 1
+        row = 0
+        self.column_layout.addWidget(self.persist_clipboard, row, col)
+        row+=1
+        self.column_layout.addWidget(self.show_scancodes_widget, row, col)
+        row+=1
+        self.column_layout.addWidget(self.partial_plugin_save, row, col)
+        row+=1
+        self.column_layout.addWidget(self.show_joystick_input_widget, row, col)
+        row+=1
+        self.column_layout.addWidget(self.runtime_ui_update, row, col)
+        row+=1
+        self.column_layout.addWidget(self.midi_enabled, row, col)
+        row+=1
+        self.column_layout.addWidget(self.verbose_container_widget, row, col)
+        row+=1
+
+        self.general_layout.addWidget(self.column_widget)
         
         container = QtWidgets.QWidget()
         layout = QtWidgets.QHBoxLayout(container)
@@ -832,6 +888,11 @@ This setting is also available on a profile by profile basis on the profile tab,
     @QtCore.Slot(bool)
     def _runtime_ui_active(self, checked):
         self.config.runtime_ui_active = checked
+
+    @QtCore.Slot(bool)
+    def _sync_last_selection(self, checked):
+        self.config.sync_last_selection = checked
+
 
     @QtCore.Slot(bool)
     def _start_minimized(self, checked):

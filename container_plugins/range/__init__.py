@@ -133,8 +133,8 @@ class RangeContainerWidget(AbstractContainerWidget):
             self.ui_action_dropdown.addItem(entry.name, entry)
 
         cfg = gremlin.config.Configuration()
-        self.ui_action_dropdown.setCurrentText(cfg.default_action)
-        self.ui_action_dropdown.setToolTip("Determines the default action added to a new range container")
+        self.ui_action_dropdown.setCurrentText(cfg.last_action)
+        self.ui_action_dropdown.setToolTip("Determines the default action added to a new container")
 
         self.add_button = QtWidgets.QPushButton("Add")
         self.add_button.clicked.connect(self._add_action)

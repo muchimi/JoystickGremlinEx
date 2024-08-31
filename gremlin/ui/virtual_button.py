@@ -19,6 +19,7 @@
 from PySide6 import QtWidgets, QtCore, QtGui
 
 import gremlin
+import gremlin.types
 from gremlin.util import load_icon
 
 class AbstractVirtualButtonWidget(QtWidgets.QGroupBox):
@@ -125,7 +126,7 @@ class VirtualAxisButtonWidget(AbstractVirtualButtonWidget):
         self.lower_limit.setValue(self.condition_data.lower_limit)
         self.upper_limit.setValue(self.condition_data.upper_limit)
         self.direction.setCurrentText(
-            gremlin.common.AxisButtonDirection.to_string(
+            gremlin.types.AxisButtonDirection.to_string(
                 self.condition_data.direction
             ).capitalize()
         )
@@ -148,7 +149,7 @@ class VirtualAxisButtonWidget(AbstractVirtualButtonWidget):
 
     def _direction_changed_cb(self, value):
         self.condition_data.direction = \
-            gremlin.common.AxisButtonDirection.to_enum(value.lower())
+            gremlin.types.AxisButtonDirection.to_enum(value.lower())
         self.virtual_button_modified.emit()
 
     def _show_hint(self):

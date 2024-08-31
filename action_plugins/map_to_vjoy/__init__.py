@@ -782,7 +782,8 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.vjoy_map = {} # holds the count of axes for 
         devices = sorted(joystick_handling.vjoy_devices(),key=lambda x: x.vjoy_id)
         for dev in devices:
-            self.cb_vjoy_device_selector.addItem(f"VJoy device {dev.vjoy_id}", dev.vjoy_id)
+            #self.cb_vjoy_device_selector.addItem(f"VJoy device {dev.vjoy_id}", dev.vjoy_id)
+            self.cb_vjoy_device_selector.addItem(dev.name, dev.vjoy_id)
             self.vjoy_map[dev.vjoy_id] = dev
         
 

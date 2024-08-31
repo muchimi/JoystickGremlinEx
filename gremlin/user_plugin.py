@@ -32,6 +32,8 @@ import dinput
 from gremlin import common, error, input_devices, joystick_handling, profile, shared_state
 import gremlin.ui.ui_common
 from gremlin.input_types import InputType
+import gremlin.types
+
 
 
 def load_module(module_name, file_path):
@@ -187,9 +189,9 @@ variable_registry = VariableRegistry()
 
 # Lookup for variable value casting
 _cast_variable = {
-    common.PluginVariableType.Int: int,
-    common.PluginVariableType.Float: float,
-    common.PluginVariableType.String: str,
+    gremlin.types.PluginVariableType.Int: int,
+    gremlin.types.PluginVariableType.Float: float,
+    gremlin.types.PluginVariableType.String: str,
 }
 
 
@@ -231,7 +233,7 @@ class AbstractVariable(QtCore.QObject):
             the user facing label given to the variable
         description : str
             description of the variable's function and intent
-        variable_type : gremlin.common.PluginVariableType
+        variable_type : gremlin.types.PluginVariableType
             data type represented by the variable
         is_optional : bool
             if True the variable is optional and will not impact saving
@@ -348,7 +350,7 @@ class NumericalVariable(AbstractVariable):
         layout.addWidget(label, 0, 0)
 
         value_widget = None
-        if self.variable_type == common.PluginVariableType.Int:
+        if self.variable_type == gremlin.types.PluginVariableType.Int:
             value_widget = QtWidgets.QSpinBox()
             value_widget.setRange(self.min_value, self.max_value)
             value_widget.setValue(clamp_value(
@@ -359,7 +361,7 @@ class NumericalVariable(AbstractVariable):
             value_widget.valueChanged.connect(
                 lambda x: self.value_changed.emit({"value": x})
             )
-        elif self.variable_type == common.PluginVariableType.Float:
+        elif self.variable_type == gremlin.types.PluginVariableType.Float:
             value_widget = QtWidgets.QDoubleSpinBox()
             value_widget.setDecimals(3)
             value_widget.setRange(self.min_value, self.max_value)
@@ -403,7 +405,7 @@ class IntegerVariable(NumericalVariable):
         super().__init__(
             label,
             description,
-            common.PluginVariableType.Int,
+            gremlin.types.PluginVariableType.Int,
             initial_value,
             min_value,
             max_value,
@@ -431,7 +433,7 @@ class FloatVariable(NumericalVariable):
         super().__init__(
             label,
             description,
-            common.PluginVariableType.Float,
+            gremlin.types.PluginVariableType.Float,
             initial_value,
             min_value,
             max_value,
@@ -456,7 +458,7 @@ class BoolVariable(AbstractVariable):
         super().__init__(
             label,
             description,
-            common.PluginVariableType.Bool,
+            gremlin.types.PluginVariableType.Bool,
             is_optional
         )
 
@@ -510,7 +512,7 @@ class StringVariable(AbstractVariable):
         super().__init__(
             label,
             description,
-            common.PluginVariableType.String,
+            gremlin.types.PluginVariableType.String,
             is_optional
         )
 
@@ -557,7 +559,7 @@ class ModeVariable(AbstractVariable):
         super().__init__(
             label,
             description,
-            common.PluginVariableType.Mode,
+            gremlin.types.PluginVariableType.Mode,
             is_optional
         )
 
@@ -599,7 +601,7 @@ class VirtualInputVariable(AbstractVariable):
         super().__init__(
             label,
             description,
-            common.PluginVariableType.VirtualInput,
+            gremlin.types.PluginVariableType.VirtualInput,
             is_optional
         )
 
@@ -608,9 +610,9 @@ class VirtualInputVariable(AbstractVariable):
         self.valid_types = valid_types
         if self.valid_types is None:
             self.valid_types = [
-                common.InputType.JoystickAxis,
-                common.InputType.JoystickButton,
-                common.InputType.JoystickHat
+                InputType.JoystickAxis,
+                InputType.JoystickButton,
+                InputType.JoystickHat
             ]
         self.value = joystick_handling.select_first_valid_vjoy_input(
             self.valid_types
@@ -685,7 +687,7 @@ class PhysicalInputVariable(AbstractVariable):
         super().__init__(
             label,
             description,
-            common.PluginVariableType.PhysicalInput,
+            gremlin.types.PluginVariableType.PhysicalInput,
             is_optional
         )
 
@@ -693,9 +695,9 @@ class PhysicalInputVariable(AbstractVariable):
         self.valid_types = valid_types
         if self.valid_types is None:
             self.valid_types = [
-                common.InputType.JoystickAxis,
-                common.InputType.JoystickButton,
-                common.InputType.JoystickHat
+                InputType.JoystickAxis,
+                InputType.JoystickButton,
+                InputType.JoystickHat
             ]
 
         self._load_from_registry(self._get_identifier())
@@ -805,7 +807,7 @@ class SelectionVariable(AbstractVariable):
         super().__init__(
             label,
             description,
-            common.PluginVariableType.Selection,
+            gremlin.types.PluginVariableType.Selection,
             is_optional
         )
 
