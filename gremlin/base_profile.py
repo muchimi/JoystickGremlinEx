@@ -1468,11 +1468,11 @@ class Profile():
     def get_root_mode(self):
         ''' gets the top mode from a profile - that would be the default startup mode - sorted by name of the root nodes'''
         tree = self.build_inheritance_tree()
+        modes = sorted(tree.keys())
         if "Default" in modes:
             # return the default mode as that is what we start with
             return "Default"
         # pick the first sorted mode
-        modes = sorted(tree.keys())
         if modes:
             return modes[0]
         return None
