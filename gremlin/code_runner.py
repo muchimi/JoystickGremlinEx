@@ -289,7 +289,7 @@ class CodeRunner:
                                         input_item.always_execute
                                     )
 
-                            verbose = config.verbose
+                            verbose = config.verbose_mode_details
                             if verbose:
                                 self.event_handler.dump_callbacks()
                                 

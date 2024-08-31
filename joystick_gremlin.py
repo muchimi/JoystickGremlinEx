@@ -2188,8 +2188,9 @@ class GremlinUi(QtWidgets.QMainWindow):
 
             # if gremlin.shared_state.current_mode == new_mode:
             #     return
-            
-            self.ui.devices.widget(self.ui.devices.count()-1).refresh_ui()
+            widget = self.ui.devices.widget(self.ui.devices.count()-1)
+            if hasattr(widget,"refresh_ui"):
+                widget.refresh_ui()
             self._select_last_input() # restore the last input on mode change if possible
 
         finally:

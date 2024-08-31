@@ -294,7 +294,7 @@ class HatButtonsContainer(AbstractContainer):
                 None
             ))
             # Create fake BasicContainer for each action set
-            basic_container = BasicContainer()
+            basic_container = BasicContainer(self)
             basic_container.action_sets = [action_set]
             basic_container.activation_condition = self.activation_condition
             basic_container.activation_condition_type = \
