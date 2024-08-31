@@ -398,11 +398,15 @@ class Configuration:
 
         # Update recent profiles
         if value is not None:
+            value = os.path.normpath(value.casefold()) # normalize the profile path
             current = self.recent_profiles
             if value in current:
                 del current[current.index(value)]
             current.insert(0, value)
-            current = current[0:8]
+            # normalize and remove duplicates
+            current = list(set([os.path.normpath(item.casefold()) for item in current]))
+            current = current[0:8] # remember up to 9
+            
             self._data["recent_profiles"] = current
         self.save()
 
@@ -1034,3 +1038,12 @@ class Configuration:
         self.save()
 
 
+    @property
+    def runtime_ui_active(self):
+        ''' keep UI enabled at runtime '''
+        return self._data.get("runtime_ui_active",False)
+    
+    @runtime_ui_active.setter
+    def runtime_ui_active(self, value):
+        self._data["runtime_ui_active"] = value 
+        self.save()

@@ -892,6 +892,14 @@ class SimConnectBlock(QtCore.QObject):
         self._units = ""
         self._is_axis = False # true if the block is axis output enabled
 
+    def __getstate__(self) -> object:
+        # use in state serialization
+        state = gremlin.shared_state.save_state(self)
+        return state
+    
+    def __setstate__(self, state):
+        return gremlin.shared_state.load_state(state)        
+
     @property
     def sm(self):
         ''' simconnect object '''

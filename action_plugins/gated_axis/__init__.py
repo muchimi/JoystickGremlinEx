@@ -43,7 +43,6 @@ class GatedAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         
         self.gate_widget = gremlin.gated_handler.GatedAxisWidget(action_data = self.action_data,
-                                                            gate_data = self.action_data.gate_data,
                                                             show_configuration=False
                                                             )
 

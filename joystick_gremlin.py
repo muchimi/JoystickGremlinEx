@@ -103,7 +103,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.14ex (m12)"
+APPLICATION_VERSION = "13.40.14ex (m13)"
 
 # the main ui
 ui = None
@@ -1139,7 +1139,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         tab_map = self._get_tab_map()
         self.tab_guids = [device_guid for device_guid, _, _, _ in tab_map.values()]
-        if self.config.verbose:
+        if self.config.verbose_mode_details:
             self._dump_tab_map(tab_map)
 
         # map of device_guid to widgets
@@ -1361,8 +1361,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         # sorted list of item GUIDs
         guid_list = []
         tab_map = self._get_tab_map()
-        verbose = self.config.verbose
-        if verbose:
+        if self.config.verbose_mode_details:
             self._dump_tab_map(tab_map)
         
         joystick_devices = self._find_joystick_tab_data()        
@@ -1398,7 +1397,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                 self.ui.devices.tabBar().moveTab(tab_index, index)
 
         tab_map = self._get_tab_map()
-        if self.config.verbose:
+        if self.config.verbose_mode_details:
             self._dump_tab_map(tab_map)
         
 
@@ -2002,6 +2001,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.ui.actionActivate.setChecked(False)
         self.activate(False)
 
+        pushCursor()
+
         # Attempt to load the new profile
         try:
             new_profile = gremlin.base_profile.Profile()
@@ -2061,6 +2062,9 @@ class GremlinUi(QtWidgets.QMainWindow):
             cfg.last_profile = None
             self.new_profile()
             gremlin.util.display_error(f"Failed to load the profile {fname} due to:\n\n{error}")
+
+        finally:
+            popCursor()
 
     def _force_close(self):
         """Forces the closure of the program."""

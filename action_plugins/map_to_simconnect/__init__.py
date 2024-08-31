@@ -1052,7 +1052,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         # set range of values output mode (axis input only)
         self._output_mode_ranged_widget = QtWidgets.QRadioButton("Ranged")
         self._output_mode_ranged_widget.clicked.connect(self._mode_ranged_cb)
-        self._output_mode_ranged_widget.setToolTip("Sets the output as a linear axis to the simconnect command.<br>The output is scaled from -1 to +1 to the specified output range defined by the command or manually.")
+        self._output_mode_ranged_widget.setToolTip("Sets the output as a linear axis to the simconnect command.<br>The output is scaled to the specified output range as defined by the command or manually.")
 
         self._output_mode_gated_widget =  QtWidgets.QRadioButton("Gated")
         self._output_mode_gated_widget.clicked.connect(self._mode_gated_cb)
@@ -1066,7 +1066,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         # trigger output mode (event trigger only)
         self._output_mode_trigger_widget = QtWidgets.QRadioButton("Trigger")
         self._output_mode_trigger_widget.clicked.connect(self._mode_trigger_cb)
-        self._output_mode_trigger_widget.setToolTip("Triggers a simconnect command (momentary inputs only)")
+        self._output_mode_trigger_widget.setToolTip("Triggers a simconnect command (for momentary inputs only like a button or a hat)")
 
         self._output_mode_description_widget = QtWidgets.QLabel()
         self._output_mode_container_layout.addWidget(QtWidgets.QLabel("Output mode:"))
@@ -1220,13 +1220,9 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
             self._gates_container_widget.setFrameShape(QtWidgets.QFrame.Shape.Box)
             self._gates_container_widget.setStyleSheet('.QFrame{background-color: lightgray;}')
             self._gates_container_layout = QtWidgets.QVBoxLayout(self._gates_container_widget)
-
-            self._gated_axis_widget = gremlin.gated_handler.GatedAxisWidget(action_data = self.action_data,
-                                                                gate_data = self.action_data.gate_data,
-                                                                show_output_mode=True
-                                                                )
-
-            self._gates_container_layout.addWidget(self._gated_axis_widget)
+            self._gated_axis_widget = None # added later if needed
+            
+            
 
             self._output_gated_container_layout.addWidget(self._gates_container_widget)
         else:
@@ -1261,14 +1257,25 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         #self.main_layout.addWidget(self._toolbar_container_widget)
         self.main_layout.addWidget(self._command_container_widget)
         self.main_layout.addWidget(self._output_container_widget)
-        
-        
-        
 
         # update from ui
+        self._ensure_gated()
         self._update_block_ui()
         self._update_axis_range()
         self._update_ui_container_visibility()
+
+    def _ensure_gated(self):
+        ''' adds a gated axis widget if the mode requires it - this is to only setup a gated axis if needed '''
+        input_type = self.action_data.input_type
+        
+        if input_type == InputType.JoystickAxis and self._gated_axis_widget is None and self.action_data.block.output_mode == SimConnectActionMode.Gated:
+            if gremlin.config.Configuration().verbose:
+                 log_info(f"Adding gated input for: {self.action_data.hardware_input_type_name}  {self.action_data.hardware_device_name} input: {self.action_data.hardware_input_id}")
+            self._gated_axis_widget = gremlin.gated_handler.GatedAxisWidget(action_data = self.action_data,
+                                                                show_output_mode=True
+                                                                )
+            self._gates_container_layout.addWidget(self._gated_axis_widget)
+
 
 
     def _show_options_dialog_cb(self):
@@ -1476,12 +1483,14 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         if input_type == InputType.JoystickAxis:
             # input drives the outputs
+            self._output_mode_trigger_widget.setVisible(False)
             self._output_mode_gated_widget.setVisible(True)
             self._output_mode_ranged_widget.setVisible(True)
             self._output_mode_sync_widget.setVisible(True)
 
         else:
             # button or event intput
+            self._output_mode_trigger_widget.setVisible(True)
             self._output_mode_gated_widget.setVisible(False)
             self._output_mode_ranged_widget.setVisible(False)
             self._output_mode_sync_widget.setVisible(False)
@@ -1519,7 +1528,8 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
                 if self.action_data.block.output_mode in (SimConnectActionMode.NotSet, SimConnectActionMode.Trigger):
                     # come up with a default mode for the selected command if not set
                     self.action_data.mode = SimConnectActionMode.Gated
-                self._gated_axis_widget.setVisible(True)
+                if self._gated_axis_widget is not None:
+                    self._gated_axis_widget.setVisible(True)
                 
                 # self._output_mode_ranged_widget.setVisible(True)
                 with QtCore.QSignalBlocker(self._output_invert_axis_widget):
@@ -1620,6 +1630,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _mode_gated_cb(self, value):
         if value:
             self.action_data.block.output_mode = SimConnectActionMode.Gated
+            self._ensure_gated()
             self._update_ui_container_visibility()
 
  

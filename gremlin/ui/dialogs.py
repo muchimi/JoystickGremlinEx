@@ -299,6 +299,12 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.close_to_systray.clicked.connect(self._close_to_systray)
         self.close_to_systray.setChecked(self.config.close_to_tray)
 
+        # enable ui at runtime
+        self.enable_ui_runtime = QtWidgets.QCheckBox("Keep UI enabled when profile is active")
+        self.enable_ui_runtime.clicked.connect(self._runtime_ui_active)
+        self.enable_ui_runtime.setChecked(self.config.runtime_ui_active)
+        
+
 
         # Start minimized option
         self.start_minimized = QtWidgets.QCheckBox(
@@ -498,6 +504,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.general_layout.addWidget(self.highlight_input_buttons)
         self.general_layout.addWidget(self.highlight_device)
         self.general_layout.addWidget(self.close_to_systray)
+        self.general_layout.addWidget(self.enable_ui_runtime)
         self.general_layout.addWidget(self.start_minimized)
         self.general_layout.addWidget(self.start_with_windows)
         self.general_layout.addWidget(self.persist_clipboard)
@@ -821,6 +828,10 @@ This setting is also available on a profile by profile basis on the profile tab,
         :param clicked whether or not the checkbox is ticked
         """
         self.config.close_to_tray = checked
+
+    @QtCore.Slot(bool)
+    def _runtime_ui_active(self, checked):
+        self.config.runtime_ui_active = checked
 
     @QtCore.Slot(bool)
     def _start_minimized(self, checked):

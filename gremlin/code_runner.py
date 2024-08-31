@@ -104,7 +104,8 @@ class CodeRunner:
 
     def disableUi(self):
         ''' disables UI '''
-        self.setUIState(False)
+        if not gremlin.config.Configuration().runtime_ui_active:
+            self.setUIState(False)
         
         
 

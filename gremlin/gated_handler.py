@@ -640,7 +640,7 @@ class GateData(QtCore.QObject):
 
        
     def __getstate__(self) -> object:
-        # eliminate the parent from serialization
+        # use in state serialization
         state = gremlin.shared_state.save_state(self)
         return state
     
@@ -1114,7 +1114,7 @@ class GateData(QtCore.QObject):
 
 
         self._range_list = ranges
-        verbose =  gremlin.config.Configuration().verbose
+        verbose =  gremlin.config.Configuration().verbose_mode_details
         if verbose:
             syslog.info("Updated ranges:")
             if ranges:
@@ -1494,13 +1494,17 @@ class GateData(QtCore.QObject):
         ''' export this configuration to XML '''
         node = ElementTree.Element("gate")
 
+        verbose = gremlin.config.Configuration().verbose
+
         node.set("use_default_range",str(self.use_default_range))
         node.set("show_mode", DisplayMode.to_string(self.display_mode))
         node.set("mode", self.profile_mode)
 
         # save gate data
         gate : GateInfo
-        for gate in self.getGates():
+        for gate in self.getGates(include_default=True):
+            if verbose:
+                log_info(f"Saving gate {gate.id} value: {gate.value} containers count: {len(gate.item_data.containers)}")
             child = ElementTree.SubElement(node, "gate")
             if gate.is_default:
                 child.set("default",str(gate.is_default))
@@ -1517,7 +1521,9 @@ class GateData(QtCore.QObject):
 
         # save range data
         rng : RangeInfo
-        for rng in self.getRanges():
+        for rng in self.getRanges(include_default = True):
+            if verbose:
+                log_info(f"Saving range {rng.id} default: {rng.is_default} min: {rng.min_range}  max: {rng.max_range} containers count: {len(gate.item_data.containers)}")
             child_comment = ElementTree.Comment(f"Range: [{rng.v1:0.{_decimals}f},{rng.v2:0.{_decimals}f}]  Gates: [{rng.g1.slider_index}/{rng.g2.slider_index}] Condition: [{_gate_condition_to_display_name[rng.condition]}] Mode: [{_gate_range_to_display_name[rng.mode]}]")
             node.append(child_comment)
             child = ElementTree.SubElement(node,"range")
@@ -1744,7 +1750,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
     configure_gate_requested = QtCore.Signal(object) # configure gate - data = gate object
 
 
-    def __init__(self, action_data, gate_data, show_configuration = False, show_output_mode = False, parent = None):
+    def __init__(self, action_data, show_configuration = False, show_output_mode = False, parent = None):
         '''
         
         :param: action_data = the AbstractContainerAction derived object holding the configuration data for the action
@@ -1762,11 +1768,13 @@ class GatedAxisWidget(QtWidgets.QWidget):
         import gremlin.joystick_handling
         
         super().__init__(parent)
-        self.gate_data : GateData = gate_data
-        self.gate_data.stepsChanged.connect(self._update_steps_cb)
-        self.gate_data.valueChanged.connect(self._update_values_cb)
 
         self.action_data = action_data
+        gate_data = action_data.gate_data
+        gate_data.stepsChanged.connect(self._update_steps_cb)
+        gate_data.valueChanged.connect(self._update_values_cb)
+
+        
         self._range_readout_widgets = {} # holds reference to range widgets by index
 
         self.single_step = 0.001 # amount of a single step when scrolling 
@@ -1861,7 +1869,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
         self.container_options_widget.setContentsMargins(0,0,0,0)
 
         self._use_default_range_widget = QtWidgets.QCheckBox("Use default range for axis output")
-        self._use_default_range_widget.setChecked(self.gate_data.use_default_range)
+        self._use_default_range_widget.setChecked(gate_data.use_default_range)
         self._use_default_range_widget.clicked.connect(self._use_default_range_changed_cb)
         self._use_default_range_widget.setToolTip("When set, the axis output uses the default range setting for value output, sub-ranges can still be used to trigger actions based on entry/exit of ranges")
 
@@ -1874,10 +1882,10 @@ class GatedAxisWidget(QtWidgets.QWidget):
         else:
             self._display_mode_widget.addItem("Normal", userData = DisplayMode.OneOne)
         self._display_mode_widget.addItem("Percent", userData = DisplayMode.Percent)
-        index = self._display_mode_widget.findData(self.gate_data.display_mode)
+        index = self._display_mode_widget.findData(gate_data.display_mode)
         if index == -1:
             self.gate_data.display_mode = DisplayMode.OneOne
-            index = self._display_mode_widget.findData(self.gate_data.display_mode)
+            index = self._display_mode_widget.findData(gate_data.display_mode)
         self._display_mode_widget.setCurrentIndex(index)
         self._display_mode_widget.currentIndexChanged.connect(self._display_mode_changed_cb)
 
@@ -1928,6 +1936,10 @@ class GatedAxisWidget(QtWidgets.QWidget):
         #self._update_conditions()
         self._update_ui()
         self._update_values_cb()
+
+    @property
+    def gate_data(self):
+        return self.action_data.gate_data
     
     def ConfigurationVisible(self):
         return self._show_configuration
