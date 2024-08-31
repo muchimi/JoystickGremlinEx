@@ -21,6 +21,7 @@ import os
 from PySide6 import QtWidgets, QtCore, QtGui
 
 import gremlin.base_profile
+import gremlin.config
 import gremlin.event_handler
 from gremlin.input_types import InputType
 from gremlin.input_devices import ButtonReleaseActions
@@ -34,12 +35,14 @@ import gremlin.ui.input_item
 import gremlin.gated_handler
 import enum
 from gremlin.profile import safe_format, safe_read
+import gremlin.util
 from .SimConnectData import *
 import re
 from lxml import etree
 from lxml import etree as ElementTree
 from gremlin.gated_handler import *
 from gremlin.ui.qdatawidget import QDataWidget
+import gremlin.config
 
 
 class QHLine(QtWidgets.QFrame):
@@ -991,6 +994,12 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _create_ui(self):
         """Creates the UI components."""
         import gremlin.gated_handler
+
+        verbose = gremlin.config.Configuration().verbose
+        if verbose:
+            log_info(f"Simconnect UI for: {self.action_data.hardware_input_type_name}  {self.action_data.hardware_device_name} input: {self.action_data.hardware_input_id}")
+
+
         # mode from aircraft button - grabs the aicraft name as a mode
         self._options_button_widget = QtWidgets.QPushButton("Simconnect Options")
         self._options_button_widget.setIcon(gremlin.util.load_icon("fa.gear"))
@@ -1203,14 +1212,6 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._output_trigger_bool_container_layout.addWidget(self._output_trigger_description_widget)
         self._output_trigger_bool_container_layout.addStretch()
 
-
-
-
-        
-
-
-
-
         # show the gated axis widget only if the input is an axis
         self._gates_container_widget = None
         input_type = self.action_data.input_type
@@ -1222,11 +1223,15 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
             self._gated_axis_widget = gremlin.gated_handler.GatedAxisWidget(action_data = self.action_data,
                                                                 gate_data = self.action_data.gate_data,
+                                                                show_output_mode=True
                                                                 )
 
             self._gates_container_layout.addWidget(self._gated_axis_widget)
 
             self._output_gated_container_layout.addWidget(self._gates_container_widget)
+        else:
+            self._gates_container_widget = None
+            self._gated_axis_widget = None
     
 
         # status widget
@@ -1321,13 +1326,14 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _update_axis_range(self):
         ''' updates the output range for the axis repeater'''
-        # update decimals based on range
-        min_range = self.action_data.block.min_range
-        max_range = self.action_data.block.max_range
-        #range = max_range - min_range
+        if self.action_data.block.output_mode == SimConnectActionMode.Gated:
+            # update decimals based on range
+            min_range = self.action_data.block.min_range
+            max_range = self.action_data.block.max_range
+            #range = max_range - min_range
 
-        # self._output_axis_widget.setRange(min_range, max_range)
-        self._gated_axis_widget.setDisplayRange(min_range, max_range)
+            # self._output_axis_widget.setRange(min_range, max_range)
+            self._gated_axis_widget.setDisplayRange(min_range, max_range)
 
 
     def _min_range_changed_cb(self):
@@ -1470,20 +1476,23 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         if input_type == InputType.JoystickAxis:
             # input drives the outputs
-            self._output_mode_gated_widget.setEnabled(True)
-            self._output_mode_ranged_widget.setEnabled(True)
+            self._output_mode_gated_widget.setVisible(True)
+            self._output_mode_ranged_widget.setVisible(True)
+            self._output_mode_sync_widget.setVisible(True)
 
         else:
             # button or event intput
-            self._output_mode_gated_widget.setEnabled(False)
-            self._output_mode_ranged_widget.setEnabled(False)
+            self._output_mode_gated_widget.setVisible(False)
+            self._output_mode_ranged_widget.setVisible(False)
+            self._output_mode_sync_widget.setVisible(False)
 
 
         
         if block and block.valid:
             self._output_container_widget.setVisible(True)
-
+            self._output_mode_readonly_widget.setVisible(block.is_readonly)
             self.output_readonly_status_widget.setText("Block: read/only" if block.is_readonly else "Block: read/write")
+
 
             
 
@@ -1581,17 +1590,17 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
     @QtCore.Slot(bool)
     def _trigger_toggle_changed_cb(self, checked):
         if checked:
-            self.action_data.trigger_mode = SimConnectTriggerMode.Toggle
+            self.action_data.block.trigger_mode = SimConnectTriggerMode.Toggle
 
     @QtCore.Slot(bool)
     def _trigger_turnon_cb(self, checked):
         if checked:
-            self.action_data.trigger_mode = SimConnectTriggerMode.TurnOn
+            self.action_data.block.trigger_mode = SimConnectTriggerMode.TurnOn
 
     @QtCore.Slot(bool)
     def _trigger_turnoff_cb(self, checked):
         if checked:
-            self.action_data.trigger_mode = SimConnectTriggerMode.TurnOff
+            self.action_data.block.trigger_mode = SimConnectTriggerMode.TurnOff
 
 
     def _range_changed_cb(self, event : RangeEvent):
@@ -1735,13 +1744,13 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         if not self.block or not self.block.valid:
             # invalid command
             return True
-
-        elif not event.is_axis and value.is_pressed:
-            # regular input mapping to simconnect
-            if not self.block.is_axis: 
-                return self.block.execute(self.value)
-                    
         
+        if event.is_axis and self.action_data.block.output_mode in (SimConnectActionMode.Ranged, SimConnectActionMode.Gated):
+            block_value = gremlin.util.scale_to_range(value.current, target_min = self.block.min_range, target_max = self.block.max_range)
+            self.block.execute(block_value)
+        elif self.action_data.block.output_mode == SimConnectActionMode.Trigger:
+            if not event.is_axis and value.is_pressed:
+                self.block.execute(value.current)
         return True
     
 
@@ -1808,9 +1817,6 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
 
         # output mode
         self.mode = SimConnectActionMode.NotSet
-
-        # trigger mode
-        self.trigger_mode = SimConnectTriggerMode.Toggle
 
         # readonly mode
         self.is_readonly = False

@@ -1202,6 +1202,10 @@ class SimConnectBlock(QtCore.QObject):
             # not connected
             return False
         
+        verbose = gremlin.config.Configuration().verbose
+        if verbose:
+            logger = logging.getLogger("system")
+        
         if self._command:
             if self._command_type ==  SimConnectCommandType.Event:
                 ae = AircraftEvents(self.sm)
@@ -1209,15 +1213,47 @@ class SimConnectBlock(QtCore.QObject):
                 if trigger:
                     if self.is_readonly:
                         # no param to set
+                        logger.info(f"Simconnect: trigger event: {self._command}")
                         trigger()
                     else:
-                        # send data
+                        logger.info(f"Simconnect: trigger event value: {self._command} {value}")
                         trigger(value)
                     return True
+            elif self._command_type == SimConnectCommandType.SimVar:
+                # set simvar
+                ar = AircraftRequests(self.sm, _time=2000)
+                if verbose:
+                    logger.info(f"Simconnect: set simvar: {self._command} mode: {self.output_mode}")
+                if self.output_mode == SimConnectActionMode.Trigger:
+                    mode = self.trigger_mode
+                    
+                    if mode == SimConnectTriggerMode.Toggle:
+                        # get the current state and flip it
+                        state = ar.get(self._command)
+                        value = 1 if state == 0 else 0
+                        ar.set(self._command, value)
+                        logger.info(f"\tToggle state: {state} -> {value}")
+                    
+                    elif mode == SimConnectTriggerMode.TurnOff:
+                        ar.set(self._command, 0)
+                        logger.info(f"\tTurn off: 0")
+                    elif mode == SimConnectTriggerMode.TurnOn:
+                        ar.set(self._command, 1)
+                        logger.info(f"\tTurn on: 1")
+                elif self.output_mode == SimConnectActionMode.SetValue:
+                    ar.set(self._command, value)
+                    logger.info(f"\tSet value: {value}")
+                
+                return True
+                
+                    
+
+
 
             elif self._command_type == SimConnectCommandType.Request and not self._readonly:
                 ar = AircraftRequests(self.sm, _time=2000)
                 ar.set(self._command, value)
+                logger.info(f"Simconnect: set request {self._command} {value}")
                 return True
 
         return False

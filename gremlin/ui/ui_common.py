@@ -765,7 +765,7 @@ class ModeWidget(QtWidgets.QWidget):
         self.setEnabled(True)
 
 
-    def populate_selector(self, profile_data, current_mode=None, startup_mode=None):
+    def populate_selector(self, profile_data, current_mode=None, emit = False):
         """Adds entries for every mode present in the profile.
 
         :param profile_data the device for which the mode selection is generated
@@ -804,20 +804,16 @@ class ModeWidget(QtWidgets.QWidget):
                     mode_names.append(entry[0])
                     display_names.append(entry[1])
 
-            # Select currently active mode
-            if len(mode_names) > 0:
-                if current_mode is None or current_mode not in self.mode_list:
-                    # pick the first one
-                    current_mode = mode_names[0]                
-
-            last_edit_mode = gremlin.config.Configuration().get_profile_last_edit_mode()
-            if not last_edit_mode:
-                # pick the top mode if nothing was saved in the configuration
-                last_edit_mode = mode_names[0]
+            # # Select currently active mode
+            # if len(mode_names) > 0:
+            #     if current_mode is None or current_mode not in self.mode_list:
+            #         # pick the first one
+            #         current_mode = mode_names[0]                
 
             # Add properly arranged mode names to the drop down list
             index = 0
             current_index = 0
+            last_edit_mode = gremlin.config.Configuration().get_profile_last_edit_mode()
             for display_name, mode_name in zip(display_names, mode_names):
                 self.edit_mode_selector.addItem(display_name, mode_name)
                 self.mode_list.append(mode_name)
@@ -826,7 +822,8 @@ class ModeWidget(QtWidgets.QWidget):
                 index += 1
 
             self.edit_mode_selector.setCurrentIndex(current_index)
-            self._edit_mode_changed_cb(current_index)
+            if emit:
+                self._edit_mode_changed_cb(current_index)
 
 
     @QtCore.Slot(int)
@@ -908,7 +905,8 @@ class ModeWidget(QtWidgets.QWidget):
     def setCurrentMode(self, current_mode):
         index = self.edit_mode_selector.findData(current_mode)
         if index != -1:
-            self.setCurrentIndex(index)
+            with QtCore.QSignalBlocker(self):
+                self.setCurrentIndex(index)
         else:
             logging.getLogger("system").error(f"SetModeError: mode '{current_mode}' is not defined")
 

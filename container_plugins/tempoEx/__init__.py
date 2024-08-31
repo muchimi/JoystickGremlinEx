@@ -396,10 +396,9 @@ class TempoExContainerFunctor(gremlin.base_classes.AbstractFunctor):
                     if cond.comparison == "press":
                         self.switch_on_press = True       
 
-        el = gremlin.event_handler.EventListener()
-        el.profile_start.connect(self._profile_start)
+        
 
-    def _profile_start(self):
+    def profile_start(self):
         # reset any prior values before start
         self.start_time = 0
         self.timer = None

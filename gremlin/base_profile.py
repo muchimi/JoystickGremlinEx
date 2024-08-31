@@ -154,6 +154,12 @@ class ProfileData(metaclass=ABCMeta):
         if self._input_item is not None:
             return self._input_item.device_guid
         return None
+    
+    def get_device_name(self):
+        ''' returns the name of the currently attached device '''
+        if self._input_item is not None:
+            return self._input_item.device_name
+        return None
 
     def get_settings(self):
         """Returns the Settings data of the profile.
@@ -194,8 +200,19 @@ class ProfileData(metaclass=ABCMeta):
         return self.get_input_type()
     
     @property
+    def hardware_input_type_name(self):
+        ''' gets the type name of hardware device attached to this '''
+        return InputType.to_display_name(self.get_input_type())
+    
+    @property
     def hardware_device_guid(self):
+        ''' gets the currently attached hardware GUID '''
         return self.get_device_guid()
+    
+    @property
+    def hardware_device_name(self):
+        ''' gets the currently attached hardware name '''
+        return self.get_device_name()
 
     @abstractmethod
     def _parse_xml(self, node):
@@ -1348,7 +1365,8 @@ class Profile():
         self._profile_name = None # the friendly name of this profile
         self._start_mode = "Default" # startup mode for this profile (this will be either the default mode, or the last used mode)
         self._default_start_mode = "Default"  # default startup mode for this profile
-        self._last_mode = "Default" # last active mode
+        self._last_runtime_mode = "Default" # last active mode
+        self._last_edit_mode = "Default"
         self._restore_last_mode = False # True if the profile should start with the last active mode (profile specific)
         self._dirty = False # dirty flag - indicates the profile data was changed but not saved yet
         self._force_numlock_off = True # if set, forces numlock to be off if it isn't so numpad keys report the correct scan codes
@@ -1399,7 +1417,7 @@ class Profile():
         """Returns a tree structure encoding the inheritance between the
         various modes.
 
-        :return tree encoding mode inheritance
+        :return tree (dictionary keyed by mode name) encoding mode inheritance
         """
         tree = {}
         for _, device in self.devices.items():
@@ -1447,22 +1465,53 @@ class Profile():
                 data[mode] = None
         return data
     
-    def set_last_mode(self, mode):
+    def get_root_mode(self):
+        ''' gets the top mode from a profile - that would be the default startup mode - sorted by name of the root nodes'''
+        tree = self.build_inheritance_tree()
+        if "Default" in modes:
+            # return the default mode as that is what we start with
+            return "Default"
+        # pick the first sorted mode
+        modes = sorted(tree.keys())
+        if modes:
+            return modes[0]
+        return None
+        
+    
+    def set_last_runtime_mode(self, mode):
         ''' sets the last used mode - this is persisted in the configuration  '''
-        if mode != self._last_mode:
-            self._last_mode = mode
+        if mode != self._last_runtime_mode:
+            self._last_runtime_mode = mode
             config = gremlin.config.Configuration()
-            self._last_mode = mode
-            config.set_profile_last_mode(mode)
+            self._last_runtime_mode = mode
+            config.set_last_runtime_mode(self._profile_fname, mode)
 
-    def get_last_mode(self):
+    def get_last_runtime_mode(self):
         ''' gets the last used mode '''
-        if self._last_mode is None:
+        if self._last_runtime_mode is None:
             config = gremlin.config.Configuration()
-            mode = config.get_profile_last_mode()
+            mode = config.get_profile_last_runtime_mode()
             if mode is not None:
-                self._last_mode = mode
-        return self._last_mode
+                self._last_runtime_mode = mode
+        return self._last_runtime_mode
+    
+    def set_last_edit_mode(self, mode):
+        ''' sets the last used mode - this is persisted in the configuration  '''
+        if mode != self._last_edit_mode:
+            self._last_edit_mode = mode
+            config = gremlin.config.Configuration()
+            self._last_edit_mode = mode
+            config.set_profile_last_edit_mode(mode)
+
+    def get_last_edit_mode(self):
+        ''' gets the last used mode '''
+        if self._last_edit_mode is None:
+            config = gremlin.config.Configuration()
+            mode = config.get_profile_last_edit_mode()
+            if mode is not None:
+                self._last_edit_mode = mode
+        return self._last_edit_mode
+
 
 
     def get_force_numlock(self):

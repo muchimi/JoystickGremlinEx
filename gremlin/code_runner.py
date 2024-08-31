@@ -501,8 +501,6 @@ class CodeRunner:
         # stop listen
         el.stop()
 
-        # re-enable tabs
-        self.enableUI()
 
         el.profile_stop.emit()
 
@@ -569,6 +567,8 @@ class CodeRunner:
         eh.change_mode(gremlin.shared_state.edit_mode, emit=True, force_update = True)
         
       
+        # re-enable tabs
+        self.enableUI()
 
 
     def _reset_state(self):

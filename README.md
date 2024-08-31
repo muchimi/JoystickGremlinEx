@@ -174,6 +174,8 @@ This release adds major new features, including some minor changes in UI functio
 - The JGEX UI and configuration options are mostly disabled when a profile runs so edits to an active profile are only permitted when a profile is not active.  The change has to do with changes in behaviors in the core system and the potential for conflicting events impacting profile state while a profile runs.  
 - When changing modes, the hourglass will be displayed during the UI update operation (this can be time consuming because each device is reloaded on mode change for the current mode)
 - Play sound action now has a play button to test play the sound file while in edit mode.
+- Curve editor now remembers the symmetry setting.
+- Curve editor now displays current input if input visualization is enabled.
 
 6/6/24 - 13.40.13ex (h) **potentially breaking change**
 

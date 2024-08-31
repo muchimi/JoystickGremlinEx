@@ -112,7 +112,7 @@ class Configuration:
     def is_debug(self):
         return self._is_debug
     
-    def set_last_mode(self, profile_path, mode_name):
+    def set_last_runtime_mode(self, profile_path, mode_name):
         """Stores the last active mode of the given profile.
 
         :param profile_path profile path for which to store the mode
@@ -120,13 +120,14 @@ class Configuration:
         """
         if profile_path is None or mode_name is None:
             return
+        
         item = self._data.get("last_mode", None)
         if not item:
             self._data["last_mode"] = {}
         self._data["last_mode"][profile_path] = mode_name
         self.save()
 
-    def get_last_mode(self, profile_path):
+    def get_last_runtime_mode(self, profile_path):
         """Returns the last active mode of the given profile.
 
         :param profile_path profile path for which to return the mode
@@ -164,17 +165,17 @@ class Configuration:
             return item.get(profile_path, None)
         return None
 
-    def set_profile_last_mode(self, mode_name):
+    def set_profile_last_runtime_mode(self, mode_name):
         ''' sets the profile's last used mode '''
         fname = self.last_profile
         if fname:
-            self.set_last_mode(fname, mode_name)
+            self.set_last_runtime_mode(fname, mode_name)
 
-    def get_profile_last_mode(self):
+    def get_profile_last_runtime_mode(self):
         ''' gets the save last used profile mode '''
         fname = self.last_profile
         if fname:
-            return self.get_last_mode(fname)
+            return self.get_last_runtime_mode(fname)
         return None
     
     def set_profile_last_edit_mode(self, mode_name):

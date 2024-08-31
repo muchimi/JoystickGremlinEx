@@ -638,6 +638,17 @@ class GateData(QtCore.QObject):
         el.profile_start.connect(self._profile_start_cb)
         el.profile_stop.connect(self._profile_stop_cb)
 
+       
+    def __getstate__(self) -> object:
+        # eliminate the parent from serialization
+        state = gremlin.shared_state.save_state(self)
+        return state
+    
+    def __setstate__(self, state):
+        return gremlin.shared_state.load_state(state)
+
+ 
+
     @property
     def process_callback(self):
         ''' the callback object '''
@@ -789,16 +800,14 @@ class GateData(QtCore.QObject):
 
     def _short_press(self, functor, event, value, delay = 250):
         ''' triggers a short press of a trigger (gate crossing)'''
+        if not hasattr(functor, "process_event"):
+            return
         # print ("short press ")
         value.current = True
-        value.is_pressed = True
         functor.process_event(event, value)
         time.sleep(delay/1000) # ms to seconds
         value.current = False
-        value.is_pressed = False
         functor.process_event(event, value)
-
-                
 
     @property
     def trigger_range_text(self):
@@ -1487,6 +1496,7 @@ class GateData(QtCore.QObject):
 
         node.set("use_default_range",str(self.use_default_range))
         node.set("show_mode", DisplayMode.to_string(self.display_mode))
+        node.set("mode", self.profile_mode)
 
         # save gate data
         gate : GateInfo
@@ -1563,7 +1573,10 @@ class GateData(QtCore.QObject):
 
         # read gate configurations 
         node_gates = gremlin.util.get_xml_child(node, "gate", multiple=True)
-        profile_mode = self.get_xml_mode(node) # get the profile mode from the XML tree
+
+        profile_mode = safe_read(node,"mode", str,"") 
+        if not profile_mode:
+            profile_mode = self.get_xml_mode(node)
         self.profile_mode = profile_mode
 
 
@@ -2054,6 +2067,10 @@ class GatedAxisWidget(QtWidgets.QWidget):
         rng : RangeInfo
 
         char_width = ui_common.get_text_width("M")
+
+        if self.gate_data.use_default_range:
+            # only show the default range as the output range to configure
+            range_list = [rng for rng in range_list if rng.is_default]
         
         display_index = 0
         decimals = self.gate_data.decimals

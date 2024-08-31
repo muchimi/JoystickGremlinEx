@@ -18,6 +18,7 @@
 
 import threading
 import sys
+import uuid
 
 def module_property(func):
     """Decorator to turn module functions into properties.
@@ -57,12 +58,6 @@ _suspend_input_highlighting_enabled = 0
 _suspend_timer = None
 
 
-# @module_property
-# def _current_mode():
-#     import gremlin.event_handler
-#     return gremlin.event_handler.EventHandler().active_mode
-
-
 ui_ready = False
 
 # holds the main UI reference
@@ -85,26 +80,29 @@ device_profile_map = {}
 current_profile = None
 
 # holds the active (runtime) mode
-active_mode = None
+runtime_mode = None
 
 # holds the edit mode 
 edit_mode = None
 
 # previous runtime mode
-previous_mode = None
+previous_runtime_mode = None
 
 @module_property
-def _current_mode():
+def _current_mode() -> str:
     if is_running:
-        return active_mode
+        #print(f"current mode is: runtime {runtime_mode}")
+        return runtime_mode
+    #print(f"current mode is: edit {edit_mode}")
     return edit_mode
 
 def resetState():
     device_guid_to_name_map.clear()
     device_profile_map.clear()
     current_profile = None
-    active_mode = None
+    runtime_mode = None
     edit_mode = None
+    previous_runtime_mode = None
 
     
 
@@ -204,6 +202,23 @@ def last_input_id(device_guid):
     if key in _tab_input_map.keys():
         return _tab_input_map[key]
     return None, None
+
+
+# pickle farm - allows to pickle an object to memory and recall it without actually pickling it
+
+_pickle_data = {}
+
+def save_state(data):
+    id = str(uuid.uuid4())
+    _pickle_data[id] = data
+    return id
+
+def load_state(id):
+    if id in _pickle_data.keys():
+        data = _pickle_data[id]
+        del _pickle_data[id]
+        return data
+    return None
 
 _icon_path_cache = {}
 

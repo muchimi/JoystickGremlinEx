@@ -460,7 +460,7 @@ class EventListener(QtCore.QObject):
 		"""
 		if self._device_update_timer is not None:
 			self._device_update_timer.cancel()
-		self._device_update_timer = Timer(0.2, self._run_device_list_update)
+		self._device_update_timer = Timer(0.5, self._run_device_list_update)
 		self._device_update_timer.start()
 
 	def _run_device_list_update(self):
@@ -645,16 +645,16 @@ class EventHandler(QtCore.QObject):
 		
 
 	@property
-	def active_mode(self):
+	def runtime_mode(self):
 		"""Returns the currently active mode.
 
 		:return name of the currently active mode
 		"""
-		return gremlin.shared_state.active_mode
+		return gremlin.shared_state.runtime_mode
 	
-	@active_mode.setter
-	def active_mode(self, value):
-		gremlin.shared_state.active_mode = value
+	@runtime_mode.setter
+	def runtime_mode(self, value):
+		gremlin.shared_state.runtime_mode = value
 
 	@property
 	def edit_mode(self):
@@ -666,20 +666,18 @@ class EventHandler(QtCore.QObject):
 
 	@property
 	def current_mode(self):
-		''' gets the current mode (edit or runtime)'''
-		if gremlin.shared_state.is_running:
-			return gremlin.shared_state.active_mode
-		return gremlin.shared_state.edit_mode
+		''' gets the current mode based on state '''
+		return gremlin.shared_state.current_mode
 
 	@property
-	def previous_mode(self):
+	def previous_runtime_mode(self):
 		''' returns the previous mode '''
-		return gremlin.shared_state.previous_mode
+		return gremlin.shared_state.previous_runtime_mode
 	
-	@previous_mode.setter
-	def previous_mode(self, value):
+	@previous_runtime_mode.setter
+	def previous_runtime_mode(self, value):
 		''' sets the active mode '''
-		gremlin.shared_state.previous_mode = value
+		gremlin.shared_state.previous_runtime_mode = value
 
 
 	def add_plugin(self, plugin):
@@ -900,8 +898,8 @@ class EventHandler(QtCore.QObject):
 			
 			#print (f"found guid: {device_guid}")
 			data = self.latched_events[event.device_guid]
-			if self.active_mode in data.keys():
-				data = data[self.active_mode]
+			if self.runtime_mode in data.keys():
+				data = data[self.runtime_mode]
 				matching_keys = []
 				if index in data.keys():
 					#print ("found identifier")
@@ -960,9 +958,19 @@ class EventHandler(QtCore.QObject):
 
 
 	def set_mode(self, new_mode):
-		''' update global mode '''
-		gremlin.shared_state.active_mode = new_mode
-		
+		''' sets the edit or runtime mode based on the state  '''
+		if gremlin.shared_state.is_running:
+			gremlin.shared_state.runtime_mode = new_mode
+		else:
+			gremlin.shared_state.edit_mode = new_mode
+
+	def set_runtime_mode(self, new_mode):
+		''' sets the active runtime mode '''
+		gremlin.shared_state.runtime_mode = new_mode
+
+	def set_edit_mode(self, new_mode):
+		''' sets the active edit mode '''
+		gremlin.shared_state.edit_mode = new_mode
 
 
 	def change_mode(self, new_mode, emit = True, force_update = False):
@@ -970,14 +978,16 @@ class EventHandler(QtCore.QObject):
 
 		:param new_mode the new mode to use
 		"""
+
 		verbose = gremlin.config.Configuration().verbose
 		current_profile = gremlin.shared_state.current_profile
+		
 
 		if verbose:
-			logging.getLogger("system").debug(f"EVENT: change mode to [{new_mode}] requested - active mode: [{gremlin.shared_state.active_mode}]  current mode: [{gremlin.shared_state.current_mode}] profile '{current_profile.name}'")
+			logging.getLogger("system").debug(f"EVENT: change mode to [{new_mode}] requested - active mode: [{gremlin.shared_state.runtime_mode}]  current mode: [{gremlin.shared_state.current_mode}] profile '{current_profile.name}'")
 
 
-		if new_mode == self.active_mode and not force_update:
+		if new_mode == self.current_mode and not force_update:
 			# already in this mode
 			return
 		
@@ -1015,24 +1025,27 @@ class EventHandler(QtCore.QObject):
 
 		if gremlin.shared_state.is_running:
 			# runtime event (prevents UI from reloading)
-			if self.active_mode != new_mode or force_update:
-				self.previous_mode = self.active_mode
+			if self.runtime_mode != new_mode or force_update:
+				self.previous_runtime_mode = self.runtime_mode
+				gremlin.shared_state.runtime_mode = new_mode
 				# remember the last mode for this profile
-				current_profile.set_last_mode(self.active_mode)
-				self.previous_mode = self.active_mode
-				self.active_mode = new_mode
+				current_profile.set_last_runtime_mode(self.runtime_mode)
+				self.previous_runtime_mode = self.runtime_mode
+				self.runtime_mode = new_mode
 				logging.getLogger("system").debug(f"Profile: {current_profile.name} - Runtime Mode switch to: {new_mode}")
 				if emit:
-					self.runtime_mode_changed.emit(self.active_mode)	
+					self.runtime_mode_changed.emit(self.runtime_mode)	
 		else:
 			# non-runtime
 
 			if self.edit_mode != new_mode or force_update:
 				gremlin.config.Configuration().set_profile_last_edit_mode(new_mode)
+				gremlin.shared_state.edit_mode = new_mode
 				self.edit_mode = new_mode
 				logging.getLogger("system").debug(f"Profile: {current_profile.name} - Design time Mode switch to: {new_mode}")
 				if emit:
 					self.mode_changed.emit(self.edit_mode)
+
 
 
 	def resume(self):
@@ -1076,7 +1089,7 @@ class EventHandler(QtCore.QObject):
 		
 		verbose = gremlin.config.Configuration().verbose
 		if verbose and event.event_type != InputType.JoystickAxis:
-			logging.getLogger("system").info(f"process event - mode [{self.active_mode}] event: {str(event)}")
+			logging.getLogger("system").info(f"process event - mode [{self.runtime_mode}] event: {str(event)}")
 
 		# filter latched keyboard or mouse events
 		if event.event_type in (InputType.Keyboard, InputType.KeyboardLatched, InputType.Mouse):
@@ -1093,7 +1106,7 @@ class EventHandler(QtCore.QObject):
 			items = self._matching_event_keys(event)  # returns list of primary keys
 			if items:
 				if verbose:
-					logging.getLogger("system").info(f"Matched keys for mode: [{self.active_mode}]  event {event} pressed: {event.is_pressed} keys: {len(items)} ")
+					logging.getLogger("system").info(f"Matched keys for mode: [{self.runtime_mode}]  event {event} pressed: {event.is_pressed} keys: {len(items)} ")
 					for index, input_item in enumerate(items):
 						logging.getLogger("system").info(f"\t[{index}]: {input_item.name}")
 				
@@ -1132,7 +1145,7 @@ class EventHandler(QtCore.QObject):
 							if verbose:
 								trigger_line = "***** TRIGGER " + "*"*30
 								logging.getLogger("system").info(trigger_line)
-								logging.getLogger("system").info(f"\tmode: [{self.active_mode}] Found latched key: Check key {latch_key.name} callbacks: {len(m_list)} event: {event}")
+								logging.getLogger("system").info(f"\tmode: [{self.runtime_mode}] Found latched key: Check key {latch_key.name} callbacks: {len(m_list)} event: {event}")
 								logging.getLogger("system").info(trigger_line)
 							self._trigger_callbacks(m_list, event)
 							return
@@ -1163,7 +1176,7 @@ class EventHandler(QtCore.QObject):
 		
 		if m_list:
 			if verbose:
-				logging.getLogger("system").info(f"TRIGGER: mode: [{self.active_mode}] callbacks: {len(m_list)} event: {event}")
+				logging.getLogger("system").info(f"TRIGGER: mode: [{self.runtime_mode}] callbacks: {len(m_list)} event: {event}")
 			self._trigger_callbacks(m_list, event)			
 
 
@@ -1192,7 +1205,7 @@ class EventHandler(QtCore.QObject):
 					pass
 			if event.device_guid in self.midi_callbacks:
 				callback_list = self.midi_callbacks[event.device_guid].get(
-					self.active_mode, {}
+					self.runtime_mode, {}
 				).get(key, [])
 
 		# Filter events when the system is paused
@@ -1208,7 +1221,7 @@ class EventHandler(QtCore.QObject):
 			key = event.identifier.message_key
 			if event.device_guid in self.osc_callbacks:
 				callback_list = self.osc_callbacks[event.device_guid].get(
-					self.active_mode, {}
+					self.runtime_mode, {}
 				).get(key, [])
 
 		# Filter events when the system is paused
@@ -1234,7 +1247,7 @@ class EventHandler(QtCore.QObject):
 		callback_list = []
 		device_guid = event.device_guid
 		if device_guid in self.callbacks:
-			mode = self.active_mode
+			mode = self.runtime_mode
 			if mode in self.callbacks[device_guid].keys():
 				if event in self.callbacks[device_guid][mode].keys():
 					callback_list = self.callbacks[device_guid][mode][event]
@@ -1242,7 +1255,7 @@ class EventHandler(QtCore.QObject):
 						self.dump_exectree(device_guid, mode, event)
 
 		if verbose:
-			logging.getLogger("system").debug(f"device: {gremlin.shared_state.get_device_name(event.device_guid)} mode: {self.active_mode} found: {len(callback_list)}")
+			logging.getLogger("system").debug(f"device: {gremlin.shared_state.get_device_name(event.device_guid)} mode: {self.runtime_mode} found: {len(callback_list)}")
 			if callback_list:
 				pass
 
@@ -1258,7 +1271,7 @@ class EventHandler(QtCore.QObject):
 		callback_list = []
 		if event.device_guid in self.latched_callbacks:
 			callback_list = self.latched_callbacks[event.device_guid].get(
-				self.active_mode, {}
+				self.runtime_mode, {}
 			).get(key, [])
 
 		# Filter events when the system is paused

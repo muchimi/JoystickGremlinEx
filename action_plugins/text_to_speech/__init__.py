@@ -148,10 +148,6 @@ class TextToSpeechFunctor(gremlin.base_profile.AbstractFunctor):
     def __init__(self, action):
         super().__init__(action)
         self.action_data = action
-        eh = gremlin.event_handler.EventListener()
-        eh.profile_start.connect(self.profile_start)
-        eh.profile_stop.connect(self.profile_stop)
-
 
     def _speak(self):
         if self.tts is not None:

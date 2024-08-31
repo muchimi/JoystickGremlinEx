@@ -191,7 +191,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
         self.action_layout = QtWidgets.QHBoxLayout()
 
         # repeat the current active mode for editing
-        mode_widget = QtWidgets.QLineEdit(text=gremlin.shared_state.active_mode)
+        mode_widget = QtWidgets.QLineEdit(text=gremlin.shared_state.current_mode)
         mode_widget.setReadOnly(True)
 
         self.action_layout.addWidget(QtWidgets.QLabel("Mode:"))
@@ -336,6 +336,7 @@ class ActionContainerView(gremlin.ui.ui_common.AbstractView):
         # Create required UI items
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.main_layout.setContentsMargins(0,0,0,0)
+        self.redraw_lock = False
 
         self.scroll_area = QtWidgets.QScrollArea()
         self.scroll_widget = QtWidgets.QWidget()
@@ -360,20 +361,28 @@ class ActionContainerView(gremlin.ui.ui_common.AbstractView):
 
     def redraw(self):
         """Redraws the entire view."""
-        import gremlin.ui.ui_common
-        gremlin.ui.ui_common.clear_layout(self.scroll_layout)
-        container_count = self.model.rows()
-        if container_count:
-            for index in range(container_count):
-                widget = self.model.data(index).widget(self.model.data(index))
-                widget.closed.connect(self._create_closed_cb(widget))
-                widget.container_modified.connect(self.model.data_changed.emit)
-                self.scroll_layout.addWidget(widget)
+
+        if not self.redraw_lock:
+            try:
+                self.redraw_lock = True
+                import gremlin.ui.ui_common
+                gremlin.ui.ui_common.clear_layout(self.scroll_layout)
+                container_count = self.model.rows()
+                if container_count:
+                    for index in range(container_count):
+                        widget = self.model.data(index).widget(self.model.data(index))
+                        widget.closed.connect(self._create_closed_cb(widget))
+                        widget.container_modified.connect(self.model.data_changed.emit)
+                        self.scroll_layout.addWidget(widget)
+                else:
+                    label = QtWidgets.QLabel(f"Please add an action or container for {self.model.item_data.display_name}")
+                    label.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop | QtCore.Qt.AlignmentFlag.AlignLeft)
+                    self.scroll_layout.addWidget(label)
+                self.scroll_layout.addStretch(1)
+            finally:
+                self.redraw_lock = False
         else:
-            label = QtWidgets.QLabel(f"Please add an action or container for {self.model.item_data.display_name}")
-            label.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop | QtCore.Qt.AlignmentFlag.AlignLeft)
-            self.scroll_layout.addWidget(label)
-        self.scroll_layout.addStretch(1)
+            logging.getLogger("system").error("re-entry code detected")
 
     def _create_closed_cb(self, widget):
         """Create callbacks to remove individual containers from the model.
@@ -688,10 +697,7 @@ class JoystickDeviceTabWidget(QDataWidget):
         #self.input_item_list_view.select_item(0, emit_signal=False)
         
         self.input_item_list_view.redraw()
-        self.input_item_list_view.select_item(0)
-        
-
-
+        self.input_item_list_view.select_item(0, emit_signal=False)
 
 
     def mode_changed_cb(self, mode):

@@ -129,5 +129,5 @@ class TextToSpeech:
         :param text the text to substitute parts of
         :return original text with parts substituted
         """
-        text = text.replace("${current_mode}", gremlin.shared_state.active_mode)
+        text = text.replace("${current_mode}", gremlin.shared_state.runtime_mode)
         return text

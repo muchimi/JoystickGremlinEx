@@ -298,6 +298,10 @@ class AbstractFunctor(metaclass=ABCMeta):
         self._name = instance.name
         self.enabled = True
 
+        el = gremlin.event_handler.EventListener()
+        el.profile_start.connect(self.profile_start)
+        el.profile_stop.connect(self.profile_stop)
+
         
 
     @abstractmethod
@@ -311,6 +315,15 @@ class AbstractFunctor(metaclass=ABCMeta):
 
         """
         pass
+
+    def profile_start(self):
+        ''' called when the profile starts '''
+        pass
+
+    def profile_stop(self):
+        ''' called when the profile stops '''
+        pass
+    
 
     def latch_extra_inputs(self):
         ''' returns any extra inputs as a list of (device_guid, input_id) to latch to this action (trigger on change) '''

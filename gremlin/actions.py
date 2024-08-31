@@ -95,7 +95,9 @@ class Value:
         """
         self._current = current
 
-
+    @property
+    def is_pressed(self):
+        return isinstance(self._current, bool) and self.current
 
 
 class ActivationCondition:

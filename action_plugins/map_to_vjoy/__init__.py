@@ -1624,10 +1624,7 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
 
         self.lock = threading.Lock()
 
-          
-        el = gremlin.event_handler.EventListener()
-        el.profile_start.connect(self._profile_start)
-
+        
     @property
     def reverse(self):
         # axis reversed state
@@ -1640,7 +1637,7 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
         log_sys(f"toggle reverse: {self.vjoy_device_id} {self.vjoy_input_id} new state: {self.reverse}")
 
 
-    def _profile_start(self):
+    def profile_start(self):
         # setup initial state
         if self.input_type in VJoyWidget.input_type_buttons:
             # set start button state

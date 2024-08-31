@@ -144,12 +144,6 @@ class MergeAxisEntryWidget(QtWidgets.QDockWidget):
         self.operation_container_layout.addWidget(self.operation_selector)
         self.operation_container_layout.addWidget(self.invert_widget)
 
-        # hook the joystick inputs
-        el = gremlin.event_handler.EventListener()
-        el.joystick_event.connect(self._event_handler)
-        el.profile_start.connect(self._profile_start)
-        el.profile_stop.connect(self._profile_stop)
-
 
         # Assemble the complete ui
         self.main_layout.addWidget(
@@ -298,13 +292,13 @@ class MergeAxisEntryWidget(QtWidgets.QDockWidget):
         self.output_widget.setValue(value)
 
     @QtCore.Slot()
-    def _profile_start(self):
+    def profile_start(self):
         ''' stop processing joystick events when profile is running '''
         el = gremlin.event_handler.EventListener()
         el.joystick_event.disconnect(self._event_handler)
 
     @QtCore.Slot()
-    def _profile_stop(self):
+    def profile_stop(self):
         ''' process joystick events when profile is not running '''
         el = gremlin.event_handler.EventListener()
         el.joystick_event.connect(self._event_handler)
@@ -387,10 +381,6 @@ class MergedAxisFunctor(gremlin.base_profile.AbstractContainerActionFunctor):
 
     def __init__(self, action):
         super().__init__(action)
-        # hook joystick input for runtime processing of input
-        el = gremlin.event_handler.EventListener()
-        el.profile_start.connect(self._profile_start_cb)
-        el.profile_stop.connect(self._profile_stop_cb)
         self.action_data = action
         self._joy1_value = 0
         self._joy2_value = 0
@@ -454,7 +444,7 @@ class MergedAxisFunctor(gremlin.base_profile.AbstractContainerActionFunctor):
                                 functor.process_event(event, shared_value)
 
     @QtCore.Slot()
-    def _profile_start_cb(self):
+    def profile_start(self):
         ''' profile starts - build execution callbacks by defined container '''
         
         # build event callback maps from subcontainers in this gated axis
@@ -473,7 +463,7 @@ class MergedAxisFunctor(gremlin.base_profile.AbstractContainerActionFunctor):
 
  
     @QtCore.Slot()
-    def _profile_stop_cb(self):
+    def profile_stop(self):
         ''' profile stops - cleanup '''
 
 
