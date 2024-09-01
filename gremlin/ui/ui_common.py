@@ -2868,6 +2868,13 @@ class QHelper():
 
         return sb_widget
     
+    def to_value(self, value):
+        ''' returns a [-1,+1] value converted to the range output'''
+        if self.show_percent:
+            return gremlin.util.scale_to_range(value, target_min = 0, target_max = 100)    
+        else:
+            return gremlin.util.scale_to_range(value, target_min = self.min_range, target_max = self.max_range)
+    
 
 class QDoubleClickSpinBox(QtWidgets.QSpinBox):
     ''' double click to reset spinbox '''

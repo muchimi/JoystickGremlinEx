@@ -1126,7 +1126,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
                 
         self._output_min_range_widget = QtWidgets.QSpinBox()
         self._output_min_range_widget.setRange(-16383,16383)
-        
+
         self._output_min_range_widget.valueChanged.connect(self._min_range_changed_cb)
 
         self._output_max_range_widget = QtWidgets.QSpinBox()
@@ -1511,7 +1511,8 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
             self._output_range_container_widget.setVisible(block.is_ranged)
 
             # hook block events
-            block.range_changed.connect(self._range_changed_cb)   
+            eh = SimConnectEventHandler()
+            eh.range_changed.connect(self._range_changed_cb)   
 
             # command description
             self.command_text_widget.setText(block.command)
@@ -1613,12 +1614,14 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.action_data.block.trigger_mode = SimConnectTriggerMode.TurnOff
 
 
-    def _range_changed_cb(self, event : RangeEvent):
+    @QtCore.Slot(object, object)
+    def _range_changed_cb(self, block, event : RangeEvent):
         ''' called when range information changes on the current simconnect command block '''
-        self._output_min_range_widget.setValue(event.min)
-        self._output_max_range_widget.setValue(event.max)
-        self._output_min_range_widget.setValue(event.min_custom)
-        self._output_max_range_widget.setValue(event.max_custom)
+        if block == self.action_data.block:
+            self._output_min_range_widget.setValue(event.min)
+            self._output_max_range_widget.setValue(event.max)
+            self._output_min_range_widget.setValue(event.min_custom)
+            self._output_max_range_widget.setValue(event.max_custom)
 
     @QtCore.Slot(bool)
     def _mode_ranged_cb(self, value):

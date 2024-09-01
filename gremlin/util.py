@@ -967,6 +967,9 @@ def scale_to_range(value, source_min = -1.0, source_max = 1.0, target_min = -1.0
     new_max: the new range's max
     invert: true if the value should be reversed
     '''
+    if value is None:
+        return None
+    
     r_delta = source_max - source_min
     if r_delta == 0:
         # frame the value if no valid range given

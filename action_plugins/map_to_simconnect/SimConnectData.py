@@ -5,6 +5,7 @@ from lxml import etree
 
 from PySide6 import QtWidgets, QtCore, QtGui
 
+import gremlin.base_classes
 import gremlin.base_profile
 import gremlin.config
 import gremlin.macro
@@ -757,7 +758,7 @@ class SimConnectData(QtCore.QObject):
                         min_range = get_int_attribute(child,"min",throw_on_missing=True)
                         max_range = get_int_attribute(child,"max",throw_on_missing=True)
 
-                block = SimConnectBlock(self)
+                block = SimConnectBlock()
                 block.command = simvar
                 block.command_type = simvar_type
                 block.output_data_type = data_type
@@ -847,15 +848,23 @@ class SimConnectData(QtCore.QObject):
             block = self._block_map[command]
             return block.category
         return SimConnectEventCategory.NotSet
+    
+@gremlin.singleton_decorator.SingletonDecorator
+class SimConnectEventHandler(QtCore.QObject):
+    ''' handles events related to simconnect '''
+    range_changed = QtCore.Signal(object, RangeEvent) # fires when the block range values change (block, event)
+    value_changed = QtCore.Signal(object) # fires when the block output value changes (block)
 
-class SimConnectBlock(QtCore.QObject):
+    def __init__(self):
+        super().__init__()
+
+
+
+
+class SimConnectBlock():
     ''' holds simconnect block information '''
 
-
-    range_changed = QtCore.Signal(RangeEvent) # fires when the block range values change
-    value_changed = QtCore.Signal() # fires when the block output value changes
-
-    def __init__(self, simconnect_data):
+    def __init__(self):
         ''' creates a simconnect block object
         
         the block auto-configures itself based on the command, and determines
@@ -864,8 +873,7 @@ class SimConnectBlock(QtCore.QObject):
         :param simconnect The simconnect object
         
         '''
-        super().__init__()
-        self._simconnect_data : SimConnectData = simconnect_data
+        
         self._command_type = SimConnectCommandType.NotSet
         self._description = None
         self._value_type = OutputType.NotSet
@@ -892,18 +900,44 @@ class SimConnectBlock(QtCore.QObject):
         self._units = ""
         self._is_axis = False # true if the block is axis output enabled
 
-    def __getstate__(self) -> object:
-        # use in state serialization
-        state = gremlin.shared_state.save_state(self)
-        return state
+    # def __getstate__(self) -> object:
+    #     ''' serialize '''
+
+    #     gremlin.util.debug_pickle(self, first_only=False)
+    #     state = self.__dict__.copy()
+    #     del state["range_changed"]
+    #     del state["value_changed"]
+
+
+    #     return state
+    #     # node = self.to_xml()
+    #     # xml = etree.tostring(node)
+    #     # # state = gremlin.shared_state.save_state(xml)
+    #     # return xml
     
-    def __setstate__(self, state):
-        return gremlin.shared_state.load_state(state)        
+    # def __setstate__(self, state):
+    #     ''' deserialize '''
+    #     self.__dict__.update(state)
+    #     pass
+        #self.range_changed = 
+        
+        # xml = state # gremlin.shared_state.load_state(state)       
+        # node = etree.fromstring(xml)
+        # self.from_xml(node)
+        # block = SimConnectBlock()
+        # block.from_xml(node)
+        # return block
+    
+    # def __copy__(self):
+    #     newcopy = gremlin.base_classes.empty_copy(self)
+    #     newcopy.__dict__ = self.__dict__.copy(  )
+    #     return newcopy
+
 
     @property
     def sm(self):
         ''' simconnect object '''
-        return self._simconnect_data.sm
+        return SimConnectData().sm
 
     def enable_notifications(self, force = False):
         ''' enables data notifications from this block '''
@@ -1115,7 +1149,10 @@ class SimConnectBlock(QtCore.QObject):
             event.max_custom = self._max_range_custom
             event.min = self._min_range
             event.min_custom = self._min_range_custom
-            self.range_changed.emit(event)
+
+            eh = SimConnectEventHandler()
+            eh.range_changed.emit(self, event)
+            
 
     @property
     def value(self):
@@ -1127,7 +1164,8 @@ class SimConnectBlock(QtCore.QObject):
         if number != self._value:
             self._value = number
             if self.notifications_enabled:
-                self.value_changed.emit()
+                eh = SimConnectEventHandler()
+                eh.value_changed.emit(self)
     
     @property
     def is_ranged(self):
@@ -1290,7 +1328,10 @@ class SimConnectBlock(QtCore.QObject):
         self.command = command
         self.value = gremlin.util.safe_read(node,"value", float, 0)
         mode = gremlin.util.safe_read(node,"mode", str, "none")
-        self.output_mode = SimConnectActionMode.to_enum(mode)
+        output_mode = SimConnectActionMode.to_enum(mode)
+        if output_mode is None:
+            output_mode = SimConnectActionMode.NotSet
+        self.output_mode = output_mode
         
         # trigger mode for singleton vars
         trigger_mode = gremlin.util.safe_read(node,"trigger", str, "none")
