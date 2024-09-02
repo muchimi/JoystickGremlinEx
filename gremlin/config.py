@@ -49,7 +49,11 @@ class Configuration:
 
         
         gettrace = getattr(sys, 'gettrace', None)
-        self._is_debug = gettrace is not None
+        frozen = getattr(sys, 'frozen', False)
+        if frozen:
+            self._is_debug = False
+        else:
+            self._is_debug = gettrace is not None
 
         
         self._last_reload = None
@@ -409,6 +413,7 @@ class Configuration:
             # normalize and remove duplicates
             current = list(set([os.path.normpath(item.casefold()) for item in current]))
             current = current[0:8] # remember up to 9
+
             
             self._data["recent_profiles"] = current
         self.save()
@@ -1093,3 +1098,4 @@ class Configuration:
         self._data["sync_last_selection"] = value 
         self.save()
         
+

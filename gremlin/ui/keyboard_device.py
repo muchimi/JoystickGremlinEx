@@ -29,7 +29,6 @@ import gremlin.config
 from gremlin.input_types import InputType
 import gremlin.keyboard
 import gremlin.shared_state
-#from gremlin.common import DeviceType
 from . import input_item, ui_common 
 from gremlin.keyboard import Key
 from .device_tab import InputItemConfiguration

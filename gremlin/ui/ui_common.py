@@ -209,7 +209,149 @@ class NoKeyboardPushButton(QtWidgets.QPushButton):
         pass
 
 
-class DynamicDoubleSpinBox(QtWidgets.QDoubleSpinBox):
+class QFloatLineEdit(QtWidgets.QLineEdit):
+    ''' double input validator with optional range limits for input axis 
+    
+        this line edit behaves like a spin box so it's interchangeable
+    
+    '''
+
+    valueChanged = QtCore.Signal(float) # fires when the value changes
+
+    def __init__(self, data = None, min_range = -1.0, max_range = 1.0, decimals = 3, step = 0.01, parent = None):
+        super().__init__(parent)
+        self._min_range = min_range
+        self._max_range = max_range
+        self._step = step
+        self._decimals = decimals
+
+        self._validator = QtGui.QDoubleValidator(bottom=min_range, top=max_range)
+        self._validator.setLocale(self.locale()) # handle correct floating point separator
+        self._validator.setNotation(QtGui.QDoubleValidator.Notation.StandardNotation)
+        self.setValidator(self._validator)
+        self.textChanged.connect(self._validate)
+        self.installEventFilter(self)
+        self.setText("0")
+        self.setValue(0.0)
+        self._data = data
+
+    @property
+    def data(self):
+        return self._data
+    @data.setter
+    def data(self, value):
+        self.data = value        
+
+    def eventFilter(self, widget, event):
+        t = event.type()
+        if t == QtCore.QEvent.Type.Wheel:
+            # handle wheel up/down change 
+            v = self.value()
+            if v is not None:
+                if event.angleDelta().y() > 0:
+                    # up
+                    v += self._step
+                else:
+                    # down
+                    v -= self._step
+                v = gremlin.util.clamp(v, self._min_range, self._max_range)
+                self.setValue(v)
+                self.valueChanged.emit(v)
+        elif t == QtCore.QEvent.Type.FocusAboutToChange:
+            if not self.hasAcceptableInput():
+                return True # skip the event
+        elif t == QtCore.QEvent.Type.FocusOut:
+            if not self.hasAcceptableInput():
+                return True # skip the event
+            # format the input to the correct decimals
+            self.setValue(self.value())
+        return False
+
+        
+    def _update_value(self, value):
+        other = self.value()
+        if value is None or other is None:
+            return
+        s_value = f"{value:0.{self._decimals}f}"
+        if s_value != self.text():
+            self.setText(s_value)
+        if other != value:        
+            self.valueChanged.emit(value)
+
+
+        
+    @QtCore.Slot()
+    def _validate(self):
+        ''' called whenever the text changes '''
+        if self.hasAcceptableInput():
+            self.valueChanged.emit(self.value())
+
+    def setValue(self, value : float):
+        ''' sets the value '''
+        self._update_value(value)
+
+    def value(self) -> float:
+        ''' current value, None if not a valid input'''
+        if self.hasAcceptableInput():
+            return float(self.text())
+        return None
+    
+    def isValid(self):
+        ''' true if the input in the box is currently valid'''
+        return self.hasAcceptableInput()
+    
+    def step(self):
+        ''' mouse wheel step value'''
+        return self._step
+    
+    def setStep(self, step):
+        self._step = step
+
+    def setSingleStep(self, step):
+        self._step = step
+
+    def decimals(self):
+        return self._decimals
+    
+    def setDecimals(self, decimals):
+        if decimals < 0:
+            decimals = 0
+        if self._decimals != decimals:
+            self._decimals = decimals
+            v = self.value()
+            if v is not None:
+                # correct to the new number of decimals
+                self.setValue(v)
+
+    def setRange(self, bottom, top):
+        if top < bottom:
+            bottom, top = top, bottom
+        self._min_range = bottom
+        self._max_range = top
+        self._validator.setBottom(bottom)
+        self._validator.setTop(top)
+        self._update_value(self.value())
+
+    def setMaximum(self, top):
+        self._max_range = top
+        self._validator.setTop(top)
+        self._update_value(self.value())
+
+    def setMinimum(self, bottom):
+        self._min_range = bottom
+        self._validator.setBottom(top)
+        self._update_value(self.value())
+        
+
+
+class DynamicDoubleSpinBox(QFloatLineEdit):
+    pass
+
+    @property
+    def decimal_point(self):
+        return self.locale().decimalPoint
+
+class DynamicDoubleSpinBox_legacy(QtWidgets.QDoubleSpinBox):
 
     """Implements a double spin box which dynamically overwrites entries."""
 
@@ -268,7 +410,11 @@ class DynamicDoubleSpinBox(QtWidgets.QDoubleSpinBox):
             # a float so we can truncate the decimal places as required
             
             format_string = f"{{:.{self.decimals():d}f}}"
-            value_string = format_string.format(float(value_string))
+    
+            try:        
+                value_string = format_string.format(float(value_string))
+            except:
+                return False
 
             # Use decimal place separator dictated by the locale settings
             text = value_string.replace(".", DynamicDoubleSpinBox.decimal_point)
@@ -536,7 +682,9 @@ class VJoySelector(AbstractInputSelector):
                 self.device_list.append(dev)
 
     def _format_device_name(self, device):
-        return f"vJoy Device {device.vjoy_id:d}"
+        return device.name
+        #return f"{device.name} ({device.vjoy_id:d})"
+        #return f"vJoy Device {device.vjoy_id:d}"
 
     def _device_identifier(self, device):
         return device.vjoy_id
@@ -1011,6 +1159,10 @@ class InputListenerWidget(QtWidgets.QFrame):
                 InputType.JoystickHat in self._event_types:
             event_listener.joystick_event.connect(self._joy_event_cb)
         elif InputType.Mouse in self._event_types:
+            if not event_listener.mouseEnabled():
+                # hook mouse
+                event_listener.enableMouse()
+
             gremlin.windows_event_hook.MouseHook().start()
             event_listener.mouse_event.connect(self._mouse_event_cb)
 
@@ -2444,6 +2596,7 @@ QMarkerDoubleRangeSlider::add-page:horizontal { background: #979EA8; border-styl
         # setup a single default marker
         self._update_pixmaps()
         self._update_targets()
+        self.setMarkerValue(0)
 
         #self.setStyleSheet(self.css)
 
@@ -3308,3 +3461,7 @@ class QBubble(QtWidgets.QLabel):
         painter.drawRoundedRect(
             0, 0, self.width() - 1, self.height() - 1, 5, 5)
         super(QBubble, self).paintEvent(event)
+
+
+
+    

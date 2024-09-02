@@ -471,7 +471,7 @@ class AxisButton(VirtualButton):
         :param event the input event that is used to decide on the state
         :return True if a state transition occurred, False otherwise
         """
-        from gremlin.common import AxisButtonDirection
+        from gremlin.types import AxisButtonDirection
         self.forced_activation = False
         direction = AxisButtonDirection.Anywhere
         if self._last_value is None:
@@ -503,7 +503,7 @@ class AxisButton(VirtualButton):
 
         # Terminate early if the travel direction is incompatible with the
         # one required by this instance
-        from gremlin.common import AxisButtonDirection
+        from gremlin.types import AxisButtonDirection
         if direction != AxisButtonDirection.Anywhere and \
                 self._direction != AxisButtonDirection.Anywhere:
             # Ensure we can only press a button by moving in the desired

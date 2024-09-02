@@ -1654,23 +1654,16 @@ class AbstractActionWidget(QtWidgets.QFrame):
 
         :return InputType corresponding to this action
         """
-        return self.action_data.parent.parent.input_type
-        # if input_type == InputType.Midi:
-        #     # change input type based on midi mode so action configures itself correctly for the type of input that will be sent
-        #     input_item = self.action_data.parent.parent.input_id
-        #     if input_item.mode == gremlin.ui.midi_device.MidiInputItem.InputMode.Axis:
-        #         return InputType.JoystickAxis
-        # return input_type
+        return self.action_data.hardware_input_type 
 
     def _get_profile_root(self):
         """Returns the root of the entire profile.
 
         :return root Profile instance
         """
-        root = self.action_data
-        while not isinstance(root, gremlin.base_profile.Profile):
-            root = root.parent
-        return root
+
+        return gremlin.shared_state.current_profile        
+        
     
     @property
     def is_running(self):

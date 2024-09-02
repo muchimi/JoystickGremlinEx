@@ -24,6 +24,7 @@ import time
 from PySide6 import QtCore, QtGui, QtWidgets
 
 import gremlin.base_profile
+import gremlin.event_handler
 from gremlin.input_types import InputType
 import gremlin.keyboard
 import gremlin.macro
@@ -1617,6 +1618,10 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
         """Starts the recording of key presses."""
         if self.button_record.isChecked():
             # Enable mouse event hooking
+            event_listener = gremlin.event_handler.EventListener()
+            if not event_listener.mouseEnabled():
+                # hook mouse
+                event_listener.enableMouse()
             gremlin.windows_event_hook.MouseHook().start()
 
             # Record keystrokes

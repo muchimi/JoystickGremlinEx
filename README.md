@@ -143,6 +143,8 @@ Joystick Gremlin EX
 13.40.14ex (as of pre-release m7)
 
 This release adds major new features, including some minor changes in UI functionality, and a few more QOL (quality of life) enhancements.
+
+- **VJoy device name enhancement** VJoy devices are now displayed including the axis/button/hat count in the name to make them easier to distinguish.  This works because VJoy requires each defined virtual joystick to be different either in the number of axes, buttons or hats defined so they are unique.
 - **New Merge Axis action** The merge axis action is similar to the merge-axis profile feature (from the menu) option except that it can be attached to any joystick axis input (any device will do) in a profile as a regular action.  The merge action, as with the gated axis action, allows the action itself to define sub-containers and sub-actions by clicking on the configuration button.  The output of the merged axis action will be sent to these sub-actions for processing, which can include response curve and any other action applicable to axis input data.  Note: output from this action is not going to be sent to other actions defined alongside it, only the sub-containers the action defines itself.
 - **New device reorder** It is now possible to re-order the hardware device tabs.  The order is persisted from one session to the next.  Right click on the tab to sort the input back to default.  This is only a visual feature - the hardware order of the devices cannot be changed as it's determined by the operating system.    
 - **New device substitution** It is now possible to replace one or more device hardware IDs with another so long as the id is not duplicated.  This is a requested feature if your hardware IDs change frequently (a rare condition). This is a QOL feature to do an edit to the profile that had to be done in the XML directly until now.  The dialog shows the profile devices in the top drop down, and the detected hardware devices with the new IDs in the bottom.  The old profile is backed up for you just in case and the updated profile is reloaded for you if a replace occurred.
@@ -176,6 +178,7 @@ This release adds major new features, including some minor changes in UI functio
 - Play sound action now has a play button to test play the sound file while in edit mode.
 - Curve editor now remembers the symmetry setting.
 - Curve editor now displays current input if input visualization is enabled.
+- New clear map tool - removes all mappings from the selected device and mode
 
 6/6/24 - 13.40.13ex (h) **potentially breaking change**
 

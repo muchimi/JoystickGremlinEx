@@ -24,6 +24,7 @@ from threading import Thread, Timer
 
 
 
+import gremlin.joystick_handling
 import gremlin.threading
 
 from PySide6 import QtCore, QtWidgets
@@ -73,7 +74,8 @@ class Event:
 			force_remote = False,
 			action_id = None,
 			data = None,
-			is_axis = False # true if the input should be considered an axis (variable) input
+			is_axis = False, # true if the input should be considered an axis (variable) input
+			is_virtual = False, # true if the input is a virtual input (vjoy)
 	):
 		"""Creates a new Event object.
 
@@ -99,6 +101,7 @@ class Event:
 		self.data = data # extra data passed along with the event
 		self.is_axis = is_axis
 		self.virtual_code = virtual_code # vk if a keyboard event (the identifier will be the key_id (scancode, extended))
+		self.is_virtual = is_virtual # true if the item is a vjoy device input
 
 	def clone(self):
 		"""Returns a clone of the event.
@@ -247,6 +250,8 @@ class EventListener(QtCore.QObject):
 	# functor enable flag changed
 	action_created = QtCore.Signal(object) # runs when an action is created
 
+
+
 	def __init__(self):
 		"""Creates a new instance."""
 		QtCore.QObject.__init__(self)
@@ -279,6 +284,21 @@ class EventListener(QtCore.QObject):
 		self.keyboard_hook.start()
 
 		Thread(target=self._run).start()
+
+	def mouseEnabled(self):
+		''' returns mouse hook status '''
+		return self.mouse_hook is not None
+	
+	def enableMouse(self):
+		if self.mouse_hook is None:
+			self.mouse_hook = windows_event_hook.MouseHook()
+			self.mouse_hook.register(self._mouse_handler)
+
+	def disableMouse(self):
+		if self.mouse_hook is not None:
+			self.mouse_hook.stop()
+			self.mouse_hook = None
+
 
 
 
@@ -363,14 +383,14 @@ class EventListener(QtCore.QObject):
 
 	def start(self):
 		''' starts the non regular listener '''
-		if self.mouse_hook:
+		if self.mouse_hook is not None:
 			self.mouse_hook.start()
 		self._key_listener_stop_requested = False
 		self.start_key_listener()
 
 
 	def stop(self):
-		if self.mouse_hook:
+		if self.mouse_hook is not None:
 			self.mouse_hook.stop()
 		self.stop_key_listener()
 
@@ -421,30 +441,40 @@ class EventListener(QtCore.QObject):
 		verbose = config.Configuration().verbose_mode_joystick
 		
 		event = dinput.InputEvent(data)
+		
+		#breakpoint()
+		device = gremlin.joystick_handling.device_info_from_guid(event.device_guid)
+		
+		is_virtual = device.is_virtual if device is not None else False
 		if event.input_type == dinput.InputType.Axis:
 			if verbose:
 				logging.getLogger("system").info(event)
+			
+			
 			self.joystick_event.emit(Event(
 				event_type= InputType.JoystickAxis,
 				device_guid=event.device_guid,
 				identifier=event.input_index,
 				value=self._apply_calibration(event),
 				raw_value=event.value,
-				is_axis = True
+				is_axis = True,
+				is_virtual = is_virtual
 			))
 		elif event.input_type == dinput.InputType.Button:
 			self.joystick_event.emit(Event(
 				event_type= InputType.JoystickButton,
 				device_guid=event.device_guid,
 				identifier=event.input_index,
-				is_pressed=event.value == 1
+				is_pressed=event.value == 1,
+				is_virtual = is_virtual
 			))
 		elif event.input_type == dinput.InputType.Hat:
 			self.joystick_event.emit(Event(
 				event_type= InputType.JoystickHat,
 				device_guid=event.device_guid,
 				identifier=event.input_index,
-				value = dill_hat_lookup[event.value]
+				value = dill_hat_lookup[event.value],
+				is_virtual = is_virtual
 			))
 
 	def _joystick_device_handler(self, data, action):
@@ -566,6 +596,8 @@ class EventListener(QtCore.QObject):
 			key_id = (event.button_id.value + 0x1000, False)
 			self._keyboard_state[key_id] = event.is_pressed
 
+			if event.is_pressed:
+				print(f"mouse pressed {event.button_id}")
 
 			self.mouse_event.emit(Event(
 				event_type= InputType.Mouse,

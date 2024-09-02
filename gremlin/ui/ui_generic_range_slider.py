@@ -1,6 +1,6 @@
 from typing import List, Optional, Sequence, Tuple, TypeVar, Union
 
-from qtpy import QtGui
+from qtpy import QtGui, QtCore
 from qtpy.QtCore import Property, QEvent, QPoint, QPointF, QRect, QRectF, Qt, Signal
 from qtpy.QtWidgets import QSlider, QStyle, QStyleOptionSlider, QStylePainter
 
@@ -62,8 +62,37 @@ class _GenericRangeSlider(_GenericSlider):
         self._should_draw_bar = True
 
         # color
-
         self.setStyleSheet("")
+
+        self._readonly = False
+
+        # filter
+        self.installEventFilter(self)
+
+
+    # mouse handling 
+    def setReadOnly(self, readonly):
+        self._readonly = readonly
+    
+    def readOnly(self):
+        return self._readonly
+    
+    def eventFilter(self, object, event):
+        
+        if self._readonly:
+            # kill mouse and keyboard events if the control is readonly
+            t = event.type()
+            if t in (QtCore.QEvent.Type.MouseButtonPress,
+                        QtCore.QEvent.Type.MouseButtonPress, 
+                        QtCore.QEvent.Type.MouseButtonRelease,
+                        QtCore.QEvent.Type.MouseButtonDblClick, 
+                        QtCore.QEvent.Type.MouseMove,
+                        QtCore.QEvent.Type.KeyPress,
+                        QtCore.QEvent.Type.KeyRelease):
+                return True
+
+        return False
+
 
     # ###############  New Public API  #######################
 

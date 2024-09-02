@@ -23,6 +23,7 @@ from PySide6 import QtCore, QtGui, QtWidgets
 import dinput
 
 import gremlin
+import gremlin.shared_state
 from . import ui_common
 from gremlin.input_types import InputType
 from gremlin.types import VisualizationType
@@ -48,13 +49,31 @@ class VisualizationSelector(QtWidgets.QWidget):
         super().__init__(parent)
 
         devices = gremlin.joystick_handling.joystick_devices()
+        
+        # get the order of the devices as set by the user for the physical devices
+        tab_map = gremlin.shared_state.ui._get_tab_map()
+        tab_ids = [device_id for device_id, _, _, _ in tab_map.values()]
+        d_list = []
+        max_index = len(devices)
+        for dev in devices:
+            if dev.device_id in tab_ids:
+                index = tab_ids.index(dev.device_id)
+                d_list.append((index, dev))
+            else:
+                # add to the end (vjoy devices)
+                d_list.append((max_index, dev))
+
+
+        d_list.sort(key=lambda x: (x[0], x[1].vjoy_id, x[1].name))
+        devices = [dev for _, dev in d_list]
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
-        for dev in sorted(devices, key=lambda x: (x.name, x.vjoy_id)):
-            if dev.is_virtual:
-                box = QtWidgets.QGroupBox(f"{dev.name} #{dev.vjoy_id:d}")
-            else:
-                box = QtWidgets.QGroupBox(dev.name)
+        for dev in devices: # sorted(devices, key=lambda x: (x.name, x.vjoy_id)):
+            # if dev.is_virtual:
+            #     #box = QtWidgets.QGroupBox(f"{dev.name} #{dev.vjoy_id:d}")
+            # else:
+            
+            box = QtWidgets.QGroupBox(dev.name)
 
             at_cb = QtWidgets.QCheckBox("Axes - Temporal")
             at_cb.clicked.connect(

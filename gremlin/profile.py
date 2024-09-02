@@ -945,7 +945,7 @@ class ProfileModifier:
                             [input_id].containers.append(container)
 
                     # Remove all containers from the source device
-                    input_item.containers = []
+                    input_item.containers.clear()
 
         # Remove the device entry completely
         del self.profile.devices[source_guid]

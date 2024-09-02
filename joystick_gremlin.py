@@ -103,7 +103,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.14ex (m14)"
+APPLICATION_VERSION = "13.40.14ex (m15)"
 
 # the main ui
 ui = None
@@ -311,9 +311,13 @@ class GremlinUi(QtWidgets.QMainWindow):
         self._actionTabSort.setToolTip("Sorts input hardware devices in alphabetical order")
         self._actionTabSubstitute = QtGui.QAction("Device Substitution...", self, triggered = self._tab_substitute_cb)
         self._actionTabSubstitute.setToolTip("Substitute device GUIDs")
+        self._actionTabClearMap = QtGui.QAction("Clear Mappings", self, triggered = self._tab_clear_map_cb)
+        self._actionTabClearMap.setToolTip("Clears all mappings from the current device")
         menuTools.addSeparator()
         menuTools.addAction(self._actionTabSort)
         menuTools.addAction(self._actionTabSubstitute)
+        menuTools.addAction(self._actionTabClearMap)
+
 
 
     def _tab_context_menu_cb(self, pos):
@@ -333,11 +337,33 @@ class GremlinUi(QtWidgets.QMainWindow):
         menu = QtWidgets.QMenu(self)
         menu.addAction(self._actionTabSort)
         menu.addAction(self._actionTabSubstitute)
+        menu.addAction(self._actionTabClearMap)
         menu.exec_(QtGui.QCursor.pos())
 
     def _tab_sort_cb(self):
         ''' sorts the tabs '''
         self._sort_tabs()
+
+
+    def _tab_clear_map_cb(self):
+        ''' clears the mappings from the current tab ''' 
+        tab_guid = gremlin.util.parse_guid(gremlin.shared_state.ui._active_tab_guid())
+        device : gremlin.base_profile.Device = gremlin.shared_state.current_profile.devices[tab_guid]
+        current_mode = gremlin.shared_state.current_mode
+        msgbox = gremlin.ui.ui_common.ConfirmBox(f"Remove all mappings from {device.name}, mode [{current_mode}]?")
+        result = msgbox.show()
+        if result == QtWidgets.QMessageBox.StandardButton.Ok:
+            self._tab_clear_map_execute(device, current_mode)
+
+    def _tab_clear_map_execute(self, device, mode_name):
+        ''' removes all mappings from the given device in the active mode '''
+        
+        mode = device.modes[mode_name]
+        for input_type in mode.config.keys():
+            for entry in mode.config[input_type].values():
+                entry.containers.clear()
+        self._create_tabs()
+        
 
 
     def _tab_substitute_cb(self, pos):
@@ -675,8 +701,8 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         container_plugins = gremlin.plugin_manager.ContainerPlugins()
         action_plugins = gremlin.plugin_manager.ActionPlugins()
-
-        mode = device_profile.modes[gremlin.shared_state.current_mode]
+        current_mode = gremlin.shared_state.current_mode
+        # mode = device_profile.modes[current_mode]
         input_types = [
             InputType.JoystickAxis,
             InputType.JoystickButton,
@@ -688,21 +714,40 @@ class GremlinUi(QtWidgets.QMainWindow):
             InputType.JoystickHat: "hat",
         }
         main_profile = device_profile.parent
+        tab_guid = gremlin.util.parse_guid(gremlin.shared_state.ui._active_tab_guid())
+        device : gremlin.base_profile.Device = main_profile.devices[tab_guid]
+        if device.type != DeviceType.Joystick:
+            ''' selected tab is not a joystick - pick the first joystick tab as ordered by the user '''
+            tab_map = gremlin.shared_state.ui._get_tab_map()
+            tab_ids = [device_id for device_id, _, tab_type, _ in tab_map.values() if tab_type == TabDeviceType.Joystick]
+            if not tab_ids:
+                syslog.warning("No joystick available to map to")
+                mb = gremlin.ui.ui_common.MessageBox("Unable to create mapping, no suitable input hardware found.")
+                mb.exec()
+                return
+            
+            tab_guid = gremlin.util.parse_guid(tab_ids[0])
+            device = main_profile.devices[tab_guid]
+
+        mode = device.modes[current_mode]
+        item_list = main_profile.list_unused_vjoy_inputs()
         for input_type in input_types:
             for entry in mode.config[input_type].values():
-                item_list = main_profile.list_unused_vjoy_inputs()
+                input_list  = item_list[1][type_name[input_type]]
+                if len(input_list) > 0:
+                    vjoy_input_id = input_list.pop(0)
+                    
 
-                container = container_plugins.repository["basic"](entry)
-                action = action_plugins.repository["remap"](container)
-                action.input_type = input_type
-                action.vjoy_device_id = 1
-                if len(item_list[1][type_name[input_type]]) > 0:
-                    action.vjoy_input_id = item_list[1][type_name[input_type]][0]
-                else:
-                    action.vjoy_input_id = 1
+                    container = container_plugins.repository["basic"](entry)
+                    action = action_plugins.repository["remap"](container)
+                    action.input_type = input_type
+                    action.vjoy_input_id = vjoy_input_id
+                    action.vjoy_device_id = 1 # first vjoy
+                
 
-                container.add_action(action)
-                entry.containers.append(container)
+                    container.add_action(action)
+                    entry.containers.append(container)
+
         self._create_tabs()
 
     def input_repeater(self):
@@ -767,7 +812,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         eh = gremlin.event_handler.EventHandler()
         eh.reset()
         
-        self.profile = gremlin.base_profile.Profile()
+        new_profile =  gremlin.base_profile.Profile()
+        self.profile = new_profile
 
         # default active mode
         gremlin.shared_state.runtime_mode = "Default"
@@ -788,7 +834,10 @@ class GremlinUi(QtWidgets.QMainWindow):
         # Create device tabs
         self._create_tabs()
 
-
+        # reset modes
+        current_mode = gremlin.shared_state.current_mode
+        self.mode_selector.populate_selector(new_profile, current_mode, emit = False)
+        
         # Create a default mode
         for device in self.profile.devices.values():
             device.ensure_mode_exists("Default")
@@ -1205,11 +1254,14 @@ class GremlinUi(QtWidgets.QMainWindow):
         :returns:  list of (device_guid, device_name, tabdevice_type, tab_index)
         '''
         tab_count = self.ui.devices.count()
+        current_profile = gremlin.shared_state.current_profile
         data = {}
         for index in range(tab_count):
             widget = self.ui.devices.widget(index)
             if hasattr(widget,"data"):
                 tab_type, device_guid = widget.data
+                # device_guid = gremlin.util.parse_guid(device_guid)
+                # device = current_profile.devices[device_guid]
                 device_name = self.ui.devices.tabText(index)
                 data[index] = (device_guid, device_name, tab_type, index)
 
@@ -1217,6 +1269,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         # for index, (device_guid, device_name, tab_type, tab_index) in data.items():
         #     print (f"[{index}] [{tab_index}] {device_name}")
         return data
+    
+
 
     def _find_tab_data(self, search_widget_type : TabDeviceType):
         ''' gets tab data based on widget type'''
@@ -1286,8 +1340,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                     self.config.last_tab_guid = self._get_tab_guid(index)
                     # print (f"select tab index : {self.config.last_tab_guid}")
       
-      
-                
+
         
     def _select_last_tab(self):
         ''' restore the last selected tab '''
@@ -1314,6 +1367,11 @@ class GremlinUi(QtWidgets.QMainWindow):
                 # print (f"Found tab index {tab_index} for guid {search_guid} {device_name}")
                 return tab_index
         return None
+    
+    def _active_tab_guid(self):
+        ''' gets the GUID of the device for the active tab '''
+        return self._get_tab_guid(self.ui.devices.currentIndex())
+                
     
     def _get_tab_guid(self, index : int):
         ''' gets the tab GUID from its index '''

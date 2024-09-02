@@ -112,6 +112,10 @@ class InputListenerModel(QtCore.QObject):
                 InputType.JoystickHat in self._event_types:
             event_listener.joystick_event.connect(self._joy_event_cb)
         elif InputType.Mouse in self._event_types:
+            event_listener = gremlin.event_handler.EventListener()
+            if not event_listener.mouseEnabled():
+                # hook mouse
+                event_listener.enableMouse()
             windows_event_hook.MouseHook().start()
             event_listener.mouse_event.connect(self._mouse_event_cb)
 

@@ -352,7 +352,6 @@ class InputEvent:
         else:
             self.device_guid = GUID.InvalidGuid()
             self.input_type = InputType.Button
-            
             self.input_index = 0
             self.value = 0
 
@@ -397,6 +396,7 @@ class DeviceSummary:
             The data received from DILL and to be held by this instance
         """
         self.device_guid = GUID(data.device_guid)
+        self.device_id = str(self.device_guid)
         self.vendor_id = data.vendor_id
         self.product_id = data.product_id
         self.joystick_id = data.joystick_id
@@ -408,11 +408,7 @@ class DeviceSummary:
         for i in range(8):
             self.axis_map.append(AxisMap(data.axis_map[i]))
         self.vjoy_id = -1
-        if self.vendor_id == 0x1234:
-            # add a marker with axis/buttons/hat to distinguish them
-            self.name += f" {self.axis_count}/{self.button_count}/{self.hat_count}"
-        pass
-
+        
     @property
     def is_virtual(self):
         """Returns if a device is virtual.
@@ -438,6 +434,7 @@ class DeviceSummary:
         """
         assert self.is_virtual is True
         self.vjoy_id = vjoy_id
+        self.name = f"VJoy {self.axis_count}/{self.button_count}/{self.hat_count} ({vjoy_id:d})"
 
 
 C_EVENT_CALLBACK = ctypes.CFUNCTYPE(None, _JoystickInputData)

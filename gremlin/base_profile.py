@@ -560,8 +560,7 @@ class Device:
         :param mode_name the name of the mode being checked
         :param device a device to initialize for this mode if specified
         """
-        if not mode_name: 
-            pass
+  
         if mode_name in self.modes:
             mode = self.modes[mode_name]
         else:
@@ -1617,6 +1616,23 @@ class Profile():
         return list(set(modes))  # unduplicated
         
 
+    def list_actions(self):
+        ''' lists all actions in the current profile '''
+        # Create a list of all used remap actions
+        remap_actions = []
+        for dev_guid in self.devices.keys():
+            dev = self.devices[dev_guid]
+            for mode_name in dev.modes.keys():
+                mode = dev.modes[mode_name]
+                for input_type in mode.config.keys():
+                    for item in mode.config[input_type].values():
+                        for container in item.containers:
+                            remap_actions.extend(
+                                extract_remap_actions(container.action_sets)
+                            )
+
+        return remap_actions
+
     def list_unused_vjoy_inputs(self):
         """Returns a list of unused vjoy inputs for the given profile.
 
@@ -1646,15 +1662,7 @@ class Profile():
         ]
 
         # Create a list of all used remap actions
-        remap_actions = []
-        for dev in self.devices.values():
-            for mode in dev.modes.values():
-                for input_type in all_input_types:
-                    for item in mode.config[input_type].values():
-                        for container in item.containers:
-                            remap_actions.extend(
-                                extract_remap_actions(container.action_sets)
-                            )
+        remap_actions = self.list_actions()
 
         # Remove all remap actions from the list of available inputs
         for act in remap_actions:
