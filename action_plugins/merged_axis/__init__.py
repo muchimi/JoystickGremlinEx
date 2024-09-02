@@ -118,7 +118,7 @@ class MergeAxisEntryWidget(QtWidgets.QDockWidget):
         self.operation_selector.addItem("Maximum", gremlin.types.MergeAxisOperation.Maximum)
         self.operation_selector.addItem("Sum",gremlin.types.MergeAxisOperation.Sum)
         self.operation_selector.currentIndexChanged.connect(
-            lambda x: self.change_cb()
+            lambda x: self._change_cb()
         )
 
         self.operation_container_widget = QtWidgets.QWidget()
