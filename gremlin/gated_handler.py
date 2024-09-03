@@ -822,6 +822,9 @@ class GateData():
         self.default_min_gate = min_gate
         self.default_max_gate = max_gate
 
+        self.registerGate(self.default_min_gate)
+        self.registerGate(self.default_max_gate)
+
         # non default gates - all maps have at least two gates defined
         g1 = GateInfo(value = -1.0, profile_mode = self.profile_mode, item_data = self._new_item_data(), parent=self, slider_index = 0)
         g2 = GateInfo(value = 1.0, profile_mode = self.profile_mode, item_data = self._new_item_data(), parent=self, slider_index = 1)
@@ -1206,21 +1209,21 @@ class GateData():
     
     def registerGate(self, gate):
         ''' registers a gate'''
-        # if self.findGate(gate.value):
-        #     syslog.error(f"Adding gate failed: {gate.value:0.{_decimals}f} already in the gate list - only one gate with a set value can be added")
-        #     return
-        if gate.id in self._gate_item_map.keys():
-             syslog.warning(f"Adding gate: {gate.id} is already registered")
-             return
-             
-
+        is_replace = gate.id in self._gate_item_map.keys()
         self._gate_item_map[gate.id] = gate
-        verbose = gremlin.config.Configuration().verbose
-        if verbose:
-            syslog.info(f"Adding gate: [{gate.value:0.{_decimals}f}] {gate.id}  default: {gate.is_default}")
+
+        if not is_replace:
+            verbose = gremlin.config.Configuration().verbose
+            if verbose:
+                syslog.info(f"Adding gate: [{gate.value:0.{_decimals}f}] {gate.id}  default: {gate.is_default}")
 
         self._update_gate_index() # update index on gate change
         self._update_ranges() # update range on gate change
+
+    def isGateRegistered(self, gate):
+        ''' true if a gate is registered'''
+        return gate.id in self._gate_item_map.keys()
+        
     
     def getGates(self, include_default = True):
         ''' gets all used gates '''
@@ -1911,7 +1914,7 @@ class GateData():
                 child.set("min_id", rng.g1.id)
                 child.set("max_id", rng.g2.id)
 
-            for condition, item_data in rng.item_data_map.items():                
+            for condition, item_data in rng.item_data_map.items():
                 if item_data.containers:
                     item_node = item_data.to_xml()
                     if item_node is not None:
@@ -1941,6 +1944,9 @@ class GateData():
     
         self.use_default_range = safe_read(node, "use_default_range", bool, True)
 
+        assert self.isGateRegistered(self.default_min_gate)
+        assert self.isGateRegistered(self.default_max_gate)
+
         if "show_percent" in node.attrib:
             show_percent = safe_read(node,"show_percent", bool, False)
             if show_percent:
@@ -1964,9 +1970,8 @@ class GateData():
         self._gate_item_map.clear()
         self._range_item_map.clear()
 
-
         for child in node_gates:
-            gate_id = safe_read(child, "id", str, get_guid())
+            gate_id = safe_read(child, "id", str,"")
             gate_default = safe_read(child, "default", bool, False)
             gate_value = safe_read(child, "value", float, 0.0)
             gate_condition = safe_read(child, "condition", str, "")
@@ -1983,6 +1988,8 @@ class GateData():
                             is_default = gate_default,
                             delay = gate_delay,
                             parent = self)
+            
+
             
             item_nodes = gremlin.util.get_xml_child(child, "action_containers", multiple=True)
             for item_node in item_nodes:
@@ -2009,7 +2016,9 @@ class GateData():
         self._range_item_map.clear()
         node_ranged = gremlin.util.get_xml_child(node, "range", multiple=True)
         for child in node_ranged:
-            range_id = safe_read(child, "id", str, get_guid())
+            range_id = safe_read(child, "id", str, "")
+            if not range_id:
+                range_id = get_guid()
             range_default = safe_read(child, "default", bool, False)
             if range_default:
                 min_gate = self.default_min_gate
@@ -2024,6 +2033,10 @@ class GateData():
                 # continue (bad data)
                 continue
 
+            if not self.isGateRegistered(min_gate):
+                self.registerGate(min_gate)
+            if not self.isGateRegistered(max_gate):
+                self.registerGate(max_gate)
 
             range_condition = safe_read(child, "condition", str, "")
             if not range_condition in _gate_condition_to_enum.keys():
@@ -2060,7 +2073,7 @@ class GateData():
                         condition_str = item_node.get("condition")
                         condition = GateCondition.to_enum(condition_str)
                     item_data = self._new_item_data()
-                    item_data.from_xml(item_node)            
+                    item_data.from_xml(item_node)
                     range_info.item_data_map[condition] = item_data
                 
             
@@ -2717,7 +2730,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
             dialog = ActionContainerUi(gate_data = self.gate_data, info_object = gate, action_data = self.action_data)
             dialog.delete_requested.connect(self._delete_gate_cb)
             dialog.exec()
-            self._update_gates_ui()            
+            self._update_gates_ui()
         
 
     QtCore.Slot()
