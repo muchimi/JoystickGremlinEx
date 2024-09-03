@@ -129,11 +129,13 @@ class InputItemConfiguration(QtWidgets.QFrame):
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
         action_item = plugin_manager.duplicate(action)
         container = container_plugins.basic.BasicContainer(self.item_data)
+        # remap inputs
+        action_item.update_inputs(self.item_data)
         container.add_action(action_item)
         
         if len(container.action_sets) > 0:
             self.action_model.add_container(container)
-        self.action_model.data_changed.emit()        
+        self.action_model.data_changed.emit()
 
     def _add_container(self, container_name):
         """Adds a new container to the input item.
@@ -160,7 +162,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
             container_item.action_model = self.action_model
         self.action_model.add_container(container_item)
         plugin_manager.set_container_data(self.item_data, container_item)
-        return container_item    
+        return container_item
 
     def _remove_container(self, container):
         """Removes an existing container from the InputItem.
@@ -498,8 +500,8 @@ class JoystickDeviceTabWidget(QDataWidget):
             right_panel.widget().hide()
             right_panel.widget().deleteLater()
         if right_panel:
-            self.main_layout.removeItem(right_panel)        
-        widget = InputItemConfiguration()     
+            self.main_layout.removeItem(right_panel)
+        widget = InputItemConfiguration()
         self.main_layout.addWidget(widget,3)
 
 
@@ -533,7 +535,7 @@ class JoystickDeviceTabWidget(QDataWidget):
         self.input_item_list_view.redraw()
 
     def _custom_widget_handler(self, list_view : input_item.InputItemListView, index : int, identifier : input_item.InputIdentifier, data, parent = None):
-        ''' creates a widget for the input 
+        ''' creates a widget for the input
         
         the widget must have a selected property
         :param list_view The list view control the widget to create belongs to
@@ -558,7 +560,7 @@ class JoystickDeviceTabWidget(QDataWidget):
         widget.create_action_icons(data)
         widget.disable_close()
         widget.disable_edit()
-        widget.setDescription(data.description)        
+        widget.setDescription(data.description)
         widget.index = index
 
         return widget
@@ -597,11 +599,11 @@ class JoystickDeviceTabWidget(QDataWidget):
         
     @property
     def running(self):
-        return gremlin.shared_state.is_running         
+        return gremlin.shared_state.is_running
 
     def _device_update(self, event):
         if self.running:
-            return 
+            return
 
         if self.last_event == event:
             return
@@ -654,7 +656,7 @@ class JoystickDeviceTabWidget(QDataWidget):
         if item:
             self.main_layout.removeItem(item)
 
-        widget = InputItemConfiguration(item_data)                 
+        widget = InputItemConfiguration(item_data)
         self.main_layout.addWidget(widget,3)
         
         if item_data is not None:
@@ -688,10 +690,10 @@ class JoystickDeviceTabWidget(QDataWidget):
             self.main_layout.removeItem(item)
 
         widget = InputItemConfiguration()
-        self.main_layout.addWidget(widget,3)            
+        self.main_layout.addWidget(widget,3)
 
 
-        self.input_item_list_model.mode = mode            
+        self.input_item_list_model.mode = mode
 
         # Select the first input item
         #self.input_item_list_view.select_item(0, emit_signal=False)

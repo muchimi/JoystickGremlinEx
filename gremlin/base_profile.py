@@ -25,7 +25,7 @@ from gremlin.plugin_manager import ContainerPlugins
 from gremlin.base_conditions import *
 from gremlin.base_buttons import VirtualAxisButton, VirtualHatButton
 from gremlin.input_types import InputType
-from gremlin.plugin_manager import ActionPlugins, ContainerPlugins 
+from gremlin.plugin_manager import ActionPlugins, ContainerPlugins
 import gremlin.joystick_handling
 import gremlin.profile
 import gremlin.input_devices
@@ -82,7 +82,7 @@ class ProfileData(metaclass=ABCMeta):
         if os.path.isfile(generic_icon):
             self._generic_icon = generic_icon
         else:
-            self._generic_icon = None       
+            self._generic_icon = None
 
 
     def icon(self):
@@ -127,6 +127,14 @@ class ProfileData(metaclass=ABCMeta):
             return self._input_item.input_id
         return None
 
+
+    def update_inputs(self, item_data):
+        ''' updates inputs from another profile entry '''
+        self._input_item.input_id = item_data.input_id
+        self._input_item.device_guid = item_data.device_guid
+        self._input_item.device_name = item_data.device_name
+        self._input_item.device_type = item_data.device_type
+        
 
     def get_mode(self):
         """Returns the Mode this data entry belongs to.
@@ -519,7 +527,7 @@ class AbstractContainer(ProfileData):
         for actions in [a for a in self.action_sets if a is not None]:
             for action in actions:
                 state = state & action.is_valid_for_save()
-        return state        
+        return state
         
 
     @abstractmethod
@@ -627,7 +635,7 @@ class InputItem():
         :param parent the parent mode of this input item
         """
         
-        self.parent = parent 
+        self.parent = parent
         self._input_type = None
         self._device_guid = None # hardware input ID
         self._name = None # device name
@@ -642,7 +650,7 @@ class InputItem():
         if parent is not None:
             # find the missing properties from the parenting hierarchy
             self._is_action = isinstance(parent, AbstractAction)
-            item = parent 
+            item = parent
             while True:
                 if isinstance(item, Mode):
                     self._profile_mode = item.name
@@ -723,7 +731,7 @@ class InputItem():
     def profile_mode(self, value):
         self._profile_mode = value
     
-    @property 
+    @property
     def device_type(self):
         return self._device_type
     @device_type.setter
@@ -792,7 +800,7 @@ class InputItem():
 
 
         elif self.input_type == InputType.Midi:
-            # midi data 
+            # midi data
             from gremlin.ui.midi_device import MidiInputItem
             midi_input_item = MidiInputItem()
             for child in node:
@@ -804,7 +812,7 @@ class InputItem():
                 
 
         elif self.input_type == InputType.OpenSoundControl:
-            # OSC data 
+            # OSC data
             from gremlin.ui.osc_device import OscInputItem
             osc_input_item = OscInputItem()
             for child in node:
@@ -857,7 +865,7 @@ class InputItem():
                     node.append(child)
             elif hasattr(self.input_id,"to_xml"):
                 child = self.input_id.to_xml()
-                node.append(child)    
+                node.append(child)
             else:
                 node.set("id", safe_format(self.input_id[0], int))
                 node.set("extended", safe_format(self.input_id[1], bool))
@@ -982,14 +990,14 @@ class AbstractAction(ProfileData):
 
         self.activation_condition = None
         self._id = None
-        self._action_type = None 
+        self._action_type = None
         self._enabled = False # true if the action is enabled
         eh = gremlin.event_handler.EventListener()
         eh.action_created.emit(self)
         
 
     def setEnabled(self, value):
-        ''' enables or disables the functor - a disabled functor will not receive the start profile event nor will the process_event be called 
+        ''' enables or disables the functor - a disabled functor will not receive the start profile event nor will the process_event be called
         
         This is done to make sure that functors only get called if the plugin is referenced in a profile's execution graph to avoid unecessary initializations
         
@@ -1109,7 +1117,7 @@ class AbstractContainerAction(AbstractAction):
         return self.get_item_data(0)
     
     def get_item_data(self, index, autocreate = True):
-        ''' gets the specified data container block 
+        ''' gets the specified data container block
         
         :param: autocreate - if set, creates a datablock if it does not exist
         
@@ -1689,7 +1697,7 @@ class Profile():
         ''' gets the default mode for this profile - this is the mode used if the default startup mode is not specified '''
         modes = self.get_root_modes()
         if modes:
-            return modes[0]    
+            return modes[0]
 
     def from_xml(self, fname):
         """Parses the global XML document into the profile data structure.
@@ -2478,7 +2486,7 @@ class ProfileMapItem():
         self._last_mode = value
 
     def get_profile_data(self) -> ProfileOptionsData:
-        ''' gets the list of profile modes in a given profile 
+        ''' gets the list of profile modes in a given profile
         :returns tuple (mode_list, default_mode, last_mode, restore_mode_flag)
         '''
 
@@ -2540,7 +2548,7 @@ class ProfileMapItem():
                     pd.force_numlock_off = force_numlock_off
 
                 except Exception as ex:
-                    logging.getLogger("system").error(f"PROC MAP: Unable to open profile mapping: {profile}:\n{ex}")  
+                    logging.getLogger("system").error(f"PROC MAP: Unable to open profile mapping: {profile}:\n{ex}")
 
         return pd
     
@@ -2599,7 +2607,7 @@ class ProfileMapItem():
                 tree.write(profile, pretty_print=True,xml_declaration=True,encoding="utf-8")
 
             except Exception as ex:
-                logging.getLogger("system").error(f"PROC MAP: Unable to open profile mapping: {profile}:\n{ex}")  
+                logging.getLogger("system").error(f"PROC MAP: Unable to open profile mapping: {profile}:\n{ex}")
 
     def _update(self):
         pd = self.get_profile_data()
@@ -2632,7 +2640,7 @@ class ProfileMap():
     ''' manages the profile to process maps '''
 
     def __init__(self):
-        self._items = [] # list of items 
+        self._items = [] # list of items
         self._process_map = {} # mapps process to ProcessMapItem
         self._valid = True
         self.load_profile_map() # load the existing map
@@ -2679,7 +2687,7 @@ class ProfileMap():
                 # print (f"Saving item: process: {item.process} profile: {item.profile}")
                 ElementTree.SubElement(root,"map", profile = item.profile, process = item.process, startup_mode = item.default_mode)
 
-        try:    
+        try:
             # save the file
             tree = ElementTree.ElementTree(root)
             tree.write(fname, pretty_print=True,xml_declaration=True,encoding="utf-8")

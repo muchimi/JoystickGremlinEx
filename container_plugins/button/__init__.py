@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (c) 2024 EMCS 
+# Copyright (c) 2024 EMCS
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-# this code is build on Gremlin work by Lionel Ott 
+# this code is build on Gremlin work by Lionel Ott
 
 import copy
 import logging
@@ -34,7 +34,7 @@ from gremlin.base_profile import AbstractContainer
 
 class ButtonContainerWidget(AbstractContainerWidget):
 
-    """Container with two actions, one for input button is pressed, the other for when the input button is released 
+    """Container with two actions, one for input button is pressed, the other for when the input button is released
     
        While this can be duplicated with conditions - this is a helper container to simplify the profile setup.
 
@@ -161,22 +161,7 @@ class ButtonContainerWidget(AbstractContainerWidget):
         self.profile_data.action_sets[index].append(action_item)
         self.profile_data.create_or_delete_virtual_button()
 
-    # def _delay_changed_cb(self, value):
-    #     """Updates the activation delay value.
 
-    #     :param value the value after which the long press action activates
-    #     """
-    #     self.profile_data.delay = value
-
-    # def _activation_changed_cb(self, value):
-    #     """Updates the activation condition state.
-
-    #     :param value whether or not the selection was toggled - ignored
-    #     """
-    #     if self.activate_press.isChecked():
-    #         self.profile_data.activate_on = "press"
-    #     else:
-    #         self.profile_data.activate_on = "release"
 
     def _handle_interaction(self, widget, action):
         """Handles interaction icons being pressed on the individual actions.
