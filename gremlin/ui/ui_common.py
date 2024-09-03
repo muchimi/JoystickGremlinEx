@@ -1939,6 +1939,7 @@ class AxisStateWidget(QtWidgets.QWidget):
         self._device_guid = None
         self._input_id = None
         self._value = 0
+        self._raw_value = 0
         self._reverse = False
         self_decimals = 3
         
@@ -2004,6 +2005,10 @@ class AxisStateWidget(QtWidgets.QWidget):
             value = self._max_range
         value += 0   # avoid negative 0 (WHY?)
         self._value = value
+
+        if self._reverse:
+            value = gremlin.util.scale_to_range(value, invert=True)
+
         scaled_value = self._scale_factor * value
         #print (f"{scaled_value}")
         self._progress_widget.setValue(scaled_value)
@@ -2049,6 +2054,7 @@ class AxisStateWidget(QtWidgets.QWidget):
 
     def setReverse(self, value):
         self._reverse = value
+        self.setValue(self._value)
 
     def reverse(self):
         ''' reverse flag '''
@@ -2082,8 +2088,7 @@ class AxisStateWidget(QtWidgets.QWidget):
 
     def _update_value(self, raw_value):
         # invert the input if needed
-        target = -raw_value if self._reverse else raw_value
-        value = gremlin.util.scale_to_range(target, source_min = -32767, source_max = 32767, target_min = self._min_range, target_max = self._max_range)
+        value = gremlin.util.scale_to_range(raw_value, source_min = -32767, source_max = 32767, target_min = self._min_range, target_max = self._max_range)
         self.setValue(value)
         
 

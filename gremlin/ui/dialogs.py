@@ -65,7 +65,7 @@ class ProfileOptionsUi(QtWidgets.QDialog):
         exp_min_sp = QtWidgets.QSizePolicy(
             QtWidgets.QSizePolicy.MinimumExpanding,
             QtWidgets.QSizePolicy.Minimum
-        )        
+        )
 
         # Actual configuration object being managed
         self.config = gremlin.config.Configuration()
@@ -219,7 +219,7 @@ class OptionsUi(ui_common.BaseDialogUi):
 
         self.tab_container.currentChanged.connect(self._tab_changed_cb)
 
-    def confirmClose(self, event):        
+    def confirmClose(self, event):
         ''' override ability to close '''
         import gremlin.util
         self._profile_mapper.validate()
@@ -235,14 +235,14 @@ class OptionsUi(ui_common.BaseDialogUi):
             index = 1 # profile tab
             if index != self.tab_container.currentIndex():
                 self.tab_container.setCurrentIndex(index)
-            # display a message box 
+            # display a message box
             message_box = QtWidgets.QMessageBox()
             message_box.setIcon(QtWidgets.QMessageBox.Icon.Warning)
             message_box.setText("Configuration Error")
             message_box.setInformativeText("The configuration is invalid.<br/>Press cancel to return,<br>or discard to remove the invalid entries.")
             message_box.setStandardButtons(
-                QtWidgets.QMessageBox.StandardButton.Cancel | 
-                QtWidgets.QMessageBox.StandardButton.Discard 
+                QtWidgets.QMessageBox.StandardButton.Cancel |
+                QtWidgets.QMessageBox.StandardButton.Discard
             )
             gremlin.util.centerDialog(message_box)
             result = message_box.exec()
@@ -655,7 +655,7 @@ This setting is also available on a profile by profile basis on the profile tab,
         self.profile_page_layout.addWidget(self.keep_active_on_focus_lost_checkbox,row,0)
         row+=1
         self.profile_page_layout.addWidget(self.activate_on_process_focus,row,0)
-        row+=1        
+        row+=1
         self.profile_page_layout.addWidget(self.activate_on_launch,row,0)
         row+=1
         self.profile_page_layout.addWidget(self.activate_restore_mode,row,0)
@@ -916,11 +916,11 @@ This setting is also available on a profile by profile basis on the profile tab,
 
     @QtCore.Slot(bool)
     def _show_joystick_input_cb(self, checked):
-        self.config.show_input_axis = checked        
+        self.config.show_input_axis = checked
 
     @QtCore.Slot(bool)
     def _partial_plugin_save(self, checked):
-        self.config.partial_plugin_save = checked        
+        self.config.partial_plugin_save = checked
     
     
     @QtCore.Slot(bool)
@@ -1243,7 +1243,7 @@ This setting is also available on a profile by profile basis on the profile tab,
                         mode_widget.setCurrentText(pd.default_mode)
                         item.default_mode = pd.default_mode
                     else:
-                        item.default_mode = pd.mode_list[0] # first item 
+                        item.default_mode = pd.mode_list[0] # first item
                     mode_widget.setEnabled(True)
                 else:
                     mode_widget.setEnabled(False)
@@ -1946,8 +1946,8 @@ The setting can be overriden by the global mode reload option set in Options for
                 device.ensure_mode_exists(mode)
                 device.modes[mode].inherit = inherit
 
-        eh = gremlin.event_handler.EventListener()
-        eh.modes_changed.emit()
+        # eh = gremlin.event_handler.EventListener()
+        # eh.modes_changed.emit()
 
     def _rename_mode(self, mode_name):
         """Asks the user for the new name for the given mode.
@@ -2498,7 +2498,7 @@ class SubstituteDialog(QtWidgets.QDialog):
 
             profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
 
-            # make a backup of the profile just in case ... roundrobin file name ... 
+            # make a backup of the profile just in case ... roundrobin file name ...
             xml_file =  profile.profile_file
             backup_file = profile.profile_file
             dirname, base_file = os.path.split(backup_file)
@@ -2512,7 +2512,7 @@ class SubstituteDialog(QtWidgets.QDialog):
                     file_list.append((backup_file, os.path.getmtime(backup_file)))
                 count+=1
             if count == max_count:
-                # ran out of roundrobin option - blitz the oldest file 
+                # ran out of roundrobin option - blitz the oldest file
                 file_list.sort(key = lambda x: x[1])
                 backup_file = file_list[-1][0]
                 os.unlink(backup_file)

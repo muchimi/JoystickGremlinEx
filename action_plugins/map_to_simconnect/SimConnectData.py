@@ -117,9 +117,10 @@ class SimConnectActionMode(enum.Enum):
 class SimConnectTriggerMode(enum.Enum):
     ''' trigger modes for boolean actions '''
     NotSet = 0 # not set
-    TurnOn = 1 # enable or turn on 
+    TurnOn = 1 # enable or turn on
     TurnOff = 2 # disable or turn off
-    Toggle = 3 # toggle 
+    Toggle = 3 # toggle
+    NoOp = 4 # send nothing (trigger command only)
 
     @staticmethod
     def to_string(value):
@@ -138,14 +139,17 @@ _trigger_mode_name = {
     SimConnectTriggerMode.NotSet : "none",
     SimConnectTriggerMode.Toggle : "toggle",
     SimConnectTriggerMode.TurnOff : "off",
-    SimConnectTriggerMode.TurnOn : "on"
+    SimConnectTriggerMode.TurnOn : "on",
+    SimConnectTriggerMode.NoOp: "noop"
+
 }
 
 _trigger_mode_to_enum = {
     "none" : SimConnectTriggerMode.NotSet,
     "toggle" : SimConnectTriggerMode.Toggle,
     "off" : SimConnectTriggerMode.TurnOff,
-    "on" : SimConnectTriggerMode.TurnOn 
+    "on" : SimConnectTriggerMode.TurnOn,
+    "noop" : SimConnectTriggerMode.NoOp
 }
 
 
@@ -312,7 +316,7 @@ _simconnect_event_category_to_enum_lookup = {
     "Freezing Position" : SimConnectEventCategory.FreezingPosition,
     "Mission Keys" : SimConnectEventCategory.MissionKeys,
     "ATC" : SimConnectEventCategory.ATC ,
-    "Multiplayer" : SimConnectEventCategory.Multiplayer 
+    "Multiplayer" : SimConnectEventCategory.Multiplayer
 }
 
 
@@ -350,7 +354,7 @@ class SimConnectData(QtCore.QObject):
         self._connect_attempts = 3 # number of connection attempts before giving up
 
         # list of all commands
-        self._commands = [] 
+        self._commands = []
 
         # list of command blocks
         self._block_map = {}
@@ -377,13 +381,13 @@ class SimConnectData(QtCore.QObject):
     @property
     def is_running(self):
         ''' true if the sim state is running '''
-        return self._is_running            
+        return self._is_running
     
     def _sim_paused_cb(self, arg):
         self._is_paused = arg
 
     def _sim_running_cb(self, state):
-        self._is_running = state        
+        self._is_running = state
 
 
     def _aicraft_loaded_cb(self, folder):
@@ -404,7 +408,7 @@ class SimConnectData(QtCore.QObject):
     def _aircraft_loaded_internal_cb(self, folder):
         # decode the data into useful bits
         title = self.get_aircraft_title()
-        self.aircraft_loaded.emit(folder, title)     
+        self.aircraft_loaded.emit(folder, title)
 
     @property
     def aircraft_title(self):
@@ -479,7 +483,7 @@ class SimConnectData(QtCore.QObject):
         return None
 
     def get_aircraft_data(self):
-        ''' returns the current aircraft information 
+        ''' returns the current aircraft information
             (aircraft, model, title)
         '''
 
@@ -520,14 +524,14 @@ class SimConnectData(QtCore.QObject):
 
         # map of a command to its category
         command_category_map = {}
-        command_map = {}        
+        command_map = {}
 
         for category in SimConnectEventCategory.to_list():
             if category == SimConnectEventCategory.Engine:
                 source = self._aircraft_events.Engine.list
             elif category == SimConnectEventCategory.FlightControls:
                 source = self._aircraft_events.Flight_Controls.list
-            elif category == SimConnectEventCategory.AutoPilot: 
+            elif category == SimConnectEventCategory.AutoPilot:
                 source = self._aircraft_events.Autopilot.list
             elif category == SimConnectEventCategory.FuelSystem:
                 source = self._aircraft_events.Fuel_System.list
@@ -537,7 +541,7 @@ class SimConnectData(QtCore.QObject):
                 source = self._aircraft_events.Instruments.list
             elif category == SimConnectEventCategory.Lights:
                 source = self._aircraft_events.Lights.list
-            elif category == SimConnectEventCategory.Failures: 
+            elif category == SimConnectEventCategory.Failures:
                 source = self._aircraft_events.Failures.list
             elif category == SimConnectEventCategory.MiscellaneousSystems:
                 source = self._aircraft_events.Miscellaneous_Systems.list
@@ -584,7 +588,7 @@ class SimConnectData(QtCore.QObject):
             # build request commands
             for data in self._aircraft_requests.list:
                 for command, data in data.list.items():
-                    self._command_map[command] = ("r", data)        
+                    self._command_map[command] = ("r", data)
             
         commands = list(self._command_map.keys())
         commands.sort()
@@ -607,7 +611,7 @@ class SimConnectData(QtCore.QObject):
                 for v in value_types:
                     if v in description:
                         units = "int"
-                        # get min and max range 
+                        # get min and max range
                         break
                 
                 if "(-16383" in description:
@@ -624,7 +628,7 @@ class SimConnectData(QtCore.QObject):
                 if "(1 or 2)" in description:
                     min_range = 1
                     max_range = 2
-                    is_toggle = True                    
+                    is_toggle = True
                     is_range = True
                 if "0 to 65535" in description:
                     min_range = 0
@@ -640,7 +644,7 @@ class SimConnectData(QtCore.QObject):
                 simvar_type = "simvar"
                 description = data[1][0]
                 units = data[1][2].decode('ascii')
-                settable = data[1][3] == 'Y'       
+                settable = data[1][3] == 'Y'
 
 
             category =  SimConnectEventCategory.to_string(self.get_command_category(command))
@@ -716,12 +720,12 @@ class SimConnectData(QtCore.QObject):
                     if throw_on_missing:
                         raise ValueError(f"Bad or missing float XML attribute {attr} on node {node}")
                     
-            return default        
+            return default
         
 
         self._block_map = {}
         if not xml_source or not os.path.isfile(xml_source):
-            logging.getLogger("system").error(f"SimconnectData: unable to load XML simvars: {xml_source}")  
+            logging.getLogger("system").error(f"SimconnectData: unable to load XML simvars: {xml_source}")
             return False
 
         try:
@@ -742,7 +746,7 @@ class SimConnectData(QtCore.QObject):
                 else:
                     data_type == OutputType.NotSet
                 simvar = get_attribute(node,"value",throw_on_missing=True)
-                simvar_type = get_attribute(node,"type",throw_on_missing=True) 
+                simvar_type = get_attribute(node,"type",throw_on_missing=True)
                 units = get_attribute(node,"units",throw_on_missing=True)
                 category = get_attribute(node,"category")
                 settable = get_bool_attribute(node,"settable",throw_on_missing=True)
@@ -776,15 +780,15 @@ class SimConnectData(QtCore.QObject):
                 block.is_toggle = is_toggle
 
                 if simvar in self._block_map.keys():
-                    logging.getLogger("system").error(f"SimconnectData: duplicate definition found: {simvar} in  {xml_source}")  
+                    logging.getLogger("system").error(f"SimconnectData: duplicate definition found: {simvar} in  {xml_source}")
                     self._block_map = {}
                     return False
                 self._block_map[simvar] = block
 
-            logging.getLogger("system").info(f"SimconnectData: loaded {len(self._block_map):,} simvars")                 
+            logging.getLogger("system").info(f"SimconnectData: loaded {len(self._block_map):,} simvars")
 
         except Exception as err:
-            logging.getLogger("system").error(f"SimconnectData: XML simvars read error: {xml_source}: {err}")  
+            logging.getLogger("system").error(f"SimconnectData: XML simvars read error: {xml_source}: {err}")
             return False
 
 
@@ -884,7 +888,7 @@ class SimConnectBlock():
         self._set_value = False # true if the item can set a value
         self._readonly = False # if readonly - the request cannot be triggered
         self._is_axis = False # true if the output is an axis variable
-        self._is_indexed = False # true if the output is indexed using the :index 
+        self._is_indexed = False # true if the output is indexed using the :index
         self._min_range = -16383 # user modifieable range
         self._max_range = 16383
         self._command_min_range = -16383 # command range (cannot be modified)
@@ -919,9 +923,9 @@ class SimConnectBlock():
     #     ''' deserialize '''
     #     self.__dict__.update(state)
     #     pass
-        #self.range_changed = 
+        #self.range_changed =
         
-        # xml = state # gremlin.shared_state.load_state(state)       
+        # xml = state # gremlin.shared_state.load_state(state)
         # node = etree.fromstring(xml)
         # self.from_xml(node)
         # block = SimConnectBlock()
@@ -1081,7 +1085,7 @@ class SimConnectBlock():
     @property
     def invert_axis(self):
         ''' inverts output (axis input only) '''
-        return self._invert 
+        return self._invert
     @invert_axis.setter
     def invert_axis(self, value):
         self._invert = value
@@ -1215,7 +1219,7 @@ class SimConnectBlock():
             max_range = 16383
 
         changed = False
-        if self._min_range != min_range: 
+        if self._min_range != min_range:
             self._min_range = min_range
             changed = True
         if self._max_range != max_range:
@@ -1279,13 +1283,15 @@ class SimConnectBlock():
                         value = 1 if state == 0 else 0
                         ar.set(self._command, value)
                         logger.info(f"\tToggle state: {state} -> {value}")
-                    
                     elif mode == SimConnectTriggerMode.TurnOff:
                         ar.set(self._command, 0)
                         logger.info(f"\tTurn off: 0")
                     elif mode == SimConnectTriggerMode.TurnOn:
                         ar.set(self._command, 1)
                         logger.info(f"\tTurn on: 1")
+                    elif mode == SimConnectTriggerMode.NoOp:
+                        logger.info(f"\tNo op:")
+                        ar.set(self._command, 1)
                 elif self.output_mode == SimConnectActionMode.SetValue:
                     ar.set(self._command, value)
                     logger.info(f"\tSet value: {value}")

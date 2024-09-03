@@ -103,7 +103,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.14ex (m17)"
+APPLICATION_VERSION = "13.40.14ex (m18)"
 
 # the main ui
 ui = None
@@ -209,7 +209,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         el.profile_stop.connect(lambda: self._update_status_bar_active(False))
 
         # hook mode change
-        el.modes_changed.connect(self._mode_configuration_changed)
+        el.modes_changed.connect(self._modes_changed)
 
         # hook changes
         eh = gremlin.event_handler.EventHandler()
@@ -2235,7 +2235,9 @@ class GremlinUi(QtWidgets.QMainWindow):
         self._do_load_profile(fname)
         self._create_recent_profiles()
 
-        
+    def _modes_changed(self):
+        ''' called when mode list has changed '''
+        self.mode_selector.populate_selector(gremlin.shared_state.current_profile, gremlin.shared_state.current_mode)
 
     def _mode_configuration_changed(self, new_mode = None):
         """Updates the mode configuration of the selector and profile."""
@@ -2245,8 +2247,6 @@ class GremlinUi(QtWidgets.QMainWindow):
 
             if new_mode is None:
                 new_mode = gremlin.shared_state.current_mode
-            
-            self.mode_selector.setCurrentMode(new_mode)
 
             # if gremlin.shared_state.current_mode == new_mode:
             #     return
