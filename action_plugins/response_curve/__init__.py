@@ -1118,7 +1118,7 @@ class ResponseCurveWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         
         if action_data.show_input_axis:
-            # hook the hardware input so we can see it on the curve    
+            # hook the hardware input so we can see it on the curve
             el = gremlin.event_handler.EventListener()
             el.joystick_event.connect(self._joystick_handler)
 
@@ -1130,7 +1130,7 @@ class ResponseCurveWidget(gremlin.ui.input_item.AbstractActionWidget):
         ''' draw the current value on the curve '''
         curve_fn = self.curve_model.get_curve_function()
         if curve_fn:
-            # get the position of the marker 
+            # get the position of the marker
             x = curve_value
             y = -g_scene_size * curve_fn(x / g_scene_size)
             #print(f"{x} {y}")
@@ -1145,7 +1145,7 @@ class ResponseCurveWidget(gremlin.ui.input_item.AbstractActionWidget):
         ''' handles joystick input '''
 
         if not event.is_axis:
-            # ignore if not an axis event 
+            # ignore if not an axis event
             return
         
         if gremlin.shared_state.is_running:
@@ -1215,12 +1215,9 @@ class ResponseCurveWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.curve_symmetry.clicked.connect(self._curve_symmetry_cb)
         self.container_options_layout.addWidget(self.curve_symmetry)
 
-        # Handle symmetry
-        self.handle_symmetry = None
-        if self.action_data.mapping_type == "cubic-bezier-spline":
-            self.handle_symmetry = QtWidgets.QCheckBox("Force smooth curves")
-            self.handle_symmetry.stateChanged.connect(self._handle_symmetry_cb)
-            self.container_options_layout.addWidget(self.handle_symmetry)
+        
+
+      
 
         # Create all objects required for the response curve UI
         self.control_point_editor = ControlPointEditorWidget()
@@ -1235,6 +1232,18 @@ class ResponseCurveWidget(gremlin.ui.input_item.AbstractActionWidget):
         # mode
         self.curve_model.set_symmetry_mode(self.action_data.symmetry_mode)
 
+
+          # Handle symmetry
+        self.handle_symmetry = QtWidgets.QCheckBox("Force smooth curves")
+        
+        if self.action_data.mapping_type == "cubic-bezier-spline":
+            self.handle_symmetry.setChecked(self.curve_model.handle_symmetry_enabled)
+            self.handle_symmetry.stateChanged.connect(self._handle_symmetry_cb)
+        else:
+            self.handle_symmetry.setVisible(False)
+
+        self.container_options_layout.addWidget(self.handle_symmetry)
+
         self.container_options_layout.addStretch()
 
         # input repeater
@@ -1247,6 +1256,7 @@ class ResponseCurveWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.input_curved_widget = QtWidgets.QLineEdit()
             self.input_curved_widget.setMaximumWidth(width)
             self.input_curved_widget.setReadOnly(True)
+            
             self.container_options_layout.addWidget(QtWidgets.QLabel("Input:"))
             self.container_options_layout.addWidget(self.input_raw_widget)
             self.container_options_layout.addWidget(QtWidgets.QLabel("Curved:"))
@@ -1329,15 +1339,14 @@ class ResponseCurveWidget(gremlin.ui.input_item.AbstractActionWidget):
         # Update curve settings UI
         if self.action_data.mapping_type == "cubic-spline":
             if self.handle_symmetry is not None:
-                self.handle_symmetry.hide()
+                self.handle_symmetry.setVisible(False)
                 self.handle_symmetry = None
         elif self.action_data.mapping_type == "cubic-bezier-spline":
-            if self.handle_symmetry is None:
-                self.handle_symmetry = QtWidgets.QCheckBox("Force smooth curves")
-                self.handle_symmetry.stateChanged.connect(
-                    self._handle_symmetry_cb
-                )
-                self.curve_settings_layout.addWidget(self.handle_symmetry)
+            self.handle_symmetry.setVisible(True)
+            self.handle_symmetry.stateChanged.connect(
+                self._handle_symmetry_cb
+            )
+            
         self.curve_symmetry.setChecked(False)
 
         # Recreate the UI components

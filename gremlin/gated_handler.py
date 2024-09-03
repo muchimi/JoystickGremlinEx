@@ -1266,7 +1266,7 @@ class GateData():
 
         '''
 
-        gates = self.getGates() # get gates (ordered by position)
+        gates = self.getGates(include_default = False) # get gates (ordered by position) - skip default gates
         steps = len(gates)
 
         if not use_current_range:
@@ -1285,9 +1285,14 @@ class GateData():
 
         
         current = min_value
-        for gate in gates:
+        for index, gate in enumerate(gates):
+            if verbose:
+                syslog.info(f"\tGate [{index}] value: {current:0.{_decimals}f}")
             gate.value = current
             current += interval
+            
+            if current > max_value:
+                current = max_value # clamp for rounding errors
         
 
 

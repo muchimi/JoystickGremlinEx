@@ -103,7 +103,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.14ex (m16)"
+APPLICATION_VERSION = "13.40.14ex (m17)"
 
 # the main ui
 ui = None
@@ -346,7 +346,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
 
     def _tab_clear_map_cb(self):
-        ''' clears the mappings from the current tab ''' 
+        ''' clears the mappings from the current tab '''
         tab_guid = gremlin.util.parse_guid(gremlin.shared_state.ui._active_tab_guid())
         device : gremlin.base_profile.Device = gremlin.shared_state.current_profile.devices[tab_guid]
         current_mode = gremlin.shared_state.current_mode
@@ -630,7 +630,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         
         try:
 
-            logging.getLogger("system").info("Activate: start")        
+            logging.getLogger("system").info("Activate: start")
             self.activate_locked = True
 
             is_running = gremlin.shared_state.is_running
@@ -658,7 +658,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                 if verbose:
                     logging.getLogger("system").info(f"Deactivate profile requested")
                 if is_running:
-                    # running - save the last running mode 
+                    # running - save the last running mode
                     self.profile.set_last_runtime_mode(gremlin.shared_state.current_mode)
                     
                 
@@ -1066,7 +1066,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             widget.data = (TabDeviceType.VjoyInput, device_guid)
             tab_label = device.name.strip()
             tab_label += f" #{device.vjoy_id:d}"
-            device_name_map[device.device_guid] = tab_label    
+            device_name_map[device.device_guid] = tab_label
             self.ui.devices.addTab(widget, tab_label)
             self._vjoy_input_device_guids.append(device_guid)
             index += 1
@@ -1222,7 +1222,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                     valid_list.append((device_guid, self.ui.devices.tabText(index), self._tab_widget_map[device_guid], current_index))
                     current_index+=1
 
-            valid_list.sort(key = lambda x: x[3]) # sort by stored tab index                    
+            valid_list.sort(key = lambda x: x[3]) # sort by stored tab index
 
             # rebuild the tabs
             devices_tab_bar = self.ui.devices.tabBar()
@@ -1410,7 +1410,7 @@ class GremlinUi(QtWidgets.QMainWindow):
     def _dump_tab_map(self, tab_map):
         log = logging.getLogger("system")
         for index, (device_guid, device_name, device_class, tab_index) in tab_map.items():
-            log.info(f"[{index}] Tab index: [{tab_index}] {device_name} {device_class} {device_guid}")    
+            log.info(f"[{index}] Tab index: [{tab_index}] {device_name} {device_class} {device_guid}")
 
 
     def _sort_tabs(self):
@@ -1422,7 +1422,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         if self.config.verbose_mode_details:
             self._dump_tab_map(tab_map)
         
-        joystick_devices = self._find_joystick_tab_data()        
+        joystick_devices = self._find_joystick_tab_data()
         joystick_devices.sort(key=lambda x: x[1].casefold())
         guid_list.extend(joystick_devices)
 
@@ -1480,13 +1480,13 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         icon = load_icon("gfx/profile_open.svg")
         #icon = self.load_icon("profile_open.svg"))
-        self.ui.actionLoadProfile.setIcon(icon)           
+        self.ui.actionLoadProfile.setIcon(icon)
         
         icon = load_icon("gfx/profile_new.svg")
         self.ui.actionNewProfile.setIcon(icon)
 
         icon = load_icon("gfx/profile_save.svg")
-        self.ui.actionSaveProfile.setIcon(icon)          
+        self.ui.actionSaveProfile.setIcon(icon)
         
         icon = load_icon("gfx/profile_save_as.svg")
         self.ui.actionSaveProfileAs.setIcon(icon)
@@ -1498,7 +1498,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.ui.actionManageCustomModules.setIcon(icon)
 
         icon = load_icon("gfx/manage_modes.svg")
-        self.ui.actionManageModes.setIcon(icon)           
+        self.ui.actionManageModes.setIcon(icon)
         
         icon = load_icon("gfx/input_repeater.svg")
         self.ui.actionInputRepeater.setIcon(icon)
@@ -1555,7 +1555,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                 verbose = gremlin.config.Configuration().verbose
                 try:
                     if verbose:
-                        logging.getLogger("system").info(f"Device change begin") 
+                        logging.getLogger("system").info(f"Device change begin")
                     
                     self.devices = gremlin.joystick_handling.joystick_devices()
                     self._create_tabs()
@@ -1565,12 +1565,12 @@ class GremlinUi(QtWidgets.QMainWindow):
                     self.ui.actionActivate.setChecked(False)
                     restart = self.runner.is_running()
                     if restart:
-                        logging.getLogger("system").info(f"Profile restart due to device change") 
+                        logging.getLogger("system").info(f"Profile restart due to device change")
                     self.activate(restart)
                 finally:
 
                     if verbose:
-                        logging.getLogger("system").info(f"Device change end") 
+                        logging.getLogger("system").info(f"Device change end")
                     self.device_change_locked = False
                 # mark items processed
                 self._device_change_queue = 0
@@ -1638,7 +1638,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                     if verbose:
                         logging.getLogger("system").info(f"Event: tab switch ignored - events too close")
                     return
-                # remember the switch time for next request            
+                # remember the switch time for next request
                 self._last_tab_switch = time.time()
                         
             # get the widget for the tab corresponding to the device
@@ -1657,7 +1657,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                 # ignore button input
                 if verbose:
                     logging.getLogger("system").info(f"Event: highlight button input ignored (option off)")
-                return        
+                return
             
             input_changed = not self._last_device_guid or not self._last_input_identifier or self._last_device_guid != device_guid or self._last_input_identifier != event.identifier
 
@@ -1746,10 +1746,10 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         # if gremlin.shared_state.is_running and not config.runtime_ui_update:
         #     # ignore updates when running a profile unless the UI should be updated
-        #     return 
+        #     return
 
         # check options
-        option_auto_load = config.autoload_profiles  
+        option_auto_load = config.autoload_profiles
         option_auto_load_on_focus = config.activate_on_process_focus
 
 
@@ -1758,8 +1758,8 @@ class GremlinUi(QtWidgets.QMainWindow):
             return # ignore if not auto loading profiles or auto activating on focus change
 
         option_restore_mode = config.restore_profile_mode_on_start or self.profile.get_restore_mode()
-        option_keep_focus = config.keep_profile_active_on_focus_loss  
-        option_reset_mode_on_process_activate = config.reset_mode_on_process_activate 
+        option_keep_focus = config.keep_profile_active_on_focus_loss
+        option_reset_mode_on_process_activate = config.reset_mode_on_process_activate
         eh = gremlin.event_handler.EventHandler()
 
         verbose = gremlin.config.Configuration().verbose
@@ -1776,8 +1776,8 @@ class GremlinUi(QtWidgets.QMainWindow):
             # profile entry found - see if we need to change profiles
             if not compare_path(self._profile_fname, profile_path):
                 # change profile
-                if verbose: 
-                    logging.getLogger("system").info(f"PROC: process change forces a profile load: switch from {os.path.basename(self._profile_fname)} ->  {os.path.basename(profile_path)}")   
+                if verbose:
+                    logging.getLogger("system").info(f"PROC: process change forces a profile load: switch from {os.path.basename(self._profile_fname)} ->  {os.path.basename(profile_path)}")
                 self.ui.actionActivate.setChecked(False)
                 self.activate(False)
                 self._do_load_profile(profile_path)
@@ -1786,14 +1786,14 @@ class GremlinUi(QtWidgets.QMainWindow):
                 self._profile_auto_activated = True # remember the profile was auto activated by virtue of a process change
                 profile_change = True
 
-                # figure out which mode to restore mode for the new profile 
+                # figure out which mode to restore mode for the new profile
                 if option_restore_mode:
                     # get the mode to restore
                     mode = self.profile.get_last_mode()
                     if verbose:
-                        logging.getLogger("system").info(f"PROC: profile: '{os.path.basename(profile_path)}' restore last mode: '{mode}' ")     
+                        logging.getLogger("system").info(f"PROC: profile: '{os.path.basename(profile_path)}' restore last mode: '{mode}' ")
 
-            # see if we need to activate the profile 
+            # see if we need to activate the profile
             if option_auto_load_on_focus and not self.runner.is_running():
                 self.ui.actionActivate.setChecked(True) # activate
                 self._profile_auto_activated = True # remember the profile was auto activated by virtue of a process change
@@ -1814,23 +1814,23 @@ class GremlinUi(QtWidgets.QMainWindow):
                 # use the default mode specified in the process mapping when changing profiles
                 mode = profile_item.default_mode
                 if verbose:
-                    logging.getLogger("system").info(f"PROC: profile: '{os.path.basename(profile_path)}' using mapping startup mode: '{mode}' ")                    
+                    logging.getLogger("system").info(f"PROC: profile: '{os.path.basename(profile_path)}' using mapping startup mode: '{mode}' ")
 
             # see if the profile activation has a new mapping
             if mode is None or not mode in self.profile.get_modes():
                 # restore the profile's default mode on activation
                 mode = self.profile.get_default_mode()
                 # if verbose:
-                #     logging.getLogger("system").info(f"PROC: restoring default mode: '{mode}' ")                    
+                #     logging.getLogger("system").info(f"PROC: restoring default mode: '{mode}' ")
 
             if mode and mode != self.current_mode:
                 eh = gremlin.event_handler.EventHandler()
                 if verbose:
-                    logging.getLogger("system").info(f"PROC: determined that mode should change to: '{mode}' ")                    
+                    logging.getLogger("system").info(f"PROC: determined that mode should change to: '{mode}' ")
                 eh.change_mode(mode) # set the selected mode
                 
                 if config.initial_load_mode_tts:
-                    tts = gremlin.tts.TextToSpeech()              
+                    tts = gremlin.tts.TextToSpeech()
                     tts.speak(f"Profile mode set to {mode}")
 
 
@@ -1896,7 +1896,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         self._mode_configuration_changed(new_mode)
 
     def _update_ui_mode(self, new_mode):
-        """ called when the profile mode changes 
+        """ called when the profile mode changes
 
         :param mode the now current mode
         """
@@ -2285,10 +2285,10 @@ class GremlinUi(QtWidgets.QMainWindow):
         if is_enabled:
             el.joystick_event.connect(self._joystick_input_selection)
         else:
-            try: 
+            try:
                 el.joystick_event.disconnect(self._joystick_input_selection)
-            except (TypeError, RuntimeError):  # pragma: no cover 
-                pass             
+            except (TypeError, RuntimeError):  # pragma: no cover
+                pass
 
 
     def _set_joystick_input_buttons_highlighting(self, is_enabled):
@@ -2301,10 +2301,10 @@ class GremlinUi(QtWidgets.QMainWindow):
         if is_enabled:
             el.joystick_event.connect(self._joystick_input_button_selection)
         else:
-            try: 
+            try:
                 el.joystick_event.disconnect(self._joystick_input_button_selection)
-            except (TypeError, RuntimeError):  # pragma: no cover 
-                pass 
+            except (TypeError, RuntimeError):  # pragma: no cover
+                pass
 
 
     def _should_process_input(self, event, widget, buttons_only = False):
@@ -2323,7 +2323,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         is_running = self.runner.is_running()
 
-        # minimum deviation to look for for an axis 
+        # minimum deviation to look for for an axis
         deviation = 0.1 if is_running else 0.5
 
         if is_running:
@@ -2370,7 +2370,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                 is_new_device = self._last_input_event.identifier != event.identifier or self._last_input_event.device_guid != event.device_guid
                 process_input = process_input or is_new_device
 
-            process_input = process_input or gremlin.input_devices.JoystickInputSignificant().should_process(event, deviation) 
+            process_input = process_input or gremlin.input_devices.JoystickInputSignificant().should_process(event, deviation)
             
 
             self._input_delay = 1
@@ -2507,7 +2507,7 @@ if __name__ == "__main__":
 
     syslog.info(F"Joystick Gremlin Ex version {Version().version}")
         
-    # Initialize the vjoy interface 
+    # Initialize the vjoy interface
     from vjoy.vjoy_interface import VJoyInterface
     VJoyInterface.initialize()
 
