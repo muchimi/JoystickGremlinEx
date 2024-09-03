@@ -112,7 +112,17 @@ class SimConnectActionMode(enum.Enum):
             raise gremlin.error.GremlinError(f"Invalid type in action mode lookup: {value}")
         return SimConnectActionMode.NotSet
     
-
+    @staticmethod
+    def to_display(value):
+        return _simconnect_action_mode_to_display_lookup[value]
+    
+_simconnect_action_mode_to_display_lookup = {
+    SimConnectActionMode.NotSet: "N/A",
+    SimConnectActionMode.Gated: "Gated",
+    SimConnectActionMode.Ranged: "Ranged",
+    SimConnectActionMode.Trigger: "Trigger",
+    SimConnectActionMode.SetValue: "Value"
+}
 
 class SimConnectTriggerMode(enum.Enum):
     ''' trigger modes for boolean actions '''
@@ -124,8 +134,8 @@ class SimConnectTriggerMode(enum.Enum):
 
     @staticmethod
     def to_string(value):
-        if value in _trigger_mode_name.keys():
-            return _trigger_mode_name[value]
+        if value in _trigger_mode_to_string.keys():
+            return _trigger_mode_to_string[value]
         return "none"
     @staticmethod
     def to_enum(value, validate = True):
@@ -134,13 +144,26 @@ class SimConnectTriggerMode(enum.Enum):
         if validate:
             raise gremlin.error.GremlinError(f"Invalid type in trigger lookup: {value}")
         return SimConnectTriggerMode.NotSet
+    
+    @staticmethod
+    def to_display(value):
+        return _trigger_mode_to_display[value]
 
-_trigger_mode_name = {
+_trigger_mode_to_string = {
     SimConnectTriggerMode.NotSet : "none",
     SimConnectTriggerMode.Toggle : "toggle",
     SimConnectTriggerMode.TurnOff : "off",
     SimConnectTriggerMode.TurnOn : "on",
     SimConnectTriggerMode.NoOp: "noop"
+}
+
+
+_trigger_mode_to_display = {
+    SimConnectTriggerMode.NotSet : "N/A",
+    SimConnectTriggerMode.Toggle : "Toggle",
+    SimConnectTriggerMode.TurnOff : "Off",
+    SimConnectTriggerMode.TurnOn : "On",
+    SimConnectTriggerMode.NoOp: "NoOp"
 
 }
 
@@ -893,7 +916,7 @@ class SimConnectBlock():
         self._max_range = 16383
         self._command_min_range = -16383 # command range (cannot be modified)
         self._command_max_range = 16383
-        self._trigger_mode = SimConnectTriggerMode.Toggle # default for on/off type blocks
+        self._trigger_mode = SimConnectTriggerMode.NoOp # default for on/off type blocks
         self._invert = False # true if the axis output should be inverted
         self._value = 0 # output value
         self._is_value = False # true if the command supports an output value
@@ -903,40 +926,6 @@ class SimConnectBlock():
         self._command = None
         self._units = ""
         self._is_axis = False # true if the block is axis output enabled
-
-    # def __getstate__(self) -> object:
-    #     ''' serialize '''
-
-    #     gremlin.util.debug_pickle(self, first_only=False)
-    #     state = self.__dict__.copy()
-    #     del state["range_changed"]
-    #     del state["value_changed"]
-
-
-    #     return state
-    #     # node = self.to_xml()
-    #     # xml = etree.tostring(node)
-    #     # # state = gremlin.shared_state.save_state(xml)
-    #     # return xml
-    
-    # def __setstate__(self, state):
-    #     ''' deserialize '''
-    #     self.__dict__.update(state)
-    #     pass
-        #self.range_changed =
-        
-        # xml = state # gremlin.shared_state.load_state(state)
-        # node = etree.fromstring(xml)
-        # self.from_xml(node)
-        # block = SimConnectBlock()
-        # block.from_xml(node)
-        # return block
-    
-    # def __copy__(self):
-    #     newcopy = gremlin.base_classes.empty_copy(self)
-    #     newcopy.__dict__ = self.__dict__.copy(  )
-    #     return newcopy
-
 
     @property
     def sm(self):
@@ -1191,7 +1180,20 @@ class SimConnectBlock():
     @property
     def valid(self) -> bool:
         return self._command is not None
+    
+    @property
+    def display_name(self) -> str:
+        ''' returns a readable form of the block '''
+        stub =  f"Command:{self.command} Mode: {SimConnectActionMode.to_display(self.output_mode)}"
+        if self.output_mode == SimConnectActionMode.SetValue:
+            stub += f" Value: {self.value}"
+        elif self.output_mode == SimConnectActionMode.Ranged:
+            stub += f" Output range: {self.min_range}, {self.max_range}"
+        elif self.output_mode == SimConnectActionMode.Trigger:
+            if self.trigger_mode != SimConnectTriggerMode.NotSet:
+                stub += f" {SimConnectTriggerMode.to_display(self.trigger_mode)}"
 
+        return stub
 
     
     def _set_range(self):

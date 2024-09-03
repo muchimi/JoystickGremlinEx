@@ -1030,6 +1030,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         # setup auto-completer for the command
         command_completer = QtWidgets.QCompleter(self._command_list, self)
         command_completer.setCaseSensitivity(QtGui.Qt.CaseSensitivity.CaseInsensitive)
+        command_completer.setFilterMode(QtCore.Qt.MatchFlag.MatchContains)
 
         self._command_selector_widget.setCompleter(command_completer)
 
@@ -1853,7 +1854,7 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
 
     def display_name(self):
         ''' returns a string for this action for display purposes '''
-        return f"Command: {self.command}  Mode: [{self.mode.name}]"
+        return self.block.display_name
       
 
     def icon(self):
