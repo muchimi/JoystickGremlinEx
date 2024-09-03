@@ -95,14 +95,16 @@ class VirtualButtonCallback:
         """
         self._execution_graph = ContainerExecutionGraph(container)
 
-    def __call__(self, event):
+    def __call__(self, event, value = None):
         """Executes the container's content when called.
 
         :param event the event triggering the callback
         """
+        if value is None:
+            value = gremlin.actions.Value(event.is_pressed)
         self._execution_graph.process_event(
             event,
-            gremlin.actions.Value(event.is_pressed)
+            value
         )
 
 
@@ -131,7 +133,7 @@ class VirtualButtonProcess:
         else:
             raise gremlin.error.GremlinError("Invalid virtual button data provided")
 
-    def __call__(self, event):
+    def __call__(self, event, value = None):
         """Processes the provided event through the virtual button instance.
 
         :param event the input event being processed
@@ -371,7 +373,7 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
         # Reorder action set entries such that if any remap action is
         # present it is executed last (after a curving action for example) (unless it's a mode switch action - mode switching must happen last because it changes the action list)
         ordered_action_set = []
-        if verbose: 
+        if verbose:
             logging.getLogger("system").info("Ordering action sets:")
         for action in action_set:
             # if not isinstance(action, action_plugins.remap.Remap):
@@ -388,7 +390,7 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
         ordered_action_set = [x[1] for x in ordered_action_set]
 
 
-        if verbose: 
+        if verbose:
             logging.getLogger("system").info("Action order:")
             for index, action in enumerate(ordered_action_set):
                 input_item = action.input_item # get_input_item()

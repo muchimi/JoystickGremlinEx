@@ -49,10 +49,10 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.button_layout = QtWidgets.QGridLayout(self.button_widget)
         self.motion_widget = QtWidgets.QWidget()
         self.motion_layout = QtWidgets.QGridLayout(self.motion_widget)
-        self.release_widget = QtWidgets.QWidget() 
+        self.release_widget = QtWidgets.QWidget()
         self.options_layout = QtWidgets.QHBoxLayout(self.release_widget)
 
-        self.click_widget = QtWidgets.QWidget() 
+        self.click_widget = QtWidgets.QWidget()
         self.click_options_layout = QtWidgets.QHBoxLayout(self.click_widget)
 
 
@@ -269,7 +269,7 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         with QtCore.QSignalBlocker(self.chkb_exec_on_release):
             self.chkb_exec_on_release.setChecked(self.action_data.exec_on_release)
 
-        action_mode = self.action_data.action_mode 
+        action_mode = self.action_data.action_mode
         index = self.mode_widget.findData(action_mode)
         if index != -1 and self.mode_widget.currentIndex != index:
             with QtCore.QSignalBlocker(self.mode_widget):
@@ -328,12 +328,12 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         )
 
 
-    def _action_mode_changed(self, index):  
+    def _action_mode_changed(self, index):
         ''' called when the action mode drop down value changes '''
         with QtCore.QSignalBlocker(self.mode_widget):
             action = self.mode_widget.itemData(index)
             self.action_data.action_mode = action
-            self._change_mode()  
+            self._change_mode()
 
     def _exec_on_release_changed(self, value):
         self.action_data.exec_on_release = self.chkb_exec_on_release.isChecked()
@@ -593,7 +593,7 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
                 if is_local:
                     gremlin.sendinput.mouse_h_wheel(direction)
                 if is_remote:
-                    input_devices.remote_client.send_mouse_h_wheel(direction)                      
+                    input_devices.remote_client.send_mouse_h_wheel(direction)
         else:
             if self.action.click_mode == MouseClickMode.Normal:
                 if value.current:
@@ -714,7 +714,7 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
             MapToMouseExFunctor._wiggle_remote_stop_requested = True
             MapToMouseExFunctor._wiggle_remote_thread.join()
             syslog.debug("Wiggle thread remote exited...")
-            MapToMouseExFunctor._wiggle_remote_thread = None            
+            MapToMouseExFunctor._wiggle_remote_thread = None
 
     @staticmethod
     def _wiggle_local():

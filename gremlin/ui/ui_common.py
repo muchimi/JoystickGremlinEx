@@ -210,7 +210,7 @@ class NoKeyboardPushButton(QtWidgets.QPushButton):
 
 
 class QFloatLineEdit(QtWidgets.QLineEdit):
-    ''' double input validator with optional range limits for input axis 
+    ''' double input validator with optional range limits for input axis
     
         this line edit behaves like a spin box so it's interchangeable
     
@@ -240,12 +240,12 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
         return self._data
     @data.setter
     def data(self, value):
-        self.data = value        
+        self.data = value
 
     def eventFilter(self, widget, event):
         t = event.type()
         if t == QtCore.QEvent.Type.Wheel:
-            # handle wheel up/down change 
+            # handle wheel up/down change
             v = self.value()
             if v is not None:
                 if event.angleDelta().y() > 0:
@@ -275,7 +275,7 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
         s_value = f"{value:0.{self._decimals}f}"
         if s_value != self.text():
             self.setText(s_value)
-        if other != value:        
+        if other != value:
             self.valueChanged.emit(value)
 
 
@@ -339,9 +339,140 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
 
     def setMinimum(self, bottom):
         self._min_range = bottom
-        self._validator.setBottom(top)
+        self._validator.setBottom(bottom)
         self._update_value(self.value())
         
+    def minimum(self):
+        return self._min_range
+
+    def maximum(self):
+        return self._max_range
+
+class QIntLineEdit(QtWidgets.QLineEdit):
+    ''' integer input validator with optional range limits for input axis
+    
+        this line edit behaves like a spin box so it's interchangeable
+    
+    '''
+
+    valueChanged = QtCore.Signal(float) # fires when the value changes
+
+    def __init__(self, data = None, min_range = -1.0, max_range = 1.0, step = 1, parent = None):
+        super().__init__(parent)
+        self._min_range = min_range
+        self._max_range = max_range
+        self._step = step
+        
+
+        self._validator = QtGui.QIntValidator(bottom=min_range, top=max_range)
+        self._validator.setLocale(self.locale()) # handle correct floating point separator
+        self.setValidator(self._validator)
+        self.textChanged.connect(self._validate)
+        self.installEventFilter(self)
+        self.setText("0")
+        self.setValue(0)
+        self._data = data
+
+    @property
+    def data(self):
+        return self._data
+    @data.setter
+    def data(self, value):
+        self.data = value
+
+    def eventFilter(self, widget, event):
+        t = event.type()
+        if t == QtCore.QEvent.Type.Wheel:
+            # handle wheel up/down change
+            v = self.value()
+            if v is not None:
+                if event.angleDelta().y() > 0:
+                    # up
+                    v += self._step
+                else:
+                    # down
+                    v -= self._step
+                v = gremlin.util.clamp(v, self._min_range, self._max_range)
+                self.setValue(v)
+                self.valueChanged.emit(v)
+        elif t == QtCore.QEvent.Type.FocusAboutToChange:
+            if not self.hasAcceptableInput():
+                return True # skip the event
+        elif t == QtCore.QEvent.Type.FocusOut:
+            if not self.hasAcceptableInput():
+                return True # skip the event
+            # format the input to the correct decimals
+            self.setValue(self.value())
+        return False
+
+        
+    def _update_value(self, value):
+        other = self.value()
+        if value is None or other is None:
+            return
+        s_value = str(value)
+        if s_value != self.text():
+            self.setText(s_value)
+        if other != value:
+            self.valueChanged.emit(value)
+
+
+        
+    @QtCore.Slot()
+    def _validate(self):
+        ''' called whenever the text changes '''
+        if self.hasAcceptableInput():
+            self.valueChanged.emit(self.value())
+
+    def setValue(self, value : int):
+        ''' sets the value '''
+        self._update_value(value)
+
+    def value(self) -> int:
+        ''' current value, None if not a valid input'''
+        if self.hasAcceptableInput():
+            return int(self.text())
+        return None
+    
+    def isValid(self):
+        ''' true if the input in the box is currently valid'''
+        return self.hasAcceptableInput()
+    
+    def step(self):
+        ''' mouse wheel step value'''
+        return self._step
+    
+    def setStep(self, step):
+        self._step = step
+
+    def setSingleStep(self, step: int):
+        self._step = step
+
+    def setRange(self, bottom, top):
+        if top < bottom:
+            bottom, top = top, bottom
+        self._min_range = bottom
+        self._max_range = top
+        self._validator.setBottom(bottom)
+        self._validator.setTop(top)
+        self._update_value(self.value())
+
+    def setMaximum(self, top):
+        self._max_range = top
+        self._validator.setTop(top)
+        self._update_value(self.value())
+
+    def setMinimum(self, bottom):
+        self._min_range = bottom
+        self._validator.setBottom(bottom)
+        self._update_value(self.value())
+
+    def minimum(self):
+        return self._min_range
+
+    def maximum(self):
+        return self._max_range
+                
 
 
 class DynamicDoubleSpinBox(QFloatLineEdit):
@@ -411,7 +542,7 @@ class DynamicDoubleSpinBox_legacy(QtWidgets.QDoubleSpinBox):
             
             format_string = f"{{:.{self.decimals():d}f}}"
     
-            try:        
+            try:
                 value_string = format_string.format(float(value_string))
             except:
                 return False
@@ -758,7 +889,7 @@ class ActionSelector(QtWidgets.QWidget):
         config.last_action = name
         if config.sync_last_selection:
             eh = gremlin.event_handler.EventHandler()
-            eh.last_action_changed.emit(self.action_dropdown, name) 
+            eh.last_action_changed.emit(self.action_dropdown, name)
 
     def _valid_action_list(self):
         """Returns a list of valid actions for this InputItemWidget.
@@ -850,7 +981,7 @@ def _inheritance_tree_to_labels(labels, tree, level):
     :param level the indentation level of this tree
     """
     for mode, children in sorted(tree.items()):
-        labels.append((mode, 
+        labels.append((mode,
             f"{"  " * level}{"" if level == 0 else " "}{mode}"))
         _inheritance_tree_to_labels(labels, children, level+1)
 
@@ -977,7 +1108,7 @@ class ModeWidget(QtWidgets.QWidget):
             # if len(mode_names) > 0:
             #     if current_mode is None or current_mode not in self.mode_list:
             #         # pick the first one
-            #         current_mode = mode_names[0]                
+            #         current_mode = mode_names[0]
 
             # Add properly arranged mode names to the drop down list
             index = 0
@@ -1195,7 +1326,7 @@ class InputListenerWidget(QtWidgets.QFrame):
         """Passes the pressed key to the provided callback and closes
         the overlay.
 
-        :param event 
+        :param event
         the keypress event to be processed
         """
 
@@ -1336,7 +1467,7 @@ class ConfirmPushButton(QtWidgets.QPushButton):
     confirmed = QtCore.Signal(object)
 
     def __init__(self, text = None, title = "Confirmation Required", prompt = "Are you sure?", show_callback = None, parent = None ) -> None:
-        ''' shows a confirm dialog box on click 
+        ''' shows a confirm dialog box on click
         
         :param text button text
         :param title dialog title
@@ -1364,7 +1495,7 @@ class ConfirmPushButton(QtWidgets.QPushButton):
         from gremlin.util import load_pixmap
         message_box = QtWidgets.QMessageBox()
         pixmap = load_pixmap("warning.svg")
-        pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio) 
+        pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
         message_box.setIconPixmap(pixmap)
         message_box.setText(self.title)
         message_box.setInformativeText(self.prompt)
@@ -1384,7 +1515,7 @@ class ConfirmBox():
         from gremlin.util import load_pixmap
         self._message_box = QtWidgets.QMessageBox(parent = parent)
         pixmap = load_pixmap("warning.svg")
-        pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio) 
+        pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
         self._message_box.setIconPixmap(pixmap)
         self._message_box.setText(title)
         self._message_box.setInformativeText(prompt)
@@ -1404,12 +1535,12 @@ class MessageBox():
         from gremlin.util import load_pixmap
         self._message_box = QtWidgets.QMessageBox(parent = parent)
         pixmap = load_pixmap("warning.svg")
-        pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio) 
+        pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
         self._message_box.setIconPixmap(pixmap)
         self._message_box.setText(title)
         self._message_box.setInformativeText(prompt)
         self._message_box.setStandardButtons(
-            QtWidgets.QMessageBox.StandardButton.Ok 
+            QtWidgets.QMessageBox.StandardButton.Ok
             )
         self._message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
         gremlin.util.centerDialog(self._message_box)
@@ -1461,14 +1592,14 @@ class QIconLabel(QtWidgets.QWidget):
         layout.addWidget(self._label_widget)
 
         if stretch:
-            layout.addStretch()   
+            layout.addStretch()
 
     def setIcon(self, icon_path = None, use_qta = True, color = None):
         ''' sets the icon of the label, pass a blank or None path to clear the icon'''
         if icon_path:
             if use_qta:
                 if color:
-                    pixmap = qta.icon(icon_path, color=color).pixmap(self.IconSize)    
+                    pixmap = qta.icon(icon_path, color=color).pixmap(self.IconSize)
                 else:
                     pixmap = qta.icon(icon_path).pixmap(self.IconSize)
             else:
@@ -1486,7 +1617,7 @@ class QIconLabel(QtWidgets.QWidget):
         ''' sets the text of the label '''
         if text:
             self._label_widget.setText(text)
-        else: 
+        else:
             self._label_widget.setText("")
 
     def setTextMinWidth(self, value):
@@ -1562,14 +1693,14 @@ class QDataComboBox(QtWidgets.QComboBox):
     
     @data.setter
     def data(self, value):
-        self._data = value        
+        self._data = value
 
 
 class QPathLineItem(QtWidgets.QWidget):
     ''' An editable text input line with a file selector button '''
 
     open = QtCore.Signal(object) # event that fires when the open button is clicked, and passes the control
-    pathChanged = QtCore.Signal(object, str) # fires when the line item changes 
+    pathChanged = QtCore.Signal(object, str) # fires when the line item changes
 
     IconSize = QtCore.QSize(16, 16)
 
@@ -1577,7 +1708,7 @@ class QPathLineItem(QtWidgets.QWidget):
         '''
         displays the path to a file or a folder
         :param: header - the header text
-        :param: text - the default content 
+        :param: text - the default content
         :data: optional data parameters
         :dir_mode: true if the entry is a folder, false if it's a file
         
@@ -1632,18 +1763,18 @@ class QPathLineItem(QtWidgets.QWidget):
     def eventFilter(self, object, event):
         t = event.type()
         if t == QtCore.QEvent.Type.FocusOut:
-            new_text = self._file_widget.text()  
+            new_text = self._file_widget.text()
             if self._text != new_text:
                 self._text = new_text
                 self.pathChanged.emit(self, self._text)
-        return False        
+        return False
 
     def _setIcon(self, icon_path = None, use_qta = True, color = None):
         ''' sets the icon of the label, pass a blank or None path to clear the icon'''
         if icon_path:
             if use_qta:
                 if color:
-                    pixmap = qta.icon(icon_path, color=color).pixmap(self.IconSize)    
+                    pixmap = qta.icon(icon_path, color=color).pixmap(self.IconSize)
                 else:
                     pixmap = qta.icon(icon_path).pixmap(self.IconSize)
             else:
@@ -1663,7 +1794,7 @@ class QPathLineItem(QtWidgets.QWidget):
             if text:
                 self._text = text
                 self._file_widget.setText(text)
-            else: 
+            else:
                 self._text = ""
                 self._file_widget.setText("")
         self._file_changed()
@@ -1688,7 +1819,7 @@ class QPathLineItem(QtWidgets.QWidget):
         if valid:
             self._setIcon("fa.check", color="green")
         else:
-            self._setIcon("fa.exclamation-circle", color="red")        
+            self._setIcon("fa.exclamation-circle", color="red")
         self._text = fname
         self.pathChanged.emit(self, self._text)
 
@@ -1763,8 +1894,8 @@ class AxisStateWidget(QtWidgets.QWidget):
     """Visualizes the current state of an axis."""
     
     css_vertical = r"QProgressBar::chunk {background: QLinearGradient( x1: 0, y1: 0, x2: 1, y2: 0,stop: 0 #78d,stop: 0.4999 #46a,stop: 0.5 #45a,stop: 1 #238 ); border-radius: 7px; border: 1px solid black;}"
-    #css_horizontal = r"QProgressBar::chunk {background: QLinearGradient( x1: 0, y1: 0, x2: 0, y2: 1,stop: 0 #78d,stop: 0.4999 #46a,stop: 0.5 #45a,stop: 1 #238 ); border-radius: 7px; border: 1px solid black;}"    
-    css_horizontal = r"QProgressBar::chunk {background: QLinearGradient( x1: 0, y1: 0, x2: 0, y2: 1,stop: 0 #77a ,stop: 0.4999 #477,stop: 0.5 #45a,stop: 1 #238 ); border-radius: 7px; border: 1px solid black;}"    
+    #css_horizontal = r"QProgressBar::chunk {background: QLinearGradient( x1: 0, y1: 0, x2: 0, y2: 1,stop: 0 #78d,stop: 0.4999 #46a,stop: 0.5 #45a,stop: 1 #238 ); border-radius: 7px; border: 1px solid black;}"
+    css_horizontal = r"QProgressBar::chunk {background: QLinearGradient( x1: 0, y1: 0, x2: 0, y2: 1,stop: 0 #77a ,stop: 0.4999 #477,stop: 0.5 #45a,stop: 1 #238 ); border-radius: 7px; border: 1px solid black;}"
     
     valueChanged = QtCore.Signal(float)
 
@@ -1844,7 +1975,7 @@ class AxisStateWidget(QtWidgets.QWidget):
             css = AxisStateWidget.css_horizontal+ f";height {self._width}px"
             self._progress_widget.setMaximumHeight(self._width)
 
-        self._progress_widget.setStyleSheet(css)    
+        self._progress_widget.setStyleSheet(css)
 
     def setLabel(self, value : str):
         ''' sets the label for the axis '''
@@ -2081,7 +2212,7 @@ class HatWidget(QtWidgets.QWidget):
                 painter.setPen(pen_active)
 
             painter.drawPolygon(HatWidget.triangle)
-            painter.restore()        
+            painter.restore()
 
 
 class HatState(QtWidgets.QGroupBox):
@@ -2513,7 +2644,7 @@ class QRowSelectorFrame(QtWidgets.QFrame):
         t = event.type()
         if self._selectable and t == QtCore.QEvent.Type.MouseButtonPress:
             self.selected = not self.selected
-        return False        
+        return False
 
     @property
     def selected(self):
@@ -2548,12 +2679,14 @@ def get_text_width(text):
     char_width = lbl.fontMetrics().averageCharWidth()
     return char_width * len(text)
 
+def get_char_width(count = 1):
+    return get_text_width("w") * count
 
 class QMarkerDoubleRangeSlider(QDoubleRangeSlider):
 
     icon_size = QtCore.QSize(16, 16)
 
-    # background: #8FBC8F;  add-page is the background color of the groove 
+    # background: #8FBC8F;  add-page is the background color of the groove
     
     css = '''
 
@@ -2641,7 +2774,7 @@ QMarkerDoubleRangeSlider::add-page:horizontal { background: #979EA8; border-styl
         # compute the positions relative to the size of the widget
         source_min = self._minimum
         source_max = self._maximum
-        target_min = self._to_qinteger_space(self._minimum) 
+        target_min = self._to_qinteger_space(self._minimum)
         target_max = self._to_qinteger_space(self._maximum)
         self._int_marker_pos = [((v - source_min) * (target_max - target_min)) / (source_max - source_min) + target_min for v in list_value]
         
@@ -2672,7 +2805,7 @@ QMarkerDoubleRangeSlider::add-page:horizontal { background: #979EA8; border-styl
         self._update_targets()
 
     def _update_targets(self):
-        self._target_min = self._to_qinteger_space(self._minimum) 
+        self._target_min = self._to_qinteger_space(self._minimum)
         self._target_max = self._to_qinteger_space(self._maximum)
 
 
@@ -2692,7 +2825,7 @@ QMarkerDoubleRangeSlider::add-page:horizontal { background: #979EA8; border-styl
 
     def paintEvent(self, ev: QtGui.QPaintEvent) -> None:
         # draw the main widget
-        super().paintEvent(ev) 
+        super().paintEvent(ev)
 
         # draw markers on top of the main widget
         
@@ -2700,7 +2833,7 @@ QMarkerDoubleRangeSlider::add-page:horizontal { background: #979EA8; border-styl
         orientation = self.orientation()
         if orientation == QtCore.Qt.Orientation.Horizontal:
             positions = [QtWidgets.QStyle.sliderPositionFromValue(self._target_min, self._target_max, v, self.width(), False) for v in self._int_marker_pos]
-            center = self.height() / 2  
+            center = self.height() / 2
         else:
             # vertical
             positions = [QtWidgets.QStyle.sliderPositionFromValue(self._target_min, self._target_max, v, self.height(), False) for v in self._int_marker_pos]
@@ -2993,7 +3126,7 @@ class QHelper():
     
     @max_range.setter
     def max_range(self, value):
-        self._max_range = value    
+        self._max_range = value
     
     @property
     def show_percent(self):
@@ -3024,7 +3157,7 @@ class QHelper():
     def to_value(self, value):
         ''' returns a [-1,+1] value converted to the range output'''
         if self.show_percent:
-            return gremlin.util.scale_to_range(value, target_min = 0, target_max = 100)    
+            return gremlin.util.scale_to_range(value, target_min = 0, target_max = 100)
         else:
             return gremlin.util.scale_to_range(value, target_min = self.min_range, target_max = self.max_range)
     

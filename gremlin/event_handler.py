@@ -69,7 +69,7 @@ class Event:
 			device_guid,
 			value=None,
 			virtual_code = 0,
-			is_pressed=None,
+			is_pressed=False,
 			raw_value=None,
 			force_remote = False,
 			action_id = None,
@@ -275,7 +275,7 @@ class EventListener(QtCore.QObject):
 		
 		self._running = True
 
-		# keyboard input handling buffer	
+		# keyboard input handling buffer
 		self._keyboard_state = {}
 		self._keyboard_queue = None
 		self._key_listener_started = False # true if the key listener is started
@@ -311,7 +311,7 @@ class EventListener(QtCore.QObject):
 
 		if isinstance(item, int):
 			virtual_code = item
-			key = gremlin.keyboard.KeyMap.find_virtual(virtual_code)	
+			key = gremlin.keyboard.KeyMap.find_virtual(virtual_code)
 			self._keyboard_buffer[virtual_code] = is_pressed
 			key_id = key.index_tuple()
 			
@@ -352,12 +352,12 @@ class EventListener(QtCore.QObject):
 			self._process_queue()
 
 
-		# done 
+		# done
 		# process any straglers
 		while not self._keyboard_queue.empty():
 			self._process_queue()
 		
-		logging.getLogger("system").info("KBD: processing stop")		
+		logging.getLogger("system").info("KBD: processing stop")
 	
 
 	def start_key_listener(self):
@@ -420,7 +420,7 @@ class EventListener(QtCore.QObject):
 		
 		if not dinput.DILL.initalized:
 			dinput.DILL.init()
-		logging.getLogger("system").info("DILL: input start listen")			
+		logging.getLogger("system").info("DILL: input start listen")
 		dinput.DILL.set_device_change_callback(self._joystick_device_handler)
 		dinput.DILL.set_input_event_callback(self._joystick_event_handler)
 		while self._running:
@@ -519,7 +519,7 @@ class EventListener(QtCore.QObject):
 		# print (f"recorded key: {key_id} vk: {virtual_code} (0x{virtual_code:X})")
 
 		# deal with any code translations needed
-		key_id, virtual_code = gremlin.keyboard.KeyMap.translate(key_id) # modify scan codes if needed 
+		key_id, virtual_code = gremlin.keyboard.KeyMap.translate(key_id) # modify scan codes if needed
 		# print (f"translated key: {KeyMap.keyid_tostring(key_id)}  vk: {virtual_code} (0x{virtual_code:X})")
 
 		is_pressed = event.is_pressed
@@ -533,13 +533,13 @@ class EventListener(QtCore.QObject):
 			return True
 
 		# if virtual_code > 0:
-		# 	self._keyboard_state[virtual_code] = is_pressed	
+		# 	self._keyboard_state[virtual_code] = is_pressed
 		
 		self._keyboard_state[key_id] = is_pressed
 		# print (f"set state: {key_id} state: {is_pressed}")
 		
 		if gremlin.shared_state.is_running:
-			# RUN mode - queue input events 
+			# RUN mode - queue input events
 			if not self._key_listener_started:
 				return True
 			
@@ -592,7 +592,7 @@ class EventListener(QtCore.QObject):
 			if not self._running:
 				return
 
-			# update keyboard state for that key 
+			# update keyboard state for that key
 			key_id = (event.button_id.value + 0x1000, False)
 			self._keyboard_state[key_id] = event.is_pressed
 
@@ -658,7 +658,7 @@ class EventHandler(QtCore.QObject):
 	# Signal emitted when the application is pause / resumed
 	is_active = QtCore.Signal(bool)
 
-	last_action_changed = QtCore.Signal(object, str) # fires when the action changes in the selector (drop_down, name) 
+	last_action_changed = QtCore.Signal(object, str) # fires when the action changes in the selector (drop_down, name)
 	last_container_changed = QtCore.Signal(object, str) # fires when the action changes in the selector (drop_down, name)
 
 	
@@ -821,7 +821,7 @@ class EventHandler(QtCore.QObject):
 				# if the key can latch with multiple primary keys, build the table of all combinations
 				key_list = [primary_key]
 				if primary_key.is_latched:
-					# multiple keys 
+					# multiple keys
 					key_list.extend(primary_key._latched_keys)
 
 				for key in key_list:
@@ -882,7 +882,7 @@ class EventHandler(QtCore.QObject):
 				if not key in self.osc_callbacks[device_guid][mode]:
 					self.osc_callbacks[device_guid][mode][key] = []
 				data = self.osc_callbacks[device_guid][mode][key]
-				data.append((self._install_plugins(callback),permanent))			
+				data.append((self._install_plugins(callback),permanent))
 			else:
 				# regular event
 				if device_guid not in self.callbacks:
@@ -950,7 +950,7 @@ class EventHandler(QtCore.QObject):
 				return input_items
 			
 			
-		return []		
+		return []
 	
 
 	def build_event_lookup(self, inheritance_tree):
@@ -1069,7 +1069,7 @@ class EventHandler(QtCore.QObject):
 				self.runtime_mode = new_mode
 				logging.getLogger("system").debug(f"Profile: {current_profile.name} - Runtime Mode switch to: {new_mode}")
 				if emit:
-					self.runtime_mode_changed.emit(self.runtime_mode)	
+					self.runtime_mode_changed.emit(self.runtime_mode)
 		else:
 			# non-runtime
 
@@ -1122,7 +1122,7 @@ class EventHandler(QtCore.QObject):
 
 		
 		
-		verbose = gremlin.config.Configuration().verbose
+		verbose = gremlin.config.Configuration().verbose_mode_inputs
 		if verbose and event.event_type != InputType.JoystickAxis:
 			logging.getLogger("system").info(f"process event - mode [{self.runtime_mode}] event: {str(event)}")
 
@@ -1136,7 +1136,7 @@ class EventHandler(QtCore.QObject):
 				logging.getLogger("system").info(f"process keyboard event: {event}")
 				logging.getLogger("system").info(f"\tKeyboard state data:")
 				for key in data.keys():
-					logging.getLogger("system").info(f"\t\t{gremlin.keyboard.KeyMap.keyid_tostring(key)} {data[key]}")					
+					logging.getLogger("system").info(f"\t\t{gremlin.keyboard.KeyMap.keyid_tostring(key)} {data[key]}")
 
 			items = self._matching_event_keys(event)  # returns list of primary keys
 			if items:
@@ -1167,10 +1167,10 @@ class EventHandler(QtCore.QObject):
 								logging.getLogger("system").info(f"\t\t* Key not found *")
 						is_latched = is_latched and state
 
-					if verbose: 
-						logging.getLogger("system").info(f"\tLatched state: {is_latched}")					
+					if verbose:
+						logging.getLogger("system").info(f"\tLatched state: {is_latched}")
 					
-					if is_latched: 
+					if is_latched:
 						latch_key = input_item.key
 
 					if latch_key:
@@ -1201,7 +1201,7 @@ class EventHandler(QtCore.QObject):
 		elif event.event_type in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat):
 			verbose = gremlin.config.Configuration().verbose_mode_joystick
 			m_list = self._matching_callbacks(event)
-		else:			 
+		else:
 			# other inputs
 			verbose = gremlin.config.Configuration().verbose_mode_details
 			m_list = self._matching_callbacks(event)
@@ -1212,7 +1212,7 @@ class EventHandler(QtCore.QObject):
 		if m_list:
 			if verbose:
 				logging.getLogger("system").info(f"TRIGGER: mode: [{self.runtime_mode}] callbacks: {len(m_list)} event: {event}")
-			self._trigger_callbacks(m_list, event)			
+			self._trigger_callbacks(m_list, event)
 
 
 	def _trigger_callbacks(self, callbacks, event):
@@ -1235,7 +1235,7 @@ class EventHandler(QtCore.QObject):
 		callback_list = []
 		if event.event_type == InputType.Midi:
 			key = event.identifier.message_key
-			import gremlin.ui.midi_device 
+			import gremlin.ui.midi_device
 			if event.identifier.command == gremlin.ui.midi_device.MidiCommandType.SysEx:
 					pass
 			if event.device_guid in self.midi_callbacks:
@@ -1313,7 +1313,7 @@ class EventHandler(QtCore.QObject):
 		if not self.process_callbacks:
 			return [c[0] for c in callback_list if c[1]]
 		else:
-			return [c[0] for c in callback_list]			
+			return [c[0] for c in callback_list]
 
 	def _install_plugins(self, callback):
 		"""Installs the current plugins into the given callback.

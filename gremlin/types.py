@@ -34,10 +34,13 @@ class VisualizationType(enum.Enum):
     ButtonHat = 3
 
 class KeyboardOutputMode(enum.Enum):
-    Both = 0 # keyboard make and break (press/release)
+    Both = 0 # keyboard make and break (press/release) (pulse mode)
     Press = 1 # keyboard make only
     Release = 2 # keyboard release only
-    Hold = 3 # press while held (default Gremlin behavior)   
+    Hold = 3 # press while held (default Gremlin behavior)
+    AutoRepeat = 4 # repeated pulse mode - key pulses while the input is held
+
+    
 class ActivationRule(enum.Enum):
 
     """Activation rules for collections of conditions.
@@ -84,7 +87,7 @@ class AxisNames(enum.Enum):
         
     @staticmethod
     def to_list():
-        return [axis for axis in AxisNames]        
+        return [axis for axis in AxisNames]
 
 
 _AxisNames_to_string_lookup = {
@@ -210,8 +213,8 @@ class DeviceType(enum.IntEnum):
 
     """Enumeration of the different possible input types."""
 
-    Keyboard = 1 # keyboard 
-    Joystick = 2 # game controller 
+    Keyboard = 1 # keyboard
+    Joystick = 2 # game controller
     VJoy = 3 # vjoy (virtual)
     Midi = 4 # midi
     Osc = 5 # open source control
@@ -753,7 +756,7 @@ class MouseAction(enum.Enum):
         elif action == MouseAction.MouseWiggleOffRemote:
             return "Wiggle Disable (remote)"
         elif action == MouseAction.MouseWiggleOnRemote:
-            return "Wiggle Enable (remote)"        
+            return "Wiggle Enable (remote)"
                 
         return f"Unknown {action}"
     
@@ -846,13 +849,13 @@ _MouseButton_to_enum_lookup = {
     "Forward": MouseButton.Forward,
     "Back": MouseButton.Back,
     "Wheel Up": MouseButton.WheelUp,
-    "Wheel Down": MouseButton.WheelDown, 
+    "Wheel Down": MouseButton.WheelDown,
     "Wheel Left": MouseButton.WheelLeft,
-    "Wheel Right": MouseButton.WheelRight   
+    "Wheel Right": MouseButton.WheelRight
 }
 
 _MouseButton_lookup_to_button_lookup = {
-    "mouse_1": MouseButton.Left, 
+    "mouse_1": MouseButton.Left,
     "mouse_2": MouseButton.Right,
     "mouse_3": MouseButton.Middle,
     "mouse_4": MouseButton.Forward,
@@ -860,7 +863,7 @@ _MouseButton_lookup_to_button_lookup = {
     "wheel_up": MouseButton.WheelUp,
     "wheel_down": MouseButton.WheelDown,
     "wheel_left": MouseButton.WheelLeft,
-    "wheel_right": MouseButton.WheelRight 
+    "wheel_right": MouseButton.WheelRight
 }
 
 
@@ -868,7 +871,7 @@ _MouseButton_lookup_to_button_lookup = {
 class VerboseMode(enum.IntFlag):
     NotSet = 0
     Keyboard = enum.auto() # keyboard input only
-    Joystick = enum.auto() # joystick input 
+    Joystick = enum.auto() # joystick input
     Inputs = enum.auto() # list inputs
     Mouse = enum.auto() # mouse input
     SimConnect = enum.auto() # simconnect interface
@@ -879,7 +882,7 @@ class VerboseMode(enum.IntFlag):
         return  (self.value & item.value) == item.value
 
 
-@enum.unique 
+@enum.unique
 class TabDeviceType(int, enum.Enum):
     ''' types of devices shown on device tabs '''
     NotSet = 0

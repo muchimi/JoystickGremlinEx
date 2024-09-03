@@ -63,13 +63,14 @@ class Value:
 
     """Represents an input value, keeping track of raw and "seen" value."""
 
-    def __init__(self, raw):
+    def __init__(self, raw, is_pressed = None):
         """Creates a new value and initializes it.
 
         :param raw the initial raw data
         """
         self._raw = raw
         self._current = raw
+        self._is_pressed = is_pressed
 
     @property
     def raw(self):
@@ -97,9 +98,14 @@ class Value:
 
     @property
     def is_pressed(self):
+        if self._is_pressed is not None:
+            return self._is_pressed
         return isinstance(self._current, bool) and self.current
 
-
+    @is_pressed.setter
+    def is_pressed(self, value: bool):
+        self._is_pressed = value
+        
 class ActivationCondition:
 
     """Represents a set of conditions dictating the activation of actions.

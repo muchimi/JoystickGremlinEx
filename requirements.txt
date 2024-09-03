@@ -1,5 +1,4 @@
 cx_Freeze==7.1.1
-cx_Freeze==7.1.1
 dill==0.3.8
 hardware==0.31.0
 mido==1.3.2
@@ -8,3 +7,4 @@ pytest==8.2.0
 pywin32==306
 reportlab==4.1.0
 pyttsx3
+QtAwesome

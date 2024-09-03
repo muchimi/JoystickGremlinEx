@@ -97,7 +97,7 @@ def scale_to_range(value, source_min = -1.0, source_max = 1.0, target_min = -1.0
     ''' scales a value on one range to the new range
     
     value: the value to scale
-    r_min: the source value's min range 
+    r_min: the source value's min range
     r_max: the source value's max range
     new_min: the new range's min
     new_max: the new range's max
@@ -115,6 +115,12 @@ def scale_to_range(value, source_min = -1.0, source_max = 1.0, target_min = -1.0
         result = (((source_max - value) * (target_max - target_min)) / (source_max - source_min)) + target_min
     else:
         result = (((value - source_min) * (target_max - target_min)) / (source_max - source_min)) + target_min
+        
+    # clamp rounding precision
+    if result < target_min:
+        result = target_min
+    elif result > target_max:
+        result = target_max
     return result + 0
 
 def get_axis(guid, index, normalized = True):

@@ -35,7 +35,7 @@ from PySide6 import QtCore, QtWidgets, QtGui
 from win32api import GetFileVersionInfo, LOWORD, HIWORD
 
 
-from . import error 
+from . import error
 
 
 # Table storing which modules have been imported already
@@ -163,13 +163,13 @@ def userprofile_path():
     """Returns the path to the user's profile folder, %userprofile%."""
     path = os.path.abspath(os.path.join(os.getenv("userprofile"),"Joystick Gremlin Ex"))
     if not os.path.isdir(path):
-        # profile folder does not exist - see if we can create it from the original profile 
+        # profile folder does not exist - see if we can create it from the original profile
         source_path = os.path.abspath(os.path.join(os.getenv("userprofile"),"Joystick Gremlin"))
         if os.path.isdir(source_path):
             try:
                 # copy from original profile
                 shutil.copytree(source_path, path)
-                logging.getLogger("system").info(f"First run - copied Joystick Gremlin profiles to to Joystick Gremlin Ex")                
+                logging.getLogger("system").info(f"First run - copied Joystick Gremlin profiles to to Joystick Gremlin Ex")
             except Exception as error:
                 logging.getLogger("system").error(f"Unable to copy profile from Joystick Gremlin to Joystick Gremlin Ex:\n{error}")
         if not os.path.isdir(path):
@@ -179,7 +179,7 @@ def userprofile_path():
             except Exception as error:
                 logging.getLogger("system").error(f"Unable to create profile folder for Joystick Gremlin Ex:\n{error}")
                 
-        if not os.path.isdir(path):                
+        if not os.path.isdir(path):
                 from gremlin.error import GremlinError
                 raise GremlinError(f"Critical error: Unable to create profile folder: {path}")
             
@@ -453,9 +453,9 @@ def get_dll_version(path, as_string = True):
     ls = info['FileVersionLS']
 
     f_major = HIWORD (ms)
-    f_minor = LOWORD (ms) 
+    f_minor = LOWORD (ms)
     p_major = HIWORD (ls)
-    p_minor = LOWORD (ls) 
+    p_minor = LOWORD (ls)
     
     if as_string:
         return f"{f_major}.{f_minor}.{p_major}.{p_minor}"
@@ -465,8 +465,8 @@ def get_dll_version(path, as_string = True):
 # def get_vjoy_driver_version() -> str:
 #     ''' gets the vjoy driver version on the current machine '''
 #     import subprocess, sys
-#     p = subprocess.Popen(["powershell.exe", 
-#                 "Get-WmiObject Win32_PnPSignedDriver | select devicename, driverversion | ConvertTo-CSV"], 
+#     p = subprocess.Popen(["powershell.exe",
+#                 "Get-WmiObject Win32_PnPSignedDriver | select devicename, driverversion | ConvertTo-CSV"],
 #                 stdout=subprocess.PIPE,
 #                 startupinfo=subprocess.STARTUPINFO(dwFlags=subprocess.STARTF_USESHOWWINDOW, wShowWindow=subprocess.SW_HIDE,)
 #     )
@@ -482,10 +482,10 @@ def get_dll_version(path, as_string = True):
 #         if  "vjoy device" in line:
 #             _, version = line.split(",")
 #             return version.replace("\r","").replace("\"","")
-#     return None    
+#     return None
 
 def version_valid(v, v_req):
-    ''' compares two versions 
+    ''' compares two versions
     
     :param v - version as string in x.x.x.x format
     :param r - version required as string in x.x.x.x format
@@ -574,7 +574,7 @@ def find_file(file_path, root_folder = None):
 
     files = []
     if not os.path.isfile(file_path):
-        # path not found 
+        # path not found
         file_root, ext = os.path.splitext(file_path)
         if ext:
             extensions = [ext]
@@ -610,7 +610,7 @@ def find_file(file_path, root_folder = None):
 
 
 def get_icon_path(*paths):
-        ''' 
+        '''
         gets an icon path
            
         '''
@@ -632,27 +632,27 @@ def get_icon_path(*paths):
             return gremlin.shared_state._icon_path_cache[the_path]
 
    
-        # logging.getLogger("system").info(f"icon path: {the_path}  root: {root_path}")        
+        # logging.getLogger("system").info(f"icon path: {the_path}  root: {root_path}")
         icon_file = os.path.join(root_path, the_path)
         icon_file = icon_file.replace("/",os.sep).lower()
         if icon_file:
             if os.path.isfile(icon_file):
                 if verbose:
-                    logging.getLogger("system").info(f"Icon file (straight) found: {icon_file}")        
+                    logging.getLogger("system").info(f"Icon file (straight) found: {icon_file}")
                 gremlin.shared_state._icon_path_cache[the_path] = icon_file
                 return icon_file
             if not icon_file.endswith(".png"):
                 icon_file_png = icon_file + ".png"
                 if os.path.isfile(icon_file_png):
                     if verbose:
-                        logging.getLogger("system").info(f"Icon file (png) found: {icon_file_png}")        
+                        logging.getLogger("system").info(f"Icon file (png) found: {icon_file_png}")
                     gremlin.shared_state._icon_path_cache[the_path] = icon_file_png
                     return icon_file_png
             if not icon_file.endswith(".svg"):
                 icon_file_svg = icon_file + ".svg"
                 if os.path.isfile(icon_file_svg):
                     if verbose:
-                        logging.getLogger("system").info(f"Icon file (svg) found: {icon_file_svg}")        
+                        logging.getLogger("system").info(f"Icon file (svg) found: {icon_file_svg}")
                     gremlin.shared_state._icon_path_cache[the_path] = icon_file_svg
                     return icon_file_svg
             brute_force = find_file(the_path)
@@ -698,7 +698,7 @@ def load_icon(*paths, use_qta = False, qta_color = None):
         pixmap = load_pixmap(*paths)
         if not pixmap or pixmap.isNull():
             if verbose:
-                logging.getLogger("system").info(f"LoadIcon() using generic icon - failed to locate: {paths}")        
+                logging.getLogger("system").info(f"LoadIcon() using generic icon - failed to locate: {paths}")
             return get_generic_icon()
 
         icon = QtGui.QIcon()
@@ -714,10 +714,10 @@ def load_image(*paths):
     the_path = get_icon_path(*paths)
     if the_path:
         if verbose:
-            logging.getLogger("system").info(f"LoadImage() found image: {paths}") 
+            logging.getLogger("system").info(f"LoadImage() found image: {paths}")
         return QtGui.QImage(the_path)
     if verbose:
-            logging.getLogger("system").info(f"LoadImage() failed to locate: {paths}")        
+            logging.getLogger("system").info(f"LoadImage() failed to locate: {paths}")
     return None
         
     
@@ -816,7 +816,7 @@ def safe_format(value, data_type, formatter=str):
 
 
 def get_xml_child(node, tag : str, multiple = False):
-    ''' gets a specific xml child node by tag - None if not found 
+    ''' gets a specific xml child node by tag - None if not found
     
     :param: multiple - if set, returns all matching subnodes as a list, blank list if nothing found - if not set, returns None or the first node found
     
@@ -832,6 +832,8 @@ def get_xml_child(node, tag : str, multiple = False):
         return nodes
 
     for child in list(node):
+        if child.tag is ElementTree.Comment:
+            continue
         if child.tag.casefold() == value:
 
             return child
@@ -889,7 +891,7 @@ def parse_bool(value, default_value=False):
             value = value.lower()
             if value in ["true", "false"]:
                 return value == "true"
-            else: 
+            else:
                 raise error.ProfileError(
                     f"Invalid bool value used: {value}"
                 )
@@ -961,7 +963,7 @@ def scale_to_range(value, source_min = -1.0, source_max = 1.0, target_min = -1.0
     ''' scales a value on one range to the new range
     
     value: the value to scale
-    r_min: the source value's min range 
+    r_min: the source value's min range
     r_max: the source value's max range
     new_min: the new range's min
     new_max: the new range's max
@@ -1034,7 +1036,7 @@ def popCursor():
     ''' restores form wait cusor '''
     global _cursor_push
     if _cursor_push > 0:
-        _cursor_push -= 1    
+        _cursor_push -= 1
         if _cursor_push == 0:
             QtWidgets.QApplication.restoreOverrideCursor()
             QtWidgets.QApplication.processEvents()
@@ -1141,7 +1143,7 @@ def display_file(path):
     if os.path.isfile(path):
         webbrowser.open(path)
     else:
-        logging.getLogger("system").error(f"DISPLAYFILE: warning: file not found: {path}")    
+        logging.getLogger("system").error(f"DISPLAYFILE: warning: file not found: {path}")
 
 
 def debug_pickle(instance, exception=None, string='', first_only=True):
@@ -1203,3 +1205,5 @@ def debug_pickle(instance, exception=None, string='', first_only=True):
         )
 
     return problems
+
+

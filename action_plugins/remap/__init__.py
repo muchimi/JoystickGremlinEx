@@ -233,6 +233,7 @@ class RemapFunctor(gremlin.base_classes.AbstractFunctor):
         self.thread = None
         self.axis_delta_value = 0.0
         self.axis_value = 0.0
+        self.test = False
 
     def process_event(self, event, value):
         if self.input_type == InputType.JoystickAxis:
@@ -261,8 +262,18 @@ class RemapFunctor(gremlin.base_classes.AbstractFunctor):
                     event
                 )
 
+
+            if joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed != value.is_pressed:
+                if not self.test and not value.is_pressed:
+                    self.test = True
+                if self.test and value.is_pressed:
+                    pass
+                print (f"test button state toggle: {value.is_pressed}")
+
             joystick_handling.VJoyProxy()[self.vjoy_device_id] \
-                .button(self.vjoy_input_id).is_pressed = value.current
+                .button(self.vjoy_input_id).is_pressed = value.is_pressed
+            
+            
 
         elif self.input_type == InputType.JoystickHat:
             joystick_handling.VJoyProxy()[self.vjoy_device_id] \

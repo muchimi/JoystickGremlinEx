@@ -1548,7 +1548,8 @@ If you want to run from the source code, you will need the following python pack
 	reportlab
 	dill
 	mido
-	python-rtpmidi
+	python-rtmidi
 	lxml
 	pyttsx3
+	qtawesome
 
