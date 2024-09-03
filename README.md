@@ -990,11 +990,11 @@ The gated axis allows you to map one or more actions when the input value crosse
 
 The gated axis action can only be associated with an axis hardware input and cannot be associated with buttons or hats.  It expects a linear input.
 
-![](doc/gated_axis.png)
+![](gated_axis.png)
 
-![](doc/gate_axis_gate_widget.png)
+![](gate_axis_gate_widget.png)
 
-![](doc/gate_axis_range_widget.png)
+![](gate_axis_range_widget.png)
 
 
 <!-- TOC --><a name="gates"></a>
@@ -1013,7 +1013,7 @@ Gates can be moved by the mouse, or by clicking the record button which will mov
 
 The gate mapping configuration window is access by clicking on the gate's configure button, or right clicking a gate.
 
-![](doc/gate_axis_gate_mapping.png)
+![](gate_axis_gate_mapping.png)
 
 
 Each gate condition has its own set of mappings.   Mappings will see the gate as a momentary (button) input so only actions suitable for a button will be available for selection.
@@ -1047,7 +1047,7 @@ If individual range mappings are not needed, a default range corresponding to th
 <!-- TOC --><a name="range-mapping"></a>
 ## Range mapping
 
-![](doc/gated_axis_range_action.png)
+![](gated_axis_range_action.png)
 
 A range lets you map actions whenever the input enters a range, exits a range, or is within a range.  Each as its own set of mappings.
 
@@ -1132,7 +1132,7 @@ It also adds a delay (pulse) function to hold a key down for a preset period of 
 
 The make/break/pulse behavior applies to all keys in the action, and the keys are released in the reverse order they were pressed.
 
-![](doc/keyboard_mapper_ex.png)
+![](keyboard_mapper_ex.png)
 
 <!-- TOC --><a name="output-modes"></a>
 ## Output modes
