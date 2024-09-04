@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
+# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,11 +18,11 @@
 
 import os
 from PySide6 import QtCore, QtGui, QtWidgets
-from xml.etree import ElementTree
+from lxml import etree as ElementTree
 
 from PySide6.QtGui import QIcon
-from gremlin.base_classes import AbstractAction, AbstractFunctor
-from gremlin.common import InputType
+import gremlin.base_profile 
+from gremlin.input_types import InputType
 import gremlin.ui.input_item
 
 
@@ -38,7 +38,7 @@ class CycleModesWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _create_ui(self):
 
-        from gremlin.common import load_icon
+        from gremlin.util import load_icon
 
         if CycleModesWidget.locked:
             return
@@ -130,18 +130,20 @@ class CycleModesWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.save_changes()
 
 
-class CycleModesFunctor(AbstractFunctor):
+class CycleModesFunctor(gremlin.base_profile.AbstractFunctor):
 
     def __init__(self, action):
         super().__init__(action)
+        import gremlin.control_action
         self.mode_list = gremlin.control_action.ModeList(action.mode_list)
 
     def process_event(self, event, value):
+        import gremlin.control_action
         gremlin.control_action.cycle_modes(self.mode_list)
         return True
 
 
-class CycleModes(AbstractAction):
+class CycleModes(gremlin.base_profile.AbstractAction):
 
     """Action allowing the switching through a list of modes."""
 
@@ -149,18 +151,22 @@ class CycleModes(AbstractAction):
     tag = "cycle-modes"
 
     default_button_activation = (True, False)
-    input_types = [
-        InputType.JoystickAxis,
-        InputType.JoystickButton,
-        InputType.JoystickHat,
-        InputType.Keyboard
-    ]
+
+    # override allowed input types if different from default
+    # input_types = [
+    #     InputType.JoystickAxis,
+    #     InputType.JoystickButton,
+    #     InputType.JoystickHat,
+    #     InputType.Keyboard,
+        
+    # ]
 
     functor = CycleModesFunctor
     widget = CycleModesWidget
 
     def __init__(self, parent):
         super().__init__(parent)
+        self.parent = parent
         self.mode_list = []
 
     def icon(self):

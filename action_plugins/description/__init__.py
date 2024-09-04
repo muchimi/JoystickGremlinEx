@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
+# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,10 +18,10 @@
 
 import os
 from PySide6 import QtWidgets
-from xml.etree import ElementTree
+from lxml import etree as ElementTree
 
-from gremlin.base_classes import AbstractAction, AbstractFunctor
-from gremlin.common import InputType
+import gremlin.base_classes 
+from gremlin.input_types import InputType
 import gremlin.ui.input_item
 
 
@@ -49,7 +49,7 @@ class DescriptionActionWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.action_data.description = value
 
 
-class DescriptionActionFunctor(AbstractFunctor):
+class DescriptionActionFunctor(gremlin.base_profile.AbstractFunctor):
 
     def __init__(self, action):
         super().__init__(action)
@@ -58,7 +58,7 @@ class DescriptionActionFunctor(AbstractFunctor):
         return True
 
 
-class DescriptionAction(AbstractAction):
+class DescriptionAction(gremlin.base_profile.AbstractAction):
 
     """Action for adding a description to a set of actions."""
 
@@ -66,12 +66,14 @@ class DescriptionAction(AbstractAction):
     tag = "description"
 
     default_button_activation = (True, False)
-    input_types = [
-        InputType.JoystickAxis,
-        InputType.JoystickButton,
-        InputType.JoystickHat,
-        InputType.Keyboard
-    ]
+    
+    # override allowed input types if different from default
+    # input_types = [
+    #     InputType.JoystickAxis,
+    #     InputType.JoystickButton,
+    #     InputType.JoystickHat,
+    #     InputType.Keyboard
+    # ]
 
     functor = DescriptionActionFunctor
     widget = DescriptionActionWidget
@@ -79,6 +81,7 @@ class DescriptionAction(AbstractAction):
     def __init__(self, parent):
         super().__init__(parent)
         self.description = ""
+        self.parent = parent
 
     def icon(self):
         return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"

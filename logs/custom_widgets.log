@@ -1,0 +1,13 @@
+2024-07-29 09:55:20,855 - DEBUG - CACHEDIR=C:\Users\etien\.matplotlib
+2024-07-29 09:55:20,855 - DEBUG - font search path [WindowsPath('C:/Python/Python312/Lib/site-packages/matplotlib/mpl-data/fonts/ttf'), WindowsPath('C:/Python/Python312/Lib/site-packages/matplotlib/mpl-data/fonts/afm'), WindowsPath('C:/Python/Python312/Lib/site-packages/matplotlib/mpl-data/fonts/pdfcorefonts')]
+2024-07-29 09:55:23,021 - INFO - generated new fontManager
+2024-07-29 09:55:23,401 - DEBUG - Loaded backend qtagg version 6.7.2.
+2024-07-29 10:38:37,594 - DEBUG - CACHEDIR=C:\Users\etien\.matplotlib
+2024-07-29 10:38:37,602 - DEBUG - Using fontManager instance from C:\Users\etien\.matplotlib\fontlist-v390.json
+2024-07-29 10:38:38,279 - DEBUG - Loaded backend qtagg version 6.7.2.
+2024-07-29 10:48:34,029 - DEBUG - CACHEDIR=C:\Users\etien\.matplotlib
+2024-07-29 10:48:34,033 - DEBUG - Using fontManager instance from C:\Users\etien\.matplotlib\fontlist-v390.json
+2024-07-29 10:48:34,240 - DEBUG - Loaded backend qtagg version 6.7.2.
+2024-07-29 10:49:18,600 - DEBUG - CACHEDIR=C:\Users\etien\.matplotlib
+2024-07-29 10:49:18,605 - DEBUG - Using fontManager instance from C:\Users\etien\.matplotlib\fontlist-v390.json
+2024-07-29 10:49:18,800 - DEBUG - Loaded backend qtagg version 6.7.2.

@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
+# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,9 +21,15 @@ import logging
 
 import dinput
 
-from . import base_classes, common, event_handler, fsm, input_devices, \
-    joystick_handling, macro, util
+from gremlin.input_types import InputType
+#from . import base_classes, event_handler, fsm, input_devices, joystick_handling, macro, util
+from gremlin.base_conditions import ActivationRule
+import gremlin.joystick_handling
 
+import gremlin.event_handler
+import gremlin.util
+import gremlin.fsm
+import gremlin.macro
 
 def smart_all(conditions):
     """Returns True if all conditions are True, False otherwise.
@@ -57,13 +63,14 @@ class Value:
 
     """Represents an input value, keeping track of raw and "seen" value."""
 
-    def __init__(self, raw):
+    def __init__(self, raw, is_pressed = None):
         """Creates a new value and initializes it.
 
         :param raw the initial raw data
         """
         self._raw = raw
         self._current = raw
+        self._is_pressed = is_pressed
 
     @property
     def raw(self):
@@ -89,7 +96,16 @@ class Value:
         """
         self._current = current
 
+    @property
+    def is_pressed(self):
+        if self._is_pressed is not None:
+            return self._is_pressed
+        return isinstance(self._current, bool) and self.current
 
+    @is_pressed.setter
+    def is_pressed(self, value: bool):
+        self._is_pressed = value
+        
 class ActivationCondition:
 
     """Represents a set of conditions dictating the activation of actions.
@@ -100,13 +116,14 @@ class ActivationCondition:
     """
 
     rule_function = {
-        base_classes.ActivationRule.All: smart_all,
-        base_classes.ActivationRule.Any: smart_any
+        ActivationRule.All: smart_all,
+        ActivationRule.Any: smart_any
     }
 
     def __init__(self, conditions, rule):
         self._conditions = conditions
         self._rule = rule
+        self.enabled = True # always enabled
 
     def process_event(self, event, value):
         """Returns whether or not a condition is satisfied, i.e. true.
@@ -154,7 +171,7 @@ class KeyboardCondition(AbstractCondition):
     particular key is pressed or released.
     """
 
-    def __init__(self, scan_code, is_extended, comparison):
+    def __init__(self, scan_code, is_extended, comparison, input_item = None):
         """Creates a new instance.
 
         :param scan_code the scan code of the key to evaluate
@@ -162,7 +179,15 @@ class KeyboardCondition(AbstractCondition):
         :param comparison the comparison operation to perform when evaluated
         """
         super().__init__(comparison)
-        self.key = macro.key_from_code(scan_code, is_extended)
+        from gremlin.ui.keyboard_device import KeyboardInputItem
+         
+        if not input_item:
+            input_item = KeyboardInputItem()
+            key = gremlin.macro.key_from_code(scan_code, is_extended)
+            input_item.key = key
+
+        self.input_item = input_item
+       
 
     def __call__(self, event, value):
         """Evaluates the condition using the condition and provided data.
@@ -171,7 +196,8 @@ class KeyboardCondition(AbstractCondition):
         :param value the possibly modified value
         :return True if the condition is satisfied, False otherwise
         """
-        key_pressed = input_devices.Keyboard().is_pressed(self.key)
+        # key_pressed = gremlin.input_devices.Keyboard().is_pressed(self.key)
+        key_pressed = self.input_item.latched
         if self.comparison == "pressed":
             return key_pressed
         else:
@@ -206,12 +232,12 @@ class JoystickCondition(AbstractCondition):
         :param value the possibly modified value
         :return True if the condition is satisfied, False otherwise
         """
-        joy = input_devices.JoystickProxy()[self.device_guid]
+        joy = gremlin.input_devices.JoystickProxy()[self.device_guid]
         if joy is None:
             # device not found - ignore
             return False
 
-        if self.input_type == common.InputType.JoystickAxis:
+        if self.input_type == InputType.JoystickAxis:
             in_range = self.condition.range[0] <= \
                        joy.axis(self.input_id).value <= \
                        self.condition.range[1]
@@ -220,14 +246,14 @@ class JoystickCondition(AbstractCondition):
                 return in_range if self.comparison == "inside" else not in_range
             else:
                 return False
-        elif self.input_type == common.InputType.JoystickButton:
+        elif self.input_type == InputType.JoystickButton:
             if self.comparison == "pressed":
                 return joy.button(self.input_id).is_pressed
             else:
                 return not joy.button(self.input_id).is_pressed
-        elif self.input_type == common.InputType.JoystickHat:
+        elif self.input_type == InputType.JoystickHat:
             return joy.hat(self.input_id).direction == \
-                   util.hat_direction_to_tuple(self.comparison)
+                   gremlin.util.hat_direction_to_tuple(self.comparison)
         else:
             logging.getLogger("system").warning(
                 f"Invalid input_type {self.input_type} received"
@@ -253,7 +279,7 @@ class VJoyCondition(AbstractCondition):
         super().__init__(condition.comparison)
         self.vjoy_id = condition.vjoy_id
         self.device_guid = None
-        for dev in joystick_handling.vjoy_devices():
+        for dev in gremlin.joystick_handling.vjoy_devices():
             if dev.vjoy_id == self.vjoy_id:
                 self.device_guid = dev.device_guid
                 break
@@ -273,12 +299,12 @@ class VJoyCondition(AbstractCondition):
                 f"GUID for vJoy {self.vjoy_id} not found"
             )
             return False
-        joy = input_devices.JoystickProxy()[self.device_guid]
+        joy = gremlin.input_devices.JoystickProxy()[self.device_guid]
         if joy is None:
             # device not found - ignore
             return False
 
-        if self.input_type == common.InputType.JoystickAxis:
+        if self.input_type == InputType.JoystickAxis:
             in_range = self.condition.range[0] <= \
                        joy.axis(self.input_id).value <= \
                        self.condition.range[1]
@@ -287,14 +313,14 @@ class VJoyCondition(AbstractCondition):
                 return in_range if self.comparison == "inside" else not in_range
             else:
                 return False
-        elif self.input_type == common.InputType.JoystickButton:
+        elif self.input_type == InputType.JoystickButton:
             if self.comparison == "pressed":
                 return joy.button(self.input_id).is_pressed
             else:
                 return not joy.button(self.input_id).is_pressed
-        elif self.input_type == common.InputType.JoystickHat:
+        elif self.input_type == InputType.JoystickHat:
             return joy.hat(self.input_id).direction == \
-                   util.hat_direction_to_tuple(self.comparison)
+                   gremlin.util.hat_direction_to_tuple(self.comparison)
         else:
             logging.getLogger("system").warning(
                 f"Invalid input_type {self.input_type} received"
@@ -339,7 +365,7 @@ class VirtualButton(metaclass=ABCMeta):
     """Implements a button like interface."""
 
     # Single shared event  listener instance
-    event_listener = event_handler.EventListener()
+    event_listener = gremlin.event_handler.EventListener()
 
     # Next identifier ID to use
     next_id = 1
@@ -360,12 +386,12 @@ class VirtualButton(metaclass=ABCMeta):
         states = ["up", "down"]
         actions = ["press", "release"]
         transitions = {
-            ("up", "press"): fsm.Transition(self._press, "down"),
-            ("up", "release"): fsm.Transition(self._noop, "up"),
-            ("down", "release"): fsm.Transition(self._release, "up"),
-            ("down", "press"): fsm.Transition(self._noop, "down")
+            ("up", "press"): gremlin.fsm.Transition(self._press, "down"),
+            ("up", "release"): gremlin.fsm.Transition(self._noop, "up"),
+            ("down", "release"): gremlin.fsm.Transition(self._release, "up"),
+            ("down", "press"): gremlin.fsm.Transition(self._noop, "down")
         }
-        return fsm.FiniteStateMachine("up", states, actions, transitions)
+        return gremlin.fsm.FiniteStateMachine("up", states, actions, transitions)
 
     def process_event(self, event):
         """Process the input event and updates the value as needed.
@@ -392,8 +418,8 @@ class VirtualButton(metaclass=ABCMeta):
     def _press(self):
         """Executes the "press" action."""
         self._is_pressed = True
-        event = event_handler.Event(
-            common.InputType.VirtualButton,
+        event = gremlin.event_handler.Event(
+            InputType.VirtualButton,
             self._identifier,
             device_guid=dinput.GUID_Virtual,
             is_pressed=self._is_pressed,
@@ -405,8 +431,8 @@ class VirtualButton(metaclass=ABCMeta):
     def _release(self):
         """Executes the "release" action."""
         self._is_pressed = False
-        event = event_handler.Event(
-            common.InputType.VirtualButton,
+        event = gremlin.event_handler.Event(
+            InputType.VirtualButton,
             self._identifier,
             device_guid=dinput.GUID_Virtual,
             is_pressed=self._is_pressed,
@@ -451,8 +477,9 @@ class AxisButton(VirtualButton):
         :param event the input event that is used to decide on the state
         :return True if a state transition occurred, False otherwise
         """
+        from gremlin.types import AxisButtonDirection
         self.forced_activation = False
-        direction = common.AxisButtonDirection.Anywhere
+        direction = AxisButtonDirection.Anywhere
         if self._last_value is None:
             self._last_value = event.value
         else:
@@ -467,9 +494,9 @@ class AxisButton(VirtualButton):
 
             # Determine direction in which the axis is moving
             if self._last_value < event.value:
-                direction = common.AxisButtonDirection.Below
+                direction = AxisButtonDirection.Below
             elif self._last_value > event.value:
-                direction = common.AxisButtonDirection.Above
+                direction = AxisButtonDirection.Above
 
         inside_range = self._lower_limit <= event.value <= self._upper_limit
         self._last_value = event.value
@@ -482,8 +509,9 @@ class AxisButton(VirtualButton):
 
         # Terminate early if the travel direction is incompatible with the
         # one required by this instance
-        if direction != common.AxisButtonDirection.Anywhere and \
-                self._direction != common.AxisButtonDirection.Anywhere:
+        from gremlin.types import AxisButtonDirection
+        if direction != AxisButtonDirection.Anywhere and \
+                self._direction != AxisButtonDirection.Anywhere:
             # Ensure we can only press a button by moving in the desired
             # direction, however, allow releasing in any direction
             if inside_range and direction != self._direction:
@@ -519,7 +547,7 @@ class HatButton(VirtualButton):
         :param event the input event that is used to decide on the state
         :return True if a state transition occurred, False otherwise
         """
-        if util.hat_tuple_to_direction(event.value) in self._directions:
+        if gremlin.util.hat_tuple_to_direction(event.value) in self._directions:
             return self._fsm.perform("press")
         else:
             return self._fsm.perform("release")

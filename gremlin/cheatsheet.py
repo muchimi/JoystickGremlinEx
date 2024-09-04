@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
+# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -23,6 +23,15 @@ from reportlab.platypus import BaseDocTemplate, Paragraph, \
     Spacer, Frame, PageTemplate, Table, Flowable, PageBreak
 
 import gremlin
+import gremlin.base_profile
+import gremlin.clipboard
+from gremlin.keyboard import key_from_code
+from gremlin.input_types import InputType
+import os
+import gremlin.shared_state
+import gremlin.util
+from PySide6 import QtWidgets, QtCore, QtGui
+from enum import Enum, auto
 
 
 hat_direction_abbrev = {
@@ -50,8 +59,9 @@ class InputItemData:
         :param input_item the InputItem instance this represents
         :param inherited_from mode from which this InputItem was inherited
         """
-        self.input_item = input_item
+        self.input_item : gremlin.base_profile.InputItem = input_item
         self.inherited_from = inherited_from
+    
 
     def table_data(self):
         """Returns the data necessary to create the data table.
@@ -61,8 +71,8 @@ class InputItemData:
         containers = self.input_item.containers
 
         # Extract information about the input item's data
-        container_count = len(containers)
-        actionset_count = [len(c.action_sets) for c in containers]
+        # container_count = len(containers)
+        # actionset_count = [len(c.action_sets) for c in containers]
         global_desc = self.input_item.description
         container_desc = [self.extract_description_actions(c) for c in containers]
 
@@ -80,7 +90,7 @@ class InputItemData:
 
         # If it's not a hat we have one input name and each description element
         # on a line of its own
-        if self.input_item.input_type != gremlin.common.InputType.JoystickHat:
+        if self.input_item.input_type != InputType.JoystickHat:
             additional_desc = ""
             for c_descs in container_desc:
                 for a_desc in c_descs:
@@ -213,7 +223,7 @@ def sort_data(data):
     """
     sorted_data = []
 
-    for input_type in gremlin.common.InputType:
+    for input_type in InputType:
         for key, value in sorted(data.items(), key=lambda x: x[0][1]):
             if input_type == key[0]:
                 sorted_data.append(
@@ -386,6 +396,11 @@ def generate_cheatsheet(fname, profile):
 
     doc.build(story)
 
+    # open in the default editor
+
+    if os.path.isfile(fname):
+        gremlin.util.display_file(fname)
+
 
 def format_input_name(input_type, identifier):
     """Returns a formatted name of the provided input.
@@ -394,14 +409,184 @@ def format_input_name(input_type, identifier):
     :param identifier the identifier of the input
     :return formatted string of the provided input
     """
-    type_map = {
-        gremlin.common.InputType.JoystickAxis: "Axis",
-        gremlin.common.InputType.JoystickButton: "Button",
-        gremlin.common.InputType.JoystickHat: "Hat",
-        gremlin.common.InputType.Keyboard: "Key",
-    }
-
-    if input_type == gremlin.common.InputType.Keyboard:
-        return gremlin.macro.key_from_code(identifier[0], identifier[1]).name
+    if input_type == InputType.Keyboard:
+        return key_from_code(identifier[0], identifier[1]).name
     else:
-        return f"{type_map[input_type]} {identifier}"
+        return f"{InputType.to_display_name(input_type)} {identifier}"
+
+class ViewInputMode(Enum):
+    Device = auto()
+    Mode = auto()
+
+class ViewInput(QtWidgets.QDialog):
+    ''' displays a dialog that lets the user pick from a list of mapped inputs '''
+
+    def __init__(self, parent=None):
+        super().__init__(parent)        
+        # make modal
+        self.setWindowModality(QtCore.Qt.ApplicationModal)
+        self.setMinimumWidth(600)
+
+        profile = gremlin.shared_state.current_profile
+
+        # get a list of mapped objects
+         # Build device actions considering inheritance
+        inheritance_tree = profile.build_inheritance_tree()
+        map_data = {}
+        for _, device in profile.devices.items():
+            map_data[device] = {}
+            recursive(device, inheritance_tree, map_data[device])
+
+        self._display_mode = ViewInputMode.Mode
+
+        self.option_container_widget = QtWidgets.QWidget()
+        self.option_container_layout = QtWidgets.QHBoxLayout(self.option_container_widget)
+
+        self.cb_display_by_device_widget = QtWidgets.QRadioButton("By device")
+        self.cb_display_by_mode_widget = QtWidgets.QRadioButton("By mode")
+
+        if self._display_mode ==ViewInputMode.Device:
+            self.cb_display_by_device_widget.setChecked(True)
+        else:
+            self.cb_display_by_mode_widget.setChecked(True)
+        
+        self.cb_display_by_device_widget.clicked.connect(self._mode_by_device_cb)
+        self.cb_display_by_mode_widget.clicked.connect(self._mode_by_mode_cb)
+        self.to_clipboard_widget = QtWidgets.QPushButton()
+        self.to_clipboard_widget.setIcon(gremlin.util.load_icon("button_copy.svg"))
+        self.to_clipboard_widget.setToolTip("Copies the data to the clipboard")
+        self.to_clipboard_widget.clicked.connect(self._to_clipboard_cb)
+        self.option_container_layout.addWidget(QtWidgets.QLabel("Display Mode:"))
+        self.option_container_layout.addWidget(self.cb_display_by_device_widget)
+        self.option_container_layout.addWidget(self.cb_display_by_mode_widget)
+        self.option_container_layout.addWidget(self.cb_display_by_mode_widget)
+        self.option_container_layout.addWidget(self.to_clipboard_widget)
+        self.option_container_layout.addStretch()
+
+
+        self._map_data = map_data
+        self._tree_widget = QtWidgets.QTreeWidget()
+        self._tree_widget.setColumnCount(2)
+        self._tree_widget.setHeaderLabels(["Mapping", "Value"])
+        header = self._tree_widget.header()
+        header.setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeMode.Stretch)
+        
+
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+        self.main_layout.addWidget(self.option_container_widget)
+        self.main_layout.addWidget(self._tree_widget)
+
+        self._update()
+
+    QtCore.Slot()
+    def _mode_by_device_cb(self):
+        if self.cb_display_by_device_widget.isChecked():
+            self._display_mode = ViewInputMode.Device
+            self._update()
+
+    QtCore.Slot()
+    def _mode_by_mode_cb(self):
+        if self.cb_display_by_device_widget.isChecked():
+            self._display_mode = ViewInputMode.Mode
+            self._update()
+
+    QtCore.Slot()
+    def _to_clipboard_cb(self):
+        ''' copies the data to the clipboard '''
+        lines = []
+
+        it = QtWidgets.QTreeWidgetItemIterator(self._tree_widget)
+        item : QtWidgets.QTreeWidgetItem
+        while it.value():
+            item = it.value()
+            depth = 0
+            parent = item.parent()
+            while parent:
+                depth +=1
+                parent = parent.parent()
+            text = f"{'\t'*depth if depth else ''}{item.text(0)} {item.text(1)}\n"
+            lines.append(text)
+            it+=1
+    
+        text = "".join(lines)
+        gremlin.clipboard.Clipboard().set_windows_clipboard_text(text)
+            
+            
+
+
+
+    def _update(self):
+        
+        nodes = []
+        
+        is_mode = self._display_mode == ViewInputMode.Mode
+
+        if is_mode:
+            # display data by mode
+            mode_nodes = {}
+            for dev, dev_data in  self._map_data.items():
+                for mode_name, mode_data in dev_data.items():
+                    # Only proceed if we actually have input items available
+                    if len(mode_data.values()) == 0:
+                        continue
+                    if is_mode:
+                        if not mode_name in mode_nodes.keys():
+                            mode_node = QtWidgets.QTreeWidgetItem([f"Mode: [{mode_name}]"])
+                            mode_nodes[mode_name] = mode_node 
+                        else:
+                            mode_node = mode_nodes[mode_name]
+                    else:
+                        mode_node = QtWidgets.QTreeWidgetItem([mode_name])
+
+                    device_node = QtWidgets.QTreeWidgetItem([f"Device: '{dev.name}'"])
+
+                    has_containers = False
+                    for entry in mode_data.values():
+                        if entry.input_item.containers:
+                            for container in entry.input_item.containers:
+                                for action_set in container.action_sets:
+                                    for action in action_set:
+                                        action_node = QtWidgets.QTreeWidgetItem([action.name, action.display_name()])
+                                        device_node.addChild(action_node)
+                            has_containers = True
+
+                    if has_containers:
+                        # has data
+                        mode_node.addChild(device_node)
+                        if not mode_node in nodes:
+                            nodes.append(mode_node)
+            
+        else:
+            # display data by device                
+            for dev, dev_data in  self._map_data.items():
+                device_node = QtWidgets.QTreeWidgetItem([f"Device: '{dev.name}'"])
+                nodes.append(device_node)
+                
+                for mode_name, mode_data in dev_data.items():
+                    # Only proceed if we actually have input items available
+                    if len(mode_data.values()) == 0:
+                        continue
+                    mode_node = QtWidgets.QTreeWidgetItem([f"Mode: [{mode_name}]"])
+                    
+                    has_containers = False
+                    for entry in mode_data.values():
+                        if entry.input_item.containers:
+                            for container in entry.input_item.containers:
+                                for action_set in container.action_sets:
+                                    for action in action_set:
+                                        action_node = QtWidgets.QTreeWidgetItem([action.name, action.display_name()])
+                                        mode_node.addChild(action_node)
+                            has_containers = True
+
+                    if has_containers:
+                        # has data
+                        device_node.addChild(mode_node)
+                        if not device_node in nodes:
+                            nodes.append(device_node)
+
+        self._tree_widget.clear()     
+        self._tree_widget.insertTopLevelItems(0, nodes)
+        self._tree_widget.expandAll()
+
+

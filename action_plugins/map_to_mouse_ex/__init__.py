@@ -6,148 +6,26 @@
 import logging
 import math
 import os
-from xml.etree import ElementTree
+from lxml import etree as ElementTree
 
 from PySide6 import QtCore, QtWidgets
 
-from gremlin.base_classes import AbstractAction, AbstractFunctor
-from gremlin.common import InputType, MouseButton
+import gremlin.base_profile
+from gremlin.input_types import InputType
+from gremlin.types import MouseButton, MouseAction, MouseClickMode
 from gremlin.profile import read_bool, safe_read, safe_format
 from gremlin.util import rad2deg
-import gremlin.ui.common
+import gremlin.ui.ui_common
 import gremlin.ui.input_item
 import gremlin.sendinput
 from gremlin import input_devices
+
+
 import enum, threading,time, random
+
 
 syslog = logging.getLogger("system")
 
-class MouseClickMode(enum.Enum):
-    Normal = 0 # click on/off
-    Press = 1 # press only
-    Release = 2 # release only
-
-    @staticmethod
-    def to_string(mode):
-        return mode.name
-    
-    def __str__(self):
-        return str(self.value)
-    
-    @classmethod
-    def _missing_(cls, name):
-        for item in cls:
-            if item.name.lower() == name.lower():
-                return item
-            return cls.Normal
-        
-    @staticmethod
-    def from_string(str):
-        ''' converts from a string representation (text or numeric) to the enum, not case sensitive'''
-        str = str.lower().strip()
-        if str.isnumeric():
-            mode = int(str)
-            return MouseClickMode(mode)
-        for item in MouseClickMode:
-            if item.name.lower() == str:
-                return item
-
-        return None
-    
-    @staticmethod
-    def to_description(action):
-        ''' returns a descriptive string for the action '''
-        if action == MouseClickMode.Normal:
-            return "Normal Click"
-        elif action == MouseClickMode.Press:
-            return "Mouse button press"
-        elif action == MouseClickMode.Release:
-            return "Mouse button release"
-        return f"Unknown {action}"
-    
-    @staticmethod
-    def to_name(action):
-        ''' returns the name from the action '''
-        if action == MouseClickMode.Normal:
-            return "Normal Click"
-        elif action == MouseClickMode.Press:
-            return "Mouse button press"
-        elif action == MouseClickMode.Release:
-            return "Mouse button release"
-        return f"Unknown {action}"
-    
-class MouseAction(enum.Enum):
-    MouseButton = 0 # output a mouse button
-    MouseMotion = 1 # output a mouse motion
-    MouseWiggleOnLocal = 2 # enable mouse wiggle - local machine only
-    MouseWiggleOffLocal = 3 # disable mouse wiggle - locla machine only
-    MouseWiggleOnRemote = 4 # enable mouse wiggle - remote machines only
-    MouseWiggleOffRemote = 5 # disable mouse wiggle - remote machines only
-
-
-    @staticmethod
-    def to_string(mode):
-        return mode.name
-    
-    def __str__(self):
-        return str(self.value)
-    
-    @classmethod
-    def _missing_(cls, name):
-        for item in cls:
-            if item.name.lower() == name.lower():
-                return item
-            return cls.MouseButton
-        
-    @staticmethod
-    def from_string(str):
-        ''' converts from a string representation (text or numeric) to the enum, not case sensitive'''
-        str = str.lower().strip()
-        if str.isnumeric():
-            mode = int(str)
-            return MouseAction(mode)
-        for item in MouseAction:
-            if item.name.lower() == str:
-                return item
-
-        return None
-    
-    @staticmethod
-    def to_description(action):
-        ''' returns a descriptive string for the action '''
-        if action == MouseAction.MouseButton:
-            return "Maps a mouse button"
-        elif action == MouseAction.MouseMotion:
-            return "Maps to a mouse motion axis"
-        elif action == MouseAction.MouseWiggleOffLocal:
-            return "Turns wiggle mode off (local only)"
-        elif action == MouseAction.MouseWiggleOnLocal:
-            return "Turns wiggle mode on (local only)"
-        
-        elif action == MouseAction.MouseWiggleOffRemote:
-            return "Turns wiggle mode off (remote only)"
-        elif action == MouseAction.MouseWiggleOnRemote:
-            return "Turns wiggle mode on (remote only)"
-        
-        return f"Unknown {action}"
-    
-    @staticmethod
-    def to_name(action):
-        ''' returns the name from the action '''
-        if action == MouseAction.MouseButton:
-            return "Mouse button"
-        elif action == MouseAction.MouseMotion:
-            return "Mouse axis"
-        elif action == MouseAction.MouseWiggleOffLocal:
-            return "Wiggle Disable (local)"
-        elif action == MouseAction.MouseWiggleOnLocal:
-            return "Wiggle Enable (local)"
-        elif action == MouseAction.MouseWiggleOffRemote:
-            return "Wiggle Disable (remote)"
-        elif action == MouseAction.MouseWiggleOnRemote:
-            return "Wiggle Enable (remote)"        
-                
-        return f"Unknown {action}"
 
 class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
@@ -160,7 +38,6 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         :param parent the parent of this widget
         """
         super().__init__(action_data, QtWidgets.QVBoxLayout, parent=parent)
-
         
 
     def _create_ui(self):
@@ -172,14 +49,14 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.button_layout = QtWidgets.QGridLayout(self.button_widget)
         self.motion_widget = QtWidgets.QWidget()
         self.motion_layout = QtWidgets.QGridLayout(self.motion_widget)
-        self.release_widget = QtWidgets.QWidget() 
+        self.release_widget = QtWidgets.QWidget()
         self.options_layout = QtWidgets.QHBoxLayout(self.release_widget)
 
-        self.click_widget = QtWidgets.QWidget() 
+        self.click_widget = QtWidgets.QWidget()
         self.click_options_layout = QtWidgets.QHBoxLayout(self.click_widget)
 
 
-        self.mode_widget = gremlin.ui.common.NoWheelComboBox()
+        self.mode_widget = gremlin.ui.ui_common.NoWheelComboBox()
 
         input_type = self._get_input_type()
         if input_type == InputType.JoystickButton:
@@ -313,7 +190,7 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.min_speed.setRange(0, 1e5)
         self.max_speed = QtWidgets.QSpinBox()
         self.max_speed.setRange(0, 1e5)
-        self.time_to_max_speed = gremlin.ui.common.DynamicDoubleSpinBox()
+        self.time_to_max_speed = gremlin.ui.ui_common.DynamicDoubleSpinBox()
         self.time_to_max_speed.setRange(0.0, 100.0)
         self.time_to_max_speed.setValue(0.0)
         self.time_to_max_speed.setDecimals(2)
@@ -343,13 +220,41 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._connect_button_hat()
 
     def _create_mouse_button_ui(self):
-        self.mouse_button = gremlin.ui.common.NoKeyboardPushButton(
-            gremlin.common.MouseButton.to_string(self.action_data.button_id)
+        self.mouse_button = gremlin.ui.ui_common.NoKeyboardPushButton(
+            gremlin.types.MouseButton.to_string(self.action_data.button_id)
         )
         self.mouse_button.clicked.connect(self._request_user_input)
 
-        self.button_layout.addWidget(QtWidgets.QLabel("Mouse Button"), 0, 0)
-        self.button_layout.addWidget(self.mouse_button, 0, 1)
+        self.mouse_container_widget = QtWidgets.QWidget()
+        self.mouse_container_layout = QtWidgets.QHBoxLayout()
+        self.mouse_container_widget.setLayout(self.mouse_container_layout)
+
+        self.mouse_container_layout.addWidget(QtWidgets.QLabel("Mouse Button"))
+        self.mouse_container_layout.addWidget(self.mouse_button)
+
+
+        self.mouse_button_widget = QtWidgets.QComboBox()
+        self.mouse_button_widget.addItem("Left (mouse 1)",gremlin.types.MouseButton.Left)
+        self.mouse_button_widget.addItem("Middle (mouse 2)",gremlin.types.MouseButton.Middle)
+        self.mouse_button_widget.addItem("Right (mouse 3)",gremlin.types.MouseButton.Right)
+        self.mouse_button_widget.addItem("Forward (mouse 4)",gremlin.types.MouseButton.Forward)
+        self.mouse_button_widget.addItem("Back (mouse 5)",gremlin.types.MouseButton.Back)
+        self.mouse_button_widget.addItem("Wheel up",gremlin.types.MouseButton.WheelUp)
+        self.mouse_button_widget.addItem("Wheel down",gremlin.types.MouseButton.WheelDown)
+
+
+        # update based on the current data
+        index = self.mouse_button_widget.findData(self.action_data.button_id)
+        self.mouse_button_widget.setCurrentIndex(index)
+
+        self.mouse_button_widget.currentTextChanged.connect(self._change_mouse_button_cb)
+
+        self.mouse_container_layout.addWidget(QtWidgets.QLabel("Selected action:"))
+        self.mouse_container_layout.addWidget(self.mouse_button_widget)
+        self.mouse_container_layout.addStretch(1)
+
+        # add to main layout
+        self.button_layout.addWidget(self.mouse_container_widget, 0,0)
 
     def _populate_ui(self):
         """Populates the UI components."""
@@ -364,7 +269,7 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         with QtCore.QSignalBlocker(self.chkb_exec_on_release):
             self.chkb_exec_on_release.setChecked(self.action_data.exec_on_release)
 
-        action_mode = self.action_data.action_mode 
+        action_mode = self.action_data.action_mode
         index = self.mode_widget.findData(action_mode)
         if index != -1 and self.mode_widget.currentIndex != index:
             with QtCore.QSignalBlocker(self.mode_widget):
@@ -412,15 +317,23 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _populate_mouse_button_ui(self):
         self.mouse_button.setText(
-            gremlin.common.MouseButton.to_string(self.action_data.button_id)
+            gremlin.types.MouseButton.to_string(self.action_data.button_id)
         )
 
-    def _action_mode_changed(self, index):  
+    def _change_mouse_button_cb(self):
+        ''' mouse event drop down selected '''
+        self.action_data.button_id = self.mouse_button_widget.currentData()
+        self.mouse_button.setText(
+            gremlin.types.MouseButton.to_string(self.action_data.button_id)
+        )
+
+
+    def _action_mode_changed(self, index):
         ''' called when the action mode drop down value changes '''
         with QtCore.QSignalBlocker(self.mode_widget):
             action = self.mode_widget.itemData(index)
             self.action_data.action_mode = action
-            self._change_mode()  
+            self._change_mode()
 
     def _exec_on_release_changed(self, value):
         self.action_data.exec_on_release = self.chkb_exec_on_release.isChecked()
@@ -482,8 +395,14 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _update_mouse_button(self, event):
         self.action_data.button_id = event.identifier
         self.mouse_button.setText(
-            gremlin.common.MouseButton.to_string(self.action_data.button_id)
+            gremlin.types.MouseButton.to_string(self.action_data.button_id)
         )
+        # update the drop down
+        with QtCore.QSignalBlocker(self.mouse_button_widget):
+            index = self.mouse_button_widget.findData(self.action_data.button_id)
+            self.mouse_button_widget.setCurrentIndex(index)
+
+
 
     def _connect_axis(self):
         """Connects all axis input elements to their callbacks."""
@@ -546,12 +465,11 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _request_user_input(self):
         """Prompts the user for the input to bind to this item."""
-        self.button_press_dialog = gremlin.ui.common.InputListenerWidget(
-            self._update_mouse_button,
+        self.button_press_dialog = gremlin.ui.ui_common.InputListenerWidget(
             [InputType.Mouse],
             return_kb_event=False
         )
-
+        self.button_press_dialog.item_selected.connect(self._update_mouse_button)
         # Display the dialog centered in the middle of the UI
         root = self
         while root.parent():
@@ -567,7 +485,7 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.button_press_dialog.show()
 
 
-class MapToMouseExFunctor(AbstractFunctor):
+class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
 
     """Implements the functionality required to move a mouse cursor.
 
@@ -598,11 +516,6 @@ class MapToMouseExFunctor(AbstractFunctor):
         self.input_type = action.input_type
         self.exec_on_release = action.exec_on_release
         self.action_mode = action.action_mode
-        #syslog.debug(f"Init mouse functor event: {self.action_mode.name} {action.action_id} exec on release: {action.exec_on_release}")
-        # if action.exec_on_release:
-        #     pass
-        
-
     
 
     def process_event(self, event, value):
@@ -667,11 +580,20 @@ class MapToMouseExFunctor(AbstractFunctor):
             if value.current:
                 direction = -16
                 if self.action.button_id == MouseButton.WheelDown:
-                    direction = 1
+                    direction = 16
                 if is_local:
                     gremlin.sendinput.mouse_wheel(direction)
                 if is_remote:
                     input_devices.remote_client.send_mouse_wheel(direction)
+        elif self.action.button_id in [MouseButton.WheelLeft, MouseButton.WheelRight]:
+            if value.current:
+                direction = -16
+                if self.action.button_id == MouseButton.WheelRight:
+                    direction = 16
+                if is_local:
+                    gremlin.sendinput.mouse_h_wheel(direction)
+                if is_remote:
+                    input_devices.remote_client.send_mouse_h_wheel(direction)
         else:
             if self.action.click_mode == MouseClickMode.Normal:
                 if value.current:
@@ -792,7 +714,7 @@ class MapToMouseExFunctor(AbstractFunctor):
             MapToMouseExFunctor._wiggle_remote_stop_requested = True
             MapToMouseExFunctor._wiggle_remote_thread.join()
             syslog.debug("Wiggle thread remote exited...")
-            MapToMouseExFunctor._wiggle_remote_thread = None            
+            MapToMouseExFunctor._wiggle_remote_thread = None
 
     @staticmethod
     def _wiggle_local():
@@ -842,7 +764,7 @@ class MapToMouseExFunctor(AbstractFunctor):
         input_devices.remote_state.say("remote wiggle mode off")
         
 
-class MapToMouseEx(AbstractAction):
+class MapToMouseEx(gremlin.base_profile.AbstractAction):
 
     """Action data for the map to mouse action.
 
@@ -854,12 +776,12 @@ class MapToMouseEx(AbstractAction):
     tag = "map_to_mouse_ex"
 
     default_button_activation = (True, True)
-    input_types = [
-        InputType.JoystickAxis,
-        InputType.JoystickButton,
-        InputType.JoystickHat,
-        InputType.Keyboard
-    ]
+    # input_types = [
+    #     InputType.JoystickAxis,
+    #     InputType.JoystickButton,
+    #     InputType.JoystickHat,
+    #     InputType.Keyboard
+    # ]
 
     functor = MapToMouseExFunctor
     widget = MapToMouseExWidget
@@ -870,11 +792,11 @@ class MapToMouseEx(AbstractAction):
         :param parent the container this action is part of
         """
         super().__init__(parent)
-
+        self.parent = parent
         # Flag whether or not this is mouse motion or button press
         self.motion_input = False
         # Mouse button enum
-        self.button_id = gremlin.common.MouseButton.Left
+        self.button_id = MouseButton.Left
         # Angle of motion, 0 is up and 90 is right, etc.
         self.direction = 0
         # Minimum motion speed in pixels / sec
@@ -893,6 +815,10 @@ class MapToMouseEx(AbstractAction):
 
         self.click_mode = MouseClickMode.Normal
 
+
+    def display_name(self):
+        ''' returns a display string for the current configuration '''
+        return f"[{self.button_id.name}]"
 
     def icon(self):
         """Returns the icon to use for this action.
@@ -923,14 +849,14 @@ class MapToMouseEx(AbstractAction):
 
         self.motion_input = read_bool(node, "motion-input", False)
         try:
-            self.button_id = gremlin.common.MouseButton(
+            self.button_id = gremlin.types.MouseButton(
                 safe_read(node, "button-id", int, 1)
             )
         except ValueError as e:
             logging.getLogger("system").warning(
                 f"Invalid mouse identifier in profile: {e:}"
             )
-            self.button_id = gremlin.common.MouseButton.Left
+            self.button_id = gremlin.types.MouseButton.Left
 
         self.direction = safe_read(node, "direction", int, 0)
         self.min_speed = safe_read(node, "min-speed", int, 5)

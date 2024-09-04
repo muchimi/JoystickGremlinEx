@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
+# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -27,6 +27,7 @@ from vjoy.vjoy_interface import VJoyState, VJoyInterface
 from gremlin.error import VJoyError
 import gremlin.common
 import gremlin.spline
+import gremlin.types
 
 
 
@@ -740,8 +741,8 @@ class VJoy:
         for i, axis in enumerate(AxisName):
             if VJoyInterface.GetVJDAxisExist(self.vjoy_id, axis.value) > 0:
                 axes[i+1] = Axis(self, axis.value)
-                self._axis_names[i+1] = gremlin.common.AxisNames.to_string(
-                    gremlin.common.AxisNames(i+1)
+                self._axis_names[i+1] = gremlin.types.AxisNames.to_string(
+                    gremlin.types.AxisNames(i+1)
                 )
                 self._axis_lookup[len(self._axis_names)] = i+1
                 self._axis_lookup[axis] = i+1

@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
+# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,16 +17,16 @@
 
 
 import os
-from xml.etree import ElementTree
+from lxml import etree as ElementTree
 
 from PySide6 import QtWidgets
+import gremlin.base_profile
 
-from gremlin.base_classes import AbstractAction, AbstractFunctor
-from gremlin.common import InputType
+from gremlin.input_types import InputType
 from gremlin.input_devices import ButtonReleaseActions
-import gremlin.ui.common
+import gremlin.ui.ui_common
 import gremlin.ui.input_item
-
+from gremlin.keyboard import key_from_code
 
 class MapToKeyboardWidget(gremlin.ui.input_item.AbstractActionWidget):
 
@@ -56,7 +56,7 @@ class MapToKeyboardWidget(gremlin.ui.input_item.AbstractActionWidget):
         text = "<b>Current key combination:</b> "
         names = []
         for key in self.action_data.keys:
-            names.append(gremlin.macro.key_from_code(*key).name)
+            names.append(key_from_code(key[0],key[1]).name)
         text += " + ".join(names)
 
         self.key_combination.setText(text)
@@ -73,12 +73,14 @@ class MapToKeyboardWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _record_keys_cb(self):
         """Prompts the user to press the desired key combination."""
-        self.button_press_dialog = gremlin.ui.common.InputListenerWidget(
-            self._update_keys,
+        
+        self.button_press_dialog = gremlin.ui.ui_common.InputListenerWidget(
             [InputType.Keyboard],
             return_kb_event=False,
             multi_keys=True
         )
+
+        self.button_press_dialog.item_selected.connect(self._update_keys)
 
         # Display the dialog centered in the middle of the UI
         root = self
@@ -95,19 +97,19 @@ class MapToKeyboardWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.button_press_dialog.show()
 
 
-class MapToKeyboardFunctor(AbstractFunctor):
+class MapToKeyboardFunctor(gremlin.base_profile.AbstractFunctor):
 
     def __init__(self, action):
         super().__init__(action)
         self.press = gremlin.macro.Macro()
         self.needs_auto_release = True
         for key in action.keys:
-            self.press.press(gremlin.macro.key_from_code(key[0], key[1]))
+            self.press.press(key_from_code(key[0], key[1]))
 
         self.release = gremlin.macro.Macro()
         # Execute release in reverse order
         for key in reversed(action.keys):
-            self.release.release(gremlin.macro.key_from_code(key[0], key[1]))
+            self.release.release(key_from_code(key[0], key[1]))
 
     def process_event(self, event, value):
         if value.current:
@@ -123,7 +125,7 @@ class MapToKeyboardFunctor(AbstractFunctor):
         return True
 
 
-class MapToKeyboard(AbstractAction):
+class MapToKeyboard(gremlin.base_profile.AbstractAction):
 
     """Action data for the map to keyboard action.
 
@@ -135,12 +137,13 @@ class MapToKeyboard(AbstractAction):
     tag = "map-to-keyboard"
 
     default_button_activation = (True, True)
-    input_types = [
-        InputType.JoystickAxis,
-        InputType.JoystickButton,
-        InputType.JoystickHat,
-        InputType.Keyboard
-    ]
+    # override allowed input types if different from default
+    # input_types = [
+    #     InputType.JoystickAxis,
+    #     InputType.JoystickButton,
+    #     InputType.JoystickHat,
+    #     InputType.Keyboard
+    # ]
 
     functor = MapToKeyboardFunctor
     widget = MapToKeyboardWidget
@@ -152,6 +155,7 @@ class MapToKeyboard(AbstractAction):
         """
         super().__init__(parent)
         self.keys = []
+        self.parent = parent
 
     def icon(self):
         """Returns the icon to use for this action.

@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
+# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,10 +19,11 @@
 from PySide6 import QtCore, QtWidgets
 
 import gremlin.joystick_handling
-import gremlin.ui.common
+import gremlin.shared_state
+import gremlin.ui.ui_common
 
-
-class ProfileSettingsWidget(QtWidgets.QWidget):
+from gremlin.ui.qdatawidget import QDataWidget
+class ProfileSettingsWidget(QDataWidget):
 
     """Widget allowing changing profile specific settings."""
 
@@ -66,7 +67,7 @@ class ProfileSettingsWidget(QtWidgets.QWidget):
 
     def refresh_ui(self, emit_change=False):
         """Refreshes the entire UI."""
-        gremlin.ui.common.clear_layout(self.scroll_layout)
+        gremlin.ui.ui_common.clear_layout(self.scroll_layout)
         self._create_ui()
         if emit_change:
             self.changed.emit()
@@ -142,7 +143,7 @@ class DefaultDelay(QtWidgets.QGroupBox):
         """Creates the UI of this widget."""
         self.setTitle("Default Macro Action Delay")
 
-        self.delay_value = gremlin.ui.common.DynamicDoubleSpinBox()
+        self.delay_value = gremlin.ui.ui_common.DynamicDoubleSpinBox()
         self.delay_value.setRange(0.0, 10.0)
         self.delay_value.setSingleStep(0.05)
         self.delay_value.setValue(self.profile_data.default_delay)
@@ -184,11 +185,12 @@ class DefaultModeSelector(QtWidgets.QGroupBox):
         self.setTitle("Startup Mode")
 
         self.dropdown = QtWidgets.QComboBox()
-        self.dropdown.addItem("Use Heuristic")
+        # self.dropdown.addItem("Use Heuristic")
         for mode in gremlin.profile.mode_list(self.profile_data):
             self.dropdown.addItem(mode)
-        if self.profile_data.startup_mode:
-            self.dropdown.setCurrentText(self.profile_data.startup_mode)
+        start_mode = gremlin.shared_state.current_profile.get_start_mode()
+        if start_mode:
+            self.dropdown.setCurrentText(start_mode)
         self.dropdown.currentIndexChanged.connect(self._update_cb)
 
         self.main_layout.addWidget(self.dropdown)
@@ -199,10 +201,8 @@ class DefaultModeSelector(QtWidgets.QGroupBox):
 
         :param index the index of the entry selected
         """
-        if index == 0:
-            self.profile_data.startup_mode = None
-        else:
-            self.profile_data.startup_mode = self.dropdown.currentText()
+        mode = self.dropdown.currentText()
+        gremlin.shared_state.current_profile.set_start_mode(mode)
 
 
 class VJoyAxisDefaultsWidget(QtWidgets.QWidget):
@@ -246,7 +246,7 @@ class VJoyAxisDefaultsWidget(QtWidgets.QWidget):
                 0
             )
 
-            box = gremlin.ui.common.DynamicDoubleSpinBox()
+            box = gremlin.ui.ui_common.DynamicDoubleSpinBox()
             box.setRange(-1, 1)
             box.setSingleStep(0.05)
             box.setValue(self.profile_data.get_initial_vjoy_axis_value(

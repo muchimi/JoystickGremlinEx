@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
+# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -157,7 +157,7 @@ class VJoyInterface:
     def initialize(self):
         """Initializes the functions as class methods."""
         from pathlib import Path
-        from gremlin.util import display_error, get_dll_version, version_valid, get_vjoy_driver_version
+        from gremlin.util import display_error, get_dll_version, version_valid #, get_vjoy_driver_version
 
         if VJoyInterface.vjoy_dll is None:
 
@@ -176,22 +176,23 @@ class VJoyInterface:
                     os._exit(1) 
 
             # check vjoy driver version and that it's installed
-            driver_version = get_vjoy_driver_version()
-            if driver_version:
-                min_version = "12.53.21.621"
-                if not version_valid(driver_version, min_version):
-                    msg = f"Invalid VJOY driver: {min_version} required, found {driver_version}"
-                    display_error(msg)
-                    logging.getLogger("system").critical(msg)
-                    os._exit(1) 
+            # removed to see if this fixes UAC issues and false positives
+            # driver_version = get_vjoy_driver_version()
+            # if driver_version:
+            #     min_version = "12.53.21.621"
+            #     if not version_valid(driver_version, min_version):
+            #         msg = f"Invalid VJOY driver: {min_version} required, found {driver_version}"
+            #         display_error(msg)
+            #         logging.getLogger("system").critical(msg)
+            #         os._exit(1) 
 
-                logging.getLogger("system").info(f"Found VJOY driver {driver_version}")
-            else:
-                # no driver
-                msg = f"VJOY driver not detected - unable to continue - expecting version {min_version}"
-                display_error(msg)
-                logging.getLogger("system").critical(msg)
-                os._exit(1)             
+            #     logging.getLogger("system").info(f"Found VJOY driver {driver_version}")
+            # else:
+            #     # no driver
+            #     msg = f"VJOY driver not detected - unable to continue - expecting version {min_version}"
+            #     display_error(msg)
+            #     logging.getLogger("system").critical(msg)
+            #     os._exit(1)             
 
 
             # check DLL version                

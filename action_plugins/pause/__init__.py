@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
+# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,12 +18,11 @@
 
 import os
 from PySide6 import QtWidgets
-from xml.etree import ElementTree
+from lxml import etree as ElementTree
 
-from gremlin.base_classes import AbstractAction, AbstractFunctor
-from gremlin.common import InputType
+import gremlin.base_profile
+from gremlin.input_types import InputType
 import gremlin.ui.input_item
-
 
 class PauseActionWidget(gremlin.ui.input_item.AbstractActionWidget):
 
@@ -33,6 +32,11 @@ class PauseActionWidget(gremlin.ui.input_item.AbstractActionWidget):
         super().__init__(action_data, parent=parent)
         assert(isinstance(action_data, PauseAction))
 
+
+    def display_name(self):
+        ''' returns a display string for the current configuration '''
+        return "Pause Action"
+
     def _create_ui(self):
         self.label = QtWidgets.QLabel("Pauses callback execution")
         self.main_layout.addWidget(self.label)
@@ -41,17 +45,18 @@ class PauseActionWidget(gremlin.ui.input_item.AbstractActionWidget):
         pass
 
 
-class PauseActionFunctor(AbstractFunctor):
+class PauseActionFunctor(gremlin.base_profile.AbstractFunctor):
 
     def __init__(self, action):
         super().__init__(action)
 
     def process_event(self, event, value):
+        import gremlin.control_action
         gremlin.control_action.pause()
         return True
 
 
-class PauseAction(AbstractAction):
+class PauseAction(gremlin.base_profile.AbstractAction):
 
     """Action for pausing the execution of callbacks."""
 
@@ -59,18 +64,21 @@ class PauseAction(AbstractAction):
     tag = "pause"
 
     default_button_activation = (True, False)
-    input_types = [
-        InputType.JoystickAxis,
-        InputType.JoystickButton,
-        InputType.JoystickHat,
-        InputType.Keyboard
-    ]
+
+    # override allowed input types if different from default
+    # input_types = [
+    #     InputType.JoystickAxis,
+    #     InputType.JoystickButton,
+    #     InputType.JoystickHat,
+    #     InputType.Keyboard
+    # ]
 
     functor = PauseActionFunctor
     widget = PauseActionWidget
 
     def __init__(self, parent):
         super().__init__(parent)
+        self.parent = parent
 
     def icon(self):
         return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"

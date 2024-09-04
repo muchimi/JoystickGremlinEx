@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
+# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -24,13 +24,24 @@ import os
 import random
 import string
 import uuid
+import sys
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
 import dinput
 from gremlin import common, error, input_devices, joystick_handling, profile, shared_state
-import gremlin.ui.common
+import gremlin.ui.ui_common
+from gremlin.input_types import InputType
+import gremlin.types
 
+
+
+def load_module(module_name, file_path):
+    spec = importlib.util.spec_from_file_location(module_name, file_path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
 
 def get_variable_definitions(fname):
     """Returns all variable definitions contained in the provided module.
@@ -48,11 +59,24 @@ def get_variable_definitions(fname):
     """
     if not os.path.isfile(fname):
         return {}
+    
+    user_package = "user_plugins"
 
-    spec = importlib.util.spec_from_file_location(
+    spec = importlib.util.spec_from_file_location(user_package + "." +
         "".join(random.choices(string.ascii_lowercase, k=16)),
         fname
     )
+
+    # see if there is a package to load
+    fname_init = os.path.join(os.path.dirname(fname),"__init__.py")
+    if not os.path.isfile(fname_init):
+        # create the file so we have a package
+        open (fname_init,'a').close
+    
+    # load the package for the plugins
+    load_module("user_plugins", fname_init)
+        
+    
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
 
@@ -165,9 +189,9 @@ variable_registry = VariableRegistry()
 
 # Lookup for variable value casting
 _cast_variable = {
-    common.PluginVariableType.Int: int,
-    common.PluginVariableType.Float: float,
-    common.PluginVariableType.String: str,
+    gremlin.types.PluginVariableType.Int: int,
+    gremlin.types.PluginVariableType.Float: float,
+    gremlin.types.PluginVariableType.String: str,
 }
 
 
@@ -209,7 +233,7 @@ class AbstractVariable(QtCore.QObject):
             the user facing label given to the variable
         description : str
             description of the variable's function and intent
-        variable_type : gremlin.common.PluginVariableType
+        variable_type : gremlin.types.PluginVariableType
             data type represented by the variable
         is_optional : bool
             if True the variable is optional and will not impact saving
@@ -326,7 +350,7 @@ class NumericalVariable(AbstractVariable):
         layout.addWidget(label, 0, 0)
 
         value_widget = None
-        if self.variable_type == common.PluginVariableType.Int:
+        if self.variable_type == gremlin.types.PluginVariableType.Int:
             value_widget = QtWidgets.QSpinBox()
             value_widget.setRange(self.min_value, self.max_value)
             value_widget.setValue(clamp_value(
@@ -337,7 +361,7 @@ class NumericalVariable(AbstractVariable):
             value_widget.valueChanged.connect(
                 lambda x: self.value_changed.emit({"value": x})
             )
-        elif self.variable_type == common.PluginVariableType.Float:
+        elif self.variable_type == gremlin.types.PluginVariableType.Float:
             value_widget = QtWidgets.QDoubleSpinBox()
             value_widget.setDecimals(3)
             value_widget.setRange(self.min_value, self.max_value)
@@ -360,6 +384,9 @@ class NumericalVariable(AbstractVariable):
             self.min_value,
             self.max_value
         )
+    
+    def __str__(self):
+        return f"NumericalVariable: {self.description} min: {self.min_value} max: {self.max_value} value: {self.value}"
 
 
 class IntegerVariable(NumericalVariable):
@@ -378,7 +405,7 @@ class IntegerVariable(NumericalVariable):
         super().__init__(
             label,
             description,
-            common.PluginVariableType.Int,
+            gremlin.types.PluginVariableType.Int,
             initial_value,
             min_value,
             max_value,
@@ -387,6 +414,7 @@ class IntegerVariable(NumericalVariable):
 
         _init_numerical(self, 0, 0, 10)
         self._load_from_registry(self._get_identifier())
+
 
 
 class FloatVariable(NumericalVariable):
@@ -405,7 +433,7 @@ class FloatVariable(NumericalVariable):
         super().__init__(
             label,
             description,
-            common.PluginVariableType.Float,
+            gremlin.types.PluginVariableType.Float,
             initial_value,
             min_value,
             max_value,
@@ -430,7 +458,7 @@ class BoolVariable(AbstractVariable):
         super().__init__(
             label,
             description,
-            common.PluginVariableType.Bool,
+            gremlin.types.PluginVariableType.Bool,
             is_optional
         )
 
@@ -465,6 +493,9 @@ class BoolVariable(AbstractVariable):
 
     def _process_registry_value(self, value):
         return value
+    
+    def __str__(self):
+        return f"BoolVariable: {self.description} value: {self.value}"
 
 
 class StringVariable(AbstractVariable):
@@ -481,7 +512,7 @@ class StringVariable(AbstractVariable):
         super().__init__(
             label,
             description,
-            common.PluginVariableType.String,
+            gremlin.types.PluginVariableType.String,
             is_optional
         )
 
@@ -528,7 +559,7 @@ class ModeVariable(AbstractVariable):
         super().__init__(
             label,
             description,
-            common.PluginVariableType.Mode,
+            gremlin.types.PluginVariableType.Mode,
             is_optional
         )
 
@@ -542,9 +573,12 @@ class ModeVariable(AbstractVariable):
         label.setToolTip(self.description)
         layout.addWidget(label, 0, 0)
 
-        value_widget = gremlin.ui.common.ModeWidget()
+        value_widget = gremlin.ui.ui_common.ModeWidget()
+        value_widget.setShowModeEdit(False)
+        value_widget.setShowProfileOptions(False)
+        value_widget.setLabelText("")
         value_widget.populate_selector(shared_state.current_profile, value)
-        value_widget.mode_changed.connect(
+        value_widget.edit_mode_changed.connect(
             lambda x: self.value_changed.emit({"value": x})
         )
 
@@ -567,7 +601,7 @@ class VirtualInputVariable(AbstractVariable):
         super().__init__(
             label,
             description,
-            common.PluginVariableType.VirtualInput,
+            gremlin.types.PluginVariableType.VirtualInput,
             is_optional
         )
 
@@ -576,9 +610,9 @@ class VirtualInputVariable(AbstractVariable):
         self.valid_types = valid_types
         if self.valid_types is None:
             self.valid_types = [
-                common.InputType.JoystickAxis,
-                common.InputType.JoystickButton,
-                common.InputType.JoystickHat
+                InputType.JoystickAxis,
+                InputType.JoystickButton,
+                InputType.JoystickHat
             ]
         self.value = joystick_handling.select_first_valid_vjoy_input(
             self.valid_types
@@ -603,16 +637,16 @@ class VirtualInputVariable(AbstractVariable):
     def set(self, vjoy, event):
         if event.event_type != self.value["input_type"]:
             logging.getLogger("system").warning(
-                f"Invalid types for vJoy set action for vjoy {str(self.value["device_id"]),} {gremlin.common.InputType.to_string(self.value["input_type"])} {self.value["input_id"]:d}"
+                f"Invalid types for vJoy set action for vjoy {str(self.value["device_id"]),} {InputType.to_string(self.value["input_type"])} {self.value["input_id"]:d}"
             )
             return
 
         device = vjoy[self.value["device_id"]]
-        if self.value["input_type"] == gremlin.common.InputType.JoystickAxis:
+        if self.value["input_type"] == InputType.JoystickAxis:
             device.axis(self.value["input_id"]).value = event.value
-        elif self.value["input_type"] == gremlin.common.InputType.JoystickButton:
+        elif self.value["input_type"] == InputType.JoystickButton:
             device.button(self.value["input_id"]).is_pressed = event.is_pressed
-        elif self.value["input_type"] == gremlin.common.InputType.JoystickHat:
+        elif self.value["input_type"] == InputType.JoystickHat:
             device.hat(self.value["input_id"]).direction = event.value
 
     def create_ui_element(self, value):
@@ -621,7 +655,7 @@ class VirtualInputVariable(AbstractVariable):
         label.setToolTip(self.description)
         layout.addWidget(label, 0, 0)
 
-        value_widget = gremlin.ui.common.VJoySelector(
+        value_widget = gremlin.ui.ui_common.VJoySelector(
             lambda data: self.value_changed.emit(data),
             self.valid_types
         )
@@ -642,6 +676,8 @@ class VirtualInputVariable(AbstractVariable):
     def _process_registry_value(self, value):
         return value
 
+    def __str__(self):
+        return f"VirtualInputVariable: {self.value}  vjoy_id: {self.vjoy_id} input_id: {self.input_id} description: {self.description}"
 
 class PhysicalInputVariable(AbstractVariable):
 
@@ -651,7 +687,7 @@ class PhysicalInputVariable(AbstractVariable):
         super().__init__(
             label,
             description,
-            common.PluginVariableType.PhysicalInput,
+            gremlin.types.PluginVariableType.PhysicalInput,
             is_optional
         )
 
@@ -659,9 +695,9 @@ class PhysicalInputVariable(AbstractVariable):
         self.valid_types = valid_types
         if self.valid_types is None:
             self.valid_types = [
-                common.InputType.JoystickAxis,
-                common.InputType.JoystickButton,
-                common.InputType.JoystickHat
+                InputType.JoystickAxis,
+                InputType.JoystickButton,
+                InputType.JoystickHat
             ]
 
         self._load_from_registry(self._get_identifier())
@@ -672,6 +708,13 @@ class PhysicalInputVariable(AbstractVariable):
             return self.value.get("input_id", 0)
         else:
             return 0
+
+    @property
+    def device_name(self):
+        if isinstance(self.value, dict):
+            return self.value.get("device_name", None)
+        else:
+            return None
 
     @property
     def device_guid(self):
@@ -701,12 +744,12 @@ class PhysicalInputVariable(AbstractVariable):
         value_widget = QtWidgets.QPushButton("Press")
         if value is not None:
             input_id = f"{value["input_id"]:d}"
-            if value["input_type"] == gremlin.common.InputType.JoystickAxis:
-                input_id = gremlin.common.AxisNames.to_string(
-                    gremlin.common.AxisNames(value["input_id"])
+            if value["input_type"] == InputType.JoystickAxis:
+                input_id = gremlin.types.AxisNames.to_string(
+                    gremlin.types.AxisNames(value["input_id"])
                 )
             value_widget.setText(
-                f"{value["device_name"]} {gremlin.common.InputType.to_string(value["input_type"]).capitalize()} {input_id}"
+                f"{value["device_name"]} {InputType.to_string(value["input_type"]).capitalize()} {input_id}"
                 )
         value_widget.clicked.connect(self._record_user_input)
 
@@ -718,10 +761,11 @@ class PhysicalInputVariable(AbstractVariable):
         return layout
 
     def _record_user_input(self):
-        widget = gremlin.ui.common.InputListenerWidget(
-            self._user_input,
+        widget = gremlin.ui.ui_common.InputListenerWidget(
             self.valid_types
         )
+
+        widget.item_selected.connect(self._user_input)
 
         # Display the dialog centered in the middle of the UI
         geom = QtWidgets.QApplication.topLevelWindows()[0].geometry()
@@ -745,6 +789,8 @@ class PhysicalInputVariable(AbstractVariable):
     def _process_registry_value(self, value):
         return value
 
+    def __str__(self):
+        return f"PhysicalInputVariable: device_name: {self.device_name}  device_id: {str(self.device_guid)}  input_id: {self.input_id}"
 
 class SelectionVariable(AbstractVariable):
 
@@ -761,7 +807,7 @@ class SelectionVariable(AbstractVariable):
         super().__init__(
             label,
             description,
-            common.PluginVariableType.Selection,
+            gremlin.types.PluginVariableType.Selection,
             is_optional
         )
 
@@ -800,3 +846,6 @@ class SelectionVariable(AbstractVariable):
         layout.setColumnMinimumWidth(0, 150)
 
         return layout
+    
+    def __str__(self):
+        return f"SelectionVariable: description: {self.description} values: {self.options}"

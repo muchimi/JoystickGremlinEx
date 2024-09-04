@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
+# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,16 +20,18 @@ import copy
 import logging
 import threading
 import time
-from xml.etree import ElementTree
+from lxml import etree as ElementTree
 
 from PySide6 import QtWidgets
 
+
 import gremlin
-import gremlin.ui.common
+import gremlin.ui.ui_common
 import gremlin.ui.input_item
+from gremlin.ui.input_item import AbstractContainerWidget
+from gremlin.base_profile import AbstractContainer
 
-
-class SmartToggleContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
+class SmartToggleContainerWidget(AbstractContainerWidget):
 
     """SmartToggle container which holds or toggles a single action."""
 
@@ -51,7 +53,7 @@ class SmartToggleContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
         self.options_layout.addWidget(
             QtWidgets.QLabel("<b>Toggle time: </b>")
         )
-        self.delay_input = gremlin.ui.common.DynamicDoubleSpinBox()
+        self.delay_input = gremlin.ui.ui_common.DynamicDoubleSpinBox()
         self.delay_input.setRange(0.1, 2.0)
         self.delay_input.setSingleStep(0.1)
         self.delay_input.setValue(0.5)
@@ -68,13 +70,13 @@ class SmartToggleContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
             widget = self._create_action_set_widget(
                 self.profile_data.action_sets[0],
                 "Smart Toggle",
-                gremlin.ui.common.ContainerViewTypes.Action
+                gremlin.ui.ui_common.ContainerViewTypes.Action
             )
             self.action_layout.addWidget(widget)
             widget.redraw()
             widget.model.data_changed.connect(self.container_modified.emit)
         else:
-            action_selector = gremlin.ui.common.ActionSelector(
+            action_selector = gremlin.ui.ui_common.ActionSelector(
                 self.profile_data.get_input_type()
             )
             action_selector.action_added.connect(self._add_action)
@@ -89,7 +91,7 @@ class SmartToggleContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
             widget = self._create_action_set_widget(
                 self.profile_data.action_sets[0],
                 "Smart Toggle",
-                gremlin.ui.common.ContainerViewTypes.Condition
+                gremlin.ui.ui_common.ContainerViewTypes.Condition
             )
             self.activation_condition_layout.addWidget(widget)
             widget.redraw()
@@ -225,19 +227,20 @@ class SmartToggleContainerFunctor(gremlin.base_classes.AbstractFunctor):
         return True
 
 
-class SmartToggleContainer(gremlin.base_classes.AbstractContainer):
+class SmartToggleContainer(AbstractContainer):
 
     """Represents a container which holds exactly one action."""
 
     name = "Smart Toggle"
     tag = "smart_toggle"
 
-    input_types = [
-        gremlin.common.InputType.JoystickAxis,
-        gremlin.common.InputType.JoystickButton,
-        gremlin.common.InputType.JoystickHat,
-        gremlin.common.InputType.Keyboard
-    ]
+    # override default allowed inputs here
+    # input_types = [
+    #     InputType.JoystickAxis,
+    #     InputType.JoystickButton,
+    #     InputType.JoystickHat,
+    #     InputType.Keyboard
+    # ]
     interaction_types = []
 
     functor = SmartToggleContainerFunctor

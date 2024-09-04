@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
+# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,11 +19,13 @@
 from PySide6 import QtCore, QtGui, QtWidgets
 
 import logging
-
-
-from gremlin import base_classes, hints, input_devices, macro, util
-from gremlin.common import InputType, load_icon
-from . import common
+from gremlin.input_types import InputType
+from gremlin import hints, input_devices, macro, util
+from gremlin.util import load_icon
+import gremlin.base_classes as bc
+from . import ui_common
+from gremlin.base_conditions import *
+import gremlin.keyboard
 
 
 class ActivationConditionWidget(QtWidgets.QWidget):
@@ -74,7 +76,7 @@ class ActivationConditionWidget(QtWidgets.QWidget):
                 self._granularity_changed_cb
             )
 
-            self.help_button = QtWidgets.QPushButton(load_icon("gfx/help"), "")
+            self.help_button = QtWidgets.QPushButton(load_icon("gfx/help.png"), "")
             self.help_button.clicked.connect(self._show_hint)
 
             self.controls_layout = QtWidgets.QHBoxLayout()
@@ -104,6 +106,7 @@ class ActivationConditionWidget(QtWidgets.QWidget):
 
         :param index the entry of the selection box
         """
+        from gremlin.base_classes import ActivationCondition, ActivationRule
         index_to_type = {
             0: None,
             1: "action",
@@ -113,9 +116,9 @@ class ActivationConditionWidget(QtWidgets.QWidget):
 
         if self.profile_data.activation_condition_type == "container":
             self.profile_data.activation_condition = \
-                base_classes.ActivationCondition(
+                ActivationCondition(
                     [],
-                    base_classes.ActivationRule.All
+                    ActivationRule.All
                 )
         else:
             self.profile_data.activation_condition = None
@@ -138,7 +141,8 @@ class AbstractConditionWidget(QtWidgets.QGroupBox):
     """Abstract class for condition ui widgets."""
 
     # Signal emitted when a condition is deleted
-    deleted = QtCore.Signal(base_classes.AbstractCondition)
+    #deleted = QtCore.Signal(base_classes.AbstractCondition)
+    deleted = QtCore.Signal(object)
 
     def __init__(self, condition_data, parent=None):
         """Creates a new widget.
@@ -185,14 +189,16 @@ class KeyboardConditionWidget(AbstractConditionWidget):
             KeyboardConditionWidget.locked = True
 
             self.key_label = QtWidgets.QLabel("")
-            if self.condition_data.scan_code is not None:
-                self.key_label.setText(
-                    f"<b>{macro.key_from_code(
-                        self.condition_data.scan_code,
-                        self.condition_data.is_extended
-                    ).name}</b>"
-                    )
-            self.record_button = common.NoKeyboardPushButton(
+            if self.condition_data.input_item:
+                self.key_label.setText(f"<b>{self.condition_data.input_item.display_name}</b>")
+            # if self.condition_data.scan_code is not None:
+            #     self.key_label.setText(
+            #         f"<b>{macro.key_from_code(
+            #             self.condition_data.scan_code,
+            #             self.condition_data.is_extended
+            #         ).name}</b>"
+            #         )
+            self.record_button = ui_common.NoKeyboardPushButton(
                 load_icon("gfx/button_edit.png"), ""
             )
             self.record_button.clicked.connect(self._request_user_input)
@@ -230,13 +236,15 @@ class KeyboardConditionWidget(AbstractConditionWidget):
 
         :param key the key that has been pressed
         """
-        self.condition_data.scan_code = key.identifier[0]
-        self.condition_data.is_extended = key.identifier[1]
+        from gremlin.ui.keyboard_device import KeyboardInputItem
+        input_item = KeyboardInputItem()
+        input_item.key = key
+        self.condition_data.input_item = input_item
+        self.condition_data.scan_code = key.scan_code
+        self.condition_data.is_extended = key.is_extended
         self.condition_data.comparison = \
             self.comparison_dropdown.currentText().lower()
-        self.key_label.setText(
-            f"<b>{macro.key_from_code(self.condition_data.scan_code,self.condition_data.is_extended).name}</b>"
-        )
+        self.key_label.setText(f"<b>{input_item.display_name}</b>")
 
     def _comparison_changed_cb(self, text):
         """Updates the comparison operation to use.
@@ -247,26 +255,23 @@ class KeyboardConditionWidget(AbstractConditionWidget):
 
     def _request_user_input(self):
         """Prompts the user for the input to bind to this item."""
-        self.button_press_dialog = common.InputListenerWidget(
-            self._key_pressed_cb,
-            [InputType.Keyboard],
-            return_kb_event=True,
-            multi_keys=False
-        )
 
-        # Display the dialog centered in the middle of the UI
-        root = self
-        while root.parent():
-            root = root.parent()
-        geom = root.geometry()
+        from gremlin.ui.virtual_keyboard import InputKeyboardDialog
+        sequence = []
+        if self.condition_data.input_item:
+            sequence = self.condition_data.input_item.sequence
+        self._keyboard_dialog = InputKeyboardDialog(sequence = sequence, parent = self, select_single = False, index = -1)
+        self._keyboard_dialog.setModal(True)
+        self._keyboard_dialog.accepted.connect(self._dialog_ok_cb)
+        self._keyboard_dialog.showNormal()  
 
-        self.button_press_dialog.setGeometry(
-            int(geom.x() + geom.width() / 2 - 150),
-            int(geom.y() + geom.height() / 2 - 75),
-            300,
-            150
-        )
-        self.button_press_dialog.show()
+    def _dialog_ok_cb(self):
+        ''' callled when the dialog completes '''
+
+        # grab a new data index as this is a new entry
+        self._key_pressed_cb(self._keyboard_dialog.latched_key)
+
+        
 
 
 class JoystickConditionWidget(AbstractConditionWidget):
@@ -296,7 +301,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
 
             JoystickConditionWidget.locked = True
 
-            common.clear_layout(self.main_layout)
+            ui_common.clear_layout(self.main_layout)
 
             self.record_button = QtWidgets.QPushButton(
                 load_icon("gfx/button_edit.png"), ""
@@ -323,14 +328,14 @@ class JoystickConditionWidget(AbstractConditionWidget):
 
     def _axis_ui(self):
         """Creates the UI needed to configure an axis based condition."""
-        self.lower = common.DynamicDoubleSpinBox()
+        self.lower = ui_common.DynamicDoubleSpinBox()
         self.lower.setMinimum(-1.0)
         self.lower.setMaximum(1.0)
         self.lower.setSingleStep(0.05)
         self.lower.setDecimals(3)
         self.lower.setValue(self.condition_data.range[0])
         self.lower.valueChanged.connect(self._range_lower_changed_cb)
-        self.upper = common.DynamicDoubleSpinBox()
+        self.upper = ui_common.DynamicDoubleSpinBox()
         self.upper.setMinimum(-1.0)
         self.upper.setMaximum(1.0)
         self.upper.setDecimals(3)
@@ -437,8 +442,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
 
     def _request_user_input(self):
         """Prompts the user for the input to bind to this item."""
-        self.input_dialog = common.InputListenerWidget(
-            self._input_pressed_cb,
+        self.input_dialog = ui_common.InputListenerWidget(
             [
                 InputType.JoystickAxis,
                 InputType.JoystickButton,
@@ -447,6 +451,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
             return_kb_event=False,
             multi_keys=False
         )
+        self.input_dialog.item_selected.connect(self._input_pressed_cb)
 
         # Display the dialog centered in the middle of the UI
         root = self
@@ -526,9 +531,9 @@ class VJoyConditionWidget(AbstractConditionWidget):
         
         try:
 
-            common.clear_layout(self.main_layout)
+            ui_common.clear_layout(self.main_layout)
 
-            self.vjoy_selector = common.VJoySelector(
+            self.vjoy_selector = ui_common.VJoySelector(
                 self._modify_vjoy,
                 [
                     InputType.JoystickAxis,
@@ -562,14 +567,14 @@ class VJoyConditionWidget(AbstractConditionWidget):
 
     def _axis_ui(self):
         """Creates the UI needed to configure an axis based condition."""
-        self.lower = common.DynamicDoubleSpinBox()
+        self.lower = ui_common.DynamicDoubleSpinBox()
         self.lower.setMinimum(-1.0)
         self.lower.setMaximum(1.0)
         self.lower.setSingleStep(0.05)
         self.lower.setDecimals(3)
         self.lower.setValue(self.condition_data.range[0])
         self.lower.valueChanged.connect(self._range_lower_changed_cb)
-        self.upper = common.DynamicDoubleSpinBox()
+        self.upper = ui_common.DynamicDoubleSpinBox()
         self.upper.setMinimum(-1.0)
         self.upper.setMaximum(1.0)
         self.upper.setDecimals(3)
@@ -769,7 +774,7 @@ class InputActionConditionWidget(AbstractConditionWidget):
         self.condition_data.comparison = label.lower()
 
 
-class ConditionModel(common.AbstractModel):
+class ConditionModel(ui_common.AbstractModel):
 
     """Stores and represents condition data."""
 
@@ -835,28 +840,30 @@ class ConditionModel(common.AbstractModel):
         self.condition_data.rule = rule
 
 
-class ConditionView(common.AbstractView):
+class ConditionView(ui_common.AbstractView):
 
     """Widget visualizing a condition model instance."""
 
     # Mapping between data and ui classes
+    
+    
     condition_map = {
         "Keyboard":
-            [base_classes.KeyboardCondition, KeyboardConditionWidget],
+            [KeyboardCondition, KeyboardConditionWidget],
         "Joystick":
-            [base_classes.JoystickCondition, JoystickConditionWidget],
+            [JoystickCondition, JoystickConditionWidget],
         "vJoy":
-            [base_classes.VJoyCondition, VJoyConditionWidget],
+            [VJoyCondition, VJoyConditionWidget],
         "Action":
-            [base_classes.InputActionCondition, InputActionConditionWidget]
+            [InputActionCondition, InputActionConditionWidget]
     }
 
     # Mapping between application rule label and enumeration
     rules_map = {
-        "All": base_classes.ActivationRule.All,
-        "Any": base_classes.ActivationRule.Any,
-        base_classes.ActivationRule.All: "All",
-        base_classes.ActivationRule.Any: "Any"
+        "All": ActivationRule.All,
+        "Any": ActivationRule.Any,
+        ActivationRule.All: "All",
+        ActivationRule.Any: "Any"
     }
 
     def __init__(self, parent=None):
@@ -897,13 +904,13 @@ class ConditionView(common.AbstractView):
         self.controls_layout.addWidget(self.condition_selector)
         self.controls_layout.addWidget(self.condition_add_button)
 
-        self.help_button = QtWidgets.QPushButton(load_icon("gfx/help"), "")
+        self.help_button = QtWidgets.QPushButton(load_icon("gfx/help.png"), "")
         self.help_button.clicked.connect(self._show_hint)
         self.controls_layout.addWidget(self.help_button)
 
     def redraw(self):
         """Redraws the entire view."""
-        common.clear_layout(self.conditions_layout)
+        ui_common.clear_layout(self.conditions_layout)
 
         lookup = {}
         for entry in ConditionView.condition_map.values():

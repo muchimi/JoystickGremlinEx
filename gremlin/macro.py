@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
+# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -22,7 +22,7 @@ import functools
 import logging
 import time
 from threading import Event, Lock, Thread
-from xml.etree import ElementTree
+from lxml import etree as ElementTree
 
 from PySide6 import QtCore
 
@@ -30,8 +30,13 @@ import win32con
 import win32api
 
 import gremlin
-import gremlin.input_devices
 from gremlin.singleton_decorator import SingletonDecorator
+from gremlin.input_types import InputType
+import gremlin.error
+import gremlin.keyboard
+import gremlin.sendinput
+import gremlin.input_devices
+
 
 
 
@@ -135,6 +140,10 @@ def _virtual_input_to_unicode(virtual_code):
     output_buffer = ctypes.create_unicode_buffer(8)
     state_buffer = ctypes.create_string_buffer(256)
 
+    if virtual_code == 0x7c:
+        pass
+
+
     # Translate three times to get around dead keys showing up in funny ways
     # as the translation takes them into account for future keys
     state = _to_unicode_ex(
@@ -191,7 +200,45 @@ def _unicode_to_key(character):
     is_extended = False
     if code_value << 8 & 0xE0 or code_value << 8 & 0xE1:
         is_extended = True
-    return Key(character, scan_code, is_extended, virtual_code)
+    return gremlin.keyboard.Key(character, scan_code, is_extended, virtual_code)
+
+
+def _send_mouse_button(button_id, is_pressed, is_local = True, is_remote = False, force_remote = False):
+        from gremlin.types import MouseButton
+        import gremlin.sendinput
+        import gremlin.input_devices
+
+        if force_remote:
+            is_remote = True
+        if button_id in [MouseButton.WheelDown, MouseButton.WheelUp]:
+            if is_pressed:
+                direction = -16
+                if button_id == MouseButton.WheelDown:
+                    direction = 16
+                if is_local:
+                    gremlin.sendinput.mouse_wheel(direction)
+                if is_remote:
+                    gremlin.input_devices.remote_client.send_mouse_wheel(direction)
+        elif button_id in [MouseButton.WheelLeft, MouseButton.WheelRight]:
+            if is_pressed:
+                direction = -16
+                if button_id == MouseButton.WheelRight:
+                    direction = 16
+                if is_local:
+                    gremlin.sendinput.mouse_h_wheel(direction)
+                if is_remote:
+                    gremlin.input_devices.remote_client.send_mouse_h_wheel(direction)                    
+        else:
+            if is_pressed:
+                if is_local:
+                    gremlin.sendinput.mouse_press(button_id)
+                if is_remote:
+                    gremlin.input_devices.remote_client.send_mouse_button(button_id.value, True)
+            else:
+                if is_local:
+                    gremlin.sendinput.mouse_release(button_id)
+                if is_remote:
+                    gremlin.input_devices.remote_client.send_mouse_button(button_id.value, False)
 
 
 def _send_key_down(key, is_local = True, is_remote = False, force_remote = False):
@@ -199,11 +246,22 @@ def _send_key_down(key, is_local = True, is_remote = False, force_remote = False
 
     :param key the key for which to send the KEYDOWN event
     """
-    
+    assert key.virtual_code and key.scan_code, f"Invalid key: {key}"
+
+
+    if key.is_mouse:
+        # special handling of virtual keys for mouse buttons
+        _send_mouse_button(key.mouse_button, True, is_local, is_remote, force_remote )
+        return
+
+    if force_remote:
+        is_remote = True
     flags = win32con.KEYEVENTF_EXTENDEDKEY if key.is_extended else 0
 
     if is_local:
-        win32api.keybd_event(key.virtual_code, key.scan_code, flags, 0)
+        gremlin.sendinput.send_key(key.virtual_code, key.scan_code, flags)
+
+        # win32api.keybd_event(key.virtual_code, key.scan_code, flags, 0)
     if is_remote:
         gremlin.input_devices.remote_client.send_key(key.virtual_code, key.scan_code, flags, force_remote)
     
@@ -211,15 +269,29 @@ def _send_key_down(key, is_local = True, is_remote = False, force_remote = False
 
 def _send_key_up(key, is_local = True, is_remote = False, force_remote = False):
     """Sends the KEYUP event for a single key.
-
     :param key the key for which to send the KEYUP event
     """
+    if key.is_mouse:
+        # special handling of virtual keys for mouse buttons
+        _send_mouse_button(key.mouse_button, False, is_local, is_remote, force_remote )
+        return
+
     flags = win32con.KEYEVENTF_EXTENDEDKEY if key.is_extended else 0
     flags |= win32con.KEYEVENTF_KEYUP
     if is_local:
-        win32api.keybd_event(key.virtual_code, key.scan_code, flags, 0)
+        gremlin.sendinput.send_key(key.virtual_code, key.scan_code, flags)
+        # win32api.keybd_event(key.virtual_code, key.scan_code, flags, 0)
     if is_remote:
         gremlin.input_devices.remote_client.send_key(key.virtual_code, key.scan_code, flags, force_remote )
+
+def key_from_code(scan_code, is_extended):
+    ''' returns a key from a code '''
+    return gremlin.keyboard.key_from_code(scan_code, is_extended)
+
+def key_from_name(name, validate = False):
+    ''' returns a key from a lookup name '''
+    return gremlin.keyboard.key_from_name(name, validate)
+
 
 
 @SingletonDecorator
@@ -489,8 +561,6 @@ class Macro:
             self._is_remote = False
         else:
             self._is_remote = is_remote
-        
-        
 
     @property
     def id(self):
@@ -575,17 +645,22 @@ class Macro:
         :param is_pressed boolean indicating if the key is pressed
             (True) or released (False)
         """
+        from gremlin.keyboard import Key, KeyMap
         if isinstance(key, str):
-            key = key_from_name(key)
+            key = KeyMap.find_by_name(key)
         elif isinstance(key, Key):
             pass
+        elif isinstance(key, int):
+            key = KeyMap.find_virtual(key)
+        elif isinstance(key, tuple):
+            key = KeyMap.find(key[0],key[1])
         else:
             raise gremlin.error.KeyboardError("Invalid key specified")
 
         self._sequence.append(KeyAction(key, is_pressed))
 
 
-class AbstractAction:
+class MacroAbstractAction:
 
     """Base class for all macro action."""
 
@@ -607,7 +682,7 @@ class AbstractAction:
         return (is_local, is_remote)
 
 
-class JoystickAction(AbstractAction):
+class JoystickAction(MacroAbstractAction):
 
     """Joystick input action for a macro."""
 
@@ -629,7 +704,7 @@ class JoystickAction(AbstractAction):
     def __call__(self, is_local = None, is_remote = None, force_remote = None):
         """Emits an Event instance through the EventListener system."""
         el = gremlin.event_handler.EventListener()
-        if self.input_type == gremlin.common.InputType.JoystickAxis:
+        if self.input_type == InputType.JoystickAxis:
             event = gremlin.event_handler.Event(
                 event_type=self.input_type,
                 device_guid=self.device_guid,
@@ -637,7 +712,7 @@ class JoystickAction(AbstractAction):
                 value=self.value,
                 force_remote = force_remote
             )
-        elif self.input_type == gremlin.common.InputType.JoystickButton:
+        elif self.input_type == InputType.JoystickButton:
             event = gremlin.event_handler.Event(
                 event_type=self.input_type,
                 device_guid=self.device_guid,
@@ -645,7 +720,7 @@ class JoystickAction(AbstractAction):
                 is_pressed=self.value,
                 force_remote = force_remote
             )
-        elif self.input_type == gremlin.common.InputType.JoystickHat:
+        elif self.input_type == InputType.JoystickHat:
             event = gremlin.event_handler.Event(
                 event_type=self.input_type,
                 device_guid=self.device_guid,
@@ -659,7 +734,7 @@ class JoystickAction(AbstractAction):
 
 
 
-class KeyAction(AbstractAction):
+class KeyAction(MacroAbstractAction):
 
     """Key to press or release by a macro."""
 
@@ -669,6 +744,8 @@ class KeyAction(AbstractAction):
         :param key the key to use in the action
         :param is_pressed True if the key should be pressed, False otherwise
         """
+        from gremlin.keyboard import Key
+
         if not isinstance(key, Key):
             raise gremlin.error.KeyboardError("Invalid Key instance provided")
         self.key = key
@@ -684,7 +761,7 @@ class KeyAction(AbstractAction):
         
 
 
-class MouseButtonAction(AbstractAction):
+class MouseButtonAction(MacroAbstractAction):
 
     """Mouse button action."""
 
@@ -694,7 +771,7 @@ class MouseButtonAction(AbstractAction):
         :param button the button to use in the action
         :param is_pressed True if the button should be pressed, False otherwise
         """
-        if not isinstance(button, gremlin.common.MouseButton):
+        if not isinstance(button, gremlin.types.MouseButton):
             raise gremlin.error.MouseError("Invalid mouse button provided")
 
         self.button = button
@@ -703,13 +780,13 @@ class MouseButtonAction(AbstractAction):
     def __call__(self, is_local = None, is_remote = None, force_remote = None):
         # ignore passed local/remote states
         is_local, is_remote = self._update_flags(is_local, is_remote, force_remote)
-        if self.button == gremlin.common.MouseButton.WheelDown:
+        if self.button == gremlin.types.MouseButton.WheelDown:
             if is_local:
                 gremlin.sendinput.mouse_wheel(1)
             if is_remote:
                 gremlin.input_devices.remote_client.send_mouse_wheel(1, force_remote)
 
-        elif self.button == gremlin.common.MouseButton.WheelUp:
+        elif self.button == gremlin.types.MouseButton.WheelUp:
             if is_local:
                 gremlin.sendinput.mouse_wheel(-1)
             if is_remote:
@@ -725,7 +802,7 @@ class MouseButtonAction(AbstractAction):
                 gremlin.input_devices.remote_client.send_mouse_button(self.button, self.is_pressed, force_remote)
 
 
-class MouseMotionAction(AbstractAction):
+class MouseMotionAction(MacroAbstractAction):
 
     """Mouse motion action."""
 
@@ -747,7 +824,7 @@ class MouseMotionAction(AbstractAction):
             gremlin.input_devices.remote_client.send_mouse_motion(self.dx, self.dy, force_remote)
 
 
-class PauseAction(AbstractAction):
+class PauseAction(MacroAbstractAction):
 
     """Represents the pause in a macro between pressed."""
 
@@ -779,7 +856,7 @@ class PauseAction(AbstractAction):
         time.sleep(duration)
 
 
-class VJoyMacroAction(AbstractAction):
+class VJoyMacroAction(MacroAbstractAction):
 
     """VJoy input action for a macro."""
 
@@ -803,7 +880,7 @@ class VJoyMacroAction(AbstractAction):
         
         is_local, is_remote = self._update_flags(is_local, is_remote, force_remote)
         vjoy = gremlin.joystick_handling.VJoyProxy()[self.vjoy_id]
-        if self.input_type == gremlin.common.InputType.JoystickAxis:
+        if self.input_type == InputType.JoystickAxis:
             if self.axis_type == "absolute":
                 if is_local:
                     vjoy.axis(self.input_id).value = self.value
@@ -819,19 +896,19 @@ class VJoyMacroAction(AbstractAction):
                     )
                 if is_remote:
                     gremlin.input_devices.remote_client.send_relative_axis(self.vjoy_id, self.input_id, self.value, force_remote)
-        elif self.input_type == gremlin.common.InputType.JoystickButton:
+        elif self.input_type == InputType.JoystickButton:
             if is_local:
                 vjoy.button(self.input_id).is_pressed = self.value
             if is_remote:
                 gremlin.input_devices.remote_client.send_button(self.vjoy_id, self.input_id, self.value, force_remote)
-        elif self.input_type == gremlin.common.InputType.JoystickHat:
+        elif self.input_type == InputType.JoystickHat:
             if is_local:
                 vjoy.hat(self.input_id).direction = self.value
             if is_remote:
                 gremlin.input_devices.remote_client.send_hat(self.vjoy_id, self.input_id, self.value, force_remote)
 
 
-class RemoteControlAction(AbstractAction):
+class RemoteControlAction(MacroAbstractAction):
     ''' remote control actions for a macro '''
     
 
@@ -846,77 +923,7 @@ class RemoteControlAction(AbstractAction):
 
 
 
-class Key:
 
-    """Represents a single key on the keyboard together with its
-    different representations.
-    """
-
-    def __init__(self, name, scan_code, is_extended, virtual_code):
-        """Creates a new Key instance.
-
-        :param name the name used to refer to this key
-        :param scan_code the scan code set 1 value corresponding
-            to this key
-        :param is_extended boolean indicating if the key is an
-            extended scan code or not
-        :param virtual_code the virtual key code assigned to this
-            key by windows
-        """
-        self._name = name
-        self._scan_code = scan_code
-        self._is_extended = is_extended
-        self._virtual_code = virtual_code
-        self._lookup_name = None
-
-    @staticmethod
-    def from_key(k : gremlin.keyboard.Key):
-        ''' converts a keyboard key to a macro key '''
-        if k:
-            return Key(k.name, k.scan_code, k.is_extended, k.virtual_code)
-        return None
-        
-
-    @property
-    def name(self):
-        return self._name
-
-    @property
-    def scan_code(self):
-        return self._scan_code
-
-    @property
-    def is_extended(self):
-        return self._is_extended
-
-    @property
-    def virtual_code(self):
-        return self._virtual_code
-
-    @property
-    def lookup_name(self):
-        if self._lookup_name is not None:
-            return self._lookup_name
-        else:
-            return self._name
-
-    @lookup_name.setter
-    def lookup_name(self, name):
-        if self._lookup_name is not None:
-            raise gremlin.error.KeyboardError("Setting lookup name repeatedly")
-        self._lookup_name = name
-
-    def __eq__(self, other):
-        return hash(self) == hash(other)
-
-    def __ne__(self, other):
-        return not (self == other)
-
-    def __hash__(self):
-        if self._is_extended:
-            return (0x0E << 8) + self._scan_code
-        else:
-            return self._scan_code
 
 
 class AbstractRepeat:
@@ -1041,150 +1048,3 @@ class HoldRepeat(AbstractRepeat):
         """
         self.delay = float(node.get("delay"))
 
-
-def key_from_name(name, validate = False):
-    """Returns the key corresponding to the provided name.
-
-    If no key exists with the provided name None is returned.
-
-    :param name the name of the key to return
-    :return Key instance or None
-    """
-    global g_scan_code_to_key, g_name_to_key
-
-    # Attempt to located the key in our database and return it if successful
-    key_name = name.lower().replace(" ", "")
-    key = g_name_to_key.get(key_name, None)
-    if key is not None:
-        return key
-
-    # Attempt to create the key to store and return if successful
-    key = _unicode_to_key(name)
-    if key is None:
-        if validate:
-            # skip error reporting on validation
-            return None
-        
-        logging.getLogger("system").warning(
-            f"Invalid key name specified \"{name}\""
-        )
-        raise gremlin.error.KeyboardError(
-            f"Invalid key specified, {name}"
-        )
-    else:
-        g_scan_code_to_key[(key.scan_code, key.is_extended)] = key
-        g_name_to_key[key_name] = key
-        return key
-
-
-def key_from_code(scan_code, is_extended):
-    """Returns the key corresponding to the provided scan code.
-
-    If no key exists with the provided scan code None is returned.
-
-    :param scan_code the scan code of the desired key
-    :param is_extended flag indicating if the key is extended
-    :return Key instance or None
-    """
-    global g_scan_code_to_key, g_name_to_key
-
-    # Attempt to located the key in our database and return it if successful
-    key = g_scan_code_to_key.get((scan_code, is_extended), None)
-    if key is not None:
-        return key
-
-    # Attempt to create the key to store and return if successful
-    virtual_code = _scan_code_to_virtual_code(scan_code, is_extended)
-    name = _virtual_input_to_unicode(virtual_code)
-
-    if virtual_code == 0xFF or name is None:
-        logging.getLogger("system").warning(
-            f"Invalid scan code specified ({scan_code}, {is_extended})"
-        )
-        raise gremlin.error.KeyboardError(
-            f"Invalid scan code specified ({scan_code}, {is_extended})"
-        )
-    else:
-        key = Key(name, scan_code, is_extended, virtual_code)
-        g_scan_code_to_key[(scan_code, is_extended)] = key
-        g_name_to_key[name.lower()] = key
-        return key
-
-
-# Storage for the various keys, prepopulated with non alphabetical keys
-g_scan_code_to_key = {}
-g_name_to_key = {
-    # Function keys
-    "f1": Key("F1", 0x3b, False, win32con.VK_F1),
-    "f2": Key("F2", 0x3c, False, win32con.VK_F2),
-    "f3": Key("F3", 0x3d, False, win32con.VK_F3),
-    "f4": Key("F4", 0x3e, False, win32con.VK_F4),
-    "f5": Key("F5", 0x3f, False, win32con.VK_F5),
-    "f6": Key("F6", 0x40, False, win32con.VK_F6),
-    "f7": Key("F7", 0x41, False, win32con.VK_F7),
-    "f8": Key("F8", 0x42, False, win32con.VK_F8),
-    "f9": Key("F9", 0x43, False, win32con.VK_F9),
-    "f10": Key("F10", 0x44, False, win32con.VK_F10),
-    "f11": Key("F11", 0x57, False, win32con.VK_F11),
-    "f12": Key("F12", 0x58, False, win32con.VK_F12),
-    # Control keys
-    "printscreen": Key("Print Screen", 0x37, True, win32con.VK_PRINT),
-    "scrolllock": Key("Scroll Lock", 0x46, False, win32con.VK_SCROLL),
-    "pause": Key("Pause", 0x45, False, win32con.VK_PAUSE),
-    # 6 control block
-    "insert": Key("Insert", 0x52, True, win32con.VK_INSERT),
-    "home": Key("Home", 0x47, True, win32con.VK_HOME),
-    "pageup": Key("PageUp", 0x49, True, win32con.VK_PRIOR),
-    "delete": Key("Delete", 0x53, True, win32con.VK_DELETE),
-    "end": Key("End", 0x4f, True, win32con.VK_END),
-    "pagedown": Key("PageDown", 0x51, True, win32con.VK_NEXT),
-    # Arrow keys
-    "up": Key("Up", 0x48, True, win32con.VK_UP),
-    "left": Key("Left", 0x4b, True, win32con.VK_LEFT),
-    "down": Key("Down", 0x50, True, win32con.VK_DOWN),
-    "right": Key("Right", 0x4d, True, win32con.VK_RIGHT),
-    # Numpad
-    "numlock": Key("NumLock", 0x45, True, win32con.VK_NUMLOCK),
-    "npdivide": Key("Numpad /", 0x35, True, win32con.VK_DIVIDE),
-    "npmultiply": Key("Numpad *", 0x37, False, win32con.VK_MULTIPLY),
-    "npminus": Key("Numpad -", 0x4a, False, win32con.VK_SUBTRACT),
-    "npplus": Key("Numpad +", 0x4e, False, win32con.VK_ADD),
-    "npenter": Key("Numpad Enter", 0x1c, True, win32con.VK_SEPARATOR),
-    "npdelete": Key("Numpad Delete", 0x53, False, win32con.VK_DECIMAL),
-    "np0": Key("Numpad 0", 0x52, False, win32con.VK_NUMPAD0),
-    "np1": Key("Numpad 1", 0x4f, False, win32con.VK_NUMPAD1),
-    "np2": Key("Numpad 2", 0x50, False, win32con.VK_NUMPAD2),
-    "np3": Key("Numpad 3", 0x51, False, win32con.VK_NUMPAD3),
-    "np4": Key("Numpad 4", 0x4b, False, win32con.VK_NUMPAD4),
-    "np5": Key("Numpad 5", 0x4c, False, win32con.VK_NUMPAD5),
-    "np6": Key("Numpad 6", 0x4d, False, win32con.VK_NUMPAD6),
-    "np7": Key("Numpad 7", 0x47, False, win32con.VK_NUMPAD7),
-    "np8": Key("Numpad 8", 0x48, False, win32con.VK_NUMPAD8),
-    "np9": Key("Numpad 9", 0x49, False, win32con.VK_NUMPAD9),
-    # Misc keys
-    "backspace": Key("Backspace", 0x0e, False, win32con.VK_BACK),
-    "space": Key("Space", 0x39, False, win32con.VK_SPACE),
-    "tab": Key("Tab", 0x0f, False, win32con.VK_TAB),
-    "capslock": Key("CapsLock", 0x3a, False, win32con.VK_CAPITAL),
-    "leftshift": Key("Left Shift", 0x2a, False, win32con.VK_LSHIFT),
-    "leftcontrol": Key("Left Control", 0x1d, False, win32con.VK_LCONTROL),
-    "leftwin": Key("Left Win", 0x5b, True, win32con.VK_LWIN),
-    "leftalt": Key("Left Alt", 0x38, False, win32con.VK_LMENU),
-    # Right shift key appears to exist in both extended and
-    # non-extended version
-    "rightshift": Key("Right Shift", 0x36, False, win32con.VK_RSHIFT),
-    "rightshift2": Key("Right Shift", 0x36, True, win32con.VK_RSHIFT),
-    "rightcontrol": Key("Right Control", 0x1d, True, win32con.VK_RCONTROL),
-    "rightwin": Key("Right Win", 0x5c, True, win32con.VK_RWIN),
-    "rightalt": Key("Right Alt", 0x38, True, win32con.VK_RMENU),
-    "apps": Key("Apps", 0x5d, True, win32con.VK_APPS),
-    "enter": Key("Enter", 0x1c, False, win32con.VK_RETURN),
-    "esc": Key("Esc", 0x01, False, win32con.VK_ESCAPE)
-}
-
-
-# Populate the scan code based lookup table
-for name_, key_ in g_name_to_key.items():
-    assert isinstance(key_, Key)
-    key_.lookup_name = name_
-    g_scan_code_to_key[(key_.scan_code, key_.is_extended)] = key_

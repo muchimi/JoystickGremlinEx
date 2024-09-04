@@ -157,11 +157,11 @@ def keyboard_handler(address, x):
             elif token in ("shft","lshft","shift","lshift","leftshift"):
                 key = "leftshift"
             elif token in ("rshft", "rshift","rightshift"):
-                key = "rightshift"
+                key = "rightshift2"
             elif token in ("alt", "lalt","leftalt"):
                 key = "leftalt"
             elif token == "ralt":
-                key = "rightalt"
+                key = "rightalt2" # 0x38 TRUE
             elif token in ("win","lwin","leftwin"):
                 key = "leftwin"
             elif token in ("rwin","rightwin"):
@@ -351,7 +351,7 @@ def vjoy_handler(address, args):
 
 
 def osc_message_handler(address, *args):
-    log(f"OSC: {address}: {args}")
+    #log(f"OSC: {address}: {args}")
     address = address.lower()
     ESC = "!ESC!"
     try:
@@ -692,9 +692,9 @@ def get_string(dgram: bytes, start_index: int) -> Tuple[str, int]:
         data_str = dgram[start_index:start_index + offset]
         return data_str.replace(b'\x00', b'').decode('utf-8'), start_index + offset
     except IndexError as ie:
-        raise ParseError('Could not parse datagram %s' % ie)
+        raise ParseError(f'Could not parse datagram {ie}')
     except TypeError as te:
-        raise ParseError('Could not parse datagram %s' % te)
+        raise ParseError(f'Could not parse datagram {te}')
 
 
 def write_int(val: int) -> bytes:
@@ -730,7 +730,7 @@ def get_int(dgram: bytes, start_index: int) -> Tuple[int, int]:
                           dgram[start_index:start_index + _INT_DGRAM_LEN])[0],
             start_index + _INT_DGRAM_LEN)
     except (struct.error, TypeError) as e:
-        raise ParseError('Could not parse datagram %s' % e)
+        raise ParseError(f'Could not parse datagram {e}')
 
 
 def write_int64(val: int) -> bytes:
@@ -766,7 +766,7 @@ def get_int64(dgram: bytes, start_index: int) -> Tuple[int, int]:
                           dgram[start_index:start_index + _INT64_DGRAM_LEN])[0],
             start_index + _INT64_DGRAM_LEN)
     except (struct.error, TypeError) as e:
-        raise ParseError('Could not parse datagram %s' % e)
+        raise ParseError(f'Could not parse datagram {e}')
 
 
 def get_uint64(dgram: bytes, start_index: int) -> Tuple[int, int]:
@@ -790,7 +790,7 @@ def get_uint64(dgram: bytes, start_index: int) -> Tuple[int, int]:
                           dgram[start_index:start_index + _UINT64_DGRAM_LEN])[0],
             start_index + _UINT64_DGRAM_LEN)
     except (struct.error, TypeError) as e:
-        raise ParseError('Could not parse datagram %s' % e)
+        raise ParseError(f'Could not parse datagram {e}')
 
 
 def get_timetag(dgram: bytes, start_index: int) -> Tuple[Tuple[datetime, int], int]:
@@ -822,7 +822,7 @@ def get_timetag(dgram: bytes, start_index: int) -> Tuple[Tuple[datetime, int], i
 
         return (utc, fraction), start_index + _TIMETAG_DGRAM_LEN
     except (struct.error, TypeError) as e:
-        raise ParseError('Could not parse datagram %s' % e)
+        raise ParseError(f'Could not parse datagram {e}')
 
 
 def write_float(val: float) -> bytes:
@@ -861,7 +861,7 @@ def get_float(dgram: bytes, start_index: int) -> Tuple[float, int]:
                           dgram[start_index:start_index + _FLOAT_DGRAM_LEN])[0],
             start_index + _FLOAT_DGRAM_LEN)
     except (struct.error, TypeError) as e:
-        raise ParseError('Could not parse datagram %s' % e)
+        raise ParseError(f'Could not parse datagram {e}')
 
 
 def write_double(val: float) -> bytes:
@@ -1014,7 +1014,7 @@ def get_rgba(dgram: bytes, start_index: int) -> Tuple[bytes, int]:
                           dgram[start_index:start_index + _INT_DGRAM_LEN])[0],
             start_index + _INT_DGRAM_LEN)
     except (struct.error, TypeError) as e:
-        raise ParseError('Could not parse datagram %s' % e)
+        raise ParseError(f'Could not parse datagram {e}')
 
 
 def write_midi(val: MidiPacket) -> bytes:
@@ -1058,7 +1058,7 @@ def get_midi(dgram: bytes, start_index: int) -> Tuple[MidiPacket, int]:
             tuple((val & 0xFF << 8 * i) >> 8 * i for i in range(3, -1, -1)))
         return (midi_msg, start_index + _INT_DGRAM_LEN)
     except (struct.error, TypeError) as e:
-        raise ParseError('Could not parse datagram %s' % e)
+        raise ParseError(f'Could not parse datagram {e}')
 
 
 
@@ -1238,8 +1238,8 @@ class OscPacket(object):
                 raise ParseError(
                     'OSC Packet should at least contain an OscMessage or an '
                     'OscBundle.')
-        except (ParseError, ParseError) as pe:
-            raise ParseError('Could not parse packet %s' % pe)
+        except (ParseError, ParseError) as e:
+            raise ParseError(f'Could not parse datagram {e}')
 
     @property
     def messages(self) -> List[TimedMessage]:
@@ -1275,8 +1275,8 @@ class OscBundle(object):
         index = len(_BUNDLE_PREFIX)
         try:
             self._timestamp, index = get_date(self._dgram, index)
-        except ParseError as pe:
-            raise ParseError("Could not get the date from the datagram: %s" % pe)
+        except ParseError as e:
+            raise ParseError(f'Could not parse datagram {e}')
         # Get the contents as a list of OscBundle and OscMessage.
         self._contents = self._parse_contents(index)
 
@@ -1301,10 +1301,9 @@ class OscBundle(object):
                 elif OscMessage.dgram_is_message(content_dgram):
                     contents.append(OscMessage(content_dgram))
                 else:
-                    logging.warning(
-                        "Could not identify content type of dgram %r" % content_dgram)
+                    logging.warning(f"Could not identify content type of dgram {content_dgram}")
         except (ParseError, ParseError, IndexError) as e:
-            raise ParseError("Could not parse a content datagram: %s" % e)
+            raise ParseError(f'Could not parse datagram {e}')
 
         return contents
 

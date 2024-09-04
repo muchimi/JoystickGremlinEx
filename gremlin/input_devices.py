@@ -27,12 +27,18 @@ from typing import Callable
 
 from PySide6 import QtCore
 
-import gremlin.common
+
+import gremlin.config
 import gremlin.keyboard
+import gremlin.shared_state
 import gremlin.types
 from dinput import DILL, GUID, GUID_Invalid
+import gremlin.util
+from gremlin.util import get_guid
+import gremlin.input_types
 
-from . import common, error, event_handler, joystick_handling, util
+from . import error
+import gremlin.joystick_handling
 
 import win32api
 import gremlin.sendinput, gremlin.tts
@@ -40,7 +46,8 @@ import gremlin.sendinput, gremlin.tts
 import socketserver, socket, msgpack
 import enum
 
-from gremlin.singleton_decorator import SingletonDecorator
+import gremlin.singleton_decorator
+import gremlin.event_handler
 
 
 syslog = logging.getLogger("system")
@@ -68,8 +75,7 @@ class VjoyAction(enum.Enum):
     VJoyEnablePairedRemote = 17 # enables primary fire one and two on remote client
     VJoyDisablePairedRemote = 18 # disable primary fire one and two on remote client
     VjoyButtonRelease = 19 # action button release (clear a button if set)
-
-    # VjoyMergeAxis = 17 # merges two axes into one (usually used to combine toe-brakes into a single axis)
+    VjoyMergeAxis = 20 # action to merge another axis 
 
   
 
@@ -146,8 +152,8 @@ class VjoyAction(enum.Enum):
             return "Disables remote control mode (remote clients will not get inputs except for paired commands)"
         elif action == VjoyAction.VjoyButtonRelease:
             return "Releases a button"
-        # elif action == VjoyAction.VjoyMergeAxis:
-        #     return "Merges two axes into one"
+        elif action == VjoyAction.VjoyMergeAxis:
+            return "Merges two axes into one"
         
         msg  = f"Unknown [{action}]"
         syslog.debug(f"Warning: missing action description mapping: {msg}")
@@ -198,6 +204,8 @@ class VjoyAction(enum.Enum):
             return "Disable remote control"
         elif action == VjoyAction.VjoyButtonRelease:
             return "Button release"
+        elif action == VjoyAction.VjoyMergeAxis:
+            return "Merge Axis"
         
         msg  = f"Unknown [{action}]"
         syslog.debug(f"Warning: missing action name mapping: {msg}")
@@ -233,11 +241,12 @@ class InternalSpeech():
 			pass
 
 
-@SingletonDecorator
+@gremlin.singleton_decorator.SingletonDecorator
 class RemoteControl():
     ''' holds remote control status information'''
 
     def __init__(self):
+        
         self._is_remote = False
         self._is_local = False
         self._is_paired = False
@@ -245,7 +254,7 @@ class RemoteControl():
         config = gremlin.config.Configuration()
         self._is_broadcast = config.enable_remote_broadcast
         self._update(self._mode)
-        el = event_handler.EventListener()
+        el = gremlin.event_handler.EventListener()
         el.config_changed.connect(self._config_changed)
         el.broadcast_changed.connect(self._broadcast_changed)
         
@@ -289,8 +298,9 @@ class RemoteControl():
             # status changed
             self._is_local = is_local
             self._is_remote = is_remote
-            el = event_handler.EventListener()
-            el.broadcast_changed.emit(event_handler.StateChangeEvent(self._is_local, self._is_remote, self._is_broadcast))
+            
+            el = gremlin.event_handler.EventListener()
+            el.broadcast_changed.emit(gremlin.event_handler.StateChangeEvent(self._is_local, self._is_remote, self._is_broadcast))
 
         if self._is_paired != is_paired:
             # pairing mode changed
@@ -304,17 +314,18 @@ class RemoteControl():
 
     def _config_changed(self):
         ''' called when broadcast config item changes '''
+        
         config = gremlin.config.Configuration()
         if self._is_broadcast != config.enable_remote_broadcast:
             self._is_broadcast = config.enable_remote_broadcast
-            el = event_handler.EventListener()
-            el.broadcast_changed.emit(event_handler.StateChangeEvent(self._is_local, self._is_remote, self._is_broadcast))
+            el = gremlin.event_handler.EventListener()
+            el.broadcast_changed.emit(gremlin.event_handler.StateChangeEvent(self._is_local, self._is_remote, self._is_broadcast))
 
     def say(self, msg):
         speech = InternalSpeech()
         speech.speak(msg)
 
-    def _broadcast_changed(self, event: event_handler.StateChangeEvent):
+    def _broadcast_changed(self, event):
         config = gremlin.config.Configuration()
         if config.enable_broadcast_speech:
             msg = None
@@ -356,13 +367,14 @@ class RemoteControl():
         return self._is_paired
 
     
-    def to_state_event(self) -> event_handler.StateChangeEvent:
+    def to_state_event(self):
         ''' returns event data for the current state '''
-        event = event_handler.StateChangeEvent(self.is_local, self.is_remote, self._is_broadcast)
+        from gremlin.event_handler import StateChangeEvent
+        event = StateChangeEvent(self.is_local, self.is_remote, self._is_broadcast)
         return event
 
 
-remote_state = RemoteControl()
+
 
 def get_remote_state():
     ''' gets the remote state '''
@@ -602,10 +614,10 @@ class ModeChangeRegistry():
         :return new callback with plugins installed
         """
         signature = inspect.signature(callback).parameters
-        print ("Signature:")
-        for item in signature:
-            print(item)
-        print("End signature")
+        # print ("Signature:")
+        # for item in signature:
+        #     print(item)
+        # print("End signature")
         partial_fn = functools.partial
         if "self" in signature:
             partial_fn = functools.partialmethod
@@ -628,10 +640,11 @@ class StateChangeRegistry():
     """Registry for functions executed on state (remote/local) change """
     def __init__(self):
         """Creates a new instance."""
+        from gremlin.event_handler import EventListener
         self._registry = {}
         self._running = False
         self._plugins = []
-        el = event_handler.EventListener()
+        el = EventListener()
         el.broadcast_changed.connect(self.state_changed)
 
     def add(self, callback):
@@ -655,8 +668,10 @@ class StateChangeRegistry():
         :return new callback with plugins installed
         """
         signature = inspect.signature(callback).parameters
-        for item in signature:
-            print(item)
+        verbose = gremlin.config.Configuration().verbose
+        if verbose:
+            for item in signature:
+                logging.getLogger("system").info(item)
         partial_fn = functools.partial
         if "self" in signature:
             partial_fn = functools.partialmethod
@@ -719,7 +734,9 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
             if subtype == "wheel":
                 direction = data["direction"]
                 gremlin.sendinput.mouse_wheel(direction)
-
+            elif subtype == "hwheel":
+                direction = data["direction"]
+                gremlin.sendinput.mouse_h_wheel(direction)
             elif subtype == "button":
                 button_id = data["button"]
                 button = gremlin.sendinput.MouseButton.to_enum(button_id)
@@ -749,7 +766,7 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
             device = data["device"]
             target = data["target"]
             value = data["value"]
-            proxy = joystick_handling.VJoyProxy()
+            proxy = gremlin.joystick_handling.VJoyProxy()
             if device in proxy.vjoy_devices:
                 # valid device
                 vjoy = proxy[device]
@@ -812,7 +829,7 @@ class RPCGremlin():
         self._server.server_close()
         self._running = False
         syslog.debug("Gremlin listener stopped.")
-        proxy = joystick_handling.VJoyProxy()
+        proxy = gremlin.joystick_handling.VJoyProxy()
         # release any locks on devices
         proxy.reset()
 
@@ -833,10 +850,10 @@ class RPCGremlin():
             return
         
         # register the devices we will need
-        vjoyid_list = [dev.vjoy_id for dev in joystick_handling.joystick_devices() if dev.is_virtual]
+        vjoyid_list = [dev.vjoy_id for dev in gremlin.joystick_handling.joystick_devices() if dev.is_virtual]
         for key in vjoyid_list:
             try:
-                device = joystick_handling.VJoyProxy()[key]
+                device = gremlin.joystick_handling.VJoyProxy()[key]
                 syslog.debug(f"Remote proxy VJOY [{key}] ok")
             except:
                 pass
@@ -901,7 +918,7 @@ class RemoteServer(QtCore.QObject):
 
 
 
-@SingletonDecorator
+@gremlin.singleton_decorator.SingletonDecorator
 class RemoteClient(QtCore.QObject):
     """ Provides access to a remote Gremlin instance """
 
@@ -922,7 +939,7 @@ class RemoteClient(QtCore.QObject):
         self._address = (RPCGremlin.MULTICAST_GROUP, self._port)
         self._sock = None
         # unique ID of this client
-        self._id = common.get_guid()
+        self._id = get_guid()
         self._alive_thread = None
         self._alive_thread_stop_requested = False
 
@@ -1090,6 +1107,19 @@ class RemoteClient(QtCore.QObject):
             self._send(raw_data)
             #syslog.debug(f"remote gremlin event set mouse: wheel {direction}")
 
+    def send_mouse_h_wheel(self, direction, force_remote = False):
+        ''' sends horizontal mousewheel data  '''
+        if self.enabled or force_remote:
+            data = {}
+            data["sender"] = self._id
+            data["action"] = "mouse"
+            data["subtype"] = "hwheel"
+            data["direction"] = direction
+            
+            raw_data = msgpack.packb(data)
+            self._send(raw_data)
+            #syslog.debug(f"remote gremlin event set mouse: wheel {direction}")            
+
     def send_mouse_motion(self, dx, dy, force_remote = False):
         ''' sends mouse motion data '''
         if self.enabled or force_remote:
@@ -1130,31 +1160,225 @@ class RemoteClient(QtCore.QObject):
 
             
 
+class OscClient(QtCore.QObject):
+    ''' runtime client for OSC messages '''
+
+    def __init__(self):
+        from gremlin.ui.osc_device import OscInterface
+        super().__init__()
+        self._interface = OscInterface()
+        self._interface.osc_message.connect(self._osc_message_cb)
+        self._event_handler = gremlin.event_handler.EventHandler()
+        self._event_listener = gremlin.event_handler.EventListener()
+        self._osc_map = {}  # list of message keys
+        
+
+    def start(self):
+        ''' starts the client '''
+
+        # build a list of messages configured for input
+        from gremlin.ui.osc_device import OscInputItem
+        import gremlin.shared_state
+        profile = gremlin.shared_state.current_profile
+        
+        self._verbose = gremlin.config.Configuration().verbose
+        # build a list of input items to midi messages
+        self._osc_map = {}  # list of message keys
+        for device in profile.devices.values():
+            if device.name == "osc":
+                for mode in device.modes.values():
+                    for input_items in mode.config.values():
+                        for input_item in input_items:
+                            if isinstance(input_item, OscInputItem):
+                                message_key = input_item.message_key
+                                if not message_key in self._osc_map.keys():
+                                    self._osc_map[message_key] = []
+                            
+                                self._osc_map[message_key].append(input_item)
+                                if self._verbose:
+                                    logging.getLogger("system").info(f"OSC: register trigger on: {input_item.display_name} mode: {input_item.mode_string} key: {message_key}")  
 
 
-# Global registry of all registered callbacks
-callback_registry = CallbackRegistry()
+        self._interface.start()
 
-# Global registry of all periodic callbacks
-periodic_registry = PeriodicRegistry()
+    def stop(self):
+        ''' stops the client '''
+        self._interface.stop()
 
-# Global registry of all start callbacks
-start_registry = SimpleRegistry()
+    def _osc_message_cb(self, message, args):
+        ''' called when an OSC message is received '''
+        from gremlin.ui.osc_device import OscInputItem, OscDeviceTabWidget
+        from gremlin.input_types import InputType
+        # get the input items behind this message
+        input_item = OscInputItem()
+        input_item.message = message # this decodes the data
+        input_item.data = args
+        message_key = input_item.message_key
+        
 
-# Global registry of all stop callbacks
-stop_registry = SimpleRegistry()
+        if message_key in self._osc_map.keys():
+            # logging.getLogger("system").info(f"OSC: runtime: processing {message_key}")
+            for input_item in self._osc_map[message_key]:
 
-# Global registry of all mode change callbacks
-mode_registry = ModeChangeRegistry()
+                # button press mode - if the value is in the top half of the range, the button is considered pressed
+                is_axis = False
+                raw_value = args[0]
+                
+                if input_item.mode == OscInputItem.InputMode.Button:
+                    is_pressed = raw_value != 0.0   #for OSC pressed is any value except 0
+                    value = 1 if is_pressed else 0
+                elif input_item.mode == OscInputItem.InputMode.Axis:
+                    is_pressed = False
+                    # map to -1 +1 range for vjoy output
+                    value = gremlin.util.scale_to_range(raw_value, input_item.min_range, input_item.max_range)
+                    is_axis = True
+                elif input_item.mode == OscInputItem.InputMode.OnChange:
+                    is_pressed = True
+                    value = raw_value
 
-# Global state registry of all state change callbacks
-state_registry = StateChangeRegistry()
+                if self._verbose:
+                    logging.getLogger("system").info(f"OSC: send event: is_pressed: {is_pressed} value: {value} raw value: {raw_value} is axis: {is_axis}")
 
-# Global remote server = listens to remote client events
-remote_server = RemoteServer()
+                self._event_listener.osc_event.emit(
+                gremlin.event_handler.Event(
+                    event_type= InputType.OpenSoundControl,
+                    device_guid= OscDeviceTabWidget.device_guid,
+                    identifier= input_item,
+                    is_pressed = is_pressed, 
+                    value = value,
+                    raw_value = raw_value,
+                    is_axis = is_axis
 
-# Global remote client = sends events to server
-remote_client = RemoteClient()
+                ))
+        # else:
+        #     if verbose:
+        #         logging.getLogger("system").info(f"OSC: runtime: ignoring {message_key}")
+    
+      
+
+class MidiClient(QtCore.QObject):
+    ''' runtime client for MIDI messages '''
+
+    
+
+    def __init__(self):
+        import gremlin.ui.midi_device
+        super().__init__()
+        self._interface = gremlin.ui.midi_device.MidiInterface()
+        self._interface.midi_message.connect(self._midi_message_cb)
+        self._event_handler = gremlin.event_handler.EventHandler()
+        self._event_listener = gremlin.event_handler.EventListener()
+        self._midi_map = {}  # list of message keys
+      
+
+    def start(self):
+        ''' starts the client - all ports '''
+        # build a map of the input items
+        from gremlin.ui.midi_device import MidiInputItem
+        import gremlin.shared_state
+        profile = gremlin.shared_state.current_profile
+        
+        self._verbose = gremlin.config.Configuration().verbose
+        
+        # build a list of input items to midi messages
+        self._midi_map = {}  # list of message keys
+        for device in profile.devices.values():
+            if device.name == "midi":
+                for mode in device.modes.values():
+                    for input_items in mode.config.values():
+                        for input_item in input_items:
+                            if isinstance(input_item, MidiInputItem):
+                                message_key = input_item.message_key
+                                if not message_key in self._midi_map.keys():
+                                    self._midi_map[message_key] = []
+                                if input_item.port_valid:
+                                    self._midi_map[message_key].append(input_item)
+                                    if self._verbose:
+                                        logging.getLogger("system").info(f"MIDI: register trigger on: {input_item.display_name} mode: {input_item.mode_string} key: {message_key}")
+                            
+
+        
+        self._interface.start()
+
+    def stop(self):
+        ''' stops the client '''
+        try:
+            self._interface.stop()
+        except:
+            pass
+        self._midi_map = {}  
+
+    def _midi_message_cb(self, port_name : str, port_index : int,  message):
+        ''' called when a midi messages is provided by the listener  '''
+        from gremlin.ui.midi_device import MidiInputItem, MidiDeviceTabWidget, MidiCommandType
+        from gremlin.input_types import InputType
+        #self._callback(port_name, port_index, message)
+
+        # get the input items behind this message
+        input_item = MidiInputItem()
+        input_item.port_name = port_name
+        input_item.message = message # this decodes the data
+        message_key = input_item.message_key
+
+        
+
+        if message_key in self._midi_map.keys():
+            # logging.getLogger("system").info(f"MIDI: runtime: processing {message_key}")
+            for input_item in self._midi_map[message_key]:
+                # send the value over if the message is a value type message
+                command = input_item.command
+                range = 127
+                raw_value = None
+                if command == MidiCommandType.Control:
+                    raw_value = message.value
+                elif command in (MidiCommandType.NoteOff, MidiCommandType.NoteOn):
+                    raw_value = message.velocity
+                elif command == MidiCommandType.Aftertouch:
+                    raw_value = message.value
+                elif command == MidiCommandType.ChannelAftertouch:  
+                    raw_value = message.value
+                elif command == MidiCommandType.ProgramChange:
+                    raw_value = None
+                elif command == MidiCommandType.PitchWheel:
+                    raw_value = message.pitch
+                    range = 16383
+                elif command == MidiCommandType.SysEx:
+                    range = 0
+                    raw_value = 1
+                
+                # button press mode - if the value is in the top half of the range, the button is considered pressed
+                is_axis = False
+                if input_item.mode == MidiInputItem.InputMode.Button:
+                    is_pressed = raw_value >= range / 2
+                    value = 1 if is_pressed else 0
+                elif input_item.mode == MidiInputItem.InputMode.Axis:
+                    is_pressed = False
+                    value = gremlin.util.scale_to_range(raw_value, 0, range)
+                    is_axis = True
+                elif input_item.mode == MidiInputItem.InputMode.OnChange:
+                    is_pressed = True
+                    value = raw_value
+
+                if self._verbose:
+                    logging.getLogger("system").info(f"MIDI: send event: is_pressed: {is_pressed} value: {value} raw value: {raw_value} is axis: {is_axis}")
+
+                self._event_listener.midi_event.emit(
+                gremlin.event_handler.Event(
+                    event_type= InputType.Midi,
+                    device_guid= MidiDeviceTabWidget.device_guid,
+                    identifier= input_item,
+                    is_pressed = is_pressed, 
+                    value = value,
+                    raw_value = raw_value,
+                    is_axis = is_axis
+
+                ))
+        # else:
+        #     logging.getLogger("system").info(f"MIDI: runtime: ignoring {message_key}")
+    
+
+
+
 
 
 
@@ -1172,12 +1396,12 @@ def register_callback(callback, device, input_type, input_id):
     device : JoystickDecorator
         Joystick decorator specifying the device and mode in which to execute
         the callback
-    input_type : gremlin.types.InputType
+    input_type : gremlin.input_types.InputType
         Type of input on which to execute the callback
     input_id : int
         Index of the input on which to execute the callback
     """
-    event = event_handler.Event(
+    event = gremlin.event_handler.Event(
         event_type=input_type,
         device_guid=device.device_guid,
         identifier=input_id
@@ -1235,7 +1459,7 @@ class JoystickWrapper:
 
         @property
         def direction(self):
-            return util.dill_hat_lookup(DILL.get_hat(self._joystick_guid, self._index))
+            return gremlin.util.dill_hat_lookup(DILL.get_hat(self._joystick_guid, self._index))
 
     def __init__(self, device_guid):
         """Creates a new wrapper object for the given object id.
@@ -1414,8 +1638,9 @@ class VJoyPlugin:
     For a function to use this plugin it requires one of its parameters
     to be named "vjoy".
     """
+    
 
-    vjoy = joystick_handling.VJoyProxy()
+    vjoy = gremlin.joystick_handling.VJoyProxy()
 
     def __init__(self):
         self.keyword = "vjoy"
@@ -1461,7 +1686,7 @@ class JoystickPlugin:
         return partial_fn(callback, joy=JoystickPlugin.joystick)
 
 
-@SingletonDecorator
+@gremlin.singleton_decorator.SingletonDecorator
 class Keyboard(QtCore.QObject):
 
     """Provides access to the keyboard state."""
@@ -1469,18 +1694,16 @@ class Keyboard(QtCore.QObject):
     def __init__(self):
         """Initialises a new object."""
         QtCore.QObject.__init__(self)
-        self._keyboard_state = {}
+        self._keyboard_state = {} # holds the state of the keys
 
-    @QtCore.Slot(event_handler.Event)
+    @QtCore.Slot(object)
     def keyboard_event(self, event):
         """Handles keyboard events and updates state.
 
         :param event the keyboard event to use to update state
         """
-        key = gremlin.keyboard.key_from_code(
-            event.identifier[0],
-            event.identifier[1]
-        )
+        key = gremlin.keyboard.KeyMap.from_event(event)
+        # print (f"Key: {key.name} pressed: {event.is_pressed}")
         self._keyboard_state[key] = event.is_pressed
 
     def is_pressed(self, key):
@@ -1491,8 +1714,8 @@ class Keyboard(QtCore.QObject):
         """
         if isinstance(key, str):
             key = gremlin.keyboard.key_from_name(key)
-        elif isinstance(key, gremlin.keyboard.Key):
-            pass
+        # elif isinstance(key, gremlin.keyboard.Key):
+        #     pass
         return self._keyboard_state.get(key, False)
 
 
@@ -1559,7 +1782,7 @@ ButtonReleaseEntry = collections.namedtuple(
 )
 
 
-@SingletonDecorator
+@gremlin.singleton_decorator.SingletonDecorator
 class ButtonReleaseActions(QtCore.QObject):
 
     """Ensures a desired action is run when a button is released."""
@@ -1569,18 +1792,19 @@ class ButtonReleaseActions(QtCore.QObject):
         QtCore.QObject.__init__(self)
 
         self._registry = {}
-        el = event_handler.EventListener()
+        el = gremlin.event_handler.EventListener()
         el.joystick_event.connect(self._input_event_cb)
         el.keyboard_event.connect(self._input_event_cb)
         el.virtual_event.connect(self._input_event_cb)
-        eh = event_handler.EventHandler()
-        self._current_mode = eh.active_mode
-        eh.mode_changed.connect(self._mode_changed_cb)
+        self._current_mode = gremlin.shared_state.runtime_mode
+
+        eh = gremlin.event_handler.EventHandler()
+        eh.runtime_mode_changed.connect(self._mode_changed_cb)
 
     def register_callback(
         self,
         callback: Callable[[], None],
-        physical_event: event_handler.Event
+        physical_event
     ) -> None:
         """Registers a callback with the system.
 
@@ -1603,7 +1827,7 @@ class ButtonReleaseActions(QtCore.QObject):
     def register_button_release(
         self,
         vjoy_input: int,
-        physical_event: event_handler.Event,
+        physical_event,
         activate_on: bool = False,
         is_local = True,
         is_remote = False,
@@ -1643,7 +1867,7 @@ class ButtonReleaseActions(QtCore.QObject):
         """
 
         # Check if the button is valid otherwise we cause Gremlin to crash
-        vjoy = joystick_handling.VJoyProxy()
+        vjoy = gremlin.joystick_handling.VJoyProxy()
         if vjoy[vjoy_input[0]].is_button_valid(vjoy_input[1]):
             if is_local:
                 vjoy[vjoy_input[0]].button(vjoy_input[1]).is_pressed = False
@@ -1657,7 +1881,7 @@ class ButtonReleaseActions(QtCore.QObject):
                 f"vJoy {vjoy_input[0]:d} button {vjoy_input[1]:d}"
             )
 
-    def _input_event_cb(self, event: event_handler.Event):
+    def _input_event_cb(self, event):
         """Runs callbacks associated with the given event.
 
         Args:
@@ -1681,7 +1905,7 @@ class ButtonReleaseActions(QtCore.QObject):
         self._current_mode = mode
 
 
-@SingletonDecorator
+@gremlin.singleton_decorator.SingletonDecorator
 class JoystickInputSignificant:
 
     """Checks whether or not joystick inputs are significant."""
@@ -1691,7 +1915,7 @@ class JoystickInputSignificant:
         self.reset()
 
    
-    def should_process(self, event: event_handler.Event, deviation = 0.1) -> bool:
+    def should_process(self, event, deviation = 0.1) -> bool:
         """Returns whether or not a particular event is significant enough to
         process.
 
@@ -1701,7 +1925,7 @@ class JoystickInputSignificant:
         Returns:
             True if the event should be processed, False otherwise
         """
-        from gremlin.common import InputType
+        from gremlin.input_types import InputType
         self._mre_registry[event] = event
 
         if event.event_type == InputType.JoystickAxis:
@@ -1716,7 +1940,7 @@ class JoystickInputSignificant:
             )
             return False
 
-    def last_event(self, event: event_handler.Event) -> event_handler.Event:
+    def last_event(self, event):
         """Returns the most recent event of this type.
 
         Args:
@@ -1734,7 +1958,7 @@ class JoystickInputSignificant:
         self._time_registry = {}
         
 
-    def _process_axis(self, event: event_handler.Event, deviation = 0.1) -> bool:
+    def _process_axis(self, event, deviation = 0.1) -> bool:
         """Process an axis event.
 
         Args:
@@ -1767,7 +1991,7 @@ class JoystickInputSignificant:
             self._time_registry[event] = time.time()
             return False
 
-    def _process_button(self, event: event_handler.Event) -> bool:
+    def _process_button(self, event) -> bool:
         """Process a button event.
 
         Args:
@@ -1778,7 +2002,7 @@ class JoystickInputSignificant:
         """
         return True
 
-    def _process_hat(self, event: event_handler.Event) -> bool:
+    def _process_hat(self, event) -> bool:
         """Process a hat event.
 
         Args:
@@ -1806,8 +2030,8 @@ def _button(button_id, device_guid, mode, always_execute=False):
         def wrapper_fn(*args, **kwargs):
             callback(*args, **kwargs)
 
-        event = event_handler.Event(
-            event_type=gremlin.types.InputType.JoystickButton,
+        event = gremlin.event_handler.Event(
+            event_type=gremlin.input_types.InputType.JoystickButton,
             device_guid=device_guid,
             identifier=button_id
         )
@@ -1834,8 +2058,8 @@ def _hat(hat_id, device_guid, mode, always_execute=False):
         def wrapper_fn(*args, **kwargs):
             callback(*args, **kwargs)
 
-        event = event_handler.Event(
-            event_type=gremlin.types.InputType.JoystickHat,
+        event = gremlin.event_handler.Event(
+            event_type=gremlin.input_types.InputType.JoystickHat,
             device_guid=device_guid,
             identifier=hat_id
         )
@@ -1862,8 +2086,8 @@ def _axis(axis_id, device_guid, mode, always_execute=False):
         def wrapper_fn(*args, **kwargs):
             callback(*args, **kwargs)
 
-        event = event_handler.Event(
-            event_type=gremlin.types.InputType.JoystickAxis,
+        event = gremlin.event_handler.Event(
+            event_type=gremlin.input_types.InputType.JoystickAxis,
             device_guid=device_guid,
             identifier=axis_id
         )
@@ -1874,6 +2098,7 @@ def _axis(axis_id, device_guid, mode, always_execute=False):
     return wrap
 
 
+''' KEYBOARD DECORATOR '''
 def keyboard(key_name, mode, always_execute=False):
     """Decorator for keyboard key callbacks.
 
@@ -1890,7 +2115,7 @@ def keyboard(key_name, mode, always_execute=False):
             callback(*args, **kwargs)
 
         key = gremlin.keyboard.key_from_name(key_name)
-        event = event_handler.Event.from_key(key)
+        event = gremlin.event_handler.Event.from_key(key)
         callback_registry.add(wrapper_fn, event, mode, always_execute)
 
         return wrapper_fn
@@ -1901,7 +2126,7 @@ def keyboard(key_name, mode, always_execute=False):
 
 
 
-
+''' PERIODIC DECORATOR '''
 def periodic(interval):
     """Decorator for periodic function callbacks.
 
@@ -1922,7 +2147,7 @@ def periodic(interval):
 
 
 
-
+''' PROFILE START DECORATOR '''
 def gremlin_start():
     ''' decorator when a profile is activated '''
     def wrap(callback):
@@ -1930,13 +2155,14 @@ def gremlin_start():
         @functools.wraps(callback)
         def wrapper_fn(*args, **kwargs):
             callback(*args, **kwargs)
-        vjoy = joystick_handling.VJoyProxy()
+        vjoy = gremlin.joystick_handling.VJoyProxy()
         start_registry.add(wrapper_fn)
 
         return wrapper_fn
 
     return wrap
 
+''' PROFILE STOP DECORATOR '''
 def gremlin_stop():
     ''' decorator when a profile is de-activated '''
     def wrap(callback):
@@ -1951,7 +2177,7 @@ def gremlin_stop():
 
     return wrap
 
-
+''' PROFILE MODE DECORATOR'''
 def gremlin_mode():
     ''' decorator when gremlin changes profile modes - passes the new mode to the plugin '''
     def wrap(callback):
@@ -1965,6 +2191,7 @@ def gremlin_mode():
 
     return wrap
 
+''' STATE DECORATOR '''
 def gremlin_state():
     ''' decorator when gremlin changes states local or remote or both '''
     def wrap(callback):
@@ -1977,6 +2204,9 @@ def gremlin_state():
         return wrapper_fn
 
     return wrap
+
+
+
 
 
 def squash(value, func):
@@ -2010,7 +2240,7 @@ def deadzone(value, low, low_center, high_center, high):
         return max(-1, min(0, (value - low_center) / abs(low - low_center)))
 
 
-def format_input(event: event_handler.Event) -> str:
+def format_input(event) -> str:
     """Formats the input specified the the device and event into a string.
 
     Args:
@@ -2021,7 +2251,7 @@ def format_input(event: event_handler.Event) -> str:
     """
     # Retrieve device instance belonging to this event
     device = None
-    for dev in joystick_handling.joystick_devices():
+    for dev in gremlin.joystick_handling.joystick_devices():
         if dev.device_guid == event.device_guid:
             device = dev
             break
@@ -2044,3 +2274,37 @@ def format_input(event: event_handler.Event) -> str:
     )
 
     return label
+
+
+remote_state = RemoteControl()
+
+
+# Global registry of all registered callbacks
+callback_registry = CallbackRegistry()
+
+# Global registry of all periodic callbacks
+periodic_registry = PeriodicRegistry()
+
+# Global registry of all start callbacks -
+start_registry = SimpleRegistry()
+
+# Global registry of all stop callbacks
+stop_registry = SimpleRegistry()
+
+# Global registry of all mode change callbacks
+mode_registry = ModeChangeRegistry()
+
+# Global state registry of all state change callbacks
+state_registry = StateChangeRegistry()
+
+# Global remote server = listens to remote client events
+remote_server = RemoteServer()
+
+# Global remote client = sends events to server
+remote_client = RemoteClient()
+
+# listens to MIDI input
+midi_client = MidiClient()
+
+# listens to OSC input
+osc_client = OscClient()

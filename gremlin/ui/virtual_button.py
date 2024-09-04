@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
+# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,7 +19,8 @@
 from PySide6 import QtWidgets, QtCore, QtGui
 
 import gremlin
-from gremlin.common import load_icon
+import gremlin.types
+from gremlin.util import load_icon
 
 class AbstractVirtualButtonWidget(QtWidgets.QGroupBox):
 
@@ -83,10 +84,10 @@ class VirtualAxisButtonWidget(AbstractVirtualButtonWidget):
         try:
             VirtualAxisButtonWidget.locked = True
             self.range_layout = QtWidgets.QHBoxLayout()
-            self.lower_limit = gremlin.ui.common.DynamicDoubleSpinBox()
+            self.lower_limit = gremlin.ui.ui_common.DynamicDoubleSpinBox()
             self.lower_limit.setRange(-1.0, 1.0)
             self.lower_limit.setSingleStep(0.05)
-            self.upper_limit = gremlin.ui.common.DynamicDoubleSpinBox()
+            self.upper_limit = gremlin.ui.ui_common.DynamicDoubleSpinBox()
             self.upper_limit.setRange(-1.0, 1.0)
             self.upper_limit.setSingleStep(0.05)
             self.direction = QtWidgets.QComboBox()
@@ -108,7 +109,7 @@ class VirtualAxisButtonWidget(AbstractVirtualButtonWidget):
 
             self.range_layout.addStretch(1)
 
-            self.help_button = QtWidgets.QPushButton(load_icon("gfx/help"), "")
+            self.help_button = QtWidgets.QPushButton(load_icon("gfx/help.png"), "")
             self.help_button.clicked.connect(self._show_hint)
             self.range_layout.addWidget(self.help_button)
 
@@ -125,7 +126,7 @@ class VirtualAxisButtonWidget(AbstractVirtualButtonWidget):
         self.lower_limit.setValue(self.condition_data.lower_limit)
         self.upper_limit.setValue(self.condition_data.upper_limit)
         self.direction.setCurrentText(
-            gremlin.common.AxisButtonDirection.to_string(
+            gremlin.types.AxisButtonDirection.to_string(
                 self.condition_data.direction
             ).capitalize()
         )
@@ -148,7 +149,7 @@ class VirtualAxisButtonWidget(AbstractVirtualButtonWidget):
 
     def _direction_changed_cb(self, value):
         self.condition_data.direction = \
-            gremlin.common.AxisButtonDirection.to_enum(value.lower())
+            gremlin.types.AxisButtonDirection.to_enum(value.lower())
         self.virtual_button_modified.emit()
 
     def _show_hint(self):
@@ -200,7 +201,7 @@ class VirtualHatButtonWidget(AbstractVirtualButtonWidget):
 
             self.main_layout.addStretch(1)
 
-            self.help_button = QtWidgets.QPushButton(load_icon("gfx/help"), "")
+            self.help_button = QtWidgets.QPushButton(load_icon("gfx/help.png"), "")
             self.help_button.clicked.connect(self._show_hint)
             self.main_layout.addWidget(self.help_button)
         finally:

@@ -3,6 +3,7 @@ from gremlin.spline import CubicSpline
 from gremlin.input_devices import keyboard, macro
 from vjoy.vjoy import AxisName
 
+
 # Create joystick decorator for the CH Fighterstick in global mode
 chfs = gremlin.input_devices.JoystickDecorator(
     "CH Fighterstick USB",
@@ -164,6 +165,7 @@ def right_pedal(event, vjoy):
 def reset_roll(event, vjoy):
     if not event.is_pressed:
         vjoy[1].axis[AxisName.RX].value = 0.0
+        import gremlin.control_action
         gremlin.control_action.switch_mode("Global")
 
 

@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
+# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -23,7 +23,6 @@ from enum import Enum
 import os
 import time
 import uuid
-from gremlin.util import get_dll_version
 import logging
 from gremlin.singleton_decorator import SingletonDecorator
 
@@ -139,8 +138,6 @@ class GUID:
             Mapping of a C struct representing a device GUID
         """
 
-
-        
         if isinstance(guid, uuid.UUID):
             # convert to ctypes structure using the integer value if the class is given a regular python UUID
             guid = _GUID(guid.int)
@@ -164,8 +161,7 @@ class GUID:
                self._ctypes_guid.Data2 == 0 and \
                self._ctypes_guid.Data3 == 0 and \
                self._ctypes_guid.Data4 == 0)
-
-
+    
     @property
     def ctypes(self):
         """Returns the object mapping the C structure.
@@ -356,7 +352,6 @@ class InputEvent:
         else:
             self.device_guid = GUID.InvalidGuid()
             self.input_type = InputType.Button
-            
             self.input_index = 0
             self.value = 0
 
@@ -401,6 +396,7 @@ class DeviceSummary:
             The data received from DILL and to be held by this instance
         """
         self.device_guid = GUID(data.device_guid)
+        self.device_id = str(self.device_guid)
         self.vendor_id = data.vendor_id
         self.product_id = data.product_id
         self.joystick_id = data.joystick_id
@@ -412,7 +408,7 @@ class DeviceSummary:
         for i in range(8):
             self.axis_map.append(AxisMap(data.axis_map[i]))
         self.vjoy_id = -1
-
+        
     @property
     def is_virtual(self):
         """Returns if a device is virtual.
@@ -438,6 +434,7 @@ class DeviceSummary:
         """
         assert self.is_virtual is True
         self.vjoy_id = vjoy_id
+        self.name = f"VJoy {self.axis_count}/{self.button_count}/{self.hat_count} ({vjoy_id:d})"
 
 
 C_EVENT_CALLBACK = ctypes.CFUNCTYPE(None, _JoystickInputData)
@@ -515,7 +512,7 @@ class DILL:
         This has to be called before any other DILL interactions can take place.
         """
         from pathlib import Path
-        from gremlin.util import display_error
+        from gremlin.util import display_error, get_dll_version
 
         if DILL._dll is None:
 

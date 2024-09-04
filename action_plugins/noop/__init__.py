@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
+# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,20 +18,24 @@
 
 import os
 from PySide6 import QtWidgets
-from xml.etree import ElementTree
+from lxml import etree as ElementTree
 
-from gremlin.base_classes import AbstractAction, AbstractFunctor
-from gremlin.common import InputType
+import gremlin.base_profile
+from gremlin.input_types import InputType
 from gremlin.ui.input_item import AbstractActionWidget
 
 
 class NoOpActionWidget(AbstractActionWidget):
-
     """Widget for the NoOp action."""
 
     def __init__(self, action_data, parent=None):
         super().__init__(action_data, parent=parent)
         assert(isinstance(action_data, NoOpAction))
+        
+
+    def display_name(self):
+        ''' returns a display string for the current configuration '''
+        return "Noop"
 
     def _create_ui(self):
         self.label = QtWidgets.QLabel("NoOp")
@@ -41,7 +45,7 @@ class NoOpActionWidget(AbstractActionWidget):
         pass
 
 
-class NoOpActionFunctor(AbstractFunctor):
+class NoOpActionFunctor(gremlin.base_profile.AbstractFunctor):
 
     """Functor, executing the NoOp action."""
 
@@ -52,7 +56,7 @@ class NoOpActionFunctor(AbstractFunctor):
         return True
 
 
-class NoOpAction(AbstractAction):
+class NoOpAction(gremlin.base_profile.AbstractAction):
 
     """Action which performs no operation."""
 
@@ -60,18 +64,20 @@ class NoOpAction(AbstractAction):
     tag = "noop"
 
     default_button_activation = (True, False)
-    input_types = [
-        InputType.JoystickAxis,
-        InputType.JoystickButton,
-        InputType.JoystickHat,
-        InputType.Keyboard
-    ]
+    # override default allowed input types here if not all
+    # input_types = [
+    #     InputType.JoystickAxis,
+    #     InputType.JoystickButton,
+    #     InputType.JoystickHat,
+    #     InputType.Keyboard
+    # ]
 
     functor = NoOpActionFunctor
     widget = NoOpActionWidget
 
     def __init__(self, parent):
         super().__init__(parent)
+        self.parent = parent
 
     def icon(self):
         return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"

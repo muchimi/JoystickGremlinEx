@@ -25,7 +25,7 @@ from PySide6 import QtCore
 from PySide6.QtCore import Property, Signal, Slot
 
 from gremlin import code_runner, common, config, error, plugin_manager, \
-    profile, profile_library, shared_state, types
+    profile, shared_state, types
 from gremlin.signal import signal
 
 from gremlin.ui.device import InputIdentifier
@@ -94,19 +94,11 @@ class Backend(QtCore.QObject):
                 self.profile,
                 "Default"
             )
-            #self.ui.tray_icon.setIcon(load_icon("gfx/icon_active.ico"))
+            
         else:
             # Stop running the code
             self.runner.stop()
-            # self._update_statusbar_active(False)
-            # self._profile_auto_activated = False
-            # current_tab = self.ui.devices.currentWidget()
-            # if type(current_tab) in [
-            #     gremlin.ui.device_tab.JoystickDeviceTabWidget,
-            #     gremlin.ui.device_tab.KeyboardDeviceTabWidget
-            # ]:
-            #     self.ui.devices.currentWidget().refresh()
-            # self.ui.tray_icon.setIcon(load_icon("gfx/icon.ico"))
+            
         self.activityChanged.emit()
 
     @Slot(InputIdentifier, result=int)
@@ -124,12 +116,11 @@ class Backend(QtCore.QObject):
             return 0
 
         try:
-            item = self.profile.get_input_item(
-                identifier.device_guid,
-                identifier.input_type,
-                identifier.input_id,
-                False
-            )
+            import gremlin.base_profile
+            item = gremlin.base_profile.InputItem()
+            item.device_guid = identifier.device_guid
+            item.input_type = identifier.input_type
+            item.input_id = identifier.input_id
             return len(item.action_configurations)
         except error.ProfileError as e:
             return 0
@@ -155,7 +146,7 @@ class Backend(QtCore.QObject):
             )
             return InputItemModel(item, self)
         except error.ProfileError as e:
-            print(e)
+            logging.getLogger("system").error(e)
 
     @Slot(str, result=bool)
     def isActionExpanded(self, uuid_str: str) -> bool:

@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
+# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,10 +18,10 @@
 from PySide6 import QtWidgets, QtCore
 
 import gremlin
-from . import common
+from . import ui_common
+from gremlin.input_types import InputType
 
-
-class CalibrationUi(common.BaseDialogUi):
+class CalibrationUi(ui_common.BaseDialogUi):
 
     """Dialog to calibrate joystick axes."""
 
@@ -131,7 +131,7 @@ class CalibrationUi(common.BaseDialogUi):
         :param index the index of the currently selected device
             in the dropdown menu
         """
-        common.clear_layout(self.axes_layout)
+        ui_common.clear_layout(self.axes_layout)
         self.axes = []
         self.current_selection_id = index
         for i in range(self.devices[index].axis_count):
@@ -144,7 +144,7 @@ class CalibrationUi(common.BaseDialogUi):
         :param event the event to process
         """
         if event.device_guid == self.devices[self.current_selection_id].device_guid \
-                and event.event_type == gremlin.common.InputType.JoystickAxis:
+                and event.event_type == InputType.JoystickAxis:
             axis_id = gremlin.joystick_handling.linear_axis_index(
                 self.devices[self.current_selection_id].axis_map,
                 event.identifier

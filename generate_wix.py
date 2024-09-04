@@ -5,8 +5,8 @@ import os
 import uuid
 import sys
 import pickle
-from xml.dom import minidom
-from xml.etree import ElementTree
+#from xml.dom import minidom
+from lxml import etree as ElementTree
 
 
 def generate_file_list(root_folder):
@@ -235,11 +235,12 @@ def create_document():
             #"Id": "2f6ff870-cfd7-4810-95ae-387c4a3f9007", # 13.40.10ex
             #"Id": "2f6ff870-cfd7-4810-95ae-387c4a3f9007", # 13.40.11ex
             #"Id": "ee7ed4b7-f969-477e-a0cc-90a555c535aa", # 13.40.12ex
-            "Id": "ee7ed4b7-f969-477e-a0cc-90a555c535aa", # 13.40.12ex
-            "UpgradeCode": "ffb68f9d-1022-4a0f-a7f3-3bb6cb91dd48",
+            #"Id": "ee7ed4b7-f969-477e-a0cc-90a555c535aa", # 13.40.13ex
+            "Id": "851832d3-6508-410c-a3e1-d8ae437fe32a", # 13.40.14ex
+            "UpgradeCode": "e5ee68fe-ada4-46a7-b4f3-798bfe8de6cf",
             "Language": "1033",
             "Codepage": "1252",
-            "Version": "13.40.13ex"
+            "Version": "13.40.14ex"
         })
     
     # also change version number in joystick_gremlin.py line 60 APPLICATION_VERSION
@@ -416,11 +417,15 @@ def write_xml(node, fname):
     :param node node of the XML document
     :param fname the file to store the XML document in
     """
-    ugly_xml = ElementTree.tostring(node, encoding="unicode")
-    dom_xml = minidom.parseString(ugly_xml)
-    with open(fname, "w") as out:
-        out.write(dom_xml.toprettyxml(indent="    "))
 
+    # ugly_xml = ElementTree.tostring(node, encoding="unicode")
+    # dom_xml = minidom.parseString(ugly_xml)
+    # with open(fname, "w") as out:
+    #     out.write(dom_xml.toprettyxml(indent="    "))
+
+    
+    tree = ElementTree.ElementTree(node)
+    tree.write(fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
 
 def main():
     # Command line arguments

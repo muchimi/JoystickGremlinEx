@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
+# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,16 +15,21 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from xml.etree import ElementTree
+from lxml import etree as ElementTree
 
 from PySide6 import QtWidgets
 
 import dinput
 
 import gremlin
-import gremlin.ui.common
+import gremlin.ui.ui_common
 import gremlin.ui.input_item
+from gremlin.input_types import InputType
+from gremlin.base_buttons import VirtualHatButton
 from container_plugins.basic import BasicContainer
+from gremlin.ui.input_item import AbstractContainerWidget
+from gremlin.base_profile import AbstractContainer
+
 
 
 # Lookup for direction to index with 4 way hat usage
@@ -57,7 +62,7 @@ _eight_names = [
 ]
 
 
-class HatButtonsContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
+class HatButtonsContainerWidget(AbstractContainerWidget):
 
     """Basic container which holds a single action."""
 
@@ -71,7 +76,7 @@ class HatButtonsContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
 
     def _create_action_ui(self):
         """Creates the UI components."""
-        gremlin.ui.common.clear_layout(self.action_layout)
+        gremlin.ui.ui_common.clear_layout(self.action_layout)
 
         self.options_layout = QtWidgets.QHBoxLayout()
         self.four_way = QtWidgets.QRadioButton("4 Way")
@@ -104,7 +109,7 @@ class HatButtonsContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
                         i,
                         direction,
                         self.action_layout,
-                        gremlin.ui.common.ContainerViewTypes.Action
+                        gremlin.ui.ui_common.ContainerViewTypes.Action
                     )
         elif self.profile_data.button_count == 8:
             for i, direction in enumerate(_eight_names):
@@ -118,7 +123,7 @@ class HatButtonsContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
                         i,
                         direction,
                         self.action_layout,
-                        gremlin.ui.common.ContainerViewTypes.Action
+                        gremlin.ui.ui_common.ContainerViewTypes.Action
                     )
         else:
             pass
@@ -143,7 +148,7 @@ class HatButtonsContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
             widget = self._create_action_set_widget(
                 action_set,
                 names[i],
-                gremlin.ui.common.ContainerViewTypes.Condition
+                gremlin.ui.ui_common.ContainerViewTypes.Condition
             )
             self.activation_condition_layout.addWidget(widget)
             widget.redraw()
@@ -236,7 +241,7 @@ class HatButtonsContainerFunctor(gremlin.base_classes.AbstractFunctor):
         pass
 
 
-class HatButtonsContainer(gremlin.base_classes.AbstractContainer):
+class HatButtonsContainer(AbstractContainer):
 
     """Represents a container which holds exactly one action."""
 
@@ -244,7 +249,8 @@ class HatButtonsContainer(gremlin.base_classes.AbstractContainer):
     tag = "hat_buttons"
     functor = HatButtonsContainerFunctor
     widget = HatButtonsContainerWidget
-    input_types = [gremlin.common.InputType.JoystickHat]
+    # override default allowed inputs here
+    input_types = [InputType.JoystickHat]
     interaction_types = []
 
     def __init__(self, parent=None):
@@ -279,26 +285,26 @@ class HatButtonsContainer(gremlin.base_classes.AbstractContainer):
                 continue
 
             # Callback generating virtual button events
-            callbacks.append(gremlin.execution_graph.CallbackData(
+            callbacks.append(gremlin.base_profile.CallbackData(
                 gremlin.execution_graph.VirtualButtonProcess(
-                    gremlin.base_classes.VirtualHatButton([
+                    VirtualHatButton([
                         gremlin.util.hat_tuple_to_direction(id_to_direction[i])
                     ])
                 ),
                 None
             ))
             # Create fake BasicContainer for each action set
-            basic_container = BasicContainer()
+            basic_container = BasicContainer(self)
             basic_container.action_sets = [action_set]
             basic_container.activation_condition = self.activation_condition
             basic_container.activation_condition_type = \
                 self.activation_condition_type
 
             # Callback reacting to virtual button events
-            callbacks.append(gremlin.execution_graph.CallbackData(
+            callbacks.append(gremlin.base_profile.CallbackData(
                 gremlin.execution_graph.VirtualButtonCallback(basic_container),
                 gremlin.event_handler.Event(
-                    gremlin.common.InputType.VirtualButton,
+                    InputType.VirtualButton,
                     callbacks[-1].callback.virtual_button.identifier,
                     device_guid=dinput.GUID_Virtual,
                     is_pressed=True,

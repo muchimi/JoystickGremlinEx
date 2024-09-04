@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
+# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,23 +20,25 @@ import logging
 import time
 import os
 import re
+import sys
 
 from PySide6 import QtCore
-from gremlin.singleton_decorator import SingletonDecorator
-from . import common, util, event_handler
+from gremlin.types import VerboseMode
+import gremlin.util
 
-@SingletonDecorator
+
+import gremlin.singleton_decorator
+@gremlin.singleton_decorator.SingletonDecorator
 class Configuration:
 
     """Responsible for loading and saving configuration data."""
 
     def get_config(sef):
-        fname = os.path.join(util.userprofile_path(), "config.json")
+        fname = os.path.join(gremlin.util.userprofile_path(), "config.json")
         return fname
 
     def __init__(self):
         """Creates a new instance, loading the current configuration."""
-
 
         self._data = {}
         
@@ -45,13 +47,20 @@ class Configuration:
             # create a stub - first time run
             self.save()
 
+        
+        gettrace = getattr(sys, 'gettrace', None)
+        frozen = getattr(sys, 'frozen', False)
+        if frozen:
+            self._is_debug = False
+        else:
+            self._is_debug = gettrace is not None
 
         
         self._last_reload = None
         self.reload()
 
         self.watcher = QtCore.QFileSystemWatcher([
-            os.path.join(util.userprofile_path(), "config.json")
+            os.path.join(gremlin.util.userprofile_path(), "config.json")
         ])
         self.watcher.fileChanged.connect(self.reload)
 
@@ -102,6 +111,125 @@ class Configuration:
 
 
 
+    
+    @property
+    def is_debug(self):
+        return self._is_debug
+    
+    def set_last_runtime_mode(self, profile_path, mode_name):
+        """Stores the last active mode of the given profile.
+
+        :param profile_path profile path for which to store the mode
+        :param mode_name name of the active mode
+        """
+        if profile_path is None or mode_name is None:
+            return
+        
+        profile_path = os.path.normpath(profile_path).casefold()
+        item = self._data.get("last_mode", None)
+        if not item:
+            self._data["last_mode"] = {}
+        self._data["last_mode"][profile_path] = mode_name
+        self.save()
+
+    def get_last_runtime_mode(self, profile_path):
+        """Returns the last active mode of the given profile.
+
+        :param profile_path profile path for which to return the mode
+        :return name of the mode if present, None otherwise
+        """
+        item = self._data.get("last_mode", None)
+        if item:
+            return item.get(profile_path, None)
+        return None
+    
+
+    def set_last_edit_mode(self, profile_path, mode_name):
+        """Stores the last active mode of the given profile.
+
+        :param profile_path profile path for which to store the mode
+        :param mode_name name of the active mode
+        """
+        if profile_path is None or mode_name is None:
+            return
+        
+        profile_path = os.path.normpath(profile_path).casefold()
+        item = self._data.get("last_edit_mode", None)
+        if not item:
+            self._data["last_edit_mode"] = {}
+        self._data["last_edit_mode"][profile_path] = mode_name
+        self.save()
+
+    def get_last_edit_mode(self, profile_path):
+        """Returns the last active mode of the given profile.
+
+        :param profile_path profile path for which to return the mode
+        :return name of the mode if present, None otherwise
+        """
+
+        item = self._data.get("last_edit_mode", None)
+        if item:
+            return item.get(profile_path, None)
+        return None
+
+    def set_profile_last_runtime_mode(self, mode_name):
+        ''' sets the profile's last used mode '''
+        fname = self.last_profile
+        if fname:
+            self.set_last_runtime_mode(fname, mode_name)
+
+    def get_profile_last_runtime_mode(self):
+        ''' gets the save last used profile mode '''
+        fname = self.last_profile
+        if fname:
+            return self.get_last_runtime_mode(fname)
+        return None
+    
+    def set_profile_last_edit_mode(self, mode_name):
+        ''' sets the profile's last used mode '''
+        fname = self.last_profile
+        if fname:
+            self.set_last_edit_mode(fname, mode_name)
+
+    def get_profile_last_edit_mode(self):
+        ''' gets the save last used profile mode '''
+        fname = self.last_profile
+        if fname:
+            return self.get_last_edit_mode(fname)
+        return None
+    
+    
+    @property
+    def initial_load_mode_tts(self):
+        ''' if set, JGEX outputs a verbal readout of the current mode on profile load '''
+        return self._data.get("initial_load_mode_tts", True)
+    
+    @initial_load_mode_tts.setter
+    def initial_load_mode_tts(self, value):
+        self._data["initial_load_mode_tts"] = value
+        self.save()
+
+    @property 
+    def runtime_ui_update(self):
+        ''' if set, JGEX will update the UI when a profile is activated '''
+        return self._data.get("runtime_ui_update", False)
+    
+    @runtime_ui_update.setter
+    def runtime_ui_update(self, value):
+        self._data["runtime_ui_update"] = value
+        self.save()
+
+
+    @property
+    def reset_mode_on_process_activate(self):
+        ''' if set, the mode is reset when the process is reactivated to the default mode '''
+        return self._data.get("reset_mode_on_process_activate", False)
+    
+    @reset_mode_on_process_activate.setter
+    def reset_mode_on_process_activate(self, value):
+        self._data["reset_mode_on_process_activate"] = value
+        self.save()
+
     def set_calibration(self, dev_id, limits):
         """Sets the calibration data for all axes of a device.
 
@@ -137,6 +265,24 @@ class Configuration:
             return [-32768, 0, 32767]
 
         return self._data["calibration"][identifier][axis_name]
+    
+
+    @property
+    def last_options_tab(self):
+        ''' index of the last option tab selected'''
+        key = "last_options_tab"
+        if key in self._data.keys():
+            index = self._data[key]
+        else:
+            index = 0
+        return index
+    
+    @last_options_tab.setter
+    def last_options_tab(self, value):
+        self._data["last_options_tab"] = value
+        self.save()
+    
+
 
     def get_executable_list(self):
         """Returns a list of all executables with associated profiles.
@@ -212,7 +358,8 @@ class Configuration:
         self._data["profiles"][exec_path] = profile_path
         self.save()
 
-    def set_last_mode(self, profile_path, mode_name):
+    
+    def set_start_mode(self, profile_path, mode_name):
         """Stores the last active mode of the given profile.
 
         :param profile_path profile path for which to store the mode
@@ -220,16 +367,17 @@ class Configuration:
         """
         if profile_path is None or mode_name is None:
             return
-        self._data["last_mode"][profile_path] = mode_name
+        self._data["start_mode"][profile_path] = mode_name
         self.save()
 
-    def get_last_mode(self, profile_path):
+    def get_start_mode(self, profile_path):
         """Returns the last active mode of the given profile.
 
         :param profile_path profile path for which to return the mode
         :return name of the mode if present, None otherwise
         """
-        return self._data["last_mode"].get(profile_path, None)
+        return self._data["start_mode"].get(profile_path, None)
+
 
     def _has_profile(self, exec_path):
         """Returns whether or not a profile exists for a given executable.
@@ -257,11 +405,16 @@ class Configuration:
 
         # Update recent profiles
         if value is not None:
+            value = os.path.normpath(value.casefold()) # normalize the profile path
             current = self.recent_profiles
             if value in current:
                 del current[current.index(value)]
             current.insert(0, value)
-            current = current[0:5]
+            # normalize and remove duplicates
+            current = list(set([os.path.normpath(item.casefold()) for item in current]))
+            current = current[0:8] # remember up to 9
+
+            
             self._data["recent_profiles"] = current
         self.save()
 
@@ -297,6 +450,14 @@ class Configuration:
             self.save()
 
     @property
+    def keep_profile_active_on_focus_loss(self):
+        return self._data.get("keep_active_on_focus_loss",True)
+    @keep_profile_active_on_focus_loss.setter
+    def keep_profile_active_on_focus_loss(self, value):
+        self._data["keep_active_on_focus_loss"] = value
+        self.save()
+
+    @property
     def keep_last_autoload(self):
         """Returns whether or not to keep last autoloaded profile active when it would otherwise
         be automatically disabled.
@@ -317,9 +478,30 @@ class Configuration:
         :param value Flag indicating whether or not to enable / disable the
             feature
         """
-        if type(value) == bool:
-            self._data["keep_last_autoload"] = value
-            self.save()
+        assert isinstance(value, bool)
+        self._data["keep_last_autoload"] = value
+        self.save()
+
+    
+    @property
+    def restore_profile_mode_on_start(self):
+        ''' determines if a profile mode, if it exists is restored when the profile is activated '''
+        return self._data.get("restore_mode_on_start", False)
+    
+    @restore_profile_mode_on_start.setter
+    def restore_profile_mode_on_start(self, value):
+        self._data["restore_mode_on_start"] = value
+        self.save()
+
+    @property
+    def highlight_autoswitch(self):
+        ''' true if in design mode and tab switching is allowed on input detect change '''
+        return self._data.get("highlight_switch", False)
+    @highlight_autoswitch.setter
+    def highlight_autoswitch(self, value):
+        self._data["highlight_switch"] = value
+        self.save()
+
 
     @property
     def highlight_input(self):
@@ -330,7 +512,7 @@ class Configuration:
 
         :return True if the feature is enabled, False otherwise
         """
-        return self._data.get("highlight_input", True)
+        return self._data.get("highlight_input", False)
 
     @highlight_input.setter
     def highlight_input(self, value):
@@ -417,11 +599,12 @@ class Configuration:
     @enable_remote_broadcast.setter
     def enable_remote_broadcast(self, value):
         ''' remote broadcast master switch enable '''
+        import gremlin.event_handler
         if type(value) == bool and self._data.get("enable_remote_broadcast",False)!= value:
             self._data["enable_remote_broadcast"] = value
             self.save()
 
-            eh = event_handler.EventListener()
+            eh = gremlin.event_handler.EventListener()
             eh.config_changed.emit()
 
     @property
@@ -489,6 +672,20 @@ class Configuration:
         self._data["activate_on_launch"] = bool(value)
         self.save()
 
+
+    @property
+    def activate_on_process_focus(self):
+        """Returns whether or not to activate the profile on process focus."""
+        return self._data.get("activate_on_process_focus", False)
+
+    @activate_on_process_focus.setter
+    def activate_on_process_focus(self, value):
+        """Sets whether or not to activate the profile on launch."""
+        self._data["activate_on_process_focus"] = bool(value)
+        self.save()
+
+
+
     @property
     def close_to_tray(self):
         """Returns whether or not to minimze the application when closing it.
@@ -539,6 +736,38 @@ class Configuration:
         """
         self._data["default_action"] = str(value)
         self.save()
+
+    @property
+    def last_action(self):
+        """Returns the default action to show in action drop downs.
+
+        :return default action to show in action selection drop downs
+        """
+        return self._data.get("last_action", Configuration().default_action)
+    
+    @last_action.setter
+    def last_action(self, value):
+        """Sets the default action to show in action drop downs.
+
+        :param value the name of the default action to show
+        """
+        self._data["last_action"] = str(value)
+        self.save()
+
+    @property
+    def last_container(self):
+        """Returns the last container to show in container drop downs."""
+        return self._data.get("last_container", "basic")
+    
+    @last_container.setter
+    def last_container(self, value):
+        """Sets the last container to show in container drop downs.
+
+        :param value the name of the default container to show
+        """
+        self._data["last_container"] = str(value)
+        self.save()
+
 
     @property
     def macro_axis_polling_rate(self):
@@ -663,6 +892,9 @@ class Configuration:
             clipboard.clear_persisted()
 
 
+
+
+
     @property
     def verbose(self):
         ''' determines loging level '''
@@ -671,3 +903,199 @@ class Configuration:
     def verbose(self, value):
         self._data["verbose"] = value
         self.save()
+
+    @property
+    def verbose_mode(self):
+        ''' sub logging level '''
+        if not "verbose_mode" in self._data:
+            self._data["verbose_mode"] = VerboseMode.All
+            self.save()
+        return VerboseMode(self._data["verbose_mode"])
+    
+    def is_verbose_mode(self, mode):
+        value = self.verbose_mode
+        result = mode in value
+        return result
+    
+    @verbose_mode.setter
+    def verbose_mode(self, value):
+        self._data["verbose_mode"] = value
+        self.save()
+
+    def verbose_set_mode(self, mode, enabled):
+        ''' enables the specified verbose mode '''
+        if not "verbose_mode" in self._data:
+            self._data["verbose_mode"] = 0 # none 
+        value = self._data["verbose_mode"]
+        if enabled:
+            value |= mode
+        else:
+            value = value & ~mode 
+        self.verbose_mode = value
+        
+
+
+
+    @property
+    def verbose_mode_keyboard(self):
+        ''' true if verbose mode is in keyboard mode '''
+        return self.verbose and VerboseMode.Keyboard in self.verbose_mode
+    
+    @property
+    def verbose_mode_joystick(self):
+        ''' true if verbose mode is in joystick mode '''
+        return self.verbose and VerboseMode.Joystick in self.verbose_mode 
+    
+    @property
+    def verbose_mode_inputs(self):
+        ''' true if verbose mode is in inputs mode '''
+        return self.verbose and VerboseMode.Inputs in self.verbose_mode     
+
+    @property
+    def verbose_mode_mouse(self):
+        ''' true if verbose mode is in inputs mode '''
+        return self.verbose and VerboseMode.Mouse in self.verbose_mode     
+    
+    @property
+    def verbose_mode_details(self):
+        ''' true if verbose mode is in inputs mode '''
+        return self.verbose and VerboseMode.Details in self.verbose_mode     
+
+    @property
+    def verbose_mode_simconnect(self):
+        ''' true if verbose mode is in simconnect mode '''
+        return self.verbose and VerboseMode.SimConnect in self.verbose_mode
+
+    @property
+    def midi_enabled(self):
+        ''' true if MIDI module is enabled '''
+        return self._data.get("midi_enabled", True)
+    
+    @midi_enabled.setter
+    def midi_enabled(self, value):
+        self._data["midi_enabled"] = value
+        self.save()
+
+    @property
+    def osc_enabled(self):
+        ''' true if osc module is enabled '''
+        return self._data.get("osc_enabled", True)
+    
+    @osc_enabled.setter
+    def osc_enabled(self, value):
+        self._data["osc_enabled"] = value
+        self.save()
+
+    @property
+    def osc_port(self):
+        ''' OSC listen port '''
+        port = self._data.get("osc_port", 8000)
+        return port
+    @osc_port.setter
+    def osc_port(self, value):
+        self._data["osc_port"] = value
+        self.save()
+
+
+    @property
+    def show_scancodes(self):
+        ''' hide/show scan codes for keyboard related inputs '''
+        return self._data.get("show_scancodes", False)
+    
+    @show_scancodes.setter
+    def show_scancodes(self, value):
+        self._data["show_scancodes"] = value
+        self.save()
+
+    @property
+    def show_input_axis(self):
+        ''' shows input axis values for axis inputs '''
+        return self._data.get("show_axis_input",True)
+    
+    @show_input_axis.setter
+    def show_input_axis(self, value):
+        self._data["show_axis_input"] = value
+        self.save()
+
+    @property
+    def last_tab_guid(self):
+        ''' last selected tab device guid '''
+        return self._data.get("last_tab_guid",None)
+    
+    @last_tab_guid.setter
+    def last_tab_guid(self, value):
+        self._data["last_tab_guid"] = str(value)
+        # print(f"config: last tab set: {value}")
+        self.save()
+       
+
+
+
+    @property
+    def tab_list(self):
+        ''' tab order for the UI devices as set by the user '''
+        return self._data.get("tab_order", None)
+    @tab_list.setter
+    def tab_list(self, value):
+        self._data["tab_order"] = value
+        self.save()
+
+    @property
+    def show_output_vjoy(self):
+        ''' determines if VJOY output devices are displayed on the device tabs '''
+        return self._data.get("show_vjoy_ouput", False)
+    @show_output_vjoy.setter
+    def show_output_vjoy(self, value):
+        self._data["show_vjoy_output"] = value
+        self.save()
+
+    @property
+    def last_plugin_folder(self):
+        ''' last folder used for plugins '''
+        return self._data.get("last_plugin_folder",None)
+    @last_plugin_folder.setter
+    def last_plugin_folder(self, value):
+        self._data["last_plugin_folder"]=value
+        self.save()
+
+    @property
+    def last_sound_folder(self):
+        ''' last folder used for sounds '''
+        return self._data.get("last_sound_folder",None)
+    @last_sound_folder.setter
+    def last_sound_folder(self, value):
+        self._data["last_sound_folder"] = value 
+        self.save()
+           
+    @property
+    def partial_plugin_save(self):
+        ''' true if partial plugin configuration saving is ok = false nothing will be saved - true partial values will be saved '''
+        return self._data.get("partial_plugin_init_ok",True)
+    
+    @partial_plugin_save.setter
+    def partial_plugin_save(self, value):
+        self._data["partial_plugin_init_ok"] = value 
+        self.save()
+
+
+    @property
+    def runtime_ui_active(self):
+        ''' keep UI enabled at runtime '''
+        return self._data.get("runtime_ui_active",False)
+    
+    @runtime_ui_active.setter
+    def runtime_ui_active(self, value):
+        self._data["runtime_ui_active"] = value 
+        self.save()
+
+    @property
+    def sync_last_selection(self):
+        ''' synchronizes the actions and container drop downs when enabled '''
+        return self._data.get("sync_last_selection",True)
+    
+    @sync_last_selection.setter
+    def sync_last_selection(self, value):
+        self._data["sync_last_selection"] = value 
+        self.save()
+        
+

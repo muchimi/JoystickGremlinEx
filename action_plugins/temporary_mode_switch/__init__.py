@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
+# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,10 +18,10 @@
 
 import os
 from PySide6 import QtWidgets
-from xml.etree import ElementTree
+from lxml import etree as ElementTree
 
-from gremlin.base_classes import AbstractAction, AbstractFunctor
-from gremlin.common import InputType
+import gremlin.base_profile
+from gremlin.input_types import InputType
 import gremlin.profile
 import gremlin.ui.input_item
 
@@ -50,13 +50,14 @@ class TemporaryModeSwitchWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.mode_list.setCurrentIndex(mode_id)
 
 
-class TemporaryModeSwitchFunctor(AbstractFunctor):
+class TemporaryModeSwitchFunctor(gremlin.base_profile.AbstractFunctor):
 
     def __init__(self, action):
         super().__init__(action)
         self.mode_name = action.mode_name
 
     def process_event(self, event, value):
+        import gremlin.control_action
         gremlin.input_devices.ButtonReleaseActions().register_callback(
             gremlin.control_action.switch_to_previous_mode,
             event
@@ -65,7 +66,7 @@ class TemporaryModeSwitchFunctor(AbstractFunctor):
         return True
 
 
-class TemporaryModeSwitch(AbstractAction):
+class TemporaryModeSwitch(gremlin.base_profile.AbstractAction):
 
     """Action representing the change of mode."""
 
@@ -73,19 +74,30 @@ class TemporaryModeSwitch(AbstractAction):
     tag = "temporary-mode-switch"
 
     default_button_activation = (True, False)
-    input_types = [
-        InputType.JoystickAxis,
-        InputType.JoystickButton,
-        InputType.JoystickHat,
-        InputType.Keyboard
-    ]
+    # override default allowed inputs here
+    # input_types = [
+    #     InputType.JoystickAxis,
+    #     InputType.JoystickButton,
+    #     InputType.JoystickHat,
+    #     InputType.Keyboard
+    # ]
 
     widget = TemporaryModeSwitchWidget
     functor = TemporaryModeSwitchFunctor
 
     def __init__(self, parent):
         super().__init__(parent)
-        self.mode_name = self.get_mode().name
+        self.mode_name = self.get_mode()
+        self.parent = parent
+
+    @property
+    def priority(self):
+        # priority relative to other actions in this sequence - 0 is the default for all actions unless specified - the highest number runs last
+        return 999        
+
+    def display_name(self):
+        ''' returns a display string for the current configuration '''
+        return f"Switch to: {self.mode_name}"
 
     def icon(self):
         return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"

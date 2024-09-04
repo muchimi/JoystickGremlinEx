@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
+# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -23,7 +23,7 @@ import math
 import threading
 import time
 
-from gremlin.common import MouseButton
+
 from gremlin.util import deg2rad
 
 from gremlin.singleton_decorator import SingletonDecorator
@@ -47,8 +47,12 @@ MOUSEEVENTF_MIDDLEDOWN = 0x0020
 MOUSEEVENTF_MIDDLEUP = 0x0040
 MOUSEEVENTF_VIRTUALDESK = 0x4000
 MOUSEEVENTF_WHEEL = 0x0800
+MOUSEEVENTF_HWHEEL = 0x1000
 MOUSEEVENTF_XDOWN = 0x0080
 MOUSEEVENTF_XUP = 0x0100
+
+KEYEVENTF_KEYUP = 0x0002
+KEYEVENTF_EXTENDEDKEY = 0x0001
 
 
 """Defines data structure type for INPUT structures.
@@ -341,6 +345,12 @@ class _KEYBDINPUT(ctypes.Structure):
     )
 
 
+def _keyboard_input(virtual_key, scan_code, flags):
+    return _INPUT(
+        INPUT_KEYBOARD,
+        _INPUTunion(ki=_KEYBDINPUT(virtual_key, scan_code, flags, 0, None))
+    )
+
 class _INPUTunion(ctypes.Union):
 
     """Defines the INPUT union type.
@@ -374,6 +384,7 @@ def mouse_relative_motion(dx, dy):
 
 
 def mouse_press(button):
+    from gremlin.types import MouseButton
     if button == MouseButton.Left:
         _send_input(_mouse_input(MOUSEEVENTF_LEFTDOWN))
     elif button == MouseButton.Right:
@@ -387,6 +398,7 @@ def mouse_press(button):
 
 
 def mouse_release(button):
+    from gremlin.types import MouseButton
     if button == MouseButton.Left:
         _send_input(_mouse_input(MOUSEEVENTF_LEFTUP))
     elif button == MouseButton.Right:
@@ -400,7 +412,15 @@ def mouse_release(button):
 
 
 def mouse_wheel(motion):
+    # vertical mouse wheel
     _send_input(_mouse_input(MOUSEEVENTF_WHEEL, data=-motion*WHEEL_DELTA))
+
+def mouse_h_wheel(motion):
+    # horizontal mouse wheel
+    import logging
+    logging.getLogger("system").info(f"send h wheel direction {motion}")
+    _send_input(_mouse_input(MOUSEEVENTF_HWHEEL, data=-motion*WHEEL_DELTA))
+
 
 
 def _mouse_input(flags, dx=0, dy=0, data=0):
@@ -410,7 +430,16 @@ def _mouse_input(flags, dx=0, dy=0, data=0):
     )
 
 
+
+
+def send_key(virtual_code, scan_code, flags):
+    ''' sends a key message via send input '''
+    _send_input(_keyboard_input(virtual_code, scan_code, flags))
+
+
+
 def _send_input(*inputs):
+    # https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendinput
     nInputs = len(inputs)
     LPINPUT = _INPUT * nInputs
     pInputs = LPINPUT(*inputs)

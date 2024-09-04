@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
+# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,11 +20,17 @@ import logging
 from PySide6 import QtCore, QtGui, QtWidgets
 
 
-from gremlin.common import PluginVariableType, load_icon
-import gremlin.profile
+from gremlin.common import PluginVariableType
+import gremlin.config
+from gremlin.util import load_icon, userprofile_path
+import gremlin.base_profile
+from gremlin.input_types import InputType
 import gremlin.user_plugin
-import gremlin.ui.common
+import gremlin.ui.ui_common
 import os
+
+import gremlin.util
+
 
 
 class ModuleManagementController(QtCore.QObject):
@@ -38,6 +44,9 @@ class ModuleManagementController(QtCore.QObject):
         # The view managed by the controller
         self.view = ModuleManagementView()
 
+        # stores a map of instance widgets by instance
+        self.instance_widget_map = {}
+
         self.view.add_module.connect(self.new_module)
         self.refresh_module_list()
 
@@ -49,7 +58,7 @@ class ModuleManagementController(QtCore.QObject):
             # Only add a new entry if the module doesn't exist yet
             if fname not in [v.file_name for v in self.profile_data.plugins]:
                 # Update the model
-                module = gremlin.profile.Plugin(self.profile_data)
+                module = gremlin.base_profile.Plugin(self.profile_data)
                 module.file_name = fname
 
                 # Create new data instance
@@ -101,6 +110,58 @@ class ModuleManagementController(QtCore.QObject):
         instance.name = name
         widget.label_name.setText(name)
 
+    def copy_instance(self, instance, widget):
+        ''' copy to a new instance '''
+        import re
+        gremlin.util.pushCursor()
+        module_data = instance.parent
+        new_instance =  gremlin.base_profile.PluginInstance(module_data)
+        
+        not_unique = True
+
+        if instance.name.endswith("copy"):
+            name_stub = instance.name
+            index = 1
+            copy_name = name_stub + f" {index}"
+        else:
+            m = re.search(r'copy \d+$', instance.name)
+            if m is None:
+                # does not end in numerical sequence
+                index = 0
+                name_stub = instance.name + " copy"
+                copy_name = name_stub
+            else:
+                # ends in sequence
+                stub = m.group()
+                seq = stub.split()[-1]
+                index = int(seq) + 1
+                name_stub = instance.name[:-len(seq)].strip()
+                copy_name = name_stub + f" {index}"
+            
+            
+        while not_unique:
+            for item in instance.parent.instances:
+                if item.name == copy_name:
+                    index+=1
+                    copy_name = name_stub + f" {index}"
+                    break
+                not_unique = False
+        new_instance.name = copy_name
+        for var in instance.variables.values():
+            new_var = var.duplicate()
+            new_instance.set_variable(new_var.name, new_var)
+
+        module_data.instances.append(new_instance)
+        module_widget = widget.module_widget
+        new_instance_widget =  InstanceWidget(new_instance.name)
+        new_instance_widget.module_widget = module_widget
+        
+
+        module_widget.add_instance(new_instance_widget)
+        self._connect_instance_signals(new_instance, new_instance_widget)
+        gremlin.util.popCursor()
+
+
     def configure_instance(self, instance, widget):
         # Get data from the custom module itself
         variables = gremlin.user_plugin.get_variable_definitions(
@@ -108,34 +169,54 @@ class ModuleManagementController(QtCore.QObject):
         )
 
         layout = self.view.right_panel.layout()
-        gremlin.ui.common.clear_layout(layout)
+        gremlin.ui.ui_common.clear_layout(layout)
+
+
+        # add the name of the instance being configured
+        header_container_widget = QtWidgets.QWidget()
+        header_container_layout = QtWidgets.QHBoxLayout(header_container_widget)
+        header_container_widget.setContentsMargins(0,0,0,0)
+        header_container_layout.setContentsMargins(0,0,0,0)
+
+
+        instance_name_widget = gremlin.ui.ui_common.QDataLineEdit(text=instance.name)
+        instance_name_widget.setStyleSheet("border-style: solid;border-width: 1px;")
+        instance_name_widget.data = instance
+        instance_name_widget.textChanged.connect(self._update_instance_name_cb)
+        header_container_layout.addWidget(QtWidgets.QLabel("Instance:"))
+        header_container_layout.addWidget(instance_name_widget)
+        #header_container_layout.addStretch()
+
+        layout.addWidget(header_container_widget)
+        layout.addWidget(gremlin.ui.ui_common.QHLine())
+        verbose = gremlin.config.Configuration().verbose
+
+
+        if verbose:
+            log = logging.getLogger("system")
+            log.info(f"Configure instance: {instance.name}")
         for var in variables:
-            if type(var) in [
-                gremlin.user_plugin.BoolVariable,
-                gremlin.user_plugin.FloatVariable,
-                gremlin.user_plugin.IntegerVariable,
-                gremlin.user_plugin.SelectionVariable,
-                gremlin.user_plugin.StringVariable,
-                gremlin.user_plugin.ModeVariable,
-                gremlin.user_plugin.PhysicalInputVariable,
-                gremlin.user_plugin.VirtualInputVariable
-            ]:
+            # if verbose:
+            #     log.info(f"\t{str(var)}")
+            if var.variable_type is not None:
                 # Create basic profile variable instance if it does not exist
                 if not instance.has_variable(var.label):
-                    profile_var = gremlin.profile.PluginVariable(instance)
+                    profile_var = gremlin.base_profile.PluginVariable(instance)
                     profile_var.name = var.label
                     profile_var.type = var.variable_type
                     profile_var.value = var.value
 
                 # Update profile variable properties if needed
                 profile_var = instance.get_variable(var.label)
-                profile_var.is_optional = var.is_optional
-                if profile_var.type != var.variable_type:
+                if profile_var.type is None:
+                    profile_var.is_optional = var.is_optional
                     profile_var.type = var.variable_type
                     profile_var.value = var.value
+                    instance.set_variable(var.label, profile_var)
 
-                instance.set_variable(var.label, profile_var)
-
+                if verbose:
+                    log.info(f"\t{str(profile_var)}")
+                
 
                 ui_element = var.create_ui_element(profile_var.value)
                 var.value_changed.connect(
@@ -154,6 +235,14 @@ class ModuleManagementController(QtCore.QObject):
                 layout.addWidget(QtWidgets.QLabel(var.label))
         layout.addStretch()
 
+    @QtCore.Slot()
+    def _update_instance_name_cb(self):
+        widget = self.sender()
+        instance = widget.data
+        name = widget.text()
+        instance_widget = self.instance_widget_map[instance]
+        self.rename_instance(instance, instance_widget, name )
+
     def _update_value_variable(self, data, widget, variable):
         if variable.type in [
             PluginVariableType.Bool,
@@ -170,12 +259,12 @@ class ModuleManagementController(QtCore.QObject):
             variable.value = data
             button = widget.itemAtPosition(0, 1).widget()
             input_id = f"{data["input_id"]:d}"
-            if data["input_type"] == gremlin.common.InputType.JoystickAxis:
-                input_id = gremlin.common.AxisNames.to_string(
-                    gremlin.common.AxisNames(data["input_id"])
+            if data["input_type"] == InputType.JoystickAxis:
+                input_id = gremlin.types.AxisNames.to_string(
+                    gremlin.types.AxisNames(data["input_id"])
                 )
             button.setText(
-                f"{data["device_name"]} {gremlin.common.InputType.to_string(data["input_type"]).capitalize()} {input_id}"
+                f"{data["device_name"]} {InputType.to_string(data["input_type"]).capitalize()} {input_id}"
                 )
 
         variable.is_valid = True
@@ -186,10 +275,13 @@ class ModuleManagementController(QtCore.QObject):
     def _create_module_widget(self, module_data):
         # Create the module widget
         module_widget = ModuleWidget(module_data.file_name)
+        self.instance_widget_map.clear()
         for instance in module_data.instances:
             instance_widget = InstanceWidget(instance.name)
+            instance_widget.module_widget = module_widget
             self._connect_instance_signals(instance, instance_widget)
             module_widget.add_instance(instance_widget)
+            self.instance_widget_map[instance] = instance_widget
 
         module_widget.btn_delete.clicked.connect(
             lambda x: self.remove_module(module_data.file_name)
@@ -211,10 +303,13 @@ class ModuleManagementController(QtCore.QObject):
         widget.btn_configure.clicked.connect(
             lambda x: self.configure_instance(instance, widget)
         )
+        widget.btn_copy.clicked.connect(
+            lambda x: self.copy_instance(instance, widget)
+        )
 
     def _create_module_instance(self, name, module_data):
         # Create the model data side of things
-        instance = gremlin.profile.PluginInstance(module_data)
+        instance = gremlin.base_profile.PluginInstance(module_data)
         instance.name = name
 
         # Properly populate the new instance with default values for all
@@ -242,7 +337,7 @@ class ModuleManagementView(QtWidgets.QSplitter):
         super().__init__(parent)
 
         self.controller = None
-        from gremlin.common import load_icon
+        
 
         # Create the left panel showing the modules and their instances
         self.left_panel = QtWidgets.QWidget()
@@ -274,13 +369,23 @@ class ModuleManagementView(QtWidgets.QSplitter):
 
     def _prompt_user_for_module(self):
         """Asks the user to select the path to the module to add."""
-
+        import gremlin.config
+        config = gremlin.config.Configuration()
+        dir = config.last_plugin_folder
+        if dir is None or not os.path.isdir(dir):
+            dir = userprofile_path()
         fname, _ = QtWidgets.QFileDialog.getOpenFileName(
             None,
             "Path to Python plugin",
-            "C:\\",
+            dir,
             "Python (*.py)"
         )
+        if os.path.isfile(fname):
+            dirname,_ = os.path.split(fname)
+            config.last_plugin_folder = dirname
+
+
+            
         self.add_module.emit(fname)
 
 
@@ -319,7 +424,7 @@ class ModuleListWidget(QtWidgets.QScrollArea):
 
     def clear(self):
         self.widget_list = []
-        gremlin.ui.common.clear_layout(self.content_layout)
+        gremlin.ui.ui_common.clear_layout(self.content_layout)
         self.content.layout().addStretch()
 
 
@@ -344,12 +449,12 @@ class ModuleWidget(QtWidgets.QFrame):
 
         if self.has_variables:
             self.btn_add_instance = QtWidgets.QPushButton(
-                load_icon("gfx/button_add"),""
+                load_icon("gfx/button_add.png"),""
             )
             header_layout.addWidget(self.btn_add_instance)
 
         self.btn_delete = QtWidgets.QPushButton(
-            load_icon("gfx/button_delete"),"")
+            load_icon("gfx/button_delete.png"),"")
         header_layout.addWidget(self.btn_delete)
 
         self.instance_layout = QtWidgets.QVBoxLayout()
@@ -376,6 +481,7 @@ class InstanceWidget(QtWidgets.QWidget):
 
     renamed = QtCore.Signal(str)
 
+
     def __init__(self, name, parent=None):
         super().__init__(parent)
 
@@ -388,21 +494,28 @@ class InstanceWidget(QtWidgets.QWidget):
         self.label_name = QtWidgets.QLabel(self.name)
 
         self.btn_rename = QtWidgets.QPushButton(
-            load_icon("gfx/button_edit"), ""
+            load_icon("gfx/button_edit.png"), ""
         )
+        self.btn_rename.setToolTip("Rename this instance")
+
         self.btn_rename.clicked.connect(self.rename_instance)
         self.btn_configure = QtWidgets.QPushButton(
-            load_icon("gfx/options"), ""
+            load_icon("fa.gear"), ""
         )
+        self.btn_configure.setToolTip("Configure this instance")
         self.btn_delete = QtWidgets.QPushButton(
-             load_icon("gfx/button_delete"), ""
+             load_icon("gfx/button_delete.png"), ""
         )
+        self.btn_delete.setToolTip("Delete this instance")
+        self.btn_copy = QtWidgets.QPushButton(load_icon("gfx/button_copy.svg"),"")
+        self.btn_copy.setToolTip("Copy this instance")
 
         self.main_layout.addWidget(self.label_name)
         self.main_layout.addStretch()
         self.main_layout.addWidget(self.btn_rename)
         self.main_layout.addWidget(self.btn_configure)
         self.main_layout.addWidget(self.btn_delete)
+        self.main_layout.addWidget(self.btn_copy)
 
     def rename_instance(self):
         name, user_input = QtWidgets.QInputDialog.getText(
@@ -415,3 +528,10 @@ class InstanceWidget(QtWidgets.QWidget):
 
         if user_input:
             self.renamed.emit(name)
+
+    @property
+    def module_widget(self):
+        return self._module_widget
+    @module_widget.setter
+    def module_widget(self, value):
+        self._module_widget = value

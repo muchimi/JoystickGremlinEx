@@ -19,11 +19,28 @@
 from __future__ import annotations
 
 import enum
+
 from typing import Tuple, Union
 
 import gremlin.error
 
 
+class VisualizationType(enum.Enum):
+
+    """Enumeration of possible visualization types."""
+
+    AxisTemporal = 1
+    AxisCurrent = 2
+    ButtonHat = 3
+
+class KeyboardOutputMode(enum.Enum):
+    Both = 0 # keyboard make and break (press/release) (pulse mode)
+    Press = 1 # keyboard make only
+    Release = 2 # keyboard release only
+    Hold = 3 # press while held (default Gremlin behavior)
+    AutoRepeat = 4 # repeated pulse mode - key pulses while the input is held
+
+    
 class ActivationRule(enum.Enum):
 
     """Activation rules for collections of conditions.
@@ -35,46 +52,6 @@ class ActivationRule(enum.Enum):
     All = 1
     Any = 2
 
-
-class InputType(enum.Enum):
-
-    """Enumeration of possible input types."""
-
-    Keyboard = 1
-    JoystickAxis = 2
-    JoystickButton = 3
-    JoystickHat = 4
-    Mouse = 5
-    VirtualButton = 6
-
-    @staticmethod
-    def to_string(value: InputType) -> str:
-        try:
-            return _InputType_to_string_lookup[value]
-        except KeyError:
-            raise gremlin.error.GremlinError("Invalid type in lookup")
-
-    @staticmethod
-    def to_enum(value: str) -> InputType:
-        try:
-            return _InputType_to_enum_lookup[value]
-        except KeyError:
-            raise gremlin.error.GremlinError("Invalid type in lookup")
-
-
-_InputType_to_string_lookup = {
-    InputType.JoystickAxis: "axis",
-    InputType.JoystickButton: "button",
-    InputType.JoystickHat: "hat",
-    InputType.Keyboard: "key",
-}
-
-_InputType_to_enum_lookup = {
-    "axis": InputType.JoystickAxis,
-    "button": InputType.JoystickButton,
-    "hat": InputType.JoystickHat,
-    "key": InputType.Keyboard
-}
 
 
 class AxisNames(enum.Enum):
@@ -107,27 +84,31 @@ class AxisNames(enum.Enum):
             raise gremlin.error.GremlinError(
                 f"Invalid AxisName lookup, {value}"
             )
+        
+    @staticmethod
+    def to_list():
+        return [axis for axis in AxisNames]
 
 
 _AxisNames_to_string_lookup = {
-    AxisNames.X: "X Axis",
-    AxisNames.Y: "Y Axis",
-    AxisNames.Z: "Z Axis",
-    AxisNames.RX: "X Rotation",
-    AxisNames.RY: "Y Rotation",
-    AxisNames.RZ: "Z Rotation",
-    AxisNames.SLIDER: "Slider",
-    AxisNames.DIAL: "Dial"
+    AxisNames.X: "X Axis (1)",
+    AxisNames.Y: "Y Axis (2)",
+    AxisNames.Z: "Z Axis (3)",
+    AxisNames.RX: "X Rotation (4)",
+    AxisNames.RY: "Y Rotation (5)",
+    AxisNames.RZ: "Z Rotation (6)",
+    AxisNames.SLIDER: "Slider (7)",
+    AxisNames.DIAL: "Dial (8)"
 }
 _AxisNames_to_enum_lookup = {
-    "X Axis": AxisNames.X,
-    "Y Axis": AxisNames.Y,
-    "Z Axis": AxisNames.Z,
-    "X Rotation": AxisNames.RX,
-    "Y Rotation": AxisNames.RY,
-    "Z Rotation": AxisNames.RZ,
-    "Slider": AxisNames.SLIDER,
-    "Dial": AxisNames.DIAL
+    "X Axis (1)": AxisNames.X,
+    "Y Axis (2)": AxisNames.Y,
+    "Z Axis (3)": AxisNames.Z,
+    "X Rotation (4)": AxisNames.RX,
+    "Y Rotation (5)": AxisNames.RY,
+    "Z Rotation (6)": AxisNames.RZ,
+    "Slider (7)": AxisNames.SLIDER,
+    "Dial (9)": AxisNames.DIAL
 }
 
 
@@ -216,24 +197,37 @@ _MouseButton_to_enum_lookup = {
     "Wheel Down": MouseButton.WheelDown,
 }
 
+class xIntEnum(enum.IntEnum):
+    def __eq__(self, other):
+        if type(self).__name__ == type(other).__name__:
+            return self.value == other.value
+        if other is int:
+            return self.value == other
+        return False
+    
+    def __hash__(self) -> int:
+        return hash(self.value)
+        
 
-class DeviceType(enum.Enum):
+class DeviceType(enum.IntEnum):
 
     """Enumeration of the different possible input types."""
 
-    Keyboard = 1
-    Joystick = 2
-    VJoy = 3
+    Keyboard = 1 # keyboard
+    Joystick = 2 # game controller
+    VJoy = 3 # vjoy (virtual)
+    Midi = 4 # midi
+    Osc = 5 # open source control
 
     @staticmethod
-    def to_string(value: DeviceType) -> str:
+    def to_string(value):
         try:
             return _DeviceType_to_string_lookup[value]
         except KeyError:
             raise gremlin.error.GremlinError("Invalid type in lookup")
 
     @staticmethod
-    def to_enum(value: str) -> DeviceType:
+    def to_enum(value):
         try:
             return _DeviceType_to_enum_lookup[value]
         except KeyError:
@@ -243,16 +237,23 @@ class DeviceType(enum.Enum):
 _DeviceType_to_string_lookup = {
     DeviceType.Keyboard: "keyboard",
     DeviceType.Joystick: "joystick",
-    DeviceType.VJoy: "vjoy"
+    DeviceType.VJoy: "vjoy",
+    DeviceType.Midi: "midi",
+    DeviceType.Osc: "osc"
 }
+
+
 _DeviceType_to_enum_lookup = {
     "keyboard": DeviceType.Keyboard,
     "joystick": DeviceType.Joystick,
-    "vjoy": DeviceType.VJoy
+    "vjoy": DeviceType.VJoy,
+    "midi": DeviceType.Midi,
+    "osc": DeviceType.Osc
+
 }
 
 
-class PluginVariableType(enum.Enum):
+class PluginVariableType(xIntEnum):
 
     """Enumeration of all supported variable types."""
 
@@ -268,7 +269,9 @@ class PluginVariableType(enum.Enum):
     @staticmethod
     def to_string(value: PluginVariableType) -> str:
         try:
-            return _PluginVariableType_to_string_lookup[value]
+            v = value.value
+            data = next((item for item in PluginVariableType if item.value == v),None)
+            return _PluginVariableType_to_string_lookup[data]
         except KeyError:
             raise gremlin.error.GremlinError(
                 "Invalid PluginVariableType in lookup"
@@ -282,6 +285,8 @@ class PluginVariableType(enum.Enum):
             raise gremlin.error.GremlinError(
                 "Invalid PluginVariableType in lookup"
             )
+        
+    
 
 
 _PluginVariableType_to_string_lookup = {
@@ -625,3 +630,267 @@ class ConditionType(enum.Enum):
                 f"Invalid condition operator type: {str(string)}"
             )
         return value
+
+
+
+class MouseClickMode(enum.Enum):
+    Normal = 0 # click on/off
+    Press = 1 # press only
+    Release = 2 # release only
+
+    @staticmethod
+    def to_string(mode):
+        return mode.name
+    
+    def __str__(self):
+        return str(self.value)
+    
+    @classmethod
+    def _missing_(cls, name):
+        for item in cls:
+            if item.name.lower() == name.lower():
+                return item
+            return cls.Normal
+        
+    @staticmethod
+    def from_string(str):
+        ''' converts from a string representation (text or numeric) to the enum, not case sensitive'''
+        str = str.lower().strip()
+        if str.isnumeric():
+            mode = int(str)
+            return MouseClickMode(mode)
+        for item in MouseClickMode:
+            if item.name.lower() == str:
+                return item
+
+        return None
+    
+    @staticmethod
+    def to_description(action):
+        ''' returns a descriptive string for the action '''
+        if action == MouseClickMode.Normal:
+            return "Normal Click"
+        elif action == MouseClickMode.Press:
+            return "Mouse button press"
+        elif action == MouseClickMode.Release:
+            return "Mouse button release"
+        return f"Unknown {action}"
+    
+    @staticmethod
+    def to_name(action):
+        ''' returns the name from the action '''
+        if action == MouseClickMode.Normal:
+            return "Normal Click"
+        elif action == MouseClickMode.Press:
+            return "Mouse button press"
+        elif action == MouseClickMode.Release:
+            return "Mouse button release"
+        return f"Unknown {action}"
+    
+class MouseAction(enum.Enum):
+    MouseButton = 0 # output a mouse button
+    MouseMotion = 1 # output a mouse motion
+    MouseWiggleOnLocal = 2 # enable mouse wiggle - local machine only
+    MouseWiggleOffLocal = 3 # disable mouse wiggle - locla machine only
+    MouseWiggleOnRemote = 4 # enable mouse wiggle - remote machines only
+    MouseWiggleOffRemote = 5 # disable mouse wiggle - remote machines only
+
+
+    @staticmethod
+    def to_string(mode):
+        return mode.name
+    
+    def __str__(self):
+        return str(self.value)
+    
+    @classmethod
+    def _missing_(cls, name):
+        for item in cls:
+            if item.name.lower() == name.lower():
+                return item
+            return cls.MouseButton
+        
+    @staticmethod
+    def from_string(str):
+        ''' converts from a string representation (text or numeric) to the enum, not case sensitive'''
+        str = str.lower().strip()
+        if str.isnumeric():
+            mode = int(str)
+            return MouseAction(mode)
+        for item in MouseAction:
+            if item.name.lower() == str:
+                return item
+
+        return None
+    
+    @staticmethod
+    def to_description(action):
+        ''' returns a descriptive string for the action '''
+        if action == MouseAction.MouseButton:
+            return "Maps a mouse button"
+        elif action == MouseAction.MouseMotion:
+            return "Maps to a mouse motion axis"
+        elif action == MouseAction.MouseWiggleOffLocal:
+            return "Turns wiggle mode off (local only)"
+        elif action == MouseAction.MouseWiggleOnLocal:
+            return "Turns wiggle mode on (local only)"
+        
+        elif action == MouseAction.MouseWiggleOffRemote:
+            return "Turns wiggle mode off (remote only)"
+        elif action == MouseAction.MouseWiggleOnRemote:
+            return "Turns wiggle mode on (remote only)"
+        
+        return f"Unknown {action}"
+    
+    @staticmethod
+    def to_name(action):
+        ''' returns the name from the action '''
+        if action == MouseAction.MouseButton:
+            return "Mouse button"
+        elif action == MouseAction.MouseMotion:
+            return "Mouse axis"
+        elif action == MouseAction.MouseWiggleOffLocal:
+            return "Wiggle Disable (local)"
+        elif action == MouseAction.MouseWiggleOnLocal:
+            return "Wiggle Enable (local)"
+        elif action == MouseAction.MouseWiggleOffRemote:
+            return "Wiggle Disable (remote)"
+        elif action == MouseAction.MouseWiggleOnRemote:
+            return "Wiggle Enable (remote)"
+                
+        return f"Unknown {action}"
+    
+class MouseButton(enum.Enum):
+
+    """Enumeration of all possible mouse buttons."""
+
+    Left = 1
+    Right = 2
+    Middle = 3
+    Forward = 4
+    Back = 5
+    WheelUp = 10
+    WheelDown = 11
+    WheelLeft = 12
+    WheelRight = 13
+
+    @staticmethod
+    def to_string(value):
+        try:
+            return _MouseButton_to_string_lookup[value]
+        except KeyError:
+            raise gremlin.error.GremlinError("Invalid type in lookup")
+
+    @staticmethod
+    def to_enum(value):
+        if isinstance(value, int):
+            return MouseButton(value)
+        try:
+            return _MouseButton_to_enum_lookup[value]
+        except KeyError:
+            raise gremlin.error.GremlinError("Invalid type in lookup")
+        
+    @staticmethod
+    def to_lookup_string(value):
+        ''' mouse button to key lookup name'''
+        try:
+            return _MouseButton_to_lookup_string_lookup[value]
+        except KeyError:
+            raise gremlin.error.GremlinError("Invalid type in lookup")
+        
+    @staticmethod
+    def lookup_to_enum(value):
+        if isinstance(value, int):
+            return MouseButton(value)
+        try:
+            return _MouseButton_lookup_to_button_lookup[value]
+        except KeyError:
+            raise gremlin.error.GremlinError("Invalid type in lookup")
+
+
+
+_MouseButton_to_string_lookup = {
+    MouseButton.Left: "Mouse Left",
+    MouseButton.Right: "Mouse Right",
+    MouseButton.Middle: "Mouse Middle",
+    MouseButton.Forward: "Mouse Forward",
+    MouseButton.Back: "Mouse Back",
+    MouseButton.WheelUp: "Wheel Up",
+    MouseButton.WheelDown: "Wheel Down",
+    MouseButton.WheelLeft: "Wheel Left",
+    MouseButton.WheelRight: "Wheel Right"
+}
+
+_MouseButton_to_lookup_string_lookup = {
+    MouseButton.Left: "mouse_1",
+    MouseButton.Right: "mouse_2",
+    MouseButton.Middle: "mouse_3",
+    MouseButton.Forward: "mouse_4",
+    MouseButton.Back: "mouse_5",
+    MouseButton.WheelUp: "wheel_up",
+    MouseButton.WheelDown: "wheel_down",
+    MouseButton.WheelLeft: "wheel_left",
+    MouseButton.WheelRight: "wheel_right"
+}
+
+
+
+_MouseButton_to_enum_lookup = {
+    "Mouse Left": MouseButton.Left,
+    "Mouse Right": MouseButton.Right,
+    "Mouse Middle": MouseButton.Middle,
+    "Mouse Forward": MouseButton.Forward,
+    "Mouse Back": MouseButton.Back,
+    "Mouse Wheel Up": MouseButton.WheelUp,
+    "Mouse Wheel Down": MouseButton.WheelDown,
+    "Left": MouseButton.Left,
+    "Right": MouseButton.Right,
+    "Middle": MouseButton.Middle,
+    "Forward": MouseButton.Forward,
+    "Back": MouseButton.Back,
+    "Wheel Up": MouseButton.WheelUp,
+    "Wheel Down": MouseButton.WheelDown,
+    "Wheel Left": MouseButton.WheelLeft,
+    "Wheel Right": MouseButton.WheelRight
+}
+
+_MouseButton_lookup_to_button_lookup = {
+    "mouse_1": MouseButton.Left,
+    "mouse_2": MouseButton.Right,
+    "mouse_3": MouseButton.Middle,
+    "mouse_4": MouseButton.Forward,
+    "mouse_5": MouseButton.Back,
+    "wheel_up": MouseButton.WheelUp,
+    "wheel_down": MouseButton.WheelDown,
+    "wheel_left": MouseButton.WheelLeft,
+    "wheel_right": MouseButton.WheelRight
+}
+
+
+@enum.unique
+class VerboseMode(enum.IntFlag):
+    NotSet = 0
+    Keyboard = enum.auto() # keyboard input only
+    Joystick = enum.auto() # joystick input
+    Inputs = enum.auto() # list inputs
+    Mouse = enum.auto() # mouse input
+    SimConnect = enum.auto() # simconnect interface
+    Details = enum.auto() # user interface details
+    All = Keyboard | Joystick | Inputs | Mouse | Details | SimConnect
+
+    def __contains__(self, item):
+        return  (self.value & item.value) == item.value
+
+
+@enum.unique
+class TabDeviceType(int, enum.Enum):
+    ''' types of devices shown on device tabs '''
+    NotSet = 0
+    Joystick = 1
+    Keyboard = 2
+    Midi = 3
+    Osc = 4
+    VjoyInput = 5
+    VjoyOutput = 6
+    Settings = 7
+    Plugins = 8

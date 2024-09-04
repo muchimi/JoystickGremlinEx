@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
+# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,14 +19,16 @@ from PySide6 import QtWidgets
 
 import logging
 import time
-from xml.etree import ElementTree
+from lxml import etree as ElementTree
 
 import gremlin
-import gremlin.ui.common
+import gremlin.ui.ui_common
 import gremlin.ui.input_item
+from gremlin.ui.input_item import AbstractContainerWidget, AbstractActionWidget
+from gremlin.base_profile import AbstractContainer
 
 
-class ChainContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
+class ChainContainerWidget(AbstractContainerWidget):
 
     """Container which holds a sequence of actions."""
 
@@ -43,7 +45,7 @@ class ChainContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
         self.widget_layout = QtWidgets.QHBoxLayout()
 
         self.profile_data.create_or_delete_virtual_button()
-        self.action_selector = gremlin.ui.common.ActionSelector(
+        self.action_selector = gremlin.ui.ui_common.ActionSelector(
             self.profile_data.get_input_type()
         )
         self.action_selector.action_added.connect(self._add_action)
@@ -54,7 +56,7 @@ class ChainContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
         self.widget_layout.addStretch(1)
 
         self.widget_layout.addWidget(QtWidgets.QLabel("<b>Timeout:</b> "))
-        self.timeout_input = gremlin.ui.common.DynamicDoubleSpinBox()
+        self.timeout_input = gremlin.ui.ui_common.DynamicDoubleSpinBox()
         self.timeout_input.setRange(0.0, 3600.0)
         self.timeout_input.setSingleStep(0.5)
         self.timeout_input.setValue(0)
@@ -69,7 +71,7 @@ class ChainContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
             widget = self._create_action_set_widget(
                 self.profile_data.action_sets[i],
                 f"Action {i:d}",
-                gremlin.ui.common.ContainerViewTypes.Action
+                gremlin.ui.ui_common.ContainerViewTypes.Action
             )
             self.action_layout.addWidget(widget)
             widget.redraw()
@@ -81,7 +83,7 @@ class ChainContainerWidget(gremlin.ui.input_item.AbstractContainerWidget):
                 widget = self._create_action_set_widget(
                     self.profile_data.action_sets[i],
                     f"Action {i:d}",
-                    gremlin.ui.common.ContainerViewTypes.Condition
+                    gremlin.ui.ui_common.ContainerViewTypes.Condition
                 )
                 self.activation_condition_layout.addWidget(widget)
                 widget.redraw()
@@ -191,7 +193,7 @@ class ChainContainerFunctor(gremlin.base_classes.AbstractFunctor):
         return result
 
 
-class ChainContainer(gremlin.base_classes.AbstractContainer):
+class ChainContainer(AbstractContainer):
 
     """Represents a container which holds multiplier actions.
 
@@ -202,12 +204,13 @@ class ChainContainer(gremlin.base_classes.AbstractContainer):
     name = "Chain"
     tag = "chain"
 
-    input_types = [
-        gremlin.common.InputType.JoystickAxis,
-        gremlin.common.InputType.JoystickButton,
-        gremlin.common.InputType.JoystickHat,
-        gremlin.common.InputType.Keyboard
-    ]
+    # override default allowed inputs here
+    # input_types = [
+    #     InputType.JoystickAxis,
+    #     InputType.JoystickButton,
+    #     InputType.JoystickHat,
+    #     InputType.Keyboard
+    # ]
     interaction_types = [
         gremlin.ui.input_item.ActionSetView.Interactions.Up,
         gremlin.ui.input_item.ActionSetView.Interactions.Down,

@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
+# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,10 +18,10 @@
 
 import os
 from PySide6 import QtWidgets
-from xml.etree import ElementTree
+from lxml import etree as ElementTree
 
-from gremlin.base_classes import AbstractAction, AbstractFunctor
-from gremlin.common import InputType
+import gremlin.base_profile
+from gremlin.input_types import InputType
 import gremlin.ui.input_item
 
 
@@ -41,17 +41,18 @@ class TogglePauseActionWidget(gremlin.ui.input_item.AbstractActionWidget):
         pass
 
 
-class TogglePauseActionFunctor(AbstractFunctor):
+class TogglePauseActionFunctor(gremlin.base_profile.AbstractFunctor):
 
     def __init__(self, action):
         super().__init__(action)
 
     def process_event(self, event, value):
+        import gremlin.control_action
         gremlin.control_action.toggle_pause_resume()
         return True
 
 
-class TogglePauseAction(AbstractAction):
+class TogglePauseAction(gremlin.base_profile.AbstractAction):
 
     """Action to resume callback execution."""
 
@@ -59,19 +60,25 @@ class TogglePauseAction(AbstractAction):
     tag = "toggle-pause"
 
     default_button_activation = (True, False)
-    input_types = [
-        InputType.JoystickAxis,
-        InputType.JoystickButton,
-        InputType.JoystickHat,
-        InputType.Keyboard
-    ]
+    # override default allowed inputs here
+    # input_types = [
+    #     InputType.JoystickAxis,
+    #     InputType.JoystickButton,
+    #     InputType.JoystickHat,
+    #     InputType.Keyboard
+    # ]
 
     functor = TogglePauseActionFunctor
     widget = TogglePauseActionWidget
 
     def __init__(self, parent):
         super().__init__(parent)
+        self.parent = parent
 
+    def display_name(self):
+        ''' returns a display string for the current configuration '''
+        return "Toggle Pause"
+    
     def icon(self):
         return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
 

@@ -7,7 +7,11 @@ Joystick Gremlin EX
 
 <!-- TOC start (generated with https://github.com/derlin/bitdowntoc) -->
 
-   * [Changelog](#changelog)
+- [Changelog](#changelog)
+- [Virus false-positives](#virus-false-positives)
+- [Releases](#releases)
+- [General](#general)
+- [Compatibility](#compatibility)
 - [There be dragons ahead!  ](#there-be-dragons-ahead)
    * [Support](#support)
    * [History](#history)
@@ -21,18 +25,87 @@ Joystick Gremlin EX
          - [Concurrent mode](#concurrent-mode)
       + [Client machine setup](#client-machine-setup)
    * [Master remote control functions](#master-remote-control-functions)
+- [Profile mapping](#profile-mapping)
+   * [Automatic activation](#automatic-activation)
+   * [Keep profile active when focus is lost](#keep-profile-active-when-focus-is-lost)
+   * [Mode selection](#mode-selection)
+- [Profile device substitution and input order](#profile-device-substitution-and-input-order)
+   * [Substitution](#substitution)
+   * [Caveats with profile automation](#caveats-with-profile-automation)
+   * [Caveats with loading to the prior mode](#caveats-with-loading-to-the-prior-mode)
 - [Copy/Paste operations](#copypaste-operations)
+- [Devices](#devices)
+   * [HID devices](#hid-devices)
+   * [Keyboard (+Mouse) device](#keyboard-mouse-device)
+         - [Keyboard inputs](#keyboard-inputs)
+         - [Scan Codes](#scan-codes)
+      + [Numlock state](#numlock-state)
+      + [Virtual Keyboard](#virtual-keyboard)
+         - [Selecting a key](#selecting-a-key)
+         - [Shift state](#shift-state)
+         - [Select single](#select-single)
+         - [Selected keys](#selected-keys)
+         - [Listen button](#listen-button)
+         - [Pass-through](#pass-through)
+      + [Special considerations](#special-considerations)
+   * [MIDI device](#midi-device)
+      + [MIDI inputs](#midi-inputs)
+      + [MIDI trigger modes](#midi-trigger-modes)
+      + [Changing modes](#changing-modes)
+      + [MIDI conflicts](#midi-conflicts)
+      + [MIDI ports](#midi-ports)
+      + [Network MIDI](#network-midi)
+      + [Using MIDI from touch surfaces](#using-midi-from-touch-surfaces)
+      + [MIDI controllers](#midi-controllers)
+      + [MIDI troubleshooting](#midi-troubleshooting)
+   * [OSC device (Open Sound Control)](#osc-device-open-sound-control)
+      + [OSC port](#osc-port)
+      + [OSC inputs](#osc-inputs)
+         - [OSC Trigger modes](#osc-trigger-modes)
+      + [Changing modes](#changing-modes-1)
+- [Profile](#profile)
+   * [Profile association](#profile-association)
+   * [Profile modes](#profile-modes)
+   * [General mapping process](#general-mapping-process)
+- [User plugins](#user-plugins)
+- [Containers](#containers)
+- [Actions](#actions)
+   * [Action priorities](#action-priorities)
+   * [General Action Types](#general-action-types)
+   * [Profile edit time vs runtime behavior](#profile-edit-time-vs-runtime-behavior)
+      + [Edit time](#edit-time)
+      + [Run time](#run-time)
+   * [Profile map visualization](#profile-map-visualization)
 - [VJoyRemap action ](#vjoyremap-action)
    * [VJoyRemap button press actions](#vjoyremap-button-press-actions)
    * [VJoyRemap axis mapping actions](#vjoyremap-axis-mapping-actions)
+- [Gated axis action](#gated-axis-action)
+   * [Gates](#gates)
+   * [Gate mappings](#gate-mappings)
+      + [Gate Delay](#gate-delay)
+   * [Ranges](#ranges)
+   * [Default range](#default-range)
+   * [Range mapping](#range-mapping)
+   * [Range output mode](#range-output-mode)
+      + [Default range](#default-range-1)
+   * [Use-cases and scenarios](#use-cases-and-scenarios)
 - [Map to mouse EX action](#map-to-mouse-ex-action)
 - [Map to keyboard EX action](#map-to-keyboard-ex-action)
+   * [Output modes](#output-modes)
+   * [Latching](#latching)
+   * [Numlock behavior](#numlock-behavior)
       + [Dragons](#dragons)
+- [Merged Axis action](#merged-axis-action)
+   * [Lower and upper inputs](#lower-and-upper-inputs)
+   * [Operations](#operations)
+   * [Invert](#invert)
+   * [Output](#output)
+   * [Action configuration](#action-configuration)
 - [Range container](#range-container)
-      + [Ranges](#ranges)
+      + [Ranges](#ranges-1)
       + [Include/exclude flag](#includeexclude-flag)
       + [Symmetry](#symmetry)
-      + [Latching](#latching)
+      + [Latching](#latching-1)
       + [Dragons](#dragons-1)
 - [Button Container](#button-container)
       + [Usage tips](#usage-tips)
@@ -69,14 +142,55 @@ Joystick Gremlin EX
 <!-- TOC end -->
 
 <!-- TOC --><a name="changelog"></a>
-## Changelog
+# Changelog
 
-### 6/6/24 - 13.40.13ex (h) **potentially breaking change**
+
+13.40.14ex (as of pre-release m7)
+
+This release adds major new features, including some minor changes in UI functionality, and a few more QOL (quality of life) enhancements.
+
+- **VJoy device name enhancement** VJoy devices are now displayed including the axis/button/hat count in the name to make them easier to distinguish.  This works because VJoy requires each defined virtual joystick to be different either in the number of axes, buttons or hats defined so they are unique.
+- **New Merge Axis action** The merge axis action is similar to the merge-axis profile feature (from the menu) option except that it can be attached to any joystick axis input (any device will do) in a profile as a regular action.  The merge action, as with the gated axis action, allows the action itself to define sub-containers and sub-actions by clicking on the configuration button.  The output of the merged axis action will be sent to these sub-actions for processing, which can include response curve and any other action applicable to axis input data.  Note: output from this action is not going to be sent to other actions defined alongside it, only the sub-containers the action defines itself.
+- **New device reorder** It is now possible to re-order the hardware device tabs.  The order is persisted from one session to the next.  Right click on the tab to sort the input back to default.  This is only a visual feature - the hardware order of the devices cannot be changed as it's determined by the operating system.    
+- **New device substitution** It is now possible to replace one or more device hardware IDs with another so long as the id is not duplicated.  This is a requested feature if your hardware IDs change frequently (a rare condition). This is a QOL feature to do an edit to the profile that had to be done in the XML directly until now.  The dialog shows the profile devices in the top drop down, and the detected hardware devices with the new IDs in the bottom.  The old profile is backed up for you just in case and the updated profile is reloaded for you if a replace occurred.
+
+- **New virtual keyboard** dialog to simplify key and mouse button selection. The updated editor supports hidden keys such as F13 to F24 and enables mouse buttons to be used as any "key" input to simplify mapping. (QOL)
+- Revamped keyboard input device and UI with virtual keyboard with mouse input support with multiple key latching.  Profiles using the old style should convert automatically to the new style.  Inputs can be added, edited and removed.  Latching (concurrent keys pressed) allows for complex and unusual keyboard input combinations to trigger actions including latching with mouse button and mouse wheel inputs.
+- Revamped keyboard conditions on actions or containers:  a keyboard condition now uses the new virtual keyboard editor and allows for multiple latched keys and mouse button triggers. (QOL)
+- **New MIDI input device** - GremlinEx can now map MIDI events to GremlinEx actions. The new MIDI inputs can be added, edited and removed in the MIDI device tab. 
+- **New OSC (Open Sound Control) input device** - GremlinEx can now map OSC events to GremlinEx actions. The new OSC inputs can be added, edited and removed from the OSC device tab.
+- **New Gated Axis action** functionality for some actions (SimConnect axis mapping as well as VJoy axis mapping - new axis mode).  Gates axes have the notion of "gates", or points along an axis that can be used to trigger one or more sub-actions and modify the axis value output behavior.  Data and triggers for this action will be sent to the sub-containers and sub-actions it defines on each gate or range based on conditions as defined.  Note: output from this action is not going to be sent to other actions defined alongside it, only the sub-containers the action defines itself.
+- **New Input Map dialog** - in the tools menu, "view input map" tool displays a dialog containing the current profile mappings as a tree, can be exported to the clipboard.
+- Improved icon reload speed (speeds up the UI load/refresh/update)
+- New file menu for opening Explorer to the current profile folder (QOL)
+- New file menu for opening the profile XML in a text editor (it will save the profile first) (QOL)
+- New mouse event drop down selector in map to mouse ex: adds a mouse event selection drop down so mouse actions can be selected by name rather than mouse input only.  
+- Action container will now scroll horizontally if the action is too wide to fit based on windows size / UI scaling options. (QOL)
+- Profiles can be saved even if one or more actions are not configured (QOL)
+- Updated profile to application (process) mapping in the options dialog (QOL)
+- Options dialog remembers which tab it was last in (QOL)
+- Options dialog has a close button (QOL)
+- Options dialog saves profile mapping information on close (QOL)
+- Pressing F5 in the UI will activate the current profile (QOL)
+- New configuration dialog for the loaded profile, separate from the global options (QOL).  This lets you quickly set profile activation options.
+- New option to force numlock off when a profile starts to help with the more complex latching that use numpad keys.
+- Added joystick input value display on axis inputs - shows an axis bar with the current axis value in the input (QOL) - can be toggled in options.
+- Update to Python 3.12.5
+- Profile mode change is now disabled when the profile runs to avoid conflicts.  Use the new profile startup profile option to pick a profile when the profile is loaded if the profile mode needs to be changed when the profile runs.
+- User plugins that use plugin variables now support partial save.  This can be enabled or disabled in options.  When enabled, plugin instance configurations setup in user-plugin tab will save in-progress work at edit time to the profile when the profile is saved.  Instances that are not fully configured will not be active at profile runtime and a log entry will be issued as a warning to skip the instance load.  This is on a per instance basis.
+- The JGEX UI and configuration options are mostly disabled when a profile runs so edits to an active profile are only permitted when a profile is not active.  The change has to do with changes in behaviors in the core system and the potential for conflicting events impacting profile state while a profile runs.  
+- When changing modes, the hourglass will be displayed during the UI update operation (this can be time consuming because each device is reloaded on mode change for the current mode)
+- Play sound action now has a play button to test play the sound file while in edit mode.
+- Curve editor now remembers the symmetry setting.
+- Curve editor now displays current input if input visualization is enabled.
+- New clear map tool - removes all mappings from the selected device and mode
+
+6/6/24 - 13.40.13ex (h) **potentially breaking change**
 
 - GremlinEx will now more gracefully handle DLL errors and check driver and DLL versions.  If the driver and DLL versions are not at minimum levels expected, an error box will be displayed and will exit the app to avoid further errors due to mismatched versions.
 
-GremlinEx requires vJoy device driver 12.53.21.621 (VJOY release 2.1.9.1 minimum).    The distribution includes the interface DLL for 2.1.9.1, but not the software which by licensing agreement cannot be included in the GremlinEx distribution.  The latest version can be found here:  
-  
+GremlinEx requires vJoy device driver 12.53.21.621 (VJOY release 2.1.9.1 minimum).    The distribution includes the interface DLL for 2.1.9.1, but not the software which by licensing agreement cannot be included in the GremlinEx distribution.  The latest version can be found here:
+
 The vJoy version can be found here: https://sourceforge.net/projects/vjoystick/files/Beta%202.x/2.1.9.1-160719/
 
 The version of HIDHide can be found here: https://github.com/nefarius/HidHide/releases
@@ -84,12 +198,12 @@ The version of HIDHide can be found here: https://github.com/nefarius/HidHide/re
 There are probably more hardening that can be done to validate the environment.
 
 
-When installing a new version of vJoy or HIDHide, uninstall the old versions first, and reboot between sessions to make sure files are removed and there will not be a conflict on installation.  There are documented issues when failing to reboot after uninstalling either HIDHide or vJoy.  
-  
+When installing a new version of vJoy or HIDHide, uninstall the old versions first, and reboot between sessions to make sure files are removed and there will not be a conflict on installation.  There are documented issues when failing to reboot after uninstalling either HIDHide or vJoy.
+ 
 Sequence wise, install vJoy first, then HIDHide.
 
 Updated Device Information dialog to use a table format that is user resizeable.  Right click on any cell to copy its contents to the clipboard.
-  
+
 Bug fix for device removal / addition while a profile is running.
 
 If a device is referenced by a script or profile and cannot be found as GremlinEx is running, or if it was added/removed dynamically while GremlinEx is running, this will no longer throw an exception.  The issue will be logged as a warning to the log file and calls using that device will just be ignored.  Plugin scripts should ensure they now check the return value of any proxy call when looking for a device as the call my return null (None) if the device cannot be found.  It is generally discouraged to change hardware configurations while GremlinEx is running, or change device hardware IDs as those are stored in profiles, and will be ignored if the ID is no longer found.  
@@ -119,9 +233,39 @@ Introduction
 
 ------------
 
-For general Joystick Gremlin documentation - consult https://whitemagic.github.io/JoystickGremlin/
 
-The EX version adds to release 13.3 of Gremlin:
+<!-- TOC --><a name="virus-false-positives"></a>
+# Virus false-positives
+
+GremlinEx uses a common tool called PyInstaller as its packaging option.  Pyinstaller is unfortunately known to create false-positives with some malware detection tools, because of how it works and this is unfortunately not an issue I can solve easily while it concerns me greatly.  The good news is, it happens rarely.
+
+There is no known solution as the false positive, if it occurs, is unfortunate yet common to python solutions using PyInstaller (Google it) and must be fixed by the scanning software provider. I can make a few suggestions however: 
+
+If you don't trust the software, you can run it through www.virustotal.com and it will tell you how many malware solutions detect the false positive.  You will see that very few, if any, detect this issue.
+
+You can run the code from source, in which case you will need to make sure you have the Python environment installed and its dependencies.  You can run the joystick_gremlin.py file by itself using python joystick_gremlin.py at the command line.  The dependencies are listed in requirements.txt.
+
+You can build the executable yourself using the deploy.bat file in the source folder which is the mechanism I use to build the EXE from source. Unfortunately this doesn't seem to fix the issue for many people even if you are the one building on your own computer.
+
+If the false-positive is reported by your scanning solution, you can make an exception in your A/V solution and mark the .exe as an exception to the scanning, until your A/V solution corrects the false-positive detection.  This appears to be the usual recourse for python projects packaged to .exe using PyInstaller from my research to date.
+
+Some have suggested the code should be signed, however I point out this utility is free, its packaging is provided as a convenience, the work is the product of hundreds of development hours, and I am not currently in a position to incur a recurring expense for a free tool to sign the code in the hope it bypasses the rare false-positive detection, given the options that are provided and the rarity of the detection, which itself is due to misreporting by the scanning software.
+
+I will continue to monitor this issue but please use one of the above workarounds if this happens.
+
+<!-- TOC --><a name="releases"></a>
+# Releases
+
+Releases, including pre-releases can be found [here on GitHub](https://github.com/muchimi/JoystickGremlinEx/releases).  Be aware the release version may not be the most up to date as GitHub hides pre-releases by default.
+
+Pre-releases are mostly (proposed) bug fixes but also can contain work-in-progress items and
+
+<!-- TOC --><a name="general"></a>
+# General
+
+GremlinEx started as a fork of the excellent original Gremlin project by WhiteMagic.  For general original Joystick Gremlin documentation - consult https://whitemagic.github.io/JoystickGremlin/
+
+Gremlin EX adds a number of features to the original, including some bug fixes or quality of life enhancements I wanted to see, or were suggested to me.  Many parts of the original were rewritten although the core design and mechanics have remained the same, a good thing.  The major changes are below.
 
 - Update to x64 bit from x32 bit
 - Update to Python 12.x (improved execution speed over Python 10)
@@ -134,12 +278,26 @@ The EX version adds to release 13.3 of Gremlin:
 - Range container for mapping axis ranges to actions easily
 - MapToKeyboardEx action plugin for enhanced keyboard control with separate make/break and delay functionality
 - Button container - provides a direct way perform actions on a raw button press or release, which is helpful for on/off and three-way buttons
+- MIDI input mapping - GremlinEx can listen to MIDI messages and trigger actions based on those.
+- Copy/Paste containers and actions between inputs.
+- Save profiles in progress for which actions are not necessarily all configured.
+- Use of more icons and tooltips to make GremlinEx more intuitive to navigate.
 
 
 I suggest you make VjoyRemap the default action in the options panel as this plugin is what provides many enhancements over the default Remap plugin.  Same for mouse output - MapToMouseEx provides enhanced options for the mouse macro functions.
 
 This said, the default plugins are all functional but they won't be aware of the new features in GremlinEx.
 
+<!-- TOC --><a name="compatibility"></a>
+# Compatibility
+
+GremlinEx will load original Gremlin profiles and copy them to a new profile folder called *Joystick Gremlin Ex*.  Profiles saved with GremlinEx may however not be compatible with the original.
+
+While the core functionality looks similar, GremlinEx adds new container types, new input types and in some cases processes things differently.
+
+Original plugins have not been touched unless core GremlinEx code and behavior changes broke them.  Updated versions will typically be marked Ex - these actions will have similar functionality but may add a few more features.
+
+User scripts for GremlinEx also gain a few new functions and decorators to help with script management and state awareness in particular.
 
 
 
@@ -203,7 +361,7 @@ There are three options that control this behavior in the GremlinEx options pane
 | Highlight currently used buttons | Detects button changes only (axis movement is ignored but can be overriden - see below (this is recommended) | 
 | Highlight swaps device tabs | Changes input tabs automatically (this is a recommended) |
 
-
+As of 13.40.14ex, GremlinEx also has an option to display input repeaters as well for all joystick hardware inputs showing live axis position as well as button state.
 
 
 <!-- TOC --><a name="button-detect-only-overrides"></a>
@@ -318,6 +476,77 @@ Local and broadcast (sending output to remote GremlinEx instances on network mac
 
 Commands are available in the VjoyRemap plugin when bound to a joystick button and available from the drop down of actions for that button.
 
+<!-- TOC --><a name="profile-mapping"></a>
+# Profile mapping
+
+GremlinEx has multiple options to automate the loading and activation of profiles based on what process has the current focus (meaning, the active window).
+
+
+![](gremlin_ex_profile_options.png)
+
+<!-- TOC --><a name="automatic-activation"></a>
+## Automatic activation
+
+If a process (.exe) is mapped to a specific profile (.xml), GremlinEx can automatically load this profile when the process has the focus at runtime.  This only works when a GremlinEx is in "run" mode - so a profile was loaded and activated.
+
+If configured, GremlinEx will load the mapped profile corresponding to the process (.exe) automatically in the background.  Depending on the complexity of the profile, GremlinEx may take a few seconds to become active as it loads the process and activates it.
+
+The automatic load occurs whenever GremlinEx detects a process focus change.
+
+<!-- TOC --><a name="keep-profile-active-when-focus-is-lost"></a>
+## Keep profile active when focus is lost
+
+This mode is used to ensure GremlinEx keeps the profile running even if the process it is mapped to no longer has the primary focus.   This happens, for example when you alt-tab, or when you activate another window.  The recommendation is to leave this option enabled.
+
+<!-- TOC --><a name="mode-selection"></a>
+## Mode selection
+
+When automatic profile load is enabled, GremlinEx has the option to override the default "startup" mode of a profile.  This is by default, the top level mode.  There are two options of interest:
+
+- Activate a default mode when the profile is activated (this is the normal mode)
+- Activate the last mode used when the profile was last activated (this is the alternate mode).  If this is enabled, the default mode setting is ignored.  The first mode used will be the default mode if the mode has not been changed before.
+
+In addition to this, the profile itself provides actions that can switch modes.
+
+<!-- TOC --><a name="profile-device-substitution-and-input-order"></a>
+# Profile device substitution and input order
+
+Windows is notorious for changing the order of gaming controllers and to this end, GremlinEx does not use the sequence of controllers.  GremlinEx tracks input controllers by their hardware ID, a "guid" or globally unique identifier that includes the manufacturer hardware code, and unique to a device.   This approach avoids the device re-order issue, but walks right into, what happens when the hardware ID changes?
+
+The hardware ID is saved with a profile, and mappings are tied to that hardware ID.
+
+On occasion, hardware IDs for HID devices can change as reported by Windows.  This can happen when:
+
+- the input is programmable and lets you change the hardware ID (example, Arduino, Rasberry Pi custom hardware controllers)
+- the manufacturer provides a firmware update changing the input ID
+- the input is wireless and the ID resets on device reconnect
+- two inputs have the same ID (example, plugging in two identical joysticks), and the hardware driver assigns a new ID - which is usually a sequence.
+
+
+<!-- TOC --><a name="substitution"></a>
+## Substitution
+
+To help with situations where the hardware ID must be changed, while it's always possible to manually edit the profile XML with a text editor such as Notepad++, GremlinEx as of 13.40.14ex includes a small substitution dialog that lets you swap out device IDs.  This is accessible by right-clicking on a device tab and selecting device substitutions, or from the tools menu.
+
+<!-- TOC --><a name="caveats-with-profile-automation"></a>
+## Caveats with profile automation
+
+GremlinEx only has information about which process has the focus from the operating system, and the configuration options. As such, it is completely possible that you will experience conflicts if you have programmed these in, or constant loading/reloading, frequently changing process and otherwise attempting to break the detection logic.  One reason for this is large profiles take a while to load and if the target process is changed while a load is in motion, it may trigger a delay and GremlinEx may not immediately respond to changes
+
+Recommended configurations to avoid:
+
+- have two (or more) processes running concurrently with each associated with an automatic load profile and constantly changing focus between them rapidly. This will cause a profile reload/reset and new mode activation whenever the focus changes.  Some optimizations were made to the profile load - caching is planned for a future release to avoid load delays.
+
+- attach a profile to a non-game process, such as a background process.
+
+The recommended approach is to only execute one mapped process at a time, and to ensure the profile remains active when the process loses focus, such as when alt-tab or switch to another window on multi-monitor setups.  Automatic profile loading is also not recommended while you are designing a profile.  Only automate profiles that are not being actively edited/modified to avoid Gremlin activating the profile while you are editing it.
+
+<!-- TOC --><a name="caveats-with-loading-to-the-prior-mode"></a>
+## Caveats with loading to the prior mode
+
+Loading the prior mode may not necessarily be expected, as it will vary with the last known used mode.   This can be confusing and unexpected, but it can be helped by ensuring that you tell GremlinEx to say what mode it's in whenever a profile starts.
+
+
 
 <!-- TOC --><a name="copypaste-operations"></a>
 # Copy/Paste operations
@@ -335,6 +564,359 @@ You can persist a copy operation between GremlinEx sessions by checking the opti
 If the persist option is not checked, GremlinEx will use whatever data is in the Windows clipboard from the last copy operation in GremlinEx.
 
 ![](copy_paste_operations.png)
+
+
+<!-- TOC --><a name="devices"></a>
+# Devices
+
+<!-- TOC --><a name="hid-devices"></a>
+## HID devices
+
+GremlinEx will show all detected game controllers in tabs located at the top of the UI.  These are the raw input devices, either buttons, hats or axes.
+
+<!-- TOC --><a name="keyboard-mouse-device"></a>
+## Keyboard (+Mouse) device
+
+GremlinEx has an updated special Keyboard device that allows you to map keyboard and mouse button as inputs to trigger actions and containers. 
+
+![](gremlin_ex_keyboard.png)
+
+GremlinEx allows you to map unusual function keys F13 to F24 and any QWERTY keyboard layouts (no support for other layouts as of yet), as well as mouse input buttons including mouse wheel actions. 
+
+<!-- TOC --><a name="keyboard-inputs"></a>
+#### Keyboard inputs
+
+![](keyboard_input.png)
+
+Keyboard inputs, as with joystick inputs are shown on the left panel in GremlinEx in the keyboard tab.  Inputs can be added, removed and edited (configured).  If an input is removed, it will remove any associated mappings.  A confirmation box will pop up if an input with content will be deleted.
+
+Use the action and container copy/paste feature to duplicate actions between inputs.
+
+<!-- TOC --><a name="scan-codes"></a>
+#### Scan Codes
+
+Gremlin Ex has an option to display keyboard scan codes that will be heard by GremlinEx to help troubleshoot the more complex key latching use cases.  The scan codes are the keyboard scan codes in hexadecimal that will be listened to to trigger this action.  The "_EX" means the scan code is extended.  This list is important because GremlinEx will only be able to trigger the actions if it "hears" these scan codes in pressed state at the same time.  
+
+Many keys are special - such as the Right Alt key or the numpad keys. For example, the numpad numbers change scan codes based on the state of the numlock key and shift states.
+
+<!-- TOC --><a name="numlock-state"></a>
+### Numlock state
+
+The keyboard's numlock state alters the hardware codes sent by the numeric keypad (numpad) keys and can in fact caused the keyboard to return the same low level key presses for different physical keys. This happens for example with arrow keys. When this happens, there is no current way in the low level API used to tell which key was pressed because the codes are the same at the hardware level. Because this is usually enabled by the numlock state, Gremlin Ex offers an option as of 13.40.14ex to turn off numlock if it was on when a profile starts.
+
+This does not eliminate the problem entirely as there are still certain key combinations that will report duplicated keys at the hardware level, without GremlinEx able to tell the difference between keys.
+
+If a key combination is not detected, you can use a keyboard scanner to see if the key windows sees is different from what you expect.  There is an option in GremlinEx to display the key scan codes corresponding to a particular key combination, and the keyboard must be able to produce these codes for GremlinEx to act on them.
+
+A free utility to view keyboard scan codes is available [here](https://dennisbabkin.com/kbdkeyinfo)
+
+<!-- TOC --><a name="virtual-keyboard"></a>
+### Virtual Keyboard
+
+For input simplicity, GremlinEx now uses a virtual keyboard to show which keys are used for the input selected.  It is still possible to listen to keys using the listen button (currently this will only capture keys, mouse buttons will be ignored).
+
+
+![](virtual_keyboard.png)
+
+
+
+Currently only US layout (QWERTY) is supported for visualization. GremlinEx uses scan-codes (physical keys) on the keyboard so what the key actually says doesn't matter and is only for visualization purposes. I do plan to add localization in a future release so the keys show the correct key name for the current keyboard layout in use.
+
+
+
+<!-- TOC --><a name="selecting-a-key"></a>
+#### Selecting a key
+
+Click on a key to select it.  More than one key can be selected in most modes. When configuring an input and more than one key is selected, GremlinEx will only trigger the container/actions if all the keys are pressed concurrently.
+
+<!-- TOC --><a name="shift-state"></a>
+#### Shift state
+
+If you hold the shift key, keys that can be shifted will show their character.
+
+<!-- TOC --><a name="select-single"></a>
+#### Select single
+
+You can select a single key by holding the control key down.  This will clear any other selection.
+
+<!-- TOC --><a name="selected-keys"></a>
+#### Selected keys
+
+Each selected key shows highlighted in the virtual keyboard.
+
+<!-- TOC --><a name="listen-button"></a>
+#### Listen button
+
+The listen button allows you to type the keys you'd like to select.  This has a limitation in that it will only "hear" the keys that can be pressed.  Listen mode replaces the current selection.
+
+<!-- TOC --><a name="pass-through"></a>
+#### Pass-through
+
+Keys uses as inputs into GremlinEx are not captured, meaning that all applications will receive the same keys that GremlinEx sees.
+
+There are no guardrails provided - and GremlinEx does not prevent the output application from seeing the keys and buttons pressed to trigger a GremlinEx action.  When mapping to a game use care to employ key combinations that make sense and do not conflict with one another.
+
+<!-- TOC --><a name="special-considerations"></a>
+### Special considerations
+
+Some actions, like mouse wheel presses, do not have a release associated with them (there is no event fired to "stop" the mouse wheel).  When mapping to an output, be aware that the output should be pulsed or otherwise handled if you expect such triggers to be momentary.  For example, if mapping a wheel event to a joystick button, use the pulse mode unless you want the button to stay pressed.
+
+Another potential gotcha is to create a loop, wherein the output of an action creates a trigger for an output.
+
+There are no guardrails to encourage flexibility however it is imperative to use this capability with care to avoid odd behaviors.
+
+<!-- TOC --><a name="midi-device"></a>
+## MIDI device
+
+GremlinEx, as of 13.40.14ex, can map MIDI messages and use those to trigger actions.
+
+MIDI is a music oriented protocol to facilitate the exchange of music information between MIDI devices.  These devices can be hardware or software devices.
+
+Unlike hardware devices, MIDI inputs must be user defined and added to tell GremlinEx what to listen to.  Because MIDI can be cryptic, the configuration dialog allows you to listen to MIDI data and automatically program what it "hears" as an input using the listen buttons.  Inputs can also be manually setup if needed.
+
+Gremlin categorizes MIDI messages in that it doesn't look at the value data in the MIDI input stream - rather it looks at the port, the channel, the command, and any specific command data, such as the note number or the controller number.
+
+Gremlin will thus, on purpose, not distinguish between two notes if the velocity is the only thing that changes.  Rather, the MIDI value is passed along to the actions as the value parameter, which enables mapping to joystick values easily (see the trigger mode section below)
+
+<!-- TOC --><a name="midi-inputs"></a>
+### MIDI inputs
+
+All MIDI inputs are supported including SysEx messages.  The general process is to add a new input to GremlinEx in the MIDI device tab which will appear on the left.  The input can be configured by click on the cog wheel.
+
+Inputs can be deleted via the trashcan icon, or all inputs cleared via the clear all button.  Use with causion as if you get past the confirmation box, there is no undo and all the container data will be gone unless you previously copied it to the clipboard.  Confirmation boxes only show up if you have a container defined for an input.
+
+<!-- TOC --><a name="midi-trigger-modes"></a>
+### MIDI trigger modes
+
+The input has three trigger modes for each MIDI input that alter how the MIDI data is processed by GremlinEx.
+
+
+| Mode      | Description |
+| ----------- | ----------- |
+| Change      | Triggers whenever the MIDI value for the current command changes |
+| Button      | Triggers a press event if the first argument is in the top half of the MIDI command range, usually 63 to 127.  The trigger value will be shown.   |
+| Axis        | The input is placed in axis mode, which enables the vjoy-remap container in axis input mode. The range of the MIDI command value is used, so velocity for a note, value for a CC, etc... |
+
+<!-- TOC --><a name="changing-modes"></a>
+### Changing modes
+
+If an input already has mapping containers attached, GremlinEx will prevent switching from an axis mode to a button/change mode and vice versa.  This is because containers and actions, when added to an input, are tailored to the type of input it is, and it's not possible to change it after the fact to avoid mapping problems and odd behaviors.
+
+<!-- TOC --><a name="midi-conflicts"></a>
+### MIDI conflicts
+
+MIDI input conflicts are possible and stem from the ability to map MIDI messages via different inputs that map to the same or similar message.   GremlinEx will scan existing mappings to avoid this as much as possible, however it is not foolproof as there are ways to configure MIDI messages in such a way conflicts may not be detected.
+
+
+<!-- TOC --><a name="midi-ports"></a>
+### MIDI ports
+
+GremlinEx listens to all MIDI ports concurrently so multiple MIDI ports can be used at the same time.  GremlinEx will scan for available ports.
+
+If a port goes away after you've configured an input on that port, that port becomes invalid and will not be used for output.  GremlinEx will not delete that input however, but GremlinEx will display a warning on each invalid input.
+
+<!-- TOC --><a name="network-midi"></a>
+### Network MIDI
+
+While outside of the scope of this document and GremlinEx, you can easily network MIDI events using [rtpMidi](https://www.tobias-erichsen.de/software/rtpmidi.html).  Another utility that is useful is [loopMidi](https://www.tobias-erichsen.de/software/loopmidi.html). These utilities let you map MIDI input from a device attached to another computer via the network and send that data to the GremlinEx machine.   We won't go into details on how to set that up, but the idea is that a MIDI device sends output to a port, and rtpMidi allows that port data to be transferred to the GremlinEx machine.  GremlinEx will be able to use that input to trigger events.
+
+**important**  GremlinEx will not listen to MIDI data via the remote control feature.  The remote control feature is only for output mapping, not for input.  Use the utilities above to network MIDI traffic which is outside the scope of GremlinEx.
+
+
+<!-- TOC --><a name="using-midi-from-touch-surfaces"></a>
+### Using MIDI from touch surfaces
+
+The MIDI input feature in GremlinEx is designed to work hand in hand with "glass" input surfaces like Hexler's TouchOSC or OSCPilot, or any software based control surface that sends MIDI data.
+
+In TouchOSC's case, if you use the button mode in Gremlin to map a particular command, GremlinEx will press the button while the "glass" button is pressed, and automatically release it when the "glass" button is released.
+
+Similarly, "glass" faders and rotary controls can be mapped using GremlinEx's MIDI axis mode.  Other modes can of course be used if the idea is to trigger an action if a specific range of values are reached.
+
+<!-- TOC --><a name="midi-controllers"></a>
+### MIDI controllers
+
+GremlinEx will see any MIDI message so long as the controller shows up as a MIDI port on the machine running GremlinEx (which can be a networked virtual port via rtpMidi).  GremlinEx was tested with hardware from MidiPlus, Arturia, and software controllers like Hexler TouchOSC.  It will also work with any software that outputs MIDI data.
+
+<!-- TOC --><a name="midi-troubleshooting"></a>
+### MIDI troubleshooting
+
+The majority of issues will come from messages not being recognized by GremlinEx because the input configuration is causing it to filter (skip) that message.  To this end, Gremlin will tell you what it's listening to.
+
+There are some tools that let you visualize what MIDI messages the computer is receiving such as [MidiOx](http://www.midiox.com/), and older but tried and true MIDI diagnostics tool, or something like [Hexler Protokol](https://hexler.net/protokol).  Both utilities are free.  It's always a good idea to verify the MIDI signaling is functional outside of GremlinEx to verify the machine is seeing messages.  If GremlinEx cannot "listen" to a message via the listen buttons, it cannot see it.
+
+
+<!-- TOC --><a name="osc-device-open-sound-control"></a>
+## OSC device (Open Sound Control)
+
+GremlinEx, as of 13.40.14ex, can map OSC messages and use those to trigger actions.  OSC is generally much easier to setup and program than MIDI.  For more info on OSC, visit 
+
+Unlike hardware devices, OSC inputs must be user defined and added to tell GremlinEx what to listen to. GremlinEx supports any OSC message, although in the current version, limits are imposed on parameter types for ease of processing/mapping to a VJOY device:
+
+OSC messages must consist of a text part, example  /this_is_my_test_fader followed by a numeric value (float or int).   Extra parameters are currently ignored, but can be provided without error.
+
+<!-- TOC --><a name="osc-port"></a>
+### OSC port
+
+OSC uses a UDP port to listen on the network for OSC messages.  The default port is 8000 for receiving, and 8001 for sending.   The port can be configured by your OSC utility, just make sure GremlinEx listens on the correct port for messages.  The output port is not used by GremlinEx currently except to configure the OSC client. The output port is always 1 above the input port, so 8001 if the default 8000 input port is used. If you are using a firewall, make sure the port is configured to receive.
+
+The port is configured in options.
+
+The host is auto-configured to the current IP of the machine. Currently, that IP cannot be localhost (127.0.0.1).  This makes sense because any OSC input device will typically run on a separate host, and thus the GremlinEx machine needs to have network connectivity.
+
+
+<!-- TOC --><a name="osc-inputs"></a>
+### OSC inputs
+
+All OSC inputs must be unique or a warning will be triggered in the UI.  An input maps to a specific message type.  In the current release, OSC inputs support the following input modes:
+
+<!-- TOC --><a name="osc-trigger-modes"></a>
+#### OSC Trigger modes
+
+
+| Mode      | Description |
+| ----------- | ----------- |
+| Change      | Triggers whenever the value changes |
+| Button      | Triggers a press event if the first argument is non-zero, and a released event when the first argument is zero  |
+| Axis        | The input is placed in axis mode, which enables the vjoy-remap container in axis input mode. A range value can be provided that tells GremlinEx the input range, it can map it to the VJOY range of -1 to +1.  The default is 0 to 1. |
+
+
+| Command Mode      | Description |
+| ----------- | ----------- |
+| Message      | The input uses the message (string) part of the OSC message as the input identifier  |
+
+| Message + Data     | The input uses the complete message as the input identifier, including any arguments.    |
+
+The recommendation is to keep it to Message mode as it makes OSC programming much simpler.
+
+A typical OSC command will thus be /my_command_1, number  where number is:
+
+| Value of first argument    | Description |
+| ----------- | ----------- |
+| range min to range max (usually 0 to 1)    | Axis mapping -1 to +1 |
+| zero    | Button release |
+| non-zero    | Button press |
+
+
+
+<!-- TOC --><a name="changing-modes-1"></a>
+### Changing modes
+
+If an input already has mapping containers attached, GremlinEx will prevent switching from an axis mode to a button/change mode and vice versa.  This is because containers and actions, when added to an input, are tailored to the type of input it is, and it's not possible to change it after the fact to avoid mapping problems and odd behaviors.
+
+<!-- TOC --><a name="profile"></a>
+# Profile
+
+A profile holds a mapping of inputs to action. 
+
+
+<!-- TOC --><a name="profile-association"></a>
+## Profile association
+
+A profile can be associated with an executable in options, and GremlinEx can automatically switch to that profile when the associated process receives the focus.  By default this is not enabled as loading processes automatically can create a bit of lag while the process is loaded, especially if a large / complex profile, but the feature is available.   The other recommendation is to not automate this while setting up or tweaking a profile to simplify the editing process especially if you constantly switch focus between processes.
+
+<!-- TOC --><a name="profile-modes"></a>
+## Profile modes
+
+A profile can have mode, the default mode being called "Default" and is the starting mode.  The "Default" profile can be renamed if needed.
+
+Modes can be nested, meaning that a mode can itself contain other modes.  A child node inherits actions from a parent mode if the child mode does not define these inputs.
+
+If this behavior is not desired, the mode can also be a mode without a parent, in which case it will be a standalone mode without inheritance.
+
+Modes can be added or deleted.  Deletions can cause a loss of data as mappings are attached not only to an input, but a specific mode, so avoid deleting modes.
+
+
+
+<!-- TOC --><a name="general-mapping-process"></a>
+## General mapping process
+
+GremlinEx shows near the top of the UI a tabbed list of all detected HID hardware, including non-hardware input items like MIDI and OSC which also function as inputs.
+
+For complex profiles, the first order of business is typically to setup the modes for the profile if you have complex mappings to do, typically if you need to have multiple mappings for the same inputs - this can be for example a "flight" vs a "walking" mode, or a "turret" mode vs a "cockpit" mode.  You create modes in the mode configuration dialog.   There is however no requirement to do modes first as modes can be added later if need be.
+
+Select the editing mode at the top right of the UI from the drop down which will select the profile mode being edited.  All mappings will be attached to this mapping.  
+
+Mappings for another mode will not be displayed from another mode.
+
+The general idea is you will select one of the input tabs, selecting the hardware or virtual input device.  GremlinEx will show the detected inputs for the selected device.  If the device is a keyboard or MIDI or OSC, the input will also need to be defined.  Joystick inputs will show detected axes and buttons and hats for that input as they are reported by the hardware.
+
+VJOY devices can also be used as input devices if so configured in the settings tab. VJOY devices cannot be used in GremlinEx concurrently for input and output.  
+
+Once you have selected the input (or created one) on the left side of the UI, you can add one or more containers to that input.  
+
+Remember to save changes via the save button as profile changes are not saved automatically.   The profile is saved to an XML file in the default Gremlin Ex user folder.  The folder can be opened directly in Windows Explorer from the file menu so it's easier to locate.
+
+It's possible to manually edit the XML file if you'd like, however if you do, make a backup of the original XML file in case an error occurs.
+
+<!-- TOC --><a name="user-plugins"></a>
+# User plugins
+
+User plugins are Python files that can be attached to a profile via the settings tab.  Python programming opens the door to very complex scenarios not easily achievable via the built-in container and action types, and recommended for advanced users only.  However user plugins are often the fastest and easiest way (depending on your perspective) to achieve very complex logical mappings in GremlinEx.
+
+Note: plugins are reloaded every time a profile starts which allows for fast bug fixing.  Exceptions will be output to the dialog.   However if the plugin references other modules, these may not be reloaded until GremlinEx is completely reloaded due to the way Python bindings work.   GremlinEx has no control over this.
+
+
+
+
+
+<!-- TOC --><a name="containers"></a>
+# Containers
+
+Containers contain actions.  Containers are attached to an input selected on the left of the UI
+
+<!-- TOC --><a name="actions"></a>
+# Actions
+
+Actions are added to containers for each input type. In GremlinEx, some actions are compound actions, meaning, they create their own inputs based on the input they receive, so these actions can have their own containers.  An example of this is the Gated Axis action - which can trigger additional actions based on the position of an input axis.
+
+Actions are aware of the type of input they are being attached to, and not all actions support all input types.  Some actions work only with joystick axis input (example, Gated Axis) while others only work with button or keyboard inputs (example, mode switch).
+
+<!-- TOC --><a name="action-priorities"></a>
+## Action priorities
+
+Some actions are special - meaning - they need to occur after other prior actions in the execution sequence for a given input.   The priority is currently hardcoded in each action plugin which will be fine for all the provided actions.  For example, a joystick axis mapping action must occur after a response curve action (that changes the input to a new value), and a mode switch action occurs after all other actions.
+
+<!-- TOC --><a name="general-action-types"></a>
+## General Action Types
+
+The default set of actions for GremlinEx grows all the time but includes in general:
+
+- Map to VJOY Joystick (Ex version recommended)
+- Map to Keyboard (Ex version recommended) - the EX version does both keyboard and mouse combination (complex input trigger like holding 4 keys down concurrently to trigger) mappings and supports special output keys like F13 to F24)
+- Map to Mouse (EX version recommended)
+- Text to speech (converts text to speech)
+- Play sound (plays a sound clip)
+- Change profile mode
+- Change profile mode temporarily (while input is pressed)
+- Cycle profile mode (advance in sequence)
+- Gated Axis (lets you defined arbitrary action points based on input position
+- Response curve (curves the input axis so it's not linear)
+- SimConnect (for MSFS output)
+- Macro (combination of various actions)
+- Pause/resume profile actions
+
+<!-- TOC --><a name="profile-edit-time-vs-runtime-behavior"></a>
+## Profile edit time vs runtime behavior
+
+When the profile is activated (either manually or automatically by process for example) changes the behavior of GremlinEx.
+
+<!-- TOC --><a name="edit-time"></a>
+### Edit time
+
+GremlinEx, as of 13.40.14ex includes a hardware repeater directly into the UI to visualize the input state at design time.  This is true for axes and buttons (not hats presently).
+
+<!-- TOC --><a name="run-time"></a>
+### Run time
+
+When a profile runs, GremlinEx will stop updating the majority of the UI for performance reasons, especially for things like mode changes and repeating input. It is thus completely possible for the run time mode to not be displayed in the UI when a profile is running - this is normal.  
+
+However the status bar (bottom left) will always reflect the active run modes of GremlinEx including the remote/local state and active run time profile mode and the toolbar (top left) will always reflect the run mode (green when active).
+
+<!-- TOC --><a name="profile-map-visualization"></a>
+## Profile map visualization
+
+GremlinEx has a dialog visualizer to show, in text form, the current mappings and modes for the profile.  This text can be copied to the clipboard and pasted as plain text.
+
 
 
 <!-- TOC --><a name="vjoyremap-action"></a>
@@ -395,6 +977,130 @@ The commands are only available to button bindings at this time.
 | ----------- | ----------- |
 | Axis To Button     | Maps a raw input range to a specific button.  While the raw input is in that range, the button will be output.  Combine multiples of those to create more than one trigger.  Use-case: detent programming based on axis position.  | |
 
+<!-- TOC --><a name="gated-axis-action"></a>
+# Gated axis action
+
+This plugin is an experimental axis input filtering plugin.  It splits an input axis into ranges.  A range is separated by two gates, and the number of gates that are defined determines how many ranges are created.
+
+The inspiration for this action comes from the need to more easily map complex gated axis inputs to outputs, and very specifically to tackle space sims, commercial airliner, turboprop and helicopter throttle mappings in simulators. 
+
+The default action is configured with two gates at min/max and a single range in the middle.
+
+The gated axis allows you to map one or more actions when the input value crosses a gate - a specific point on the axis.  The gates axis also allows you to map one or more actions when the input enters, exits or is within a range.
+
+The gated axis action can only be associated with an axis hardware input and cannot be associated with buttons or hats.  It expects a linear input.
+
+![](gated_axis.png)
+
+![](gate_axis_gate_widget.png)
+
+![](gate_axis_range_widget.png)
+
+
+<!-- TOC --><a name="gates"></a>
+## Gates
+
+A gate is a point along the input axis with a specific floating point value in the range -1 to +1.  
+
+Up to 20 gates can be defined.
+
+A gate can be added to the action by right clicking anywhere on a range, or adding a gate manually.
+
+Gates can be moved by the mouse, or by clicking the record button which will move the gate to the live input position (the black marker on the display), or the value can be manually input.  The mouse wheel over the gate position number will also increment or decrement the gate's position.
+
+<!-- TOC --><a name="gate-mappings"></a>
+## Gate mappings
+
+The gate mapping configuration window is access by clicking on the gate's configure button, or right clicking a gate.
+
+![](gate_axis_gate_mapping.png)
+
+
+Each gate condition has its own set of mappings.   Mappings will see the gate as a momentary (button) input so only actions suitable for a button will be available for selection.
+
+| Condition      | Description |
+| ----------- | ----------- |
+| Cross | The gate will trigger whenever the input crosses the gate |
+| Cross (inc) | The gate will trigger if the gate is crossed from left to right, or in increasing value |
+| Cross (dec) | The gate will trigger if the gate is crossed from right to left, or decreasing value |
+
+
+<!-- TOC --><a name="gate-delay"></a>
+### Gate Delay
+
+The delay is a value in milliseconds that determines how much time elapses between a press and release action.  Internally a gate will mimic a button press, so will send two specific events to sub-actions on a gate, a press action, followed by a release action.  Setting this to zero means the two are instant.  The default value is 250 milliseconds (1/4 second) which is enough time for most games to capture the input, either a keyboard press or a button press.
+
+
+<!-- TOC --><a name="ranges"></a>
+## Ranges
+
+A range is defined by two gates.  The number of available ranges depends on the number of gates, and the size of each range depends on the position of the two gates representing the lower and upper end of the range.   Ranges are automatically computed based on gates, and adjust whenever a gate is moved.
+
+Ranges cannot overlap.
+
+<!-- TOC --><a name="default-range"></a>
+## Default range
+
+If individual range mappings are not needed, a default range corresponding to the entire input axis is defined.  A checkbox toggles this mode on/off.
+
+
+<!-- TOC --><a name="range-mapping"></a>
+## Range mapping
+
+![](gated_axis_range_action.png)
+
+A range lets you map actions whenever the input enters a range, exits a range, or is within a range.  Each as its own set of mappings.
+
+Actions mapped to a range will see it as a joystick axis input.
+
+
+| Condition      | Description |
+| ----------- | ----------- |
+| Enter Range | This will trigger whenever the input value enters the range.  This triggers once every time the input enters the range.  |
+| Exit Range | This will trigger whenever the input value exits the range. If the range is a boundary range (at minimum or maximum of the input range), it will still trigger.  This triggers once every time the input exits the range. |
+| In Range | This will trigger whenever the input changes within the range.  This is useful to send axis data out based on the position inside a range.  This triggers on any input change. |
+| Outsie of Range | This will trigger whenever the input changes and is not in this range. This triggers on any input change. |
+
+
+
+<!-- TOC --><a name="range-output-mode"></a>
+## Range output mode
+
+Ranges have multiple output modes that affect the output value sent to mappings.
+
+| Mode      | Description |
+| ----------- | ----------- |
+| Normal | The value is output as is (this is the default) - this is also known as the pass-through mode.  |
+| Output Fixed Value | Mappings get a fixed value whenever the range condition is triggered. This is helpful to freeze the output to a fixed value.  |
+| Ranged | The value is scaled to the range's defined minimum and maximum. By default the minimum and maximum match the bounding gate positions, but this can be changed to any valid value to scale the output.  |
+| Filtered (no output) | No value is output in this mode. Use this to suppress output when the input is in a given range. |
+| Rebased | This is similar to ranged mode, and the bounds are set to -1 to +1 so each range acts as a full output axis. |
+
+
+
+
+Whenever you add or remove gates, ranges are added or removed as well.  It is recommended you don't configure ranges until you have the number of gates finalized to avoid inadvertently loosing configured actions because a range was deleted as you removed a gate.  JGEX will confirm deletions.
+
+<!-- TOC --><a name="default-range-1"></a>
+### Default range
+
+The default range is a special range that is used for how the gated output should behave when the input is not in configured range.   A configured range is a range that has actions and modes defined. The default range is used when a range exists, but is not configured to do something special.
+
+You can use the default range to your advantage by only configuring special ranges in the input axis - and let the default range handle what happens when the input is not in the special ranges you've defined.
+
+
+<!-- TOC --><a name="use-cases-and-scenarios"></a>
+## Use-cases and scenarios
+
+The gated axis plugin can be useful for a number of scenarios where more sophistication is needed on input axis data.
+
+The plugin can be used for complex axis to button mapping, for establishing complex setups for latched output, for scaling purposes, to suppress output for some input values, allows for stepped throttle settings, and allow for different scale and sensitivity (curves) based on input positions.
+
+Examples for ranges include mapping beta-range for turbo props simulations, trigger fuel cutoff at the bottom of a range, thrust reverser toggle, introduce dead zones along the axis, or split a single axis into multiple axes.
+
+Examples for gates include triggering a mode or setting up a state based on how a gate is crossed (directional) as well as bi-directional.
+
+
 <!-- TOC --><a name="map-to-mouse-ex-action"></a>
 # Map to mouse EX action
 
@@ -426,6 +1132,29 @@ It also adds a delay (pulse) function to hold a key down for a preset period of 
 
 The make/break/pulse behavior applies to all keys in the action, and the keys are released in the reverse order they were pressed.
 
+![](keyboard_mapper_ex.png)
+
+<!-- TOC --><a name="output-modes"></a>
+## Output modes
+
+| Mode     | Description |
+| ----------- | ----------- |
+| Hold | Keys will be pressed while the input is active, and released when the input is not.  The meaning of active depends on the input type.  For example, keys will be pressed while a joystick button is held down and will release when the button is released.  The input does not auto-repeat in this mode - only one make/break is sent for each latched key. |
+| Pulse | This mode triggers a press action, waits the pulse delay, and releases the keys.  This happens regardless of the input state.  If the input is pressed again while the pulse delay has not elapsed, the pulse is restarted.  In this mode, the keys are always released after the pulse delay.   Keep the pulse delay at or above 200ms as most game loops will fail to capture key presses under 200ms. |
+| Auto Repeat | This mode is similar to pulse mode, except the pulse will repeat while the input is held.  The interval specifies the time between pulses.  Set to 0 for no delay, keeping again in mind that most game loops will not detect key presses if they occur within 200ms of each other.|
+| Press | This mode triggers a press only (a "make" in keyboard hardware parlance).  This mode does not release the keys so it's expected at some point, the profile will release the keys.  Dragons: when used to send mouse clicks - it will keep the mouse pressed until the release which can cause behavior issues in the operating system.  Use with caution and only paired with a release mapping somewhere in the profile. Usually you can manually press the keys or the mouse to "undo" a press, provided that input is available (example F13 would not be).|
+| Release | Ths mode triggers a release only (a "break" in keyboard hardware parlance).  This is the companion action to the press mode. |
+
+
+<!-- TOC --><a name="latching"></a>
+## Latching
+
+This action can send very complex and unusual keys and mouse buttons, including keys that are not typically available on a regular keyboard like the F13 to F24 function keys.   The action can also combine unusual "latched" sequences such as pressing more than multiple keys and mouse buttons at once.
+
+<!-- TOC --><a name="numlock-behavior"></a>
+## Numlock behavior
+
+The keyboard behavior is hard-coded in the hardware to send duplicative scan codes depending on the state of the numlock key.  To avoid issues, GremlinEx automatically turns off numlock (if it was on) while the profile is running to ensure that the keyboard sends the correct and predictable scan codes.  This can be a challenge in some situations but was necessary to ensure the keyboard mapper sends consistent keystrokes and mouse buttons when the hardware, depending on the state of numlock, sends duplicate scan codes based on its mode.   This ensures that numeric keypad keystrokes all show up as numeric keypad.
 
 
 <!-- TOC --><a name="dragons"></a>
@@ -437,6 +1166,50 @@ Make sure that if you use a press action, there is a companion release action so
 
 When a key is pulsed, the release will occur regardless of input state or conditions.
 
+<!-- TOC --><a name="merged-axis-action"></a>
+# Merged Axis action
+
+This action is similar to the profile wide merged-axis functionality via the menu, with some key differences:
+
+- the action can be added to any joystick axis input
+- the action only sends its output to sub-actions it defines
+- the action includes an option to invert the output
+
+<!-- TOC --><a name="lower-and-upper-inputs"></a>
+## Lower and upper inputs
+
+The action lets you select two input operators from the list of axis input (physical or virtual) to participate in the merge operation.  While the same operator can be selected for both upper and lower entries, in this case nothing will happen but it does let you define sub-actions unique for that input if needed, which can be of use in some use-cases.
+
+The inputs can be associated with the hardware input mapping this action, however this is not a requirement.   The hardware input in this case is used as a placeholder to add a merge action to the profile, the only requirement is the action has to be added to an axis input.  The input of that hardware is not used in the merge operation unless the input specified in the action happens to be the same as the hardware input the action is mapped to.
+
+<!-- TOC --><a name="operations"></a>
+## Operations
+
+| Operation      | Description |
+| ----------- | ----------- |
+| Sum | The two axis inputs are added and clamped to -1.0 to +1.0 range |
+| Minimum | The smallest of the two inputs is output |
+| Maximum | The largest of the two inputs is output |
+| Average | The average value is used as the output - this is typically used to combine two axes into one for brake pedals for example  |
+
+<!-- TOC --><a name="invert"></a>
+## Invert
+
+The checkbox inverts the computed output.
+
+<!-- TOC --><a name="output"></a>
+## Output
+
+The output helps visualize the computed output while the profile is not running the computed output based on the live input.  When the profile starts, the updates are disabled.  The updates will resume when the profile is stopped.
+
+<!-- TOC --><a name="action-configuration"></a>
+## Action configuration
+
+The button opens a dialog showing the list of sub-containers and sub-actions that will receive the merged axis information and process it for mapping.
+
+The actions defined in this dialog are only executed for this action and will not be visible to other actions defined in the profile.
+
+Each merge axis action contains its own sets of sub-containers/sub-actions.
 
 
 <!-- TOC --><a name="range-container"></a>
@@ -454,7 +1227,7 @@ The Add button adds containers.  The add and replace button replaces all the ran
 
 The range container is designed to work with joystick buttons or the enhanced keyboard mapper (map to keyboard ex)
 
-<!-- TOC --><a name="ranges"></a>
+<!-- TOC --><a name="ranges-1"></a>
 ### Ranges
 
 All joystick axis values in JGex are -1.0 to +1.0 regardless of the device, with 0.0 being the center position.
@@ -470,7 +1243,7 @@ Each bracket can include or exclude the value.  Think of it as greater than, ver
 The symmetry option applies the opposite bracket as the trigger.  So if the bracket is (0.9 to 1.0), in symmetry mode the bracket (-1, -0.9) will also trigger if the axis is in that range.
 
 
-<!-- TOC --><a name="latching"></a>
+<!-- TOC --><a name="latching-1"></a>
 ### Latching
 
 The range container is latched - meaning that this special container is aware of other range containers in the execution graph.  The latching is automatic and ensures that when the axis is moved to a different position, prior active ranges reset so can re-trigger when the axis moves into their range again, so the container has to be aware of other ranges.
@@ -790,5 +1563,9 @@ If you want to run from the source code, you will need the following python pack
 	msgpack
 	reportlab
 	dill
-
+	mido
+	python-rtmidi
+	lxml
+	pyttsx3
+	qtawesome
 

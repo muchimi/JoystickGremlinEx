@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
+# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,10 +20,11 @@ import logging
 from PySide6 import QtWidgets, QtCore, QtGui
 
 import gremlin
-from . import common
+import gremlin.types
+from . import ui_common
+from gremlin.input_types import InputType
 
-
-class MergeAxisUi(common.BaseDialogUi):
+class MergeAxisUi(ui_common.BaseDialogUi):
 
     """Allows merging physical axes into a single virtual ones."""
 
@@ -56,11 +57,19 @@ class MergeAxisUi(common.BaseDialogUi):
             label.setMargin(10)
             self.main_layout.addWidget(label)
         else:
+            container_widget = QtWidgets.QWidget()
+            container_layout = QtWidgets.QHBoxLayout(container_widget)
+            container_layout.addStretch()
+            
             self.add_button = QtWidgets.QPushButton("New Axis")
             self.add_button.clicked.connect(self._add_entry)
 
+            container_layout.addWidget(self.add_button)
+            container_layout.addStretch()
+
+
             self.main_layout.addLayout(self.merge_layout)
-            self.main_layout.addWidget(self.add_button)
+            self.main_layout.addWidget(container_widget)
 
             self.from_profile()
 
@@ -98,11 +107,11 @@ class MergeAxisUi(common.BaseDialogUi):
             vjoy_sel = entry.vjoy_selector.get_selection()
             joy1_sel = entry.joy1_selector.get_selection()
             joy2_sel = entry.joy2_selector.get_selection()
-            mode_idx = entry.mode_selector.selector.currentIndex()
+            mode_idx = entry.mode_selector.currentIndex()
             operation_str = entry.operation_selector.currentText()
             self.profile_data.merge_axes.append({
                 "mode": entry.mode_selector.mode_list[mode_idx],
-                "operation": gremlin.common.MergeAxisOperation.to_enum(
+                "operation": gremlin.types.MergeAxisOperation.to_enum(
                     operation_str
                 ),
                 "vjoy": {
@@ -188,18 +197,18 @@ class MergeAxisEntry(QtWidgets.QDockWidget):
 
         # Selectors for both physical and virtual joystick axis for the
         # mapping selection
-        self.vjoy_selector = common.VJoySelector(
+        self.vjoy_selector = ui_common.VJoySelector(
             lambda x: change_cb(),
-            [gremlin.common.InputType.JoystickAxis],
+            [InputType.JoystickAxis],
             profile_data.settings.vjoy_as_input
         )
-        self.joy1_selector = common.JoystickSelector(
+        self.joy1_selector = ui_common.JoystickSelector(
             lambda x: change_cb(),
-            [gremlin.common.InputType.JoystickAxis]
+            [InputType.JoystickAxis]
         )
-        self.joy2_selector = common.JoystickSelector(
+        self.joy2_selector = ui_common.JoystickSelector(
             lambda x: change_cb(),
-            [gremlin.common.InputType.JoystickAxis]
+            [InputType.JoystickAxis]
         )
 
         # Operation selection
@@ -213,9 +222,19 @@ class MergeAxisEntry(QtWidgets.QDockWidget):
         )
 
         # Mode selection
-        self.mode_selector = gremlin.ui.common.ModeWidget()
+        self.mode_container_widget = QtWidgets.QWidget()
+        self.mode_container_layout = QtWidgets.QVBoxLayout(self.mode_container_widget)
+
+        self.mode_selector = gremlin.ui.ui_common.ModeWidget()
         self.mode_selector.populate_selector(profile_data)
-        self.mode_selector.mode_changed.connect(change_cb)
+        self.mode_selector.edit_mode_changed.connect(change_cb)
+        self.mode_selector.setShowModeEdit(False)
+        self.mode_selector.setShowProfileOptions(False)
+        self.mode_selector.setLabelText("Profile Mode:")
+
+        self.mode_container_layout.addStretch()
+        self.mode_container_layout.addWidget(self.mode_selector)
+        self.mode_container_layout.addStretch()
 
         # Assemble the complete ui
         self.main_layout.addWidget(
@@ -237,7 +256,7 @@ class MergeAxisEntry(QtWidgets.QDockWidget):
         self.main_layout.addWidget(self.joy2_selector, 1, 1)
         self.main_layout.addWidget(self.vjoy_selector, 1, 2)
         self.main_layout.addWidget(self.operation_selector, 1, 3)
-        self.main_layout.addWidget(self.mode_selector, 1, 4)
+        self.main_layout.addWidget(self.mode_container_widget, 1, 4)
 
     def closeEvent(self, event):
         """Emits the closed event when this widget is being closed.
@@ -254,7 +273,7 @@ class MergeAxisEntry(QtWidgets.QDockWidget):
         """
         try:
             self.vjoy_selector.set_selection(
-                gremlin.common.InputType.JoystickAxis,
+                InputType.JoystickAxis,
                 data["vjoy"]["vjoy_id"],
                 data["vjoy"]["axis_id"]
             )
@@ -271,22 +290,22 @@ class MergeAxisEntry(QtWidgets.QDockWidget):
         joy2_id = data["upper"]["device_guid"]
 
         self.joy1_selector.set_selection(
-            gremlin.common.InputType.JoystickAxis,
+            InputType.JoystickAxis,
             joy1_id,
             data["lower"]["axis_id"]
         )
         self.joy2_selector.set_selection(
-            gremlin.common.InputType.JoystickAxis,
+            InputType.JoystickAxis,
             joy2_id,
             data["upper"]["axis_id"]
         )
         if data["mode"] in self.mode_selector.mode_list:
-            self.mode_selector.selector.setCurrentIndex(
+            self.mode_selector.setCurrentIndex(
                 self.mode_selector.mode_list.index(data["mode"])
             )
 
         self.operation_selector.setCurrentText(
-            gremlin.common.MergeAxisOperation.to_string(
+            gremlin.types.MergeAxisOperation.to_string(
                 data["operation"]
             ).capitalize()
         )

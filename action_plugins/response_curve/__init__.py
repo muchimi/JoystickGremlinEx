@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
+# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,13 +21,19 @@ import logging
 import os
 import time
 from PySide6 import QtCore, QtGui, QtWidgets
-from xml.etree import ElementTree
+from lxml import etree as ElementTree
 
 import gremlin
-from gremlin.base_classes import AbstractAction, AbstractFunctor
-from gremlin.common import InputType
-from gremlin.ui.common import DualSlider, DynamicDoubleSpinBox
+import gremlin.base_profile
+import gremlin.config
+import gremlin.event_handler
+from gremlin.input_types import InputType
+import gremlin.joystick_handling
+from gremlin.ui.ui_common import DynamicDoubleSpinBox, DualSlider, get_text_width
 import gremlin.ui.input_item
+import gremlin.util
+import gremlin.shared_state
+
 
 g_scene_size = 250.0
 
@@ -38,6 +44,24 @@ class SymmetryMode(enum.Enum):
 
     NoSymmetry = 1
     Diagonal = 2
+
+    @staticmethod
+    def to_string(value):
+        return _symmetry_mode_to_string[value]
+    
+    @staticmethod
+    def to_enum(value):
+        return _symmetry_mode_to_enum[value]
+
+_symmetry_mode_to_string = {
+    SymmetryMode.NoSymmetry: "none",
+    SymmetryMode.Diagonal: "diagonal"
+}
+
+_symmetry_mode_to_enum = {
+    "none" : SymmetryMode.NoSymmetry,
+    "diagonal" : SymmetryMode.Diagonal
+}
 
 
 class Point2D:
@@ -527,6 +551,38 @@ class CubicBezierSplineModel(AbstractCurveModel):
                 )
 
 
+
+
+class DataPointGraphicsItem(QtWidgets.QGraphicsEllipseItem):
+
+    """UI Item representing a data point center of a control point."""
+
+    def __init__(self, x, y, parent=None):
+        """Creates a new instance.
+
+        :param control_point the control point this element visualizes
+        :param parent the parent of this widget
+        """
+        super().__init__(-6, -6, 12, 12, parent)
+
+        self.x = x
+        self.y = y
+
+        self.setPos(x, y)
+            
+        self.setZValue(3)
+        self.setBrush(QtGui.QBrush(QtCore.Qt.red))
+
+    def update(self, x, y):
+        self.x = x
+        self.y = y
+        self.redraw()
+
+
+    def redraw(self):
+        """Forces a position update of the ui element."""
+        self.setPos(self.x, self.y)
+
 class ControlPointGraphicsItem(QtWidgets.QGraphicsEllipseItem):
 
     """UI Item representing the center of a control point."""
@@ -678,7 +734,7 @@ class CurveView(QtWidgets.QGraphicsScene):
 
     """Visualization of the entire curve editor UI element."""
 
-    def __init__(self, curve_model, point_editor, parent=None):
+    def __init__(self, curve_model, point_editor, show_input_axis = False, parent=None):
         """Creates a new instance.
 
         :param curve_model the model to visualize
@@ -690,7 +746,7 @@ class CurveView(QtWidgets.QGraphicsScene):
         self.model.content_modified.connect(self.redraw_scene)
         self.model.content_added.connect(self._populate_from_model)
         self.point_editor = point_editor
-        from gremlin.common import load_image
+        from gremlin.util import load_image
 
         self.background_image = load_image("response_curve/grid.svg")
 
@@ -698,7 +754,9 @@ class CurveView(QtWidgets.QGraphicsScene):
         self.point_editor.x_input.valueChanged.connect(self._editor_update)
         self.point_editor.y_input.valueChanged.connect(self._editor_update)
 
+        self.show_input_axis = show_input_axis
         self.current_item = None
+        self.tracker = None
         self._populate_from_model()
 
     def _populate_from_model(self):
@@ -713,6 +771,11 @@ class CurveView(QtWidgets.QGraphicsScene):
 
         for cp in self.model.get_control_points():
             self.addItem(ControlPointGraphicsItem(cp))
+
+        if self.show_input_axis:
+            self.tracker = DataPointGraphicsItem(0,0)
+            self.addItem(self.tracker)
+        
         self.redraw_scene()
 
     def add_control_point(self, point, handles=()):
@@ -790,6 +853,7 @@ class CurveView(QtWidgets.QGraphicsScene):
                 self.point_editor.set_values(
                     self.current_item.control_point.center
                 )
+
 
     def mousePressEvent(self, evt):
         """Informs the model about point selection if a point is clicked.
@@ -875,6 +939,7 @@ class ControlPointEditorWidget(QtWidgets.QWidget):
         self.main_layout.addWidget(self.x_input)
         self.main_layout.addWidget(self.y_label)
         self.main_layout.addWidget(self.y_input)
+        self.main_layout.addStretch()
 
     def set_values(self, point):
         """Sets the values in the input fields to those of the provided point.
@@ -1049,10 +1114,80 @@ class ResponseCurveWidget(gremlin.ui.input_item.AbstractActionWidget):
         super().__init__(action_data, parent=parent)
 
         self.is_inverted = False
-        self.symmetry_mode_on = False
+        self.action_data = action_data
+
+        
+        if action_data.show_input_axis:
+            # hook the hardware input so we can see it on the curve
+            el = gremlin.event_handler.EventListener()
+            el.joystick_event.connect(self._joystick_handler)
+
+
+    def _update_value(self, value):
+        ''' updates dot on the curve based on the value -1 to +1 '''
+        curve_value = gremlin.joystick_handling.scale_to_range(value, target_min = -g_scene_size, target_max= +g_scene_size+1)  # value on the curve by pixel x
+    
+        ''' draw the current value on the curve '''
+        curve_fn = self.curve_model.get_curve_function()
+        if curve_fn:
+            # get the position of the marker
+            x = curve_value
+            y = -g_scene_size * curve_fn(x / g_scene_size)
+            #print(f"{x} {y}")
+            self.curve_scene.tracker.update(x,y)
+
+            self.input_raw_widget.setText(f"{value:0.3f}")
+            curved = curve_fn(value)
+            self.input_curved_widget.setText(f"{curved:0.3f}")
+
+
+    def _joystick_handler(self, event):
+        ''' handles joystick input '''
+
+        if not event.is_axis:
+            # ignore if not an axis event
+            return
+        
+        if gremlin.shared_state.is_running:
+            # not running
+            return
+
+        if self.action_data.hardware_device_guid != event.device_guid:
+            # ignore if a different input device
+            return
+            
+        if self.action_data.hardware_input_id != event.identifier:
+            # ignore if a different input axis on the input device
+            return
+        
+        if self.curve_scene.tracker is None:
+            return
+
+        value = gremlin.joystick_handling.scale_to_range(event.raw_value, source_min = -32767, source_max = 32767) # -1 to 1 value
+        self._update_value(value)
+       
+  
+    @QtCore.Slot()
+    def profile_start(self):
+        # listen to hardware events
+        if self.action_data.show_axis_input:
+            el = gremlin.event_handler.EventListener()
+            el.joystick_event.disconnect(self._joystick_event_cb)
+
+    @QtCore.Slot()
+    def profile_stop(self):
+        # listen to hardware events
+        if self.action_data.show_axis_input:
+            el = gremlin.event_handler.EventListener()
+            el.joystick_event.connect(self._joystick_event_cb)
 
     def _create_ui(self):
         """Creates the required UI elements."""
+
+
+        self.container_options_widget = QtWidgets.QWidget()
+        self.container_options_layout = QtWidgets.QHBoxLayout(self.container_options_widget)
+
         # Dropdown menu for the different curve types
         self.curve_type_selection = QtWidgets.QComboBox()
         self.curve_type_selection.addItem("Cubic Spline")
@@ -1062,27 +1197,27 @@ class ResponseCurveWidget(gremlin.ui.input_item.AbstractActionWidget):
         )
 
         # Curve manipulation options
-        self.curve_settings_layout = QtWidgets.QHBoxLayout()
-        self.curve_settings_layout.addWidget(QtWidgets.QLabel("Curve Type:"))
-        self.curve_settings_layout.addWidget(self.curve_type_selection)
-        self.curve_settings_layout.addStretch(1)
+        
+        
+        self.container_options_layout.addWidget(QtWidgets.QLabel("Curve Type:"))
+        self.container_options_layout.addWidget(self.curve_type_selection)
+
+        
 
         # Curve inversion
         self.curve_inversion = QtWidgets.QPushButton("Invert")
         self.curve_inversion.clicked.connect(self._invert_curve)
-        self.curve_settings_layout.addWidget(self.curve_inversion)
+        self.container_options_layout.addWidget(self.curve_inversion)
 
         # Curve symmetry
         self.curve_symmetry = QtWidgets.QCheckBox("Diagonal Symmetry")
-        self.curve_symmetry.stateChanged.connect(self._curve_symmetry_cb)
-        self.curve_settings_layout.addWidget(self.curve_symmetry)
+        self.curve_symmetry.setChecked(self.action_data.symmetry_mode == SymmetryMode.Diagonal)
+        self.curve_symmetry.clicked.connect(self._curve_symmetry_cb)
+        self.container_options_layout.addWidget(self.curve_symmetry)
 
-        # Handle symmetry
-        self.handle_symmetry = None
-        if self.action_data.mapping_type == "cubic-bezier-spline":
-            self.handle_symmetry = QtWidgets.QCheckBox("Force smooth curves")
-            self.handle_symmetry.stateChanged.connect(self._handle_symmetry_cb)
-            self.curve_settings_layout.addWidget(self.handle_symmetry)
+        
+
+      
 
         # Create all objects required for the response curve UI
         self.control_point_editor = ControlPointEditorWidget()
@@ -1093,10 +1228,45 @@ class ResponseCurveWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.curve_model = CubicBezierSplineModel(self.action_data)
         else:
             raise gremlin.error.ProfileError("Invalid curve type")
+        
+        # mode
+        self.curve_model.set_symmetry_mode(self.action_data.symmetry_mode)
+
+
+          # Handle symmetry
+        self.handle_symmetry = QtWidgets.QCheckBox("Force smooth curves")
+        
+        if self.action_data.mapping_type == "cubic-bezier-spline":
+            self.handle_symmetry.setChecked(self.curve_model.handle_symmetry_enabled)
+            self.handle_symmetry.stateChanged.connect(self._handle_symmetry_cb)
+        else:
+            self.handle_symmetry.setVisible(False)
+
+        self.container_options_layout.addWidget(self.handle_symmetry)
+
+        self.container_options_layout.addStretch()
+
+        # input repeater
+        if self.action_data.show_input_axis:
+            width = get_text_width("M") * 8
+
+            self.input_raw_widget = QtWidgets.QLineEdit()
+            self.input_raw_widget.setMaximumWidth(width)
+            self.input_raw_widget.setReadOnly(True)
+            self.input_curved_widget = QtWidgets.QLineEdit()
+            self.input_curved_widget.setMaximumWidth(width)
+            self.input_curved_widget.setReadOnly(True)
+            
+            self.container_options_layout.addWidget(QtWidgets.QLabel("Input:"))
+            self.container_options_layout.addWidget(self.input_raw_widget)
+            self.container_options_layout.addWidget(QtWidgets.QLabel("Curved:"))
+            self.container_options_layout.addWidget(self.input_curved_widget)
+
         # Graphical curve editor
         self.curve_scene = CurveView(
             self.curve_model,
-            self.control_point_editor
+            self.control_point_editor,
+            self.action_data.show_input_axis
         )
 
         # Create view displaying the curve scene
@@ -1109,7 +1279,7 @@ class ResponseCurveWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.deadzone = DeadzoneWidget(self.action_data)
 
         # Add all widgets to the layout
-        self.main_layout.addLayout(self.curve_settings_layout)
+        self.main_layout.addWidget(self.container_options_widget)
         self.main_layout.addLayout(self.curve_view_layout)
         self.main_layout.addWidget(self.control_point_editor)
         self.main_layout.addWidget(self.deadzone_label)
@@ -1139,6 +1309,11 @@ class ResponseCurveWidget(gremlin.ui.input_item.AbstractActionWidget):
             self._change_curve_type
         )
 
+        # update the joystick input
+        if self.action_data.show_input_axis:
+            value = gremlin.joystick_handling.get_axis(self.action_data.hardware_device_guid, self.action_data.hardware_input_id)
+            self._update_value(value)
+
     def _change_curve_type(self, curve_type):
         """Changes the type of curve used.
 
@@ -1164,29 +1339,32 @@ class ResponseCurveWidget(gremlin.ui.input_item.AbstractActionWidget):
         # Update curve settings UI
         if self.action_data.mapping_type == "cubic-spline":
             if self.handle_symmetry is not None:
-                self.handle_symmetry.hide()
+                self.handle_symmetry.setVisible(False)
                 self.handle_symmetry = None
         elif self.action_data.mapping_type == "cubic-bezier-spline":
-            if self.handle_symmetry is None:
-                self.handle_symmetry = QtWidgets.QCheckBox("Force smooth curves")
-                self.handle_symmetry.stateChanged.connect(
-                    self._handle_symmetry_cb
-                )
-                self.curve_settings_layout.addWidget(self.handle_symmetry)
+            self.handle_symmetry.setVisible(True)
+            self.handle_symmetry.stateChanged.connect(
+                self._handle_symmetry_cb
+            )
+            
         self.curve_symmetry.setChecked(False)
 
         # Recreate the UI components
         self.curve_scene = CurveView(
             self.curve_model,
-            self.control_point_editor
+            self.control_point_editor,
+            self.action_data.show_input_axis
         )
         self.curve_view = QtWidgets.QGraphicsView(self.curve_scene)
         self._configure_response_curve_view()
 
-    def _curve_symmetry_cb(self, state):
-        if state == QtCore.Qt.Checked:
+    @QtCore.Slot(bool)
+    def _curve_symmetry_cb(self, checked):
+        if checked:
+            self.action_data.symmetry_mode = SymmetryMode.Diagonal
             self.curve_model.set_symmetry_mode(SymmetryMode.Diagonal)
         else:
+            self.action_data.symmetry_mode = SymmetryMode.NoSymmetry
             self.curve_model.set_symmetry_mode(SymmetryMode.NoSymmetry)
 
         self.curve_scene.redraw_scene()
@@ -1211,7 +1389,7 @@ class ResponseCurveWidget(gremlin.ui.input_item.AbstractActionWidget):
             2*g_scene_size,
             2*g_scene_size
         ))
-        gremlin.ui.common.clear_layout(self.curve_view_layout)
+        gremlin.ui.ui_common.clear_layout(self.curve_view_layout)
         self.curve_view_layout.addStretch()
         self.curve_view_layout.addWidget(self.curve_view)
         self.curve_view_layout.addStretch()
@@ -1220,7 +1398,7 @@ class ResponseCurveWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.curve_model.invert()
 
 
-class ResponseCurveFunctor(AbstractFunctor):
+class ResponseCurveFunctor(gremlin.base_profile.AbstractFunctor):
 
     def __init__(self, action):
         super().__init__(action)
@@ -1241,10 +1419,11 @@ class ResponseCurveFunctor(AbstractFunctor):
 
     def process_event(self, event, value):
         value.current = self.response_fn(self.deadzone_fn(value.current))
+        # print ("response curve")
         return True
 
 
-class ResponseCurve(AbstractAction):
+class ResponseCurve(gremlin.base_profile.AbstractAction):
 
     """Represents axis response curve mapping."""
 
@@ -1252,6 +1431,8 @@ class ResponseCurve(AbstractAction):
     tag = "response-curve"
 
     default_button_activation = (True, True)
+    
+    # override allowed input if different from default
     input_types = [
         InputType.JoystickAxis
     ]
@@ -1270,10 +1451,13 @@ class ResponseCurve(AbstractAction):
         :param parent the parent profile.InputItem of this instance
         """
         super().__init__(parent)
+        self.parent = parent
         self.deadzone = [-1, 0, 0, 1]
         self.sensitivity = 1.0
         self.mapping_type = "cubic-spline"
         self.control_points = [(-1.0, -1.0), (1.0, 1.0)]
+        self.symmetry_mode = SymmetryMode.NoSymmetry
+        self.show_input_axis = gremlin.config.Configuration().show_input_axis
 
     def icon(self):
         """Returns the icon representing the action."""
@@ -1291,6 +1475,12 @@ class ResponseCurve(AbstractAction):
 
         :param node the XML node to parse
         """
+
+        if "mode" in node.attrib:
+            mode = node.get("mode")
+            self.symmetry_mode = SymmetryMode.to_enum(mode)
+
+
         self.control_points = []
         for child in node:
             if child.tag == "deadzone":
@@ -1309,12 +1499,15 @@ class ResponseCurve(AbstractAction):
                         float(point.get("y"))
                     ))
 
+
     def _generate_xml(self):
         """Generates a XML node corresponding to this object.
 
         :return XML node representing the object's data
         """
         node = ElementTree.Element("response-curve")
+        node.set("mode", SymmetryMode.to_string(self.symmetry_mode))
+
         # Response curve mapping
         if len(self.control_points) > 0:
             mapping_node = ElementTree.Element("mapping")

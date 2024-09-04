@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (C) 2015 - 2019 Lionel Ott - Modified by Muchimi (C) EMCS 2024 and other contributors
+# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -122,10 +122,11 @@ class ContainerPlugins:
 
     def _discover_plugins(self):
         """Processes known plugin folders for action plugins."""
+        import gremlin.shared_state
         plugin_folder = "container_plugins"
-        root_path = get_root_path()
+        root_path = gremlin.shared_state.root_path
         walk_path = os.path.join(root_path, plugin_folder)
-        log_sys(f"Container plugin folder: {walk_path}")
+        log_sys(f"Using container plugin folder: {walk_path}")
         if not os.path.isdir(walk_path):
             raise error(f"Unable to find container plugins: {walk_path}")
         
@@ -144,7 +145,7 @@ class ContainerPlugins:
                     )
                     if "version" in plugin.__dict__:
                         self._plugins[plugin.name] = plugin.create
-                        log_sys(f"Loaded container plugin: {plugin.name}"
+                        log_sys(f"\tLoaded container plugin: {plugin.name}"
                         )
                     else:
                         del plugin
@@ -152,7 +153,7 @@ class ContainerPlugins:
                     # Log an error and ignore the action_plugins if
                     # anything is wrong with it
                     logging.getLogger("system").warning(
-                        f"Loading container_plugins '{fname}' failed due to: {e}"
+                        f"\tLoading container_plugins '{fname}' failed due to: {e}"
                     )
 
     def _create_maps(self):
@@ -165,13 +166,14 @@ class ContainerPlugins:
         ''' duplicates a container '''
         # because containers can be quite complex - we'll just generate the xml and change IDs as needed and reload
         # into a new container of the same type
-        from gremlin.base_classes import AbstractContainer
+        from gremlin.base_profile import AbstractContainer
+        from gremlin.util import get_guid
         assert isinstance(container, AbstractContainer),"Invalid container data for duplicate()"
         container_item = copy.deepcopy(container)
 
         for action_set in container_item.get_action_sets():
             for action in action_set:
-                action.action_id = common.get_guid()
+                action.action_id = get_guid()
         
         return container_item
 
@@ -248,13 +250,10 @@ class ActionPlugins:
 
     def _create_type_action_map(self):
         """Creates a lookup table from input types to available actions."""
-        self._type_to_action_map = {
-            common.InputType.JoystickAxis: [],
-            common.InputType.JoystickButton: [],
-            common.InputType.JoystickHat: [],
-            common.InputType.Keyboard: []
-        }
-
+        self._type_to_action_map = {}
+        for input_type in common.InputType.to_list():
+            self._type_to_action_map[input_type] = []
+        
         for entry in self._plugins.values():
             for input_type in entry.input_types:
                 self._type_to_action_map[input_type].append(entry)
@@ -267,10 +266,11 @@ class ActionPlugins:
 
     def _discover_plugins(self):
         """Processes known plugin folders for action plugins."""
+        import gremlin.shared_state
         plugin_folder = "action_plugins"
-        root_path = get_root_path()
+        root_path = gremlin.shared_state.root_path
         walk_path = os.path.join(root_path, plugin_folder)
-        log_sys(f"Action plugin folder: {walk_path}")
+        log_sys(f"Using action plugin folder: {walk_path}")
         if not os.path.isdir(walk_path):
             raise error(f"Unable to find action_plugins: {walk_path}")
         
@@ -288,18 +288,20 @@ class ActionPlugins:
                     )
                     if "version" in plugin.__dict__:
                         self._plugins[plugin.name] = plugin.create
-                        log_sys(f"Loaded action plugin: {plugin.name}")
+                        log_sys(f"\tLoaded action plugin: {plugin.name}")
                     else:
                         del plugin
                 except Exception as e:
                     # Log an error and ignore the action_plugins if
                     # anything is wrong with it
-                    log_sys_warn(f"Loading action_plugins '{root.split("\\")[-1]}' failed due to: {e}")
+                    log_sys_warn(f"\tLoading action_plugins '{root.split("\\")[-1]}' failed due to: {e}")
 
 
     def duplicate(self, action):
         ''' duplicates an action and gives it a unique ID '''
+        from gremlin.util import get_guid
         dup = copy.deepcopy(action)
-        dup.action_id = common.get_guid()
+        dup.parent = action.parent
+        dup.action_id = get_guid()
         return dup
     
