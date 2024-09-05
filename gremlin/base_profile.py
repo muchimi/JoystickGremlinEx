@@ -627,7 +627,7 @@ class Device:
 
 class InputItem():
 
-    """Represents a single input item such as a button or axis."""
+    """Represents a single input item such as a button or axis, containers and parameters/options associated with that input mapping """
 
     def __init__(self, parent = None):
         """Creates a new InputItem instance.
@@ -641,7 +641,7 @@ class InputItem():
         self._name = None # device name
         self._input_id = None # input Id on the hardware
         self.always_execute = False
-        self.description = ""
+        self._description = ""
         #self._containers = base_classes.TraceableList(callback = self._container_change_cb) # container
         self._containers = []
         self._selected = False # true if the item is selected
@@ -664,17 +664,24 @@ class InputItem():
                 
       
 
-    # def __getstate__(self) -> object:
-    #     # eliminate the parent from serialization
-    #     state = self.__dict__.copy()
-    #     del state['parent'] # remove circular reference
-    #     return state
+    @property
+    def description(self):
+        if not self._description:
+            # see if there is a container
+            if self.containers:
+                for container in self.containers:
+                    if container.action_sets:
+                        action_list = container.action_sets[0]
+                        if action_list:
+                            action = action_list[0]
+                            if hasattr(action, "display_name"):
+                                return action.display_name()
+
+        return self._description
     
-    # def __setstate__(self, state):
-    #     self.__dict__.update(state)
-    #     self.parent = None
-
-
+    @description.setter
+    def description(self, value):
+        return self._description
 
     @property
     def selected(self):
