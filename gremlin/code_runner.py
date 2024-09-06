@@ -372,7 +372,7 @@ class CodeRunner:
                 self.event_handler.process_event
             )
 
-            # hook joystick input events 
+            # hook joystick input events
             evt_listener.joystick_event.connect(
                 self.event_handler.process_event
             )
@@ -412,7 +412,7 @@ class CodeRunner:
             gremlin.input_devices.remote_server.start()
             gremlin.input_devices.remote_client.start()
 
-            # listen to MIDI 
+            # listen to MIDI
             if config.midi_enabled:
                 gremlin.input_devices.midi_client.start()
 
@@ -436,16 +436,17 @@ class CodeRunner:
 
             # call start functions
             gremlin.input_devices.start_registry.start()
-            gremlin.input_devices.periodic_registry.start()     
+            gremlin.input_devices.periodic_registry.start()
 
 
 
             gremlin.macro.MacroManager().start()
+            verbose = gremlin.config.Configuration().verbose
 
             # determine the profile start mode
             mode = start_mode
             if config.restore_profile_mode_on_start or profile.get_restore_mode():
-                # restore the profile mode 
+                # restore the profile mode
                 if verbose:
                     logging.getLogger("system").error(f"Restore last active profile mode: '{mode}'")
                 mode = profile.get_last_mode()
@@ -461,7 +462,7 @@ class CodeRunner:
 
             if not mode in mode_list:
                 logging.getLogger("system").error(f"Unable to select startup mode: '{mode}' no longer exists")
-            else:                
+            else:
                 if verbose:
                     logging.getLogger("system").info(f"Using profile start mode: '{mode}'")
                 self.event_handler.change_mode(mode)
@@ -523,7 +524,7 @@ class CodeRunner:
         
         # reset functor latching
         container_plugins = gremlin.plugin_manager.ContainerPlugins()
-        container_plugins.reset_functors()        
+        container_plugins.reset_functors()
 
         # Disconnect all signals
 

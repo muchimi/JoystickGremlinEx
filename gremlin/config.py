@@ -209,7 +209,7 @@ class Configuration:
         self._data["initial_load_mode_tts"] = value
         self.save()
 
-    @property 
+    @property
     def runtime_ui_update(self):
         ''' if set, JGEX will update the UI when a profile is activated '''
         return self._data.get("runtime_ui_update", False)
@@ -591,7 +591,7 @@ class Configuration:
             self._data["allow_remote_control"] = value
             self.save()
 
-    @property 
+    @property
     def enable_remote_broadcast(self):
         ''' enables gremlin to broadcast control changes over UDP multicast '''
         return self._data.get("enable_remote_broadcast",False)
@@ -925,12 +925,12 @@ class Configuration:
     def verbose_set_mode(self, mode, enabled):
         ''' enables the specified verbose mode '''
         if not "verbose_mode" in self._data:
-            self._data["verbose_mode"] = 0 # none 
+            self._data["verbose_mode"] = 0 # none
         value = self._data["verbose_mode"]
         if enabled:
             value |= mode
         else:
-            value = value & ~mode 
+            value = value & ~mode
         self.verbose_mode = value
         
 
@@ -944,22 +944,22 @@ class Configuration:
     @property
     def verbose_mode_joystick(self):
         ''' true if verbose mode is in joystick mode '''
-        return self.verbose and VerboseMode.Joystick in self.verbose_mode 
+        return self.verbose and VerboseMode.Joystick in self.verbose_mode
     
     @property
     def verbose_mode_inputs(self):
         ''' true if verbose mode is in inputs mode '''
-        return self.verbose and VerboseMode.Inputs in self.verbose_mode     
+        return self.verbose and VerboseMode.Inputs in self.verbose_mode
 
     @property
     def verbose_mode_mouse(self):
         ''' true if verbose mode is in inputs mode '''
-        return self.verbose and VerboseMode.Mouse in self.verbose_mode     
+        return self.verbose and VerboseMode.Mouse in self.verbose_mode
     
     @property
     def verbose_mode_details(self):
         ''' true if verbose mode is in inputs mode '''
-        return self.verbose and VerboseMode.Details in self.verbose_mode     
+        return self.verbose and VerboseMode.Details in self.verbose_mode
 
     @property
     def verbose_mode_simconnect(self):
@@ -1064,7 +1064,7 @@ class Configuration:
         return self._data.get("last_sound_folder",None)
     @last_sound_folder.setter
     def last_sound_folder(self, value):
-        self._data["last_sound_folder"] = value 
+        self._data["last_sound_folder"] = value
         self.save()
            
     @property
@@ -1074,7 +1074,7 @@ class Configuration:
     
     @partial_plugin_save.setter
     def partial_plugin_save(self, value):
-        self._data["partial_plugin_init_ok"] = value 
+        self._data["partial_plugin_init_ok"] = value
         self.save()
 
 
@@ -1085,7 +1085,7 @@ class Configuration:
     
     @runtime_ui_active.setter
     def runtime_ui_active(self, value):
-        self._data["runtime_ui_active"] = value 
+        self._data["runtime_ui_active"] = value
         self.save()
 
     @property
@@ -1095,7 +1095,21 @@ class Configuration:
     
     @sync_last_selection.setter
     def sync_last_selection(self, value):
-        self._data["sync_last_selection"] = value 
+        self._data["sync_last_selection"] = value
         self.save()
         
 
+    @property
+    def last_keyboard_mapper_pulse_value(self):
+        return self._data.get("last_keyboard_mapper_pulse_value", 250)
+    @last_keyboard_mapper_pulse_value.setter
+    def last_keyboard_mapper_pulse_value(self, value):
+        self._data["last_keyboard_mapper_pulse_value"] = value
+
+
+    @property
+    def last_keyboard_mapper_interval_value(self):
+        return self._data.get("last_keyboard_mapper_interval_value", 250)
+    @last_keyboard_mapper_interval_value.setter
+    def last_keyboard_mapper_interval_value(self, value):
+        self._data["last_keyboard_mapper_interval_value"] = value

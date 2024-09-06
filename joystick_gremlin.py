@@ -103,7 +103,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.14ex (m19)"
+APPLICATION_VERSION = "13.40.14ex (m21)"
 
 # the main ui
 ui = None
@@ -167,6 +167,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                 
         eh = gremlin.event_handler.EventHandler()
         eh.mode_changed.connect(self._update_mode_change)
+        eh.mode_status_update.connect(self._update_mode_status_bar)
 
 
 
@@ -1887,6 +1888,8 @@ class GremlinUi(QtWidgets.QMainWindow):
                 remote_msg = "<font color=\"red\">Disabled</font>"
 
             self.status_bar_is_active.setText(f"<b>Status:</b> {text_running} <b>Local Control</b> {local_msg} <b>Broadcast:</b> {remote_msg}")
+            self._update_mode_status_bar()
+
         except e:
             log_sys_error(f"Unable to update status bar event: {event}")
             log_sys_error(e)
@@ -1894,6 +1897,25 @@ class GremlinUi(QtWidgets.QMainWindow):
     def _update_mode_change(self, new_mode):
         self._update_ui_mode(new_mode)
         self._mode_configuration_changed(new_mode)
+
+    def _update_mode_status_bar(self):
+        ''' updates the mode status bar with current runtime and edit modes '''
+        try:
+            
+            is_running = gremlin.shared_state.is_running
+            runtime_mode = gremlin.shared_state.runtime_mode
+            edit_mode = gremlin.shared_state.edit_mode
+
+            msg = f"<b>Runtime Mode:</b> {runtime_mode if runtime_mode else "n/a"}"
+            if not is_running:
+                msg += f" <b>Edit Mode:</b> {edit_mode if edit_mode else "n/a"}"
+
+            self.status_bar_mode.setText(msg)
+            if self.config.mode_change_message:
+                self.ui.tray_icon.showMessage(f"Runtime Mode: {runtime_mode if runtime_mode else "n/a"} Edit mode: {edit_mode if edit_mode else "n/a"}","",QtWidgets.QSystemTrayIcon.MessageIcon.NoIcon,250)
+        except Exception as err:
+            log_sys_error(f"Unable to update status bar mode:\n{err}")
+
 
     def _update_ui_mode(self, new_mode):
         """ called when the profile mode changes
@@ -1914,24 +1936,27 @@ class GremlinUi(QtWidgets.QMainWindow):
                         tab.set_mode(new_mode)
                 # select the last input after mode change
                 self._select_last_input()
+
+            self._update_mode_status_bar()
             gremlin.util.popCursor()
 
-        
-        # update the status bar on mode change
-        try:
             
-            runtime_mode = gremlin.shared_state.runtime_mode
-            edit_mode = gremlin.shared_state.edit_mode
+        
+        # # update the status bar on mode change
+        # try:
+            
+        #     runtime_mode = gremlin.shared_state.runtime_mode
+        #     edit_mode = gremlin.shared_state.edit_mode
 
-            msg = f"<b>Runtime Mode:</b> {runtime_mode if runtime_mode else "n/a"}"
-            if not is_running:
-                msg += f" <b>Edit Mode:</b> {edit_mode if edit_mode else "n/a"}"
+        #     msg = f"<b>Runtime Mode:</b> {runtime_mode if runtime_mode else "n/a"}"
+        #     if not is_running:
+        #         msg += f" <b>Edit Mode:</b> {edit_mode if edit_mode else "n/a"}"
 
-            self.status_bar_mode.setText(msg)
-            if self.config.mode_change_message:
-                self.ui.tray_icon.showMessage(f"Mode: {new_mode if new_mode else "n/a"}","",QtWidgets.QSystemTrayIcon.MessageIcon.NoIcon,250)
-        except Exception as err:
-            log_sys_error(f"Unable to update status bar mode: {new_mode}:\n{err}")
+        #     self.status_bar_mode.setText(msg)
+        #     if self.config.mode_change_message:
+        #         self.ui.tray_icon.showMessage(f"Mode: {new_mode if new_mode else "n/a"}","",QtWidgets.QSystemTrayIcon.MessageIcon.NoIcon,250)
+        # except Exception as err:
+        #     log_sys_error(f"Unable to update status bar mode: {new_mode}:\n{err}")
 
 
     def _kb_event_cb(self, event):
@@ -2238,6 +2263,7 @@ class GremlinUi(QtWidgets.QMainWindow):
     def _modes_changed(self):
         ''' called when mode list has changed '''
         self.mode_selector.populate_selector(gremlin.shared_state.current_profile, gremlin.shared_state.current_mode)
+        self._update_mode_status_bar()
 
     def _mode_configuration_changed(self, new_mode = None):
         """Updates the mode configuration of the selector and profile."""

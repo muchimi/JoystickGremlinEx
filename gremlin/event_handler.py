@@ -651,6 +651,7 @@ class EventHandler(QtCore.QObject):
 	
 	mode_changed = QtCore.Signal(str) # Signal emitted when the mode is changed at design time
 	runtime_mode_changed = QtCore.Signal(str)  # mode change specific to runtime
+	mode_status_update = QtCore.Signal() # tell the UI to update the mode status bar
 
 	# signal emitted when the profile is changed
 	profile_changed = QtCore.Signal(str)
@@ -1081,6 +1082,8 @@ class EventHandler(QtCore.QObject):
 				if emit:
 					self.mode_changed.emit(self.edit_mode)
 
+		# update the status bar
+		self.mode_status_update.emit()
 
 
 	def resume(self):

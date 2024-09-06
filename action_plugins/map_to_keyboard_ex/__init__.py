@@ -23,8 +23,11 @@ from PySide6 import QtWidgets, QtCore, QtGui
 import gremlin.base_profile
 
 import gremlin.config
+import gremlin.config
+import gremlin.config
 from gremlin.input_types import InputType
 from gremlin.input_devices import ButtonReleaseActions
+import gremlin.config
 import gremlin.macro
 import gremlin.shared_state
 import gremlin.ui.ui_common
@@ -251,18 +254,25 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _delay_changed(self):
         self.action_data.delay = self.delay_box.value()
+        
 
     def _autorepeat_changed(self):
         self.action_data.autorepeat_delay = self.autorepeat_delay_box.value()
+        
 
     def _quarter_sec_delay(self):
         self.delay_box.setValue(250)
+        
 
     def _half_sec_delay(self):
         self.delay_box.setValue(500)
+        
 
     def _sec_delay(self):
         self.delay_box.setValue(1000)
+        
+
+
 
     def _record_keys_cb(self):
         """Prompts the user to press the desired key combination."""
@@ -435,9 +445,35 @@ class MapToKeyboardEx(gremlin.base_profile.AbstractAction):
         self.parent = parent
         self.keys = []
         self.mode = KeyboardOutputMode.Both
-        self.delay = 250 # delay between make/break in milliseconds
-        self.autorepeat_delay = 250 # delay between autorepeats in milliseconds
+        config = gremlin.config.Configuration()
+        self._delay = config.last_keyboard_mapper_pulse_value # delay between make/break in milliseconds
+        self._autorepeat_delay = config.last_keyboard_mapper_interval_value # delay between autorepeats in milliseconds
 
+    @property
+    def delay(self):
+        return self._delay
+    @delay.setter
+    def delay(self, value):
+        if value < 0:
+            value = 0
+        self._delay = value
+        gremlin.config.Configuration().last_keyboard_mapper_pulse_value = value
+
+    @property
+    def autorepeat_delay(self):
+        return self._autorepeat_delay
+    @autorepeat_delay.setter
+    def autorepeat_delay(self, value):
+        if value < 0:
+            value = 0
+        self._autorepeat_delay = value
+        gremlin.config.Configuration().last_keyboard_mapper_interval_value = value
+
+    def _update_config(self):
+        config = gremlin.config.Configuration()
+        
+        config.last_keyboard_mapper_interval_value =self.autorepeat_delay_box.value()
+        
 
     def _get_display_keys(self):
         text = ''

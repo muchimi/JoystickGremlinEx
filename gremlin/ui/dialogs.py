@@ -1976,6 +1976,10 @@ The setting can be overriden by the global mode reload option set in Options for
                     device.modes[name] = device.modes[mode_name]
                     device.modes[name].name = name
                     del device.modes[mode_name]
+                    if gremlin.shared_state.edit_mode == mode_name:
+                        gremlin.shared_state.edit_mode = name
+                    if gremlin.shared_state.runtime_mode == mode_name:
+                        gremlin.shared_state.runtime_mode = name
 
                     # Update inheritance information
                     for mode in device.modes.values():
@@ -1986,6 +1990,8 @@ The setting can be overriden by the global mode reload option set in Options for
                 if mode_name == gremlin.shared_state.current_profile.get_start_mode():
                     gremlin.shared_state.current_profile.set_start_mode(name)
 
+                
+
             self._populate_mode_layout()
             self._fire_mode_change()
 
@@ -1993,8 +1999,25 @@ The setting can be overriden by the global mode reload option set in Options for
         eh = gremlin.event_handler.EventListener()
         eh.modes_changed.emit()
 
-
     def _delete_mode(self, mode_name):
+        message_box = QtWidgets.QMessageBox()
+        message_box.setText("Delete confirmation")
+        message_box.setInformativeText(f"Delete mode {mode_name}?<br>This will delete this mode and all associated mappings.<br>Are you sure?")
+        pixmap = load_pixmap("warning.svg")
+        pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
+        message_box.setIconPixmap(pixmap)
+        message_box.setStandardButtons(
+            QtWidgets.QMessageBox.StandardButton.Ok |
+            QtWidgets.QMessageBox.StandardButton.Cancel
+            )
+        message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
+        gremlin.util.centerDialog(message_box)
+        result = message_box.exec()
+        if result == QtWidgets.QMessageBox.StandardButton.Ok:
+            self._delete_mode_confirm(mode_name)
+
+
+    def _delete_mode_confirm(self, mode_name):
         """Removes the specified mode.
 
         Performs an update of the inheritance of all modes that inherited
@@ -2008,6 +2031,8 @@ The setting can be overriden by the global mode reload option set in Options for
         if len(mode_list.keys()) == 1:
             QMessageBox.warning(self, "Warning","Cannot delete last mode - one mode must exist")
             return
+        
+        
 
         parent_of_deleted = None
         for mode in list(self._profile.devices.values())[0].modes.values():
@@ -2025,9 +2050,19 @@ The setting can be overriden by the global mode reload option set in Options for
         for device in self._profile.devices.values():
             del device.modes[mode_name]
 
+
+        
+        default_mode = gremlin.shared_state.current_profile.get_root_mode()
+        if gremlin.shared_state.edit_mode == mode_name:
+            gremlin.shared_state.edit_mode = default_mode
+        if gremlin.shared_state.runtime_mode == mode_name:
+            gremlin.shared_state.runtime_mode = default_mode
+
+
         # Update the ui
         self._populate_mode_layout()
         self._fire_mode_change()
+
 
     @QtCore.Slot()
     def _add_mode_cb(self):
