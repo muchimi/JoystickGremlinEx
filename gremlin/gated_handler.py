@@ -1464,7 +1464,7 @@ class GateData():
     
     def _gate_used_gates(self):
         ''' gets used gates '''
-        return [info for info in self._gate_item_map.values() if info.used and info.value is not None]
+        return [info for info in self._gate_item_map.values() if info.used and info.value is not None and not info.is_default]
     
     def _get_gates_for_values(self, old_value, new_value):
         ''' gets the list of sorted list of gates between two values '''
@@ -2663,6 +2663,13 @@ class GatedAxisWidget(QtWidgets.QWidget):
         self._remove_gate(gate)
 
     def _remove_gate(self, gate):
+
+        # ensure there are at least two gates left
+        count = len(self.gate_data._gate_used_gates())
+        if count <= 2:
+            syslog.warn("Unable to delete gate: at least two gates must be defined.")
+            return # do not allow fewer than 2 gates
+
         message_box = QtWidgets.QMessageBox()
         message_box.setText("Delete confirmation")
         message_box.setInformativeText("This will delete this gate.\nAre you sure?")
@@ -2887,7 +2894,8 @@ class GatedAxisWidget(QtWidgets.QWidget):
             return
         
         # add the gate
-        gate = self.gate_data.getGate(value = value)
+        gate = GateInfo(value = value, parent = self.gate_data)
+        self.gate_data.registerGate(gate)
         self._update_ui()
 
 
