@@ -104,7 +104,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.14ex (m22)"
+APPLICATION_VERSION = "13.40.15ex (m1)"
 
 # the main ui
 ui = None
@@ -2566,7 +2566,6 @@ if __name__ == "__main__":
     DILL.init()
     DILL.initialize_capi()
     logging.getLogger("system").info(f"Found DirectInput Interface version {DILL.version}")
-
 
     # Show unhandled exceptions to the user when running a compiled version
     # of Joystick Gremlin
