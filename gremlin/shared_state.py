@@ -71,7 +71,7 @@ is_running = False
 _suspend_ui_keyinput = 0
 
 # list of device names to their GUID
-device_guid_to_name_map = {} 
+device_guid_to_name_map = {}
 
 # map of device profiles - indexed by hardware GUID
 device_profile_map = {}
@@ -82,8 +82,11 @@ current_profile = None
 # holds the active (runtime) mode
 runtime_mode = None
 
-# holds the edit mode 
+# holds the edit mode
 edit_mode = None
+
+# true if a device change occurs when a profile is running
+has_device_changes = False
 
 # previous runtime mode
 previous_runtime_mode = None
@@ -223,7 +226,7 @@ def load_state(id):
 _icon_path_cache = {}
 
 def _get_root_path():
-    ''' gets the root path of the application '''    
+    ''' gets the root path of the application '''
     import sys
     import pathlib
     import os
