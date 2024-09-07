@@ -20,6 +20,8 @@ import logging
 import threading
 
 import dinput
+import gremlin.event_handler
+import gremlin.shared_state
 
 from . import common, error, util
 from vjoy import vjoy
@@ -236,6 +238,14 @@ def linear_axis_index(axis_map, axis_index):
         if entry.axis_index == axis_index:
             return entry.linear_index
     raise error.GremlinError("Linear axis lookup failed")
+
+
+def reset_devices():
+    ''' resets devices on device change '''
+    logging.getLogger("system").info("Joystick device change detected - re-initializing joysticks")
+    joystick_devices_initialization()
+    el = gremlin.event_handler.EventListener()
+    el.device_change_event.emit()
 
 
 def joystick_devices_initialization():

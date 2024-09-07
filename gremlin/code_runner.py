@@ -572,6 +572,11 @@ class CodeRunner:
         # re-enable tabs
         self.enableUI()
 
+        # check if devices changed at runtime
+        if gremlin.shared_state.has_device_changes:
+            gremlin.shared_state.has_device_changes = False # mark as changes processed
+            gremlin.joystick_handling.reset_devices()
+
 
     def _reset_state(self):
         """Resets all states to their default values."""

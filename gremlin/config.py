@@ -1105,6 +1105,7 @@ class Configuration:
     @last_keyboard_mapper_pulse_value.setter
     def last_keyboard_mapper_pulse_value(self, value):
         self._data["last_keyboard_mapper_pulse_value"] = value
+        self.save()
 
 
     @property
@@ -1113,3 +1114,13 @@ class Configuration:
     @last_keyboard_mapper_interval_value.setter
     def last_keyboard_mapper_interval_value(self, value):
         self._data["last_keyboard_mapper_interval_value"] = value
+        self.save()
+
+    @property
+    def runtime_ignore_device_change(self):
+        ''' ignore device changes at runtime '''
+        return self._data.get("runtime_ignore_device_change", True)
+    @runtime_ignore_device_change.setter
+    def runtime_ignore_device_change(self, value):
+        self._data["runtime_ignore_device_change"] = value
+        self.save()

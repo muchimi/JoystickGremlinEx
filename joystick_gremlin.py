@@ -34,6 +34,7 @@ import webbrowser
 
 import dinput
 
+import gremlin.joystick_handling
 import gremlin.shared_state
 import gremlin.ui.keyboard_device
 import gremlin.ui.midi_device
@@ -103,7 +104,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.14ex (m21)"
+APPLICATION_VERSION = "13.40.14ex (m22)"
 
 # the main ui
 ui = None
@@ -148,6 +149,9 @@ class GremlinUi(QtWidgets.QMainWindow):
         self._device_change_queue = 0 # count of device updates while the UI is already updating
 
         self._resize_count = 0
+
+        # list of detected devices
+        self._active_devices = []
 
 
 
@@ -999,6 +1003,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         """
         
 
+
         self._recreate_tab_widget()
                 
         if self.tab_guids is None:
@@ -1011,6 +1016,9 @@ class GremlinUi(QtWidgets.QMainWindow):
         # Device lists
         phys_devices = gremlin.joystick_handling.physical_devices()
         vjoy_devices = gremlin.joystick_handling.vjoy_devices()
+
+        self._active_devices = gremlin.joystick_handling.joystick_devices()
+        
 
         index = 0
 
@@ -1555,10 +1563,26 @@ class GremlinUi(QtWidgets.QMainWindow):
             while self._device_change_queue > 0:
                 verbose = gremlin.config.Configuration().verbose
                 try:
+                    syslog =logging.getLogger("system")
                     if verbose:
-                        logging.getLogger("system").info(f"Device change begin")
+                        syslog.info(f"Device change begin")
                     
-                    self.devices = gremlin.joystick_handling.joystick_devices()
+                    # list which device is different
+                    old_devices = [(device.device_guid, device.name) for device in self._active_devices]
+                    detected_devices = gremlin.joystick_handling.joystick_devices()
+                    new_devices = [(device.device_guid, device.name) for device in detected_devices]
+                    added_devices = [item for item in new_devices if not item in old_devices]
+                    removed_devices = [item for item in old_devices if not item in new_devices]
+                    if verbose:
+                        if added_devices:
+                            syslog.info("\tDevice added detected:")
+                            for device_guid, device_name in added_devices:
+                                syslog.info(f"\t\t{device_name} {device_guid}")
+                        if removed_devices:
+                            syslog.info("\tDevice removed detected:")
+                            for device_guid, device_name in removed_devices:
+                                syslog.info(f"\t\t{device_name} {device_guid}")
+                        
                     self._create_tabs()
 
                     # Stop Gremlin execution

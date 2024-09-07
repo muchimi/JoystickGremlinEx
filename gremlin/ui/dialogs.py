@@ -308,14 +308,22 @@ class OptionsUi(ui_common.BaseDialogUi):
         # enable ui at runtime
         self.enable_ui_runtime = QtWidgets.QCheckBox("Keep UI enabled when profile is active")
         self.enable_ui_runtime.setToolTip("When enabled, the UI will remain interactable while a profile is running.<br>This can create conflicts if the profile or mode is changed while a profile is running,<b>use caution.</b>")
-        self.enable_ui_runtime.clicked.connect(self._runtime_ui_active)
         self.enable_ui_runtime.setChecked(self.config.runtime_ui_active)
+        self.enable_ui_runtime.clicked.connect(self._runtime_ui_active)
+        
         
         # synchronize action/container drop downs
         self.sync_last_selection = QtWidgets.QCheckBox("Sync action &amp; container selections")
         self.sync_last_selection.setToolTip("When enabled, action and container drop downs will remain synchronized with the last selected entry")
-        self.sync_last_selection.clicked.connect(self._sync_last_selection)
         self.sync_last_selection.setChecked(self.config.sync_last_selection)
+        self.sync_last_selection.clicked.connect(self._sync_last_selection)
+        
+
+        # ignore device changes at runtime
+        self.runtime_ignore_device_change = QtWidgets.QCheckBox("Ignore device change at runtime")
+        self.runtime_ignore_device_change.setToolTip("When enabled, device connect/disconnects will be ignored at runtime")
+        self.runtime_ignore_device_change.setChecked(self.config.runtime_ignore_device_change)
+        self.runtime_ignore_device_change.clicked.connect(self._runtime_ignore_device_change)
 
 
         # Start minimized option
@@ -568,6 +576,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         row+=1
         self.column_layout.addWidget(self.verbose_container_widget, row, col)
         row+=1
+        self.column_layout.addWidget(self.runtime_ignore_device_change, row, col)
 
         self.general_layout.addWidget(self.column_widget)
         
@@ -892,6 +901,10 @@ This setting is also available on a profile by profile basis on the profile tab,
     @QtCore.Slot(bool)
     def _sync_last_selection(self, checked):
         self.config.sync_last_selection = checked
+
+    @QtCore.Slot(bool)
+    def _runtime_ignore_device_change(self, checked):
+        self.config.runtime_ignore_device_change = checked
 
 
     @QtCore.Slot(bool)

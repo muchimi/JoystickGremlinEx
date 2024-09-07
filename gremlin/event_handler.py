@@ -218,6 +218,9 @@ class EventListener(QtCore.QObject):
 
 	# Signal emitted when a joystick is attached or removed
 	device_change_event = QtCore.Signal()
+
+	# called when a process device change should be handled
+	_process_device_change = QtCore.Signal()
 	
 	# Signal emitted when the icon needs to be refreshed
 	icon_changed = QtCore.Signal(DeviceChangeEvent)
@@ -275,6 +278,8 @@ class EventListener(QtCore.QObject):
 		
 		self._running = True
 
+		self._process_device_change_lock = False
+
 		# keyboard input handling buffer
 		self._keyboard_state = {}
 		self._keyboard_queue = None
@@ -283,7 +288,15 @@ class EventListener(QtCore.QObject):
 		self._keyboard_thread = None
 		self.keyboard_hook.start()
 
+		self.device_change_event.connect(self._device_changed_cb)
+
+		# internal event on process change
+		self._process_device_change.connect(self._process_device_change_cb)
+
 		Thread(target=self._run).start()
+
+	def _device_changed_cb(self):
+		self._init_joysticks()
 
 	def mouseEnabled(self):
 		''' returns mouse hook status '''
@@ -488,6 +501,8 @@ class EventListener(QtCore.QObject):
 		:param data information about the device changing state
 		:param action whether the device was added or removed
 		"""
+
+
 		if self._device_update_timer is not None:
 			self._device_update_timer.cancel()
 		self._device_update_timer = Timer(0.5, self._run_device_list_update)
@@ -495,10 +510,35 @@ class EventListener(QtCore.QObject):
 
 	def _run_device_list_update(self):
 		"""Performs the update of the devices connected."""
-		joystick_handling.joystick_devices_initialization()
-		self._init_joysticks()
-		self.device_change_event.emit()
+		self._process_device_change.emit()
 
+
+	def _process_device_change_cb(self):
+
+		if self._process_device_change_lock:
+			return
+		
+		self._process_device_change_lock = True
+
+		try:
+			syslog = logging.getLogger("system")
+			
+			is_running = gremlin.shared_state.is_running
+			gremlin.shared_state.has_device_changes = True
+			if is_running:
+				if gremlin.config.Configuration().runtime_ignore_device_change:
+					syslog.warning("\tRuntime device change detected - ignoring due to options")
+					return
+				else:
+					syslog.warning("\tChange detected at runtime - stopping profile")
+					gremlin.shared_state.ui.activate(False)
+
+			# reset devices and fire off the device change event
+			joystick_handling.reset_devices()
+
+		finally:
+			self._process_device_change_lock = False
+				
 		
 		
 
