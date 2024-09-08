@@ -219,6 +219,9 @@ class EventListener(QtCore.QObject):
 	# Signal emitted when a joystick is attached or removed
 	device_change_event = QtCore.Signal()
 
+	# fires when the number of gamepad devices changes
+	gamepad_change_event = QtCore.Signal()
+
 	# called when a process device change should be handled
 	_process_device_change = QtCore.Signal()
 	
@@ -501,6 +504,10 @@ class EventListener(QtCore.QObject):
 		:param data information about the device changing state
 		:param action whether the device was added or removed
 		"""
+
+		# ignore if a VIGEM device - these are handled, for the moment, directly by the action
+		if data.vendor_id == 0x045E and data.product_id == 0x28E and data.button_count == 10 and data.name == b'Controller (XBOX 360 For Windows)':
+			return
 
 
 		if self._device_update_timer is not None:

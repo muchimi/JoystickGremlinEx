@@ -785,7 +785,7 @@ class InputItem():
             # see if old style keyboard entry
             if "extended" in node.attrib:
                 scan_code = self.input_id
-                is_extended = read_bool(node, "extended")
+                is_extended = read_bool(node, "extended", False)
                 is_mouse = safe_read(node,"mouse", bool, False)
                 key = Key(scan_code=scan_code, is_extended=is_extended, is_mouse = is_mouse)
                 input_item.key = key

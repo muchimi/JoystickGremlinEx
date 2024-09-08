@@ -531,6 +531,22 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.runtime_ui_update.clicked.connect(self._runtime_ui_update)
         self.runtime_ui_update.setToolTip("When set, Joystick Gremlin Ex will update the UI on profile or mode changes at runtime - this can be turned off to enhance performance at runtime")
 
+
+        # gamepad device count
+        self.gamepad_container_widget = QtWidgets.QWidget()
+        self.gamepad_container_widget.setContentsMargins(0,0,0,0)
+        self.gamepad_container_layout = QtWidgets.QHBoxLayout(self.gamepad_container_widget)
+        self.gamepad_container_layout.setContentsMargins(0,0,0,0)
+        self.gamepad_device_count_widget = QtWidgets.QSpinBox()
+        self.gamepad_device_count_widget.setRange(0,4) # 0 (none), 1 to 4 devices
+        self.gamepad_device_count_widget.setValue(self.config.vigem_device_count)
+        self.gamepad_device_count_widget.setToolTip("Number of virtual gamepad devices to create, 0 for none, 1 to 4")
+        self.gamepad_device_count_widget.valueChanged.connect(self._device_count_changed)
+        self.gamepad_container_layout.addWidget(QtWidgets.QLabel("Gamepad count:"))
+        self.gamepad_container_layout.addWidget(self.gamepad_device_count_widget)
+        self.gamepad_container_layout.addStretch()
+
+
         self.column_widget = QtWidgets.QWidget()
         self.column_widget.setContentsMargins(0,0,0,0)
         self.column_layout = QtWidgets.QGridLayout(self.column_widget)
@@ -579,6 +595,10 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.column_layout.addWidget(self.runtime_ignore_device_change, row, col)
 
         self.general_layout.addWidget(self.column_widget)
+
+
+        self.general_layout.addWidget(self.gamepad_container_widget)
+
         
         container = QtWidgets.QWidget()
         layout = QtWidgets.QHBoxLayout(container)
@@ -997,6 +1017,9 @@ This setting is also available on a profile by profile basis on the profile tab,
             if value_info[0] == "Joystick Gremlin":
                 return True
         return False
+
+    def _device_count_changed(self):
+        self.config.vigem_device_count = self.gamepad_device_count_widget.value()
 
 
     @QtCore.Slot(bool)

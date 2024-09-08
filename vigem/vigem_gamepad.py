@@ -34,6 +34,8 @@ class VBus:
     Virtual USB bus (ViGEmBus)
     """
     def __init__(self):
+        self.vigem_disconnect = vcli.vigem_disconnect
+        self.vigem_free = vcli.vigem_free
         self._busp = vcli.vigem_alloc()
         check_err(vcli.vigem_connect(self._busp))
 
@@ -41,8 +43,9 @@ class VBus:
         return self._busp
 
     def __del__(self):
-        vcli.vigem_disconnect(self._busp)
-        vcli.vigem_free(self._busp)
+        self.vigem_disconnect(self._busp)
+        self.vigem_free(self._busp)
+
 
 
 # We instantiate a single global VBus for all controllers
@@ -52,6 +55,9 @@ VBUS = VBus()
 class VGamepad(ABC):
     def __init__(self):
         self.vbus = VBUS
+        # for GC purposes, keep a reference so the functions are available when the object is being deleted
+        self.vigem_target_remove = vcli.vigem_target_remove
+        self.vigem_target_free = vcli.vigem_target_free
         self._busp = self.vbus.get_busp()
         self._devicep = self.target_alloc()
         self.CMPFUNC = CFUNCTYPE(None, c_void_p, c_void_p, c_ubyte, c_ubyte, c_ubyte, c_void_p)
@@ -60,8 +66,8 @@ class VGamepad(ABC):
         assert vcli.vigem_target_is_attached(self._devicep), "The virtual device could not connect to ViGEmBus."
 
     def __del__(self):
-        vcli.vigem_target_remove(self._busp, self._devicep)
-        vcli.vigem_target_free(self._devicep)
+        self.vigem_target_remove(self._busp, self._devicep)
+        self.vigem_target_free(self._devicep)
 
     def get_vid(self):
         """
@@ -207,6 +213,43 @@ class VX360Gamepad(VGamepad):
         :param: float between -1.0 and 1.0 (0 = neutral position)
         """
         self.left_joystick(round(x_value_float * 32767), round(y_value_float * 32767))
+
+    def left_joystick_x_float(self, value_float):
+        """
+        Sets the values of the X and Y axis for the left joystick
+
+        :param: float between -1.0 and 1.0 (0 = neutral position)
+        """
+        value = round(value_float * 32767)
+        self.report.sThumbLX = value
+
+    def left_joystick_y_float(self, value_float):
+        """
+        Sets the values of the X and Y axis for the left joystick
+
+        :param: float between -1.0 and 1.0 (0 = neutral position)
+        """
+        value = round(value_float * 32767)
+        self.report.sThumbLY = value
+
+    def right_joystick_x_float(self, value_float):
+        """
+        Sets the values of the X and Y axis for the right joystick
+
+        :param: float between -1.0 and 1.0 (0 = neutral position)
+        """
+        value = round(value_float * 32767)
+        self.report.sThumbRX = value
+
+    def right_joystick_y_float(self, value_float):
+        """
+        Sets the values of the X and Y axis for the right joystick
+
+        :param: float between -1.0 and 1.0 (0 = neutral position)
+        """
+        value = round(value_float * 32767)
+        self.report.sThumbRY = value
+        
 
     def right_joystick_float(self, x_value_float, y_value_float):
         """

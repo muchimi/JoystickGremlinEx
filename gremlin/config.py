@@ -1124,3 +1124,17 @@ class Configuration:
     def runtime_ignore_device_change(self, value):
         self._data["runtime_ignore_device_change"] = value
         self.save()
+
+
+    @property
+    def vigem_device_count(self):
+        ''' count of gamepads to create for VIGEM - default is 1 '''
+        return self._data.get("vigem_device_count",1)
+    @vigem_device_count.setter
+    def vigem_device_count(self, value):
+        if value < 0:
+            value = 0
+        elif value > 3:
+            value = 3
+        self._data["vigem_device_count"] = value
+        self.save()

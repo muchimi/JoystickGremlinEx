@@ -69,6 +69,12 @@ Joystick Gremlin EX
       + [OSC inputs](#osc-inputs)
          - [OSC Trigger modes](#osc-trigger-modes)
       + [Changing modes](#changing-modes-1)
+   * [Gamepad (X-Box controller)](#gamepad-x-box-controller)
+      + [Requirements](#requirements)
+      + [HIDHide interaction](#hidhide-interaction)
+      + [Number of devices and device lifecycle](#number-of-devices-and-device-lifecycle)
+      + [Mapping to a gamepad device](#mapping-to-a-gamepad-device)
+      + [Gamepad input](#gamepad-input)
 - [Profile](#profile)
    * [Profile association](#profile-association)
    * [Profile modes](#profile-modes)
@@ -144,10 +150,16 @@ Joystick Gremlin EX
    * [Sample scripts](#sample-scripts)
    * [OSC (open stage control) info](#osc-open-stage-control-info)
    * [Python dependencies](#python-dependencies)
+   * [Credits](#credits)
 
 <!-- TOC end -->
 
 # Changelog
+
+13.40.15ex (pre-release)
+
+- **Gamepad support** JGEX supports up to four (4) virtual XBox 360 gamepads via VIGEM.  See gamepad section.  Gamepads can be mapped via the new **map to gamepad** action.
+- Improved device mapping output.
 
 
 13.40.14ex (as of pre-release m7)
@@ -793,6 +805,65 @@ A typical OSC command will thus be /my_command_1, number  where number is:
 
 If an input already has mapping containers attached, GremlinEx will prevent switching from an axis mode to a button/change mode and vice versa.  This is because containers and actions, when added to an input, are tailored to the type of input it is, and it's not possible to change it after the fact to avoid mapping problems and odd behaviors.
 
+
+## Gamepad (X-Box controller)
+
+As of 13.40.15ex, GremlinEx supports the VIGEM virtual X-Box 360 controller output.  Up to four (4) devices can be configured for output.
+
+| Output | Description |
+| ----------- | ----------- |
+| Left stick X | (axis) outputs left stick, X axis |
+| Left stick Y | (axis) outputs left stick, Y axis |
+| Right stick X | (axis) outputs right stick, X axis |
+| Right stick Y | (axis) outputs right stick, Y axis |
+| Left trigger | (slider) outputs left trigger slider |
+| Right trigger | (slider) outputs right trigger slider |
+| Left thumb | (button) outputs the left thumb button (usually left stick push)  |
+| Right thumb | (button) outputs left thumb button (usually left stick push)  |
+| A,B,X,Y | (button) outputs the A/B/X/Y buttons |
+| Left/Right shoulder | (button) outputs the left and right bump buttons |
+| Guide/Start/Back | (button) outputs the guide, start and back buttons |
+
+### Requirements
+
+The VIGEM Bus must be installed - this is what provides the virtual gamepad controllers similar to what VJoy does, but for game controllers.
+
+VIGEM bus can be found at https://github.com/nefarius/ViGEmBus. While the driver is no longer updated, it is a signed driver under 64 bit Windows 10 and 11.  The driver, once installed, will show under Device Manager/System Devices as "Nefarius Virtual Gamepad Emulation Bus".
+
+Once installed, JGEX will automatically detect the VIGEM Bus driver, and will create a single device to start (unless this was previously changed in options).  The necessary DLL is included with JGEX and loaded automatically, no additional Python library is needed.  To detect the new virtual gamepad support, JGEX will need to be restarted.
+
+IMPORTANT: no device will show in control panel or HIDHide until JGEX runs, as JGEX creates the device at runtime.  GremlinEX creates the devices when it starts, and removes them when it exists, regardless of what profile is running or not.
+
+### HIDHide interaction
+
+There is nothing special to do with HIDHide.  Because JGEX creates the virtual gamepad devices at runtime, they are visible to the game automatically by default, even if other devices are hidden.   
+
+The devices will go away when JGEX is not running.
+
+### Number of devices and device lifecycle
+
+GremlinEX supports up to four virtual X-box controllers. The number of devices created  is configured in the options dialog, which can be set from 0 to 4.  0 means no device output. 
+
+GremlinEx will create the devices when it runs (no profile needs to be active).  The devices will go away when GremlinEx exits.
+
+VIGEM devices will not show in GremlinEx's device bar because there are no configuration items to set so while the devices exist, they are not displayed.
+
+### Mapping to a gamepad device
+
+Mapping to a gamepad is via the **map to gamepad** action.  The action is no different from mapping to Vjoy and functions the same way.
+
+The action supports either joystick, hat, or any momentary input.  The action will only show mappings suitable for the input selected, so it will show gamepad axes if the input is a linear input, and button type mappings if not.
+
+It is possible to curve an axis input into the gamepad and reverse its input via the response curve action if needed.
+
+![](gamepad_action.png)
+
+
+### Gamepad input
+
+Unlike VJOY, GremlinEx does not currently support a virtual gamepad used as input.  However a hardware gamepad (such as an X-Box One controller for example) will show up in JGEX as a regular joystick input in the device tabs and can be mapped like any other Joystick controller.
+
+
 # Profile
 
 A profile holds a mapping of inputs to action. 
@@ -1427,17 +1498,25 @@ In nearly all cases - what I found usually happens:
 - you're using a controller that isn't a DirectInput HID game controller as classified by windows - so a device with axis/button definitions  - this happens a lot with gamepads although most can be setup as a regular (non gamepad) controller.
 
 ## GremlinEx has been tested with 
-- Virpil
+- Virpil (sticks)
 - Thrustmaster
 - MTG
 - Logitech
 - Honeycomb
-- Microsoft
+- Microsoft X-Box One gamepad controller
 - Arduino (with HID library)
 - RasberryPi (with HID library)
 - TouchOSC
-- StreamDeck (via vjoy plugin and OSC plugin)
 - AxisAndOhs
+- Elgato Streamdeck (in MIDI, OSC and VJOY mode)
+- LoupeDeck Live (in MIDI mode)
+- Derek Spears Designs panels
+
+
+Notable test titles:
+- Microsoft MSFS 2020 (Simconnect)
+- Cloud Imperium Games Star Citizen
+- DCS
 
 
 ## Sample scripts
@@ -1483,4 +1562,21 @@ If you want to run from the source code, you will need the following python pack
 	lxml
 	pyttsx3
 	qtawesome
+
+
+## Credits
+
+There are lots of credits to go around and I'm sure I'm missing quite a few - apologies.
+
+Credits go to Whitemagic for the amazing original Gremlin that to this day amazes me with its brilliant and elegant design.
+
+To ShaulIz for VJoy - the virtual joystick support that makes this all work - if this didn't exist - none of this would either.
+
+To Nefarius for work on HIDHide to remove game confusion with real inputs mixing up with virtual ones, and make tools like Gremlin and JGEX feasible, and of course VIGEM Bus for virtual gamepad support.
+
+To Yann Boutellier for his sample code on the Python integration with VIGEM Bus, the underlying code JGEX used a lot of with a few tweaks to support gamepads in JGEX.
+
+To testers and contributors to this project - in particular Lolo_350, Zer0_Kelvin who got into the weed of regression testings and calling out in great detail what's working, what needs help and what was totally broken.  Lots of what JGEX does is because of "hey, can it do this?"
+
+To my wife for dealing with me and the long hours in the basement figuring this stuff out.
 

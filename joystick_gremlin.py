@@ -34,7 +34,9 @@ import webbrowser
 
 import dinput
 
+import gremlin.gamepad_handling
 import gremlin.joystick_handling
+
 import gremlin.shared_state
 import gremlin.ui.keyboard_device
 import gremlin.ui.midi_device
@@ -2032,6 +2034,10 @@ class GremlinUi(QtWidgets.QMainWindow):
 
     def apply_user_settings(self, ignore_minimize=False):
         """Configures the program based on user settings."""
+
+        # gamepad count
+        gremlin.gamepad_handling.gamepad_reset()
+
         self._set_joystick_input_highlighting(
             self.config.highlight_input
         )
@@ -2149,6 +2155,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
             # Make the first root node the default active mode
             self.mode_selector.populate_selector(new_profile, current_mode, emit = True)
+            self._update_mode_status_bar()
 
             # Save the profile at this point if it was converted from a prior
             # profile version, as otherwise the change detection logic will
@@ -2598,6 +2605,10 @@ if __name__ == "__main__":
     dinput.DILL.init()
     time.sleep(0.25)
     gremlin.joystick_handling.joystick_devices_initialization()
+
+    # check for gamepad availability via VIGEM
+    if gremlin.gamepad_handling.gamepadAvailable():
+        gremlin.gamepad_handling.gamepad_initialization()
 
     # Check if vJoy is properly setup and if not display an error
     # and terminate GremlinEx

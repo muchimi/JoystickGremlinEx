@@ -29,6 +29,7 @@ added_files.extend(container_plugins_files)
 added_binaries = [
     ("vjoy/vJoyInterface.dll", "."),
     ("dill.dll", "."),
+    ("vigem/ViGEmClient.dll", "."),
 	
 ]
 

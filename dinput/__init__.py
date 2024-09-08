@@ -401,7 +401,10 @@ class DeviceSummary:
         bool
             True if the device is a virtual vJoy device, False otherwise
         """
-        return self.vendor_id == 0x1234 and self.product_id == 0xBEAD
+        if self.vendor_id == 0x1234 and self.product_id == 0xBEAD:
+            return True
+        #if self.vendor_id == 0x
+        return False
 
     def set_vjoy_id(self, vjoy_id):
         """Sets the vJoy id for this device summary.

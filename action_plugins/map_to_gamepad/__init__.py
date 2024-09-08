@@ -24,6 +24,7 @@ from lxml import etree as ElementTree
 from PySide6 import QtCore, QtWidgets
 
 import gremlin.base_profile
+import gremlin.event_handler
 from gremlin.input_types import InputType
 
 from gremlin.profile import read_bool, safe_read, safe_format
@@ -31,12 +32,15 @@ from gremlin.util import rad2deg
 import gremlin.ui.ui_common
 import gremlin.ui.input_item
 import gremlin.sendinput
+import gremlin.gamepad_handling
 
 
-from . import vigem_commons as vcom
-from . import vigem_gamepad as gamepad
+import vigem.vigem_gamepad as vg
+import vigem.vigem_commons as vc
 
 from enum import Enum, auto
+
+import gremlin.util
 
 class GamePadOutput(Enum):
     NotSet = auto()
@@ -167,15 +171,23 @@ class MapToGamepadWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _create_ui(self):
         """Creates the UI components."""
 
-        
-        self.output_selector = QtWidgets.QComboBox()
+        el = gremlin.event_handler.EventListener()
+        el.gamepad_change_event.connect(self._gamepad_count_changed)
+
         self.output_widget = QtWidgets.QWidget()
         self.output_layout = QtWidgets.QHBoxLayout(self.output_widget)
+        
+        self.device_selector = QtWidgets.QComboBox()
+        self.output_selector = QtWidgets.QComboBox()
+        
+        self.output_layout.addWidget(QtWidgets.QLabel("Device:"))
+        self.output_layout.addWidget(self.device_selector)
         self.output_layout.addWidget(QtWidgets.QLabel("Output:"))
         self.output_layout.addWidget(self.output_selector)
         self.output_layout.addStretch()
         
         self.output_selector.currentIndexChanged.connect(self._output_mode_changed)
+        self.device_selector.currentIndexChanged.connect(self._device_changed)
         #self.output_widget.setContentsMargins(0,0,0,0)
         self.output_layout.setContentsMargins(0,0,0,0)
 
@@ -183,6 +195,15 @@ class MapToGamepadWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _populate_ui(self):
         """Populates the UI components."""
+        devices = gremlin.gamepad_handling.gamepadDevices()
+        is_enabled = len(devices) > 0
+        self.setEnabled(is_enabled)
+        with QtCore.QSignalBlocker(self.device_selector):
+            self.device_selector.clear()
+            for index, device in enumerate(devices):
+                self.device_selector.addItem(f"Controller (XBOX 360 For Windows) [{index+1}]", index)
+        
+
         with QtCore.QSignalBlocker(self.output_selector):
             self.output_selector.clear()
             if self.action_data.get_input_type() == InputType.JoystickAxis:
@@ -215,8 +236,26 @@ class MapToGamepadWidget(gremlin.ui.input_item.AbstractActionWidget):
             if index != -1:
                 self.output_selector.setCurrentIndex(index)
 
+            index = self.device_selector.findData(self.action_data.device_index)
+            if index != -1:
+                self.device_selector.setCurrentIndex(index)
+            else:
+                # pick the first entry
+                self.device_selector.setCurrentIndex(0)
+                self.action_data.device_index = 0
+
+    @QtCore.Slot()
+    def _gamepad_count_changed(self):
+        ''' number of devices changed '''
+        self._populate_ui()
+
+    @QtCore.Slot()
     def _output_mode_changed(self):
         self.action_data.output_mode = self.output_selector.currentData()
+
+    @QtCore.Slot()
+    def _device_changed(self):
+        self.action_data.device_index = self.device_selector.currentData()
 
 class MapToGamepadFunctor(gremlin.base_profile.AbstractFunctor):
 
@@ -234,15 +273,15 @@ class MapToGamepadFunctor(gremlin.base_profile.AbstractFunctor):
         """
         super().__init__(action_data)
         self.action_data = action_data
-        
 
     def process_event(self, event, value):
-        if not self.action_data.available:
+        vigem = gremlin.gamepad_handling.getGamepad(self.action_data.device_index)
+        if vigem is None:
             return False
         output_mode = self.action_data.output_mode
         if output_mode == GamePadOutput.NotSet:
             return True # nothing to do
-        vigem = self.action_data.vigem
+        # vigem : vg.VX360Gamepad
         if event.event_type == InputType.JoystickAxis:
             if output_mode == GamePadOutput.LeftStickX:
                 vigem.left_joystick_float_x(value.current)
@@ -253,40 +292,42 @@ class MapToGamepadFunctor(gremlin.base_profile.AbstractFunctor):
             elif output_mode == GamePadOutput.RightStickY:
                 vigem.right_joystick_float_y(value.current)
             if output_mode == GamePadOutput.LeftTrigger:
-                vigem.left_trigger_float(value.current)
+                vscaled = gremlin.util.scale_to_range(value.current,target_min=0.0, target_max=1.0)
+                vigem.left_trigger_float(vscaled)
             if output_mode == GamePadOutput.RightTrigger:
-                vigem.right_trigger_float(value.current)
+                vscaled = gremlin.util.scale_to_range(value.current,target_min=0.0, target_max=1.0)
+                vigem.right_trigger_float(vscaled)
         else:
             if output_mode == GamePadOutput.ButtonA:
-                button =vcom.XUSB_BUTTON.XUSB_GAMEPAD_A
+                button =vc.XUSB_BUTTON.XUSB_GAMEPAD_A
             elif output_mode == GamePadOutput.ButtonB:
-                button =vcom.XUSB_BUTTON.XUSB_GAMEPAD_B
+                button =vc.XUSB_BUTTON.XUSB_GAMEPAD_B
             elif output_mode == GamePadOutput.ButtonX:
-                button =vcom.XUSB_BUTTON.XUSB_GAMEPAD_X
+                button =vc.XUSB_BUTTON.XUSB_GAMEPAD_X
             elif output_mode == GamePadOutput.ButtonY:
-                button =vcom.XUSB_BUTTON.XUSB_GAMEPAD_Y
+                button =vc.XUSB_BUTTON.XUSB_GAMEPAD_Y
             elif output_mode == GamePadOutput.ButtonStart:
-                button =vcom.XUSB_BUTTON.XUSB_GAMEPAD_START
+                button =vc.XUSB_BUTTON.XUSB_GAMEPAD_START
             elif output_mode == GamePadOutput.ButtonBack:
-                button =vcom.XUSB_BUTTON.XUSB_GAMEPAD_BACK
+                button =vc.XUSB_BUTTON.XUSB_GAMEPAD_BACK
             elif output_mode == GamePadOutput.ButtonGuide:
-                button =vcom.XUSB_BUTTON.XUSB_GAMEPAD_GUIDE
+                button =vc.XUSB_BUTTON.XUSB_GAMEPAD_GUIDE
             elif output_mode == GamePadOutput.ButtonThumbRight:
-                button =vcom.XUSB_BUTTON.XUSB_GAMEPAD_RIGHT_THUMB
+                button =vc.XUSB_BUTTON.XUSB_GAMEPAD_RIGHT_THUMB
             elif output_mode == GamePadOutput.ButtonThumbLeft:
-                button =vcom.XUSB_BUTTON.XUSB_GAMEPAD_LEFT_THUMB
+                button =vc.XUSB_BUTTON.XUSB_GAMEPAD_LEFT_THUMB
             elif output_mode == GamePadOutput.ButtonShoulderLeft:
-                button =vcom.XUSB_BUTTON.XUSB_GAMEPAD_LEFT_SHOULDER
+                button =vc.XUSB_BUTTON.XUSB_GAMEPAD_LEFT_SHOULDER
             elif output_mode == GamePadOutput.ButtonShoulderRight:
-                button =vcom.XUSB_BUTTON.XUSB_GAMEPAD_RIGHT_SHOULDER
+                button =vc.XUSB_BUTTON.XUSB_GAMEPAD_RIGHT_SHOULDER
             elif output_mode == GamePadOutput.ButtonDpadDown:
-                button =vcom.XUSB_BUTTON.XUSB_GAMEPAD_DPAD_DOWN
+                button =vc.XUSB_BUTTON.XUSB_GAMEPAD_DPAD_DOWN
             elif output_mode == GamePadOutput.ButtonDpadUp:
-                button =vcom.XUSB_BUTTON.XUSB_GAMEPAD_DPAD_UP
+                button =vc.XUSB_BUTTON.XUSB_GAMEPAD_DPAD_UP
             elif output_mode == GamePadOutput.ButtonDpadLeft:
-                button =vcom.XUSB_BUTTON.XUSB_GAMEPAD_DPAD_LEFT
+                button =vc.XUSB_BUTTON.XUSB_GAMEPAD_DPAD_LEFT
             elif output_mode == GamePadOutput.ButtonDpadRight:
-                button =vcom.XUSB_BUTTON.XUSB_GAMEPAD_DPAD_RIGHT
+                button =vc.XUSB_BUTTON.XUSB_GAMEPAD_DPAD_RIGHT
             else:
                 button = None
 
@@ -295,6 +336,9 @@ class MapToGamepadFunctor(gremlin.base_profile.AbstractFunctor):
                     vigem.press_button(button)
                 else:
                     vigem.release_button(button)
+
+        vigem.update()
+        
 
         return True
 
@@ -331,19 +375,8 @@ class MapToGamepad(gremlin.base_profile.AbstractAction):
         super().__init__(parent)
         self.parent = parent
 
-
-        # ensure a device is available
-        self.available = False
-        self.vigem = None
-        try:
-            self.vigem =  gamepad.VX360Gamepad()
-            self.available = True # mark available
-        except:
-            pass
-
+        self.device_index = 0
         self.output_mode = GamePadOutput.NotSet
-
-
 
  
     def display_name(self):
@@ -376,10 +409,12 @@ class MapToGamepad(gremlin.base_profile.AbstractAction):
             instance
         """
 
-        mode = None
         if "mode" in node.attrib:
             mode = node.get("mode")
             self.output_mode = GamePadOutput.to_enum(mode)
+
+        self.device_index = safe_read(node,"device_index", int, 0)
+
 
 
     def _generate_xml(self):
@@ -388,7 +423,11 @@ class MapToGamepad(gremlin.base_profile.AbstractAction):
         :return XML node containing the information of this  instance
         """
         node = ElementTree.Element(self.tag)
-        node.set("mode", GamePadOutput.to_string(self.output_mode))
+        mode = GamePadOutput.to_string(self.output_mode)
+        if mode == "none":
+            pass
+        node.set("mode", mode)
+        node.set("device_index",str(self.device_index))
         return node
 
     def _is_valid(self):
@@ -396,7 +435,9 @@ class MapToGamepad(gremlin.base_profile.AbstractAction):
 
         :return True if the action is configured correctly, False otherwise
         """
-        return self.available
+        return gremlin.gamepad_handling.gamepadAvailable()
+    
+
 
 
 version = 1

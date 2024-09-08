@@ -29,7 +29,7 @@ import gremlin.config
 from gremlin.input_types import InputType
 import gremlin.keyboard
 import gremlin.shared_state
-from . import input_item, ui_common 
+from . import input_item, ui_common
 from gremlin.keyboard import Key
 from .device_tab import InputItemConfiguration
 from .input_item import InputItemWidget, InputIdentifier, InputItemListView
@@ -100,7 +100,7 @@ class KeyboardInputItem():
             return self._key.index_tuple
         return None
     
-    @property 
+    @property
     def latched(self):
         ''' true if all the keys in this input are latched '''
         if not self._key:
@@ -132,7 +132,7 @@ class KeyboardInputItem():
             return []
         return self.key._latched_keys
 
-    @property 
+    @property
     def has_mouse(self):
         ''' true if any of the keys in the input is a mouse input '''
         if self._key:
@@ -185,7 +185,7 @@ class KeyboardInputItem():
                                 (scan_code, is_extended), _ = gremlin.keyboard.KeyMap.translate((scan_code, is_extended))
                                 key = gremlin.keyboard.KeyMap.find(scan_code, is_extended)
                             if not key in self._key.latched_keys:
-                                self._key._latched_keys.append(key) 
+                                self._key._latched_keys.append(key)
 
                     self._key._update()
         self._suspend_update = False
@@ -216,10 +216,10 @@ class KeyboardInputItem():
 
     
     def _update(self):
-        # updates the message key and display 
+        # updates the message key and display
         if self._suspend_update:
             # ignore
-            return 
+            return
         if not self._key:
             self._message_key = ""
             self._title_name = "Keyboard Input (not configured)"
@@ -245,7 +245,10 @@ class KeyboardInputItem():
 
         self._display_name = self._key.latched_name
         self._description = self.key.latched_code
-        self._display_tooltip = self._key.latched_name + " " + self.key.latched_code
+        try:
+            self._display_tooltip = self._key.latched_name + " " + self.key.latched_code
+        except:
+            self._display_tooltip = ""
 
     def to_string(self):
         return f"KeyboardInputItem: pair: {self.key_tuple} name: {self._display_name}"
@@ -257,7 +260,7 @@ class KeyboardInputItem():
 
     def __eq__(self, other):
         if isinstance(other, KeyboardInputItem):
-            return self.message_key == other.message_key 
+            return self.message_key == other.message_key
         return self.__hash__() == other.__hash__()
 
     def __ne__(self, other):
@@ -267,7 +270,7 @@ class KeyboardInputItem():
         return str(self.id).__hash__()
     
     def __lt__(self, other):
-        ''' used for sorting purposes '''        
+        ''' used for sorting purposes '''
         # keep as is (don't sort this input entry)
         return False
     
@@ -340,7 +343,7 @@ class KeyboardDeviceTabWidget(QDataWidget):
         if right_panel:
             self.main_layout.removeItem(right_panel)
 
-        widget = InputItemConfiguration()     
+        widget = InputItemConfiguration()
         self.main_layout.addWidget(widget,3)
 
         button_container_widget = QtWidgets.QWidget()
@@ -403,7 +406,7 @@ class KeyboardDeviceTabWidget(QDataWidget):
             self.main_layout.removeItem(right_panel)
 
         widget = InputItemConfiguration()
-        self.main_layout.addWidget(widget,3)            
+        self.main_layout.addWidget(widget,3)
 
     def _add_key_dialog_cb(self):
         ''' display the keyboard input dialog '''
@@ -414,7 +417,7 @@ class KeyboardDeviceTabWidget(QDataWidget):
         self._keyboard_dialog.accepted.connect(self._dialog_ok_cb)
         self._keyboard_dialog.closed.connect(self._dialog_close_cb)
         self._keyboard_dialog.setModal(True)
-        self._keyboard_dialog.showNormal()  
+        self._keyboard_dialog.showNormal()
         
 
     def _dialog_close_cb(self):
@@ -424,10 +427,10 @@ class KeyboardDeviceTabWidget(QDataWidget):
         ''' callled when the dialog completes '''
 
         # grab a new data index as this is a new entry
-        index = self._keyboard_dialog.index 
+        index = self._keyboard_dialog.index
         keys = self._keyboard_dialog.keys
         latched_key = self._keyboard_dialog.latched_key
-        self._process_input_keys(keys, index, latched_key)        
+        self._process_input_keys(keys, index, latched_key)
 
     def _process_input_keys(self, keys, index, root_key = None):
         ''' processes input keys
@@ -462,7 +465,7 @@ class KeyboardDeviceTabWidget(QDataWidget):
         input_type = InputType.KeyboardLatched # always use latched type starting with 13.40.14ex if root_key.is_latched else InputType.Keyboard
 
 
-        # creates the item in the profile if needed 
+        # creates the item in the profile if needed
         self.device_profile.modes[self.current_mode].get_data(input_type,input_id)
 
         if reload:
@@ -499,7 +502,7 @@ class KeyboardDeviceTabWidget(QDataWidget):
             self.main_layout.removeItem(right_panel)
 
         widget = InputItemConfiguration(item_data)
-        self.main_layout.addWidget(widget,3)            
+        self.main_layout.addWidget(widget,3)
 
         if item_data:
             
@@ -536,7 +539,7 @@ class KeyboardDeviceTabWidget(QDataWidget):
         return lambda: self.input_item_list_view.redraw_index(index)
 
     def set_mode(self, mode):
-        ''' changes the mode of the tab '''        
+        ''' changes the mode of the tab '''
         self.current_mode = mode
         self.device_profile.ensure_mode_exists(self.current_mode)
         self.input_item_list_model.mode = mode
@@ -559,7 +562,7 @@ class KeyboardDeviceTabWidget(QDataWidget):
         self._select_item_cb(self.input_item_list_view.current_index)
 
     def _custom_widget_handler(self, list_view : InputItemListView, index : int, identifier : InputIdentifier, data, parent = None):
-        ''' creates a widget for the input 
+        ''' creates a widget for the input
         
         the widget must have a selected property
         :param list_view The list view control the widget to create belongs to
@@ -584,7 +587,7 @@ class KeyboardDeviceTabWidget(QDataWidget):
 
     def _update_input_widget(self, input_widget, container_widget):
         ''' called when the widget has to update itself on a data change '''
-        data = input_widget.identifier.input_id 
+        data = input_widget.identifier.input_id
         input_widget.setTitle(data.title_name)
         input_widget.setInputDescription(data.display_name)
         input_widget.setToolTip(data.display_tooltip)
@@ -638,7 +641,7 @@ class KeyboardDeviceTabWidget(QDataWidget):
         self._keyboard_dialog.accepted.connect(self._dialog_ok_cb)
         self._keyboard_dialog.closed.connect(self._dialog_close_cb)
         self._keyboard_dialog.setModal(True)
-        self._keyboard_dialog.showNormal()        
+        self._keyboard_dialog.showNormal()
         
 
 
