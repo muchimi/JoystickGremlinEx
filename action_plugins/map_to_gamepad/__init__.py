@@ -33,126 +33,20 @@ import gremlin.ui.ui_common
 import gremlin.ui.input_item
 import gremlin.sendinput
 import gremlin.gamepad_handling
+from gremlin import input_devices
+from gremlin.types import GamePadOutput
 
 
-import vigem.vigem_gamepad as vg
+
+# import vigem.vigem_gamepad as vg
 import vigem.vigem_commons as vc
 
 from enum import Enum, auto
 
 import gremlin.util
-
-class GamePadOutput(Enum):
-    NotSet = auto()
-    LeftStickX = auto()
-    LeftStickY = auto()
-    RightStickX = auto()
-    RightStickY = auto()
-    LeftTrigger = auto()
-    RightTrigger = auto()
-    ButtonA = auto()
-    ButtonB = auto()
-    ButtonX = auto()
-    ButtonY = auto()
-    ButtonStart = auto()
-    ButtonBack = auto()
-    ButtonThumbLeft = auto()
-    ButtonThumbRight = auto()
-    ButtonGuide = auto()
-    ButtonShoulderLeft = auto()
-    ButtonShoulderRight = auto()
-    ButtonDpadUp = auto()
-    ButtonDpadDown = auto()
-    ButtonDpadLeft = auto()
-    ButtonDpadRight = auto()
+from gremlin.types import GamePadOutput
 
 
-    @staticmethod
-    def to_string(value):
-        return _gamepad_output_to_string[value]
-    
-    @staticmethod
-    def to_enum(value):
-        return _gamepad_output_to_enum[value]
-    
-    @staticmethod
-    def to_display_name(value):
-        return _gamepad_output_to_display_name[value]
-    
-_gamepad_output_to_string = {
-    GamePadOutput.NotSet : "none",
-    GamePadOutput.LeftStickX: "left_x",
-    GamePadOutput.LeftStickY: "left_y",
-    GamePadOutput.RightStickX: "right_x",
-    GamePadOutput.RightStickY: "right_y",
-    GamePadOutput.LeftTrigger: "left_trigger",
-    GamePadOutput.RightTrigger: "right_trigger",
-    GamePadOutput.ButtonA: "button_a",
-    GamePadOutput.ButtonB:"button_b",
-    GamePadOutput.ButtonX: "button_x",
-    GamePadOutput.ButtonY:"button_y",
-    GamePadOutput.ButtonStart:"button_start",
-    GamePadOutput.ButtonBack:"button_back",
-    GamePadOutput.ButtonThumbLeft:"button_thumb_left",
-    GamePadOutput.ButtonThumbRight:"button_thumb_right",
-    GamePadOutput.ButtonGuide:"button_guide",
-    GamePadOutput.ButtonShoulderLeft:"button_shoulder_left",
-    GamePadOutput.ButtonShoulderRight:"button_shoulder_right",
-    GamePadOutput.ButtonDpadUp:"button_dpad_up",
-    GamePadOutput.ButtonDpadDown:"button_dpad_down",
-    GamePadOutput.ButtonDpadLeft:"button_dpad_left",
-    GamePadOutput.ButtonDpadRight:"button_dpad_right",
-}
-
-_gamepad_output_to_display_name = {
-    GamePadOutput.NotSet : "N/A",
-    GamePadOutput.LeftStickX: "Left Stick X",
-    GamePadOutput.LeftStickY: "Left Stick Y",
-    GamePadOutput.RightStickX: "Right Stick X",
-    GamePadOutput.RightStickY: "Right Stick Y",
-    GamePadOutput.LeftTrigger: "Left Trigger",
-    GamePadOutput.RightTrigger: "Right Trigger",
-    GamePadOutput.ButtonA: "A",
-    GamePadOutput.ButtonB:"B",
-    GamePadOutput.ButtonX: "X",
-    GamePadOutput.ButtonY:"Y",
-    GamePadOutput.ButtonStart:"Start",
-    GamePadOutput.ButtonBack:"Back",
-    GamePadOutput.ButtonThumbLeft:"Thumb Left",
-    GamePadOutput.ButtonThumbRight:"Thumb Right",
-    GamePadOutput.ButtonGuide:"Guide",
-    GamePadOutput.ButtonShoulderLeft:"Shoulder Left",
-    GamePadOutput.ButtonShoulderRight:"Shoulder Right",
-    GamePadOutput.ButtonDpadUp:"Dpad Up",
-    GamePadOutput.ButtonDpadDown:"Dpad Down",
-    GamePadOutput.ButtonDpadLeft:"Dpad Left",
-    GamePadOutput.ButtonDpadRight:"Dpad Right",
-}
-
-_gamepad_output_to_enum = {
-    "none": GamePadOutput.NotSet ,
-    "left_x" : GamePadOutput.LeftStickX,
-    "left_y": GamePadOutput.LeftStickY ,
-    "right_x" : GamePadOutput.RightStickX,
-    "right_y": GamePadOutput.RightStickY,
-    "left_trigger": GamePadOutput.LeftTrigger,
-    "right_trigger": GamePadOutput.RightTrigger,
-    "button_a": GamePadOutput.ButtonA,
-    "button_b": GamePadOutput.ButtonB,
-    "button_x": GamePadOutput.ButtonX,
-    "button_y": GamePadOutput.ButtonY,
-    "button_start": GamePadOutput.ButtonStart,
-    "button_back": GamePadOutput.ButtonBack,
-    "button_thumb_left": GamePadOutput.ButtonThumbLeft,
-    "button_thumb_right": GamePadOutput.ButtonThumbRight,
-    "button_guide": GamePadOutput.ButtonGuide,
-    "button_shoulder_left": GamePadOutput.ButtonShoulderLeft,
-    "button_shoulder_right": GamePadOutput.ButtonShoulderRight,
-    "button_dpad_up": GamePadOutput.ButtonDpadUp,
-    "button_dpad_down": GamePadOutput.ButtonDpadDown,
-    "button_dpad_left": GamePadOutput.ButtonDpadLeft,
-    "button_dpad_right": GamePadOutput.ButtonDpadRight,
-}
 
 
 class MapToGamepadWidget(gremlin.ui.input_item.AbstractActionWidget):
@@ -275,28 +169,44 @@ class MapToGamepadFunctor(gremlin.base_profile.AbstractFunctor):
         self.action_data = action_data
 
     def process_event(self, event, value):
-        vigem = gremlin.gamepad_handling.getGamepad(self.action_data.device_index)
-        if vigem is None:
-            return False
+        (is_local, is_remote) = input_devices.remote_state.state
+        if event.force_remote:
+            # force remote mode on if specified in the event
+            is_remote = True
+            is_local = False
+
+        if is_local:
+
+            vigem = gremlin.gamepad_handling.getGamepad(self.action_data.device_index)
+            if vigem is None:
+                return False
+            
+            
         output_mode = self.action_data.output_mode
         if output_mode == GamePadOutput.NotSet:
             return True # nothing to do
         # vigem : vg.VX360Gamepad
         if event.event_type == InputType.JoystickAxis:
-            if output_mode == GamePadOutput.LeftStickX:
-                vigem.left_joystick_float_x(value.current)
-            elif output_mode == GamePadOutput.LeftStickY:
-                vigem.left_joystick_float_y(value.current)
-            if output_mode == GamePadOutput.RightStickX:
-                vigem.right_joystick_float_x(value.current)
-            elif output_mode == GamePadOutput.RightStickY:
-                vigem.right_joystick_float_y(value.current)
-            if output_mode == GamePadOutput.LeftTrigger:
-                vscaled = gremlin.util.scale_to_range(value.current,target_min=0.0, target_max=1.0)
-                vigem.left_trigger_float(vscaled)
-            if output_mode == GamePadOutput.RightTrigger:
-                vscaled = gremlin.util.scale_to_range(value.current,target_min=0.0, target_max=1.0)
-                vigem.right_trigger_float(vscaled)
+            if is_local:
+                vscaled = value.current
+                if output_mode == GamePadOutput.LeftStickX:
+                    vigem.left_joystick_float_x(vscaled)
+                elif output_mode == GamePadOutput.LeftStickY:
+                    vigem.left_joystick_float_y(vscaled)
+                if output_mode == GamePadOutput.RightStickX:
+                    vigem.right_joystick_float_x(vscaled)
+                elif output_mode == GamePadOutput.RightStickY:
+                    vigem.right_joystick_float_y(vscaled)
+                if output_mode == GamePadOutput.LeftTrigger:
+                    vscaled = gremlin.util.scale_to_range(value.current,target_min=0.0, target_max=1.0)
+                    vigem.left_trigger_float(vscaled)
+                if output_mode == GamePadOutput.RightTrigger:
+                    vscaled = gremlin.util.scale_to_range(value.current,target_min=0.0, target_max=1.0)
+                    vigem.right_trigger_float(vscaled)
+            else:
+                # remote
+                input_devices.remote_client.send_gamepad_axis(self.action_data.device_index, output_mode, vscaled)
+                return True
         else:
             if output_mode == GamePadOutput.ButtonA:
                 button =vc.XUSB_BUTTON.XUSB_GAMEPAD_A
@@ -332,13 +242,17 @@ class MapToGamepadFunctor(gremlin.base_profile.AbstractFunctor):
                 button = None
 
             if button is not None:
-                if value.is_pressed:
-                    vigem.press_button(button)
+                if is_local:
+                    if value.is_pressed:
+                        vigem.press_button(button)
+                    else:
+                        vigem.release_button(button)
                 else:
-                    vigem.release_button(button)
+                    input_devices.remote_client.send_gamepad_button(self.action_data.device_index, button, value.is_pressed)
+                    return True
 
-        vigem.update()
         
+        vigem.update() # sends the data to the controller
 
         return True
 

@@ -1,3 +1,21 @@
+# -*- coding: utf-8; -*-
+
+# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+
 from abc import abstractmethod, ABCMeta
 from collections import namedtuple
 import codecs
@@ -70,7 +88,7 @@ class ProfileData(metaclass=ABCMeta):
     def __init__(self, parent):
         """Creates a new instance.
 
-        :param parent the parent item of this instance in the profile tree
+        :param: parent the parent item of this instance in the profile tree (type: InputItem)
         """
         assert parent is not None
         self.code = None
@@ -769,8 +787,6 @@ class InputItem():
         container_node = node # node that holds the container information
         container_plugins = ContainerPlugins()
         container_name_map = container_plugins.tag_map
-        if node.tag == "key":
-            pass
         self.input_type = InputType.to_enum(node.tag)
         if "id" in node.attrib.keys():
             self.input_id = safe_read(node, "id", int)
@@ -1558,7 +1574,7 @@ class Profile():
 
 
 
-    def add_mode(self, name):
+    def add_mode(self, name, inherited_name = None, emit = True):
         import gremlin.event_handler
         ''' adds a new mode'''
         if name in self.mode_list():
@@ -1567,12 +1583,24 @@ class Profile():
         for device in self.devices.values():
             new_mode = Mode(device)
             new_mode.name = name
-            new_mode.parent = self.get_default_mode()
+            if inherited_name is not None:
+                new_mode.inherit = inherited_name
+            else:
+                new_mode.inherit = self.get_default_mode()
+            new_mode.parent = device
             device.modes[name] = new_mode
 
-        eh = gremlin.event_handler.EventListener()
-        eh.modes_changed.emit()
+        if emit:
+            eh = gremlin.event_handler.EventListener()
+            eh.modes_changed.emit()
         return True
+    
+    def mode_tree(self):
+        ''' gets the parent/child hiearchy of modes - returns a map '''
+        return self.build_inheritance_tree()
+        
+
+
     
     def remove_mode(self, name):
         ''' removes a mode from this profile '''
@@ -1606,7 +1634,7 @@ class Profile():
         eh = gremlin.event_handler.EventListener()
         eh.modes_changed.emit()
 
-    def get_root_modes(self):
+    def get_root_modes(self) -> list[str]:
         """Returns a list of root modes.
 
         :return list of root modes
@@ -1620,8 +1648,8 @@ class Profile():
                     root_modes.append(mode_name)
         return list(set(root_modes))  # unduplicated
     
-    def get_modes(self):
-        ''' get all profile modes '''
+    def get_modes(self) -> list[str]:
+        ''' get all profile mode names '''
         modes = []
         for device in self.devices.values():
             if device.type != DeviceType.Keyboard:
@@ -1629,7 +1657,8 @@ class Profile():
             for mode_name, mode in device.modes.items():
                 modes.append(mode_name)
         return list(set(modes))  # unduplicated
-        
+    
+
 
     def list_actions(self):
         ''' lists all actions in the current profile '''
@@ -2038,8 +2067,8 @@ class Mode:
         :param parent the parent device of this mode
         """
         self.parent = parent
-        self.inherit = None
-        self.name = None
+        self.inherit = None # name of the mode we inherit properties from
+        self.name = None # name of the current mode
 
         self.config = {
             InputType.JoystickAxis: {},

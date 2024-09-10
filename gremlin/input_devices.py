@@ -29,6 +29,9 @@ from PySide6 import QtCore
 
 
 import gremlin.config
+import gremlin.gamepad_handling
+from gremlin.types import GamePadOutput
+
 import gremlin.keyboard
 import gremlin.shared_state
 import gremlin.types
@@ -68,14 +71,14 @@ class VjoyAction(enum.Enum):
     VJoyEnableRemoteOnly = 10 # enables remote control, disables local control
     VJoyEnableLocalOnly = 11 # enables local control, disables remote control
     VJoyDisableRemote = 12 # turns remote control off
-    VJoyDisableLocal = 13 # turns local control off 
+    VJoyDisableLocal = 13 # turns local control off
     VJoyEnableRemote = 14 # enables remote control (does not impact local control)
     VJoyEnableLocal = 15 # enables local control (does not impact remote control)
     VJoyEnableLocalAndRemote = 16 # enables concurrent local/remote control
     VJoyEnablePairedRemote = 17 # enables primary fire one and two on remote client
     VJoyDisablePairedRemote = 18 # disable primary fire one and two on remote client
     VjoyButtonRelease = 19 # action button release (clear a button if set)
-    VjoyMergeAxis = 20 # action to merge another axis 
+    VjoyMergeAxis = 20 # action to merge another axis
 
   
 
@@ -279,7 +282,7 @@ class RemoteControl():
         elif value == VjoyAction.VJoyEnableLocal:
             is_local = True
         elif value == VjoyAction.VJoyEnableRemote:
-            is_remote = True            
+            is_remote = True
         elif value == VjoyAction.VJoyToggleRemote:
             is_local = not self._is_local
             is_remote = not self._is_remote
@@ -372,9 +375,6 @@ class RemoteControl():
         from gremlin.event_handler import StateChangeEvent
         event = StateChangeEvent(self.is_local, self.is_remote, self._is_broadcast)
         return event
-
-
-
 
 def get_remote_state():
     ''' gets the remote state '''
@@ -695,7 +695,7 @@ class GremlinServer(socketserver.ThreadingMixIn,socketserver.UDPServer):
     pass
 
 class GremlinSocketHandler(socketserver.BaseRequestHandler):
-    ''' handles remote input from a gremlin client on the network 
+    ''' handles remote input from a gremlin client on the network
     
         received network events are processed here
     
@@ -715,12 +715,12 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
         sender = data["sender"]
         if sender == remote_client.id:
             # ignore our own broadcasts
-            return 
+            return
         
         action = data["action"]
         if action == "hb":
             # heart beat
-            return 
+            return
         
         if action == "key":
             # keyboard output
@@ -755,10 +755,47 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
                 # accelerated motion
                 a = data["acc"]
                 min_speed = data["min_speed"]
-                max_speed = data["max_speed"] 
+                max_speed = data["max_speed"]
                 time_to_max_speed = data["time_to_speed"]
                 mouse_controller = gremlin.sendinput.MouseController()
                 mouse_controller.set_accelerated_motion(a,min_speed,max_speed,time_to_max_speed)
+        elif action == "gamepad":
+            # gamepad handling
+            index = data["index"] # id of the gamepad to send the data to
+            subtype = data["subtype"] # axis or button
+            output_mode = data["mode"] # either a gamepadoutput or the translated button code
+            vigem = gremlin.gamepad_handling.getGamepad(index)
+            if vigem is not None:
+                if subtype == "axis":
+                    value = data["value"]
+                    
+                    if vigem:
+                        if output_mode == GamePadOutput.LeftStickX:
+                            vigem.left_joystick_float_x(vscaled)
+                        elif output_mode == GamePadOutput.LeftStickY:
+                            vigem.left_joystick_float_y(vscaled)
+                        if output_mode == GamePadOutput.RightStickX:
+                            vigem.right_joystick_float_x(vscaled)
+                        elif output_mode == GamePadOutput.RightStickY:
+                            vigem.right_joystick_float_y(vscaled)
+                        if output_mode == GamePadOutput.LeftTrigger:
+                            vscaled = gremlin.util.scale_to_range(value.current,target_min=0.0, target_max=1.0)
+                            vigem.left_trigger_float(vscaled)
+                        if output_mode == GamePadOutput.RightTrigger:
+                            vscaled = gremlin.util.scale_to_range(value.current,target_min=0.0, target_max=1.0)
+                            vigem.right_trigger_float(vscaled)
+
+                elif subtype == "button":
+                    is_pressed = data["is_pressed"]
+                    if is_pressed:
+                        vigem.press_button(button)
+                    else:
+                        vigem.release_button(button)
+                vigem.update()
+            
+
+
+
 
 
         elif action in ("button","axis","hat","relative_axis"):
@@ -948,7 +985,7 @@ class RemoteClient(QtCore.QObject):
         ''' creates a multicast client send socket'''
         if self._broadcast_enabled:
             # alive thread is only on master machine
-            if not self._alive_thread:        
+            if not self._alive_thread:
                 syslog.debug("Starting Alive thread...")
                 self._alive_thread_stop_requested = False
                 self._alive_thread = threading.Thread(target=self._alive_ticker)
@@ -1053,7 +1090,7 @@ class RemoteClient(QtCore.QObject):
             data["target"] = axis_id
             data["value"] = value
             raw_data = msgpack.packb(data)
-            self._send(raw_data)        
+            self._send(raw_data)
 
     def send_hat(self, device_id, hat_id, direction, force_remote = False):
         ''' handles a remote joystick event '''
@@ -1118,7 +1155,7 @@ class RemoteClient(QtCore.QObject):
             
             raw_data = msgpack.packb(data)
             self._send(raw_data)
-            #syslog.debug(f"remote gremlin event set mouse: wheel {direction}")            
+            #syslog.debug(f"remote gremlin event set mouse: wheel {direction}")
 
     def send_mouse_motion(self, dx, dy, force_remote = False):
         ''' sends mouse motion data '''
@@ -1144,6 +1181,32 @@ class RemoteClient(QtCore.QObject):
             data["min_speed"] = min_speed
             data["max_speed"] = max_speed
             data["time_to_speed"] = time_to_max_speed
+            raw_data = msgpack.packb(data)
+            self._send(raw_data)
+
+    def send_gamepad_axis(self, index, mode, value, force_remote = False):
+        ''' sends a gamepad axis to the remote client '''
+        if self.enabled or force_remote:
+            data = {}
+            data["sender"] = self._id
+            data["action"] = "gamepad"
+            data["subtype"] = "axis"
+            data["index"] = index # which device to send to
+            data["mode"] = mode
+            data["value"] = value
+            raw_data = msgpack.packb(data)
+            self._send(raw_data)
+    
+    def send_gamepad_button(self, index, mode, is_pressed, force_remote = False):
+        ''' sends a gamepad button to the remote client '''
+        if self.enabled or force_remote:
+            data = {}
+            data["sender"] = self._id
+            data["action"] = "gamepad"
+            data["index"] = index  # which device to send to
+            data["subtype"] = "button"
+            data["mode"] = mode
+            data["is_pressed"] = is_pressed
             raw_data = msgpack.packb(data)
             self._send(raw_data)
 
@@ -1196,7 +1259,7 @@ class OscClient(QtCore.QObject):
                             
                                 self._osc_map[message_key].append(input_item)
                                 if self._verbose:
-                                    logging.getLogger("system").info(f"OSC: register trigger on: {input_item.display_name} mode: {input_item.mode_string} key: {message_key}")  
+                                    logging.getLogger("system").info(f"OSC: register trigger on: {input_item.display_name} mode: {input_item.mode_string} key: {message_key}")
 
 
         self._interface.start()
@@ -1244,7 +1307,7 @@ class OscClient(QtCore.QObject):
                     event_type= InputType.OpenSoundControl,
                     device_guid= OscDeviceTabWidget.device_guid,
                     identifier= input_item,
-                    is_pressed = is_pressed, 
+                    is_pressed = is_pressed,
                     value = value,
                     raw_value = raw_value,
                     is_axis = is_axis
@@ -1306,7 +1369,7 @@ class MidiClient(QtCore.QObject):
             self._interface.stop()
         except:
             pass
-        self._midi_map = {}  
+        self._midi_map = {}
 
     def _midi_message_cb(self, port_name : str, port_index : int,  message):
         ''' called when a midi messages is provided by the listener  '''
@@ -1335,7 +1398,7 @@ class MidiClient(QtCore.QObject):
                     raw_value = message.velocity
                 elif command == MidiCommandType.Aftertouch:
                     raw_value = message.value
-                elif command == MidiCommandType.ChannelAftertouch:  
+                elif command == MidiCommandType.ChannelAftertouch:
                     raw_value = message.value
                 elif command == MidiCommandType.ProgramChange:
                     raw_value = None
@@ -1367,7 +1430,7 @@ class MidiClient(QtCore.QObject):
                     event_type= InputType.Midi,
                     device_guid= MidiDeviceTabWidget.device_guid,
                     identifier= input_item,
-                    is_pressed = is_pressed, 
+                    is_pressed = is_pressed,
                     value = value,
                     raw_value = raw_value,
                     is_axis = is_axis
@@ -1981,10 +2044,10 @@ class JoystickInputSignificant:
                 if abs(self._event_registry[event].value - event.value) > deviation:
                     self._event_registry[event] = event
                     self._time_registry[event] = time.time()
-                    # print (f"axis move: {abs(self._event_registry[event].value - event.value)} deviation: {deviation} TRUE")    
+                    # print (f"axis move: {abs(self._event_registry[event].value - event.value)} deviation: {deviation} TRUE")
                     return True
                 else:
-                    #print (f"axis move: {abs(self._event_registry[event].value - event.value)} deviation: {deviation} FALSE")    
+                    #print (f"axis move: {abs(self._event_registry[event].value - event.value)} deviation: {deviation} FALSE")
                     return False
         else:
             self._event_registry[event] = event

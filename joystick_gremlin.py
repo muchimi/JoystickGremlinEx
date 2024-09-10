@@ -35,8 +35,8 @@ import webbrowser
 import dinput
 
 import gremlin.gamepad_handling
+import gremlin.import_profile
 import gremlin.joystick_handling
-
 import gremlin.shared_state
 import gremlin.ui.keyboard_device
 import gremlin.ui.midi_device
@@ -106,7 +106,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.15ex (m1)"
+APPLICATION_VERSION = "13.40.15ex (m2)"
 
 # the main ui
 ui = None
@@ -320,9 +320,13 @@ class GremlinUi(QtWidgets.QMainWindow):
         self._actionTabSubstitute.setToolTip("Substitute device GUIDs")
         self._actionTabClearMap = QtGui.QAction("Clear Mappings", self, triggered = self._tab_clear_map_cb)
         self._actionTabClearMap.setToolTip("Clears all mappings from the current device")
+        self._actionTabImport = QtGui.QAction("Import Profile...", self, triggered = self._tab_import_cb)
+        self._actionTabImport.setToolTip("Import profile data into the current device")
+
         menuTools.addSeparator()
         menuTools.addAction(self._actionTabSort)
         menuTools.addAction(self._actionTabSubstitute)
+        menuTools.addAction(self._actionTabImport)
         menuTools.addAction(self._actionTabClearMap)
 
 
@@ -344,6 +348,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         menu = QtWidgets.QMenu(self)
         menu.addAction(self._actionTabSort)
         menu.addAction(self._actionTabSubstitute)
+        menu.addAction(self._actionTabImport)
         menu.addAction(self._actionTabClearMap)
         menu.exec_(QtGui.QCursor.pos())
 
@@ -361,6 +366,13 @@ class GremlinUi(QtWidgets.QMainWindow):
         result = msgbox.show()
         if result == QtWidgets.QMessageBox.StandardButton.Ok:
             self._tab_clear_map_execute(device, current_mode)
+
+
+    def _tab_import_cb(self):
+        ''' imports a profile into the device '''
+        tab_guid = gremlin.util.parse_guid(gremlin.shared_state.ui._active_tab_guid())
+        device : gremlin.base_profile.Device = gremlin.shared_state.current_profile.devices[tab_guid]
+        gremlin.import_profile.import_profile(device.device_guid)
 
     def _tab_clear_map_execute(self, device, mode_name):
         ''' removes all mappings from the given device in the active mode '''
@@ -2179,6 +2191,17 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         finally:
             popCursor()
+
+    def refresh(self):
+        ''' refresh the UI '''
+        self._create_tabs()
+
+        current_profile =gremlin.shared_state.current_profile
+        current_mode = gremlin.shared_state.current_mode
+
+        # Make the first root node the default active mode
+        self.mode_selector.populate_selector(current_profile, current_mode, emit = False)
+        self._update_mode_status_bar()
 
     def _force_close(self):
         """Forces the closure of the program."""

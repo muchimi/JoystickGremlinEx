@@ -6,6 +6,8 @@ import gremlin.event_handler
 from vigem import vigem_gamepad as vg
 from vigem.vigem_client import VigemClient as vc
 import gremlin.config
+from enum import Enum, auto
+
 
 
 _gamepad_available = False

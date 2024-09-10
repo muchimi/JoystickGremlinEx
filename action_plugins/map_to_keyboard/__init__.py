@@ -189,6 +189,8 @@ class MapToKeyboard(gremlin.base_profile.AbstractAction):
                 gremlin.profile.parse_bool(child.get("extended"))
             ))
 
+        pass
+
     def _generate_xml(self):
         """Returns an XML node containing this instance's information.
 
@@ -208,7 +210,15 @@ class MapToKeyboard(gremlin.base_profile.AbstractAction):
         :return True if the action is configured correctly, False otherwise
         """
         return len(self.keys) > 0
-
+    
+    def display_name(self):
+        ''' friendly display name '''
+        names = []
+        text = ""
+        for key in self.keys:
+            names.append(key_from_code(key[0],key[1]).name)
+        text += " + ".join(names)
+        return text
 
 version = 1
 name = "map-to-keyboard"

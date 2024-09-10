@@ -1,5 +1,7 @@
 """
-VGamepad API (Windows)
+VGamepad API (Windows)  adapted from Yann Boutellier's vgamepad libary and Nefarius' VIGEM SDK samples
+
+
 """
 
 from . import vigem_commons as vcom
@@ -34,6 +36,7 @@ class VBus:
     Virtual USB bus (ViGEmBus)
     """
     def __init__(self):
+        # keep internal references so GC does not remove the dll before the objects are terminated properly
         self.vigem_disconnect = vcli.vigem_disconnect
         self.vigem_free = vcli.vigem_free
         self._busp = vcli.vigem_alloc()
