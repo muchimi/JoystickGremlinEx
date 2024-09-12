@@ -232,7 +232,21 @@ class DeviceType(IntEnum):
             return _DeviceType_to_enum_lookup[value]
         except KeyError:
             raise gremlin.error.GremlinError("Invalid type in lookup")
+        
+    @staticmethod
+    def to_display_name(value):
+        return _DeviceType_to_display_name[value]
 
+
+
+
+_DeviceType_to_display_name = {
+    DeviceType.Keyboard: "Keyboard",
+    DeviceType.Joystick: "Joystick",
+    DeviceType.VJoy: "VJoy",
+    DeviceType.Midi: "MIDI",
+    DeviceType.Osc: "OSC"
+}
 
 _DeviceType_to_string_lookup = {
     DeviceType.Keyboard: "keyboard",
