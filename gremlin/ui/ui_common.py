@@ -3603,3 +3603,37 @@ class QBubble(QtWidgets.QLabel):
 
 
     
+class ActionLabel(QtWidgets.QLabel):
+
+    """Handles showing the correct icon for the given action."""
+
+    def __init__(self, action_entry, parent=None):
+        """Creates a new label for the given entry.
+
+        :param action_entry the entry to create the label for
+        :param parent the parent
+        """
+        QtWidgets.QLabel.__init__(self, parent)
+        icon = action_entry.icon()
+        if isinstance(icon, str):
+            # convert to icon if a path is given
+            icon = load_icon(icon)
+        
+        if isinstance(icon, QtGui.QIcon):
+            pixmap = icon.pixmap(16)
+        else:
+            pixmap = QtGui.QPixmap(icon)
+        pixmap = pixmap.scaled(16, 16, QtCore.Qt.KeepAspectRatio)
+        self.setPixmap(pixmap)
+
+        self.action_entry = action_entry
+
+        el = gremlin.event_handler.EventListener()
+        el.icon_changed.connect(self._icon_change)
+
+    def _icon_change(self, event):
+        icon = self.action_entry.icon()
+        if isinstance(icon, QtGui.QIcon):
+            self.setPixmap(QtGui.QPixmap(icon.pixmap(20)))
+        else:
+            self.setPixmap(QtGui.QPixmap(icon))

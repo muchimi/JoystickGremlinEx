@@ -217,6 +217,11 @@ def device_info_from_guid(guid) -> DeviceSummary:
         return _joystick_device_guid_map[guid]
     return None
 
+def is_device_connected(guid) -> bool:
+    ''' true if the device is connected (reported in) '''
+    return guid in _joystick_device_guid_map.keys()
+
+
 
 def linear_axis_index(axis_map, axis_index):
     """Returns the linear index for an axis based on the axis index.

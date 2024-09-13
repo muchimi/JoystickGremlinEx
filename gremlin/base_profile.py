@@ -578,7 +578,8 @@ class Device:
         self.device_guid = None
         self.modes = {}
         self.type = None
-        self.virtual = False # true if the device was found in the detected hardware list
+        self.virtual = False # true if the device is virtual (vjoy)
+        self.connected = False # true if the device was found in the detected hardware list
 
     def ensure_mode_exists(self, mode_name, device=None):
         """Ensures that a specified mode exists, creating it if needed.
@@ -619,6 +620,7 @@ class Device:
         self.label = safe_read(node, "label", default_value=self.name)
         self.type = DeviceType.to_enum(safe_read(node, "type", str))
         self.device_guid = parse_guid(node.get("device-guid"))
+        self.connected = gremlin.joystick_handling.is_device_connected(self.device_guid)
 
         for child in node:
             mode = Mode(self)
