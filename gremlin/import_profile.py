@@ -45,6 +45,7 @@ from gremlin.types import DeviceType
 from gremlin.input_types import InputType
 from gremlin.util import safe_read
 from gremlin.ui import ui_common
+from gremlin.clipboard import Clipboard
 # from gremlin.input_types import InputType
 
 #from xml.dom import minidom
@@ -322,6 +323,11 @@ class ImportProfileDialog(QtWidgets.QDialog):
         self.command_one_to_one_button_widget = QtWidgets.QPushButton("Map 1:1")
         self.command_one_to_one_button_widget.setToolTip("Maps inputs to outputs 1:1 if the input exists in the output.<br>If the output doesn't exist, the first available slot to import to will be used.")
         self.command_one_to_one_button_widget.clicked.connect(self._cmd_one_to_one)
+
+        
+
+
+
         self.container_command_header_layout.addWidget(self.command_one_to_one_button_widget)
         self.container_command_header_layout.addStretch()
 
@@ -336,6 +342,10 @@ class ImportProfileDialog(QtWidgets.QDialog):
         self.import_button_widget.clicked.connect(self._import_cb)
         self.close_button_widget = QtWidgets.QPushButton("Close")
         self.close_button_widget.clicked.connect(self._close_cb)
+
+        self.container_buttons_layout.addStretch()
+        self.container_buttons_layout.addWidget(self.import_button_widget)
+        self.container_buttons_layout.addWidget(self.close_button_widget)
 
         self.container_mode_layout.addWidget(self.create_mode_widget)
         self.container_mode_layout.addWidget(self.target_mode_label_widget)
@@ -402,9 +412,7 @@ class ImportProfileDialog(QtWidgets.QDialog):
         self.target_mode_selector.setEnabled(target_mode_enabled)
         self.target_mode_label_widget.setEnabled(target_mode_enabled)
 
-    @QtCore.Slot()
-    def _import_cb(self):
-        pass
+
 
     @QtCore.Slot()
     def _close_cb(self):        
@@ -419,7 +427,7 @@ class ImportProfileDialog(QtWidgets.QDialog):
         self._update_import_mode_list()
 
         # update input list
-        self._update_input_list()
+        self._update_map()
        
 
     def populate_mode_selector(self, selector : QtWidgets.QComboBox, profile : gremlin.base_profile.Profile):
@@ -705,7 +713,7 @@ class ImportProfileDialog(QtWidgets.QDialog):
             self.import_mode_list_widget.setItemWidget(item, widget)
 
 
-    def _update_input_list(self):
+    def _update_map(self):
         ''' updates the mappings source to target '''
 
         self._map = {} # clear and rebuild the map
@@ -865,7 +873,14 @@ class ImportProfileDialog(QtWidgets.QDialog):
             tree.expandAll()
                     
 
-
+    def _find_map_item(self, widget):
+        ''' finds which map item has the given widget as an output map widget 
+       
+        :widget: the target mapped widget
+        
+        '''
+        item = next((item for item in self._map.keys() if item.map_to_widget == widget), None)
+        return item
 
     def _create_target_selection_widget(self, device_type):
         ''' create a combo box for the target '''
@@ -956,7 +971,7 @@ class ImportProfileDialog(QtWidgets.QDialog):
     
     @QtCore.Slot()
     def _target_device_changed(self):
-        ''' called when the target dervice for a source device changes '''   
+        ''' called when the target device for a source device changes '''   
         widget = self.sender()
         import_item : ImportItem  = widget.data
         device = widget.currentData() # device
@@ -964,8 +979,7 @@ class ImportProfileDialog(QtWidgets.QDialog):
         self._input_device_guid_to_target_device_guid[import_item.device_guid] = target_device_guid
 
         # repopulate the tree with the new data
-        self._update_input_list()
-
+        self._update_map()
 
             
     @QtCore.Slot(bool)
@@ -1000,6 +1014,93 @@ class ImportProfileDialog(QtWidgets.QDialog):
                 if first:
                     index = widget.findData(first)
                     widget.setCurrentIndex(index)
+
+    @QtCore.Slot()
+    def _import_cb(self):
+        ''' run the import based on the mapping options '''
+        # only map the selected import items
+
+        import_items = [item for item in self._map.keys() if isinstance(item, ImportItem) and item.selected]
+        import_item : ImportItem
+
+        mode_list = self.target_profile.get_modes()
+        target_profile = self.target_profile
+
+        container_plugins = gremlin.plugin_manager.ContainerPlugins()
+        container_name_map = container_plugins.tag_map
+
+        for import_item in import_items:
+            # target output device
+            target_device_guid = self._input_device_guid_to_target_device_guid[import_item.device_guid]
+            target_device : gremlin.base_profile.Device = self.target_devices_map[target_device_guid]
+            source_device_guid = import_item.device_guid
+
+            # get the modes mapped for this input
+            mode_items = [item for item in self._map.keys() if isinstance(item, ImportModeItem) and item.parent == import_item and item.selected]
+            mode_item : ImportModeItem
+            for mode_item in mode_items:
+                source_mode = mode_item.mode
+                widget = mode_item.map_to_widget
+                if widget:
+                    # has a mode
+                    target_mode = widget.currentText()
+                    # if the mode is not in the target profile, create that mode
+                    if not target_mode in mode_list:
+                        self.target_profile.add_mode(target_mode, emit=False)
+
+                    # get the list of source items to map to the target device for the target mode
+                    input_items = [item for item in self._map.keys() if isinstance(item, ImportInputItem) and item.parent == mode_item and item.selected]
+                    input_item : ImportInputItem
+                    for input_item in input_items:
+                        # copy the containers
+                        
+                        widget = input_item.map_to_widget
+                        if widget:
+                            # get the target input on that device
+                            target_input_item : ImportInputItem = widget.currentData()
+                            
+                            container_items = input_item.containers # [item for item in input_item.containers if item.selected]
+                            container_item : ImportContainerItem
+                            for container_item in container_items:
+                                # get the source device 
+                                device : gremlin.base_profile.Device
+                                device = next((device for device in self.source_profile.devices.values() if device.device_guid == source_device_guid), None)
+                                profile_mode = device.modes[source_mode]
+                                for profile_input_items in profile_mode.config.values():
+                                    profile_input_item : gremlin.base_profile.InputItem
+                                    for profile_input_item in profile_input_items.values():
+                                        if profile_input_item.input_id == input_item.input_id and profile_input_item.input_type == input_item.input_type:
+                                            # matching profile input
+                                            for profile_container in profile_input_item.containers:
+                                                # copy the containers from the source input to the target input
+                                                profile_target_mode : gremlin.base_profile.Mode = target_device.modes[target_mode]
+                                                profile_target_input_item : gremlin.base_profile.InputItem
+                                                for profile_target_input_item in profile_target_mode.config.values():
+                                                    if profile_target_input_item.input_type == target_input_item.input_type and \
+                                                        profile_target_input_item.input_id == target_input_item.input_id:
+                                                        # found the matching input item on the target profile
+                                                        node = profile_container.to_xml() # use xml to serialize to avoid reference shenanigans
+                                                        # change node actionIds to new Ids (not technically necessary but good to do)
+                                                        action_nodes = node.xpath("//*[@action_id]")
+                                                        for action_node in action_nodes:
+                                                            new_id = gremlin.util.get_guid().replace("{","").replace("}",'')
+                                                            action_node.set("action_id",new_id)
+                                                        # create a new container
+                                                        container = container_name_map[profile_container.container_type](profile_target_input_item)
+                                                        # configure the container from the serialized data
+                                                        container.from_xml(node)
+
+                                                        #profile_target_input_item.add_container(container)
+
+
+
+                                            
+
+
+
+
+                    
+
 
 
 
