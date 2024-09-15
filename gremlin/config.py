@@ -1138,3 +1138,13 @@ class Configuration:
             value = 3
         self._data["vigem_device_count"] = value
         self.save()
+
+    @property
+    def import_level(self):
+        ''' import mapping expansion level 0 to 4 '''
+        return self._data.get("import_level",1)
+
+    @import_level.setter
+    def import_level(self, value):
+        self._data["import_level"] = value
+        self.save()

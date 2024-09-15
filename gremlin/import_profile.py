@@ -31,6 +31,7 @@ import copy
 import logging
 import time
 from typing import Union, Any
+import gremlin.import_profile
 import gremlin.joystick_handling
 import gremlin.plugin_manager
 import gremlin.util
@@ -58,9 +59,9 @@ ContainerItem= namedtuple("ContainerItem","device_name device_guid device_type m
 
 def find_dropdown(widget):
     ''' finds the drop down contained by the widget
-    
+
     :returns: None if not found, or the combobox widget
-    
+
     '''
     if widget is not None:
         # find the first combo box in the layout
@@ -91,19 +92,19 @@ class AbstractTreeItem():
     @property
     def selected(self) -> bool:
         return self._selected
-    
+
     def get_mapped_item(self):
-        ''' returns the mapped_to item 
+        ''' returns the mapped_to item
 
         the map_to_widget is either a combobox or a layout containing a combo box with the selected mapped item
 
         :returns: the mapped item data, or None if not mapped
-         
+
         '''
         widget = self.map_to_widget
         return find_dropdown(widget)
-        
-    
+
+
     @selected.setter
     def selected(self, value):
         self._selected = value
@@ -120,7 +121,7 @@ class AbstractTreeItem():
     # override in derived classes
     def selectable_items(self):
         return []
-        
+
 
     def __hash__(self):
         return hash(self._id)
@@ -130,14 +131,18 @@ class ImportContainerItem(AbstractTreeItem):
     ''' holds a single container data '''
     def __init__(self):
         super().__init__()
+        self.container_id = None # id of the container
         self.container_type = None  # type of container this is
         self.container_name : str = None
         self.actions = [] # actions in the container
         self.action_names = [] # action names mapped in the container
-        
+
 
     def selectable_items(self):
         return self.actions
+    
+    def __str__(self):
+        return f"Import Container Item: {self.container_name} {self.container_id}"
 
 class ImportInputItem(AbstractTreeItem):
     ''' holds the input data '''
@@ -151,21 +156,21 @@ class ImportInputItem(AbstractTreeItem):
         self.mode : str = None # mode for this input
         self.containers : list[ImportContainerItem] = []  # list of ImportContainerItems
         self._selected : bool = True # true if selected for import
-    
+
     def selectable_items(self):
         return self.containers
 
 
     def __str__(self):
         return f"{self.input_name} [{self.input_id}]"
-    
+
 class ImportModeItem(AbstractTreeItem):
     def __init__(self):
         super().__init__()
         self.mode = None # mode
         self.parent = None # parent (ImportItem)
         self.items : list[ImportInputItem] = []
-    
+
     def selectable_items(self):
         return self.items
 
@@ -179,17 +184,17 @@ class ImportItem(AbstractTreeItem):
         self.device_guid = None
         self.mode_map : dict[str, ImportModeItem ] = {} # map keyed by mode of list of input_items
 
-    
+
     def selectable_items(self):
         return list(self.mode_map.values())
-    
+
 
 class ImportProfileDialog(QtWidgets.QDialog):
     ''' dialog for import options '''
 
 
-    def __init__(self, device_guid, profile_path, parent=None):
-        
+    def __init__(self, profile_path, parent=None):
+
         super().__init__(parent)
 
         # make modal
@@ -198,31 +203,37 @@ class ImportProfileDialog(QtWidgets.QDialog):
 
         # get the device information
         self.target_profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
-        device_guids = list(self.target_profile.devices.keys())
-        if not device_guid in device_guids:
-            syslog.warning(f"Import profile: error: target device does not exist in current profile {device_guid}")
+
+        # buid list of target devices in the current profile - these are devices that can be imported into
+        self.target_devices_map = {}
+
+        self.target_devices = [device for device in self.target_profile.get_ordered_device_list()]
+        if len(self.target_devices) == 0:
+            devices = self.target_profile.get_ordered_device_list()
+            syslog.error("Import error: No mappable devices found in target profile")
+            ui_common.MessageBox("Import error:","No mappable devices found in the target profile")
             self.close()
             return
-        
-        # buid list of target devices in the current profile - these are devices that can be imported into
-        self.target_devices = []
-        self.target_devices_map = {}
-        self.target_devices = [device for device in self.target_profile.devices.values() if device.connected]
+
         for device in self.target_devices:
             self.target_devices_map[device.device_guid] = device
 
-        
-        self.target_device : gremlin.base_profile.Device = self.target_profile.devices[device_guid]
-        self.device_name = self.target_device.name.casefold()
-        self.target_hardware = gremlin.joystick_handling.device_info_from_guid(self.target_device.device_guid)
         self.profile_path = profile_path
         self._import_map = {} # import map from the import profile ([device_guid] ImportItems -> [mode] -> ImportInputItems -> [containers list] -> ImportContainerItem
-        self._import_mode_list = [] # list of available modes in the import profile 
+        self._import_mode_list = [] # list of available modes in the import profile
         self._import_mode_selection_map  = {} # map of modes to the import selection - value = true if the mode is selected for import, false otherwise
         self._target_input_item_map = {}  # map of device GUID to available input items for that device - cached as needed
         self._map = {}  # map of source items to their mapped destination
         self._input_items_by_source_device_guid = {} # holds the data for input items based on device GUID
         self._input_device_guid_to_target_device_guid = {} # holds the map of source device guids to target device guid for mapping
+        self._import_input_items = [] # list of imported input items
+
+
+        self._tree_root_nodes = []
+        self._tree_device_nodes = []
+        self._tree_mode_nodes = []
+        self._tree_container_nodes = []
+        self._tree_input_nodes = []
 
         # Actual configuration object being managed
         self.config = gremlin.config.Configuration()
@@ -231,7 +242,7 @@ class ImportProfileDialog(QtWidgets.QDialog):
         self._create_ui() # create the dialog UI
         self._load_import_profile() # load and update the ui with the import profile
 
-        
+
 
         # current list of import inputs
         #self._import_model = ImportItemListModel()
@@ -256,17 +267,6 @@ class ImportProfileDialog(QtWidgets.QDialog):
         self.container_path_layout.addWidget(self.path_widget)
         self.container_path_layout.addStretch()
 
-        # device to import
-        
-        self.container_device_widget = QtWidgets.QWidget()
-        self.container_device_widget.setContentsMargins(0,0,0,0)
-        self.container_device_layout = QtWidgets.QHBoxLayout(self.container_device_widget)
-        self.container_device_layout.setContentsMargins(0,0,0,0)
-
-        self.source_device_selector = QtWidgets.QComboBox()
-        self.source_device_selector.currentIndexChanged.connect(self._device_change_cb)
-        self.container_device_layout.addWidget(self.source_device_selector)
-
         # import options
         self.container_options_widget = QtWidgets.QWidget()
         self.container_options_widget.setContentsMargins(0,0,0,0)
@@ -284,7 +284,7 @@ class ImportProfileDialog(QtWidgets.QDialog):
         self.target_mode_label_widget = QtWidgets.QLabel("Target Mode:")
 
         self.target_mode_selector = QtWidgets.QComboBox()
-        # populate the modes of the current device being imported into 
+        # populate the modes of the current device being imported into
         self.populate_mode_selector(self.target_mode_selector, self.target_profile)
 
         self.import_modes_widget = QtWidgets.QRadioButton("Import All Modes")
@@ -294,7 +294,7 @@ class ImportProfileDialog(QtWidgets.QDialog):
         self.import_mode_selector = QtWidgets.QComboBox()
 
         self.import_mode_list_widget = QtWidgets.QListWidget()
-        
+
         self.import_modes_widget.setChecked(True)
         self.import_modes_widget.clicked.connect(self._update_mode_options)
         self.import_single_mode_widget.clicked.connect(self._update_mode_options)
@@ -324,14 +324,52 @@ class ImportProfileDialog(QtWidgets.QDialog):
         self.command_one_to_one_button_widget.setToolTip("Maps inputs to outputs 1:1 if the input exists in the output.<br>If the output doesn't exist, the first available slot to import to will be used.")
         self.command_one_to_one_button_widget.clicked.connect(self._cmd_one_to_one)
 
-        
 
+        self.command_deselect_all_button_widget = QtWidgets.QPushButton("Select None")
+        self.command_deselect_all_button_widget.setToolTip("Deselects all imports")
+        self.command_deselect_all_button_widget.clicked.connect(self._cmd_deselect_all)
+
+
+        self.command_select_all_button_widget = QtWidgets.QPushButton("Select All")
+        self.command_select_all_button_widget.setToolTip("Selects all imports")
+        self.command_select_all_button_widget.clicked.connect(self._cmd_select_all)
+
+
+
+        width = ui_common.get_text_width("MMMM")
+
+        self.command_level_1_button_widget = QtWidgets.QPushButton("L1")
+        self.command_level_1_button_widget.setToolTip("Expand/Collapse to Devices")
+        self.command_level_1_button_widget.clicked.connect(lambda: self._cmd_set_level(1))
+        self.command_level_1_button_widget.setMaximumWidth(width)
+
+        self.command_level_2_button_widget = QtWidgets.QPushButton("L2")
+        self.command_level_2_button_widget.setToolTip("Expand/Collapse to Modes")
+        self.command_level_2_button_widget.clicked.connect(lambda: self._cmd_set_level(2))
+        self.command_level_2_button_widget.setMaximumWidth(width)
+
+        self.command_level_3_button_widget = QtWidgets.QPushButton("L3")
+        self.command_level_3_button_widget.setToolTip("Expand/Collapse to Inputs")
+        self.command_level_3_button_widget.clicked.connect(lambda: self._cmd_set_level(3))
+        self.command_level_3_button_widget.setMaximumWidth(width)
+
+        self.command_level_4_button_widget = QtWidgets.QPushButton("L4")
+        self.command_level_4_button_widget.setToolTip("Expand/Collapse to Containers")
+        self.command_level_4_button_widget.clicked.connect(lambda: self._cmd_set_level(4))
+        self.command_level_4_button_widget.setMaximumWidth(width)
 
 
         self.container_command_header_layout.addWidget(self.command_one_to_one_button_widget)
+        self.container_command_header_layout.addWidget(self.command_select_all_button_widget)
+        self.container_command_header_layout.addWidget(self.command_deselect_all_button_widget)
         self.container_command_header_layout.addStretch()
+        self.container_command_header_layout.addWidget(self.command_level_1_button_widget)
+        self.container_command_header_layout.addWidget(self.command_level_2_button_widget)
+        self.container_command_header_layout.addWidget(self.command_level_3_button_widget)
+        self.container_command_header_layout.addWidget(self.command_level_4_button_widget)
 
-        
+
+
         # buttons
         self.container_buttons_widget = QtWidgets.QWidget()
         self.container_buttons_widget.setContentsMargins(0,0,0,0)
@@ -339,8 +377,10 @@ class ImportProfileDialog(QtWidgets.QDialog):
         self.container_buttons_layout.setContentsMargins(0,0,0,0)
 
         self.import_button_widget = QtWidgets.QPushButton("Import")
+        self.import_button_widget.setToolTip("Imports the mapped items into the current profile")
         self.import_button_widget.clicked.connect(self._import_cb)
         self.close_button_widget = QtWidgets.QPushButton("Close")
+        self.close_button_widget.setToolTip("Closes the dialog")
         self.close_button_widget.clicked.connect(self._close_cb)
 
         self.container_buttons_layout.addStretch()
@@ -355,12 +395,7 @@ class ImportProfileDialog(QtWidgets.QDialog):
         # self.container_mode_layout.addWidget(self.import_mode_list_widget)
 
 
-
-
-
         self.main_layout.addWidget(self.container_path_widget)
-        self.main_layout.addWidget(self.container_device_widget)
-        #self.main_layout.addWidget(self.container_mode_widget)
         self.main_layout.addWidget(self.container_command_header_widget)
         self.main_layout.addWidget(self.container_mappings_widget)
         self.main_layout.addWidget(self.container_buttons_widget)
@@ -378,7 +413,7 @@ class ImportProfileDialog(QtWidgets.QDialog):
     def current_import_mode(self):
         ''' current import mode selected '''
         return self.import_mode_selector.currentText()
-    
+
     @property
     def current_import_device(self):
         ''' current import device '''
@@ -386,23 +421,33 @@ class ImportProfileDialog(QtWidgets.QDialog):
             return None
         return self.source_device_selector.currentData()
 
+    def _get_subtree_nodes(self, tree_widget_item):
+        """Returns all QTreeWidgetItems in the subtree rooted at the given node."""
+        nodes = []
+        nodes.append(tree_widget_item)
+        for i in range(tree_widget_item.childCount()):
+            nodes.extend(self._get_subtree_nodes(tree_widget_item.child(i)))
+        return nodes
+
+    def _get_tree_items(self, widget):
+        """ gets all tree widgets in the given tree"""
+        nodes = []
+        for index in range(widget.topLevelItemCount()):
+            top_item = widget.topLevelItem(index)
+            nodes.extend(self._get_subtree_nodes(top_item))
+        return nodes
+
     def _update_ui(self):
         ''' updates the UI based on the profiles '''
 
-        # update the device list from the list of import devices
-        with QtCore.QSignalBlocker(self.source_device_selector):
-            self.source_device_selector.clear()
-            item : ImportItem
-            for item in self._import_map.values():
-                self.source_device_selector.addItem(item.device_name, item)
 
         # populate the modes for the target
-        self.populate_mode_selector(self.import_mode_selector, self.source_profile)
+        #self.populate_mode_selector(self.import_mode_selector, self.source_profile)
 
         # update selectable import mode list
         self._device_change_cb()
 
-    
+
     def _update_mode_options(self):
         ''' updates the mode options based on what is selected '''
         source_mode_enabled = self.import_single_mode_widget.isChecked()
@@ -415,7 +460,7 @@ class ImportProfileDialog(QtWidgets.QDialog):
 
 
     @QtCore.Slot()
-    def _close_cb(self):        
+    def _close_cb(self):
         gremlin.shared_state.ui.refresh()
         self.close()
 
@@ -428,18 +473,18 @@ class ImportProfileDialog(QtWidgets.QDialog):
 
         # update input list
         self._update_map()
-       
+
 
     def populate_mode_selector(self, selector : QtWidgets.QComboBox, profile : gremlin.base_profile.Profile):
-        ''' populates profile modes for the specified profile 
-        
+        ''' populates profile modes for the specified profile
+
         :param: selector = the combo box to populate (will be cleared)
         :param: profile = the profile to load modes from
-        
+
         '''
         while selector.count() > 0:
             selector.removeItem(0)
-        
+
         mode_list = profile.get_modes()
         self.mode_list = [x[1] for x in mode_list]
         # Create mode name labels visualizing the tree structure
@@ -481,11 +526,29 @@ class ImportProfileDialog(QtWidgets.QDialog):
         for mode, children in sorted(tree.items()):
             labels.append((mode,
                 f"{"  " * level}{"" if level == 0 else " "}{mode}"))
-            self._inheritance_tree_to_labels(labels, children, level+1)        
+            self._inheritance_tree_to_labels(labels, children, level+1)
+
+    def _get_input_name(self, input_type: InputType, input_id):
+        if input_type == InputType.JoystickAxis:
+            return f"Axis {input_id}"
+        elif input_type == InputType.JoystickButton:
+            return f"Button {input_id}"
+        elif input_type == InputType.JoystickHat:
+            return f"Hat {input_id}"
+        elif input_type == InputType.Keyboard:
+            return f"Key {input_id}"
+        elif input_type == InputType.KeyboardLatched:
+            return f"KeyEx {input_id}"
+        elif input_type == InputType.Midi:
+            return f"MIDI {input_id}"
+        elif input_type == InputType.OpenSoundControl:
+            return f"OSC {input_id}"
+        return f"unknown: {input_type} {input_id}"
+
 
     def _load_import_profile(self):
         ''' imports a profile to the specified target device ID matching by name
-        
+
         :param: device_guid  the device to import to
         :path: the xml to import
         '''
@@ -514,10 +577,7 @@ class ImportProfileDialog(QtWidgets.QDialog):
             node_name = node.get("name")
             node_guid = gremlin.util.parse_guid(node.get("device-guid"))
             node_type = DeviceType.to_enum(node.get("type"))
-            if node_type != self.target_device.type:
-                # device type does not match
-                continue
-        
+
             # node entry matches GUID or name
             item = NodeItem(node_name, node_guid, node_type, node)
             item_list.append(item)
@@ -544,67 +604,64 @@ class ImportProfileDialog(QtWidgets.QDialog):
                         # axis node
                         input_id = safe_read(node_input,"id",int, 0)
                         input_description = safe_read(node_input,"description",str,"")
-                        if input_id < self.target_hardware.axis_count:
-                            data = ContainerItem(device_name=item.device_name,
-                                                device_guid=item.device_guid,
-                                                device_type=item.device_type,
-                                                mode = mode,
-                                                input_type = InputType.JoystickAxis,
-                                                input_description = input_description,
-                                                input_id=input_id,
-                                                container_nodes = node_containers
-                                                )
-                            import_list.append(data)
-                            
+                        data = ContainerItem(device_name=item.device_name,
+                                            device_guid=item.device_guid,
+                                            device_type=item.device_type,
+                                            mode = mode,
+                                            input_type = InputType.JoystickAxis,
+                                            input_description = input_description,
+                                            input_id=input_id,
+                                            container_nodes = node_containers
+                                            )
+                        import_list.append(data)
+
                     elif node_input.tag == "button":
                         # button node
                         input_id = safe_read(node_input,"id",int, 0)
                         input_description = safe_read(node_input,"description",str,"")
-                        if input_id < self.target_hardware.button_count:
-                            data = ContainerItem(device_name=item.device_name,
-                                                device_guid=item.device_guid,
-                                                device_type=item.device_type,
-                                                mode = mode,
-                                                input_type = InputType.JoystickButton,
-                                                input_description = input_description,
-                                                input_id=input_id,
-                                                container_nodes = node_containers
-                                                )
-                            import_list.append(data)
-                            
-                            
+                        data = ContainerItem(device_name=item.device_name,
+                                            device_guid=item.device_guid,
+                                            device_type=item.device_type,
+                                            mode = mode,
+                                            input_type = InputType.JoystickButton,
+                                            input_description = input_description,
+                                            input_id=input_id,
+                                            container_nodes = node_containers
+                                            )
+                        import_list.append(data)
+
+
                     elif node_input.tag == "hat":
                         # button node
                         input_id = safe_read(node_input,"id",int, 0)
                         input_description = safe_read(node_input,"description",str,"")
-                        if input_id < self.target_hardware.hat_count:
-                            data = ContainerItem(device_name=item.device_name,
-                                                device_guid=item.device_guid,
-                                                device_type=item.device_type,
-                                                mode = mode,
-                                                input_type = InputType.JoystickHat,
-                                                input_description = input_description,
-                                                input_id=input_id,
-                                                container_nodes = node_containers
-                                                )
-                            import_list.append(data)
-                
-        
+                        data = ContainerItem(device_name=item.device_name,
+                                            device_guid=item.device_guid,
+                                            device_type=item.device_type,
+                                            mode = mode,
+                                            input_type = InputType.JoystickHat,
+                                            input_description = input_description,
+                                            input_id=input_id,
+                                            container_nodes = node_containers
+                                            )
+                        import_list.append(data)
+
+
 
         if not import_list:
-            syslog.warning(f"Import profile: warning: no matching GUID or names found {self.target_device.name} {self.device_guid}")
+            syslog.warning(f"Import profile: warning: no data found")
             return
-        
-                
+
+
 
         # process each container and add to the target
 
         container_plugins = gremlin.plugin_manager.ContainerPlugins()
-        container_name_map = container_plugins.tag_map
+        container_tag_map = container_plugins.tag_map
         mode_list = []
 
         item : ContainerItem
-        syslog.info(f"Import to: '{self.target_device.name}' [{self.target_device.device_guid}]")
+
         for item in import_list:
             nodes = item.container_nodes
             input_id = item.input_id
@@ -616,77 +673,94 @@ class ImportProfileDialog(QtWidgets.QDialog):
             if not mode in mode_list:
                 mode_list.append(mode)
 
-            target_mode = self.target_device.modes[mode]
-            target_entry = target_mode.config[input_type]
-            target_input_item : gremlin.base_profile.InputItem= target_entry[input_id]
-
+            # import (device) node - parents to nothing
             if not item.device_guid in self._import_map.keys():
-                import_data = ImportItem()
-                import_data.device_name = item.device_name
-                import_data.device_guid = item.device_guid
-                import_data.device_type = item.device_type
-                import_data.input_id = input_id
-                import_data.input_type = input_type
-                import_data.input_description = input_description
-                self._import_map[item.device_guid] = import_data
-                import_data.parent = None
-
-
+                import_item = ImportItem()
+                import_item.device_name = item.device_name
+                import_item.device_guid = item.device_guid
+                import_item.device_type = item.device_type
+                import_item.input_id = input_id
+                import_item.input_type = input_type
+                import_item.input_description = input_description
+                self._import_map[item.device_guid] = import_item
+                import_item.parent = None
 
             else:
-                import_data = self._import_map[item.device_guid]
+                import_item = self._import_map[item.device_guid]
 
-            input_data = ImportInputItem()
-            input_data.input_id = input_id
-            input_data.input_description = input_description
-            input_data.input_type = input_type
-            input_data.input_name = target_input_item.display_name
-            input_data.mode = mode
-            input_data.parent = item
-            input_data.device_guid = import_data.device_guid
-            if not import_data.device_guid in self._input_items_by_source_device_guid.keys():
-                self._input_items_by_source_device_guid[import_data.device_guid] = [] # create list of ImportInputItems for that specific import device so we can find them easily
-            self._input_items_by_source_device_guid[import_data.device_guid].append(input_data)
-            if not mode in import_data.mode_map.keys():
-                mode_item = ImportModeItem()
-                mode_item.mode = mode
-                mode_item.parent = item
-                import_data.mode_map[mode] = mode_item
+            # mode node - parents to import (device) node
+            if not mode in import_item.mode_map.keys():
+                import_mode_item = ImportModeItem()
+                import_mode_item.mode = mode
+                import_mode_item.parent = import_item
+                import_item.mode_map[mode] = import_mode_item
             else:
-                mode_item = import_data.mode_map[mode]
-            mode_item.items.append(input_data)
+                import_mode_item = import_item.mode_map[mode]
 
+            # input node - parents to mode node
+            import_input_item = ImportInputItem()
+            import_input_item.input_id = input_id
+            import_input_item.input_description = input_description
+            import_input_item.input_type = input_type
+            import_input_item.input_name = self._get_input_name(import_input_item.input_type, import_input_item.input_id)
+            import_input_item.mode = mode
 
+            import_input_item.device_guid = import_item.device_guid
+            if not import_item.device_guid in self._input_items_by_source_device_guid.keys():
+                self._input_items_by_source_device_guid[import_item.device_guid] = [] # create list of ImportInputItems for that specific import device so we can find them easily
+            self._input_items_by_source_device_guid[import_item.device_guid].append(import_input_item)
 
-            syslog.info(f"\t{target_input_item.display_name}")
-            
+            import_mode_item.items.append(import_input_item)
 
-            for node in nodes:
+            import_input_item.parent = import_mode_item
+
+            profile_input_item = gremlin.base_profile.InputItem()
+            profile_input_item._input_type = input_type
+            profile_input_item._device_guid = import_item.device_guid
+            profile_input_item._input_id = input_id
+            self._import_input_items.append(profile_input_item)
+
+            for index, node in enumerate(nodes):
                 container_type = node.get("type")
-                if container_type not in container_name_map:
+                if container_type not in container_tag_map:
                     syslog.warning(f"\t\tUnknown container type used: {container_type}")
                     continue
 
 
-                container = container_name_map[container_type](target_input_item)
+                container = container_tag_map[container_type](profile_input_item)
                 container.from_xml(node)
 
-                container_data = ImportContainerItem()
-                container_data.container_name = container.name
-                container_data.container_type = container_type
-                container_data.parent = input_data
+                # check for old profile format without container IDs - if not set - we need to find it from the profile so the generated IDs are in sync
+                # the logical question is: why don't we just use that "loaded" profile to start with - the answer is - malformed XML profiles that have double entries and other old stuff in them a new profile would not load
+                container_id = container.id
+                if not "container_id" in node.attrib:
+                    try:
+                        containers = self.source_profile.devices[import_item.device_guid].modes[mode].config[input_type][input_id].containers
+                        container_id = containers[index].id
+                    except:
+                        # not found - use the default ID
+                        pass
                 
+                    
 
-                target_input_item.containers.append(container)
+                # container node - parents to input node
+                import_container_item = ImportContainerItem()
+                import_container_item.container_id = container_id
+                import_container_item.container_name = container.name
+                import_container_item.container_type = container_type
+                import_container_item.parent = import_input_item
 
-                syslog.info(f"\tContainer: {container_type}")
+
+                profile_input_item.containers.append(container)
+
+                syslog.info(f"\tContainer: {container.tag} {container.id}")
                 for action_set in container.action_sets:
                     for action in action_set:
                         syslog.info(f"\t\t\tImported container: {action.name} {action.display_name()}")
-                        container_data.actions.append(action)
-                        container_data.action_names.append(action.display_name())
+                        import_container_item.actions.append(action)
+                        import_container_item.action_names.append(action.display_name())
 
-                input_data.containers.append(container_data)
+                import_input_item.containers.append(import_container_item)
 
 
 
@@ -717,10 +791,10 @@ class ImportProfileDialog(QtWidgets.QDialog):
         ''' updates the mappings source to target '''
 
         self._map = {} # clear and rebuild the map
-        
+
 
         tree = self.import_input_tree_widget
-        with QtCore.QSignalBlocker(tree):     
+        with QtCore.QSignalBlocker(tree):
             tree.setColumnCount(4)
             tree.setHeaderLabels(["Device","Actions","Map To",""])
             tree.clear()
@@ -731,11 +805,18 @@ class ImportProfileDialog(QtWidgets.QDialog):
             header.setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeMode.Stretch)
 
 
+            self._tree_device_nodes = []
+            self._tree_mode_nodes = []
+            self._tree_container_nodes = []
+            self._tree_input_nodes = []
+
+
             root_node = QtWidgets.QTreeWidgetItem(["Importable items"])
+            self._tree_root_nodes = [root_node]
             tree.addTopLevelItem(root_node)
 
             import_item : ImportItem
-            
+
             for import_item in self._import_map.values():
 
                 container_widget = QtWidgets.QWidget()
@@ -744,6 +825,8 @@ class ImportProfileDialog(QtWidgets.QDialog):
                 container_layout.setContentsMargins(0,0,0,0)
 
                 device_node = QtWidgets.QTreeWidgetItem()
+                device_node.setData(0,0, import_item)
+                self._tree_device_nodes.append(device_node)
                 root_node.addChild(device_node)
 
                 cb = ui_common.QDataCheckbox(f"{import_item.device_name}")
@@ -769,16 +852,18 @@ class ImportProfileDialog(QtWidgets.QDialog):
                     device = self.target_devices_map[target_device_guid] # device of the target device
                     index = widget.findData(device) # index in the drop down
                     with QtCore.QSignalBlocker(widget):
-                        widget.setCurrentIndex(index)  
+                        widget.setCurrentIndex(index)
 
                 self._map[import_item] = widget
 
                 tree.setItemWidget(device_node, 0, container_widget)
                 tree.setItemWidget(device_node, 2, map_to_widget)
-                
+
                 mode_item: ImportModeItem
                 for mode_item in import_item.mode_map.values():
                     mode_node = QtWidgets.QTreeWidgetItem()
+                    mode_node.setData(0,0,mode_item)
+                    self._tree_mode_nodes.append(mode_node)
 
                     container_widget = QtWidgets.QWidget()
                     container_widget.setContentsMargins(0,0,0,0)
@@ -801,10 +886,12 @@ class ImportProfileDialog(QtWidgets.QDialog):
                     tree.setItemWidget(mode_node, 0, container_widget)
                     tree.setItemWidget(mode_node, 2, map_to_widget)
                     self._map[mode_item] = widget
-                    
+
                     for input_item in mode_item.items:
 
                         input_node = QtWidgets.QTreeWidgetItem()
+                        input_node.setData(0,0,input_item)
+                        self._tree_input_nodes.append(input_node)
 
                         container_widget = QtWidgets.QWidget()
                         container_widget.setContentsMargins(0,0,0,0)
@@ -833,6 +920,8 @@ class ImportProfileDialog(QtWidgets.QDialog):
                         for container_item in input_item.containers:
 
                             container_node = QtWidgets.QTreeWidgetItem()
+                            container_node.setData(0,0,container_item)
+                            self._tree_container_nodes.append(container_node)
                             cb = ui_common.QDataCheckbox(f"Container: {container_item.container_name}")
                             cb.data = container_item
                             container_item.selected_widget = cb
@@ -850,8 +939,8 @@ class ImportProfileDialog(QtWidgets.QDialog):
                             container_layout.addStretch()
 
                             tree.setItemWidget(container_node, 0, container_widget)
-                            
-                            
+
+
                             # icons for the items
                             container_widget = QtWidgets.QWidget()
                             container_widget.setContentsMargins(0,0,0,0)
@@ -866,18 +955,19 @@ class ImportProfileDialog(QtWidgets.QDialog):
                                 container_layout.addWidget(al)
                             container_layout.addStretch()
 
-                            
-                            tree.setItemWidget(container_node, 1, container_widget)
-                        
 
-            tree.expandAll()
-                    
+                            tree.setItemWidget(container_node, 1, container_widget)
+
+
+            # set tree expansion level to the last selected level
+            self._cmd_set_level(gremlin.config.Configuration().import_level)
+
 
     def _find_map_item(self, widget):
-        ''' finds which map item has the given widget as an output map widget 
-       
+        ''' finds which map item has the given widget as an output map widget
+
         :widget: the target mapped widget
-        
+
         '''
         item = next((item for item in self._map.keys() if item.map_to_widget == widget), None)
         return item
@@ -890,16 +980,17 @@ class ImportProfileDialog(QtWidgets.QDialog):
         container_layout = QtWidgets.QHBoxLayout(container_widget)
         container_layout.setContentsMargins(0,0,0,0)
         widget = ui_common.QDataComboBox()
-        
+
         container_layout.addWidget(widget)
-        
+        assert len(self.target_devices) > 0
+
         for device in self.target_devices:
             if device.type == device_type:
                 widget.addItem(device.name, device)
-        
+
         widget.currentIndexChanged.connect(self._target_device_changed)
         return container_widget, widget
-    
+
     def _create_target_mode_widget(self):
         ''' create a combo box for the mode mapping '''
 
@@ -909,11 +1000,11 @@ class ImportProfileDialog(QtWidgets.QDialog):
         container_layout.setContentsMargins(0,0,0,0)
         widget = ui_common.QDataComboBox()
         container_layout.addWidget(widget)
-        
+
         self.populate_mode_selector(widget, self.target_profile)
-        
+
         return container_widget, widget
-    
+
     def _create_target_input_widget(self, source_input_item : ImportInputItem, device_guid):
         ''' create a combo box for the mode mapping '''
 
@@ -925,21 +1016,21 @@ class ImportProfileDialog(QtWidgets.QDialog):
                 item = ImportInputItem()
                 item.input_id = index + 1
                 item.input_type = InputType.JoystickAxis
-                item.input_name = f"Axis {index + 1}"
+                item.input_name = self._get_input_name(item.input_type, item.input_id)
                 item.device_guid = device_guid
                 items.append(item)
             for index in range(info.button_count):
                 item = ImportInputItem()
                 item.input_id = index + 1
                 item.input_type = InputType.JoystickButton
-                item.input_name = f"Button {index + 1}"
+                item.input_name = self._get_input_name(item.input_type, item.input_id)
                 item.device_guid = device_guid
                 items.append(item)
             for index in range(info.hat_count):
                 item = ImportInputItem()
                 item.input_id = index + 1
                 item.input_type = InputType.JoystickHat
-                item.input_name = f"Hat {index + 1}"
+                item.input_name = self._get_input_name(item.input_type, item.input_id)
                 item.device_guid = device_guid
                 items.append(item)
             self._target_input_item_map[device_guid] = items
@@ -965,13 +1056,13 @@ class ImportProfileDialog(QtWidgets.QDialog):
             index = widget.findData(first)
             widget.setCurrentIndex(index)
             return container_widget, widget
-        
+
         return None # no match exists
-    
-    
+
+
     @QtCore.Slot()
     def _target_device_changed(self):
-        ''' called when the target device for a source device changes '''   
+        ''' called when the target device for a source device changes '''
         widget = self.sender()
         import_item : ImportItem  = widget.data
         device = widget.currentData() # device
@@ -981,7 +1072,7 @@ class ImportProfileDialog(QtWidgets.QDialog):
         # repopulate the tree with the new data
         self._update_map()
 
-            
+
     @QtCore.Slot(bool)
     def _select_import_item_cb(self, checked):
         widget = self.sender()
@@ -991,6 +1082,8 @@ class ImportProfileDialog(QtWidgets.QDialog):
     @QtCore.Slot(bool)
     def _import_mode_selection_cb(self, checked):
         self._import_mode_selection_cb[self.sender().text()] = checked
+
+
 
     @QtCore.Slot()
     def _cmd_one_to_one(self):
@@ -1015,6 +1108,61 @@ class ImportProfileDialog(QtWidgets.QDialog):
                     index = widget.findData(first)
                     widget.setCurrentIndex(index)
 
+
+    @QtCore.Slot()
+    def _cmd_deselect_all(self):
+        ''' deselects all nodes in the tree '''
+        items = [item for item in self._map.keys() if isinstance(item, ImportItem)]
+        for item in items:
+            item.selected = False
+
+    @QtCore.Slot()
+    def _cmd_select_all(self):
+        ''' selects all nodes in the tree '''
+        items = [item for item in self._map.keys() if isinstance(item, ImportItem)]
+        for item in items:
+            item.selected = True
+
+
+    @QtCore.Slot(int)
+    def _cmd_set_level(self, level):
+        ''' expand/collapse tree map to level
+        0 = expand all
+        1 = expand device
+        2 = expand mode
+        3 = expand container
+        4 = expand input
+        '''
+
+        # save the level
+        gremlin.config.Configuration().import_level = level
+
+        expand_items = []
+        expand_items.extend(self._tree_root_nodes)
+        if level == 0:
+            self.import_input_tree_widget.expandAll()
+            return
+
+        if level >= 1:
+            expand_items.extend(self._tree_device_nodes)
+        if level >= 2:
+            expand_items.extend(self._tree_mode_nodes)
+        if level >= 3:
+            expand_items.extend(self._tree_input_nodes)
+        if level >= 4:
+            expand_items.extend(self._tree_container_nodes)
+
+
+        self.import_input_tree_widget.collapseAll()
+        for item in expand_items:
+            item : QtWidgets.QTreeWidgetItem
+            #item.setBackground(0, QtGui.QColor('green'))
+            parent = item.parent()
+            if parent:
+                parent.setExpanded(True)
+            #item.setExpanded(True)
+            #self.import_input_tree_widget.expandItem(item)
+
     @QtCore.Slot()
     def _import_cb(self):
         ''' run the import based on the mapping options '''
@@ -1024,15 +1172,23 @@ class ImportProfileDialog(QtWidgets.QDialog):
         import_item : ImportItem
 
         mode_list = self.target_profile.get_modes()
-        target_profile = self.target_profile
+
 
         container_plugins = gremlin.plugin_manager.ContainerPlugins()
-        container_name_map = container_plugins.tag_map
+        container_tag_map = container_plugins.tag_map
+
+        input_count = 0
+        mode_count = 0
+        container_count = 0
+        action_count = 0
+
+        verbose = gremlin.config.Configuration().verbose
+        syslog = logging.getLogger("system")
 
         for import_item in import_items:
             # target output device
             target_device_guid = self._input_device_guid_to_target_device_guid[import_item.device_guid]
-            target_device : gremlin.base_profile.Device = self.target_devices_map[target_device_guid]
+            target_device : gremlin.base_profile.Device = self.target_profile.devices[target_device_guid]
             source_device_guid = import_item.device_guid
 
             # get the modes mapped for this input
@@ -1047,64 +1203,97 @@ class ImportProfileDialog(QtWidgets.QDialog):
                     # if the mode is not in the target profile, create that mode
                     if not target_mode in mode_list:
                         self.target_profile.add_mode(target_mode, emit=False)
+                        if verbose:
+                            syslog.info(f"Adding non existing mode {target_mode} to target profile")
+
+                    if verbose:
+                        syslog.info(f"Import mode [{source_mode}] to mode [{target_mode}] in target profile")
+
+                    mode_count+=1
 
                     # get the list of source items to map to the target device for the target mode
                     input_items = [item for item in self._map.keys() if isinstance(item, ImportInputItem) and item.parent == mode_item and item.selected]
                     input_item : ImportInputItem
                     for input_item in input_items:
                         # copy the containers
-                        
+
                         widget = input_item.map_to_widget
                         if widget:
+
+
+                            input_input_id = input_item.input_id
+                            input_input_type = input_item.input_type
+
                             # get the target input on that device
                             target_input_item : ImportInputItem = widget.currentData()
-                            
+                            target_input_id = target_input_item.input_id
+                            target_input_type = target_input_item.input_type
+
+                            input_count += 1
+
+                            profile_target_mode : gremlin.base_profile.Mode = target_device.modes[target_mode]
+                            profile_target_input_item : gremlin.base_profile.InputItem
+
+                            input_device : gremlin.base_profile.Device
+                            input_device = next((device for device in self.source_profile.devices.values() if device.device_guid == source_device_guid), None)
+                            input_profile_mode = input_device.modes[source_mode]
+                            # mode.config is a dictionary of [input_type][input_id] holding gremlin.base_profile.InputItem
+                            # InputItems hold the containers for that input
+                            profile_target_input_item = profile_target_mode.config[target_input_type][target_input_id]
+
                             container_items = input_item.containers # [item for item in input_item.containers if item.selected]
                             container_item : ImportContainerItem
+
+                            profile_input_item : gremlin.base_profile.InputItem
+                            profile_input_item = input_profile_mode.config[input_input_type][input_input_id]
+
                             for container_item in container_items:
-                                # get the source device 
-                                device : gremlin.base_profile.Device
-                                device = next((device for device in self.source_profile.devices.values() if device.device_guid == source_device_guid), None)
-                                profile_mode = device.modes[source_mode]
-                                for profile_input_items in profile_mode.config.values():
-                                    profile_input_item : gremlin.base_profile.InputItem
-                                    for profile_input_item in profile_input_items.values():
-                                        if profile_input_item.input_id == input_item.input_id and profile_input_item.input_type == input_item.input_type:
-                                            # matching profile input
-                                            for profile_container in profile_input_item.containers:
-                                                # copy the containers from the source input to the target input
-                                                profile_target_mode : gremlin.base_profile.Mode = target_device.modes[target_mode]
-                                                profile_target_input_item : gremlin.base_profile.InputItem
-                                                for profile_target_input_item in profile_target_mode.config.values():
-                                                    if profile_target_input_item.input_type == target_input_item.input_type and \
-                                                        profile_target_input_item.input_id == target_input_item.input_id:
-                                                        # found the matching input item on the target profile
-                                                        node = profile_container.to_xml() # use xml to serialize to avoid reference shenanigans
-                                                        # change node actionIds to new Ids (not technically necessary but good to do)
-                                                        action_nodes = node.xpath("//*[@action_id]")
-                                                        for action_node in action_nodes:
-                                                            new_id = gremlin.util.get_guid().replace("{","").replace("}",'')
-                                                            action_node.set("action_id",new_id)
-                                                        # create a new container
-                                                        container = container_name_map[profile_container.container_type](profile_target_input_item)
-                                                        # configure the container from the serialized data
-                                                        container.from_xml(node)
+                                # get the source container to import
+                                profile_container = next((container for container in profile_input_item.containers if container_item.container_id == container.id),None)
+                                if not profile_container:
+                                    syslog.warning(f"Unable to find import container id: {str(container_item)}")
+                                    continue
+                                
+                                # found the matching input item on the target profile
+                                # use xml to serialize to avoid reference shenanigans
+                                node = profile_container.to_xml() 
+                                # change node actionIds to new Ids (not technically necessary but good to do)
+                                action_nodes = node.xpath("//*[@action_id]")
+                                for action_node in action_nodes:
+                                    new_id = gremlin.util.get_guid(no_brackets=True)
+                                    action_node.set("action_id",new_id)
+                                # create a new container
+                                container = container_tag_map[profile_container.tag](profile_target_input_item)
+                                # configure the container from the serialized data
+                                container.from_xml(node)
+                                # generate a new container ID 
+                                container.id = gremlin.util.get_guid(no_brackets=True)
+                                if verbose:
+                                    syslog.info(f"Adding container : {profile_container.tag} to input type {InputType.to_display_name(profile_target_input_item.input_type)} input {profile_target_input_item.input_id} {container.action_count} actions")
 
-                                                        #profile_target_input_item.add_container(container)
+                                container_count +=1
+                                action_count += container.action_count
+                                profile_target_input_item.containers.append(container)
 
 
 
-                                            
-
-
-
-
-                    
+        ui_common.MessageBox("Import results:",
+            f"Imported {input_count:,} input(s)<br>{mode_count:,} mode(s)<br>{container_count:,} container(s)<br>{action_count:,} action(s)",
+            is_warning=False)
 
 
 
 
-def import_profile(device_guid):
+
+
+
+
+
+
+
+
+
+def import_profile():
     ''' imports a profile - prompts the user for a profile to import into the specified device '''
     fname, _ = QtWidgets.QFileDialog.getOpenFileName(
             None,
@@ -1115,5 +1304,7 @@ def import_profile(device_guid):
     if fname == "":
         return
 
-    dialog = ImportProfileDialog(device_guid, fname)    
+    dialog = ImportProfileDialog(fname)
     dialog.exec()
+
+    gremlin.shared_state.ui.refresh()

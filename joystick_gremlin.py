@@ -370,9 +370,9 @@ class GremlinUi(QtWidgets.QMainWindow):
 
     def _tab_import_cb(self):
         ''' imports a profile into the device '''
-        tab_guid = gremlin.util.parse_guid(gremlin.shared_state.ui._active_tab_guid())
-        device : gremlin.base_profile.Device = gremlin.shared_state.current_profile.devices[tab_guid]
-        gremlin.import_profile.import_profile(device.device_guid)
+        # tab_guid = gremlin.util.parse_guid(gremlin.shared_state.ui._active_tab_guid())
+        # device : gremlin.base_profile.Device = gremlin.shared_state.current_profile.devices[tab_guid]
+        gremlin.import_profile.import_profile()
 
     def _tab_clear_map_execute(self, device, mode_name):
         ''' removes all mappings from the given device in the active mode '''
@@ -815,6 +815,10 @@ class GremlinUi(QtWidgets.QMainWindow):
         if fname != "":
             self._load_recent_profile(fname)
 
+    def import_profile(self):
+        ''' import a profile '''
+        gremlin.import_profile.import_profile()
+
     def new_profile(self):
         """Creates a new empty profile."""
         # Disable Gremlin if active before opening a new profile
@@ -920,6 +924,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         # Menu actions
         # File
         self.ui.actionLoadProfile.triggered.connect(self.load_profile)
+        self.ui.actionImportProfile.triggered.connect(self.import_profile)
         self.ui.actionNewProfile.triggered.connect(self.new_profile)
         self.ui.actionSaveProfile.triggered.connect(self.save_profile)
         self.ui.actionSaveProfileAs.triggered.connect(self.save_profile_as)
@@ -1268,6 +1273,23 @@ class GremlinUi(QtWidgets.QMainWindow):
         el = gremlin.event_handler.EventListener()
         el.tabs_loaded.emit()
 
+
+    def get_ordered_device_guid_list(self, filter_tab_type : TabDeviceType = TabDeviceType.NotSet):
+        ''' returns the list of device guids as directinput GUIDs
+        
+        :param: filter_tab_type = the type of tab device to filter for
+        :returns: list of DINPUT GUID
+        
+        '''
+        data = self._get_tab_map()
+        device_guid_list = []
+        for index in range(len(data)):
+            (device_guid, device_name, tab_type, index) = data[index]
+            if filter_tab_type == TabDeviceType.NotSet or tab_type == filter_tab_type:
+                device_guid_list.append(gremlin.util.parse_guid(device_guid))
+
+        return device_guid_list
+        
 
 
     def _get_tab_map(self):

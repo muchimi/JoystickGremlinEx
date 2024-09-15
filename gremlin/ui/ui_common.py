@@ -1530,13 +1530,14 @@ class ConfirmBox():
         return self._message_box.exec()
 
 class MessageBox():
-    def __init__(self, title = "Notice", prompt = "Operation", parent = None):
+    def __init__(self, title = "Notice", prompt = "Operation", is_warning = True, parent = None):
 
         from gremlin.util import load_pixmap
         self._message_box = QtWidgets.QMessageBox(parent = parent)
-        pixmap = load_pixmap("warning.svg")
-        pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
-        self._message_box.setIconPixmap(pixmap)
+        if is_warning:
+            pixmap = load_pixmap("warning.svg")
+            pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
+            self._message_box.setIconPixmap(pixmap)
         self._message_box.setText(title)
         self._message_box.setInformativeText(prompt)
         self._message_box.setStandardButtons(

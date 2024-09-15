@@ -515,12 +515,14 @@ def grouped(iterable, n):
     ''' returns n items for a given iterable item '''
     return zip(*[iter(iterable)]*n)
 
-def get_guid(strip=True):
+def get_guid(strip=True,no_brackets = False):
     ''' generates a reasonably lowercase unique guid string '''
     import uuid
     guid = f"{uuid.uuid4()}"
     if strip:
-        return guid.replace("-",'')
+        guid = guid.replace("-",'')
+    if no_brackets:
+        guid = guid.replace("{",'').replace("}",'')
     return guid
     
 def find_files(root_folder, source_pattern = "*") -> list:

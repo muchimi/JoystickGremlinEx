@@ -92,7 +92,7 @@ class ProfileData(metaclass=ABCMeta):
         """
         assert parent is not None
         self.code = None
-        self._id = None  # unique ID for this entry
+        self._id = gremlin.util.get_guid(no_brackets=True)
         self._input_item : gremlin.base_profile.InputItem = _get_input_item(parent)
         
         
@@ -318,6 +318,12 @@ class AbstractContainer(ProfileData):
             self.device_input_id = None
             self.device_input_type = None
 
+    @property
+    def id(self):
+        return self._id
+    @id.setter
+    def id(self, value):
+        self._id = value
 
     
     @property
@@ -379,6 +385,13 @@ class AbstractContainer(ProfileData):
         # Create activation condition data if needed
         self.create_or_delete_virtual_button()
 
+    @property
+    def action_count(self):
+        ''' returns the count of defined actions in this container '''
+        count = sum(len(action_list) for action_list in self.action_sets)
+        return count
+        
+
     def create_or_delete_virtual_button(self):
         """Creates activation condition data as required."""
         need_virtual_button = False
@@ -438,6 +451,9 @@ class AbstractContainer(ProfileData):
         :param node the XML node to populate fields with
         """
         super().from_xml(node)
+        if "container_id" in node.attrib:
+            self.id = node.get("container_id")
+
         self._parse_action_set_xml(node)
         self._parse_virtual_button_xml(node)
         self._parse_activation_condition_xml(node)
@@ -448,6 +464,7 @@ class AbstractContainer(ProfileData):
         :return XML node representing the state of this instance
         """
         node = super().to_xml()
+        node.set("container_id", self.id)
         # Add activation condition if needed
         if self.virtual_button:
             node.append(self.virtual_button.to_xml())
@@ -575,11 +592,21 @@ class Device:
         self.parent = parent  # profile
         self.name = None
         self.label = ""
-        self.device_guid = None
+        self._device_guid = None
         self.modes = {}
         self.type = None
         self.virtual = False # true if the device is virtual (vjoy)
         self.connected = False # true if the device was found in the detected hardware list
+
+    @property
+    def device_guid(self):
+        return self._device_guid
+    @device_guid.setter
+    def device_guid(self, value : dinput.GUID):
+        assert isinstance(value, dinput.GUID) if value is not None else True
+        self._device_guid = value
+        self.connected = gremlin.joystick_handling.is_device_connected(value) if value is not None else False
+        
 
     def ensure_mode_exists(self, mode_name, device=None):
         """Ensures that a specified mode exists, creating it if needed.
@@ -788,7 +815,7 @@ class InputItem():
 
         container_node = node # node that holds the container information
         container_plugins = ContainerPlugins()
-        container_name_map = container_plugins.tag_map
+        container_tag_map = container_plugins.tag_map
         self.input_type = InputType.to_enum(node.tag)
         if "id" in node.attrib.keys():
             self.input_id = safe_read(node, "id", int)
@@ -854,12 +881,12 @@ class InputItem():
                 # ignore extra data
                 continue
             container_type = child.attrib["type"]
-            if container_type not in container_name_map:
+            if container_type not in container_tag_map:
                 logging.getLogger("system").warning(
                     f"Unknown container type used: {container_type}"
                 )
                 continue
-            entry = container_name_map[container_type](self)
+            entry = container_tag_map[container_type](self)
             entry.from_xml(child)
             self.add_container(entry)
             if hasattr(entry, "action_model"):
@@ -1413,6 +1440,17 @@ class Profile():
     @property
     def name(self):
         return self._profile_name
+    
+
+    def get_ordered_device_list(self):
+        ''' gets the devices ordered by the current UI order '''
+        id_list = gremlin.shared_state.ui.get_ordered_device_guid_list()
+        device_list = []
+        for id in id_list:
+            if id in self.devices.keys():
+                device_list.append(self.devices[id])
+        return device_list
+    
 
     def initialize_joystick_device(self, device, modes):
         """Ensures a joystick is properly initialized in the profile.
