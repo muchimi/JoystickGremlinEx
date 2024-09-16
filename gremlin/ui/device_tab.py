@@ -24,6 +24,7 @@ from PySide6 import QtWidgets, QtCore
 import gremlin
 import gremlin.base_profile
 import gremlin.config
+import gremlin.event_handler
 import gremlin.profile
 import gremlin.shared_state
 import gremlin.types
@@ -88,7 +89,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
         # setup the container widget reference
         plugin_manager = gremlin.plugin_manager.ContainerPlugins()
         plugin_manager.set_widget(self.item_data, self)
-        
+
 
     def _add_action(self, action_name):
         """Adds a new action to the input item.
@@ -106,17 +107,16 @@ class InputItemConfiguration(QtWidgets.QFrame):
 
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
         container = container_plugins.basic.BasicContainer(self.item_data)
-        container.add_action(
-            plugin_manager.get_class(action_name)(container)
-        )
+        action = plugin_manager.get_class(action_name)(container)
+        container.add_action(action)
+      
 
-        # add the container
-        #self.item_data.containers.append(container)
 
         if len(container.action_sets) > 0:
             self.action_model.add_container(container)
         
         self.action_model.data_changed.emit()
+        
 
     def _paste_action(self, action):
         """ paste action to the input item """
@@ -171,6 +171,8 @@ class InputItemConfiguration(QtWidgets.QFrame):
         """
         self.action_model.remove_container(container)
 
+                
+
     def _create_description(self):
         """Creates the description input for the input item."""
         self.description_layout = QtWidgets.QHBoxLayout()
@@ -181,6 +183,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
         self.description_field.setText(self.item_data.description)
         self.description_field.textChanged.connect(self._edit_description_cb)
         self.description_layout.addWidget(self.description_field)
+        
 
         self.main_layout.addLayout(self.description_layout)
 

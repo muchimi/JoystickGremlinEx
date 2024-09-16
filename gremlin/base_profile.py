@@ -931,8 +931,8 @@ class InputItem():
         if self.always_execute:
             node.set("always-execute", "True")
 
-        if self.description:
-            node.set("description", safe_format(self.description, str))
+        if self._description:
+            node.set("description", safe_format(self._description, str))
         else:
             node.set("description", "")
         
@@ -1088,6 +1088,7 @@ class AbstractAction(ProfileData):
         ''' type name of this action '''
         return self._action_type
     
+
     def display_name(self):
         ''' display name for this action '''
         return "N/A"

@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-
+from __future__ import annotations
 import logging
 
 from PySide6 import QtWidgets, QtCore
@@ -240,6 +240,7 @@ class MidiInputItem():
     @mode.setter
     def mode(self, value):
         self._mode = value
+        self._mode_string = self.mode_string(value)
 
 
     @property
@@ -267,7 +268,9 @@ class MidiInputItem():
         if node.tag == "input":
             self.id = read_guid(node, "guid")
             self.port_name = safe_read(node, "port", str)
-            self.mode_from_string(safe_read(node, "mode", str))
+            mode = self.mode_from_string(safe_read(node, "mode", str))
+            if mode is not None:
+                self.mode = mode
             data = safe_read(node, "data", str)
             bytes = byte_string_to_list(data)
             self.message = mido.Message.from_bytes(bytes) if bytes else None
@@ -382,6 +385,22 @@ class MidiInputItem():
         input_item.message = message  # updates the whole item
         input_item.port_name = port_name
         return input_item
+    
+    def duplicate(self) -> MidiInputItem:
+        ''' duplicates an input item '''
+        import copy
+        source = self
+        target = MidiInputItem()
+        target.id = uuid.uuid4()
+        target._port_name = source._port_name
+        target._command = source._command
+        target._message = copy.deepcopy(source._message)
+        target._message_key = source._message_key
+        target._mode = source._mode
+        target._display_name = source._display_name
+        target._display_tooltip = source._display_tooltip
+        target._update_display_name()
+        return target
     
     
     def __hash__(self):
@@ -1296,12 +1315,17 @@ class MidiInputConfigDialog(QtWidgets.QDialog):
         return self._mode
         
 from gremlin.ui.qdatawidget import QDataWidget
+
+
+def get_midi_device_guid():
+    return parse_guid('1b56ecf7-0624-4049-b7b3-8d9b7d8ed7e0')
+
 class MidiDeviceTabWidget(QDataWidget):
 
     """Widget used to configure open sound control (OSC) inputs """
 
     # IMPORTANT: MUST BE A DID FORMATTED ID ON CUSTOM INPUTS
-    device_guid = parse_guid('1b56ecf7-0624-4049-b7b3-8d9b7d8ed7e0')
+    device_guid = get_midi_device_guid()
 
     def __init__(
             self,
@@ -1474,9 +1498,6 @@ class MidiDeviceTabWidget(QDataWidget):
         mode = self.device_profile.modes[self.current_mode]
         sorted_keys = list(mode.config[InputType.Midi].keys())
         return sorted_keys.index(input_id)
-        
-
-   
 
     def _create_change_cb(self, index):
         """Creates a callback handling content changes.

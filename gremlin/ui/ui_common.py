@@ -685,9 +685,9 @@ class AbstractInputSelector(QtWidgets.QWidget):
         # will be invisible unless it is selected as the active device
         for device in self.device_list:
             selection = QtWidgets.QComboBox(self)
-            # selection.setEditable(True)
-            # selection.setInsertPolicy(QtWidgets.QComboBox.InsertPolicy.NoInsert)
+            # limit drop down size
             selection.setMaxVisibleItems(20)
+            selection.setStyleSheet("QComboBox { combobox-popup: 0; }")
             self._input_type_registry.append([])
             self.selection_widget = selection
             

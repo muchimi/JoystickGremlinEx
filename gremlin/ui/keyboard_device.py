@@ -17,9 +17,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-
+from __future__ import annotations
 import logging
-
 from PySide6 import QtWidgets, QtCore
 import json
 
@@ -257,6 +256,21 @@ class KeyboardInputItem():
     def name(self):
         ''' display name - can be a compound key '''
         return self._display_name
+    
+    def duplicate(self) -> KeyboardInputItem:
+        ''' duplicates this object '''
+        import copy
+        source = self
+        target = KeyboardInputItem()
+        target.id = uuid.uuid4()
+        target._key = copy.deepcopy(source._key)
+        target._title_name = source._title_name
+        target._display_name = source._display_name
+        target._display_tooltip = source._display_tooltip
+        target._description = source._description
+        target._suspend_update = source._suspend_update
+        target._update()
+        return target
 
     def __eq__(self, other):
         if isinstance(other, KeyboardInputItem):
@@ -281,12 +295,16 @@ class KeyboardInputItem():
             
 
 from gremlin.ui.qdatawidget import QDataWidget
+
+def get_keyboard_device_guid():
+    return parse_guid('6F1D2B61-D5A0-11CF-BFC7-444553540000')
+
 class KeyboardDeviceTabWidget(QDataWidget):
 
     """Widget used to configure keyboard inputs """
 
     # IMPORTANT: MUST BE A DID FORMATTED ID ON CUSTOM INPUTS (this one happens to match the regular keyboard device ID)
-    device_guid = parse_guid('6F1D2B61-D5A0-11CF-BFC7-444553540000')
+    device_guid = get_keyboard_device_guid()
 
     def __init__(
             self,

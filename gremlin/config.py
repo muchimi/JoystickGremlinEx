@@ -1148,3 +1148,15 @@ class Configuration:
     def import_level(self, value):
         self._data["import_level"] = value
         self.save()
+
+
+    @property
+    def import_window_location(self):
+        """Returns the position of the import profile """
+        return self._data.get("import_window_location", None)
+
+    @import_window_location.setter
+    def import_window_location(self, value):
+        """Sets the position of the import profile window """
+        self._data["import_window_location"] = value
+        self.save()

@@ -160,6 +160,17 @@ Joystick Gremlin EX
 
 - **Gamepad support** JGEX supports up to four (4) virtual XBox 360 gamepads via VIGEM.  See gamepad section.  Gamepads can be mapped via the new **map to gamepad** action.
 - Improved device mapping output.
+- **Profile Import** JGEX can import mappings from another profile into the current profile optionally changing the destination, mode and mappings.  This feature is experimental and still in development and is not feature complete at this time.  
+A new menu option "import profile" in the file menu, or the context menu on a device tab brings up the option.    
+Current features are:  
+	- import to another device  
+	- import to the same mode or a different mode (that exists)
+	- selectively select imports from a device. mode, input or container (four levels)
+	- import is currently additive (imported items are added to the current input in the current profile)  
+	+ import to another input (button or axis)
+	+ supports importing mappings for joystick, keyboard, MIDI and OSC
+- QOL feature: most drop downs limited to 20 items before they start scrolling
+- bug fixes
 
 
 13.40.14ex (as of pre-release m7)

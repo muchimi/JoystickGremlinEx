@@ -202,20 +202,29 @@ class TextToSpeech(gremlin.base_profile.AbstractAction):
         self.volume = 100
         self.rate = 0
         self.voice_index = 0
-        self.voice_name = ''
+        self._voice_name = ''
+
+    @property
+    def voice_name(self):
+        return self._voice_name
+    @voice_name.setter
+    def voice_name(self, value):
+        if value != self._voice_name:
+            self._voice_name = value
+
 
     @property
     def text(self):
         return self._text
     @text.setter
     def text(self, value):
-        self._text = value
+        if value != self._text:
+            self._text = value
 
 
     def display_name(self):
         ''' returns a display string for the current configuration '''
-
-        return f"Say: [{self.text}] Voice: [{self.voice_name}]"
+        return f"Say: [{self.text}]" # Voice: [{self.voice_name}]"
 
     def icon(self):
         return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
@@ -236,7 +245,13 @@ class TextToSpeech(gremlin.base_profile.AbstractAction):
                 voice_id = int(voice_id)
             else:
                 voice_id = 0
+            
+            tts = gremlin.tts.TextToSpeech()
+            voices = tts.getVoices()
+            if voices and voice_id < len(voices):
+                self.voice_name = voices[voice_id]
             self.voice_index = voice_id
+            
             
         if "volume" in node.attrib:
             self.volume = int(node.get("volume"))
@@ -273,21 +288,6 @@ class TextToSpeech(gremlin.base_profile.AbstractAction):
         obj.voice_index = self.voice_index
         obj.action_id = gremlin.util.get_guid()
         return obj
-
-
-    # def __getstate__(self) -> object:
-    #     # serialize options
-    #     state = self.__dict__.copy()
-    #     del state['tts'] # don't serialize tts
-    #     del state['voice'] # don't serialize voice
-    #     return state
-    
-    # def __setstate__(self, state):
-    #     # deserialize options
-    #     self.__dict__.update(state)
-    #     self.tts = gremlin.tts.TextToSpeech()
-    #     self.voice = self.tts.getVoices()[self.voice_index]
-
 
 
 version = 1

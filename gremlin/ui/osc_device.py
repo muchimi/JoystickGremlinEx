@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-
+from __future__ import annotations
 import logging
 
 from PySide6 import QtWidgets, QtCore, QtGui
@@ -1952,6 +1952,26 @@ class OscInputItem():
             self._display_name =  f"{self._message}"
         else:
             self._display_name =  f"{self._message}/{self._message_data_string}"
+
+    def duplicate(self) -> OscInputItem:
+        ''' duplicates an input item '''
+        import copy
+        source = self
+        target= OscInputItem()
+        target.id = uuid.uuid4()
+        target._message = copy.deepcopy(source._message)
+        target._message_data = source._message_data
+        target._message_data_string = source._message_data_string
+        target._mode = source._mode
+        target._command_mode = source._command_mode
+        target._title_name = source._title_name
+        target._display_name =  source._display_name
+        target._display_tooltip = source._display_tooltip
+        target._message_key = source._message_key
+        target._min_range = source._min_range
+        target._max_range = source._max_range
+        target._update_display_name()
+        return target
         
 
     def __hash__(self):
@@ -2498,12 +2518,15 @@ class OscInputConfigDialog(QtWidgets.QDialog):
 
 from gremlin.ui.qdatawidget import QDataWidget
 
+def get_osc_device_guid():
+    return parse_guid('ccb486e8-808e-4b3f-abe7-bcb380f39aa4')
+
 class OscDeviceTabWidget(QDataWidget):
 
     """Widget used to configure open sound control (OSC) inputs """
     
     # IMPORTANT: MUST BE A DID FORMATTED ID ON CUSTOM INPUTS
-    device_guid = parse_guid('ccb486e8-808e-4b3f-abe7-bcb380f39aa4')
+    device_guid = get_osc_device_guid()
 
     def __init__(
             self,

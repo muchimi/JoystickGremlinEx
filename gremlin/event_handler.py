@@ -254,7 +254,7 @@ class EventListener(QtCore.QObject):
 	modes_changed = QtCore.Signal()
 
 	# functor enable flag changed
-	action_created = QtCore.Signal(object) # runs when an action is created
+	action_created = QtCore.Signal(object) # runs when an action is created - object = the object that triggered the event 
 
 
 
