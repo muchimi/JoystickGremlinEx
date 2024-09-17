@@ -21,7 +21,7 @@ import math
 import os
 from lxml import etree as ElementTree
 
-from PySide6 import QtCore, QtWidgets
+from PySide6 import QtCore, QtWidgets, QtGui
 
 import gremlin.base_profile
 from gremlin.input_types import InputType
@@ -43,21 +43,25 @@ class MapToMouseWidget(gremlin.ui.input_item.AbstractActionWidget):
         :param action_data the data managed by this widget
         :param parent the parent of this widget
         """
-        super().__init__(action_data, QtWidgets.QVBoxLayout, parent=parent)
+        super().__init__(action_data, parent=parent)
 
     def _create_ui(self):
         """Creates the UI components."""
         # Layouts to use
-        self.mode_layout = QtWidgets.QHBoxLayout()
+        self.container_widget = QtWidgets.QWidget()
+        self.container_layout = QtWidgets.QVBoxLayout(self.container_widget)
+
+        self.mode_widget = QtWidgets.QWidget()
+        self.mode_layout = QtWidgets.QHBoxLayout(self.mode_widget)
 
         self.button_widget = QtWidgets.QWidget()
         self.button_layout = QtWidgets.QGridLayout(self.button_widget)
         self.motion_widget = QtWidgets.QWidget()
         self.motion_layout = QtWidgets.QGridLayout(self.motion_widget)
 
-        self.main_layout.addLayout(self.mode_layout)
-        self.main_layout.addWidget(self.button_widget)
-        self.main_layout.addWidget(self.motion_widget)
+        self.container_layout.addWidget(self.mode_widget)
+        self.container_layout.addWidget(self.button_widget)
+        self.container_layout.addWidget(self.motion_widget)
 
         self.button_group = QtWidgets.QButtonGroup()
         self.button_radio = QtWidgets.QRadioButton("Button")
@@ -78,6 +82,11 @@ class MapToMouseWidget(gremlin.ui.input_item.AbstractActionWidget):
             self._create_axis_ui()
         else:
             self._create_button_hat_ui()
+
+        
+        warning_widget = gremlin.ui.ui_common.QIconLabel("fa.warning",use_qta=True,icon_color=QtGui.QColor("yellow"),text="Legacy mapper - consider using <i>Map to Mouse Ex</i> for additional functionality", use_wrap=False)
+        self.main_layout.addWidget(self.container_widget)
+        self.main_layout.addWidget(warning_widget)            
 
     def _create_axis_ui(self):
         """Creates the UI for axis setups."""

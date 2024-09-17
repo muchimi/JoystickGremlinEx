@@ -273,15 +273,27 @@ class InputItemListModel(ui_common.AbstractModel):
 
 
 
-        if event.event_type == InputType.JoystickAxis:
+        if event.event_type in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat):
             # Generate a mapping from axis index to linear axis index
-            axis_index_to_linear_index = {}
-            axis_keys = sorted(input_items.config[InputType.JoystickAxis].keys())
-            for l_idx, a_idx in enumerate(axis_keys):
-                axis_index_to_linear_index[a_idx] = l_idx
+            # axis_index_to_linear_index = {}
+            item: gremlin.base_profile.InputItem
+            item_found: gremlin.base_profile.InputItem = None
+            index : int
 
-            return offset_map[event.event_type] + \
-                   axis_index_to_linear_index[event.identifier]
+            for index, item in self._index_map.items():
+                if item.input_type == event.event_type and item.input_id == event.identifier:
+                    item_found = item
+                    break
+            if item_found:
+                return index
+            
+            return 0
+            # axis_keys = sorted(input_items.config[InputType.JoystickAxis].keys())
+            # for l_idx, a_idx in enumerate(axis_keys):
+            #     axis_index_to_linear_index[a_idx] = l_idx
+
+            # return offset_map[event.event_type] + \
+            #        axis_index_to_linear_index[event.identifier]
         else:
             return offset_map[event.event_type] + event.identifier - 1
 
@@ -609,16 +621,7 @@ class InputItemListView(ui_common.AbstractView):
             self._confirmed_close(index)
 
     def _confirmed_close(self, index):
-        # widget = self.itemAt(index)
-        # if widget.selected:
-        #     selected_index = index - 1
-        #     if selected_index < 0:
-        #         selected_index = index + 1
-        #     if selected_index < self.model.rows():
-        #         other_widget = self.itemAt(selected_index)
-        #         other_widget.selected = True
         self.removeRow(index)
-        #self.redraw()
 
     def _edit_item_cb(self, index):
         ''' emits the edit event along with the item being edited '''
@@ -701,7 +704,7 @@ class InputItemListView(ui_common.AbstractView):
 
         if user_selected:
             # save what was last selected
-            gremlin.shared_state.update_last_selection(event.device_guid, event.device_input_type, event.device_input_id)
+            gremlin.shared_state.set_last_input_id(event.device_guid, event.device_input_type, event.device_input_id)
 
         widget = self.itemAt(index)
         if widget:

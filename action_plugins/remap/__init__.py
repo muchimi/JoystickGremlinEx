@@ -30,7 +30,7 @@ from gremlin import input_devices, joystick_handling, util
 from gremlin.error import ProfileError
 import gremlin.plugin_manager
 from gremlin.profile import safe_format, safe_read
-import gremlin.ui.ui_common
+from gremlin.ui import ui_common
 import gremlin.ui.input_item
 import os
 from gremlin.util import *
@@ -92,11 +92,16 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
                 InputType.JoystickHat
             ]
         }
-        self.vjoy_selector = gremlin.ui.ui_common.VJoySelector(
+        self.vjoy_selector = ui_common.VJoySelector(
             lambda x: self.save_changes(),
             input_types[self._get_input_type()],
             self.action_data.get_settings().vjoy_as_input
         )
+
+
+        
+
+        
         self.main_layout.addWidget(self.vjoy_selector)
 
         # Create UI widgets for absolute / relative axis modes if the remap
@@ -109,7 +114,7 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.absolute_checkbox = QtWidgets.QRadioButton("Absolute")
             self.absolute_checkbox.setChecked(True)
             self.relative_checkbox = QtWidgets.QRadioButton("Relative")
-            self.relative_scaling = gremlin.ui.ui_common.DynamicDoubleSpinBox()
+            self.relative_scaling = ui_common.DynamicDoubleSpinBox()
 
             self.remap_type_layout.addStretch()
             self.remap_type_layout.addWidget(self.absolute_checkbox)
@@ -124,6 +129,13 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             if self.action_data.input_type == InputType.JoystickAxis:
                 self.remap_type_widget.show()
 
+        # display a warning that this is a legacy mapper
+        warning_container = QtWidgets.QWidget()
+        warning_layout = QtWidgets.QHBoxLayout(warning_container)
+        warning_widget = gremlin.ui.ui_common.QIconLabel("fa.warning",use_qta=True,icon_color=QtGui.QColor("yellow"),text="Legacy mapper - consider using <i>VJoy Remap</i> for additional functionality", use_wrap=False)
+        warning_layout.addWidget(warning_widget)
+        warning_layout.addStretch()
+        self.main_layout.addWidget(warning_container)            
         self.main_layout.setContentsMargins(0, 0, 0, 0)
 
     def _populate_ui(self):

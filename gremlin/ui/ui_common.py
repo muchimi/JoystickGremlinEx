@@ -847,9 +847,12 @@ class ActionSelector(QtWidgets.QWidget):
         self.main_layout.addWidget(self.action_label)
  
         self.action_dropdown = QtWidgets.QComboBox()
-
+        # warning_icon = load_icon("fa.warning", use_qta=True, qta_color = QtGui.QColor('#918B16'))
         for name in self._valid_action_list():
-            self.action_dropdown.addItem(name)
+            # if name in ("Remap","Map to Keyboard","Map to Mouse"):
+            #     self.action_dropdown.addItem(warning_icon, name)
+            # else:
+                self.action_dropdown.addItem(name)
         cfg = gremlin.config.Configuration()
         self.action_dropdown.setCurrentText(cfg.last_action)
         self.action_dropdown.currentIndexChanged.connect(self._action_changed)
@@ -1574,26 +1577,32 @@ class QIconLabel(QtWidgets.QWidget):
     IconSize = QtCore.QSize(16, 16)
     HorizontalSpacing = 2
 
-    def __init__(self, icon_path = None, text = None, stretch=True, use_qta = False, icon_color = None, parent = None):
+    def __init__(self, icon_path = None, text = None, stretch=True, use_qta = False, icon_color = None, use_wrap = True, parent = None):
         super().__init__(parent)
 
-        layout = QtWidgets.QHBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        self.setLayout(layout)
+        container_widget = QtWidgets.QWidget()
+        container_widget.setContentsMargins(0, 0, 0, 0)
+        container_layout = QtWidgets.QHBoxLayout(container_widget)
+        container_layout.setContentsMargins(0, 0, 0, 0)
+        
 
         self._icon_widget = QtWidgets.QLabel()
         if icon_path:
             self.setIcon(icon_path, use_qta, color = icon_color)
             
-        layout.addWidget(self._icon_widget)
-        layout.addSpacing(self.HorizontalSpacing)
-
-        self._label_widget =  QWrapableLabel(text)
-        self._label_widget.setWordWrap(True)
-        layout.addWidget(self._label_widget)
-
+        container_layout.addWidget(self._icon_widget)
+        container_layout.addSpacing(self.HorizontalSpacing)
+        if use_wrap:
+            self._label_widget =  QWrapableLabel(text)
+            self._label_widget.setWordWrap(True)
+        else:
+            self._label_widget = QtWidgets.QLabel(text)
+        container_layout.addWidget(self._label_widget)
         if stretch:
-            layout.addStretch()
+            container_layout.addStretch()
+
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.addWidget(container_widget)
 
     def setIcon(self, icon_path = None, use_qta = True, color = None):
         ''' sets the icon of the label, pass a blank or None path to clear the icon'''

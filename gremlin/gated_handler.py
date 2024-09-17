@@ -917,7 +917,7 @@ class GateData():
 
     @QtCore.Slot(object)
     def _joystick_event_cb(self, event):
-        ''' handles joystick input
+        ''' handles joystick input at runtime
         
         To avoid challenges with other GremlinEx functionality - we handle our own hierarchy calls to our subcontainers here.
         For gate crossings, we mimic a button push (for now) so functors get both a press and release call

@@ -191,10 +191,10 @@ def delayed_input_highlighting_suspension():
     )
     _suspend_timer.start()
 
-
+# holds the last tab selections
 _tab_input_map = {}
 
-def update_last_selection(device_guid, input_type, input_id):
+def set_last_input_id(device_guid, input_type, input_id):
     ''' tracks the last selection per device guid '''
     key = str(device_guid)
     _tab_input_map[key] = (input_type, input_id)

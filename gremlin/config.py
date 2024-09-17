@@ -1027,8 +1027,6 @@ class Configuration:
         self._data["last_tab_guid"] = str(value)
         # print(f"config: last tab set: {value}")
         self.save()
-       
-
 
 
     @property

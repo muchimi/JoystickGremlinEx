@@ -256,6 +256,7 @@ class EventListener(QtCore.QObject):
 	# functor enable flag changed
 	action_created = QtCore.Signal(object) # runs when an action is created - object = the object that triggered the event 
 
+	select_input = QtCore.Signal(object, object, object) # selects a particular input (device_guid, input_type, input_id)
 
 
 	def __init__(self):

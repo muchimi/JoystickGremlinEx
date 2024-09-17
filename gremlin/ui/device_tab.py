@@ -37,13 +37,7 @@ import gremlin.ui.ui_common
 
 class InputItemConfiguration(QtWidgets.QFrame):
 
-    """UI dialog responsible for the configuration of a single
-    input item such as an axis, button, hat, or key.
-
-
-    this control is displayed whenever an input is selected to configure it.
-
-    """
+    """ mapping viewer for a selected input item (this is the right side of the device tab) """
 
     # Signal emitted when the description changes
     description_changed = QtCore.Signal(str)
@@ -56,12 +50,23 @@ class InputItemConfiguration(QtWidgets.QFrame):
         """
         super().__init__(parent)
 
-        self.item_data : gremlin.base_profile.InputItem = item_data
+        
 
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.button_layout = QtWidgets.QHBoxLayout()
         self.widget_layout = QtWidgets.QVBoxLayout()
+
+        if item_data is None:
+            parent = self.parent()
+            while parent and not isinstance(parent, JoystickDeviceTabWidget):
+                parent = self.parent()
+            parent :JoystickDeviceTabWidget
+            if parent is not None:
+                item_data = parent.last_item_data
+
+
+        self.item_data : gremlin.base_profile.InputItem = item_data
 
         if not item_data:
             label = QtWidgets.QLabel("Please select an input to configure")
@@ -431,6 +436,7 @@ class JoystickDeviceTabWidget(QDataWidget):
 
         self.device = device
         self.last_item_data = None
+        self.last_item_index = 0
 
 
         # the main layout has a left input selection panel and a right configuration panel, two widgets, the last one is always the configuration panel
@@ -504,7 +510,7 @@ class JoystickDeviceTabWidget(QDataWidget):
             right_panel.widget().deleteLater()
         if right_panel:
             self.main_layout.removeItem(right_panel)
-        widget = InputItemConfiguration()
+        widget = InputItemConfiguration(parent = self)
         self.main_layout.addWidget(widget,3)
 
 
@@ -649,6 +655,7 @@ class JoystickDeviceTabWidget(QDataWidget):
         # if self.last_item_data == item_data:
         #     return
         self.last_item_data = item_data
+        self.last_item_index = index
 
         # Remove the existing widget, if there is one
         
@@ -659,7 +666,7 @@ class JoystickDeviceTabWidget(QDataWidget):
         if item:
             self.main_layout.removeItem(item)
 
-        widget = InputItemConfiguration(item_data)
+        widget = InputItemConfiguration(item_data, parent = self)
         self.main_layout.addWidget(widget,3)
         
         if item_data is not None:
@@ -668,10 +675,10 @@ class JoystickDeviceTabWidget(QDataWidget):
             widget.action_model.data_changed.connect(change_cb)
             widget.description_changed.connect(change_cb)
 
-        # indicate the input changed
-        device_guid = str(item_data.device_guid)
-        identifier = item_data.input_id
-        self.inputChanged.emit(device_guid, identifier)
+            # indicate the input changed
+            device_guid = str(item_data.device_guid)
+            identifier = item_data.input_id
+            self.inputChanged.emit(device_guid, identifier)
 
 
 
@@ -692,17 +699,19 @@ class JoystickDeviceTabWidget(QDataWidget):
         if item:
             self.main_layout.removeItem(item)
 
-        widget = InputItemConfiguration()
+        index = self.last_item_index
+        item_data = self.last_item_data
+
+        widget = InputItemConfiguration(item_data = item_data, parent = self)
         self.main_layout.addWidget(widget,3)
 
 
         self.input_item_list_model.mode = mode
 
-        # Select the first input item
-        #self.input_item_list_view.select_item(0, emit_signal=False)
         
         self.input_item_list_view.redraw()
-        self.input_item_list_view.select_item(0, emit_signal=False)
+        self.input_item_list_view.select_item(index, emit_signal=False)
+
 
 
     def mode_changed_cb(self, mode):

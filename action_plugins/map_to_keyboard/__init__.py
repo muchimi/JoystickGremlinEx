@@ -19,7 +19,7 @@
 import os
 from lxml import etree as ElementTree
 
-from PySide6 import QtWidgets
+from PySide6 import QtWidgets, QtGui
 import gremlin.base_profile
 
 from gremlin.input_types import InputType
@@ -49,7 +49,13 @@ class MapToKeyboardWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self.main_layout.addWidget(self.key_combination)
         self.main_layout.addWidget(self.record_button)
-        self.main_layout.addStretch(1)
+
+        warning_container = QtWidgets.QWidget()
+        warning_layout = QtWidgets.QHBoxLayout(warning_container)
+        warning_widget = gremlin.ui.ui_common.QIconLabel("fa.warning",use_qta=True,icon_color=QtGui.QColor("yellow"),text="Legacy mapper - consider using <i>Map to Keyboard Ex</i> for additional functionality", use_wrap=False)
+        warning_layout.addWidget(warning_widget)
+        warning_layout.addStretch()
+        self.main_layout.addWidget(warning_container)                   
 
     def _populate_ui(self):
         """Populates the UI components."""

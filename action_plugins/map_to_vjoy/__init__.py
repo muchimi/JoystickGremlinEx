@@ -1874,7 +1874,7 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
 
     """Action remapping physical joystick inputs to vJoy inputs."""
 
-    name = "VjoyRemap"
+    name = "Vjoy Remap"
     tag = "vjoyremap"
 
     default_button_activation = (True, True)
@@ -2234,7 +2234,7 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
 
 
 version = 1
-name = "VjoyRemap"
+name = "Vjoy Remap"
 create = VjoyRemap
 
 
