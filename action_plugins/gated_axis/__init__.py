@@ -17,7 +17,7 @@
 
 
 import os
-from PySide6 import QtWidgets
+from PySide6 import QtWidgets, QtCore
 from lxml import etree as ElementTree
 
 import gremlin.base_profile
@@ -33,7 +33,7 @@ class GatedAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def __init__(self, action_data, parent=None):
         super().__init__(action_data, parent=parent)
-        assert(isinstance(action_data, GatedAxis))
+        
 
     def _create_ui(self):
 
@@ -45,12 +45,18 @@ class GatedAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.gate_widget = gremlin.gated_handler.GatedAxisWidget(action_data = self.action_data,
                                                             show_configuration=False
                                                             )
+        self.gate_widget.hook()
 
         self.main_layout.addWidget(self.gate_widget)
 
+    def _cleanup_ui(self):
+        self.gate_widget.unhook()
+        self.gate_widget.deleteLater()
 
     def _populate_ui(self):
         pass
+
+    
 
 
 class GatedAxisFunctor(gremlin.base_profile.AbstractContainerActionFunctor):

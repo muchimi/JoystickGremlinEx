@@ -42,6 +42,8 @@ import gremlin.ui.keyboard_device
 import gremlin.ui.midi_device
 import gremlin.ui.osc_device
 import gremlin.util
+from gremlin.util import InvokeUiMethod, assert_ui_thread
+
 
 # Import QtMultimedia so pyinstaller doesn't miss it
 
@@ -138,6 +140,15 @@ class GremlinUi(QtWidgets.QMainWindow):
         :param parent the parent of this window
         """
         
+        # setup idle thread
+        # self._idle_thread = QtCore.QThread()
+        # self._idle_thread.setPriority(QtCore.QThread.Priority.IdlePriority)
+        # self._idle_lock = Lock()
+        # self._idle_callbacks = []  # callbacks to call when the thread is idle
+        # self._idle_run = True
+        # self._idle_thread.started.connect(self._idle_processing)
+        # self._idle_thread.start()
+        # self._idle_thread.finished.connect(self._idle_thread.deleteLater)
         
 
         QtWidgets.QMainWindow.__init__(self, parent)
@@ -146,7 +157,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         self._recreate_tab_widget()
         self.locked = False
         self.activate_locked = False
-        self.selection_lock = Lock()
+        self._selection_locked = False
         self.joystick_event_lock = Lock() # lock for joystick events
         self.device_change_locked = False
         self._device_change_queue = 0 # count of device updates while the UI is already updating
@@ -200,12 +211,14 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         self._last_input_event = None
         self._last_input_identifier = None # input id of the last triggered device
-        self._last_device_guid = None # string representation of the last GUID of the last triggered device
-        self._last_input_type = None # last input type (InputType) selected
-        self._last_input_id = None # last input id selected
+        # self._last_device_guid = None # string representation of the last GUID of the last triggered device
+        # self._last_input_type = None # last input type (InputType) selected
+        # self._last_input_id = None # last input id selected
 
         self._last_tab_switch = None
-        self._input_delay = 0.25
+        self._input_delay = 0.25 # delay in seconds between joystick inputs for highlighting purposes
+        self._joystick_axis_highlight_deviation = 0.1 # deviation needed before registering a highlight on axis change (this is to avoid noisy inputs and prevent the UI from going crazy) 1.0 = half travel
+        self._joystick_axis_highlight_map = {} # map of device / axis values
         self._event_process_registry = {}
         self._temp_input_axis_override = False # flag that tracks device swaps on axis
         self._temp_input_axis_only_override = False # flag that tracks device swaps but on axis only (shift + ctrl key)
@@ -272,24 +285,34 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         GremlinUi.ui = self
 
+    # def push_idle_callback(self, callback):
+    #     ''' adds a function to call when the UI is idle '''
+    #     with self._idle_lock:
+    #         self._idle_callbacks.append(callback)
+
+    # def _idle_processing(self):
+    #     ''' loop for idle processing '''
+    #     while self._idle_run:
+    #         if self._idle_callbacks:
+    #             callback = self._idle_callbacks.pop()
+    #             InvokeUiMethod(callback)
+                
+        
+
+
+
+
+    def _joystick_input_handler(self, event):
+        ''' handles joystick events in the UI'''
+        if gremlin.shared_state.is_running or self._input_highlight_stack > 0:
+            return 
+        if self._input_highlighting_enabled:
+            InvokeUiMethod(lambda: self._process_joystick_input_selection(event,self._button_highlighting_enabled))
+    
 
     def _recreate_tab_widget(self):
         ''' remove/recreate tabs for QT memory management '''
 
-        # with QtCore.QSignalBlocker(self.ui.devices):
-            
-        #     for index in range(self.ui.devices.count()):
-        #         widget = self.ui.devices.widget(index)
-        #         if widget is not None:
-        #             if hasattr(widget,"clear_layout"):
-        #                 widget.clear_layout()
-        #             widget.deleteLater()
-        #         self.ui.devices.removeTab(index)
-
-        # remove and recreate the tab object to clear QT object memory
-        # blitz the current tab widget
-
-        
         self.ui.devices.currentChanged.disconnect(self._current_tab_changed)
         self.ui.devices.customContextMenuRequested.disconnect(self._tab_context_menu_cb)
         devices_tab_bar = self.ui.devices.tabBar()
@@ -319,7 +342,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             print (f"last tab: index: [{index}] {self.ui.devices.tabText(index)} {device_guid}")
             self.config.last_tab_guid = device_guid
             self.last_tab_index = index
-            self._last_device_guid = device_guid
+            #self._last_device_guid = device_guid
             # refresh the tab selection
             
             
@@ -453,10 +476,16 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         :param evt the closure event
         """
+
         if self.config.close_to_tray and self.ui.tray_icon.isVisible():
             self.hide()
             evt.ignore()
         else:
+
+            # terminate the idle thread
+            # self._idle_run = False
+            # self._idle_thread.wait()
+
             self.process_monitor.running = False
             del self.ui.tray_icon
             QtCore.QCoreApplication.quit()
@@ -1034,6 +1063,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         the different connected devices.
         """
         
+        assert_ui_thread()
+
         try:
             self.push_highlighting()
         
@@ -1442,6 +1473,8 @@ class GremlinUi(QtWidgets.QMainWindow):
 
     def _get_input_item(self, device_guid : str, index : int) -> gremlin.base_profile.InputItem:
         widget = self._get_tab_widget_guid(device_guid)
+        if widget is None:
+            return None
         row_count = widget.input_item_list_model.rows()
         if row_count == 0 or index > row_count:
             return None
@@ -1463,70 +1496,79 @@ class GremlinUi(QtWidgets.QMainWindow):
         
         '''
 
-        with self.selection_lock:
-            try:
-                self.push_highlighting()
-                syslog = logging.getLogger("system")
-                if not isinstance(device_guid, str):
-                    device_guid = str(device_guid)
-                
-                # index of current device tab
-                index = self.ui.devices.currentIndex()
-                current_device_guid = self._get_tab_guid(index)
-                last_input_type, last_input_id = self._get_last_input(device_guid)
-                if input_type is None and input_id is None:
-                    input_type = last_input_type
-                    input_id = last_input_id
-                    force = True # force the selection when setting defaults
+        assert not self._selection_locked,"reentrant code detected"
+        self._selection_locked = True
+      
+        try:
+            self.push_highlighting()
+            el = gremlin.event_handler.EventListener()
+            el.push_joystick() # suspend joystick input while changing UI
 
-                if not force and \
-                    device_guid == current_device_guid and \
-                    last_input_type == input_type and \
-                    last_input_id == input_id:
-                    # no change
+            syslog = logging.getLogger("system")
+            if not isinstance(device_guid, str):
+                device_guid = str(device_guid)
+            
+            # index of current device tab
+            index = self.ui.devices.currentIndex()
+            current_device_guid = self._get_tab_guid(index)
+            last_input_type, last_input_id = self._get_last_input(device_guid)
+            if input_type is None and input_id is None:
+                input_type = last_input_type
+                input_id = last_input_id
+                force = True # force the selection when setting defaults
+
+            if not force and \
+                device_guid == current_device_guid and \
+                last_input_type == input_type and \
+                last_input_id == input_id:
+                # no change
+                return
+            
+            # avoid spamming
+            if self._last_input_change_timestamp + self._input_delay > time.time():
+                    # delay not occured yet
                     return
-                
-                # avoid spamming
-                if self._last_input_change_timestamp + self._input_delay > time.time():
-                        # delay not occured yet
-                        return
-                self._last_input_change_timestamp = time.time()
-                
-                syslog.info(f"Select input event: {device_guid} {self._get_device_name(device_guid)} input: {InputType.to_display_name(input_type)} input ID: {input_id}")
+            self._last_input_change_timestamp = time.time()
+            
+            syslog.info(f"Select input event: {device_guid} {self._get_device_name(device_guid)} input: {InputType.to_display_name(input_type)} input ID: {input_id}")
 
+            
+            # guid of current device tab
+            
+            if current_device_guid.casefold() != device_guid.casefold():
+                # change tabs
+                syslog.info("Tab change requested")
+                index = self._find_tab_index(device_guid)
+                if index is not None:
+                    with QtCore.QSignalBlocker(self.ui.devices):
+                        self.ui.devices.setCurrentIndex(index)
+                        self.config.last_tab_guid = self._get_tab_guid(index)
+                        # print (f"select tab index : {self.config.last_tab_guid}")
+                    gremlin.shared_state.last_device_guid = device_guid
+                    gremlin.config.Configuration().last_tab_guid = device_guid
+                    syslog.info("Tab change complete")
                 
-                # guid of current device tab
-                
-                if current_device_guid.casefold() != device_guid.casefold():
-                    # change tabs
-                    syslog.info("Tab change requested")
-                    index = self._find_tab_index(device_guid)
-                    if index is not None:
-                        with QtCore.QSignalBlocker(self.ui.devices):
-                            self.ui.devices.setCurrentIndex(index)
-                            self.config.last_tab_guid = self._get_tab_guid(index)
-                            # print (f"select tab index : {self.config.last_tab_guid}")
-                        self._last_device_guid = device_guid
-                        gremlin.config.Configuration().last_tab_guid = device_guid
-                        syslog.info("Tab change complete")
+
+            if input_id is not None:
+                # within the inputs = select it
+                syslog.info("ID change started")
+                widget = self.ui.devices.currentWidget()
+                if widget:
+                    widget.input_item_list_view.select_input(input_type, input_id)
+                    index = widget.input_item_list_view.current_index
+                    widget.input_item_list_view.redraw_index(index)
                     
 
-                if input_id is not None:
-                    # within the inputs = select it
-                    syslog.info("ID change started")
-                    widget = self.ui.devices.currentWidget()
-                    if widget:
-                        with QtCore.QSignalBlocker(widget):
-                            widget.input_item_list_view.select_input(input_type, input_id)
-                            index = widget.input_item_list_view.current_index
-                            widget.input_item_list_view.redraw_index(index)
+                #QtWidgets.QApplication.processEvents()
+                syslog.info("ID change complete")
 
-                    syslog.info("ID change complete")
+            gremlin.shared_state.set_last_input_id(device_guid, input_type, input_id)
 
-                gremlin.shared_state.set_last_input_id(device_guid, input_type, input_id)
-
-            finally:
-                self.pop_highlighting()
+        finally:
+            self._selection_locked = False
+            self.pop_highlighting()
+            el.pop_joystick() # restor joystick input while changing UI
+            time.sleep(0.05) # let things settle
 
 
         
@@ -1766,33 +1808,57 @@ class GremlinUi(QtWidgets.QMainWindow):
             
             
     @QtCore.Slot()
-    def _device_input_changed_cb(self, device_guid, identifier):
+    def _device_input_changed_cb(self, device_guid, input_type, input_id):
         ''' called when device input changed '''
-        self._last_device_guid = device_guid
-        self._last_input_identifier = identifier
+        gremlin.shared_state.set_last_input_id(device_guid, input_type, input_id)
+        
 
     
 
-    def _process_joystick_input_selection(self, event, buttons_only = False):
+    def _process_joystick_input_selection(self, event : gremlin.event_handler.Event, buttons_only = False):
         """Handles joystick events to select the appropriate input item for device highligthing in the UI
 
         :param event the event to process
         """
 
+        assert_ui_thread()
+
         if self.locked:
             return
         
+        config = self.config
+        if not config.highlight_enabled:
+            # highlighting turned off
+            return 
+        
         # avoid specific axis input spamming
-        if event.event_type == InputType.JoystickAxis:
-            if self._last_input_timestamp + self._input_delay > time.time():
-                # delay not occured yet
-                return
-            self._last_input_timestamp = time.time()
+        if self._last_input_timestamp + self._input_delay > time.time():
+            # delay not occured yet
+            return
+        self._last_input_timestamp = time.time()
             
+        if event.event_type == InputType.JoystickAxis:
+            # only process if there is a significant deviation for that axis to avoid noisy input an inadvertent motion
 
+            if not config.highlight_input_axis:
+                # ignore if axis highlighting is disabled
+                return
+            device_guid = str(event.device_guid).casefold()
+            if not device_guid in self._joystick_axis_highlight_map.keys():
+                self._joystick_axis_highlight_map[device_guid] = {}
+            if not event.identifier in self._joystick_axis_highlight_map[device_guid].keys():
+                self._joystick_axis_highlight_map[device_guid][event.identifier] = event.value
+                deviation = 2.0
+            else:
+                deviation = abs(self._joystick_axis_highlight_map[device_guid][event.identifier] - event.value)
+            if deviation < self._joystick_axis_highlight_deviation:
+                # deviation insufficient
+                return
+            self._joystick_axis_highlight_map[device_guid][event.identifier] = event.value
+            
                 
 
-        verbose = gremlin.config.Configuration().verbose_mode_inputs
+        verbose = config.verbose_mode_inputs
 
         # enter critical section
         try:
@@ -1809,8 +1875,6 @@ class GremlinUi(QtWidgets.QMainWindow):
             if gremlin.shared_state.is_highlighting_suspended():
                 # skip if auto highlight of tabs/inputs is disabled
                 return
-            
-            config = self.config # gremlin.config.Configuration()
             
         
             # Switch to the tab corresponding to the event's device if the option
@@ -1846,7 +1910,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                 return
             
             # prevent switching based on user options
-            if not config.highlight_input and event.event_type == InputType.JoystickAxis:
+            if not config.highlight_input_axis and event.event_type == InputType.JoystickAxis:
                 # ignore axis input
                 if verbose:
                     logging.getLogger("system").info(f"Event: highlight axis input ignored (option off)")
@@ -1857,15 +1921,18 @@ class GremlinUi(QtWidgets.QMainWindow):
                     logging.getLogger("system").info(f"Event: highlight button input ignored (option off)")
                 return
             
-            input_changed = not self._last_device_guid or not self._last_input_identifier or self._last_device_guid != device_guid or self._last_input_identifier != event.identifier
+            last_device_guid, last_input_type, last_input_id =  gremlin.shared_state.get_last_input_id()
+            
+            input_changed = not last_device_guid or not last_input_type or not last_input_id \
+                or last_device_guid != device_guid or last_input_type != event.event_type or  last_input_id != event.identifier
 
-            process_input = input_changed or self._should_process_input(event, widget, buttons_only)
+            if event.event_type == InputType.JoystickAxis:
+                process_input = input_changed
+            else:
+                process_input = input_changed or self._should_process_input(event, widget, buttons_only)
             if verbose:
                 logging.getLogger("system").info(f"Event: process input {'ok' if process_input else 'ignored'}")
 
-            self._last_input_identifier = event.identifier
-            current_device_guid = self._last_device_guid
-            self._last_device_guid = device_guid
             gremlin.shared_state.set_last_input_id(device_guid, event.event_type, event.identifier)
             
             if not process_input:
@@ -1874,19 +1941,12 @@ class GremlinUi(QtWidgets.QMainWindow):
             eh = gremlin.event_handler.EventListener()
             
 
-            if config.highlight_device and tab_switch_needed:
+            if config.highlight_autoswitch and tab_switch_needed:
                 if verbose:
                     logging.getLogger("system").info(f"Event: execute tab switch begin")
                 eh.select_input.emit(event.device_guid, event.event_type, event.identifier)
-                #self._select_input(event.device_guid, event.event_type, event.identifier)
-                # self.ui.devices.setCurrentWidget(self.tabs[event.device_guid])
-                # self.refresh()
-                # if verbose:
-                #     logging.getLogger("system").info(f"Event: execute tab switch complete ")
-                # update the selected widget
             else:
                 eh.select_input.emit(event.device_guid, event.event_type, event.identifier)
-                #self._select_input(current_device_guid, event.event_type, event.identifier)
 
 
 
@@ -2152,7 +2212,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         
 
 
-        if (self.config.highlight_input or self.config.highlight_input_buttons):
+        if (self.config.highlight_input_axis or self.config.highlight_input_buttons):
             if key.lookup_name == "leftshift":
                 if event.is_pressed:
                     # temporarily force the listening to joystick axes changes
@@ -2195,7 +2255,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         gremlin.gamepad_handling.gamepad_reset()
 
         self._set_joystick_input_highlighting(
-            self.config.highlight_input
+            self.config.highlight_input_axis
         )
         self._set_joystick_input_buttons_highlighting(self.config.highlight_input_buttons)
         if not ignore_minimize:
@@ -2516,12 +2576,6 @@ class GremlinUi(QtWidgets.QMainWindow):
         """
         self._button_highlighting_enabled = is_enabled        
 
-    def _joystick_input_handler(self, event):
-        ''' handles joystick events in the UI'''
-        if gremlin.shared_state.is_running or self._input_highlight_stack > 0:
-            return 
-        if self._input_highlighting_enabled:
-            self._process_joystick_input_selection(event,self._button_highlighting_enabled)
 
     def push_highlighting(self):
         ''' disables the highlighting of devices '''
@@ -2553,12 +2607,14 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         is_running = self.runner.is_running()
 
-        # minimum deviation to look for for an axis
-        deviation = 0.1 if is_running else 0.5
-
         if is_running:
             return False
        
+
+        # minimum deviation to look for for an axis
+        deviation = self._joystick_axis_highlight_deviation
+
+     
         if buttons_only and event.event_type == InputType.JoystickAxis and not self.input_axis_override:
             # ignore axis moves if button only mode
             return False
@@ -2582,6 +2638,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             
        
         process_input = False
+        config = gremlin.config.Configuration()
 
         if event.event_type == InputType.JoystickAxis:
             # only worry about axis deviation delta if it's an axis
@@ -2831,6 +2888,7 @@ if __name__ == "__main__":
         ui.activate(True)
     if args.start_minimized:
         ui.setHidden(True)
+    
 
     # Run UI
     syslog.info("GremlinEx UI launching")

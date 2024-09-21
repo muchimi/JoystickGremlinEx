@@ -194,10 +194,22 @@ def delayed_input_highlighting_suspension():
 # holds the last tab selections
 _tab_input_map = {}
 
+# last selected device 
+last_device_guid = None
+
+
 def set_last_input_id(device_guid, input_type, input_id):
     ''' tracks the last selection per device guid '''
     key = str(device_guid)
     _tab_input_map[key] = (input_type, input_id)
+
+def get_last_input_id():
+    if not last_device_guid or not last_device_guid in _tab_input_map.keys():
+        return (None, None, None)
+    input_type, input_id = _tab_input_map[last_device_guid]
+    return (last_device_guid, input_type, input_id)
+
+
 
 def last_input_id(device_guid):
     ''' retrieves the last input id for a given input guid (input_type, input_id) of the last selection for this device '''

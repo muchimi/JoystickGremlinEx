@@ -1446,10 +1446,23 @@ def clear_layout(layout):
         if child.layout():
             clear_layout(child.layout())
         elif child.widget():
-            child.widget().hide()
-            child.widget().deleteLater()
+            widget = child.widget()
+            widget.hide()
+            widget.deleteLater()
         layout.removeItem(child)
 
+def get_layout_widgets(layout) -> list:
+    ''' returns a list of layout widgets '''
+    widgets = []
+    while layout.count() > 0:
+        child = layout.takeAt(0)
+        if child.layout():
+            widgets.extend(get_layout_widgets(child.layout()))
+        elif child.widget():
+            widgets.append(child.widget())
+
+    return widgets
+        
 
 class NoWheelComboBox (QtWidgets.QComboBox):
     ''' implements a combo box with no-wheel scrolling to avoid inadvertent switching of entries while scolling containers '''
@@ -2865,7 +2878,7 @@ QMarkerDoubleRangeSlider::add-page:horizontal { background: #979EA8; border-styl
                     painter.drawPixmap(center + pd.offset_x, value + pd.offset_y, pd.pixmap)
 
       
-
+        painter.end()
 
 
 

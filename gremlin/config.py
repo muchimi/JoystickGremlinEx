@@ -504,19 +504,19 @@ class Configuration:
 
 
     @property
-    def highlight_input(self):
-        """Returns whether or not to highlight inputs.
+    def highlight_input_axis(self):
+        """Returns whether or not to highlight inputs for an axis
 
         This enables / disables the feature where using a physical input
         automatically selects it in the UI.
 
         :return True if the feature is enabled, False otherwise
         """
-        return self._data.get("highlight_input", False)
+        return self._data.get("highlight_input_axis", False)
 
-    @highlight_input.setter
-    def highlight_input(self, value):
-        """Sets whether or not to highlight inputs.
+    @highlight_input_axis.setter
+    def highlight_input_axis(self, value):
+        """Sets whether or not to highlight inputs for an axis
 
         This enables / disables the feature where using a physical input
         automatically selects it in the UI.
@@ -525,12 +525,12 @@ class Configuration:
             feature
         """
         if type(value) == bool:
-            self._data["highlight_input"] = value
+            self._data["highlight_input_axis"] = value
             self.save()
 
     @property
     def highlight_input_buttons(self):
-        """Returns whether or not to highlight inputs.
+        """Returns whether or not to highlight inputs for a button
 
         This enables / disables the feature where using a physical input
         automatically selects it in the UI.
@@ -541,7 +541,7 @@ class Configuration:
 
     @highlight_input_buttons.setter
     def highlight_input_buttons(self, value):
-        """Sets whether or not to highlight inputs.
+        """Sets whether or not to highlight inputs for a button 
 
         This enables / disables the feature where using a physical input
         automatically selects it in the UI.
@@ -555,7 +555,7 @@ class Configuration:
 
 
     @property
-    def highlight_device(self):
+    def highlight_enabled(self):
         """Returns whether or not highlighting swaps device tabs.
 
         This enables / disables the feature where using a physical input
@@ -565,8 +565,8 @@ class Configuration:
         """
         return self._data.get("highlight_device", False)
 
-    @highlight_device.setter
-    def highlight_device(self, value):
+    @highlight_enabled.setter
+    def highlight_enabled(self, value):
         """Sets whether or not to swap device tabs to highlight inputs.
 
         This enables / disables the feature where using a physical input

@@ -29,6 +29,7 @@ import uuid
 import dinput
 import qtawesome as qta
 from lxml import etree as ElementTree
+from typing import Callable
 
 
 from PySide6 import QtCore, QtWidgets, QtGui
@@ -364,6 +365,18 @@ def clear_layout(layout):
             child.widget().hide()
             child.widget().deleteLater()
         layout.removeItem(child)
+
+def get_layout_widgets(layout) -> list:
+    ''' returns a list of layout widgets '''
+    widgets = []
+    while layout.count() > 0:
+        child = layout.takeAt(0)
+        if child.layout():
+            widgets.extend(get_layout_widgets(child.layout()))
+        elif child.widget():
+            widgets.append(child.widget())
+
+    return widgets        
 
 def layout_contains(layout, widget):
     ''' true if widget is contained in the given layout '''
@@ -1209,3 +1222,41 @@ def debug_pickle(instance, exception=None, string='', first_only=True):
     return problems
 
 
+def is_close(a, b, tolerance = 0.0001):
+    ''' compares two floating point numbers with approximate precision '''
+    return math.isclose(a, b, abs_tol=tolerance)
+
+class InvokeUiMethod(QtCore.QObject):
+    ''' invokes a call on the UI thread as QT is not thread safe '''
+    def __init__(self, method: Callable):
+        ''' Invokes a method on the main ui thread. 
+        
+        :params: method: lambda expression
+        
+        '''
+        super().__init__()
+        current_thread = QtCore.QThread.currentThread()
+        ui_thread = QtWidgets.QApplication.instance().thread() # QT thread
+        if current_thread != ui_thread:
+            self.moveToThread(ui_thread)
+            self.setParent(QtWidgets.QApplication.instance())
+            self.method = method
+            self.called.connect(self.execute)
+            self.called.emit()
+        else:
+            method()
+
+    called = QtCore.Signal()
+
+    @QtCore.Slot()
+    def execute(self):
+        self.method()
+        # trigger garbage collector
+        self.setParent(None)
+
+
+def assert_ui_thread():
+    current_thread = QtCore.QThread.currentThread()
+    ui_thread = QtWidgets.QApplication.instance().thread() # UI thread
+    if current_thread != ui_thread:
+        assert False,"call not on UI thread"

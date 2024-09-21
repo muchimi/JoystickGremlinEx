@@ -401,6 +401,7 @@ class ActionContainerView(gremlin.ui.ui_common.AbstractView):
         :return callback function to remove the provided widget from the
             model
         """
+
         return lambda: self.model.remove_container(widget.profile_data)
 
 
@@ -409,7 +410,7 @@ class JoystickDeviceTabWidget(QDataWidget):
 
     """Widget used to display the input joystick device."""
 
-    inputChanged = QtCore.Signal(str, object) # indicates the input selection changed sends (device_guid string, identifier object)
+    inputChanged = QtCore.Signal(str, object, object) # indicates the input selection changed sends (device_guid string, input_type, input_id)
 
     def __init__(
             self,
@@ -514,9 +515,9 @@ class JoystickDeviceTabWidget(QDataWidget):
         self.main_layout.addWidget(widget,3)
 
 
-        # listen to device changes
+        # # listen to device changes
         el = gremlin.event_handler.EventListener()
-        el.joystick_event.connect(self._device_update)
+        # el.joystick_event.connect(self._device_update)
 
 
         self.updating = False
@@ -524,7 +525,7 @@ class JoystickDeviceTabWidget(QDataWidget):
 
         # update the selection if nothing is selected
         selected_index = self.input_item_list_view.current_index
-        if selected_index is not None:
+        if selected_index is not None and selected_index != -1:
             self.input_item_selected_cb(selected_index)
 
 
@@ -610,37 +611,6 @@ class JoystickDeviceTabWidget(QDataWidget):
     def running(self):
         return gremlin.shared_state.is_running
 
-    def _device_update(self, event):
-        if self.running:
-            return
-
-        if self.last_event == event:
-            return
-        
-        self.last_event = event
-        if self.device.device_guid != event.device_guid:
-            return
-                
-        if event.event_type == InputType.JoystickButton:
-            if not event.is_pressed:
-                return
-        elif event.event_type == InputType.JoystickAxis:
-            cfg = gremlin.config.Configuration()
-            if not cfg.highlight_input:
-                return
-            if not gremlin.input_devices.JoystickInputSignificant().should_process(event):
-                return
-        elif event.event_type == InputType.JoystickHat:
-            if not event.is_pressed:
-                return
-
-        config = gremlin.config.Configuration()
-        if not config.highlight_input_buttons and event.event_type == InputType.JoystickButton:
-            return
-        if not config.highlight_input:
-            return
-        self.input_item_list_view.select_input(event.event_type, event.identifier)
-
     
     def input_item_selected_cb(self, index):
         """Handles the selection of an input item.
@@ -677,8 +647,9 @@ class JoystickDeviceTabWidget(QDataWidget):
 
             # indicate the input changed
             device_guid = str(item_data.device_guid)
-            identifier = item_data.input_id
-            self.inputChanged.emit(device_guid, identifier)
+            input_type = item_data.input_type
+            input_id = item_data.input_id
+            self.inputChanged.emit(device_guid, input_type, input_id)
 
 
 
@@ -710,7 +681,7 @@ class JoystickDeviceTabWidget(QDataWidget):
 
         
         self.input_item_list_view.redraw()
-        self.input_item_list_view.select_item(index, emit_signal=False)
+        self.input_item_list_view.select_item(index, emit=False)
 
 
 

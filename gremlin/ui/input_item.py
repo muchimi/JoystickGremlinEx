@@ -430,6 +430,7 @@ class InputItemListView(ui_common.AbstractView):
 
         if self.model is None:
             return
+        
 
         with QtCore.QSignalBlocker(self):
 
@@ -480,8 +481,6 @@ class InputItemListView(ui_common.AbstractView):
                 
 
                 # hook the widget
-                
-                
                 widget.selected_changed.connect(self._widget_selection_change_cb)
                 widget.index = index # assigned index
                 if selected:
@@ -501,12 +500,12 @@ class InputItemListView(ui_common.AbstractView):
                     logging.getLogger("system").info(f"LV: {device_name} [{index:02d}] type: {InputType.to_string(data.input_type)} name: {data.input_id}")
 
 
-            if selected_index == -1 and row_count > 0:
-                selected_index = 0 # select the first one by default if nothing was selected
+            # if selected_index == -1 and row_count > 0:
+            #     selected_index = 0 # select the first one by default if nothing was selected
 
-            if selected_index >= 0:
-                # select the item
-                self.select_item(selected_index, False)
+            # if selected_index >= 0:
+            #     # select the item
+            #     self.select_item(selected_index, emit = False)
 
             self.scroll_layout.addStretch()
 
@@ -569,14 +568,14 @@ class InputItemListView(ui_common.AbstractView):
 
 
 
-    def select_input(self, input_type, identifier):
+    def select_input(self, input_type, identifier, emit = True):
         ''' selects an entry based on input type and ID'''
         for index in range(self.model.rows()):
             data = self.model.data(index)
             if input_type is not None and data.input_type != input_type:
                 continue
             if data.input_id == identifier:
-                self.select_item(index)
+                self.select_item(index, emit)
                 return
 
     def selected_item(self):
@@ -646,7 +645,7 @@ class InputItemListView(ui_common.AbstractView):
             widget.update_display()
         
 
-    def select_item(self, index, emit_signal=True, force = True, user_selected = False):
+    def select_item(self, index, emit=True, force = True, user_selected = False):
         """Handles selecting a specific item.  this is called whenever an input item is selected
 
         :param index the index of the item being selected
@@ -688,23 +687,18 @@ class InputItemListView(ui_common.AbstractView):
             with (QtCore.QSignalBlocker(last_widget)):
                 last_widget.selected = False
 
-        
-        
-
-        # signal the hardware input device changed
-        el = gremlin.event_handler.EventListener()
-        event = gremlin.event_handler.DeviceChangeEvent()
-        data = self.model.data(index)
-        event.device_guid = self.model._device_data.device_guid
-        event.device_name = self.model._device_data.name
-        event.device_input_type = data.input_type if data else None
-        event.device_input_id = data.input_id if data else None
-        el.profile_device_changed.emit(event)
         self._current_index = index
 
+        data = self.model.data(index)
+        device_guid = self.model._device_data.device_guid
+        device_name = self.model._device_data.name
+        device_input_type = data.input_type if data else None
+        device_input_id = data.input_id if data else None
+        
         if user_selected:
             # save what was last selected
-            gremlin.shared_state.set_last_input_id(event.device_guid, event.device_input_type, event.device_input_id)
+            
+            gremlin.shared_state.set_last_input_id(device_guid, device_input_type, device_input_id)
 
         widget = self.itemAt(index)
         if widget:
@@ -714,11 +708,18 @@ class InputItemListView(ui_common.AbstractView):
             with (QtCore.QSignalBlocker(widget)):
                 widget.selected = True
 
-        #logging.getLogger("system").info(f"Select widget: index {index} {data.display_name}")
 
-
-        if emit_signal:
+        if emit:
             self.item_selected.emit(index)
+
+            el = gremlin.event_handler.EventListener()
+            event = gremlin.event_handler.DeviceChangeEvent()
+            data = self.model.data(index)
+            event.device_guid = device_guid
+            event.device_name = device_name
+            event.device_input_type = device_input_type
+            event.device_input_id = device_input_id
+            el.profile_device_changed.emit(event)
 
         # return the currently selected widget
         return widget
@@ -811,11 +812,26 @@ class ActionSetView(ui_common.AbstractView):
             self.action_selector.action_paste.connect(self._paste_action)
             self.group_layout.addWidget(self.action_selector, 1, 0)
 
+        if parent:
+            ''' hook container closing '''
+            parent.closing.connect(self._container_closing)
 
+        self._widgets = [] # holds the list of widgets for this action set
+
+    def _container_closing(self):
+        for widget in self._widgets:
+            if hasattr(widget,"_cleanup_ui"):
+                widget._cleanup_ui()
+        # clear
+        self._widgets.clear()
 
     def redraw(self):
 
         ui_common.clear_layout(self.action_layout)
+
+        if self._widgets:
+            pass
+        self._widgets.clear()
 
         if self.model is None:
             return
@@ -830,6 +846,7 @@ class ActionSetView(ui_common.AbstractView):
                 wrapped_widget = BasicActionWrapper(widget)
                 wrapped_widget.closed.connect(self._create_closed_cb(widget))
                 self.action_layout.addWidget(wrapped_widget)
+                self._widgets.append(widget)
         elif self.view_type == ui_common.ContainerViewTypes.Condition:
             for index in range(self.model.rows()):
                 data = self.model.data(index)
@@ -1359,6 +1376,9 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
     # Signal which is emitted whenever the widget is closed
     closed = QtCore.Signal(QtWidgets.QWidget)
 
+    # fires when the container is about to be closed
+    closing = QtCore.Signal()
+
     # Signal which is emitted whenever the widget's contents change as well as
     # the UI tab that was active when the event was emitted
     container_modified = QtCore.Signal()
@@ -1522,7 +1542,8 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         action_set_view = ActionSetView(
             self.profile_data,
             label,
-            view_type
+            view_type,
+            parent = self
         )
         action_set_view.set_model(action_set_model)
         action_set_view.interacted.connect(
@@ -1605,11 +1626,16 @@ class AbstractActionWidget(QtWidgets.QFrame):
         self._create_ui()
         self._populate_ui()
 
+    def _cleanup_ui(self):
+        ''' called when a container is closing '''
+        pass
+
     def _create_ui(self):
         """Creates all the elements necessary for the widget."""
         raise gremlin.error.MissingImplementationError(
             "AbstractActionWidget._create_ui not implemented in subclass"
         )
+    
 
     def _populate_ui(self):
         """Updates this widget's representation based on the provided

@@ -21,7 +21,7 @@ import logging
 import time
 import queue
 from threading import Thread, Timer
-
+from typing import Callable
 
 
 import gremlin.joystick_handling
@@ -256,8 +256,11 @@ class EventListener(QtCore.QObject):
 	# functor enable flag changed
 	action_created = QtCore.Signal(object) # runs when an action is created - object = the object that triggered the event 
 
+	# selection event - tells the UI to show a different input
 	select_input = QtCore.Signal(object, object, object) # selects a particular input (device_guid, input_type, input_id)
 
+
+	
 
 	def __init__(self):
 		"""Creates a new instance."""
@@ -284,6 +287,9 @@ class EventListener(QtCore.QObject):
 
 		self._process_device_change_lock = False
 
+		self._joystick_suspend_count = 0 # stack count for suspend joystick
+
+
 		# keyboard input handling buffer
 		self._keyboard_state = {}
 		self._keyboard_queue = None
@@ -298,6 +304,14 @@ class EventListener(QtCore.QObject):
 		self._process_device_change.connect(self._process_device_change_cb)
 
 		Thread(target=self._run).start()
+
+	def push_joystick(self):
+		self._joystick_suspend_count += 1
+
+	def pop_joystick(self):
+		if self._joystick_suspend_count > 0:
+			self._joystick_suspend_count -= 1
+
 
 	def _device_changed_cb(self):
 		self._init_joysticks()
@@ -453,6 +467,10 @@ class EventListener(QtCore.QObject):
 
 		:param data the joystick event
 		"""
+
+		if self._joystick_suspend_count > 0:
+			# ignore if joystick input is suspended
+			return
 
 		from gremlin.util import dill_hat_lookup
 		verbose = config.Configuration().verbose_mode_joystick
@@ -1377,3 +1395,5 @@ class EventHandler(QtCore.QObject):
 			if keyword in signature:
 				callback = plugin.install(callback, functools.partial)
 		return callback
+
+

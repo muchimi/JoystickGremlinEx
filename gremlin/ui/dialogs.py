@@ -284,9 +284,9 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.highlight_input_axis = QtWidgets.QCheckBox(
             "Highlight currently triggered axis"
         )
-        self.highlight_input_axis.clicked.connect(self._highlight_input)
+        self.highlight_input_axis.clicked.connect(self._highlight_input_axis)
         self.highlight_input_axis.setToolTip("This otion will enable automatic selection and highlighting of device inputs when they are triggered.")
-        self.highlight_input_axis.setChecked(self.config.highlight_input)
+        self.highlight_input_axis.setChecked(self.config.highlight_input_axis)
 
         # Highlight input option buttons
         self.highlight_input_buttons = QtWidgets.QCheckBox(
@@ -296,9 +296,9 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.highlight_input_buttons.setChecked(self.config.highlight_input_buttons)
 
         # Switch to highlighted device
-        self.highlight_device = QtWidgets.QCheckBox("Highlight swaps device tabs")
-        self.highlight_device.clicked.connect(self._highlight_device)
-        self.highlight_device.setChecked(self.config.highlight_device)
+        self.highlight_enabled = QtWidgets.QCheckBox("Highlight swaps device tabs")
+        self.highlight_enabled.clicked.connect(self._highlight_enabled)
+        self.highlight_enabled.setChecked(self.config.highlight_enabled)
 
         # Close to system tray option
         self.close_to_systray = QtWidgets.QCheckBox("Closing minimizes to system tray")
@@ -562,7 +562,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         row+=1
         self.column_layout.addWidget(self.highlight_input_buttons, row, col)
         row+=1
-        self.column_layout.addWidget(self.highlight_device, row, col)
+        self.column_layout.addWidget(self.highlight_enabled, row, col)
         row+=1
         self.column_layout.addWidget(self.sync_last_selection, row, col)
         row+=1
@@ -1031,12 +1031,12 @@ This setting is also available on a profile by profile basis on the profile tab,
 
 
     @QtCore.Slot(bool)
-    def _highlight_input(self, clicked):
+    def _highlight_input_axis(self, clicked):
         """Stores preference for input highlighting.
 
         :param clicked whether or not the checkbox is ticked
         """
-        self.config.highlight_input = clicked
+        self.config.highlight_input_axis = clicked
 
     @QtCore.Slot(bool)
     def _highlight_input_buttons(self, clicked):
@@ -1049,12 +1049,12 @@ This setting is also available on a profile by profile basis on the profile tab,
 
 
     @QtCore.Slot(bool)
-    def _highlight_device(self, clicked):
+    def _highlight_enabled(self, clicked):
         """Stores preference for device highlighting.
 
         :param clicked whether or not the checkbox is ticked
         """
-        self.config.highlight_device = clicked
+        self.config.highlight_enabled = clicked
         self.config.save()
 
     def _select_profile(self):
