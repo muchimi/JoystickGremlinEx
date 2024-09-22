@@ -218,7 +218,7 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
 
     valueChanged = QtCore.Signal(float) # fires when the value changes
 
-    def __init__(self, data = None, min_range = -1.0, max_range = 1.0, decimals = 3, step = 0.01, parent = None):
+    def __init__(self, data = None, min_range = -1.0, max_range = 1.0, decimals = 3, step = 0.01, value = 0.0, parent = None):
         super().__init__(parent)
         self._min_range = min_range
         self._max_range = max_range
@@ -231,8 +231,8 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
         self.setValidator(self._validator)
         self.textChanged.connect(self._validate)
         self.installEventFilter(self)
-        self.setText("0")
-        self.setValue(0.0)
+        #self.setText("0")
+        self.setValue(value)
         self._data = data
 
     @property
@@ -269,13 +269,14 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
 
         
     def _update_value(self, value):
-        other = self.value()
-        if value is None or other is None:
+        if value is None:
             return
-        s_value = f"{value:0.{self._decimals}f}"
-        if s_value != self.text():
-            self.setText(s_value)
-        if other != value:
+        other = self.value()
+        if other is None or other != value:
+            s_value = f"{value:0.{self._decimals}f}"
+            if s_value != self.text():
+                self.setText(s_value)
+            
             self.valueChanged.emit(value)
 
 
@@ -357,7 +358,7 @@ class QIntLineEdit(QtWidgets.QLineEdit):
 
     valueChanged = QtCore.Signal(float) # fires when the value changes
 
-    def __init__(self, data = None, min_range = -1.0, max_range = 1.0, step = 1, parent = None):
+    def __init__(self, data = None, min_range = -1.0, max_range = 1.0, step = 1, value = 0, parent = None):
         super().__init__(parent)
         self._min_range = min_range
         self._max_range = max_range
@@ -369,8 +370,7 @@ class QIntLineEdit(QtWidgets.QLineEdit):
         self.setValidator(self._validator)
         self.textChanged.connect(self._validate)
         self.installEventFilter(self)
-        self.setText("0")
-        self.setValue(0)
+        self.setValue(value)
         self._data = data
 
     @property
@@ -1657,7 +1657,23 @@ class QIconLabel(QtWidgets.QWidget):
     def text(self):
         ''' gets the text of the widget '''
         return self._icon_widget.text()
+
+class QDataWidget(QtWidgets.QWidget):
+    ''' data widgets '''
+    def __init__(self, data = None, parent = None):
+        super().__init__(parent)
+        self._data = data
+
+    @property
+    def data(self):
+        return self._data
     
+    @data.setter
+    def data(self, value):
+        self._data = value
+    
+
+
 class QDataCheckbox(QtWidgets.QCheckBox):
     ''' a checkbox that has a data property to track an object associated with the checkbox '''
     def __init__(self, text = None, data = None, parent = None):
@@ -3509,17 +3525,31 @@ class DualSlider(QtWidgets.QWidget):
 
 class QFlowLayout(QtWidgets.QLayout):
     def __init__(self, parent=None, margin=-1, hspacing=-1, vspacing=-1):
+        '''
+        :params:
+        parent = parent of the object
+        margin = margin, -1 for auto
+        hspacing = horizontal spacing, -1 for auto
+        vspacing = vertical spacing, -1 for auto
+        sort_property = name of the index member of the item to set the display order, None to disable
+        '''
         super().__init__(parent)
         self._hspacing = hspacing
         self._vspacing = vspacing
         self._items = []
         self.setContentsMargins(margin, margin, margin, margin)
+        self._grid_layout = True
+
 
     def __del__(self):
         del self._items[:]
 
     def addItem(self, item):
         self._items.append(item)
+
+    def sortItems(self, callback):
+        ''' sorts the items based on the given sort property '''
+        self._items.sort(key = lambda item: callback(item))
 
     def horizontalSpacing(self):
         if self._hspacing >= 0:
@@ -3576,29 +3606,89 @@ class QFlowLayout(QtWidgets.QLayout):
         x = effective.x()
         y = effective.y()
         lineheight = 0
-        for item in self._items:
-            widget = item.widget()
-            hspace = self.horizontalSpacing()
-            if hspace == -1:
-                hspace = widget.style().layoutSpacing(
-                    QtWidgets.QSizePolicy.PushButton,
-                    QtWidgets.QSizePolicy.PushButton, QtCore.Qt.Horizontal)
-            vspace = self.verticalSpacing()
-            if vspace == -1:
-                vspace = widget.style().layoutSpacing(
-                    QtWidgets.QSizePolicy.PushButton,
-                    QtWidgets.QSizePolicy.PushButton, QtCore.Qt.Vertical)
-            nextX = x + item.sizeHint().width() + hspace
-            if nextX - hspace > effective.right() and lineheight > 0:
-                x = effective.x()
-                y = y + lineheight + vspace
+
+        if self._grid_layout:
+            # compute max width
+            max_w = 0
+            pos_x = {}
+            pos_x[0] = x
+
+            for item in self._items:
+                widget = item.widget()
+                if not widget.isVisible():
+                    continue
+                hspace = self.horizontalSpacing()
+                if hspace == -1:
+                    hspace = widget.style().layoutSpacing(
+                        QtWidgets.QSizePolicy.PushButton,
+                        QtWidgets.QSizePolicy.PushButton, QtCore.Qt.Horizontal)
+                vspace = self.verticalSpacing()
+                if vspace == -1:
+                    vspace = widget.style().layoutSpacing(
+                        QtWidgets.QSizePolicy.PushButton,
+                        QtWidgets.QSizePolicy.PushButton, QtCore.Qt.Vertical)
+                item_w = item.sizeHint().width() + hspace    
+                max_w = max(max_w,item_w)
+                lineheight = max(lineheight, item.sizeHint().height())
+            # compute columns
+            
+            usable_width = effective.right() - x
+            if max_w == 0:
+                max_w = usable_width
+            max_col = max(1, usable_width // max_w)
+            
+            # print (f"available width {usable_width} max widget {max_w} columns: {max_col}")
+            for col in range(max_col):
+                pos_x[col] = col * max_w
+                # print(f"\tcol {col} position {pos_x[col]}")
+
+            col = 0
+            row = 0
+            for item in self._items:
+                widget = item.widget()
+                if not widget.isVisible():
+                    continue
+                x = pos_x[col]
+                if not testonly:
+                    item.setGeometry(
+                        QtCore.QRect(QtCore.QPoint(x, y), item.sizeHint()))
+                    # print (f"\titem {col},{row} {x},{y}")
+
+                col += 1
+                if col == max_col:
+                    col = 0
+                    row += 1
+                    y += lineheight + vspace
+
+        else:
+            item : QtWidgets.QWidgetItem
+            for item in self._items:
+                widget = item.widget()
+                hspace = self.horizontalSpacing()
+                if hspace == -1:
+                    hspace = widget.style().layoutSpacing(
+                        QtWidgets.QSizePolicy.PushButton,
+                        QtWidgets.QSizePolicy.PushButton, QtCore.Qt.Horizontal)
+                vspace = self.verticalSpacing()
+                if vspace == -1:
+                    vspace = widget.style().layoutSpacing(
+                        QtWidgets.QSizePolicy.PushButton,
+                        QtWidgets.QSizePolicy.PushButton, QtCore.Qt.Vertical)
                 nextX = x + item.sizeHint().width() + hspace
-                lineheight = 0
-            if not testonly:
-                item.setGeometry(
-                    QtCore.QRect(QtCore.QPoint(x, y), item.sizeHint()))
-            x = nextX
-            lineheight = max(lineheight, item.sizeHint().height())
+                
+                if nextX - hspace > effective.right() and lineheight > 0:
+                    x = effective.x()
+                    y = y + lineheight + vspace
+                    nextX = x + item.sizeHint().width() + hspace
+                    lineheight = 0
+                    
+                if not testonly:
+                    item.setGeometry(
+                        QtCore.QRect(QtCore.QPoint(x, y), item.sizeHint()))
+                x = nextX
+            
+                lineheight = max(lineheight, item.sizeHint().height())
+
         return y + lineheight - rect.y() + bottom
 
     def smartSpacing(self, pm):
