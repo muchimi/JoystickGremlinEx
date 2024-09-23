@@ -52,7 +52,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
 
         
 
-
+        self.item_data : gremlin.base_profile.InputItem = item_data
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.button_layout = QtWidgets.QHBoxLayout()
         self.widget_layout = QtWidgets.QVBoxLayout()
@@ -64,15 +64,12 @@ class InputItemConfiguration(QtWidgets.QFrame):
             parent :JoystickDeviceTabWidget
             if parent is not None:
                 item_data = parent.last_item_data
-
-
-        self.item_data : gremlin.base_profile.InputItem = item_data
-
-        if not item_data:
+        
             label = QtWidgets.QLabel("Please select an input to configure")
             label.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop | QtCore.Qt.AlignmentFlag.AlignLeft)
             self.main_layout.addWidget(label)
             return
+
         
         if not item_data.is_action:
             # only draw description if not a sub action item
@@ -439,6 +436,9 @@ class JoystickDeviceTabWidget(QDataWidget):
         self.last_item_data = None
         self.last_item_index = 0
 
+        label = QtWidgets.QLabel("Please select an input to configure")
+        label.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop | QtCore.Qt.AlignmentFlag.AlignLeft)
+        self._empty_widget = label
 
         # the main layout has a left input selection panel and a right configuration panel, two widgets, the last one is always the configuration panel
         self.main_layout = QtWidgets.QHBoxLayout(self)
@@ -505,14 +505,15 @@ class JoystickDeviceTabWidget(QDataWidget):
         self.main_layout.addLayout(self.left_panel_layout,1)
 
         # add a list input view even if nothing is selected yet
-        right_panel = self.main_layout.takeAt(1)
-        if right_panel is not None and right_panel.widget():
-            right_panel.widget().hide()
-            right_panel.widget().deleteLater()
-        if right_panel:
-            self.main_layout.removeItem(right_panel)
-        widget = InputItemConfiguration(parent = self)
-        self.main_layout.addWidget(widget,3)
+        # right_panel = self.main_layout.takeAt(1)
+        # if right_panel is not None and right_panel.widget():
+        #     right_panel.widget().hide()
+        #     right_panel.widget().deleteLater()
+        # if right_panel:
+        #     self.main_layout.removeItem(right_panel)
+
+        self._empty_widget = InputItemConfiguration(parent = self)
+        self.main_layout.addWidget(self._empty_widget,3)
 
 
         # # listen to device changes
@@ -613,7 +614,7 @@ class JoystickDeviceTabWidget(QDataWidget):
 
     
     def input_item_selected_cb(self, index):
-        """Handles the selection of an input item.
+        """ Handles the selection of an input item.
 
         :param index the index of the selected item
         """
@@ -622,41 +623,47 @@ class JoystickDeviceTabWidget(QDataWidget):
             self.device_profile.modes[self.current_mode]
         )
 
-        # if self.last_item_data == item_data:
-        #     return
+        # grab the last widget visible, if there is one
+        last_widget = _cache.retrieve(self.last_item_data)
+        if last_widget:
+            # hide it
+            last_widget.hide()
+
         self.last_item_data = item_data
         self.last_item_index = index
 
-        # Remove the existing widget, if there is one
-        
-        item = self.main_layout.takeAt(1)
-        if item is not None and item.widget():
-            item.widget().hide()
-            item.widget().deleteLater()
-        if item:
-            self.main_layout.removeItem(item)
 
-        widget = InputItemConfiguration(item_data, parent = self)
-        self.main_layout.addWidget(widget,3)
-        
         if item_data is not None:
+            # if there is data, hide the empty container and grab the last content, or create a new widget for it
+            # there is a widget for each combination of device, input type and input ID
+            self._empty_widget.hide()
+            widget = _cache.retrieve(item_data)
+            if not widget:
+                # not in cache, create it and add to cache for this device/input combination
+                widget = InputItemConfiguration(item_data, parent = self)    
+                _cache.register(item_data, widget)
+
+                change_cb = self._create_change_cb(index)
+                widget.action_model.data_changed.connect(change_cb)
+                widget.description_changed.connect(change_cb)
+
+                # indicate the input changed
+                device_guid = str(item_data.device_guid)
+                input_type = item_data.input_type
+                input_id = item_data.input_id
+                self.inputChanged.emit(device_guid, input_type, input_id)
+        
+                self.main_layout.addWidget(widget,3)
+            widget.show()
+
+        else:
+            # empty widget
+            self._empty_widget.show()
             
-            change_cb = self._create_change_cb(index)
-            widget.action_model.data_changed.connect(change_cb)
-            widget.description_changed.connect(change_cb)
-
-            # indicate the input changed
-            device_guid = str(item_data.device_guid)
-            input_type = item_data.input_type
-            input_id = item_data.input_id
-            self.inputChanged.emit(device_guid, input_type, input_id)
-
 
 
     def set_mode(self, mode):
         ''' changes the mode of the tab '''
-
-
             
         self.current_mode = mode
         self.device_profile.ensure_mode_exists(self.current_mode, self.device)
@@ -781,3 +788,40 @@ def input_item_index_lookup(index, input_items):
                 InputType.JoystickHat,
                 index - axis_count - button_count + 1
             )
+
+
+
+@gremlin.singleton_decorator.SingletonDecorator
+class InputConfigurationWidgetCache():
+    def __init__(self):
+        self._widget_map = {}
+
+    def register(self, item_data, widget):
+        if item_data:
+            key = self.getKey(item_data)
+            if not key in self._widget_map:
+                self._widget_map[key] = widget
+
+
+    def getKey(self, item_data):
+        device_guid = item_data.device_guid
+        input_id = item_data.input_id
+        input_type = item_data.input_type
+        return (device_guid, input_id, input_type)
+        
+
+    def retrieve(self,item_data):
+        if item_data:
+            key = self.getKey(item_data)
+            if key in self._widget_map:
+                return self._widget_map[key]
+        return None
+        
+    def remove(self,item_data):
+        if item_data:
+            key = self.getKey(item_data)
+            if key in self._widget_map:
+                del self._widget_map[key]
+
+# prevent GC
+_cache = InputConfigurationWidgetCache()

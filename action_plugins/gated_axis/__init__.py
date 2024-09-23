@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-
+from __future__ import annotations
 import os
 from PySide6 import QtWidgets, QtCore
 from lxml import etree as ElementTree
@@ -26,14 +26,15 @@ import gremlin.ui.input_item
 import gremlin.gated_handler
 import gremlin.shared_state
 
-
 class GatedAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     """Widget associated with the action of switching to the previous mode."""
 
     def __init__(self, action_data, parent=None):
         super().__init__(action_data, parent=parent)
-        
+        self.action_data = action_data
+
+
 
     def _create_ui(self):
 
@@ -41,21 +42,29 @@ class GatedAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.container_layout = QtWidgets.QVBoxLayout(self.container_widget)
         self.container_widget.setContentsMargins(0,0,0,0)
 
+        # cache = gremlin.gated_handler.GatedAxisWidgetCache()
+        # widget = cache.retrieve(self.action_data)
+        # if not widget:
+        widget = gremlin.gated_handler.GatedAxisWidget(action_data = self.action_data,
+                                                                show_configuration=False
+                                                                )
+        #cache.register(self.action_data, widget)
         
-        self.gate_widget = gremlin.gated_handler.GatedAxisWidget(action_data = self.action_data,
-                                                            show_configuration=False
-                                                            )
-        self.gate_widget.hook()
+        
+        self.gate_widget = widget
+        self.main_layout.addWidget(widget)
 
-        self.main_layout.addWidget(self.gate_widget)
 
-    def _cleanup_ui(self):
-        self.gate_widget.unhook()
-        self.gate_widget.deleteLater()
+
+
+    # def _cleanup_ui(self):
+        #self.container_layout.removeWidget(self.gate_widget)
+        
 
     def _populate_ui(self):
         pass
 
+        
     
 
 
