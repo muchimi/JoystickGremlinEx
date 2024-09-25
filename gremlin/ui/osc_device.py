@@ -53,7 +53,7 @@ from gremlin.util import *
 from lxml import etree as ElementTree
 
 import enum
-
+from gremlin.base_classes import AbstractInputItem
 
   
 
@@ -1723,7 +1723,9 @@ class OscInterface(QtCore.QObject):
 
 ''' GREMLIN UI STUFF '''
 
-class OscInputItem():
+
+
+class OscInputItem(AbstractInputItem):
     ''' holds OSC input data '''
 
     class InputMode(enum.Enum):
@@ -1739,7 +1741,7 @@ class OscInputItem():
 
 
     def __init__(self):
-        self.id = uuid.uuid4() # GUID (unique) if loaded from XML - will reload that one
+        super().__init__()
         self._message = None # the OSC message command
         self._message_data = None # the list of values associated with that command
         self._message_data_string = None # the string representation of the data args
@@ -1751,6 +1753,8 @@ class OscInputItem():
         self._message_key = "" # unique key that identifies this input
         self._min_range = 0.0
         self._max_range = 1.0 
+
+
 
     @property
     def is_axis(self):
@@ -2692,6 +2696,13 @@ class OscDeviceTabWidget(QDataWidget):
         item_data = self.input_item_list_model.data(index)
         widget = gremlin.ui.device_tab.InputItemConfiguration(item_data)
         self.main_layout.addWidget(widget,3)            
+
+        # remember the last input
+        config = gremlin.config.Configuration()
+        device_guid = self.device_guid
+        input_type = InputType.OpenSoundControl
+        input_id = item_data.input_id if item_data else None
+        config.set_last_input(device_guid, input_type, input_id)
 
         if item_data:
             

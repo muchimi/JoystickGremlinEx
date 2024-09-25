@@ -35,6 +35,7 @@ from gremlin.singleton_decorator import SingletonDecorator
 from gremlin.util import parse_guid, byte_list_to_string
 import gremlin.event_handler
 import gremlin.config 
+from gremlin.base_classes import AbstractInputItem
 
 
 ''' these MIDI objects are based on the MIDO and python-rtMIDI libraries '''
@@ -158,7 +159,7 @@ _string_to_midi_lookup = {
 }
 
 
-class MidiInputItem():
+class MidiInputItem(AbstractInputItem):
     ''' holds the data for a MIDI device '''
 
     class InputMode(enum.Enum):
@@ -183,7 +184,8 @@ class MidiInputItem():
 
 
     def __init__(self):
-        self.id = uuid.uuid4() # GUID (unique) if loaded from XML - will reload that one
+        super().__init__()
+        
         self._port_name = None
         self._message = None # the midi message
         self._title_name =  "MIDI (not configured)"
@@ -634,8 +636,8 @@ class MidiInputListenerWidget(QtWidgets.QFrame):
         palette.setColor(QtGui.QPalette.ColorRole.Window, QtGui.QColorConstants.DarkGray)
         self.setPalette(palette)
 
-        # Disable ui input selection on joystick input
-        push_suspend_highlighting()
+        # # Disable ui input selection on joystick input
+        gremlin.shared_state.push_suspend_highlighting()
 
         # listen for the escape key
         event_listener = gremlin.event_handler.EventListener()
@@ -664,6 +666,9 @@ class MidiInputListenerWidget(QtWidgets.QFrame):
             self._callback(port_name, port_index, message)
 
         self.close()
+
+    def closeEvent(self, event):
+        gremlin.shared_state.pop_suspend_highlighting()
 
 
 class MidiInputConfigDialog(QtWidgets.QDialog):
@@ -1451,6 +1456,13 @@ class MidiDeviceTabWidget(QDataWidget):
 
         item_data = self.input_item_list_model.data(index)
 
+        # remember the last input
+        config = gremlin.config.Configuration()
+        device_guid = self.device_guid
+        input_type = InputType.Midi
+        input_id = item_data.input_id if item_data else None
+        config.set_last_input(device_guid, input_type, input_id)
+
         right_panel = self.main_layout.takeAt(1)
         if right_panel is not None and right_panel.widget():
             right_panel.widget().hide()
@@ -1469,6 +1481,7 @@ class MidiDeviceTabWidget(QDataWidget):
             widget.action_model.data_changed.connect(change_cb)
             widget.description_changed.connect(change_cb)
     
+
 
 
   

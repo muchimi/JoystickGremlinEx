@@ -38,11 +38,12 @@ from gremlin.input_types import InputType
 import gremlin.base_classes
 from lxml import etree as ElementTree
 import gremlin.ui.ui_common
+from gremlin.base_classes import AbstractInputItem
 
-class KeyboardInputItem():
+class KeyboardInputItem(AbstractInputItem):
     ''' holds a keyboard input item '''
     def __init__(self):
-        self.id = uuid.uuid4() # GUID (unique) if loaded from XML - will reload that one
+        super().__init__()
         self._key = None # associated primary key (containing latched items)
         self._title_name = "Keyboard input (not configured)"
         self._display_name = None
@@ -399,7 +400,16 @@ class KeyboardDeviceTabWidget(QDataWidget):
 
     def _config_changed_cb(self):
         self.input_item_list_view.redraw()
+
+    def itemAt(self, index):
+        ''' gets the input widget as the given index'''
+        item =  self.input_item_list_view.itemAt(index)
+        return item
+    
+    def itemFromId(self, id):
+        self.input_item_list_view
         
+
     @property
     def model(self):
         ''' the current model '''
@@ -511,6 +521,12 @@ class KeyboardDeviceTabWidget(QDataWidget):
         ''' called when a key has been selected - refreshes the view panel '''
 
         item_data = self.input_item_list_model.data(index)
+
+        config = gremlin.config.Configuration()
+        device_guid = self.device_guid
+        input_type = InputType.KeyboardLatched
+        input_id = item_data.input_id
+        config.set_last_input(device_guid, input_type, input_id)
 
         right_panel = self.main_layout.takeAt(1)
         if right_panel is not None and right_panel.widget():

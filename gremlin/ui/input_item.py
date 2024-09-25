@@ -178,6 +178,7 @@ class InputItemListModel(ui_common.AbstractModel):
         """
 
         return len(self._index_map)
+    
 
 
     def data(self, index):

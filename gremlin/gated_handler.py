@@ -2834,8 +2834,8 @@ class GatedAxisWidget(QtWidgets.QWidget):
         self._update_values_cb(self.gate_data)
         print ("gate axis widget init")
 
-        cache = GatedAxisWidgetCache()
-        cache.register(action_data, self)
+        # cache = GatedAxisWidgetCache()
+        # cache.register(action_data, self)
         self.hook()
 
 
@@ -4034,34 +4034,35 @@ class ActionContainerUi(QtWidgets.QDialog):
 
 
 
-@gremlin.singleton_decorator.SingletonDecorator
-class GatedAxisWidgetCache():
-    def __init__(self):
-        self._widget_map = {}
+# @gremlin.singleton_decorator.SingletonDecorator
+# class GatedAxisWidgetCache():
+#     ''' caches the gate axis widget to prevent it from being garbage collected '''
+#     def __init__(self):
+#         self._widget_map = {}
 
-    def register(self, action_data, widget):
-        key = self.getKey(action_data)
-        if not key in self._widget_map:
-            self._widget_map[key] = widget
+#     def register(self, action_data, widget):
+#         key = self.getKey(action_data)
+#         if not key in self._widget_map:
+#             self._widget_map[key] = widget
 
 
-    def getKey(self, action_data):
-        device_guid = action_data.hardware_device_guid
-        input_id = action_data.hardware_input_id
-        input_type = action_data.hardware_input_type
-        return (device_guid, input_id, input_type)
+#     def getKey(self, action_data):
+#         device_guid = action_data.hardware_device_guid
+#         input_id = action_data.hardware_input_id
+#         input_type = action_data.hardware_input_type
+#         return (device_guid, input_id, input_type)
         
 
-    def retrieve(self,action_data):
-        key = self.getKey(action_data)
-        if key in self._widget_map:
-            return self._widget_map[key]
-        return None
+#     def retrieve(self,action_data):
+#         key = self.getKey(action_data)
+#         if key in self._widget_map:
+#             return self._widget_map[key]
+#         return None
         
-    def remove(self,action_data):
-        key = self.getKey(action_data)
-        if key in self._widget_map:
-            del self._widget_map[key]
+#     def remove(self,action_data):
+#         key = self.getKey(action_data)
+#         if key in self._widget_map:
+#             del self._widget_map[key]
 
-# prevent GC
-_cache = GatedAxisWidgetCache()
+# # prevent GC
+# _cache = GatedAxisWidgetCache()

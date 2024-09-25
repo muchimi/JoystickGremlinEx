@@ -23,7 +23,13 @@ import re
 import sys
 
 from PySide6 import QtCore
+import gremlin.base_classes
+import gremlin.event_handler
+import gremlin.input_types
+import gremlin.joystick_handling
+import gremlin.shared_state
 from gremlin.types import VerboseMode
+import gremlin.types
 import gremlin.util
 
 
@@ -36,18 +42,29 @@ class Configuration:
     def get_config(sef):
         fname = os.path.join(gremlin.util.userprofile_path(), "config.json")
         return fname
+    
+    def get_profile_config(self):
+        ''' profile specific config file '''
+        if self._profile_fname:
+            fname, ext = os.path.splitext(self._profile_fname)
+            return fname + ".json"
+        return None
 
     def __init__(self):
         """Creates a new instance, loading the current configuration."""
 
-        self._data = {}
-        
+        self._data = {} # gremlin items 
+        self._profile_data = {}  # profile specific options 
+        self._profile_loaded = False
+        self._profile_fname = None # current profile to use for the conig
+        self._profile_config_fname = None # config file specific to the profile
+
         fname = self.get_config()
         if not os.path.isfile(fname):
             # create a stub - first time run
             self.save()
 
-        
+            
         gettrace = getattr(sys, 'gettrace', None)
         frozen = getattr(sys, 'frozen', False)
         if frozen:
@@ -57,12 +74,23 @@ class Configuration:
 
         
         self._last_reload = None
+        self._last_profile_reload = None
         self.reload()
+
+
 
         self.watcher = QtCore.QFileSystemWatcher([
             os.path.join(gremlin.util.userprofile_path(), "config.json")
         ])
+        
         self.watcher.fileChanged.connect(self.reload)
+        
+
+    
+  
+        
+    
+
 
     def reload(self):
         """Loads the configuration file's content."""
@@ -99,6 +127,36 @@ class Configuration:
         self._last_reload = time.time()
         self.save()
 
+    def reload_profile(self):
+        """Loads the profile's configuration file's content."""
+        if self._last_profile_reload is not None and \
+                time.time() - self._last_profile_reload < 1:
+            return
+        
+        self._profile_data = {}
+
+        fname = self._profile_config_fname
+        if not fname:
+            return # nothing to load
+        
+
+        
+        # Attempt to load the configuration file if this fails set
+        # default empty values.
+        if os.path.isfile(fname):
+            with open(fname) as hdl:
+                try:
+                    decoder = json.JSONDecoder()
+                    self._profile_data = decoder.decode(hdl.read())
+                    load_successful = True
+                except ValueError:
+                    pass
+
+        # Save all data
+        self._last_profile_reload = time.time()
+        self.save_profile()
+
+
     def save(self):
         """Writes the configuration file to disk."""
         fname = self.get_config()
@@ -110,6 +168,16 @@ class Configuration:
             hdl.write(encoder.encode(self._data))
 
 
+    def save_profile(self):
+        ''' saves to the profile specific config file '''
+        fname = self._profile_config_fname
+        if fname:
+            with open(fname, "w") as hdl:
+                encoder = json.JSONEncoder(
+                    sort_keys=True,
+                    indent=4
+                )
+                hdl.write(encoder.encode(self._profile_data))
 
     
     @property
@@ -1020,13 +1088,18 @@ class Configuration:
     @property
     def last_tab_guid(self):
         ''' last selected tab device guid '''
-        return self._data.get("last_tab_guid",None)
+        tab_guid = self._profile_data.get("last_tab_guid",None)
+        if not tab_guid:
+            tab_guid = self._data.get("last_tab_guid",None)
+        return tab_guid
     
     @last_tab_guid.setter
     def last_tab_guid(self, value):
-        self._data["last_tab_guid"] = str(value)
-        # print(f"config: last tab set: {value}")
+        tab_guid = str(value)
+        self._data["last_tab_guid"] = tab_guid
+        self._profile_data["last_tab_guid"] = tab_guid
         self.save()
+        self.save_profile()
 
 
     @property
@@ -1158,3 +1231,171 @@ class Configuration:
         """Sets the position of the import profile window """
         self._data["import_window_location"] = value
         self.save()
+
+    @property
+    def last_device_guid(self):
+        ''' gets the last selected device guid'''
+        device_guid = self._profile_data.get("last_device_guid", None)  # try the profile specific config first
+        if not device_guid:
+            device_guid = self._data.get("last_device_guid", None)
+        return device_guid
+    
+    @property
+    def last_dinput_device_guid(self):
+        ''' last device guid as a dinput GUID instead of a string '''
+        guid = self.last_device_guid
+        if guid:
+            return gremlin.util.parse_guid(guid)
+        return None
+    
+    @last_device_guid.setter
+    def last_device_guid(self, device_guid):
+        ''' stores the last device GUID '''
+        device_guid = str(device_guid)
+        self._data["last_device_guid"] = device_guid # general config 
+        self._profile_data["last_device_guid"] = device_guid # profile specific config
+        self.save()
+        self.save_profile()
+
+    def set_last_input(self, device_guid, input_type : gremlin.input_types.InputType, input_id ):
+        ''' stores the last input '''
+        data : dict = self._profile_data.get("last_input", {})
+        if not isinstance(device_guid, str):
+            device_guid = str(device_guid)
+        if isinstance(input_id, gremlin.base_classes.AbstractInputItem):
+            # convert to an ID we can use
+            input_id = input_id.guid
+        elif input_id is None:
+            # no data is ok
+            pass
+        elif not isinstance(input_id, int):
+            assert False, f"Don't know how to handle input_id type: {type(input_id).__name__}"
+            
+        data[device_guid] = (input_type, input_id)
+        self._profile_data["last_input"] = data
+        self._profile_data["last_device_guid"] = device_guid
+        self.save_profile()
+
+        if self.verbose:
+            logging.getLogger("system").info(f"Saving last input selection: {device_guid} {input_type} {input_id}")
+
+    def _get_input_id(self, dinput_device_guid, input_id) -> tuple: 
+        ''' converts input ID from the storage data to the actual input ID that isn't stored in the config 
+        :returns:
+        (input_type, save_input_id, input_id)  # input type, the save input ID is a configuration "save" value for saving data, input_id is the object
+        
+        '''
+        save_input_id = input_id
+        device_type = gremlin.shared_state.device_type_map[dinput_device_guid]
+        if device_type == gremlin.types.DeviceType.Joystick:
+            device_info = gremlin.joystick_handling.device_info_from_guid(dinput_device_guid)
+            if device_info:
+                if device_info.axis_count > 0:
+                    input_type = gremlin.input_types.InputType.JoystickAxis
+                    if input_id is None or input_id > device_info.axis_count:
+                        input_id = 1
+                elif device_info.button_count > 0:
+                    input_type = gremlin.input_types.InputType.JoystickButton
+                    if input_id is None or input_id > device_info.button_count:
+                        input_id = 1
+        elif device_type in (gremlin.types.DeviceType.Keyboard, gremlin.types.DeviceType.Midi, gremlin.types.DeviceType.Osc):
+            # grab the tab widget
+            if device_type == gremlin.types.DeviceType.Keyboard:
+                input_type = gremlin.input_types.InputType.KeyboardLatched
+            elif device_type == gremlin.types.DeviceType.Midi:
+                input_type = gremlin.input_types.InputType.Midi
+            elif device_type == gremlin.types.DeviceType.Osc:
+                input_type = gremlin.input_types.InputType.OpenSoundControl
+            if dinput_device_guid in gremlin.shared_state.device_widget_map:
+                widget = gremlin.shared_state.device_widget_map[dinput_device_guid]
+                if input_id is None:
+                    item = widget.itemAt(0)
+                    if item is not None:
+                        save_input_id = item.identifier.guid
+                else:
+                    count = widget.input_item_list_model.rows()
+                    found = False
+                    save_input_id = input_id
+                    for index in range(count):
+                        item = widget.input_item_list_model.data(index)
+                        if item.input_id.guid == input_id:
+                            input_id = item.input_id
+                            save_input_id = input_id.guid
+                            found = True
+                            break
+                    if not found and count > 0:
+                        item = widget.input_item_list_model.data(0)
+                        input_id = item.input_id
+                        save_input_id = input_id.guid
+                    
+        else:
+            assert False, f"Don't know how to handle device type: {type(device_type).__name__}"
+
+        return (input_type, save_input_id, input_id)
+
+
+    def get_last_input(self, device_guid) -> tuple: # (device_guid, input_type, input_id)
+        ''' gets the last input for a given device '''
+        if not isinstance(device_guid, str):
+            dinput_device_guid = device_guid
+            device_guid = str(device_guid)
+        else:
+            dinput_device_guid = gremlin.util.parse_guid(device_guid)
+        data : dict = self._profile_data.get("last_input", {})
+        if device_guid in data:
+            input_type, input_id = data[device_guid]
+            if input_id is not None:
+                input_type, save_input_id, input_id = self._get_input_id(dinput_device_guid, input_id)
+                if self.verbose:
+                    logging.getLogger("system").info(f"Loading saved input selection: {device_guid} {input_type} {input_id}")
+                return (device_guid, gremlin.input_types.InputType.to_enum(input_type), input_id)
+        # provide a suitable default for the input
+        input_id = None
+        if dinput_device_guid in gremlin.shared_state.device_type_map:
+            input_type, save_input_id, input_id = self._get_input_id(dinput_device_guid,  input_id)             
+
+            # save the new defaults
+            data[device_guid] = (input_type, save_input_id)
+            self._profile_data["last_input"] = data
+            self.save_profile()
+            if self.verbose:
+                    logging.getLogger("system").info(f"Loading default input selection: {device_guid} {input_type} {input_id}")
+            return (device_guid, input_type, input_id)
+            
+        return (None, None, None)
+        
+
+        
+
+    def ensure_profile(self, profile):
+        ''' called when a new profile is created '''
+
+        if not profile or not profile.profile_file:
+            return # nothing to do - no profile
+        
+        if self._profile_fname == profile.profile_file:
+            return # nothing to do - same profile        
+        
+        self._profile_fname = profile.profile_file
+        fname = self.get_profile_config()
+        
+        
+        
+        self._profile_config_fname = fname
+        self.reload_profile()            
+
+        # hook profile load
+        if not self._profile_loaded:
+            eh = gremlin.event_handler.EventListener()
+            eh.profile_changed.connect(self._profile_changed_cb)
+            self._profile_loaded = True
+        
+
+        if self._profile_fname and not os.path.isfile(self._profile_fname):
+            self.save_profile()
+
+
+    @QtCore.Slot()
+    def _profile_changed_cb(self):
+        self._last_profile_reload = None
+        self.reload_profile()

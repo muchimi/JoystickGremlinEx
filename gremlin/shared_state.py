@@ -20,6 +20,7 @@ import threading
 import sys
 import uuid
 
+
 def module_property(func):
     """Decorator to turn module functions into properties.
     Function names must be prefixed with an underscore."""
@@ -75,6 +76,12 @@ device_guid_to_name_map = {}
 
 # map of device profiles - indexed by hardware GUID
 device_profile_map = {}
+
+# map of device type to hardware GUID (DeviceType enum)
+device_type_map = {}
+
+# map of device widgets by hardware GUID (widget)
+device_widget_map = {}
 
 # Holds the currently active profile
 current_profile = None

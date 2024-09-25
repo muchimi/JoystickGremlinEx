@@ -612,7 +612,7 @@ class JoystickDeviceTabWidget(QDataWidget):
     def running(self):
         return gremlin.shared_state.is_running
 
-    
+    @QtCore.Slot(int)
     def input_item_selected_cb(self, index):
         """ Handles the selection of an input item.
 
@@ -793,6 +793,7 @@ def input_item_index_lookup(index, input_items):
 
 @gremlin.singleton_decorator.SingletonDecorator
 class InputConfigurationWidgetCache():
+    ''' caches the joystick input widget for each device/input combination  '''
     def __init__(self):
         self._widget_map = {}
 
@@ -823,5 +824,5 @@ class InputConfigurationWidgetCache():
             if key in self._widget_map:
                 del self._widget_map[key]
 
-# prevent GC
+# primary cache instantiation to prevent GC
 _cache = InputConfigurationWidgetCache()

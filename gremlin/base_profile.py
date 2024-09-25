@@ -1430,9 +1430,7 @@ class Profile():
         self._restore_last_mode = False # True if the profile should start with the last active mode (profile specific)
         self._dirty = False # dirty flag - indicates the profile data was changed but not saved yet
         self._force_numlock_off = True # if set, forces numlock to be off if it isn't so numpad keys report the correct scan codes
-
-
-
+        
 
     @property
     def dirty(self):
@@ -1873,12 +1871,15 @@ class Profile():
             # use a default mode
             self._start_mode = self.get_default_mode()
 
-        self._profile_fname = fname
+        self._profile_fname = fname.casefold()
 
         name, _ = os.path.splitext(os.path.basename(fname))
         self._profile_name = name
 
-        
+        # have config use updated profile settings
+        config = gremlin.config.Configuration()
+        config.ensure_profile(self)
+
 
         return profile_was_updated
     

@@ -213,3 +213,24 @@ def empty_copy(obj):
     newcopy = Empty(  )
     newcopy.__class__ = obj.__class__
     return newcopy      
+
+
+class AbstractInputItem():
+    ''' base class for input items for MIDI, OSC and KEYBOARD items '''
+    def __init__(self):
+        self._id = uuid.uuid4() # GUID (unique) if loaded from XML - will reload that one
+        self._guid = str(self.id).replace("-","")
+
+    @property
+    def guid(self):
+        ''' id in string format '''
+        return self._guid
+    
+    @property
+    def id(self):
+        return self._id
+    
+    @id.setter
+    def id(self, value):
+        self._id = value
+        self._guid = str(value).replace("-","")
