@@ -1259,9 +1259,16 @@ class Configuration:
 
     def set_last_input(self, device_guid, input_type : gremlin.input_types.InputType, input_id ):
         ''' stores the last input '''
-        data : dict = self._profile_data.get("last_input", {})
+        if gremlin.shared_state.is_tab_loading:
+            # don't save while tabs are loading
+            return 
+        
         if not isinstance(device_guid, str):
             device_guid = str(device_guid)
+        data : dict = self._profile_data.get("last_input", {})
+        verbose = self.verbose_mode_details
+        
+        
         if isinstance(input_id, gremlin.base_classes.AbstractInputItem):
             # convert to an ID we can use
             input_id = input_id.guid
@@ -1270,14 +1277,27 @@ class Configuration:
             pass
         elif not isinstance(input_id, int):
             assert False, f"Don't know how to handle input_id type: {type(input_id).__name__}"
-            
+
+           
         data[device_guid] = (input_type, input_id)
         self._profile_data["last_input"] = data
+        self._data["last_device_guid"] = device_guid
         self._profile_data["last_device_guid"] = device_guid
         self.save_profile()
 
-        if self.verbose:
-            logging.getLogger("system").info(f"Saving last input selection: {device_guid} {input_type} {input_id}")
+        if verbose:
+            device_name = gremlin.shared_state.get_device_name(device_guid)
+            logging.getLogger("system").info(f"Saving last input selection: {device_guid} {device_name} {input_type} {input_id}")
+            pass
+
+
+    def get_last_device_guid(self):
+        ''' gets the last selected device in the profile '''
+        device_guid = self._profile_data.get("last_device_guid",None)
+        if device_guid is None:
+            device_guid = self._data.get("last_device_guid",None)
+        return device_guid
+        
 
     def _get_input_id(self, dinput_device_guid, input_id) -> tuple: 
         ''' converts input ID from the storage data to the actual input ID that isn't stored in the config 
@@ -1336,6 +1356,9 @@ class Configuration:
 
     def get_last_input(self, device_guid) -> tuple: # (device_guid, input_type, input_id)
         ''' gets the last input for a given device '''
+        verbose = self.verbose_mode_details
+        if verbose:
+            device_name = gremlin.shared_state.get_device_name(device_guid)
         if not isinstance(device_guid, str):
             dinput_device_guid = device_guid
             device_guid = str(device_guid)
@@ -1346,8 +1369,8 @@ class Configuration:
             input_type, input_id = data[device_guid]
             if input_id is not None:
                 input_type, save_input_id, input_id = self._get_input_id(dinput_device_guid, input_id)
-                if self.verbose:
-                    logging.getLogger("system").info(f"Loading saved input selection: {device_guid} {input_type} {input_id}")
+                if verbose:
+                    logging.getLogger("system").info(f"Loading saved input selection: {device_guid} {device_name} {input_type} {input_id}")
                 return (device_guid, gremlin.input_types.InputType.to_enum(input_type), input_id)
         # provide a suitable default for the input
         input_id = None
@@ -1358,12 +1381,16 @@ class Configuration:
             data[device_guid] = (input_type, save_input_id)
             self._profile_data["last_input"] = data
             self.save_profile()
-            if self.verbose:
-                    logging.getLogger("system").info(f"Loading default input selection: {device_guid} {input_type} {input_id}")
+            if verbose:
+                logging.getLogger("system").info(f"Loading default input selection: {device_guid} {device_name} {input_type} {input_id}")
             return (device_guid, input_type, input_id)
             
+
+        if verbose:
+            logging.getLogger("system").info(f"Loading input selection: nothing found for {device_guid} {device_name}")
         return (None, None, None)
         
+
 
         
 

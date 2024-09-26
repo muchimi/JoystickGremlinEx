@@ -2233,31 +2233,33 @@ class HatWidget(QtWidgets.QWidget):
         brush_active = QtGui.QBrush(QtGui.QColor("#b22823"))
 
         # Prepare painter instance
-        painter = QtGui.QPainter(self)
-        painter.setRenderHint(QtGui.QPainter.Antialiasing | QtGui.QPainter.SmoothPixmapTransform)
-        painter.setPen(pen_default)
-        painter.setBrush(brush_default)
+        p = QtGui.QPainter(self)
+        p.setRenderHint(QtGui.QPainter.Antialiasing | QtGui.QPainter.SmoothPixmapTransform)
+        p.setPen(pen_default)
+        p.setBrush(brush_default)
 
-        painter.translate(50, 50)
+        p.translate(50, 50)
 
         # Center dot
         if self.angle == -1:
-            painter.setBrush(brush_active)
-        painter.drawEllipse(-8, -8, 16, 16)
-        painter.setBrush(brush_default)
+            p.setBrush(brush_active)
+        p.drawEllipse(-8, -8, 16, 16)
+        p.setBrush(brush_default)
         # Directions
         for angle in [0, 45, 90, 135, 180, 225, 270, 315]:
-            painter.save()
-            painter.rotate(angle)
-            painter.translate(0, 35)
+            p.save()
+            p.rotate(angle)
+            p.translate(0, 35)
 
             if angle == self.angle:
-                painter.setBrush(brush_active)
-                painter.setPen(pen_active)
+                p.setBrush(brush_active)
+                p.setPen(pen_active)
 
-            painter.drawPolygon(HatWidget.triangle)
-            painter.restore()
+            p.drawPolygon(HatWidget.triangle)
+            p.restore()
 
+
+        p.end()
 
 class HatState(QtWidgets.QGroupBox):
 
@@ -2428,8 +2430,11 @@ class TimeLinePlotWidget(QtWidgets.QWidget):
 
         :param event the paint event
         """
-        widget_painter = QtGui.QPainter(self)
-        widget_painter.drawPixmap(0, 0, self._pixmap)
+        p = QtGui.QPainter(self)
+        p.drawPixmap(0, 0, self._pixmap)
+        p.end()
+
+        
 
     def add_point(self, value, series_id=0):
         """Adds a data point to a time series.
@@ -2443,15 +2448,15 @@ class TimeLinePlotWidget(QtWidgets.QWidget):
 
     def _update_pixmap(self):
         """Updates the pixmap that contains the moving timeline."""
-        pixmap_painter = QtGui.QPainter(self._pixmap)
-        pixmap_painter.setRenderHint(self._render_flags)
+        p = QtGui.QPainter(self._pixmap)
+        p.setRenderHint(self._render_flags)
 
         self._pixmap.scroll(
             -self._step_size,
             0,
             QtCore.QRect(0, 0, self._pixmap.width(), self._pixmap.height())
         )
-        pixmap_painter.eraseRect(
+        p.eraseRect(
             self._pixmap.width() - self._step_size,
             0,
             1,
@@ -2459,9 +2464,9 @@ class TimeLinePlotWidget(QtWidgets.QWidget):
         )
 
         # Draw vertical line in one second intervals
-        pixmap_painter.setPen(TimeLinePlotWidget.pens[0])
+        p.setPen(TimeLinePlotWidget.pens[0])
         if self._vertical_timestep < time.time()-1:
-            pixmap_painter.drawLine(
+            p.drawLine(
                 self._pixmap.width()-1,
                 0,
                 self._pixmap.width() - 1,
@@ -2472,16 +2477,16 @@ class TimeLinePlotWidget(QtWidgets.QWidget):
         if self._horizontal_steps <= 5:
             quarter = int(self._pixmap.height() / 4)
             x = self._pixmap.width()-1
-            pixmap_painter.drawPoint(x, quarter)
-            pixmap_painter.drawPoint(x, 2*quarter)
-            pixmap_painter.drawPoint(x, 3*quarter)
+            p.drawPoint(x, quarter)
+            p.drawPoint(x, 2*quarter)
+            p.drawPoint(x, 3*quarter)
         elif self._horizontal_steps > 10:
             self._horizontal_steps = 0
 
         # Draw onto the pixmap all series data that has been accumulated
         for key, value in self._series.items():
-            pixmap_painter.setPen(TimeLinePlotWidget.pens[key])
-            pixmap_painter.drawLine(
+            p.setPen(TimeLinePlotWidget.pens[key])
+            p.drawLine(
                 self._pixmap.width()-self._step_size-1,
                 int(2 + (self._pixmap.height()-4) * (value[0] + 1) / 2.0),
                 self._pixmap.width()-1,
@@ -2490,6 +2495,7 @@ class TimeLinePlotWidget(QtWidgets.QWidget):
             value[0] = value[1]
 
 
+        p.end()
 
 class JoystickDeviceWidget(QtWidgets.QWidget):
 
@@ -2873,7 +2879,7 @@ QMarkerDoubleRangeSlider::add-page:horizontal { background: #979EA8; border-styl
 
         # draw markers on top of the main widget
         
-        painter = QtGui.QPainter(self)
+        p = QtGui.QPainter(self)
         orientation = self.orientation()
         if orientation == QtCore.Qt.Orientation.Horizontal:
             positions = [QtWidgets.QStyle.sliderPositionFromValue(self._target_min, self._target_max, v, self.width(), False) for v in self._int_marker_pos]
@@ -2888,13 +2894,13 @@ QMarkerDoubleRangeSlider::add-page:horizontal { background: #979EA8; border-styl
             if index < p_count:
                 pd = pixmaps[index]
                 if orientation == QtCore.Qt.Orientation.Horizontal:
-                    painter.drawPixmap(value + pd.offset_x, center + pd.offset_y, pd.pixmap)
+                    p.drawPixmap(value + pd.offset_x, center + pd.offset_y, pd.pixmap)
                 else:
                     # vertical
-                    painter.drawPixmap(center + pd.offset_x, value + pd.offset_y, pd.pixmap)
+                    p.drawPixmap(center + pd.offset_x, value + pd.offset_y, pd.pixmap)
 
       
-        painter.end()
+        p.end()
 
 
 
@@ -3539,6 +3545,8 @@ class QFlowLayout(QtWidgets.QLayout):
         self._items = []
         self.setContentsMargins(margin, margin, margin, margin)
         self._grid_layout = True
+        self._row = 0
+        self._col = 0
 
 
     def __del__(self):
@@ -3594,10 +3602,15 @@ class QFlowLayout(QtWidgets.QLayout):
 
     def minimumSize(self):
         size = QtCore.QSize()
+        lineheight = 0
+        for item in self._items:
+            lineheight = max(lineheight, item.sizeHint().height())
         for item in self._items:
             size = size.expandedTo(item.minimumSize())
+            #size = size.expandedTo(item.sizeHint()) + QSize(item.geometry().x(), item.geometry().y())
         left, top, right, bottom = self.getContentsMargins()
         size += QtCore.QSize(left + right, top + bottom)
+        size += QSize(0, lineheight * self._row)
         return size
 
     def doLayout(self, rect, testonly):
@@ -3649,16 +3662,20 @@ class QFlowLayout(QtWidgets.QLayout):
                 if not widget.isVisible():
                     continue
                 x = pos_x[col]
+
                 if not testonly:
                     item.setGeometry(
                         QtCore.QRect(QtCore.QPoint(x, y), item.sizeHint()))
-                    # print (f"\titem {col},{row} {x},{y}")
 
                 col += 1
                 if col == max_col:
                     col = 0
                     row += 1
                     y += lineheight + vspace
+
+            self._row = row
+            self._col = max_col
+            return y + lineheight - rect.y() + bottom
 
         else:
             item : QtWidgets.QWidgetItem
@@ -3707,11 +3724,12 @@ class QBubble(QtWidgets.QLabel):
         self.setContentsMargins(5, 5, 5, 5)
 
     def paintEvent(self, event):
-        painter = QtGui.QPainter(self)
-        painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
-        painter.drawRoundedRect(
+        p = QtGui.QPainter(self)
+        p.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        p.drawRoundedRect(
             0, 0, self.width() - 1, self.height() - 1, 5, 5)
         super(QBubble, self).paintEvent(event)
+        p.end()
 
 
 

@@ -74,6 +74,14 @@ _suspend_ui_keyinput = 0
 # list of device names to their GUID
 device_guid_to_name_map = {}
 
+def get_device_name(device_guid):
+    if isinstance(device_guid, str):
+        import gremlin.util
+        device_guid = gremlin.util.parse_guid(device_guid)
+    if device_guid in device_guid_to_name_map:
+        return device_guid_to_name_map[device_guid]
+    return "Not found"
+
 # map of device profiles - indexed by hardware GUID
 device_profile_map = {}
 
@@ -115,13 +123,6 @@ def resetState():
     previous_runtime_mode = None
 
     
-
-def get_device_name(guid):
-    ''' gets the device name from the UUID'''
-    if not guid in device_guid_to_name_map.keys():
-        return "[Unknown]"
-    return device_guid_to_name_map[guid]
-
 def ui_keyinput_suspended():
     global _suspend_ui_keyinput
     return _suspend_ui_keyinput > 0
@@ -198,32 +199,27 @@ def delayed_input_highlighting_suspension():
     )
     _suspend_timer.start()
 
-# holds the last tab selections
-_tab_input_map = {}
-
-# last selected device 
-last_device_guid = None
-
+# true if tabs are loading
+is_tab_loading = False 
 
 def set_last_input_id(device_guid, input_type, input_id):
-    ''' tracks the last selection per device guid '''
-    key = str(device_guid)
-    _tab_input_map[key] = (input_type, input_id)
+    if not is_tab_loading:
+        import gremlin.config
+        config = gremlin.config.Configuration()
+        config.set_last_input(device_guid, input_type, input_id)
 
 def get_last_input_id():
-    if not last_device_guid or not last_device_guid in _tab_input_map.keys():
-        return (None, None, None)
-    input_type, input_id = _tab_input_map[last_device_guid]
-    return (last_device_guid, input_type, input_id)
-
-
+    import gremlin.config
+    config = gremlin.config.Configuration()
+    device_guid = config.get_last_device_guid()
+    if device_guid:
+        return gremlin.config.Configuration().get_last_input(device_guid)
 
 def last_input_id(device_guid):
     ''' retrieves the last input id for a given input guid (input_type, input_id) of the last selection for this device '''
-    key = str(device_guid)
-    if key in _tab_input_map.keys():
-        return _tab_input_map[key]
-    return None, None
+    import gremlin.config
+    device_guid, input_type, input_id = gremlin.config.Configuration().get_last_input(device_guid)
+    return (input_type, input_id)
 
 
 # pickle farm - allows to pickle an object to memory and recall it without actually pickling it

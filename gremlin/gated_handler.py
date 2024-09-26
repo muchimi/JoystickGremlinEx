@@ -823,7 +823,6 @@ class GateEventHandler(QtCore.QObject):
 
     slider_marker_update = QtCore.Signal(float)
 
-    update_gates = QtCore.Signal()
     update_ui = QtCore.Signal()
 
     use_default_range_changed = QtCore.Signal() # fires when the range default selection is toggled
@@ -2803,8 +2802,6 @@ class GatedAxisWidget(QtWidgets.QWidget):
         # create the gate and range widgets
         self._create_widgets(self.container_gate_ui_layout)
 
-        #self._update_gates_ui()
-
         # steps container
         self._create_steps_ui()
 
@@ -2916,10 +2913,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
         if verbose:
             logging.getLogger("system").info(f"Gate widget: set display range {range_min, range_max}")
         
-        #self.slider.setRange(range_min, range_max)
         self.gate_data.setDisplayRange(range_min, range_max)
-        #self._update_values_cb() # update slider gate positions
-        #self._update_gates_ui() # update gate data
 
     @property
     def min_range(self):
@@ -2941,10 +2935,6 @@ class GatedAxisWidget(QtWidgets.QWidget):
         self.container_gate_widget.setContentsMargins(0,0,0,0)
 
         self.container_gate_layout = ui_common.QFlowLayout(self.container_gate_widget)
-        #self.container_gate_layout.setContentsMargins(0,0,0,0)
-        
-        # container_gate_count_widget = QtWidgets.QWidget()
-        # container_gate_count_layout = QtWidgets.QHBoxLayout(container_gate_count_widget)
 
         container_range_count_widget = QtWidgets.QWidget()
         container_range_count_layout = QtWidgets.QHBoxLayout(container_range_count_widget)
@@ -3067,169 +3057,6 @@ class GatedAxisWidget(QtWidgets.QWidget):
             return self._range_widgets_map[rng].widget
         return None
         
-
-    #def _update_gates_ui_handler(self):
-    # def _update_gates_ui_ignore(self):
-        # ''' creates the gate data for each gate '''
-
-        # print ("gate axis: update gates")
-        # self._gate_value_widget_map = {}
-        # gate_list = self.gate_data.getGateValueItems()
-
-       
-        # gate_count_widget = QtWidgets.QLabel(f"Gates ({len(gate_list)}):")
-        # self.container_gate_count_layout.addWidget(gate_count_widget)
-        # #self.container_gate_layout.addWidget(gate_count_widget,0,0)
-        # # row = 1
-        # # col = 0
-
-        # label_width = ui_common.get_text_width("Range MM")
-        # helper = self._helper()
-        # delete_enabled = len(gate_list) > 2 # keep at least 2 gates
-        # mode = self.gate_data.display_mode
-        # if mode == DisplayMode.Normal:
-        #     range_min = self.gate_data.display_range_min
-        #     range_max = self.gate_data.display_range_max
-        # elif mode == DisplayMode.Percent:
-        #     range_min = 0.0
-        #     range_max = 100.0
-        # else:
-        #     range_min = -1.0
-        #     range_max = 1.0
-
-        # for _, gate in gate_list:
-        #     if gate.is_default:
-        #         # don't display default gates - they are internal for the default range
-        #         continue
-        #     id = gate.id
-        #     label_widget = QtWidgets.QLabel(f"Gate {gate.slider_index + 1}:")
-        #     label_widget.setMaximumWidth(label_width)
-        #     sb_widget = helper.get_double_spinbox(id, gate.display_value, range_min, range_max)
-        #     sb_widget.valueChanged.connect(self._gate_value_changed_cb)
-            
-            
-        #     self._gate_value_widget_map[gate.id] = sb_widget
-
-        #     grab_widget = ui_common.QDataPushButton()
-        #     grab_widget.data = (gate, sb_widget) # gate and control to update
-        #     grab_widget.setIcon(self._grab_icon)
-        #     grab_widget.setMaximumWidth(20)
-        #     grab_widget.clicked.connect(self._grab_cb)
-        #     grab_widget.setToolTip("Grab axis value")
-            
-
-        #     setup_widget = ui_common.QDataPushButton()
-        #     setup_widget.data = gate
-        #     has_containers = gate.has_containers
-        #     if has_containers:
-        #         setup_widget.setIcon(self._setup_container_icon)
-        #     else:
-        #         setup_widget.setIcon(self._setup_icon)
-        #     setup_widget.setMaximumWidth(20)
-        #     setup_widget.clicked.connect(self._configure_gate_cb)
-        #     setup_widget.setToolTip(f"Setup actions for gate {id}")
-            
-
-        #     clear_widget = ui_common.QDataPushButton()
-        #     clear_widget.setIcon(load_icon("mdi.delete"))
-        #     clear_widget.setMaximumWidth(20)
-        #     clear_widget.data = gate
-        #     clear_widget.clicked.connect(self._delete_gate_confirm_cb)
-        #     clear_widget.setToolTip("Removes this gate")
-        #     clear_widget.setEnabled(delete_enabled)
-
-        #     container_widget = QtWidgets.QWidget()
-        #     container_layout = QtWidgets.QHBoxLayout(container_widget)
-
-        #     container_layout.addWidget(label_widget)
-        #     container_layout.addWidget(sb_widget)
-        #     container_layout.addWidget(grab_widget)
-        #     container_layout.addWidget(setup_widget)
-        #     container_layout.addWidget(clear_widget)
-        #     container_widget.setContentsMargins(0,0,0,0)
-
-        #     self.container_gate_layout.addWidget(container_widget)
-
-        # # ranges between the gates
-        # gremlin.util.clear_layout(self.container_range_layout)
-        # gremlin.util.clear_layout(self.container_range_count_layout)
-        # QtWidgets.QApplication.processEvents()
-        # range_list = self.gate_data.getRanges(include_default = self.gate_data.use_default_range)
-        # range_count_widget = QtWidgets.QLabel(f"Ranges ({len(range_list)}):")
-        # self.container_range_count_layout.addWidget(range_count_widget)
-        
-        # self._range_readout_widgets = {}
-        # rng : RangeInfo
-
-
-
-        # char_width = ui_common.get_text_width("M")
-
-        # if self.gate_data.use_default_range:
-        #     # only show the default range as the output range to configure
-        #     range_list = [rng for rng in range_list if rng.is_default]
-        
-        # display_index = 0
-        # decimals = self.gate_data.decimals
-        # for rng in range_list:
-        #     id = rng.id
-        #     g1 : GateInfo = rng.g1
-        #     if g1 is None:
-        #         continue
-        #     g2 : GateInfo= rng.g2
-        #     if g2 is None:
-        #         continue
-
-        #     if rng.is_default:
-        #         # default range
-        #         label_widget = QtWidgets.QLabel(f"Default:")
-        #     else:
-        #         display_index += 1
-        #         label_widget = QtWidgets.QLabel(f"Range {display_index}:")
-
-        #     label_widget.setMaximumWidth(label_width)
-
-        #     range_widget = ui_common.QDataLineEdit()
-        #     range_widget.setReadOnly(True)
-        #     g1v = g1.display_value
-        #     g2v = g2.display_value
-        #     txt = f"[{g1v:0.{decimals}f} to {g2v:0.{decimals}f}]"
-        #     range_widget.setText(txt)
-        #     range_widget.setMinimumWidth(char_width * len(txt))
-
-        #     self._range_readout_widgets[id] = range_widget
-        #     range_widget.data = (rng, range_widget)
-            
-            
-
-        #     setup_widget = ui_common.QDataPushButton(data = rng)
-        #     setup_widget.setIcon(self._setup_icon)
-        #     has_containers = rng.has_containers
-        #     if has_containers:
-        #         setup_widget.setIcon(self._setup_container_icon)
-        #     else:
-        #         setup_widget.setIcon(self._setup_icon)
-        #     setup_widget.setMaximumWidth(20)
-        #     setup_widget.clicked.connect(self._configure_range_cb)
-        #     setup_widget.setToolTip(f"Setup actions for range {id}")
-
-        #     container_widget = QtWidgets.QWidget()
-        #     container_layout = QtWidgets.QHBoxLayout(container_widget)
-
-        #     container_layout.addWidget(label_widget)
-        #     container_layout.addWidget(range_widget)
-        #     container_layout.addWidget(setup_widget)
-        #     container_widget.setContentsMargins(0,0,0,0)
-            
-        #     self.container_range_layout.addWidget(container_widget)
-
-
-        # self.container_gate_ui_layout.addWidget(self.container_gate_widget)
-        # self.container_gate_ui_layout.addWidget(self.container_gate_count_widget)
-        # self.container_gate_ui_layout.addWidget(self.container_range_count_widget)
-        # self.container_gate_ui_layout.addWidget(self.container_range_widget)
-
-
     @QtCore.Slot(RangeInfo)
     def _range_changed_cb(self, range_info):
         ''' called when range data changes '''
@@ -3278,8 +3105,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
         if not gate and count < 20:
             gate = GateInfo(id = get_guid(), value = value, parent = self.gate_data)
             self.gate_data.registerGate(gate)
-            
-        self._update_gates_ui()
+        
         self._update_ui()
 
 
@@ -3292,10 +3118,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
         for index, value in enumerate(values):
             gate : GateInfo = self.gate_data.getGateSliderIndex(index)
             if gate is not None:
-                gate.setValue(value)
-        # update ui
-        self._update_gates_ui()
-        
+                gate.setValue(value, emit=True)
 
     def _set_slider_gate_value(self, index, value):
         ''' sets a gate value on the slider '''
@@ -3378,7 +3201,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
         else:
             dialog = ActionContainerUi(gate_data = self.gate_data, info_object = rng, action_data = self.action_data)
             dialog.exec()
-            self._update_gates_ui()
+            
 
     @QtCore.Slot(int)
     def _slider_handle_clicked_cb(self, handle_index):
@@ -3394,7 +3217,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
             # gates can be deleted
             dialog.delete_requested.connect(self._delete_gate_cb)
             dialog.exec()
-            self._update_gates_ui()
+            
 
     @QtCore.Slot()
     def _configure_gate_cb(self):
@@ -3409,7 +3232,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
             dialog = ActionContainerUi(gate_data = self.gate_data, info_object = gate, action_data = self.action_data)
             dialog.delete_requested.connect(self._delete_gate_cb)
             dialog.exec()
-            self._update_gates_ui()
+            
         
 
     QtCore.Slot()
@@ -3626,11 +3449,10 @@ class GatedAxisWidget(QtWidgets.QWidget):
 
         if gate_count < value:
             self.gate_data.setGateCount(value)
-            self._update_gates_ui() # update for changes
+            
     
     def _set_steps_confirm_cb(self, value):
         self.gate_data.setGateCount(value)
-        self._update_gates_ui()
         self._normalize_cb()
             
 
@@ -3640,7 +3462,6 @@ class GatedAxisWidget(QtWidgets.QWidget):
         value = self.sb_steps_widget.value()
         #self.gate_data.gates = value
         self.gate_data.normalize_steps(True)
-        self._update_gates_ui()
         self._update_values_cb(self.gate_data)
 
 
@@ -3649,7 +3470,6 @@ class GatedAxisWidget(QtWidgets.QWidget):
         value = self.sb_steps_widget.value()
         #self.gate_data.gates = value
         self.gate_data.normalize_steps(False)
-        self._update_gates_ui()
         self._update_values_cb(self.gate_data)
 
 
@@ -3657,7 +3477,6 @@ class GatedAxisWidget(QtWidgets.QWidget):
     def _update_steps_cb(self, gate_data):
         ''' updates gate steps on the widget and their positions '''
         if self.gate_data == gate_data:
-            self._update_gates_ui() # update gate manual update UI
             self._update_values_cb(self.gate_data)
         
 
@@ -3729,7 +3548,6 @@ class GatedAxisWidget(QtWidgets.QWidget):
     def deleteGate(self, data):
         ''' remove a gate from this widget '''
         self.gate_data.deleteGate(data)
-        self._update_gates_ui()
         self._update_ui()
 
   
@@ -4031,38 +3849,3 @@ class ActionContainerUi(QtWidgets.QDialog):
             self.condition_description_widget.setText(GateCondition.to_description(condition))
 
 
-
-
-
-# @gremlin.singleton_decorator.SingletonDecorator
-# class GatedAxisWidgetCache():
-#     ''' caches the gate axis widget to prevent it from being garbage collected '''
-#     def __init__(self):
-#         self._widget_map = {}
-
-#     def register(self, action_data, widget):
-#         key = self.getKey(action_data)
-#         if not key in self._widget_map:
-#             self._widget_map[key] = widget
-
-
-#     def getKey(self, action_data):
-#         device_guid = action_data.hardware_device_guid
-#         input_id = action_data.hardware_input_id
-#         input_type = action_data.hardware_input_type
-#         return (device_guid, input_id, input_type)
-        
-
-#     def retrieve(self,action_data):
-#         key = self.getKey(action_data)
-#         if key in self._widget_map:
-#             return self._widget_map[key]
-#         return None
-        
-#     def remove(self,action_data):
-#         key = self.getKey(action_data)
-#         if key in self._widget_map:
-#             del self._widget_map[key]
-
-# # prevent GC
-# _cache = GatedAxisWidgetCache()

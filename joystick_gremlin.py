@@ -338,9 +338,9 @@ class GremlinUi(QtWidgets.QMainWindow):
     def _current_tab_changed(self, index):
         device_guid = self._get_tab_guid(index)
         if device_guid is not None:
-            input_type, input_id = self._get_tab_input_data(index)
-            print (f"last tab: index: [{index}] {self.ui.devices.tabText(index)} {device_guid}")
-            self.config.last_tab_guid = device_guid
+            verbose = gremlin.config.Configuration().verbose
+            if verbose:
+                logging.getLogger("system").info(f"last tab: index: [{index}] {self.ui.devices.tabText(index)} {device_guid}")
             self.last_tab_index = index
             _, restore_input_type, restore_input_id = self.config.get_last_input(device_guid)
             self._select_input(device_guid, restore_input_type, restore_input_id)
@@ -1068,6 +1068,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         assert_ui_thread()
 
         try:
+            gremlin.shared_state.is_tab_loading = True
+
             self.push_highlighting()
         
             self._recreate_tab_widget()
@@ -1337,6 +1339,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
             # select the tab that was last selected (if it exists)
 
+            gremlin.shared_state.is_tab_loading = False
             device_guid = self.config.last_device_guid
             _, restore_input_type, restore_input_id = self.config.get_last_input(device_guid)
             self._select_input(device_guid, restore_input_type, restore_input_id)
@@ -1538,14 +1541,6 @@ class GremlinUi(QtWidgets.QMainWindow):
                 input_id = last_input_id
                 force = True # force the selection when setting defaults
 
-
-            # if not force and \
-            #     device_guid == current_device_guid and \
-            #     last_input_type == input_type and \
-            #     last_input_id == input_id:
-            #     # no change
-            #     return
-            
             # avoid spamming
             if self._last_input_change_timestamp + self._input_delay > time.time():
                     # delay not occured yet

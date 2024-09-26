@@ -1252,7 +1252,8 @@ class InputItemWidget(QtWidgets.QFrame):
 
         :param event the mouse event
         """
-        self.selected_changed.emit(self)
+        if not self.selected:
+            self.selected_changed.emit(self)
 
     def _close_button_cb(self):
         ''' fires the closed event when the close button has been pressed '''
@@ -1818,6 +1819,8 @@ class TitleBarButton(QtWidgets.QAbstractButton):
         self.style().drawComplexControl(
             QtWidgets.QStyle.CC_ToolButton, options, p, self
         )
+
+        p.end()
 
 
 class TitleBar(QtWidgets.QFrame):
