@@ -40,7 +40,8 @@ class InputItemConfiguration(QtWidgets.QFrame):
     """ mapping viewer for a selected input item (this is the right side of the device tab) """
 
     # Signal emitted when the description changes
-    description_changed = QtCore.Signal(str)
+    description_changed = QtCore.Signal(str) # indicates the description was changed
+    description_clear = QtCore.Signal() # clear the description field
 
     def __init__(self, item_data = None, parent=None):
         """Creates a new object instance.
@@ -185,9 +186,16 @@ class InputItemConfiguration(QtWidgets.QFrame):
         self.description_field.setText(self.item_data.description)
         self.description_field.textChanged.connect(self._edit_description_cb)
         self.description_layout.addWidget(self.description_field)
-        
+        del_icon = gremlin.util.load_icon("mdi.delete")
+        self.description_clear_button = QtWidgets.QPushButton()
+        self.description_clear_button.setIcon(del_icon)
+        self.description_clear_button.clicked.connect(self._delete_description_cb)
+        self.description_clear_button.setMaximumWidth(20)
+        self.description_clear_button.setToolTip("Reset description to default")
+        self.description_layout.addWidget(self.description_clear_button)
 
         self.main_layout.addLayout(self.description_layout)
+
 
     def _create_dropdowns(self):
         """Creates a drop down selection with actions that can be
@@ -237,6 +245,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
         self.action_layout.addWidget(self.action_selector)
         self.main_layout.addLayout(self.action_layout)
 
+    @QtCore.Slot()
     def _edit_description_cb(self, text):
         """Handles changes to the description text field.
 
@@ -244,6 +253,15 @@ class InputItemConfiguration(QtWidgets.QFrame):
         """
         self.item_data.description = text
         self.description_changed.emit(text)
+
+    @QtCore.Slot()
+    def _delete_description_cb(self):
+        """ deletes the description text.
+
+        :param text the new contents of the text field
+        """
+        self.item_data.description = None
+        self.description_clear.emit()
 
     def _always_execute_cb(self, state):
         """Handles changes to the always execute checkbox.
@@ -643,9 +661,9 @@ class JoystickDeviceTabWidget(QDataWidget):
                 widget = InputItemConfiguration(item_data, parent = self)    
                 _cache.register(item_data, widget)
 
-                change_cb = self._create_change_cb(index)
-                widget.action_model.data_changed.connect(change_cb)
-                widget.description_changed.connect(change_cb)
+                widget.action_model.data_changed.connect(self._create_change_cb(index))
+                widget.description_changed.connect(lambda x: self._description_changed_cb(index, x))
+                widget.description_clear.connect(lambda: self._description_clear_cb(index))
 
                 # indicate the input changed
                 device_guid = str(item_data.device_guid)
@@ -659,8 +677,24 @@ class JoystickDeviceTabWidget(QDataWidget):
         else:
             # empty widget
             self._empty_widget.show()
-            
+    
+    def _description_changed_cb(self, index, text):
+        ''' called when the description text of the widget changes to update the description on the input item 
+        
+        :param: index = the index of the input widget to update with the new text
+        
+        '''
+        item = self.input_item_list_view.itemAt(index)
+        item.data.description = text
+        item.setDescription(text)
 
+    def _description_clear_cb(self, index):
+        ''' delete description entry '''
+        item = self.input_item_list_view.itemAt(index)
+        item.data.description = None
+        item.setDescription('')
+        
+        
 
     def set_mode(self, mode):
         ''' changes the mode of the tab '''
@@ -711,6 +745,14 @@ class JoystickDeviceTabWidget(QDataWidget):
         :return callback function redrawing changed content
         """
         return lambda: self.input_item_list_view.redraw_index(index)
+    
+    def _create_description_change_cb(self, index):
+        """Creates a callback handling content changes.
+
+        :param index the index of the content being changed
+        :return callback function redrawing changed content
+        """
+        return lambda: self.description_changed_cb(index)
 
     def update_device_label(self, text):
         """Updates the label assigned to this device.

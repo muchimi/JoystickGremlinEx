@@ -713,7 +713,7 @@ class InputItem():
 
     @property
     def description(self):
-        if not self._description:
+        if self._description is None:
             # see if there is a container
             if self.containers:
                 for container in self.containers:
@@ -728,7 +728,8 @@ class InputItem():
     
     @description.setter
     def description(self, value):
-        return self._description
+        self._description = value
+        
 
     @property
     def selected(self):
@@ -819,7 +820,7 @@ class InputItem():
         self.input_type = InputType.to_enum(node.tag)
         if "id" in node.attrib.keys():
             self.input_id = safe_read(node, "id", int)
-        self.description = safe_read(node, "description", str)
+        self._description = safe_read(node, "description", str)
         self.always_execute = read_bool(node, "always-execute", False)
 
         if self.input_type in (InputType.KeyboardLatched, InputType.Keyboard):
