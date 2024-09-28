@@ -24,6 +24,8 @@ from typing import Tuple, Union
 
 import gremlin.error
 
+import logging
+
 
 class VisualizationType(Enum):
 
@@ -72,18 +74,16 @@ class AxisNames(Enum):
         try:
             return _AxisNames_to_string_lookup[value]
         except KeyError:
-            raise gremlin.error.GremlinError(
-                f"Invalid AxisName lookup, {value}"
-            )
+            logging.getLogger("system").error(f"AxisNames: Don't know how to convert axis to string: '{value}' to a string - defaulting to X (1)")
+            return "X"
 
     @staticmethod
     def to_enum(value: str) -> AxisNames:
         try:
             return _AxisNames_to_enum_lookup[value]
         except KeyError:
-            raise gremlin.error.GremlinError(
-                f"Invalid AxisName lookup, {value}"
-            )
+            logging.getLogger("system").error(f"AxisNames: Don't know how to convert axis to enum: '{value}' to a string - defaulting to X (1)")
+            return AxisNames.X
         
     @staticmethod
     def to_list():

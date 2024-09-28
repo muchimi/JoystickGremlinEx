@@ -1154,6 +1154,7 @@ class InputItemWidget(QtWidgets.QFrame):
             self._description_widget.setText(f"<i>{value}</i>")
             self._container_layout.addWidget(self._description_widget, self._row_description,0)
         else:
+            self._description_widget.setText('')
             layout_remove(self._container_layout, self._description_widget)
             
 
@@ -1784,6 +1785,7 @@ class TitleBarButton(QtWidgets.QAbstractButton):
         :param event the rendering event
         """
         p = QtGui.QPainter(self)
+        # p.begin(self)
 
         options = QtWidgets.QStyleOptionToolButton()
         options.initFrom(self)

@@ -1506,7 +1506,8 @@ class GremlinUi(QtWidgets.QMainWindow):
     def _select_input(self, device_guid, input_type : InputType = None, input_id = None):
         eh = gremlin.event_handler.EventListener()
         eh.select_input.emit(device_guid, input_type, input_id)
-        
+
+       
     def _select_input_handler(self, device_guid, input_type = None, input_id = None, force = False):
         ''' Selects a specific input on the given tab 
         The tab is changed if different from the current tab.
@@ -1593,8 +1594,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         finally:
             self._selection_locked = False
             self.pop_highlighting()
-            el.pop_joystick() # restor joystick input while changing UI
-            time.sleep(0.05) # let things settle
+            el.pop_joystick() # restore joystick input while changing UI
+            #time.sleep(0.05) # let things settle
 
 
         
@@ -2915,6 +2916,10 @@ if __name__ == "__main__":
     if args.start_minimized:
         ui.setHidden(True)
     
+    # # restore last input
+    # event_listener = gremlin.event_handler.EventListener()
+    # device_guid, input_type, input_id = ui.config.get_last_input()
+    # event_listener.select_input.emit(device_guid, input_type, input_id)
 
     # Run UI
     syslog.info("GremlinEx UI launching")

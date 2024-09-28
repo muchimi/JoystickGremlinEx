@@ -1296,6 +1296,11 @@ class Configuration:
         device_guid = self._profile_data.get("last_device_guid",None)
         if device_guid is None:
             device_guid = self._data.get("last_device_guid",None)
+        if device_guid is None:
+            # get the first device available
+            if len(gremlin.shared_state.device_guid_to_name_map):
+                devices = list(gremlin.shared_state.device_guid_to_name_map.keys())
+                device_guid = devices[0]
         return device_guid
         
 
@@ -1354,8 +1359,16 @@ class Configuration:
         return (input_type, save_input_id, input_id)
 
 
-    def get_last_input(self, device_guid) -> tuple: # (device_guid, input_type, input_id)
-        ''' gets the last input for a given device '''
+    def get_last_input(self, device_guid = None) -> tuple: # (device_guid, input_type, input_id)
+        ''' gets the last input for a given device
+         
+        :param: device_guid - the device to look for - if None - uses the last known device
+           
+        '''
+
+        if device_guid is None:
+            device_guid = self.get_last_device_guid()
+
         verbose = self.verbose_mode_details
         if verbose:
             device_name = gremlin.shared_state.get_device_name(device_guid)

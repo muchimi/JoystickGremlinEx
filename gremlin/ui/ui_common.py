@@ -2234,6 +2234,7 @@ class HatWidget(QtWidgets.QWidget):
 
         # Prepare painter instance
         p = QtGui.QPainter(self)
+        # p.begin(self)
         p.setRenderHint(QtGui.QPainter.Antialiasing | QtGui.QPainter.SmoothPixmapTransform)
         p.setPen(pen_default)
         p.setBrush(brush_default)
@@ -2431,6 +2432,7 @@ class TimeLinePlotWidget(QtWidgets.QWidget):
         :param event the paint event
         """
         p = QtGui.QPainter(self)
+        # p.begin(self)
         p.drawPixmap(0, 0, self._pixmap)
         p.end()
 
@@ -2449,6 +2451,7 @@ class TimeLinePlotWidget(QtWidgets.QWidget):
     def _update_pixmap(self):
         """Updates the pixmap that contains the moving timeline."""
         p = QtGui.QPainter(self._pixmap)
+        # p.begin(self)
         p.setRenderHint(self._render_flags)
 
         self._pixmap.scroll(
@@ -2880,6 +2883,7 @@ QMarkerDoubleRangeSlider::add-page:horizontal { background: #979EA8; border-styl
         # draw markers on top of the main widget
         
         p = QtGui.QPainter(self)
+        # p.begin(self)
         orientation = self.orientation()
         if orientation == QtCore.Qt.Orientation.Horizontal:
             positions = [QtWidgets.QStyle.sliderPositionFromValue(self._target_min, self._target_max, v, self.width(), False) for v in self._int_marker_pos]
@@ -2948,6 +2952,7 @@ class QToggle(QCheckBox):
         handleRadius = round(0.24 * contRect.height())
 
         p = QPainter(self)
+        # p.begin(self)
         p.setRenderHint(QPainter.Antialiasing)
 
         p.setPen(self._transparent_pen)
@@ -3053,6 +3058,7 @@ class QAnimatedToggle(QToggle):
         handleRadius = round(0.24 * contRect.height())
 
         p = QPainter(self)
+        # p.begin(self)
         p.setRenderHint(QPainter.Antialiasing)
 
         p.setPen(self._transparent_pen)
@@ -3529,6 +3535,8 @@ class DualSlider(QtWidgets.QWidget):
         painter.drawComplexControl(QtWidgets.QStyle.CC_Slider, option_lower)
         painter.drawComplexControl(QtWidgets.QStyle.CC_Slider, option_upper)
 
+
+
 class QFlowLayout(QtWidgets.QLayout):
     def __init__(self, parent=None, margin=-1, hspacing=-1, vspacing=-1):
         '''
@@ -3725,6 +3733,7 @@ class QBubble(QtWidgets.QLabel):
 
     def paintEvent(self, event):
         p = QtGui.QPainter(self)
+        # p.begin(self)
         p.setRenderHint(QtGui.QPainter.Antialiasing, True)
         p.drawRoundedRect(
             0, 0, self.width() - 1, self.height() - 1, 5, 5)

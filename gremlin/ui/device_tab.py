@@ -663,7 +663,7 @@ class JoystickDeviceTabWidget(QDataWidget):
 
                 widget.action_model.data_changed.connect(self._create_change_cb(index))
                 widget.description_changed.connect(lambda x: self._description_changed_cb(index, x))
-                widget.description_clear.connect(lambda: self._description_clear_cb(index))
+                widget.description_clear.connect(lambda: self._description_clear_cb(index,widget))
 
                 # indicate the input changed
                 device_guid = str(item_data.device_guid)
@@ -688,8 +688,10 @@ class JoystickDeviceTabWidget(QDataWidget):
         item.data.description = text
         item.setDescription(text)
 
-    def _description_clear_cb(self, index):
+    def _description_clear_cb(self, index, widget):
         ''' delete description entry '''
+        with QtCore.QSignalBlocker(widget.description_field):
+            widget.description_field.setText('')
         item = self.input_item_list_view.itemAt(index)
         item.data.description = None
         item.setDescription('')
