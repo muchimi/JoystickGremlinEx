@@ -93,11 +93,10 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             ]
         }
         self.vjoy_selector = ui_common.VJoySelector(
-            lambda x: self.save_changes(),
+            lambda x: self.save_changes(),  # handler when selection changes
             input_types[self._get_input_type()],
             self.action_data.get_settings().vjoy_as_input
         )
-
 
         
 
@@ -207,8 +206,8 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         # Store remap data
         try:
             vjoy_data = self.vjoy_selector.get_selection()
-            input_type_changed = \
-                self.action_data.input_type != vjoy_data["input_type"]
+            # input_type_changed = \
+            #     self.action_data.input_type != vjoy_data["input_type"]
             self.action_data.vjoy_device_id = vjoy_data["device_id"]
             self.action_data.vjoy_input_id = vjoy_data["input_id"]
             self.action_data.input_type = vjoy_data["input_type"]
@@ -220,8 +219,8 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
                 self.action_data.axis_scaling = self.relative_scaling.value()
 
             # Signal changes
-            if input_type_changed:
-                self.action_modified.emit()
+            #if input_type_changed:
+            self.action_modified.emit()
         except gremlin.error.GremlinError as e:
             log_sys_error(e)
 

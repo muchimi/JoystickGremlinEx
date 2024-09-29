@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-
+from __future__ import annotations
 import importlib
 import logging
 import os
@@ -34,6 +34,10 @@ class ContainerPlugins:
 
     def __init__(self):
         """Initializes the container plugin manager."""
+        self.reset()
+
+    def reset(self):
+        ''' resets the plugins '''
         self._plugins = {}
         self._discover_plugins()
 
@@ -162,20 +166,32 @@ class ContainerPlugins:
             self._tag_to_type_map[entry.tag] = entry
             self._name_to_type_map[entry.name] = entry
 
-    def duplicate(self, container):
+    def duplicate(self, container, input_item = None):
         ''' duplicates a container '''
         # because containers can be quite complex - we'll just generate the xml and change IDs as needed and reload
         # into a new container of the same type
-        from gremlin.base_profile import AbstractContainer
+        from gremlin.base_profile import AbstractContainer, InputItem
         from gremlin.util import get_guid
         assert isinstance(container, AbstractContainer),"Invalid container data for duplicate()"
-        container_item = copy.deepcopy(container)
+        assert isinstance(input_item, InputItem),"Invalid input item tyhpe for duplicate()"
 
-        for action_set in container_item.get_action_sets():
+        if input_item is None:
+            input_item = container.parent
+
+        node = container.to_xml()
+        container_type = node.attrib["type"]
+        container_tag_map = self.tag_map
+        
+        new_container = container_tag_map[container_type](input_item)
+        new_container.from_xml(node)
+
+        #new_container = copy.deepcopy(container)
+
+        for action_set in new_container.get_action_sets():
             for action in action_set:
                 action.action_id = get_guid()
         
-        return container_item
+        return new_container
 
 
 
@@ -192,6 +208,10 @@ class ActionPlugins:
 
     def __init__(self):
         """Initializes the action plugin manager."""
+        self.reset()
+
+    def reset(self):
+        ''' resets the plugins '''
         self._plugins = {}
         self._type_to_action_map = {}
         self._type_to_name_map = {}
@@ -297,11 +317,22 @@ class ActionPlugins:
                     log_sys_warn(f"\tLoading action_plugins '{root.split("\\")[-1]}' failed due to: {e}")
 
 
-    def duplicate(self, action):
+    def duplicate(self, action, container):
         ''' duplicates an action and gives it a unique ID '''
         from gremlin.util import get_guid
-        dup = copy.deepcopy(action)
-        dup.parent = action.parent
-        dup.action_id = get_guid()
-        return dup
+
+        node = action.to_xml()
+        action_tag = node.tag
+        action_tag_map = self.tag_map
+        
+        new_action = action_tag_map[action_tag](container)
+        new_action.from_xml(node)
+        new_action.action_id = get_guid()
+
+
+        # dup = copy.deepcopy(action)
+        #dup.parent = action.parent
+        #dup.action_id = get_guid()
+
+        return new_action
     

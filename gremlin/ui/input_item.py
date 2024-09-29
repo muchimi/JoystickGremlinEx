@@ -17,6 +17,7 @@
 
 import enum
 from PySide6 import QtWidgets, QtCore, QtGui
+import lxml.etree
 
 import gremlin
 import gremlin.config
@@ -33,13 +34,14 @@ import gremlin.plugin_manager
 
 import gremlin.ui.ui_common as ui_common
 from functools import partial
-from  gremlin.clipboard import Clipboard
+from  gremlin.clipboard import Clipboard, ObjectEncoder, EncoderType
 from gremlin.util import get_guid
 import logging
 syslog = logging.getLogger("system")
 import qtawesome as qta
 import gremlin.ui.input_item
 import gremlin.base_profile
+import lxml
 
 
 
@@ -488,25 +490,13 @@ class InputItemListView(ui_common.AbstractView):
                     # remember which item to select
                     selected_index = index
 
-                # widget.selected_changed.connect(self._create_selection_callback(index))
                 widget.edit.connect(self._create_edit_callback(index))
                 widget.closed.connect(self._create_closed_callback(index))
 
-
-                # widget.selected = index == self._current_index
-
-                #logging.getLogger("system").info(f"create widget: index {index} selected: {widget.selected}")
                 
                 if verbose:
                     logging.getLogger("system").info(f"LV: {device_name} [{index:02d}] type: {InputType.to_string(data.input_type)} name: {data.input_id}")
 
-
-            # if selected_index == -1 and row_count > 0:
-            #     selected_index = 0 # select the first one by default if nothing was selected
-
-            # if selected_index >= 0:
-            #     # select the item
-            #     self.select_item(selected_index, emit = False)
 
             self.scroll_layout.addStretch()
 
@@ -664,7 +654,7 @@ class InputItemListView(ui_common.AbstractView):
 
         if not force and self._current_index == index:
             return # nothing to do if the current index is the same as the new index
-
+        
         # If the index is actually an event we have to correctly translate the
         # event into an index, taking the possible non-contiguous nature of
         # axes into account
@@ -699,10 +689,10 @@ class InputItemListView(ui_common.AbstractView):
         device_input_type = data.input_type if data else None
         device_input_id = data.input_id if data else None
         
-        if user_selected:
-            # save what was last selected
+        # if user_selected:
+        #     # save what was last selected
             
-            gremlin.shared_state.set_last_input_id(device_guid, device_input_type, device_input_id)
+        #     gremlin.shared_state.set_last_input_id(device_guid, device_input_type, device_input_id)
 
         widget = self.itemAt(index)
         if widget:
@@ -712,18 +702,23 @@ class InputItemListView(ui_common.AbstractView):
             with (QtCore.QSignalBlocker(widget)):
                 widget.selected = True
 
+        # if emit:
 
-        if emit:
-            self.item_selected.emit(index)
+            # eh = gremlin.event_handler.EventListener()
+            # eh.select_input.emit(device_guid, device_input_type, device_input_id)                
 
-            el = gremlin.event_handler.EventListener()
-            event = gremlin.event_handler.DeviceChangeEvent()
-            data = self.model.data(index)
-            event.device_guid = device_guid
-            event.device_name = device_name
-            event.device_input_type = device_input_type
-            event.device_input_id = device_input_id
-            el.profile_device_changed.emit(event)
+
+        if emit and index != -1:
+            self.item_selected.emit(index) # load the mapped content for the given index
+
+        #     el = gremlin.event_handler.EventListener()
+        #     event = gremlin.event_handler.DeviceChangeEvent()
+        #     data = self.model.data(index)
+        #     event.device_guid = device_guid
+        #     event.device_name = device_name
+        #     event.device_input_type = device_input_type
+        #     event.device_input_id = device_input_id
+        #     el.profile_device_changed.emit(event)
 
         # return the currently selected widget
         return widget
@@ -873,8 +868,20 @@ class ActionSetView(ui_common.AbstractView):
     def _paste_action(self, action):
         ''' handles action paste operation '''
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.duplicate(action)
-        self.model.add_action(action_item)
+        if isinstance(action, ObjectEncoder):
+            oc = action
+            if oc.encoder_type == EncoderType.Action:
+                xml = oc.data
+                node = lxml.etree.fromstring(xml)
+                action_tag = node.tag
+                action_tag_map = plugin_manager.tag_map
+                new_action = action_tag_map[action_tag](self.profile_data)
+                new_action.from_xml(node)
+                new_action.action_id = get_guid()
+                self.model.add_action(new_action)
+        else:
+            action_item = plugin_manager.duplicate(action)
+            self.model.add_action(action_item)
 
 
     def _create_closed_cb(self, widget):
@@ -1206,7 +1213,8 @@ class InputItemWidget(QtWidgets.QFrame):
                 style = "#main_layout{background-color: #E8E8E8; }"
 
             self.setStyleSheet(style)
-            self.selected_changed.emit(self.identifier)
+            self.selected_changed.emit(self)
+            #self.selected_changed.emit(self.identifier)
 
 
 
@@ -1571,9 +1579,14 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
     def _container_copy(self, _):
         """Emits the copy clipboard when the widget is being copied """
-
         clipboard = Clipboard()
-        clipboard.data = self.profile_data
+        container = self.profile_data
+        node = container.to_xml()
+        xml = lxml.etree.tostring(node)
+        oc = ObjectEncoder(container, xml, EncoderType.Container)
+        oc.name = container.name
+        clipboard.data = oc
+        #clipboard.data = self.profile_data
         logging.getLogger("system").info(f"container {self.profile_data.name} copied to clipboard")
 
     def _handle_interaction(self, widget, action):
@@ -1951,7 +1964,11 @@ class BasicActionWrapper(AbstractActionWrapper):
         ''' clipboard copy event '''
         clipboard = Clipboard()
         action =  self.action_widget.action_data
-        clipboard.data = action
+        node = action.to_xml()
+        xml = lxml.etree.tostring(node)
+        oc =  ObjectEncoder(action, xml, EncoderType.Action)
+        #clipboard.data = action
+        clipboard.data = oc
         logging.getLogger("system").info(f"copy to clipboard: {action.name}")
 
 

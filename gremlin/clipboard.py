@@ -11,18 +11,23 @@ import lxml.etree
 import jsonpickle
 import importlib
 import msgpack
-
+from enum import IntEnum
 
 import gremlin.base_profile
 from gremlin.singleton_decorator import SingletonDecorator
 
+class EncoderType(IntEnum):
+    Action = 1
+    Container = 2
+
 class ObjectEncoder():
     ''' helper class to encode objects '''
-    def __init__(self, obj, data):
+    def __init__(self, obj, data, encoder_type : EncoderType ):
         cls = type(obj)
         self._name = cls.__name__
         self._module = cls.__module__
-        self._data =data
+        self._data = data
+        self._type : EncoderType = encoder_type
 
     @property
     def data(self):
@@ -35,6 +40,14 @@ class ObjectEncoder():
     @property
     def name(self):
         return self._name
+    
+    @name.setter
+    def name(self, value):
+        self._name = value
+    
+    @property
+    def encoder_type(self)->EncoderType:
+        return self._type
 
 @SingletonDecorator
 class Clipboard(QtCore.QObject):
@@ -58,6 +71,7 @@ class Clipboard(QtCore.QObject):
 
         # user profile path
         
+
 
     @property
     def data(self):
@@ -201,12 +215,18 @@ class Clipboard(QtCore.QObject):
     def is_container(self):
         ''' true if the data item is a container '''
         from gremlin.base_profile import AbstractContainer
+        data = self.data
+        if isinstance(data, ObjectEncoder):
+            return data.encoder_type == EncoderType.Container
         return self.data is not None and isinstance(self.data, AbstractContainer)
     
     @property
     def is_action(self):
         ''' true if the data item is an action '''
         from gremlin.base_profile import AbstractAction
+        data = self.data
+        if isinstance(data, ObjectEncoder):
+            return data.encoder_type == EncoderType.Action
         return self.data is not None and isinstance(self.data, AbstractAction)
     
     @property

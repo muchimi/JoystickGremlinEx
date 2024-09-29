@@ -366,17 +366,20 @@ def clear_layout(layout):
             child.widget().deleteLater()
         layout.removeItem(child)
 
-def get_layout_widgets(layout) -> list:
+def get_layout_widgets(layout : QtWidgets.QLayout) -> list:
     ''' returns a list of layout widgets '''
     widgets = []
-    while layout.count() > 0:
-        child = layout.takeAt(0)
-        if child.layout():
-            widgets.extend(get_layout_widgets(child.layout()))
-        elif child.widget():
-            widgets.append(child.widget())
+    index = layout.count()
+    while index >= 0:
+        child = layout.itemAt(index)
+        if child is not None:
+            if child.layout():
+                widgets.extend(get_layout_widgets(child.layout()))
+            elif child.widget():
+                widgets.append(child.widget())
+        index -= 1
 
-    return widgets        
+    return widgets
 
 def layout_contains(layout, widget):
     ''' true if widget is contained in the given layout '''

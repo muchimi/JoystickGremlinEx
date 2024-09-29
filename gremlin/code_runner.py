@@ -567,7 +567,7 @@ class CodeRunner:
         if self._startup_profile and gremlin.shared_state.current_profile != self._startup_profile:
             eh.change_profile(self._startup_profile)
         # change back to edit mode
-        eh.change_mode(gremlin.shared_state.edit_mode, emit=True, force_update = True)
+        eh.change_mode(gremlin.shared_state.edit_mode, emit=True, force_update = False)
         
       
         # re-enable tabs

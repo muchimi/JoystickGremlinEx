@@ -821,7 +821,7 @@ class GateEventHandler(QtCore.QObject):
     gate_value_changed = QtCore.Signal(GateInfo) # fires when a gate value changes (GateInfo)
     range_value_changed = QtCore.Signal(RangeInfo) # fires when either of the gate values change
 
-    slider_marker_update = QtCore.Signal(float)
+    slider_marker_update = QtCore.Signal(float, object)
 
     update_ui = QtCore.Signal()
 
@@ -1044,6 +1044,8 @@ class GateData():
         triggers = self.process_triggers(input_value)
         trigger: TriggerData
 
+        verbose = False
+
         for trigger in triggers:
             short_press = False
             if trigger.is_range:
@@ -1051,37 +1053,47 @@ class GateData():
             else:
                 containers = trigger.gate.itemData(trigger.condition).containers
             if trigger.mode == TriggerMode.FixedValue:
+                if verbose:
+                    syslog.info("Trigger: fixed value")
                 value.current = trigger.value
             elif trigger.mode == TriggerMode.ValueInRange:
+                if verbose:
+                    syslog.info("Trigger: value in range")
                 value.current = trigger.value
                 event.is_pressed = True
                 value.is_pressed = True
             elif trigger.mode == TriggerMode.ValueOutOfRange:
+                if verbose:
+                    syslog.info("Trigger: value out of range")
                 value.current = trigger.value
                 value.is_pressed = False
                 event.is_pressed = False
             elif trigger.mode == TriggerMode.GateCrossed:
                 # mimic a joystick button press for a gate crossing
+                if verbose:
+                    syslog.info("Trigger: gate crossing")
                 delay = trigger.gate.delay
                 event.is_axis = False
                 event.event_type = InputType.JoystickButton
                 short_press = True # send a key up in 250ms
             elif trigger.mode == TriggerMode.RangeEnter:
                 # enter range
-                print ("range enter")
+                if verbose:
+                    syslog.info("Trigger: range enter")
                 value.current = trigger.value
                 value.is_pressed = True
                 event.is_pressed = True
             elif trigger.mode == TriggerMode.RangeExit:
                 
                 # exit range
-                print ("range exit")
+                if verbose:
+                    syslog.info("Trigger: range exit")
                 value.current = trigger.value
                 is_pressed = trigger.condition == GateCondition.ExitRange # flip pressed mode depending on if we are releasing previously pressed event on range enter, or just triggering on the exit gate condition
                 value.is_pressed = is_pressed
                 event.is_pressed = is_pressed
 
-            if self.filter_map[trigger.mode]:
+            if verbose and self.filter_map[trigger.mode]:
                 syslog.info(f"Trigger: {str(trigger)}  value: {value.current}")
         
             
@@ -2062,7 +2074,8 @@ class GateData():
         ''' export this configuration to XML '''
         node = ElementTree.Element("gate")
 
-        verbose = gremlin.config.Configuration().verbose
+        verbose = gremlin.config.Configuration().verbose_mode_details
+        
 
         node.set("use_default_range",str(self.use_default_range))
         node.set("show_mode", DisplayMode.to_string(self.display_mode))
@@ -2853,7 +2866,8 @@ class GatedAxisWidget(QtWidgets.QWidget):
         eh = GateEventHandler()
         eh.gatedata_stepsChanged.connect(self._update_steps_cb)
         eh.gatedata_valueChanged.connect(self._update_values_cb)
-        eh.slider_marker_update.connect(self._slider_marker_update_handler)
+        eh.slider_marker_update.connect(self._slider_update_value_handler)
+        # eh.slider_marker_update.connect(self._slider_marker_update_handler)
         # eh.range_value_changed.connect(self._range_changed_cb)
         eh.gate_order_changed.connect(self._gate_order_changed_cb)
         eh.gate_value_changed.connect(self._gate_value_changed)
@@ -3281,19 +3295,20 @@ class GatedAxisWidget(QtWidgets.QWidget):
         # run the update on the UI thread
         #InvokeUiMethod(lambda: self._update_slider(input_value))
         # assert_ui_thread()
-        # self._update_slider_marker(input_value)
-        self._call_update_slider(input_value)
+        self._update_slider_marker(input_value)
+        #self._call_update_slider(input_value)
         
 
-    def _call_update_slider(self, value):
-        ''' asks the UI to update the slider '''
-        eh = GateEventHandler()
-        eh.slider_marker_update.emit(value)
+    # def _call_update_slider(self, value):
+    #     ''' asks the UI to update the slider '''
+    #     eh = GateEventHandler()
+    #     eh.slider_marker_update.emit(value)
 
     @QtCore.Slot(float)
     def _slider_marker_update_handler(self, value):
         ''' updates the slider marker position '''
-        InvokeUiMethod(lambda: self._update_slider_marker(value))
+        self._update_slider_marker(value)
+        #InvokeUiMethod(lambda: self._update_slider_marker(value))
 
 
     @QtCore.Slot(list)
@@ -3303,6 +3318,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
 
     def _update_slider_marker(self, value):
         ''' updates the slider value '''
+        # print (f"update marker: {value} input id: {self.action_data.hardware_input_id}")
         self._slider.setMarkerValue(value)
         self._update_output_value()
 

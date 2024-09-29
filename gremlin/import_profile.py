@@ -600,12 +600,14 @@ class ImportProfileDialog(QtWidgets.QDialog):
         :param: device_guid  the device to import to
         :path: the xml to import
         '''
+
+
         syslog = logging.getLogger("system")
 
 
         self.source_profile = gremlin.base_profile.Profile()
         self.source_profile.from_xml(self.profile_path)
-
+        
         # read the xml
         tree = ElementTree.parse(self.profile_path)
         self.root = tree.getroot()

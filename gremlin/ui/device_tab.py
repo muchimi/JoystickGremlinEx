@@ -24,6 +24,7 @@ from PySide6 import QtWidgets, QtCore
 import gremlin
 import gremlin.base_profile
 import gremlin.config
+import gremlin.config
 import gremlin.event_handler
 import gremlin.profile
 import gremlin.shared_state
@@ -33,7 +34,8 @@ from gremlin.input_types import InputType
 import gremlin.util
 import gremlin.ui.input_item as input_item
 import gremlin.ui.ui_common
-
+from  gremlin.clipboard import Clipboard, ObjectEncoder, EncoderType
+import lxml
 
 class InputItemConfiguration(QtWidgets.QFrame):
 
@@ -51,8 +53,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
         """
         super().__init__(parent)
 
-        
-
+        self.id = gremlin.util.get_guid()
         self.item_data : gremlin.base_profile.InputItem = item_data
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.button_layout = QtWidgets.QHBoxLayout()
@@ -64,12 +65,17 @@ class InputItemConfiguration(QtWidgets.QFrame):
                 parent = self.parent()
             parent :JoystickDeviceTabWidget
             if parent is not None:
-                item_data = parent.last_item_data
+                item_data = parent.last_item_data_key
         
             label = QtWidgets.QLabel("Please select an input to configure")
             label.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop | QtCore.Qt.AlignmentFlag.AlignLeft)
             self.main_layout.addWidget(label)
             return
+
+        verbose = gremlin.config.Configuration().verbose
+        if verbose:
+            syslog = logging.getLogger("system")
+            syslog.info(f"Create InputItemConfiguation for {item_data.debug_display}")
 
         
         if not item_data.is_action:
@@ -130,8 +136,9 @@ class InputItemConfiguration(QtWidgets.QFrame):
                 return
 
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.duplicate(action)
         container = container_plugins.basic.BasicContainer(self.item_data)
+        action_item = plugin_manager.duplicate(action, container )
+        
         # remap inputs
         action_item.update_inputs(self.item_data)
         container.add_action(action_item)
@@ -160,12 +167,32 @@ class InputItemConfiguration(QtWidgets.QFrame):
         :param container container to be added
         """
         plugin_manager = gremlin.plugin_manager.ContainerPlugins()
-        container_item = plugin_manager.duplicate(container)
-        if hasattr(container_item, "action_model"):
-            container_item.action_model = self.action_model
-        self.action_model.add_container(container_item)
-        plugin_manager.set_container_data(self.item_data, container_item)
-        return container_item
+
+        if isinstance(container, ObjectEncoder):
+            oc = container
+            if oc.encoder_type == EncoderType.Container:
+                xml = oc.data
+                node = lxml.etree.fromstring(xml)
+                container_type = node.get("type")
+                container_tag_map = plugin_manager.tag_map
+                new_container = container_tag_map[container_type](self.item_data)
+                new_container.from_xml(node)
+
+                #new_container = copy.deepcopy(container)
+
+                for action_set in new_container.get_action_sets():
+                    for action in action_set:
+                        action.action_id = gremlin.util.get_guid()
+        else:
+            new_container = plugin_manager.duplicate(container, self.item_data)
+
+        if hasattr(new_container, "action_model"):
+            new_container.action_model = self.action_model
+
+        
+        self.action_model.add_container(new_container)
+        plugin_manager.set_container_data(self.item_data, new_container)
+        return new_container
 
     def _remove_container(self, container):
         """Removes an existing container from the InputItem.
@@ -451,16 +478,29 @@ class JoystickDeviceTabWidget(QDataWidget):
         self.current_mode = current_mode
 
         self.device = device
-        self.last_item_data = None
+        self.last_item_data_key = None
         self.last_item_index = 0
 
-        label = QtWidgets.QLabel("Please select an input to configure")
-        label.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop | QtCore.Qt.AlignmentFlag.AlignLeft)
-        self._empty_widget = label
+        # label = QtWidgets.QLabel("Please select an input to configure")
+        # label.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop | QtCore.Qt.AlignmentFlag.AlignLeft)
+        #self._empty_widget = label
 
         # the main layout has a left input selection panel and a right configuration panel, two widgets, the last one is always the configuration panel
         self.main_layout = QtWidgets.QHBoxLayout(self)
         self.left_panel_layout = QtWidgets.QVBoxLayout()
+        self.left_panel_layout.setContentsMargins(0,0,0,0)
+
+        self.right_panel_layout = QtWidgets.QVBoxLayout()
+        self.right_panel_layout.setContentsMargins(0,0,0,0)
+
+        self.right_container_widget = QtWidgets.QWidget()
+        self.right_container_widget.setContentsMargins(0,0,0,0)
+
+        self.right_container_layout = QtWidgets.QVBoxLayout(self.right_container_widget)
+        self.right_container_layout.setContentsMargins(0,0,0,0)
+
+        
+
         self.device_profile.ensure_mode_exists(current_mode, self.device)
 
         # List of inputs
@@ -520,18 +560,20 @@ class JoystickDeviceTabWidget(QDataWidget):
             label.setMargin(10)
             self.left_panel_layout.addWidget(label)
 
-        self.main_layout.addLayout(self.left_panel_layout,1)
+        self.main_layout.addLayout(self.left_panel_layout,1) # 1/4 width
+        self.main_layout.addLayout(self.right_panel_layout,3) # 3/4 width
 
-        # add a list input view even if nothing is selected yet
-        # right_panel = self.main_layout.takeAt(1)
-        # if right_panel is not None and right_panel.widget():
-        #     right_panel.widget().hide()
-        #     right_panel.widget().deleteLater()
-        # if right_panel:
-        #     self.main_layout.removeItem(right_panel)
+        #self._empty_widget = InputItemConfiguration(parent = self)
+        
+        config = gremlin.config.Configuration()
 
-        self._empty_widget = InputItemConfiguration(parent = self)
-        self.main_layout.addWidget(self._empty_widget,3)
+        if config.debug_ui:
+            self._debug_widget = QtWidgets.QLabel("Debug widget")
+            self._debug_widget.setMaximumHeight(32)
+            self.right_panel_layout.addWidget(self._debug_widget)
+
+        self.right_panel_layout.addWidget(self.right_container_widget)
+        #self.right_panel_layout.addStretch()
 
 
         # # listen to device changes
@@ -547,6 +589,8 @@ class JoystickDeviceTabWidget(QDataWidget):
         if selected_index is not None and selected_index != -1:
             self.input_item_selected_cb(selected_index)
 
+
+        
 
         # update display on config change
         el.config_changed.connect(self._config_changed_cb)
@@ -632,34 +676,59 @@ class JoystickDeviceTabWidget(QDataWidget):
 
     @QtCore.Slot(int)
     def input_item_selected_cb(self, index):
-        """ Handles the selection of an input item.
+        """ Handles the loading of mappings for a given input item - handler for select_input event
 
         :param index the index of the selected item
         """
+
+        config = gremlin.config.Configuration()
+        verbose = config.verbose_mode_details
+        syslog = logging.getLogger("system")
+
         item_data = input_item_index_lookup(
             index,
             self.device_profile.modes[self.current_mode]
         )
 
-        # grab the last widget visible, if there is one
-        last_widget = _cache.retrieve(self.last_item_data)
-        if last_widget:
-            # hide it
-            last_widget.hide()
+        if verbose:
+            if item_data:
+                syslog.info(f"Selecting input config item for input index [{index}] mode: {self.current_mode}: {item_data.debug_display}")
+            else:
+                syslog.info(f"Selecting input config item for input index [{index}] mode: {self.current_mode}: Empty content")
 
-        self.last_item_data = item_data
+
+        new_key = _cache.getKey(item_data)
+
+        if new_key == self.last_item_data_key:
+            # same input - nothing to do
+            return
+
+        # hide all the existing widgets 
+        widgets = gremlin.util.get_layout_widgets(self.right_container_layout)
+        for widget in widgets:
+            if isinstance(widget, InputItemConfiguration):
+                if verbose:
+                    syslog.info(f"Hide widget:{widget.id} {widget.item_data.debug_display if widget.item_data else 'N/A'}")
+                widget.setVisible(False)
+            else:
+                self.right_container_layout.removeWidget(widget)
+                widget.deleteLater()
+            
+        self.last_item_data_key = new_key
         self.last_item_index = index
+
 
 
         if item_data is not None:
             # if there is data, hide the empty container and grab the last content, or create a new widget for it
             # there is a widget for each combination of device, input type and input ID
-            self._empty_widget.hide()
-            widget = _cache.retrieve(item_data)
+            # self._empty_widget.hide()
+            widget = _cache.retrieve(new_key)
             if not widget:
                 # not in cache, create it and add to cache for this device/input combination
-                widget = InputItemConfiguration(item_data, parent = self)    
+                widget = InputItemConfiguration(item_data, parent = self)
                 _cache.register(item_data, widget)
+                
 
                 widget.action_model.data_changed.connect(self._create_change_cb(index))
                 widget.description_changed.connect(lambda x: self._description_changed_cb(index, x))
@@ -670,13 +739,39 @@ class JoystickDeviceTabWidget(QDataWidget):
                 input_type = item_data.input_type
                 input_id = item_data.input_id
                 self.inputChanged.emit(device_guid, input_type, input_id)
-        
-                self.main_layout.addWidget(widget,3)
-            widget.show()
+                self.right_container_layout.addWidget(widget)       
+
+     
+
+
+            assert widget.item_data == item_data,"cache mismatch"
+
+            if verbose:
+                syslog.info(f"Show widget:  {widget.id} {item_data.debug_display}")
+            
+            widget.setVisible(True)
+            if config.debug_ui:
+                self._debug_widget.setText(f"Contents for : {item_data.debug_display}")
+
+            # if verbose:
+            #     syslog.info("Map layout contents:")
+            #     for widget in gremlin.util.get_layout_widgets(self.right_container_layout):
+            #         if isinstance(widget, InputItemConfiguration):
+            #             syslog.info(f"\t{widget.id} {widget.isVisible()} {widget.item_data.debug_display}")
+            #         else:
+            #             syslog.info(f"\tlabel {widget.isVisible()}")
+
 
         else:
-            # empty widget
-            self._empty_widget.show()
+            # show the empty widget
+            self._debug_widget.setText(f"Contents for : N/A")
+            self.right_container_layout.insertWidget(0,QtWidgets.QLabel("Please select an input to configure"))
+
+
+        
+        #self.right_container_layout.update()
+            
+
     
     def _description_changed_cb(self, index, text):
         ''' called when the description text of the widget changes to update the description on the input item 
@@ -700,32 +795,19 @@ class JoystickDeviceTabWidget(QDataWidget):
 
     def set_mode(self, mode):
         ''' changes the mode of the tab '''
+
+        if gremlin.config.Configuration().verbose:
+            syslog = logging.getLogger("system")
+            syslog.info(f"Device tab: change mode requested: device tab: {gremlin.shared_state.get_device_name(self.device.device_guid)} current mode: [{self.current_mode}]  new mode: [{mode}] ")
             
         self.current_mode = mode
         self.device_profile.ensure_mode_exists(self.current_mode, self.device)
-        
-   
-        # Remove the existing widget, if there is one
-        item = self.main_layout.takeAt(1)
-        if item is not None and item.widget():
-            item.widget().hide()
-            item.widget().deleteLater()
-        if item:
-            self.main_layout.removeItem(item)
 
         index = self.last_item_index
-        item_data = self.last_item_data
-
-        widget = InputItemConfiguration(item_data = item_data, parent = self)
-        self.main_layout.addWidget(widget,3)
-
-
         self.input_item_list_model.mode = mode
-
-        
         self.input_item_list_view.redraw()
         self.input_item_list_view.select_item(index, emit=False)
-
+        self.input_item_selected_cb(index)
 
 
     def mode_changed_cb(self, mode):
@@ -841,21 +923,38 @@ class InputConfigurationWidgetCache():
     def __init__(self):
         self._widget_map = {}
 
+
     def register(self, item_data, widget):
         if item_data:
             key = self.getKey(item_data)
             if not key in self._widget_map:
                 self._widget_map[key] = widget
+                if gremlin.config.Configuration().verbose:
+                    syslog = logging.getLogger("system")            
+                    syslog.info(f"Cache: register {item_data.debug_display}")
+            
+    def clear(self):
+        ''' clears the cache '''
+        if gremlin.config.Configuration().verbose:
+            syslog = logging.getLogger("system")            
+            syslog.info(f"Cache: clear widget cache")
+        self._widget_map.clear()
 
 
     def getKey(self, item_data):
         device_guid = item_data.device_guid
         input_id = item_data.input_id
         input_type = item_data.input_type
-        return (device_guid, input_id, input_type)
+        mode = item_data.profile_mode
+        return (device_guid, input_id, input_type, mode)
         
 
-    def retrieve(self,item_data):
+    def retrieve(self, key):
+        if key in self._widget_map:
+            return self._widget_map[key]
+        return None
+    
+    def retrieve_by_data(self,item_data):
         if item_data:
             key = self.getKey(item_data)
             if key in self._widget_map:
@@ -867,6 +966,33 @@ class InputConfigurationWidgetCache():
             key = self.getKey(item_data)
             if key in self._widget_map:
                 del self._widget_map[key]
+
+    def dump(self):
+        ''' dumps the cache content to the log for debug purposes '''
+        syslog = logging.getLogger("system")
+        items = list(self._widget_map.values())
+        items.sort(key = lambda x: (x.item_data.profile_mode, x.item_data.device_guid, x.item_data.input_type, x.item_data.input_id))
+        current_device_guid = None
+        current_mode = None
+        current_input_type = None
+        
+        syslog.info("-"*50)
+        syslog.info("UI widget cache dump")
+        for index, input_item_config in enumerate(items):
+            item: gremlin.base_profile.InputItem = input_item_config.item_data
+            if not current_mode or current_mode != item.profile_mode:
+                current_mode = item.profile_mode
+                syslog.info(f"Mode {current_mode}:")
+            if not current_device_guid or current_device_guid != item.device_guid:
+                device_name = gremlin.shared_state.get_device_name(item.device_guid)
+                current_device_guid = item.device_guid
+                syslog.info(f"\tDevice {device_name} id {str(item.device_guid)}:")
+            if not current_input_type or current_input_type != item.input_type:
+                current_input_type = item.input_type
+                syslog.info(f"\t\tInput Type: {InputType.to_display_name(item.input_type)}")
+            syslog.info(f"\t\t\tInput Id: {item.display_name} cache index [{index:,}]")
+
+            
 
 # primary cache instantiation to prevent GC
 _cache = InputConfigurationWidgetCache()

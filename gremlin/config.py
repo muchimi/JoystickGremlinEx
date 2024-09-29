@@ -959,14 +959,21 @@ class Configuration:
             clipboard = Clipboard()
             clipboard.clear_persisted()
 
-
-
-
-
     @property
     def verbose(self):
         ''' determines loging level '''
-        return self._data.get("verbose", False)
+        value = self._data.get("verbose", None)
+        if value is None:
+            # not set - set other defaults
+            self.verbose_mode_details = False
+            self.verbose_mode_inputs = False
+            self.verbose_mode_mouse = False
+            self.verbose_mode_joystick = False
+            self.verbose_mode_keyboard = False
+            self._data["verbose"] = False
+            return False
+        return value
+
     @verbose.setter
     def verbose(self, value):
         self._data["verbose"] = value
@@ -1085,21 +1092,7 @@ class Configuration:
         self._data["show_axis_input"] = value
         self.save()
 
-    @property
-    def last_tab_guid(self):
-        ''' last selected tab device guid '''
-        tab_guid = self._profile_data.get("last_tab_guid",None)
-        if not tab_guid:
-            tab_guid = self._data.get("last_tab_guid",None)
-        return tab_guid
-    
-    @last_tab_guid.setter
-    def last_tab_guid(self, value):
-        tab_guid = str(value)
-        self._data["last_tab_guid"] = tab_guid
-        self._profile_data["last_tab_guid"] = tab_guid
-        self.save()
-        self.save_profile()
+
 
 
     @property
@@ -1283,12 +1276,29 @@ class Configuration:
         self._profile_data["last_input"] = data
         self._data["last_device_guid"] = device_guid
         self._profile_data["last_device_guid"] = device_guid
+        
         self.save_profile()
 
         if verbose:
             device_name = gremlin.shared_state.get_device_name(device_guid)
             logging.getLogger("system").info(f"Saving last input selection: {device_guid} {device_name} {input_type} {input_id}")
             pass
+
+    # @property
+    # def last_tab_guid(self):
+    #     ''' last selected tab device guid '''
+    #     tab_guid = self._profile_data.get("last_tab_guid",None)
+    #     if not tab_guid:
+    #         tab_guid = self._data.get("last_tab_guid",None)
+    #     return tab_guid
+    
+    # @last_tab_guid.setter
+    # def last_tab_guid(self, value):
+    #     tab_guid = str(value)
+    #     self._data["last_tab_guid"] = tab_guid
+    #     self._profile_data["last_tab_guid"] = tab_guid
+    #     self.save()
+    #     self.save_profile()        
 
 
     def get_last_device_guid(self):
@@ -1439,3 +1449,11 @@ class Configuration:
     def _profile_changed_cb(self):
         self._last_profile_reload = None
         self.reload_profile()
+
+    @property
+    def debug_ui(self):
+        return self._data.get("debug_ui",False)
+    @debug_ui.setter
+    def debug_ui(self, value):
+        self._data["debug_ui"] = value
+        self.save()

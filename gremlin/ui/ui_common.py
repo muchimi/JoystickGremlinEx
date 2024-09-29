@@ -558,7 +558,6 @@ class DynamicDoubleSpinBox_legacy(QtWidgets.QDoubleSpinBox):
 
 class AbstractInputSelector(QtWidgets.QWidget):
 
-
     def __init__(self, change_cb, valid_types, parent=None):
         super().__init__(parent)
 
@@ -647,6 +646,7 @@ class AbstractInputSelector(QtWidgets.QWidget):
             entry.setCurrentIndex(0)
         self._execute_callback()
 
+
     def _initialize(self):
         raise gremlin.error.MissingImplementationError(
             "Missing implementation of AbstractInputSelector._initialize"
@@ -669,6 +669,7 @@ class AbstractInputSelector(QtWidgets.QWidget):
             self._device_id_registry.append(self._device_identifier(device))
         self.main_layout.addWidget(self.device_dropdown)
         self.device_dropdown.activated.connect(self._update_device)
+        
         
 
     def _create_input_dropdown(self):
@@ -2310,7 +2311,7 @@ class AxesTimeline(QtWidgets.QGroupBox):
         3: "#4daf4a",
         4: "#984ea3",
         5: "#ff7f00",
-        6: "#ffff33",
+        6: "#8a8a2c", 
         7: "#a65628",
         8: "#f781bf"
     }
@@ -3747,6 +3748,8 @@ class ActionLabel(QtWidgets.QLabel):
 
     """Handles showing the correct icon for the given action."""
 
+    
+
     def __init__(self, action_entry, parent=None):
         """Creates a new label for the given entry.
 
@@ -3755,15 +3758,16 @@ class ActionLabel(QtWidgets.QLabel):
         """
         QtWidgets.QLabel.__init__(self, parent)
         icon = action_entry.icon()
+        self._width = 20
         if isinstance(icon, str):
             # convert to icon if a path is given
             icon = load_icon(icon)
         
         if isinstance(icon, QtGui.QIcon):
-            pixmap = icon.pixmap(16)
+            pixmap = icon.pixmap(self._width)
         else:
             pixmap = QtGui.QPixmap(icon)
-        pixmap = pixmap.scaled(16, 16, QtCore.Qt.KeepAspectRatio)
+        pixmap = pixmap.scaled(self._width, self._width, QtCore.Qt.KeepAspectRatio)
         self.setPixmap(pixmap)
 
         self.action_entry = action_entry
@@ -3774,6 +3778,6 @@ class ActionLabel(QtWidgets.QLabel):
     def _icon_change(self, event):
         icon = self.action_entry.icon()
         if isinstance(icon, QtGui.QIcon):
-            self.setPixmap(QtGui.QPixmap(icon.pixmap(20)))
+            self.setPixmap(QtGui.QPixmap(icon.pixmap(self._width)))
         else:
             self.setPixmap(QtGui.QPixmap(icon))

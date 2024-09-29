@@ -203,8 +203,6 @@ class OptionsUi(ui_common.BaseDialogUi):
         # do not create the page for now as this serves no purpose with new version of HID guardian
         # self._create_hidguardian_page()
 
-        
-
         # closing bar
         close_button = QtWidgets.QPushButton("Close")
         close_button.clicked.connect(self.close)
@@ -310,6 +308,12 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.enable_ui_runtime.setToolTip("When enabled, the UI will remain interactable while a profile is running.<br>This can create conflicts if the profile or mode is changed while a profile is running,<b>use caution.</b>")
         self.enable_ui_runtime.setChecked(self.config.runtime_ui_active)
         self.enable_ui_runtime.clicked.connect(self._runtime_ui_active)
+
+
+        self.debug_ui = QtWidgets.QCheckBox("Debug UI")
+        self.debug_ui.setToolTip("Enabled additional diagnostics widgets on the UI - only use for troubleshooting/debug purposes<br>Restart required to take effect.")
+        self.debug_ui.setChecked(self.config.debug_ui)
+        self.debug_ui.clicked.connect(self._debug_ui)
         
         
         # synchronize action/container drop downs
@@ -593,6 +597,8 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.column_layout.addWidget(self.verbose_container_widget, row, col)
         row+=1
         self.column_layout.addWidget(self.runtime_ignore_device_change, row, col)
+        row+=1
+        self.column_layout.addWidget(self.debug_ui, row, col)
 
         self.general_layout.addWidget(self.column_widget)
 
@@ -913,6 +919,10 @@ This setting is also available on a profile by profile basis on the profile tab,
         :param clicked whether or not the checkbox is ticked
         """
         self.config.close_to_tray = checked
+
+    @QtCore.Slot(bool)
+    def _debug_ui(self, checked):
+        self.config.debug_ui = checked
 
     @QtCore.Slot(bool)
     def _runtime_ui_active(self, checked):

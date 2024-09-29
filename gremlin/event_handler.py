@@ -737,6 +737,10 @@ class EventHandler(QtCore.QObject):
 		self.reset()
 
 	def reset(self):
+		verbose = gremlin.config.Configuration().verbose
+		if verbose:
+			logging.getLogger("system").info("EventHandler: reset()")
+			
 		self.process_callbacks = True
 		self.callbacks = {}
 		self.latched_events = {}

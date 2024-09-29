@@ -520,25 +520,38 @@ class KeyboardDeviceTabWidget(QDataWidget):
     def _select_item_cb(self, index):
         ''' called when a key has been selected - refreshes the view panel '''
 
-        item_data = self.input_item_list_model.data(index)
-
-        config = gremlin.config.Configuration()
-        device_guid = self.device_guid
-        input_type = InputType.KeyboardLatched
-        input_id = item_data.input_id
-        config.set_last_input(device_guid, input_type, input_id)
-
-        right_panel = self.main_layout.takeAt(1)
-        if right_panel is not None and right_panel.widget():
-            right_panel.widget().hide()
-            right_panel.widget().deleteLater()
-        if right_panel:
-            self.main_layout.removeItem(right_panel)
-
-        widget = InputItemConfiguration(item_data)
-        self.main_layout.addWidget(widget,3)
+        if index == -1:
+            if self.input_item_list_model.rows() > 0:
+                item_data = self.input_item_list_model.data(0)
+            else:
+                # no input to select
+                return
+        else:
+            item_data = self.input_item_list_model.data(index)
 
         if item_data:
+            
+            config = gremlin.config.Configuration()
+            device_guid = self.device_guid
+            input_type = InputType.KeyboardLatched
+
+
+            right_panel = self.main_layout.takeAt(1)
+            if right_panel is not None and right_panel.widget():
+                right_panel.widget().hide()
+                right_panel.widget().deleteLater()
+            if right_panel:
+                self.main_layout.removeItem(right_panel)        
+
+
+
+            input_id = item_data.input_id if item_data else None
+            config.set_last_input(device_guid, input_type, input_id)
+
+            widget = InputItemConfiguration(item_data)
+            self.main_layout.addWidget(widget,3)
+
+        
             
             # Create new configuration widget
             

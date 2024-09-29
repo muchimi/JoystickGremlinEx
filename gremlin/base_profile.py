@@ -987,6 +987,12 @@ class InputItem():
         elif self._input_type == InputType.Midi:
             return f"Midi {self._input_id}"
         return f"Unknown input: {self._input_type}"
+    
+
+    @property
+    def debug_display(self):
+        ''' debug string for this item'''
+        return f"InputItem: {gremlin.shared_state.get_device_name(self.device_guid)} Input: {InputType.to_display_name(self.input_type)} Type: {self.display_name} mode: {self.profile_mode}"
 
     # def __eq__(self, other):
     #     """Checks whether or not two InputItem instances are identical.
