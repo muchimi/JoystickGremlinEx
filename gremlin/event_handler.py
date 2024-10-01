@@ -240,9 +240,10 @@ class EventListener(QtCore.QObject):
 	# signal emitted when the UI tabs are loaded and profiles are loaded - some widgets use this for post-UI initialization update that needs to occur after the UI data is completely loaded
 	tabs_loaded = QtCore.Signal()
 
-	profile_reset = QtCore.Signal() # issues the reset signal (when runtime for a profile needs to reset)
-	profile_start = QtCore.Signal() # issues the start signal (when a profile starts)
-	profile_stop = QtCore.Signal() # issues the stop signal (when a profile stops)
+	profile_reset = QtCore.Signal() # profile reset signal (when runtime for a profile needs to reset)
+	profile_start = QtCore.Signal() # profile start signal (when a profile starts)
+	profile_stop = QtCore.Signal() # profile stop signal (when a profile stops)
+	profile_unload = QtCore.Signal() # profile unload signal (when a profile is unloaded and a new profile loaded)
 	
 	# occurs on broadcast configuration change
 	config_changed =  QtCore.Signal()
@@ -255,6 +256,9 @@ class EventListener(QtCore.QObject):
 
 	# functor enable flag changed
 	action_created = QtCore.Signal(object) # runs when an action is created - object = the object that triggered the event 
+
+	# remove action
+	action_delete = QtCore.Signal(object) # fires when an action is about to be deleted, passes the action as a parameters
 
 	# selection event - tells the UI to show a different input
 	select_input = QtCore.Signal(object, object, object) # selects a particular input (device_guid, input_type, input_id)

@@ -990,14 +990,8 @@ def scale_to_range(value, source_min = -1.0, source_max = 1.0, target_min = -1.0
     if value is None:
         return None
     
-    r_delta = source_max - source_min
-    if r_delta == 0:
-        # frame the value if no valid range given
-        if value < source_min:
-            value = -1.0
-        if value > source_max:
-            value = 1.0
-
+    assert source_min != source_max, "Invalid source range - cannot be the same"
+    
     if invert:
         result = (((source_max - value) * (target_max - target_min)) / (source_max - source_min)) + target_min
     else:

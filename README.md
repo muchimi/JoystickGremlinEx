@@ -156,8 +156,19 @@ Joystick Gremlin EX
 
 # Changelog
 
-13.40.15ex (pre-release)
+## 13.40.15ex (pre-release)
 
+### (m2)
+- Added cleanup events for action plugins so they can release resources via _cleanup() \[AbstractAction] and _cleanup_ui() \[AbstractActionWidget] - the methods are virtual so are optional but will be called when an action is deleted or unloaded.  This helps with releasing references that could cause problems with the automatic garbage collection and hooks into various events.
+- Cut/Paste refactor for Containers and Actions - this eliminates keeping a reference to the source binary object that can cause problems with garbage collection. The refactor now only stores XML configuration data in the internal clipboard and is thus much smaller memory wise.
+- UI objects are now persisted rather than being recreated.  The first advantage is the UI is much more responsive when changing device tabs or changing modes as UI elements will need to be recreated. The second advantage is it bypasses the issue with Python/QT pointers not always staying in sync through internal behaviors. Python referencing an object that QT has internally discarded results in an instant Python crash with no errors. The drawback is a slightly elevated memory footprint, however the measured impact is small (so far) and has avoided reported random crashes not due to Python Exceptions while improving the overall UI experience.
+- Fixed a minor icon sizing issue for action icons - they are now all consistent.
+- For newer users using legacy profiles, legacy keyboard, mouse and remap plugins now indicate there are replacements plugins in GremlinEx.
+- GremlinEx now has separate preferences kept with each profile (will have a .json extension)
+- One such preference is remembering the last selection per device per profile that will be restored on subsequent profile load if the device/input still exists.
+- Fixed an issue with automated description entries being saved to a profile overriding the manually entered description for an input.
+
+### (m1)
 - **Gamepad support** JGEX supports up to four (4) virtual XBox 360 gamepads via VIGEM.  See gamepad section.  Gamepads can be mapped via the new **map to gamepad** action.
 - Improved device mapping output.
 - **Profile Import** JGEX can import mappings from another profile into the current profile optionally changing the destination, mode and mappings.  This feature is experimental and still in development and is not feature complete at this time.  
@@ -173,7 +184,7 @@ Current features are:
 - bug fixes
 
 
-13.40.14ex (as of pre-release m7)
+## 13.40.14ex (m22)
 
 This release adds major new features, including some minor changes in UI functionality, and a few more QOL (quality of life) enhancements.
 

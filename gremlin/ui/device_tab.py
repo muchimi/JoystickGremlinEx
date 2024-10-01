@@ -45,11 +45,15 @@ class InputItemConfiguration(QtWidgets.QFrame):
     description_changed = QtCore.Signal(str) # indicates the description was changed
     description_clear = QtCore.Signal() # clear the description field
 
-    def __init__(self, item_data = None, parent=None):
+    def __init__(self, item_data = None, input_type = None, parent=None):
         """Creates a new object instance.
 
-        :param item_data profile data associated with the item, can be none to display an empty box
-        :param parent the parent of this widget
+        :params:
+         
+        item_data =profile data associated with the item, can be none to display an empty box
+        input_type = override input type if the input type is not that of the item_data (InputItem) - controls what containers/actions are available
+        parent = the parent of this widget
+
         """
         super().__init__(parent)
 
@@ -58,6 +62,11 @@ class InputItemConfiguration(QtWidgets.QFrame):
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.button_layout = QtWidgets.QHBoxLayout()
         self.widget_layout = QtWidgets.QVBoxLayout()
+        self._input_type = InputType.NotSet
+        if input_type is not None:
+            self._input_type = input_type
+        elif item_data is not None:
+            self._input_type = item_data.input_type
 
         if item_data is None:
             parent = self.parent()
@@ -240,13 +249,13 @@ class InputItemConfiguration(QtWidgets.QFrame):
         self.action_layout.addWidget(mode_widget)
 
         self.action_selector = ui_common.ActionSelector(
-            self.item_data.input_type
+            self._input_type
         )
         self.action_selector.action_added.connect(self._add_action)
         self.action_selector.action_paste.connect(self._paste_action)
 
         self.container_selector = input_item.ContainerSelector(
-            self.item_data.input_type
+            self._input_type
         )
         self.container_selector.container_added.connect(self._add_container)
         self.container_selector.container_paste.connect(self._paste_container)
@@ -369,7 +378,14 @@ class ActionContainerModel(gremlin.ui.ui_common.AbstractModel):
 
         :param container the container instance to remove
         """
+        eh = gremlin.event_handler.EventListener()
+
         if container in self._containers:
+            # notify actions that the container is closing
+            for action_set in container.action_sets:
+                for action in action_set:
+                    eh.action_delete.emit(action)
+
             del self._containers[self._containers.index(container)]
         self.data_changed.emit()
 
@@ -942,11 +958,12 @@ class InputConfigurationWidgetCache():
 
 
     def getKey(self, item_data):
-        device_guid = item_data.device_guid
-        input_id = item_data.input_id
-        input_type = item_data.input_type
-        mode = item_data.profile_mode
-        return (device_guid, input_id, input_type, mode)
+        # device_guid = item_data.device_guid
+        # input_id = item_data.input_id
+        # input_type = item_data.input_type
+        # mode = item_data.profile_mode
+        id = item_data.id
+        return id # (device_guid, input_id, input_type, mode, id)
         
 
     def retrieve(self, key):

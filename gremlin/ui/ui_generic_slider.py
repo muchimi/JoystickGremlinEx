@@ -1,7 +1,7 @@
 """Generic Sliders with internal python-based models.
 
 This module reimplements most of the logic from qslider.cpp in python:
-https://code.woboq.org/qt5/qtbase/src/widgets/widgets/qslider.cpp.html
+https://codebrowser.dev/qt6/qtbase/src/widgets/widgets/qslider.cpp.html
 
 This probably looks like tremendous overkill at first (and it may be!),
 since a it's possible to achieve a very reasonable "float slider" by
@@ -311,6 +311,7 @@ class _GenericSlider(QSlider):
             e.accept()
 
     def paintEvent(self, ev: QtGui.QPaintEvent) -> None:
+
         painter = QStylePainter(self)
         opt = self._styleOption
 
@@ -320,28 +321,31 @@ class _GenericSlider(QSlider):
             opt.subControls |= SC_TICKMARKS
         painter.drawComplexControl(CC_SLIDER, opt)
 
-        if (
-            opt.tickPosition != QSlider.TickPosition.NoTicks
-            and "MONTEREY_SLIDER_STYLES_FIX" in self.styleSheet()
-        ):
-            # draw tick marks manually because they are badly behaved with style sheets
-            interval = opt.tickInterval or int(self._pageStep)
-            _range = self._maximum - self._minimum
-            nticks = (_range + interval) // interval
+        # if (
+        #     opt.tickPosition != QSlider.TickPosition.NoTicks
+        #     and "MONTEREY_SLIDER_STYLES_FIX" in self.styleSheet()
+        # ):
+        #     # draw tick marks manually because they are badly behaved with style sheets
+        #     interval = opt.tickInterval or int(self._pageStep)
+        #     _range = self._maximum - self._minimum
+        #     nticks = (_range + interval) // interval
 
-            painter.setPen(QtGui.QColor("#C7C7C7"))
-            half_height = 3
-            for i in range(int(nticks)):
-                if self.orientation() == Qt.Orientation.Vertical:
-                    y = int((self.height() - 8) * i / (nticks - 1)) + 1
-                    x = self.rect().center().x()
-                    painter.drawRect(x - half_height, y, 6, 1)
-                else:
-                    x = int((self.width() - 3) * i / (nticks - 1)) + 1
-                    y = self.rect().center().y()
-                    painter.drawRect(x, y - half_height, 1, 6)
+        #     painter.setPen(QtGui.QColor("#C7C7C7"))
+        #     half_height = 3
+        #     for i in range(int(nticks)):
+        #         if self.orientation() == Qt.Orientation.Vertical:
+        #             y = int((self.height() - 8) * i / (nticks - 1)) + 1
+        #             x = self.rect().center().x()
+        #             painter.drawRect(x - half_height, y, 6, 1)
+        #         else:
+        #             x = int((self.width() - 3) * i / (nticks - 1)) + 1
+        #             y = self.rect().center().y()
+        #             painter.drawRect(x, y - half_height, 1, 6)
 
         self._draw_handle(painter, opt)
+
+
+
 
     # ###############  Implementation Details  #######################
 
@@ -435,7 +439,7 @@ class _GenericSlider(QSlider):
         else:
             opt.activeSubControls = self._hoverControl
 
-        painter.drawComplexControl(CC_SLIDER, opt)
+        painter.drawComplexControl(CC_SLIDER, opt, p)
 
     # from QSliderPrivate.pixelPosToRangeValue
     def _pixelPosToRangeValue(self, pos: int) -> float:

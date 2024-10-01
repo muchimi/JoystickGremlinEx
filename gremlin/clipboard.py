@@ -123,7 +123,8 @@ class Clipboard(QtCore.QObject):
                 pass
 
         if data and isinstance(data, AbstractContainer) \
-            or isinstance(data, AbstractAction):
+            or isinstance(data, AbstractAction) \
+                or isinstance(data, ObjectEncoder):
             self._data = data
 
 
@@ -161,7 +162,7 @@ class Clipboard(QtCore.QObject):
                         logging.getLogger("system").error(f"DILL serializationf failed: {error}")        
 
 
-    def set_windows_clipboard_text(self, value):
+    def set_windows_clipboard_text(self, value : str):
         ''' sets the windows clipboard text '''
         # method 1
         clipboard = QApplication.clipboard()
@@ -175,7 +176,7 @@ class Clipboard(QtCore.QObject):
         # win32clipboard.SetClipboardText(value, win32clipboard.CF_TEXT)
         # win32clipboard.CloseClipboard()
 
-    def get_windows_clipboard_text(self):
+    def get_windows_clipboard_text(self) -> str:
         ''' gets the windows clipboard text '''
 
         try:

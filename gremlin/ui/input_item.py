@@ -1646,8 +1646,17 @@ class AbstractActionWidget(QtWidgets.QFrame):
 
         self.main_layout = layout_type(self)
 
+        eh = gremlin.event_handler.EventListener()
+        eh.profile_unload.connect(self._cleanup_ui)
+        eh.action_delete.connect(self._action_delete)
+
         self._create_ui()
         self._populate_ui()
+
+    def _action_delete(self, action_data):
+        if action_data._id == self.action_data._id:
+            self._cleanup_ui()
+            
 
     def _cleanup_ui(self):
         ''' called when a container is closing '''
@@ -1688,25 +1697,6 @@ class AbstractActionWidget(QtWidgets.QFrame):
     def is_running(self):
         ''' true if the profile is running '''
         return gremlin.shared_state.is_running
-
-
-# class AbstractContainerActionWidget(AbstractActionWidget):
-
-#     def __init__(self,
-#             action_data,
-#             layout_type=QtWidgets.QVBoxLayout,
-#             parent=None):
-#         ''' called when the profile data load is completed '''
-        
-
-#         super().__init__(action_data, layout_type, parent)
-
-
-#     def get_container_ui(self):
-#         from gremlin.ui.device_tab import InputItemConfiguration
-#         container_widget = InputItemConfiguration(self.action_data.item_data)
-
-#         return container_widget
 
    
 class AbstractActionWrapper(QtWidgets.QDockWidget):

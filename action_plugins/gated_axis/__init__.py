@@ -53,18 +53,18 @@ class GatedAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
         
         self.gate_widget = widget
         self.main_layout.addWidget(widget)
-
-
-
-
-    # def _cleanup_ui(self):
-        #self.container_layout.removeWidget(self.gate_widget)
         
 
     def _populate_ui(self):
         pass
 
-        
+    def _cleanup_ui(self):
+        ''' cleanup the UI and widget hooks '''
+        self.gate_widget.unhook()
+        self.main_layout.removeWidget(self.gate_widget)
+        self.gate_widget.deleteLater()
+        self.gate_widget = None
+
     
 
 
@@ -101,6 +101,13 @@ class GatedAxis(gremlin.base_profile.AbstractAction):
         gate_data = gremlin.gated_handler.GateData(profile_mode = gremlin.shared_state.current_mode, action_data=self)
         self.gate_data = gate_data
         self.gates = [gate_data]
+
+    def _cleanup(self):
+        ''' clean ourselves up '''
+        super()._cleanup()
+        self.gates.clear()
+        self.gate_data = None
+
 
     def icon(self):
         return "fa.sliders"

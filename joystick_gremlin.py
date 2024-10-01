@@ -2323,6 +2323,11 @@ class GremlinUi(QtWidgets.QMainWindow):
     
     @profile.setter
     def profile(self, value):
+        current_profile = gremlin.shared_state.current_profile
+        if current_profile and current_profile != value:
+            eh = gremlin.event_handler.EventListener()
+            eh.profile_unload.emit()
+
         gremlin.shared_state.current_profile = value
 
 
@@ -2342,6 +2347,10 @@ class GremlinUi(QtWidgets.QMainWindow):
         # Attempt to load the new profile
         try:
             new_profile = gremlin.base_profile.Profile()
+            if gremlin.shared_state.current_profile:
+                eh = gremlin.event_handler.EventListener()
+                eh.profile_unload.emit()
+
             gremlin.shared_state.current_profile = new_profile
             profile_updated = new_profile.from_xml(fname)
 

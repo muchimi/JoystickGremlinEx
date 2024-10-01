@@ -186,6 +186,13 @@ class ProfileData(metaclass=ABCMeta):
         if self._input_item is not None:
             return self._input_item.device_name
         return None
+    
+    @property
+    def input_display_name(self):
+        ''' gets a config display string for the input '''
+        return f"{gremlin.shared_state.get_device_name(self.get_device_guid())} {InputType.to_display_name(self.get_input_type())} {self.get_input_id()}"
+    
+
 
     def get_settings(self):
         """Returns the Settings data of the profile.
@@ -365,6 +372,10 @@ class AbstractContainer(ProfileData):
     def hardware_input_type(self):
         ''' gets the type of hardware device attached to this '''
         return self.device_input_type
+    
+    @property
+    def input_display_name(self):
+        return f"{gremlin.shared_state.get_device_name(self.device_guid)} {InputType.to_display_name(self.device_input_type)} {self.device_input_id}"
     
 
 
@@ -681,7 +692,7 @@ class InputItem():
 
         :param parent the parent mode of this input item
         """
-        
+        self._id = gremlin.util.get_guid() # unique ID of this object
         self.parent = parent
         self._input_type = None
         self._device_guid = None # hardware input ID
@@ -709,7 +720,10 @@ class InputItem():
                     break
                 item = item.parent
                 
-      
+    @property
+    def id(self):
+        ''' id of the InputItem '''
+        return self._id
 
     @property
     def description(self):
@@ -1053,6 +1067,18 @@ class AbstractAction(ProfileData):
         self._enabled = False # true if the action is enabled
         eh = gremlin.event_handler.EventListener()
         eh.action_created.emit(self)
+        eh.profile_unload.connect(self._cleanup)
+        eh.action_delete.connect(self._action_delete)
+        
+    def _action_delete(self, action_data):
+        if self._id == action_data._id:
+            self._cleanup()
+
+    def _cleanup(self):
+        ''' called when the action should clean itself up '''
+        eh = gremlin.event_handler.EventListener()
+        eh.profile_unload.disconnect(self._cleanup)
+        eh.action_delete.disconnect(self._action_delete)
         
 
     def setEnabled(self, value):
@@ -1094,6 +1120,7 @@ class AbstractAction(ProfileData):
     def action_type(self):
         ''' type name of this action '''
         return self._action_type
+    
     
 
     def display_name(self):

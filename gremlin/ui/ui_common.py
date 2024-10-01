@@ -2124,6 +2124,7 @@ class AxisStateWidget(QtWidgets.QWidget):
         
         if self._device_guid != event.device_guid or self._input_id != event.identifier:
             return
+        
         self._update_value(event.raw_value)
 
     def _update_value(self, raw_value):
@@ -2785,7 +2786,7 @@ QMarkerDoubleRangeSlider::add-page:horizontal { background: #979EA8; border-styl
         self._update_targets()
         self.setMarkerValue(0)
 
-        #self.setStyleSheet(self.css)
+        # self.setStyleSheet(self.css)
 
     def _get_pixmaps(self):
         if self._pixmaps: return self._pixmaps
@@ -2877,36 +2878,41 @@ QMarkerDoubleRangeSlider::add-page:horizontal { background: #979EA8; border-styl
             self._pixmaps = [pixmaps]
 
 
-    def paintEvent(self, ev: QtGui.QPaintEvent) -> None:
-        # draw the main widget
-        super().paintEvent(ev)
-
-        # draw markers on top of the main widget
+    # def paintEvent(self, ev: QtGui.QPaintEvent) -> None:
+    #     # draw the main widget
+    #     #p = QtGui.QPainter(self)
         
-        p = QtGui.QPainter(self)
-        # p.begin(self)
-        orientation = self.orientation()
-        if orientation == QtCore.Qt.Orientation.Horizontal:
-            positions = [QtWidgets.QStyle.sliderPositionFromValue(self._target_min, self._target_max, v, self.width(), False) for v in self._int_marker_pos]
-            center = self.height() / 2
-        else:
-            # vertical
-            positions = [QtWidgets.QStyle.sliderPositionFromValue(self._target_min, self._target_max, v, self.height(), False) for v in self._int_marker_pos]
-            center = self.width() / 2
-        pixmaps = self._get_pixmaps()
-        p_count = len(pixmaps)
-        for index, value in enumerate(positions):
-            if index < p_count:
-                pd = pixmaps[index]
-                if orientation == QtCore.Qt.Orientation.Horizontal:
-                    p.drawPixmap(value + pd.offset_x, center + pd.offset_y, pd.pixmap)
-                else:
-                    # vertical
-                    p.drawPixmap(center + pd.offset_x, value + pd.offset_y, pd.pixmap)
+    #     #super().paintEvent(ev)
+    #     # print ("end paint")
+        
 
+    #     # # draw markers on top of the main widget
+    #     # p = QtWidgets.QStylePainter(self)
+    #     # #self._paintEvent(p)
+        
+    #     # #p = QtGui.QPainter(self)
+    #     # # p.begin(self)
+    #     # orientation = self.orientation()
+    #     # if orientation == QtCore.Qt.Orientation.Horizontal:
+    #     #     positions = [QtWidgets.QStyle.sliderPositionFromValue(self._target_min, self._target_max, v, self.width(), False) for v in self._int_marker_pos]
+    #     #     center = self.height() / 2
+    #     # else:
+    #     #     # vertical
+    #     #     positions = [QtWidgets.QStyle.sliderPositionFromValue(self._target_min, self._target_max, v, self.height(), False) for v in self._int_marker_pos]
+    #     #     center = self.width() / 2
+    #     # pixmaps = self._get_pixmaps()
+    #     # p_count = len(pixmaps)
+    #     # for index, value in enumerate(positions):
+    #     #     if index < p_count:
+    #     #         pd = pixmaps[index]
+    #     #         if orientation == QtCore.Qt.Orientation.Horizontal:
+    #     #             p.drawPixmap(value + pd.offset_x, center + pd.offset_y, pd.pixmap)
+    #     #         else:
+    #     #             # vertical
+    #     #             p.drawPixmap(center + pd.offset_x, value + pd.offset_y, pd.pixmap)
       
-        p.end()
-
+    #     #p.end()
+        
 
 
 
@@ -3666,6 +3672,7 @@ class QFlowLayout(QtWidgets.QLayout):
 
             col = 0
             row = 0
+            index = 0
             for item in self._items:
                 widget = item.widget()
                 if not widget.isVisible():
@@ -3675,6 +3682,8 @@ class QFlowLayout(QtWidgets.QLayout):
                 if not testonly:
                     item.setGeometry(
                         QtCore.QRect(QtCore.QPoint(x, y), item.sizeHint()))
+                    print (f"flow [{index}] position {x} {y}")
+                    index+=1
 
                 col += 1
                 if col == max_col:
