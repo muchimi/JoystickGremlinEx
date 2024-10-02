@@ -291,7 +291,7 @@ class GateInfo():
     ''' holds gate data information '''
     
 
-    def __init__(self, index, id = None, value = None, profile_mode = None, item_data = None, condition = GateCondition.OnCross, parent = None, is_default = False, delay = 250, slider_index = None, is_used = True):
+    def __init__(self, index, id = None, value = None, profile_mode = None, item_data: gremlin.base_profile.InputItem = None, condition = GateCondition.OnCross, parent = None, is_default = False, delay = 250, slider_index = None, is_used = True):
 
         assert parent is not None, "Gates must be parented to a GateData object " # = must provide this parameter
         self.parent : GateData = parent
@@ -314,6 +314,9 @@ class GateInfo():
         self.slider_index = slider_index # index of the gate in the slider
         self.delay = delay  # delay in milliseconds for the trigger duration between a press and release
 
+        eh = gremlin.event_handler.EventListener()
+        eh.mapping_changed.connect(self._item_data_changed)
+
     @property
     def has_containers(self):
         ''' true if the gate has any mappings in any mode '''
@@ -322,6 +325,7 @@ class GateInfo():
     @property
     def container_count(self) -> int:
         ''' gets the container count '''
+        # item_data : gremlin.base_profile.InputItem
         return sum(len(item_data.containers) for item_data in self.item_data_map.values())
     
     @property
@@ -392,6 +396,16 @@ class GateInfo():
 
     def setItemData(self, condition, value):
         self.item_data_map[condition] = value
+
+    @QtCore.Slot(object)
+    def _item_data_changed(self, item_data : gremlin.base_profile.InputItem):
+        ''' called on container or action add/remove '''
+        for item in self.item_data_map.values():
+            if item._id == item_data._id:
+                # notify the gate has changed
+                eh = GateEventHandler()
+                eh.gate_configuration_changed.emit(self)
+                break
             
 
 
@@ -827,7 +841,10 @@ class GateEventHandler(QtCore.QObject):
     gatedata_valueChanged = QtCore.Signal(object) # signals when the gate data changes (gatedata)
 
     gate_value_changed = QtCore.Signal(GateInfo) # fires when a gate value changes (GateInfo)
+    gate_configuration_changed = QtCore.Signal(GateInfo) # fires when a gate changes its configuration data
+
     range_value_changed = QtCore.Signal(RangeInfo) # fires when either of the gate values change
+    range_configuration_changed = QtCore.Signal(RangeInfo) # fires when a range configuration changes
 
     slider_marker_update = QtCore.Signal(float, object)
 
@@ -2507,6 +2524,7 @@ class GateWidgetInfo():
         eh = GateEventHandler()
         eh.gate_used_changed.connect(self._gate_used_changed)
         eh.gate_value_changed.connect(self._gate_value_changed)
+        eh.gate_configuration_changed.connect(self._gate_configuration_changed)
         
 
         self._create_widget(gate, 
@@ -2516,15 +2534,20 @@ class GateWidgetInfo():
                             delete_enabled,
                             parent = parent)
         
-        if is_container:
-            self.setup_widget.setIcon(load_icon("ei.cog-alt",qta_color="#365a75"))
-        else:
-            self.setup_widget.setIcon(load_icon("fa.gear"))
+        
 
         # update UI visibility based on usage flags
         self.widget.setVisible(gate.used)
         # display the default value
         self._update_value(gate.value)
+        self._update_icon()
+
+    def _update_icon(self):
+        ''' updates the icon '''
+        if self.gate.has_containers:
+            self.setup_widget.setIcon(load_icon("ei.cog-alt",qta_color="#365a75"))
+        else:
+            self.setup_widget.setIcon(load_icon("fa.gear"))
 
     def cleanup(self):
         self.value_widget.valueChanged.disconnect(self._value_changed_cb) # hook manual changes made to the widget
@@ -2548,6 +2571,12 @@ class GateWidgetInfo():
             # indicate the gate order should update
             eh = GateEventHandler()
             eh.gate_order_changed.emit()
+
+    @QtCore.Slot(GateInfo)
+    def _gate_configuration_changed(self, gate):            
+        ''' called when a gate changes configuration '''
+        if gate.id == self.gate.id:
+            self._update_icon()
 
     def _update_value(self, value):
         ''' updates the display gate value '''
@@ -2802,22 +2831,22 @@ class GatedAxisWidget(QtWidgets.QWidget):
 
         self.slider_frame_widget = QtWidgets.QFrame()
         self.slider_frame_layout = QtWidgets.QVBoxLayout(self.slider_frame_widget)
-        self.slider_frame_widget.setStyleSheet('.QFrame{background-color: lightgray;}')
+        self.slider_frame_widget.setStyleSheet('.QFrame{background-color: lightgray; border-radius: 10px;}')
         self._slider = QSliderWidget() #ui_common.QMarkerDoubleRangeSlider()
      
         #self._slider.setOrientation(QtCore.Qt.Horizontal)
         self._slider.setRange(-1, 1)
         self._slider.setMarkerValue(value)
         self._slider.valueChanged.connect(self._slider_value_changed_cb)
-        self._slider.setMinimumWidth(200)
-        self._slider.handleRightClicked.connect(self._slider_handle_clicked_cb)
-        self._slider.handleGrooveClicked.connect(self._slider_groove_clicked_cb)
+        self._slider.handleDoubleClicked.connect(self._slider_gate_configure_cb) # calls up gate actions
+        self._slider.rangeRightClicked.connect(self._slider_range_add_gate_cb) # adds a gate
+        self._slider.rangeDoubleClicked.connect(self._slider_range_configure_cb) # calls up range actions
         
         self.warning_widget = ui_common.QIconLabel("fa.warning", text="", use_qta = True,  icon_color="red")
         self.warning_widget.setVisible(False)
 
         self.slider_frame_layout.addWidget(self._slider)
-        self.slider_frame_layout.addWidget(QtWidgets.QLabel("test"))
+        #self.slider_frame_layout.addWidget(QtWidgets.QLabel("test"))
       
         self.container_slider_widget = QtWidgets.QWidget()
         self.container_slider_layout = QtWidgets.QGridLayout(self.container_slider_widget)
@@ -2942,6 +2971,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
         eh.gate_order_changed.connect(self._gate_order_changed_cb)
         eh.gate_value_changed.connect(self._gate_value_changed)
         eh.use_default_range_changed.connect(self._update_range_display)
+        eh.gate_configuration_changed.connect(self._gate_configuration_changed)
 
 
         self._hooked = True
@@ -2964,6 +2994,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
             # eh.range_value_changed.disconnect(self._range_changed_cb)
             eh.gate_order_changed.disconnect(self._gate_order_changed_cb)
             eh.use_default_range_changed.disconnect(self._update_range_display)
+            eh.gate_configuration_changed.disconnect(self._gate_configuration_changed)
             self._hooked = False
 
     @property
@@ -3045,11 +3076,13 @@ class GatedAxisWidget(QtWidgets.QWidget):
             gwi = GateWidgetInfo(gate, self._configure_gate_cb,
                                 self._delete_gate_confirm_cb,
                                 self._grab_cb,
-                                parent = self.container_gate_widget
+                                parent = self.container_gate_widget,
+                                is_container=gate.has_containers
                                 )
 
             self._gwi_map[gate] = gwi
             self.container_gate_layout.addWidget(gwi.widget)
+            self._update_gate_icon(gate.slider_index, gate)
 
 
         # sort the gates
@@ -3068,15 +3101,21 @@ class GatedAxisWidget(QtWidgets.QWidget):
        
     def _update_range_display(self):
         ''' called when the range display mode changes '''
+
+        
         
         range_list = self.gate_data.getUsedRanges()
         if self.gate_data.use_default_range:
-            # hide the range
+            # enable single range mode on the slider
+            self._slider.singleRange = True
+            # hide the ranges
             range_count = 1
             for rng in range_list:
                 rng.setUsed(False)
             self.gate_data.default_range.used = True
         else:
+            # disable single range mode on the slider
+            self._slider.singleRange = False
             range_count = len(range_list)
             for rng in range_list:
                 rng.setUsed(True)
@@ -3091,6 +3130,13 @@ class GatedAxisWidget(QtWidgets.QWidget):
         ''' called when a gate value changes '''
         if gate in self.gate_data.getGates():
             self._set_slider_gate_value(gate.slider_index, gate.value)
+
+    @QtCore.Slot(GateInfo)
+    def _gate_configuration_changed(self, gate : GateInfo):
+        ''' called when the gate configuration changes '''
+       
+        if gate in self.gate_data.getGates():
+            self._update_gate_icon(gate.slider_index, gate)
         
 
     @QtCore.Slot()
@@ -3160,7 +3206,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
         
 
     @QtCore.Slot(float)
-    def _slider_groove_clicked_cb(self, value):
+    def _slider_range_add_gate_cb(self, value):
         ''' fired when the user clicked on the groove - adds a gate at that location '''
         
         count = len(self.gate_data.getGates())
@@ -3169,10 +3215,15 @@ class GatedAxisWidget(QtWidgets.QWidget):
             self._add_gate(value)
             self._update_ui()
 
-            
-            
+    @QtCore.Slot(float)
+    def _slider_range_configure_cb(self, value):
+        ''' fired when the user clicked on the groove - adds a gate at that location '''
         
-        
+        count = len(self.gate_data.getGates())
+        gate = self.gate_data.findGate(value)
+        if not gate and count < 20:
+            self._add_gate(value)
+            self._update_ui()
 
 
 
@@ -3274,7 +3325,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
             
 
     @QtCore.Slot(int)
-    def _slider_handle_clicked_cb(self, handle_index):
+    def _slider_gate_configure_cb(self, handle_index):
         ''' handle right clicked - pass event along '''
         connected = gremlin.util.isSignalConnected(self, "configure_gate_requested")
         if connected:
@@ -3299,7 +3350,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
             # call the handler
             self.configure_gate_requested.emit(gate)
         else:
-            dialog = ActionContainerUi(gate_data = self.gate_data, info_object = gate, action_data = self.action_data)
+            dialog = ActionContainerUi(gate_data = self.gate_data, info_object = gate, action_data = self.action_data, input_type=InputType.JoystickButton)
             dialog.delete_requested.connect(self._delete_gate_cb)
             dialog.exec()
             
@@ -3514,6 +3565,8 @@ class GatedAxisWidget(QtWidgets.QWidget):
         gates = self.gate_data.getGates()
         self.container_gate_layout.update()
         self._reload_ranges()
+
+        self._update_gate_icon(gate.slider_index, gate)
         
        
         return gate
@@ -3628,6 +3681,23 @@ class GatedAxisWidget(QtWidgets.QWidget):
             if values != self._slider.value():
                 with QtCore.QSignalBlocker(self._slider):
                     self._update_slider(values)
+            
+
+    def _update_gate_icons(self):
+        gates = self.gate_data.getGates()
+        gate : GateInfo
+        for index, gate in enumerate(gates):
+            self._update_gate_icon(self, index, gate)
+
+
+    def _update_gate_icon(self, index : int, gate : GateInfo):
+        ''' updates the icon for a single gate '''
+        if gate is None:
+            self._slider.setHandleIcon(index, None)
+        elif gate.has_containers:
+            self._slider.setHandleIcon(index,"ei.cog-alt",True,"#365a75")
+        else:
+            self._slider.setHandleIcon(index, "fa.gear",True,"#808080")
                 
 
     def _update_output_value(self):
@@ -3686,9 +3756,10 @@ class GatedAxisWidget(QtWidgets.QWidget):
         self._update_output_value()
 
 
-    def deleteGate(self, data):
+    def deleteGate(self, gate : GateInfo):
         ''' remove a gate from this widget '''
-        self.gate_data.deleteGate(data)
+        self._update_gate_icon(gate.slider_index, None)
+        self.gate_data.deleteGate(gate)
         self._update_ui()
 
   
@@ -3696,7 +3767,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
 class ActionContainerUi(QtWidgets.QDialog):
     """UI to setup the individual action trigger containers and sub actions """
 
-    delete_requested = QtCore.Signal(object) # fired when the remove button is clicked - passes the GateData to blitz
+    delete_requested = QtCore.Signal(GateInfo) # fired when the remove button is clicked - passes the GateData to blitz
 
     def __init__(self, gate_data, info_object, action_data, input_type, parent=None):
         '''

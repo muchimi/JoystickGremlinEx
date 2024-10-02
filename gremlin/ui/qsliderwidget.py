@@ -1,5 +1,5 @@
 # implements a custom multi-gate slider widget
-
+from __future__ import annotations
 import enum
 import time
 import threading
@@ -28,23 +28,21 @@ from  PySide6.QtCore import (
 
 from PySide6.QtWidgets import QCheckBox
 from PySide6.QtGui import QColor, QBrush, QPaintEvent, QPen, QPainter, QFont, QMouseEvent
-
-
-class Direction:
-    Up = 0
-    Down = 1
+from itertools import pairwise
 
 class QSliderWidget(QtWidgets.QWidget):
     ''' custom slider object '''
 
-    handleLeftClicked = QtCore.Signal(int) # called when a gate is left clicked
-    handleRightClicked = QtCore.Signal(int) # called when a gate is right clicked
-    handleGrooveClicked = QtCore.Signal(float) # called when a groove is clicked (between gates) - sends the value of the slider where clicked
+    handleClicked = QtCore.Signal(int) # called when a handle is left clicked (handle index)
+    handleRightClicked = QtCore.Signal(int) # called when a handle is right clicked (handle index)
+    handleDoubleClicked = QtCore.Signal(int) # called when a handle is double clicked (handle index)
+    handleDoubleRightClicked = QtCore.Signal(int) # called when a handle is double clicked with the right mouse button (handle index)
+    rangeClicked = QtCore.Signal(float, int, int) # called when a groove is clicked (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
+    rangeRightClicked = QtCore.Signal(float, int, int) # called when a range is right clicked (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
+    rangeDoubleClicked = QtCore.Signal(float, int, int) # called when a range is double clicked (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
+    rangeDoubleRightClicked = QtCore.Signal(float, int, int) # called when a range is double clicked with the right mouse button (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
     valueChanged = QtCore.Signal() # called when a gate value changes via dragging
 
-    
-    # QOVERFLOW = 2**31 - 1
-    # MAX_DISPLAY = 5000
 
     class PixmapData():
         ''' holds a pixmap definition '''
@@ -62,38 +60,62 @@ class QSliderWidget(QtWidgets.QWidget):
     def __init__(self, parent = None):
         super().__init__(parent)
 
-        self._values = [-1.0, 1.0]
+        self._values = [-1.0, 1.0]  # position of the gates inside the range - the values must be between the slider's min/max values
+        self._handle_icons = {} # icon data for handles, keyed by index
+        self._internal_handle_pixmaps = {}  # holds the pixmaps for the current handle icons keyed by handle ID
         self._minimum = -1.0
         self._maximum = 1.0
 
-        self.finishedNumberColor = QColor(255, 255, 255)
-        self.finishedBackgroundColor = QColor(228, 231, 237)
-        self.unfinishedBackgroundColor = QColor(138, 231, 237)
-
-        self.pointerDirection = Direction.Up
-
+        self.handleColor = QColor("#a7b59e")
+        self.handleBorderColor = QColor("#e0e0e0")
+        self.rangeBorderColor = QColor("#e0e0e0")
+        self.rangeColor = QColor("#8fBc8f")  
+        self.rangeAlternateColor = QColor("#8fb9bc") 
+        self.UseAlternateColor = True # alternate range colors
+        self.BackgroundColor = QColor("#8a8a8a")
+        
         self._finishedProgressLength = 0
-        self._gate_rects = [] # rects of clickable spots
-        self._gate_positions = [] # computed gate position offset indexed by gate index
+        self._handle_hotspots = [] # rects of handle clickable spots
+        self._range_hotspots = [] # rects of clickable spots for ranges between handles
+        self._handle_positions = [] # computed gate position offset indexed by gate index
         self._marker_pos = [] # computed marker positions
 
         self._readOnly = False
-        self._range_width = 0 # range width, pixels
-        self._range_left = 0 # left range start position, pixel
-        self._range_right = 0 # right range start position, pixel
+        self._usable_width = 0 # range width, pixels
+        self._usable_left = 0 # left range start position, pixel
+        self._usable_right = 0 # right range start position, pixel
         self._marker_size = 16 # size of the marker icons in pixels
 
-        self._range_gate_left = 0 # position of the first gate in pixels
-        self._range_gate_right = 0 # position of the last gate in pixels
-        self._range_gate_width = 0 # width of the bar between min gate and max gate in pixels
-        self._range_gate_height = 0 # height of the gate range bar
-        self._range_gate_top = 0 # top offset for the gate range bar
+        self._range_left = 0 # position of the first gate in pixels
+        self._range_right = 0 # position of the last gate in pixels
+        self._range_width = 0 # width of the bar between min gate and max gate in pixels
+        self._handle_height = 0 # height of the gate range bar
+        self._handle_top = 0 # top offset for the gate range bar
+        self._handle_min = 0 # min possible x for a handle position
+        self._handle_max = 0 # max possible x for a handle position
+        self._range_msg = "N/A"
+
+        self._single_range = False # true if there are different ranges between handles, false if a single range between min/max handles
+
+        # mouse and drag tracking
+        self._mouse_down = False # is mouse button down
+        self._drag_start = None # start drag position
+        self._drag_handle_index = None # handle being dragged
+        self._drag_active = False # true if a drag operation is in progress
+        self._drag_x_offset = 0 # offset in pixels of the mouse position to the center of the gate
+
+        # hover tracking
+        self._hover_handle = False # true if mouse is over a handle hotspot
+        self._hover_range = False # true if mouse is over a range hotspot
+        self._hover_handle_index = -1 # hover index for handle -1 indicates not set
+        self._hover_range_handle_pair = None # hover index pairs
+        self._hover_lock = False # true when a drag operation is in process to keep the hover as-is
 
         
         #self.sizePolicy().setHorizontalPolicy(QtWidgets.QSizePolicy.Expanding)
 
         self.setSizePolicy(
-            QtWidgets.QSizePolicy.MinimumExpanding,
+            QtWidgets.QSizePolicy.Expanding,
             QtWidgets.QSizePolicy.Fixed
         )
 
@@ -104,9 +126,12 @@ class QSliderWidget(QtWidgets.QWidget):
         self._update_pixmaps()
         self._update_targets()
         self.setMarkerValue(0)
+        self._update_offsets()
+        self._update_all_handle_pixmaps()
+        self.setMouseTracking(True) # track mouse movements
         
-    def sizeHint(self):
-        return QtCore.QSize(400,32)
+    def minimumSizeHint(self):
+        return QtCore.QSize(160,32)
     
     @property
     def values(self) -> list:
@@ -115,6 +140,38 @@ class QSliderWidget(QtWidgets.QWidget):
     @values.setter
     def values(self, value : int | float | list | tuple):
         self.setValue(value)
+
+    @property
+    def singleRange(self):
+        return self._single_range
+    @singleRange.setter
+    def singleRange(self, value):
+        self._single_range = value
+        self._update_offsets()
+        self.update()
+
+    def setHandleIcon(self, index, icon, use_qta = False, color = "#a0a0a0"):
+        ''' sets the handle icon - to clear an icon, set it to None
+         
+        :param index: the handle index (int)
+        :param icon: the QTA name or the png/svg file
+        :param use_qta: set to true if the icon is a QTA icon
+        :param color: icon color (qta icons only), None if default color
+
+          '''
+        if icon is None:
+            # clear the entry
+            if index in self._handle_icons:
+                del self._handle_icons[index]
+                self.update()
+        else:
+            hid = QSliderWidget.HandleIconData(index, icon, use_qta, color)
+            self._handle_icons[index] = hid
+            self._update_handle_pixmaps(hid)
+            self.update()
+
+
+
         
     def setValue(self, value : int | float | list | tuple):
         ''' input values expected to be -1 to +1 floating point '''
@@ -162,54 +219,76 @@ class QSliderWidget(QtWidgets.QWidget):
         size = self.size()
         widget_width = size.width()
         widget_height = size.height()
-        usable_width = int(widget_width * 0.9)
+        margin = 4 # pixel margin
+        usable_width = widget_width - margin
+        range_width = usable_width - margin
+        usable_margin = int((widget_width - range_width) * 0.5)
+
 
         gate_positions = []
 
         if len(self._values) == 0:
             return
         
+        handle_count = len(self._values)
+        
+        # handle sizes
+        max_icon_size = widget_height - 2*margin
+        handle_size = 24
+        handle_size = min(handle_size, max_icon_size)
+        self._handle_radius = int(handle_size * 0.5)
+        self._handle_size = self._handle_radius * 2
+        self._handle_top = int((widget_height - self._handle_size) * 0.5)
+        
+        self._handle_count = handle_count
+        self._widget_width = widget_width
+        self._widget_height = widget_height
+        self._widget_corner = int(widget_height * 0.5)
 
         # compute the max range geometry boundaries (horizontal only)
-        self._range_width = usable_width
-        self._range_margin = (widget_width - usable_width) // 2
-        self._range_left = self._range_margin
-        self._range_right = widget_width - self._range_margin
-        self._range_gate_height = widget_height * 0.5
-        self._range_gate_top = (widget_height - self._range_gate_height) // 2
+        self._usable_width = range_width
+        self._usable_margin = int(handle_size * 0.5) + usable_margin # account for handle diameter
+        self._usable_left = self._usable_margin 
+        self._usable_right = widget_width - self._usable_margin
+        
 
-        print (f"Range width: {self._range_width} range left: {self._range_left} range right: {self._range_right}  range width: {self._range_width}  widget width: {widget_width}  height {widget_height}")
+        
+
+        print (f"Range width: {self._usable_width} range left: {self._usable_left} range right: {self._usable_right}  range width: {self._usable_width}  widget width: {widget_width}  height {widget_height} handle diameter: {handle_size} radius: {self._handle_radius}")
 
         for value in self._values:
-            x = gremlin.util.scale_to_range(value, target_min = self._range_left, target_max = self._range_right)
-            gate_positions.append(x)
-            print(f"Gate offset: {x}")
+            x = gremlin.util.scale_to_range(value, target_min = self._usable_left, target_max = self._usable_right)
+            gate_positions.append(x - self._handle_radius)
+            print(f"Handle offset: {x}")
 
         # leftmost position of the first gate
         if len(gate_positions) == 1:
             # single gate - use the whole range
-            self._range_gate_left = self._range_left
-            self._range_gate_right = self._range_right
+            self._range_left = self._usable_left 
+            self._range_right = self._usable_right
         else:
             # two or more gates 
-            self._range_gate_left = gate_positions[0]
-            self._range_gate_right = gate_positions[-1]
-        self._range_gate_width = self._range_gate_right - self._range_gate_left
-        self._gate_positions = gate_positions
-        print (f"Gate left: {self._range_gate_left}  right: {self._range_gate_right}  width: {self._range_gate_width} height: {self._range_gate_height} top margin: {self._range_gate_top}")
-        
+            self._range_left = gate_positions[0] + self._handle_radius
+            self._range_right = gate_positions[-1] + self._handle_radius
 
-
-
+        self._handle_min = self._usable_left - self._handle_radius
+        self._handle_max = self._usable_right - self._handle_radius
+        self._range_width = self._range_right - self._range_left
+        self._range_height = int(self._handle_size * 0.6)
+        self._range_corner = int(self._range_height * 0.33)
+        self._range_top = int((widget_height - self._range_height)*0.5)
+        self._handle_positions = gate_positions
+        print (f"Range left: {self._range_left}  right: {self._range_right}  width: {self._range_width} height: {self._range_height} top margin: {self._range_top}")
         self._update_marker_offsets()
+        self._update_all_handle_pixmaps()
 
     def _update_marker_offsets(self):
 
         # compute marker positions
         source_min = self._minimum
         source_max = self._maximum
-        target_min = self._range_left # self._to_qinteger_space(self._range_left)
-        target_max = self._range_right # self._to_qinteger_space(self._range_right)
+        target_min = self._usable_left # self._to_qinteger_space(self._range_left)
+        target_max = self._usable_right # self._to_qinteger_space(self._range_right)
         self._int_marker_pos = [((v - source_min) * (target_max - target_min)) / (source_max - source_min) + target_min for v in self._marker_pos]
         print (f"marker: {[v for v in self._int_marker_pos]}")
         
@@ -218,16 +297,6 @@ class QSliderWidget(QtWidgets.QWidget):
         ''' update target positions '''
         self._target_min = self._minimum # self._to_qinteger_space(self._minimum)
         self._target_max = self._maximum # self._to_qinteger_space(self._maximum)
-
-    # def _to_qinteger_space(self, val, _max=None):
-    #     """Converts a value to the internal integer space."""
-        
-    #     _max = _max or self.MAX_DISPLAY
-    #     range_ = self._maximum - self._minimum
-    #     if range_ == 0:
-    #         return self._minimum
-    #     return int(min(self.QOVERFLOW, val / range_ * _max))        
-
 
     def setMarkerValue(self, value):
         ''' sets the marker(s) value - single float is one marker, passing a tuple creates multiple markers'''
@@ -296,13 +365,15 @@ class QSliderWidget(QtWidgets.QWidget):
         self._draw_widget(painter)
         self._draw_markers(painter)
 
+        painter.end()
+
     def getBackgroundColor(self) -> QColor:
         """
         Get the background color of the progress bar.
 
         :return: QColor object representing the background color.
         """
-        return self.unfinishedBackgroundColor       
+        return self.BackgroundColor       
 
     def getFinishedBackgroundColor(self) -> QColor:
         """
@@ -310,7 +381,7 @@ class QSliderWidget(QtWidgets.QWidget):
 
         :return: QColor object representing the finished segment color.
         """
-        return self.finishedBackgroundColor
+        return self.rangeColor
 
     def getFinishedNumberColor(self) -> QColor:
         """
@@ -318,8 +389,8 @@ class QSliderWidget(QtWidgets.QWidget):
 
         :return: QColor object representing the finished number color.
         """
-        return self.finishedNumberColor
-         
+        return self.handleColor
+  
 
 
     def _draw_widget(self, painter: QPainter):
@@ -328,62 +399,151 @@ class QSliderWidget(QtWidgets.QWidget):
 
         :param painter: QPainter object.
         """
-        gate_count = len(self._gate_positions)
-        sliderBarLength = self.size().width()
-        sliderBarHeight = int(self.size().height() * 0.5)
-        totalRangeLength = int(sliderBarLength * 0.88)
-        iconSize = int((totalRangeLength / (gate_count - 1)) * 0.15)
-        iconStep = totalRangeLength // (gate_count - 1)
-        iconStartY = 0
+        handle_count = self._handle_count
 
 
-
-        iconBorderPen = QPen(QBrush(self.getBackgroundColor()), iconSize * 0.1)
-        whiteBrush = QBrush(Qt.white)
+        handle_pen = QPen(QBrush(self.handleBorderColor), self._handle_size * 0.1)
+        range_pen = QPen(QBrush(self.rangeBorderColor), self._range_height * 0.1)
+        handle_pen_h = QPen(QBrush(gremlin.util.highlight_qcolor(self.handleBorderColor)), self._handle_size * 0.1)
+        range_pen_h = QPen(QBrush(gremlin.util.highlight_qcolor(self.rangeBorderColor)), self._range_height * 0.1)
         
-        maxIconSize = int(self.size().height() * 2 / 3)
-        iconSize = min(iconSize, maxIconSize)
-        
-        startX = 0 # self._to_qinteger_space(0)
-        startY = (iconSize / 2) - (sliderBarHeight / 2)
 
+        handle_fill = QBrush(self.handleColor)
+        handle_fill_h = QBrush(gremlin.util.highlight_qcolor(self.handleColor))
+
+        if self.UseAlternateColor:
+            range_colors = [self.rangeColor, self.rangeAlternateColor]
+            range_colors_h = [gremlin.util.highlight_qcolor(self.rangeColor), 
+                             gremlin.util.highlight_qcolor(self.rangeAlternateColor)]
+        else:
+            color_h = gremlin.util.highlight_qcolor(self.rangeColor)
+            range_colors = [self.rangeColor, self.rangeColor]
+            range_colors_h = [color_h, color_h]
+        
+       
         backgroundBrush = QBrush(self.getBackgroundColor())
-        finishedBrush = QBrush(self.getFinishedBackgroundColor())
         emptyPen = QPen(Qt.NoPen)
 
         # slider background
         painter.setPen(emptyPen)
         painter.setBrush(backgroundBrush)
-        painter.drawRoundedRect(startX, startY, sliderBarLength, sliderBarHeight,
-                                 sliderBarHeight, sliderBarHeight)
+        painter.drawRoundedRect(0, 0, self._widget_width, self._widget_height,self._widget_corner, self._widget_corner)
 
-        # slider range
-        startX = self._range_gate_left #  self._to_qinteger_space(self._range_left)
-        painter.setBrush(finishedBrush)
-        painter.drawRoundedRect(startX, startY, self._range_gate_width, self._range_gate_height,
-                                 self._range_gate_height, self._range_gate_height)
+        # slider range - from the leftmost handle to the rightmost handle
 
-        painter.save()
-        painter.translate(startX + sliderBarLength * 0.05, iconStartY)
 
-        # draw gates
-        for i in range(gate_count):
-            painter.setBrush(whiteBrush)
+        
+        # painter.setBrush(finishedBrush)
+        # painter.drawRoundedRect(self._range_left, self._range_top, self._range_width, self._range_height, self._range_corner, self._range_corner)
 
-            currentXOffset = self._gate_positions[i]
-            painter.setPen(iconBorderPen)
+        # reset computed hotspots
+        self._handle_hotspots = []
+        self._range_hotspots = []
+        self._range_hotspots_map = {} # map of rect to range index pairs (a,b)
 
-            # Store the bounding rectangle of each gate
-            iconRect = QRect(currentXOffset, 1, iconSize, iconSize)
-            clickableRect = QRect(currentXOffset + (iconStep - iconSize) // 2 - (iconSize/2), 1, iconSize, iconSize)
-            self._gate_rects.append(clickableRect)
+        # draw ranges of different colors
+        color_index = 0
+        color_count = len(range_colors)
+        painter.setPen(range_pen)
+        msg = ""
+        range_height = self._range_height
+        range_corner = 0
+        range_top = self._range_top
 
-            #if self.barStyle == self.Styles.Circular:
-            painter.drawEllipse(iconRect)
-            # else:
-            #     painter.drawRect(iconRect)
+        color_index = 0
+        if self._single_range:
+            # single range used across all gates
+            color_fill = range_colors[color_index]
+            color_pen = self.rangeBorderColor
+            if self._hover_range:
+                color_fill = range_colors_h[color_index]
+                color_pen = range_pen_h
 
-        painter.restore()
+            painter.setBrush(color_fill)
+            painter.setPen(color_pen)  
+            a = 0
+            b = handle_count-1
+            
+            x1 = self._handle_positions[a]
+            x2 = self._handle_positions[b]  
+
+            range_left = x1 + self._handle_radius
+            range_width = x2 - x1
+            
+            painter.drawRoundedRect(range_left, range_top, range_width, range_height, range_corner, range_corner)
+
+            range_rect = QRect(range_left, range_top, range_width, range_height)
+            # msg += f"range [{x1} {x2} {range_rect.left()} {range_rect.right()} {range_rect.top()} {range_rect.bottom()} ] "
+            self._range_hotspots.append(range_rect)
+            self._range_hotspots_map[range_rect] = (a,b)
+
+        else:
+            # individual ranges between handles
+
+            for a, b in pairwise(range(handle_count)):
+
+                x1 = self._handle_positions[a]
+                x2 = self._handle_positions[b]
+
+                color_fill = range_colors[color_index]
+                color_pen = self.rangeBorderColor
+                if self._hover_range:
+                    ah, bh = self._hover_range_handle_pair
+                    if a == ah and b == bh:
+                        # highlight on hover
+                        # print (f"hover range {a} {b}")
+                        color_fill = range_colors_h[color_index]
+                        color_pen = range_pen_h
+
+                painter.setBrush(color_fill)
+                painter.setPen(color_pen)    
+                
+                color_index += 1
+                if color_index == color_count:
+                    color_index = 0
+
+                range_left = x1 + self._handle_radius
+                range_width = x2 - x1
+                
+                painter.drawRoundedRect(range_left, range_top, range_width, range_height, range_corner, range_corner)
+
+                range_rect = QRect(range_left, range_top, range_width, range_height)
+                # msg += f"range [{x1} {x2} {range_rect.left()} {range_rect.right()} {range_rect.top()} {range_rect.bottom()} ] "
+                self._range_hotspots.append(range_rect)
+                self._range_hotspots_map[range_rect] = (a,b)
+
+
+        self._range_msg = msg
+
+        for index in range(handle_count):
+            
+            if self._hover_handle and self._hover_handle_index == index:
+                # highlight on hover
+                # print (f"hover handle {index}")
+                color_fill = handle_fill_h
+                color_pen = handle_pen_h
+            else:
+                color_fill = handle_fill
+                color_pen = handle_pen
+
+
+            painter.setBrush(color_fill)
+            painter.setPen(color_pen)    
+            
+            x = self._handle_positions[index]
+            # clickable areas
+            handle_rect = QRect(x, self._handle_top, self._handle_size, self._handle_size)
+            # print (f"handle [{index}  {handle_rect}]")
+            self._handle_hotspots.append(handle_rect)
+            painter.drawEllipse(handle_rect)
+
+            # handle icons
+            if index in self._internal_handle_pixmaps:
+                # icon defined
+                pd = self._internal_handle_pixmaps[index]
+                painter.drawPixmap(x + self._handle_radius + pd.offset_x, self._handle_top + pd.offset_y, pd.pixmap)
+
+        
 
     def _draw_markers(self, painter: QPainter):
         ''' draws the markers on the widget '''
@@ -405,31 +565,244 @@ class QSliderWidget(QtWidgets.QWidget):
         self.adjustSize()
         self.update()
 
+               
+    def _mouse_position_to_value(self, x):
+        ''' converts a mouse position to a slider value '''
+        if x >= self._usable_left and x <= self._usable_right:
+            # x is in the "value" zone
+            value = gremlin.util.scale_to_range(x, self._usable_left, self._usable_right, self._minimum, self._maximum)
+            #print (f"click value: {x} -> {value}")
+            return value
+        # not in range
+        #print (f"click value: {x} -> N/A")
+        return None
+    
+    def _get_min_max_handles(self):
+        ''' gets the index of the lowest and highest handle by value '''
+        values = [(value, index) for index, value in enumerate(self._values)]
+        values.sort(key = lambda x: x[0])
+        return (values[0][1], values[-1][1])
+
+
+   
+
+    def _hover_enter_range(self, a, b):
+        ''' enters a range '''
+        self._hover_exit_handle()
+        self._hover_exit_range()
+        #print (f"hover enter range: {a} {b}")
+        self._hover_range = True
+        self._hover_range_handle_pair = (a,b)
+        return True
+
+    def _hover_exit_range(self):
+        ''' exists a range '''
+        if self._hover_range:
+            # no longer hovering over a range
+            # print (f"hover exit range: {self._hover_range_handle_pair}")
+            self._hover_range = False # not over a range
+            self._hover_range_handle_pair = None
+            return True
+        return False
+            
+
+    def _hover_enter_handle(self, index):
+        ''' enters a handle '''
+        self._hover_exit_range()
+        self._hover_exit_handle()
+        # print (f"hover enter handle: {index}")
+        self._hover_handle = True
+        self._hover_handle_index = index
+        return True
+        
+
+
+    def _hover_exit_handle(self):
+        ''' exits a handle '''
+        if self._hover_handle:
+            # print (f"hover exit handle: {self._hover_handle_index}")
+            self._hover_handle = False
+            self._hover_handle_index = -1
+            return True
+        return False
+
+
+    def _hover_update(self, point : QPoint):
+        ''' updates the hover state '''
+        hover_changed = False
+        
+        if not self._hover_lock:
+            is_hover = False
+            rect : QRect
+
+            # look for hover entry/exit on handles first
+            for index, rect in enumerate(self._handle_hotspots):
+                if rect.contains(point):
+                    if self._hover_handle_index != index:
+                        hover_changed = hover_changed or self._hover_exit_handle()
+                        hover_changed = hover_changed or self._hover_exit_range()
+                        hover_changed = hover_changed or self._hover_enter_handle(index)
+                        
+                    is_hover = True
+                    break
+
+            if not is_hover:
+                #print (f"mouse {point} {self._range_msg}")
+            
+                # scan for hovering over a range
+                for rect in self._range_hotspots:
+                    if rect.contains(point):
+                        a,b = self._range_hotspots_map[rect]
+                        if self._hover_range_handle_pair is None or self._hover_range_handle_pair != (a,b):
+                            hover_changed = hover_changed or self._hover_exit_handle()
+                            hover_changed = hover_changed or self._hover_exit_range()
+                            hover_changed = hover_changed or self._hover_enter_range(a,b)
+                        is_hover = True
+                        break
+
+            if not is_hover:
+                hover_changed = hover_changed or self._hover_exit_handle()
+                hover_changed = hover_changed or self._hover_exit_range()
+
+        return hover_changed
+    
+
+    def mouseDoubleClickEvent(self, event):
+        ''' double click event '''
+        if self._readOnly:
+            # don't fire events in readonly mode
+            #print ("readonly - skip mousepress")
+            return 
+        
+        verbose = gremlin.config.Configuration().verbose
+        if verbose:
+            syslog = logging.getLogger("system")
+        
+        point = event.pos()
+        # print("Mouse click coordinates:", point)  # Debug print
+        for index, rect in enumerate(self._handle_hotspots):
+            if rect.contains(point):
+                button = event.button()
+                if button == Qt.MouseButton.LeftButton:
+                    if verbose:
+                        syslog.info(f"handle {index} left double clicked")
+                    self.handleDoubleClicked.emit(index)
+                elif button == Qt.MouseButton.RightButton:
+                    if verbose:
+                        syslog.info(f"handle {index} right rouble clicked")
+                    self.handleDoubleRightClicked.emit(index)
+                return
+            
+        # check ranges
+        #print (f"mouse point: {point}")
+        for index, rect in enumerate(self._range_hotspots):
+            #print (f"{rect}")
+            if rect.contains(point):
+                a,b = self._range_hotspots_map[rect]
+                value = self._mouse_position_to_value(point.x())
+                if value is not None:
+                    button = event.button()
+                    if button == Qt.MouseButton.LeftButton:
+                        if verbose:
+                            syslog.info(f"range left double clicked: {value}")
+                        self.rangeDoubleClicked.emit(value, a, b)
+                    elif button == Qt.MouseButton.RightButton:
+                        if verbose:
+                            syslog.info(f"range right double clicked: {value}")
+                        self.rangeDoubleRightClicked.emit(value, a, b)
+                    return
+                    
+
+
+    
     def mousePressEvent(self, event: QMouseEvent) -> None:
         ''' mouse press event handler 
         :param event: QMouseEvent object.
 
         '''
+        #print ("mouse press")
         if self._readOnly:
             # don't fire events in readonly mode
+            #print ("readonly - skip mousepress")
             return 
+        
         point = event.pos()
-        for index, rect in enumerate(self._gate_rects):
+        for index, rect in enumerate(self._handle_hotspots):
             if rect.contains(point):
                 # gate clicked
+                
+                self._mouse_down = True
                 self._drag_active = True
-                self._drag_gate_index = index
-                self.setMouseTracking(True) # track mouse movements
+                self._drag_handle_index = index  # current handle index of the handle bring dragged
+                self._drag_start = point
+                # store the x offset where the drag started occuring 
+                self._drag_x_offset = self._handle_positions[index] - point.x()
+                self._drag_last_point = point
+                self._drag_x = point.x()
+                self._hover_lock = True # lock the current hover mode
+                # print (f"handle drag index {index}  offset: {self._drag_x_offset}")
+                
+
+
 
     def mouseMoveEvent(self, event : QMouseEvent):
+        point : QPoint = event.pos()
+
+        # process mouse movement for hover
+        hover_changed = self._hover_update(point)
+
         if event.buttons() == QtCore.Qt.LeftButton:
             # left mouse drag operation
+            point = event.pos()
+            x = point.x()
+            if not self._drag_active and self._mouse_down and abs(self._drag_x - x) > 2: # move at least 3 pixels
+                # drag started
+                self._drag_active = True
+                # print ("mouse drag starting")
+                
+
             if self._drag_active:
-                point = event.pos()
-                width = self._range_width()
+                
+                if self._drag_x != x:
+                    # mouse moved
+                    #print ("mouse drag detected")
+                    current_x = self._handle_positions[self._drag_handle_index]
+                    x_offset = x - self._drag_x
+                    current_x += x_offset
 
+                    # drag bounds check
+                    if current_x < self._handle_min:
+                        current_x = self._handle_min
+                    elif current_x > self._handle_max:
+                        current_x = self._handle_max
 
+                    value = self._mouse_position_to_value(current_x + self._handle_radius)
+                    # get the index of the value relative to the other gates
+                    self._values[self._drag_handle_index] = value
+                    values = [(value, index) for index, value in enumerate(self._values)]
+                    pair = values[self._drag_handle_index]
+                    values.sort(key = lambda x: x[0])
+                    self._values.sort()
+                    new_index = values.index(pair)
+                    
+                    #print (f"new index: {new_index}")
+                    self._drag_handle_index = new_index
 
+                    self._handle_positions[self._drag_handle_index] = current_x
+                    index_min, index_max = self._get_min_max_handles()
+                    
+                    self._range_left = self._handle_positions[index_min] + self._handle_radius
+                    self._range_right = self._handle_positions[index_max] + self._handle_radius
+                    self._range_width = self._range_right - self._range_left
+                    self._drag_x = x
+                    # print (f"drag offset: {x_offset}  new position: {current_x}  new value: {value}  min index: {index_min}  max index: {index_max}")
+                
+                    hover_changed = True
+
+        if hover_changed:
+            # update colors/state
+            #print("hover changed")
+            self.update()
 
                 
 
@@ -439,29 +812,72 @@ class QSliderWidget(QtWidgets.QWidget):
 
         :param event: QMouseEvent object.
         """
+
+        #print ("mouse release")
         if self._readOnly:
             # don't fire events in readonly mode
+            # print ("readonly - skip mouse release")
             return 
+        
+        verbose = gremlin.config.Configuration().verbose
+        if verbose:
+            syslog = logging.getLogger("system")
+        
         if self._drag_active:
             # stop drag
+            # print ("stop drag")
+            self._hover_lock = False 
             self._drag_active = False
-            self._drag_gate_index = None
-            self.setMouseTracking(False)
-            return
-        
-        self._drag_gate_index = index
+            self._values.sort() # update any values
+            self._hover_update(event.pos())
+            self.update() # get the updated hotspots
+            button = event.button()
+            index = self._drag_handle_index
+            if button == Qt.MouseButton.LeftButton:
+                if verbose:
+                    syslog.info(f"handle {index} left clicked")
+                self.handleClicked.emit(index)
+            elif button == Qt.MouseButton.RightButton:
+                if verbose:
+                    syslog.info(f"handle {index} right clicked")
+                self.handleRightClicked.emit(index)
+            return            
+
+
         point = event.pos()
         # print("Mouse click coordinates:", point)  # Debug print
-        for index, rect in enumerate(self._gate_rects):
+        for index, rect in enumerate(self._handle_hotspots):
             if rect.contains(point):
-                # print("Step", index + 1, "clicked")  # Debug print
-                #self.changeCurrentStep(index + 1)
                 button = event.button()
                 if button == Qt.MouseButton.LeftButton:
-                    self.handleLeftClicked.emit(index)
+                    if verbose:
+                        syslog.info(f"handle {index} left clicked")
+                    self.handleClicked.emit(index)
                 elif button == Qt.MouseButton.RightButton:
+                    if verbose:
+                        syslog.info(f"handle {index} right clicked")
                     self.handleRightClicked.emit(index)
-                break
+                return
+            
+        # check ranges
+        #print (f"mouse point: {point}")
+        for index, rect in enumerate(self._range_hotspots):
+            #print (f"{rect}")
+            if rect.contains(point):
+                a,b = self._range_hotspots_map[rect]
+                value = self._mouse_position_to_value(point.x())
+                if value is not None:
+                    button = event.button()
+                    if button == Qt.MouseButton.LeftButton:
+                        if verbose:
+                            syslog.info(f"range left clicked: {value}")
+                        self.rangeClicked.emit(value, a, b)
+                    elif button == Qt.MouseButton.RightButton:
+                        if verbose:
+                            syslog.info(f"range right clicked: {value}")
+                        self.rangeRightClicked.emit(value, a, b)
+                    return
+                    
 
 
     class PixmapData():
@@ -477,9 +893,14 @@ class QSliderWidget(QtWidgets.QWidget):
                 self.width = 0
                 self.height = 0
 
+    class HandleIconData():
+        def __init__(self, index: int,  icon : str, use_qta: bool = True, color = "#808080"):
+            self.index = index
+            self.icon = icon
+            self.use_qta = use_qta
+            self.color = color
+            
 
-
-        # self.setStyleSheet(self.css)
 
     def _get_pixmaps(self):
         if self._pixmaps: return self._pixmaps
@@ -493,3 +914,24 @@ class QSliderWidget(QtWidgets.QWidget):
             pixmap = pixmap.scaledToHeight(center)
         pd = QSliderWidget.PixmapData(pixmap = pixmap, offset_x = -pixmap.width()/2, offset_y=0)
         self._internal_pixmaps = [pd]
+
+    def _update_handle_pixmaps(self, hid : QSliderWidget.HandleIconData):
+        ''' updates the pixmaps for the handle icons '''
+        icon_size = int(self._handle_size * 0.75)
+        margin = (self._handle_size - icon_size) // 2
+        if hid.use_qta:
+            if hid.color is not None:
+                icon = gremlin.util.load_icon(hid.icon, use_qta = True, qta_color = hid.color)
+            else:
+                icon = gremlin.util.load_icon(hid.icon, use_qta = True)
+        else:
+            icon = gremlin.util.load_icon(hid.icon)
+
+        pixmap = icon.pixmap(icon_size)
+        pd = QSliderWidget.PixmapData(pixmap = pixmap, offset_x = -pixmap.width()/2, offset_y= margin)
+        self._internal_handle_pixmaps[hid.index] = pd
+
+    def _update_all_handle_pixmaps(self):
+        ''' updates all handle icons on resize/update'''
+        for hid in self._handle_icons.values():
+            self._update_handle_pixmaps(hid)

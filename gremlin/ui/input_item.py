@@ -684,10 +684,10 @@ class InputItemListView(ui_common.AbstractView):
         self._current_index = index
 
         data = self.model.data(index)
-        device_guid = self.model._device_data.device_guid
-        device_name = self.model._device_data.name
-        device_input_type = data.input_type if data else None
-        device_input_id = data.input_id if data else None
+        # device_guid = self.model._device_data.device_guid
+        # device_name = self.model._device_data.name
+        # device_input_type = data.input_type if data else None
+        # device_input_id = data.input_id if data else None
         
         # if user_selected:
         #     # save what was last selected

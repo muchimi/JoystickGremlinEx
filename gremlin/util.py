@@ -34,7 +34,7 @@ from typing import Callable
 
 from PySide6 import QtCore, QtWidgets, QtGui
 from win32api import GetFileVersionInfo, LOWORD, HIWORD
-
+from PySide6.QtGui import QColor
 
 from . import error
 
@@ -1257,3 +1257,37 @@ def assert_ui_thread():
     ui_thread = QtWidgets.QApplication.instance().thread() # UI thread
     if current_thread != ui_thread:
         assert False,"call not on UI thread"
+
+
+def highlight_qcolor(color : QColor, factor : float = 1.1) -> QColor:
+    '''
+    computes a highlight color from a QT color object
+
+    :param color: a QT color
+    :param factor: optional, factor
+    :returns: the new QColor object
+    
+    '''
+    h,s,v,a = color.getHsv()
+    v = v * factor
+    new_color = color.fromHsv(h, s, v, a)
+    return new_color
+
+
+
+def highlight_color(hex_color:str, factor : float = 1.1):
+    ''''
+    computes a highlight color from a hex color
+
+    :param hex_color: a hex color in the format "#aabbcc
+    :param factor: optional, factor
+    :returns: the new hex color as a string 
+    '''
+    import colorsys
+    hex_color = hex_color.lstrip('#')
+    r, g, b = tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+    #luminance = 0.299 * r + 0.587 * g + 0.114 * b
+    h, s, v = colorsys.rgb_to_hsv(r, g, b)
+    v = v * factor
+    r, g, b = colorsys.hsv_to_rgb(h, s, v)
+    return f"#{r:02x}{g:02x}{b:02x}"

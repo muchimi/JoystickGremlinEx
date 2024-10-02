@@ -128,12 +128,13 @@ class InputItemConfiguration(QtWidgets.QFrame):
         action = plugin_manager.get_class(action_name)(container)
         container.add_action(action)
       
-
-
         if len(container.action_sets) > 0:
             self.action_model.add_container(container)
         
         self.action_model.data_changed.emit()
+
+        eh = gremlin.event_handler.EventListener()
+        eh.mapping_changed.emit(self.item_data)
         
 
     def _paste_action(self, action):
@@ -156,6 +157,9 @@ class InputItemConfiguration(QtWidgets.QFrame):
             self.action_model.add_container(container)
         self.action_model.data_changed.emit()
 
+        eh = gremlin.event_handler.EventListener()
+        eh.mapping_changed.emit(self.item_data)
+
     def _add_container(self, container_name):
         """Adds a new container to the input item.
 
@@ -167,6 +171,10 @@ class InputItemConfiguration(QtWidgets.QFrame):
             container.action_model = self.action_model
         self.action_model.add_container(container)
         plugin_manager.set_container_data(self.item_data, container)
+
+        eh = gremlin.event_handler.EventListener()
+        eh.mapping_changed.emit(self.item_data)
+
         return container
     
 
@@ -201,6 +209,10 @@ class InputItemConfiguration(QtWidgets.QFrame):
         
         self.action_model.add_container(new_container)
         plugin_manager.set_container_data(self.item_data, new_container)
+
+        eh = gremlin.event_handler.EventListener()
+        eh.mapping_changed.emit(self.item_data)
+
         return new_container
 
     def _remove_container(self, container):
@@ -208,7 +220,11 @@ class InputItemConfiguration(QtWidgets.QFrame):
 
         :param container the container instance to be removed
         """
+
         self.action_model.remove_container(container)
+
+        eh = gremlin.event_handler.EventListener()
+        eh.mapping_changed.emit(self.item_data)
 
                 
 
