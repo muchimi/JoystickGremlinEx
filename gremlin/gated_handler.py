@@ -20,7 +20,7 @@
 from __future__ import annotations
 import os
 from lxml import etree as ElementTree
-from PySide6 import QtWidgets, QtCore, QtGui
+from PySide6 import QtWidgets, QtCore, QtGui #QtWebEngineWidgets
 
 import gremlin.base_profile
 import gremlin.config
@@ -45,7 +45,6 @@ import gremlin.util
 import gremlin.singleton_decorator
 from gremlin.util import InvokeUiMethod
 import gremlin.util
-
 
 
 
@@ -313,9 +312,17 @@ class GateInfo():
         self._used = is_used
         self.slider_index = slider_index # index of the gate in the slider
         self.delay = delay  # delay in milliseconds for the trigger duration between a press and release
+        self._error = False # no error state
 
         eh = gremlin.event_handler.EventListener()
         eh.mapping_changed.connect(self._item_data_changed)
+
+    @property
+    def isError(self):
+        return self._error
+    @isError.setter
+    def isError(self, value : bool):
+        self._error = value
 
     @property
     def has_containers(self):
@@ -723,6 +730,7 @@ class RangeInfo():
         if gate.id == self._g1_id or gate.id == self._g2_id:
             eh = GateEventHandler()
             eh.range_value_changed.emit(self)
+
 
     QtCore.Slot(GateInfo)
     def _gate_used_changed_cb(self, gate):
@@ -2543,11 +2551,17 @@ class GateWidgetInfo():
         self._update_icon()
 
     def _update_icon(self):
-        ''' updates the icon '''
+        ''' updates the icon on the setup button depending on the container state '''
         if self.gate.has_containers:
             self.setup_widget.setIcon(load_icon("ei.cog-alt",qta_color="#365a75"))
         else:
             self.setup_widget.setIcon(load_icon("fa.gear"))
+
+        if self.gate.isError:
+            self.setIcon("fa.warning", color = "red")
+        else:
+            self.setIcon(None)
+
 
     def cleanup(self):
         self.value_widget.valueChanged.disconnect(self._value_changed_cb) # hook manual changes made to the widget
@@ -2572,6 +2586,8 @@ class GateWidgetInfo():
             eh = GateEventHandler()
             eh.gate_order_changed.emit()
 
+            self._update_icon()
+
     @QtCore.Slot(GateInfo)
     def _gate_configuration_changed(self, gate):            
         ''' called when a gate changes configuration '''
@@ -2581,8 +2597,9 @@ class GateWidgetInfo():
     def _update_value(self, value):
         ''' updates the display gate value '''
         with QtCore.QSignalBlocker(self.value_widget):
-                syslog.info(f"GWI: gate {self.gate.index} update display value {value}")
+                # syslog.info(f"GWI: gate {self.gate.index} update display value {value}")
                 self.value_widget.setValue(value)
+                
 
     @property
     def id(self):
@@ -2621,7 +2638,14 @@ class GateWidgetInfo():
         self.label_widget = QtWidgets.QLabel(f"Gate {gate.slider_index + 1}:") # the slider index is the ordered gate number
         self.label_widget.setMaximumWidth(label_width)
 
+
+        self.label_warning = QtWidgets.QLabel(" ")
+        self.label_warning.setMaximumWidth(20)
+        self.label_warning.setMinimumWidth(20)
+        
+
         self.value_widget = ui_common.QFloatLineEdit(gate, range_min, range_max, value = gate.value)
+        
 
         # self.value_widget = helper.get_double_spinbox(gate.id, value, range_min, range_max)
         self.value_widget.valueChanged.connect(self._value_changed_cb) # hook manual changes made to the widget
@@ -2654,6 +2678,7 @@ class GateWidgetInfo():
 
 
         gate_layout.addWidget(self.label_widget)
+        gate_layout.addWidget(self.label_warning)
         gate_layout.addWidget(self.value_widget)
         gate_layout.addWidget(self.grab_widget)
         gate_layout.addWidget(self.setup_widget)
@@ -2664,6 +2689,15 @@ class GateWidgetInfo():
         ''' called to record a value changed when the gate value widget is manually changed '''
         value = gremlin.util.scale_to_range(self.value_widget.value(), self.value_widget.minimum(), self.value_widget.maximum(), -1.0, 1.0)
         self.gate.setValue(value, emit=True)
+
+    def setIcon(self, icon, color = None):
+        ''' sets the icon, pass a None value to clear it'''
+        if icon is not None:
+            icon = gremlin.util.load_icon(icon, qta_color = color)
+            self.label_warning.setPixmap(icon.pixmap(16,16))
+        else:
+            self.label_warning.setPixmap(QtGui.QPixmap())
+
         
 class RangeWidgetInfo():
     ''' info object for the range widgets '''
@@ -2760,6 +2794,34 @@ class RangeWidgetInfo():
         self.range_widget.setText(txt)
         self.range_widget.setMinimumWidth(char_width * len(txt))
 
+
+class GatedAxisInstructions(QtWidgets.QDialog):
+    '''
+    Dialog box for instructions
+    '''
+    def __init__(self, parent = None):
+        super().__init__(parent)
+        self.setWindowTitle("Gated Axis Mapper Instructions")
+        self.setWindowModality(QtCore.Qt.ApplicationModal)
+        #self._view = QtWebEngineWidgets.QWebEngineView()
+        self._view = QtWidgets.QTextEdit()
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.addWidget(self._view)
+        self._load()
+
+
+    def _load(self):
+        location = gremlin.util.find_file("gated_handler_instructions.md", gremlin.shared_state.root_path)
+        if location:
+            with open(location,"+rt") as f:
+                md = f.read()
+
+            self._view.setMarkdown(md)
+            # url = QtCore.QUrl.fromLocalFile(location)
+            # self._view.load(url)
+
+
+
 class GatedAxisWidget(QtWidgets.QWidget):
     ''' a widget that represents a single gate on an axis input and what should happen in that gate
     
@@ -2830,8 +2892,8 @@ class GatedAxisWidget(QtWidgets.QWidget):
         # axis input gate widget
 
         self.slider_frame_widget = QtWidgets.QFrame()
-        self.slider_frame_layout = QtWidgets.QVBoxLayout(self.slider_frame_widget)
-        self.slider_frame_widget.setStyleSheet('.QFrame{background-color: lightgray; border-radius: 10px;}')
+        self.slider_frame_layout = QtWidgets.QHBoxLayout(self.slider_frame_widget)
+        self.slider_frame_widget.setStyleSheet('.QFrame{background-color: #d3d3d3; border-radius: 10px;}')
         self._slider = QSliderWidget() #ui_common.QMarkerDoubleRangeSlider()
      
         #self._slider.setOrientation(QtCore.Qt.Horizontal)
@@ -2846,7 +2908,17 @@ class GatedAxisWidget(QtWidgets.QWidget):
         self.warning_widget.setVisible(False)
 
         self.slider_frame_layout.addWidget(self._slider)
-        #self.slider_frame_layout.addWidget(QtWidgets.QLabel("test"))
+        help_button = QtWidgets.QPushButton()
+        help_icon = gremlin.util.load_icon("mdi.help-circle-outline")
+        help_button.setIcon(help_icon)
+        help_button.setToolTip("Help")
+        help_button.setFlat(True)
+        help_button.setStyleSheet("QPushButton { background-color: transparent }")
+        help_button.setMaximumWidth(32)
+        
+        help_button.clicked.connect(self._show_help)
+
+        self.slider_frame_layout.addWidget(help_button)
       
         self.container_slider_widget = QtWidgets.QWidget()
         self.container_slider_layout = QtWidgets.QGridLayout(self.container_slider_widget)
@@ -2943,6 +3015,22 @@ class GatedAxisWidget(QtWidgets.QWidget):
             logging.getLogger("system").info(f"gate axis widget: init {self.id} {self.action_data.input_display_name}")
 
         self.hook()
+
+    @QtCore.Slot()
+    def _show_help(self):
+        dialog = GatedAxisInstructions(self)
+        w = 600
+        h = 400
+        geom = self.geometry()
+        dialog.setGeometry(
+            int(geom.x() + geom.width() / 2 - w/2),
+            int(geom.y() + geom.height() / 2 - h/2),
+            w,
+            h
+        )
+        
+        gremlin.util.centerDialog(dialog,w,h)
+        dialog.show()
 
 
     def hook(self):
@@ -3131,6 +3219,10 @@ class GatedAxisWidget(QtWidgets.QWidget):
         if gate in self.gate_data.getGates():
             self._set_slider_gate_value(gate.slider_index, gate.value)
 
+        # update icons on value change
+        self._update_gate_icons()
+
+
     @QtCore.Slot(GateInfo)
     def _gate_configuration_changed(self, gate : GateInfo):
         ''' called when the gate configuration changes '''
@@ -3150,14 +3242,14 @@ class GatedAxisWidget(QtWidgets.QWidget):
 
     def get_gate_gwi(self, gate : GateInfo) -> GateWidgetInfo:
         ''' gets the gate widget info for a given gate '''
-        if gate in self._gate_value_widget_map.keys():
-            return self._gate_value_widget_map[gate]
+        if gate in self._gwi_map.keys():
+            return self._gwi_map[gate]
         return None
     
-    def get_gate_widget(self, gate : GateInfo) -> QtWidgets.QWidget:
+    def get_gate_widget(self, gate : GateInfo):
         ''' returns the widget for the corresponding gate '''
-        if gate in self._gate_value_widget_map.keys():
-            return self._gate_value_widget_map[gate].widget
+        if gate in self._gwi_map.keys():
+            return self._gwi_map[gate].widget
         return None
     
     def get_range_widget(self, rng : RangeInfo):
@@ -3227,15 +3319,19 @@ class GatedAxisWidget(QtWidgets.QWidget):
 
 
 
-    @QtCore.Slot()
-    def _slider_value_changed_cb(self):
+    @QtCore.Slot(int, float)
+    def _slider_value_changed_cb(self, index, value):
         ''' occurs when the slider values change '''
-        values = list(self._slider.value())
-        # update the gate data
-        for index, value in enumerate(values):
-            gate : GateInfo = self.gate_data.getGateSliderIndex(index)
-            if gate is not None:
-                gate.setValue(value, emit=True)
+        gate : GateInfo = self.gate_data.getGateSliderIndex(index)
+        if gate is not None:
+            gate.setValue(value, emit = True)
+
+        # values = list(self._slider.value())
+        # # update the gate data
+        # for index, value in enumerate(values):
+        #     gate : GateInfo = self.gate_data.getGateSliderIndex(index)
+        #     if gate is not None:
+        #         gate.setValue(value, emit=True)
 
     def _set_slider_gate_value(self, index, value):
         ''' sets a gate value on the slider '''
@@ -3248,8 +3344,14 @@ class GatedAxisWidget(QtWidgets.QWidget):
             values[index] = value
         InvokeUiMethod(lambda: self._update_slider(values))
 
-    def _update_slider(self, values):
-        assert_ui_thread()
+    def _update_slider(self, values : list[float] | tuple[float]):
+        '''
+        Updates the slider handle values (gates)
+
+        Arguments:
+            values -- tuple of values -1.0 to 1.0
+        '''
+        
         verbose = gremlin.config.Configuration().verbose_mode_details
         if verbose:
             sv = "Slider: "
@@ -3258,6 +3360,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
             syslog.info(sv)
         with QtCore.QSignalBlocker(self._slider):
             self._slider.setValue(values)
+            self._update_gate_tooltips()
 
     @QtCore.Slot()
     def _grab_cb(self):
@@ -3681,13 +3784,39 @@ class GatedAxisWidget(QtWidgets.QWidget):
             if values != self._slider.value():
                 with QtCore.QSignalBlocker(self._slider):
                     self._update_slider(values)
+                    
             
+
+    def _update_gate_tooltips(self):
+        '''
+        Updates gate tooltip values 
+        '''
+        gates = self.gate_data.getGates()
+        gate : GateInfo
+        for index, gate in enumerate(gates):
+            self._slider.setHandleTooltip(index, f"Gate {gate.value:0.{_decimals}f}")            
 
     def _update_gate_icons(self):
         gates = self.gate_data.getGates()
         gate : GateInfo
+        conflicts_map = {}
         for index, gate in enumerate(gates):
-            self._update_gate_icon(self, index, gate)
+            gate.isError = False # assume no error
+            value = f"{gate.value:0.4f}"
+            if not value in conflicts_map:
+                conflicts_map[value] = []
+            conflicts_map[value].append(gate)
+
+        # process maps
+        for conflicts in conflicts_map.values():
+            if len(conflicts) > 1: # more than one gate with that value = conflict
+                for gate in conflicts:
+                    gate.isError = True
+
+        for index, gate in enumerate(gates):
+            self._update_gate_icon(index, gate)
+
+
 
 
     def _update_gate_icon(self, index : int, gate : GateInfo):
@@ -3695,9 +3824,15 @@ class GatedAxisWidget(QtWidgets.QWidget):
         if gate is None:
             self._slider.setHandleIcon(index, None)
         elif gate.has_containers:
-            self._slider.setHandleIcon(index,"ei.cog-alt",True,"#365a75")
+            self._slider.setHandleIcon(index, 'ei.cog-alt', True, "#365a75")
         else:
             self._slider.setHandleIcon(index, "fa.gear",True,"#808080")
+
+        # find the widgets for the gate
+        gwi : GateWidgetInfo = self.get_gate_gwi(gate)
+        gwi._update_icon()
+        
+
                 
 
     def _update_output_value(self):
