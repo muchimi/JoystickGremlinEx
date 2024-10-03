@@ -100,6 +100,7 @@ class QSliderWidget(QtWidgets.QWidget):
 
         # mouse and drag tracking
         self._mouse_down = False # is mouse button down
+        self._double_clicked = False # true if the mouse was just double clicked
         self._drag_start = None # start drag position
         self._drag_handle_index = None # handle being dragged
         self._drag_active = False # true if a drag operation is in progress
@@ -249,10 +250,10 @@ class QSliderWidget(QtWidgets.QWidget):
             self._update_marker_offsets()
             self.update()
 
-    def setReadonly(self, value : bool):
+    def setReadOnly(self, value : bool):
         self._readOnly = value
     
-    def isReadonly(self) -> bool:
+    def readOnly(self) -> bool:
         return self._readOnly
     
         
@@ -681,6 +682,9 @@ class QSliderWidget(QtWidgets.QWidget):
     def _hover_update(self,  event : QMouseEvent):
         ''' updates the hover state '''
         hover_changed = False
+        if self._readOnly:
+            # no hovering in readonly mode
+            return 
         
         if not self._hover_lock:
             is_hover = False
@@ -733,6 +737,9 @@ class QSliderWidget(QtWidgets.QWidget):
             #print ("readonly - skip mousepress")
             return 
         
+        # print ("double click")
+        self._double_clicked = True
+
         verbose = gremlin.config.Configuration().verbose
         if verbose:
             syslog = logging.getLogger("system")
@@ -769,6 +776,7 @@ class QSliderWidget(QtWidgets.QWidget):
                         if verbose:
                             syslog.info(f"range right double clicked: {value}")
                         self.rangeDoubleRightClicked.emit(value, a, b)
+                        
                     return
                     
 
@@ -881,6 +889,11 @@ class QSliderWidget(QtWidgets.QWidget):
         if self._readOnly:
             # don't fire events in readonly mode
             # print ("readonly - skip mouse release")
+            return 
+        
+        if self._double_clicked:
+            self._double_clicked = False
+            # ignore mouse releases on double click
             return 
         
         verbose = gremlin.config.Configuration().verbose

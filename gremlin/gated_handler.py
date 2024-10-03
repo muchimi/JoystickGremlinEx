@@ -45,7 +45,7 @@ import gremlin.util
 import gremlin.singleton_decorator
 from gremlin.util import InvokeUiMethod
 import gremlin.util
-
+from itertools import pairwise
 
 
 
@@ -527,16 +527,22 @@ class RangeInfo():
         self._fixed_value = None # fixed value to output for this range if the condition is Fixed
         self._swap_gates() # flip the gates so the values are always increasing 
 
-    def get_used(self):
+    def get_used(self) -> bool:
         ''' sets the used flag on the range itself independent of the gate usage '''
         return self._used
         
-    def set_used(self, value):
+    def set_used(self, value : bool):
         ''' sets the used flag without firing a change event '''
         self._used = value        
+
+    def valueInRange(self, value: float) -> bool:
+        ''' true if the value is within the current range '''
+        return value >= self.v1 and value <= self.v2
+
+
     
     @property
-    def used(self):
+    def used(self) -> bool:
         return self._used and self.g1.used and self.g2.used
     
     @used.setter
@@ -561,16 +567,19 @@ class RangeInfo():
         ''' gets the container count '''
         return sum(len(item_data.containers) for item_data in self.item_data_map.values())
 
-    def copy_from(self, rng):
+    def copy_from(self, other : RangeInfo):
         ''' copies data from another range object '''
-        self.profile_mode = rng.profile_mode
-        self._condition = rng._condition
-        self._output_mode = rng._output_mode
-        self._fixed_value = rng._fixed_value
-        self.is_default = rng.is_default
-        self._g2_id = rng._g2_id
-        self._g1_id = rng._g1_id
-        self.item_data_map = rng.item_data_map
+        self.profile_mode = other.profile_mode
+        self._condition = other._condition
+        self._output_mode = other._output_mode
+        self._fixed_value = other._fixed_value
+        self._output_range_min = other._output_range_min
+        self._output_range_max = other._output_range_max
+        self._is_default = other._is_default
+        self._g2_id = other._g2_id
+        self._g1_id = other._g1_id
+        self.item_data_map = other.item_data_map
+
 
 
     def _get_gate(self, id):
@@ -633,7 +642,10 @@ class RangeInfo():
     
     @output_range_max.setter
     def output_range_max(self, value):
+        if value == 0:
+            pass
         self._output_range_max = value
+
     
     def range(self):
         ''' returns the tuple of range values '''
@@ -830,7 +842,10 @@ class RangeInfo():
             rr = f"N/A"
         else:
             rr = self.range_display()
-        return f"Range [{rr}] mode: {self.mode}  id: {self.id}"
+        fixed_value = f"{self._fixed_value:0.{_decimals}f}" if self._fixed_value else "n/a"
+        output_range_min = f"{self._output_range_min:0.{_decimals}f}" if self._output_range_min else "n/a"
+        output_range_max = f"{self._output_range_max:0.{_decimals}f}" if self._output_range_max else "n/a"
+        return f"Range [{rr}] mode: {self.mode}  id: {self.id}  Fixed: {fixed_value} Output range min: {output_range_min} max: {output_range_max}"
     
     def __eq__(self, other):
         ''' compares to range objects by range value '''
@@ -1376,27 +1391,32 @@ class GateData():
         rng_list = []
     
         for g1, g2 in required_ranges:
-            rng : RangeInfo = None
-            if ranges:
-                # grab existing range info
-                rng = ranges.pop(0)
-                rng.g1 = g1
-                rng.g2 = g2
-            else:
-                # get the next available range
-                rng = self.registerRange(g1, g2)
-                # rng = RangeInfo(id = get_guid(), min_gate = g1, max_gate = g2, profile_mode = self.gate_data.profile_mode,
-                #     condition= GateCondition.InRange, mode= GateRangeOutputMode.Normal, parent = self, used= True)
-            if not rng:
+            range_info : RangeInfo = None
+            range_info = self.findRange(g1, g2, used_only = False) # find the existing range
+            if not range_info:
+                # try by value
+                range_info = self.findRangeByGateValue(g1.value, g2.value, used_only = False) # find the existing range
+            if not range_info:
+                if ranges:
+                    # grab existing range info
+                    range_info = ranges.pop(0)
+                    range_info.g1 = g1
+                    range_info.g2 = g2
+                else:
+                    # get the next available range
+                    range_info = self.registerRange(g1, g2)
+                    # rng = RangeInfo(id = get_guid(), min_gate = g1, max_gate = g2, profile_mode = self.gate_data.profile_mode,
+                    #     condition= GateCondition.InRange, mode= GateRangeOutputMode.Normal, parent = self, used= True)
+            if not range_info:
                 syslog.warning(f"Range: unable to find an available range for gates {g1} {g2}")
                 continue
-            rng.used = True
-            rng_list.append(rng)
-            syslog.info(f"Ranges: sync range for {rng.range_gate_display()}  {rng.range_display()}")
+            range_info.used = True
+            rng_list.append(range_info)
+            syslog.info(f"Ranges: sync range for {range_info.range_gate_display()}  {range_info.range_display()}")
 
-        for rng in ranges:
+        for range_info in ranges:
             # mark any remaining range unused if we didn't use them all
-            rng.used = False
+            range_info.used = False
 
 
         # return the list of ranges 
@@ -1488,20 +1508,40 @@ class GateData():
             self.default_range.set_gates(g1, g2)
         
 
-    def findRange(self, g1 : GateInfo, g2: GateInfo):
+    def findRange(self, g1 : GateInfo, g2: GateInfo, used_only = True) -> RangeInfo | None:
         ''' find the range for the given two gates '''
-        for rng in self._ranges:
-            if rng.g1 == g1 and rng.g2 == g2:
+
+        rng_list = self.getRanges(used_only = used_only)
+        for rng in rng_list:
+            if rng.g1.id == g1.id and rng.g2.id == g2.id:
                 return rng
         return None 
     
-    def findRangeByValue(self, v1 : float, v2: float):
+    def findRangeByValue(self, value : float) -> RangeInfo | None:
+        rng_list = self.getUsedRanges()
+        rng : RangeInfo
+        for rng in rng_list:
+            if rng.valueInRange(value):
+                return rng
+            
+        return None
+
+        # gates = self.getGates()
+        # gate_count = len(gates)
+        # for g1,g2 in pairwise(gates):
+        #     if value >= g1.value and value <= g2.value:
+        #         rng = self.findRange(g1, g2)
+        #         if rng : 
+        #             return rng
+        return None
+    
+    def findRangeByGateValue(self, v1 : float, v2: float, used_only = True) -> RangeInfo | None:
         ''' gets the range from two values '''
         g1 = self.findGate(v1)
         if g1:
             g2 = self.findGate(v2)
             if g2:
-                return self.findRange(g1, g2)
+                return self.findRange(g1, g2, used_only = used_only)
         return None
 
     def registerRange(self, g1 : GateInfo, g2 : GateInfo) -> RangeInfo:
@@ -2171,13 +2211,10 @@ class GateData():
         node.set("show_mode", DisplayMode.to_string(self.display_mode))
         node.set("mode", self.profile_mode)
 
+       
         # save gate data
         gate : GateInfo
-        gates = self.getGates(include_default=True)
-        # reorder so default gates are first and are listed by value
-        gates.sort(key = lambda x: (x.is_default, x.value))
-        gate : GateInfo
-        for gate in gates:
+        for gate in self.getUsedGates():
             if gate.is_default:
                 # skip default gates
                 continue
@@ -2202,32 +2239,34 @@ class GateData():
                         child.append(item_node)
 
         # save range data
-        rng : RangeInfo
-        for rng in self.getRanges(include_default = False):
+        range_info : RangeInfo
+        for range_info in self.getUsedRanges():
             if verbose:
-                log_info(f"Saving range {rng.id} default: {rng.is_default} min: {rng.range_min}  max: {rng.range_max} containers count: {rng.container_count:,}")
-            child_comment = ElementTree.Comment(f"Range: [{rng.v1:0.{_decimals}f},{rng.v2:0.{_decimals}f}]  Gates: [{rng.g1.slider_index}/{rng.g2.slider_index}] Condition: [{_gate_condition_to_display_name[rng.condition]}] Mode: [{_gate_range_to_display_name[rng.mode]}]")
+                log_info(f"Saving range {range_info.id} default: {range_info.is_default} min: {range_info.range_min}  max: {range_info.range_max} containers count: {range_info.container_count:,}")
+            child_comment = ElementTree.Comment(f"Range: [{range_info.v1:0.{_decimals}f},{range_info.v2:0.{_decimals}f}]  Gates: [{range_info.g1.slider_index}/{range_info.g2.slider_index}] Condition: [{_gate_condition_to_display_name[range_info.condition]}] Mode: [{_gate_range_to_display_name[range_info.mode]}]")
             node.append(child_comment)
             child = ElementTree.SubElement(node,"range")
             
 
-            if rng.is_default:
-                child.set("default", str(rng.is_default))
-            child.set("condition",_gate_condition_to_name[rng.condition])
-            child.set("mode",_gate_range_to_string[rng.mode])
-            mode = rng.mode
+            if range_info.is_default:
+                child.set("default", str(range_info.is_default))
+            child.set("condition",_gate_condition_to_name[range_info.condition])
+
+            mode = range_info.mode
+            child.set("mode",_gate_range_to_string[mode])
+            
             if mode == GateRangeOutputMode.Fixed:
-                child.set("fixed_value", f"{rng.fixed_value:0.{_decimals}f}")
+                child.set("fixed_value", f"{range_info.fixed_value:0.{_decimals}f}")
             elif mode == GateRangeOutputMode.Ranged:
-                child.set("range_min",  f"{rng.range_max:0.{_decimals}f}")
-                child.set("range_max",  f"{rng.range_min:0.{_decimals}f}")
+                child.set("range_min",  f"{range_info.output_range_min:0.{_decimals}f}")
+                child.set("range_max",  f"{range_info.output_range_max:0.{_decimals}f}")
 
-            child.set("id", rng.id)
-            if not rng.is_default:
-                child.set("min_id", rng.g1.id)
-                child.set("max_id", rng.g2.id)
+            child.set("id", range_info.id)
+            if not range_info.is_default:
+                child.set("min_id", range_info.g1.id)
+                child.set("max_id", range_info.g2.id)
 
-            for condition, item_data in rng.item_data_map.items():
+            for condition, item_data in range_info.item_data_map.items():
                 if item_data.containers:
                     item_node = item_data.to_xml()
                     if item_node is not None:
@@ -2408,8 +2447,8 @@ class GateData():
                 range_info.used = True
 
                 if range_mode == GateRangeOutputMode.Ranged:
-                    range_info.range_min = range_min
-                    range_info.range_max = range_max
+                    range_info.output_range_min = range_min
+                    range_info.output_range_max = range_max
                 elif range_mode == GateRangeOutputMode.Fixed:
                     fixed_value = safe_read(child,"fixed_value", float, 0)
                     range_info.fixed_value = fixed_value
@@ -2440,7 +2479,21 @@ class GateData():
         # update the ranges based on the new gates
         self._update_ranges()
 
-        print ("After update ranges: ")
+
+        '''
+        Read ranges:
+        Range [-1.000,0.000] mode: GateRangeOutputMode.Ranged  id: 1057090d27994b18b3a935c41e48062b  Fixed: n/a Output range min: -1.00000 max: -0.02000
+        Range [0.000,0.577] mode: GateRangeOutputMode.Normal  id: e2e6d3ccd472468f88041098d72cee7c  Fixed: n/a Output range min: n/a max: n/a
+        Range [0.577,1.000] mode: GateRangeOutputMode.Normal  id: f5ba3995630e47ce8b8309846b8bf1bc  Fixed: n/a Output range min: n/a max: n/a
+        After update ranges:
+        Range [-1.000,0.000] mode: GateRangeOutputMode.Ranged  id: f943dd59dc9644e9b2b2664446dcc340  Fixed: n/a Output range min: n/a max: n/a
+        Range [0.000,0.577] mode: GateRangeOutputMode.Normal  id: fc44a6cf86f74ad5aebbf56091527208  Fixed: n/a Output range min: n/a max: n/a
+        Range [0.577,1.000] mode: GateRangeOutputMode.Normal  id: f553ecc3455e400ab5ee2d433f5ac696  Fixed: n/a Output range min: n/a max: n/a
+        
+
+        ''' 
+
+        print ("After update ranges: ")  
         all_ranges = self.getUsedRanges()
         for rng in all_ranges:
             print (f"\t{str(rng)}")
@@ -2942,6 +2995,9 @@ class GatedAxisWidget(QtWidgets.QWidget):
 
 
         self.container_options_widget = QtWidgets.QWidget()
+        self.container_options_widget.setContentsMargins(0,0,0,0)
+        #self.container_options_widget.setStyleSheet("Background-color: orange;")
+
         self.container_options_layout = QtWidgets.QHBoxLayout(self.container_options_widget)
         self.container_options_widget.setContentsMargins(0,0,0,0)
 
@@ -2975,9 +3031,10 @@ class GatedAxisWidget(QtWidgets.QWidget):
        
 
         self.container_gate_ui_widget = QtWidgets.QWidget()
-        self.container_gate_ui_widget.setContentsMargins(0,0,0,0)
+        #self.container_gate_ui_widget.setStyleSheet("Background-color: red;")
+        self.container_gate_ui_widget.setContentsMargins(8,0,0,0)
         self.container_gate_ui_layout = QtWidgets.QVBoxLayout(self.container_gate_ui_widget)
-        self.container_gate_ui_layout.setContentsMargins(0,0,0,0)
+        #self.container_gate_ui_layout.setContentsMargins(0,0,0,0)
 
         # create the gate and range widgets
         self._create_widgets(self.container_gate_ui_layout)
@@ -3136,9 +3193,10 @@ class GatedAxisWidget(QtWidgets.QWidget):
         
         '''
         self.container_gate_widget = QtWidgets.QWidget()
-        self.container_gate_widget.setContentsMargins(0,0,0,0)
+        #self.container_gate_widget.setContentsMargins(0,0,0,0)
 
         self.container_gate_layout = ui_common.QFlowLayout(self.container_gate_widget)
+        #self.container_gate_layout.setContentsMargins(0,0,0,0)
 
         self.container_range_count_widget = QtWidgets.QWidget()
         self.container_range_count_layout = QtWidgets.QHBoxLayout(self.container_range_count_widget)
@@ -3310,12 +3368,10 @@ class GatedAxisWidget(QtWidgets.QWidget):
     @QtCore.Slot(float)
     def _slider_range_configure_cb(self, value):
         ''' fired when the user clicked on the groove - adds a gate at that location '''
+        rng = self.gate_data.findRangeByValue(value)
+        if rng is not None:
+            self._configure_range_exec(rng)
         
-        count = len(self.gate_data.getGates())
-        gate = self.gate_data.findGate(value)
-        if not gate and count < 20:
-            self._add_gate(value)
-            self._update_ui()
 
 
 
@@ -3419,6 +3475,10 @@ class GatedAxisWidget(QtWidgets.QWidget):
         ''' open the configuration dialog for ranges '''
         widget = self.sender()  # the button's data field contains the widget to update
         rng = widget.data
+        self._configure_range_exec(rng)
+
+
+    def _configure_range_exec(self, rng : RangeInfo):
         connected = gremlin.util.isSignalConnected(self,"configure_range_requested")
         if connected:
             self.configure_range_requested.emit(rng)
@@ -3904,7 +3964,7 @@ class ActionContainerUi(QtWidgets.QDialog):
 
     delete_requested = QtCore.Signal(GateInfo) # fired when the remove button is clicked - passes the GateData to blitz
 
-    def __init__(self, gate_data, info_object, action_data, input_type, parent=None):
+    def __init__(self, gate_data : GateData, info_object : RangeInfo | GateInfo, action_data, input_type : InputType, parent=None):
         '''
         :param: data = the gate or range data block
         
@@ -3916,7 +3976,7 @@ class ActionContainerUi(QtWidgets.QDialog):
 
         is_range = isinstance(info_object, RangeInfo)
         self._info = info_object
-    
+        
         self._gate_data : GateData = gate_data
         self._is_range = is_range
         self._action_data = action_data
@@ -3936,21 +3996,19 @@ class ActionContainerUi(QtWidgets.QDialog):
         if is_range:
             # range has an output mode for how to handle the output value for the range
 
-            rng : RangeInfo = info_object
+            range_info : RangeInfo = info_object
 
             self.trigger_condition_layout.addWidget(QtWidgets.QLabel(f"Range Configuration: {info_object.range_display()}"))
-
             
             self.slider_frame_widget = QtWidgets.QFrame()
             self.slider_frame_layout = QtWidgets.QVBoxLayout(self.slider_frame_widget)
-            self.slider_frame_widget.setStyleSheet('.QFrame{background-color: lightgray;}')
+            self.slider_frame_widget.setStyleSheet('.QFrame{background-color: transparent;}')
             self.slider = QSliderWidget() # ui_common.QMarkerDoubleRangeSlider()
-            self.slider.setOrientation(QtCore.Qt.Horizontal)
             self.slider.setRange(-1,1)
             self.slider_frame_layout.addWidget(self.slider)
 
             # display two gates for a range
-            values = [rng.g1.value, rng.g2.value]
+            values = [range_info.g1.value, range_info.g2.value]
             self.slider.setValue(values)
             self.slider.setReadOnly(True)
 
@@ -3958,6 +4016,7 @@ class ActionContainerUi(QtWidgets.QDialog):
             self.axis_widget = ui_common.AxisStateWidget(orientation = QtCore.Qt.Orientation.Horizontal, show_percentage=False)
             el = gremlin.event_handler.EventListener()
             el.joystick_event.connect(self._joystick_event_cb)
+            # holds the last value sent to the output repeater  - grab the current value
 
             self.output_mode_widget = QtWidgets.QComboBox()
             self.output_container_widget = QtWidgets.QWidget()
@@ -3980,11 +4039,11 @@ class ActionContainerUi(QtWidgets.QDialog):
             self.container_output_range_widget.setContentsMargins(0,0,0,0)
             
             self.sb_range_min_widget = ui_common.QFloatLineEdit()
-            self.sb_range_min_widget.setValue(info_object.range_min)
+            self.sb_range_min_widget.setValue(info_object.output_range_min)
             self.sb_range_min_widget.valueChanged.connect(self._range_min_changed_cb)
 
             self.sb_range_max_widget = ui_common.QFloatLineEdit()
-            self.sb_range_max_widget.setValue(info_object.range_max)
+            self.sb_range_max_widget.setValue(info_object.output_range_max)
 
             self.sb_range_max_widget.valueChanged.connect(self._range_max_changed_cb)
 
@@ -3999,6 +4058,12 @@ class ActionContainerUi(QtWidgets.QDialog):
             self.container_output_range_layout.addWidget(self.sb_range_min_widget)
             self.container_output_range_layout.addWidget(QtWidgets.QLabel("Range Max:"))
             self.container_output_range_layout.addWidget(self.sb_range_max_widget)
+
+            self.reset_range_button_widget = QtWidgets.QPushButton("Reset")
+            self.reset_range_button_widget.setToolTip("Reset to default range")
+            self.reset_range_button_widget.clicked.connect(self._range_reset_cb)
+
+            self.container_output_range_layout.addWidget(self.reset_range_button_widget)
             self.container_output_range_layout.addStretch()
             
             self.container_fixed_widget = QtWidgets.QWidget()
@@ -4015,6 +4080,8 @@ class ActionContainerUi(QtWidgets.QDialog):
             self.container_range_data_layout.addWidget(self.container_output_range_widget)
             self.container_range_data_layout.addWidget(self.container_fixed_widget)
             
+            # update the repeater
+            self._update_axis_widget()
             
 
         else:
@@ -4070,6 +4137,11 @@ class ActionContainerUi(QtWidgets.QDialog):
         self._condition_changed_cb()
 
 
+    def _current_input_axis(self):
+        ''' gets the current input axis value '''
+        return gremlin.joystick_handling.get_axis(self._action_data.hardware_device_guid, 
+                                                  self._action_data.hardware_input_id) 
+
     @QtCore.Slot(object)
     def _joystick_event_cb(self, event):
         ''' updates axis output based on input '''
@@ -4106,6 +4178,19 @@ class ActionContainerUi(QtWidgets.QDialog):
         if value is not None:
             self.axis_widget.setValue(value)
 
+    def _update_axis_widget(self, value : float = None):
+        ''' updates the axis output repeater with the value 
+        
+        :param value: the floating point input value, if None uses the cached value
+        
+        '''
+        if value is None:
+            value = self._current_input_axis()
+        value = self._gate_data._get_filtered_range_value(self._info, value)
+        if value is not None:
+            self.axis_widget.setValue(value)
+
+
     QtCore.Slot()
     def _delay_changed_cb(self):
         ''' delay value changed for gates '''
@@ -4137,28 +4222,36 @@ class ActionContainerUi(QtWidgets.QDialog):
         self.delete_requested.emit(self._info)
         self.close()
 
-    
-
-
     QtCore.Slot()
     def _range_min_changed_cb(self):
         value = self.sb_range_min_widget.value()
         self._info.output_range_min = value
-        
+        self._update_axis_widget()        
 
     QtCore.Slot()
     def _range_max_changed_cb(self):
         self._info.output_range_max = self.sb_range_max_widget.value()
+        self._update_axis_widget()        
+
+    @QtCore.Slot()
+    def _range_reset_cb(self):
+        ''' reset range '''
+        info_object = self._info
+        self.sb_range_min_widget.setValue(info_object.range_min)
+        self.sb_range_max_widget.setValue(info_object.range_max)
 
     QtCore.Slot()
     def _fixed_value_changed_cb(self):
         self._info.fixed_value = self.sb_fixed_value_widget.value()
+        # update the repeater
+        self._update_axis_widget()
 
     @QtCore.Slot()
     def _output_mode_changed_cb(self):
         ''' change the output mode of a range'''
         value = self.output_mode_widget.currentData()
         self._info.mode = value
+        print (f"Range mode: {value}")
         self._update_ui()
     
     @QtCore.Slot()
@@ -4203,6 +4296,9 @@ class ActionContainerUi(QtWidgets.QDialog):
 
             self.container_fixed_widget.setVisible(fixed_visible)
             self.container_output_range_widget.setVisible(range_visible)
+
+            # update the repeater
+            self._update_axis_widget()
 
 
         else:

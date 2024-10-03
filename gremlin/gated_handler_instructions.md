@@ -1,5 +1,4 @@
 
-
 # Gated Axis Interaction guide
 
 ## General usage
@@ -33,7 +32,7 @@ Gates cannot be stacked (meaning, on top of one another).  Only one gate can occ
 
 - Drag a gate via the mouse to change its position and value.
 - The position is more precise by entering the specific value in the gate data repeater.
-- You can use the mouse wheel to change the numeric value while hovering over it.
+- You can use the mouse wheel to change the numeric value while hovering over it.  Hold the shift key to increase sensitivity (smaller increments).
 - The normalize buttons change all gate values are regular intervals based on the left-most and right-most gate positions, or resets the whole range.
   
 ## Ways to remove a gate

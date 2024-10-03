@@ -647,7 +647,15 @@ class EventListener(QtCore.QObject):
 		''' returns the state of the given key '''
 		return self._keyboard_state.get(key.index_tuple(), False)
 	
-
+	def get_shifted_state(self):
+		lshift_key = gremlin.keyboard.Key(scan_code = gremlin.keyboard.scan_codes.sc_shiftLeft)
+		if self.get_key_state(lshift_key):
+			return True
+		rshift_key = gremlin.keyboard.Key(scan_code = gremlin.keyboard.scan_codes.sc_shiftRight)
+		if self.get_key_state(rshift_key):
+			return True
+		
+		return False
 
 	def _mouse_handler(self, event):
 		"""Callback for mouse events.

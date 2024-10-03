@@ -106,7 +106,7 @@ class Key():
         
     """
 
-    def __init__(self, name = None, scan_code = None, is_extended = None, virtual_code = None, is_mouse = False):
+    def __init__(self, name = None, scan_code : int = None, is_extended : bool = None, virtual_code : int = None, is_mouse : bool = False):
         """Creates a new Key instance.
 
         :param name the name used to refer to this key
@@ -119,9 +119,6 @@ class Key():
         :param is_mouse True if the key is a mouse button instead of a key - if set only the name is used
         """
 
-
-        
-        
         if scan_code is None:
             scan_code = 0
         if virtual_code is None:
@@ -173,10 +170,9 @@ class Key():
         return self._is_mouse
 
 
-    def _load(self, scan_code, is_extended, virtual_code, is_mouse):
+    def _load(self, scan_code : int, is_extended : bool, virtual_code : int, is_mouse : bool):
         self._mouse_button = None
         name = None
-        
         if is_mouse or scan_code >= 0x1000:
             if scan_code >= 0x1000:
                 # convert fake scan code to convert to a mouse button
@@ -622,7 +618,7 @@ def key_from_code(scan_code, is_extended):
 
 
 
-class scan_codes(enum.Enum):
+class scan_codes(enum.IntEnum):
     ''' windows scan codes lookup '''
     sc_escape = 0x01
     sc_1 = 0x02

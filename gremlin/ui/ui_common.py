@@ -244,12 +244,15 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
             # handle wheel up/down change
             v = self.value()
             if v is not None:
+                eh = gremlin.event_handler.EventListener()
+                is_shifted = eh.get_shifted_state()
+                factor = 0.1 if is_shifted else 1.0
                 if event.angleDelta().y() > 0:
                     # up
-                    v += self._step
+                    v += self._step * factor
                 else:
                     # down
-                    v -= self._step
+                    v -= self._step * factor
                 v = gremlin.util.clamp(v, self._min_range, self._max_range)
                 self.setValue(v)
                 self.valueChanged.emit(v)
@@ -3499,7 +3502,7 @@ class QFlowLayout(QtWidgets.QLayout):
                 if not testonly:
                     item.setGeometry(
                         QtCore.QRect(QtCore.QPoint(x, y), item.sizeHint()))
-                    print (f"flow [{index}] position {x} {y}")
+                    # print (f"flow [{index}] position {x} {y}")
                     index+=1
 
                 col += 1
