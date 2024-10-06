@@ -15,6 +15,18 @@ The area of the axis between two gates is a range.  A range can "trigger" action
 
 Action lists for a range are the same as a Joystick Axis from the GremlinEx perspective.
 
+### Range Modes
+
+When the input axis is in a given range, the range mode determines the output behavior and what happens while the input is in the range.
+
+| Mode | Description |
+| ---- | ----------- |
+| Normal | The output range is the same as the input range |
+| Ranged | The output range can be rescaled to a new min/max range |
+| Fixed | The output is constant (fixed) while the input is in the range.  The same value is sent whenever the input changes. |
+| Filtered | There is no output sent while the input is in this range |
+| Rebased | Similar to Ranged mode, but the range is always set to -1 to +1 |
+
 ## Configuring a gate or a range
 
 - Double click a gate or a range to view its configuration and mapping options (dialog).

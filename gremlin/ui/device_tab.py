@@ -96,7 +96,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
         else:
             self._create_dropdowns()
 
-        self.action_model = ActionContainerModel(self.item_data.containers, self.item_data)
+        self.action_model = ActionContainerModel(self.item_data.containers, self.item_data, self._input_type)
         self.action_view = ActionContainerView()
         self.action_view.setContentsMargins(0,0,0,0)
         self.action_view.set_model(self.action_model)
@@ -350,20 +350,27 @@ class ActionContainerModel(gremlin.ui.ui_common.AbstractModel):
 
     """Stores action containers for display using the corresponding view."""
 
-    def __init__(self, containers, item_data = None, parent=None):
+    def __init__(self, containers, item_data : InputItemConfiguration = None, input_type: InputType = None, parent=None):
         """Creates a new instance.
 
-        :param containers the container instances of this model
-        :param parent the parent of this widget
+        :param containers: the container instances of this model
+        :param item_data: the input mapping data (InputItemConfiguration)
+        :param input_type: the override input type if different from the input item configuration
+        :param parent: the parent of this widget
         """
         super().__init__(parent)
         self._containers = containers
         self._item_data = item_data
+        self._input_type = input_type if input_type is not None else item_data._input_type
 
     @property
-    def item_data(self):
+    def item_data(self) -> InputItemConfiguration:
         ''' get the item data associated with this action container '''
         return self._item_data
+    
+    @property
+    def input_type(self) -> InputType:
+        return self._input_type
     
     def rows(self):
         """Returns the number of rows in the model.
@@ -459,7 +466,8 @@ class ActionContainerView(gremlin.ui.ui_common.AbstractView):
                         widget.container_modified.connect(self.model.data_changed.emit)
                         self.scroll_layout.addWidget(widget)
                 else:
-                    label = QtWidgets.QLabel(f"Please add an action or container for {self.model.item_data.display_name}")
+                    input_type = self.model.input_type # InputType.JoystickAxis
+                    label = QtWidgets.QLabel(f"Please add an action or container for {self.model.item_data.display_name} ({InputType.to_display_name(input_type)})")
                     label.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop | QtCore.Qt.AlignmentFlag.AlignLeft)
                     self.scroll_layout.addWidget(label)
                 self.scroll_layout.addStretch(1)
@@ -530,8 +538,6 @@ class JoystickDeviceTabWidget(QDataWidget):
 
         self.right_container_layout = QtWidgets.QVBoxLayout(self.right_container_widget)
         self.right_container_layout.setContentsMargins(0,0,0,0)
-
-        
 
         self.device_profile.ensure_mode_exists(current_mode, self.device)
 
@@ -739,8 +745,8 @@ class JoystickDeviceTabWidget(QDataWidget):
         widgets = gremlin.util.get_layout_widgets(self.right_container_layout)
         for widget in widgets:
             if isinstance(widget, InputItemConfiguration):
-                if verbose:
-                    syslog.info(f"Hide widget:{widget.id} {widget.item_data.debug_display if widget.item_data else 'N/A'}")
+                # if verbose:
+                #     syslog.info(f"Hide widget:{widget.id} {widget.item_data.debug_display if widget.item_data else 'N/A'}")
                 widget.setVisible(False)
             else:
                 self.right_container_layout.removeWidget(widget)
