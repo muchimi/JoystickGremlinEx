@@ -867,6 +867,8 @@ def parse_guid(value):
     :param value the string representation of the GUID
     :param dinput.GUID object representing the provided value
     """
+    if value is None:
+        return None
     try:
         tmp = uuid.UUID(value)
         raw_guid = dinput._GUID()

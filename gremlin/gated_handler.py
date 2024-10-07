@@ -1210,7 +1210,7 @@ class GateData():
         triggers = self.process_triggers(input_value, self._active_ranges)
         trigger: TriggerData
 
-        verbose = gremlin.config.Configuration().verbose #_mode_details
+        verbose = gremlin.config.Configuration().verbose_mode_details
 
         
         # if verbose:
@@ -1288,7 +1288,7 @@ class GateData():
                             callbacks = callback_map[condition]
                 else:
                     # gate trigger
-                    if trigger.range in self._callbacks:
+                    if trigger.gate in self._callbacks:
                         callback_map = self._callbacks[trigger.gate]
                         if condition in callback_map:
                             callbacks = callback_map[condition]

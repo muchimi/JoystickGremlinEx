@@ -383,8 +383,8 @@ class Remap(gremlin.base_profile.AbstractAction):
         self.vjoy_input_id = None
         input_type = self.parent.parent.input_type
         self.input_type = input_type
-        if input_type == InputType.OpenSoundControl:
-            self.is_axis = self.parent.parent.input_id.is_axis
+        if hasattr(self.parent.parent,"is_axis"):
+            self.is_axis = self.parent.parent.is_axis
         else:
             self.is_axis = input_type == InputType.JoystickAxis
         

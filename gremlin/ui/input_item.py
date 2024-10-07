@@ -1097,8 +1097,6 @@ class InputItemWidget(QtWidgets.QFrame):
         else:
             self.custom_container_widget = None
 
-
-
         if self.custom_container_widget:
             self._container_layout.addWidget(self.custom_container_widget,self._row_custom_content,0) # custom container
         

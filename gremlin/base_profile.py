@@ -217,7 +217,7 @@ class ProfileData(metaclass=ABCMeta):
     def hardware_device(self):
         ''' gets the hardware device attached to this action '''
         profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
-        device_guid = self.get_device_guid()
+        device_guid = self.hardware_device_guid
         if device_guid in profile.devices.keys():
             return profile.devices[device_guid]
         return None
@@ -225,25 +225,25 @@ class ProfileData(metaclass=ABCMeta):
     @property
     def hardware_input_id(self):
         ''' gets the input id on the hardware device attached to this '''
-        return self.get_input_id()
+        return self.input_item.input_id if self.input_item else None
     
     @property
-    def hardware_input_type(self):
+    def hardware_input_type(self) -> InputType :
         ''' gets the type of hardware device attached to this '''
-        return self.get_input_type()
+        return self.input_item.input_type if self.input_item else None
     
     @property
-    def hardware_input_type_name(self):
+    def hardware_input_type_name(self) -> str:
         ''' gets the type name of hardware device attached to this '''
-        return InputType.to_display_name(self.get_input_type())
+        return InputType.to_display_name(self.hardware_input_type)
     
     @property
-    def hardware_device_guid(self):
+    def hardware_device_guid(self) -> dinput.GUID:
         ''' gets the currently attached hardware GUID '''
-        return self.get_device_guid()
+        return self.input_item.device_guid if self.input_item else None
     
     @property
-    def hardware_device_name(self):
+    def hardware_device_name(self) -> str:
         ''' gets the currently attached hardware name '''
         return self.get_device_name()
 
@@ -361,17 +361,17 @@ class AbstractContainer(ProfileData):
     @property
     def hardware_device_guid(self):
         ''' gets the GUID of the mapped hardware device'''
-        return self.device_guid
+        return self.input_item.device_guid if self.input_item else None #self.device_guid
     
     @property
     def hardware_input_id(self):
         ''' gets the input id on the hardware device attached to this '''
-        return self.device_input_id
+        return self.input_item.input_id if self.input_item else None # self.device_input_id
     
     @property
     def hardware_input_type(self):
         ''' gets the type of hardware device attached to this '''
-        return self.device_input_type
+        return self.input_item.input_type if self.input_item else None # self.device_input_type
     
     @property
     def input_display_name(self):

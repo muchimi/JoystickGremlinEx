@@ -2709,14 +2709,14 @@ class OscDeviceTabWidget(QDataWidget):
         device_guid = self.device_guid
         input_type = InputType.OpenSoundControl
         input_id = input_data.input_id if input_data else None
-        input_data.is_axis = input_id.is_axis
+        
 
         config.set_last_input(device_guid, input_type, input_id)
 
         if input_data:
             
             # Create new configuration widget
-            
+            input_data.is_axis = input_id.is_axis
             change_cb = self._create_change_cb(index)
             self._item_data.action_model.data_changed.connect(change_cb)
             self._item_data.description_changed.connect(change_cb)

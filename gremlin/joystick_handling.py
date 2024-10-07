@@ -29,6 +29,7 @@ from dinput import DeviceSummary
 from gremlin.input_types import InputType
 import gremlin.config
 
+
 # List of all joystick devices
 _joystick_devices = []
 
@@ -80,15 +81,21 @@ class VJoyProxy:
         VJoyProxy.vjoy_devices = {}
 
       
-def joystick_devices():
+def joystick_devices() -> list[DeviceSummary]:
     """Returns the list of joystick like devices.
 
     :return list containing information about all joystick like devices
     """
     return _joystick_devices
 
+def axis_input_devices() -> list[DeviceSummary]:
+    ''' returns the list of input devices '''
+    devices = [dev for dev in _joystick_devices if dev.axis_count]
+    return devices
+    
 
-def vjoy_devices():
+
+def vjoy_devices() -> list[DeviceSummary]:
     """Returns the list of vJoy devices.
 
     :return list of vJoy devices
@@ -183,7 +190,7 @@ def select_first_valid_vjoy_input(valid_types):
     return None
 
 
-def vjoy_id_from_guid(guid):
+def vjoy_id_from_guid(guid : str | dinput.GUID):
     """Returns the vJoy id corresponding to the given device GUID.
 
     Parameters
@@ -196,6 +203,8 @@ def vjoy_id_from_guid(guid):
     int
         vJoy id corresponding to the provided device
     """
+    if isinstance(guid, str):
+        guid = util.parse_guid(guid) # convert to dinput GUID 
     for dev in vjoy_devices():
         if dev.device_guid == guid:
             return dev.vjoy_id
@@ -205,25 +214,31 @@ def vjoy_id_from_guid(guid):
     )
     return 1
 
-def device_name_from_guid(guid) -> str:
+def device_name_from_guid(guid : str | dinput.GUID) -> str:
     ''' gets device name from GUID '''
+    if isinstance(guid, str):
+        guid = util.parse_guid(guid) # convert to dinput GUID 
     if guid in _joystick_device_guid_map.keys():
         return _joystick_device_guid_map[guid].name
     return None
     
-def device_info_from_guid(guid) -> DeviceSummary:
+def device_info_from_guid(guid : str | dinput.GUID) -> DeviceSummary:
     ''' gets physical device information '''
+    if isinstance(guid, str):
+        guid = util.parse_guid(guid) # convert to dinput GUID 
     if guid in _joystick_device_guid_map.keys():
         return _joystick_device_guid_map[guid]
     return None
 
-def is_device_connected(guid) -> bool:
+def is_device_connected(guid : str | dinput.GUID) -> bool:
     ''' true if the device is connected (reported in) '''
+    if isinstance(guid, str):
+        guid = util.parse_guid(guid) # convert to dinput GUID 
     return guid in _joystick_device_guid_map.keys()
 
 
 
-def linear_axis_index(axis_map, axis_index):
+def linear_axis_index(axis_map : dinput.AxisMap, axis_index : int) -> int:
     """Returns the linear index for an axis based on the axis index.
 
     Parameters

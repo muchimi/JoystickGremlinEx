@@ -1704,6 +1704,21 @@ class QDataCheckbox(QtWidgets.QCheckBox):
         self._data = value
 
 
+
+class QDataRadioButton(QtWidgets.QRadioButton):
+    ''' a radio button that has a data property to track an object associated with the checkbox '''
+    def __init__(self, text = None, data = None, parent = None):
+        super().__init__(text, parent)
+        self._data = data
+
+    @property
+    def data(self):
+        return self._data
+    
+    @data.setter
+    def data(self, value):
+        self._data = value
+
 class QDataPushButton(QtWidgets.QPushButton):
     ''' a checkbox that has a data property to track an object associated with the checkbox '''
     def __init__(self, text = None, data = None, parent = None):

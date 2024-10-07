@@ -159,18 +159,20 @@ Joystick Gremlin EX
 ## 13.40.15ex (pre-release)
 
 ### (m2)
+- First attempt with multiple code refactors and bug fixes detailed below.
 - Added cleanup events for action plugins so they can release resources via _cleanup() \[AbstractAction] and _cleanup_ui() \[AbstractActionWidget] - the methods are virtual so are optional but will be called when an action is deleted or unloaded.  This helps with releasing references that could cause problems with the automatic garbage collection and hooks into various events.
-- Cut/Paste refactor for Containers and Actions - this eliminates keeping a reference to the source binary object that can cause problems with garbage collection. The refactor now only stores XML configuration data in the internal clipboard and is thus much smaller memory wise.
+- **Cut/Paste refactor** for Containers and Actions - this eliminates keeping a reference to the source binary object that can cause problems with garbage collection. The refactor now only stores XML configuration data in the internal clipboard and is thus much smaller memory wise.
 - Many UI objects are now persisted rather than being recreated on UI refresh (performance and memory optimization)
-- Refactored Gated Axis with custom control to avoid critical crash involving QT Slider.
-- Gated Axis now supports concurrent mappings for range and gate condition (they stack) 
+- Refactored **Gated Axis with custom control** to avoid QT internal critical crash involving QT sliders.
+- **Gated Axis** now supports concurrent mappings for range and gate condition (they stack)
+- Added a **new axis merge** capability direct into the "**map to vjoy**" plugin.  This avoids the need to use the separate merged axis functionality. The base iteration lets you merge another input concurrently via the "Merge Axis" mode and select add, average and center mode, optional inversion, and output scaling.  The merged output data will be sent to the mapped containers/actions. 
 - Fixed a minor icon sizing issue for action icons - they are now all consistent.
 - For newer users using legacy profiles, legacy keyboard, mouse and remap plugins now indicate there are replacements plugins in GremlinEx.
 - GremlinEx now has separate preferences kept with each profile (will have a .json extension)
 - One such preference is remembering the last selection per device per profile that will be restored on subsequent profile load if the device/input still exists.
 - Fixed an issue with automated description entries being saved to a profile overriding the manually entered description for an input.
-- Fixed an issue with OSC with the UI refactor
-- Further refactor of ComboBoxes to only display up to 20 items before scrolling
+- Fixed an issue with OSC and MIDI UI due to prior UI refactors
+- Further refactor of **ComboBoxes** to only display up to 20 items before scrolling
 - Update to QT 6.7.3
 
 ### (m1)

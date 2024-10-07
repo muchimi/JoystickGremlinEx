@@ -37,6 +37,8 @@ import gremlin.event_handler
 import gremlin.config 
 from gremlin.base_classes import AbstractInputItem
 import gremlin.ui.ui_common
+import gremlin.ui.device_tab
+import gremlin.base_profile
 
 ''' these MIDI objects are based on the MIDO and python-rtMIDI libraries '''
 
@@ -181,6 +183,7 @@ class MidiInputItem(AbstractInputItem):
                 return "Change"
             
         
+        
 
 
     def __init__(self):
@@ -242,7 +245,7 @@ class MidiInputItem(AbstractInputItem):
     @mode.setter
     def mode(self, value):
         self._mode = value
-        self._mode_string = self.mode_string(value)
+        self._mode_string = MidiInputItem.InputMode.to_string(value)
 
 
     @property
@@ -607,7 +610,6 @@ class MidiInputListenerWidget(QtWidgets.QFrame):
         :param parent the parent widget of this widget
         """
         super().__init__(parent)
-        from gremlin.shared_state import set_suspend_input_highlighting
 
 
         # setup and listen for the midi message
@@ -813,6 +815,9 @@ class MidiInputConfigDialog(QtWidgets.QDialog):
         self._container_mode_radio_widget.setLayout(self._container_mode_radio_layout)
         self._container_mode_description_widget = QtWidgets.QLabel()
 
+        # comment field
+        self._container_mode_comment_widget = QtWidgets.QLabel()
+
 
 
         self._mode_button_widget = QtWidgets.QRadioButton("Button")
@@ -841,6 +846,7 @@ class MidiInputConfigDialog(QtWidgets.QDialog):
 
         self._container_mode_layout.addWidget(self._container_mode_radio_widget)
         self._container_mode_layout.addWidget(self._container_mode_description_widget)
+        self._container_mode_layout.addWidget(self._container_mode_comment_widget)
 
 
         
@@ -920,7 +926,9 @@ class MidiInputConfigDialog(QtWidgets.QDialog):
         if self._mode_locked:
             self._mode_locked_widget.setIcon("fa.lock")
             stub = "Axis to button" if self._mode == MidiInputItem.InputMode.Axis else "Button to axis"
-            self._mode_locked_widget.setToolTip(f"{stub} change is locked because InputItem has containers defined for that specific input type.<br>Clear the containers to unlock.")
+            msg = f"{stub} change is locked because InputItem has containers defined for that specific input type.<br>Clear the containers to unlock."
+            self._mode_locked_widget.setToolTip(msg)
+            self.setComment(msg)
             if self._mode == MidiInputItem.InputMode.Axis:
                 # lock the button modes
                 self._mode_button_widget.setEnabled(False)
@@ -929,6 +937,7 @@ class MidiInputConfigDialog(QtWidgets.QDialog):
                 self._mode_axis_widget.setEnabled(False)
         else:
             self._mode_locked_widget.setIcon()
+            self.setComment()
 
 
         
@@ -961,6 +970,13 @@ class MidiInputConfigDialog(QtWidgets.QDialog):
 
         # update port specific listen button label
         self.listen_filter_widget.setText(f"Listen ({self.port_name})")
+
+    def setComment(self, value : str = None):
+        ''' sets the comment'''
+        if value is None:
+            value = ''
+        self._container_mode_comment_widget.setText(value)
+            
 
     def _update_command(self):
         command = self._midi_command_selector_widget.currentData()
@@ -1454,13 +1470,13 @@ class MidiDeviceTabWidget(QDataWidget):
         :param index the index of the selected item
         """
 
-        item_data = self.input_item_list_model.data(index)
+        input_data : gremlin.base_profile.InputItem = self.input_item_list_model.data(index)
 
         # remember the last input
         config = gremlin.config.Configuration()
         device_guid = self.device_guid
         input_type = InputType.Midi
-        input_id = item_data.input_id if item_data else None
+        input_id = input_data.input_id if input_data else None
         config.set_last_input(device_guid, input_type, input_id)
 
         right_panel = self.main_layout.takeAt(1)
@@ -1470,16 +1486,18 @@ class MidiDeviceTabWidget(QDataWidget):
         if right_panel:
             self.main_layout.removeItem(right_panel)
 
-        widget = gremlin.ui.device_tab.InputItemConfiguration(item_data)
-        self.main_layout.addWidget(widget,3)            
+        self._item_data = gremlin.ui.device_tab.InputItemConfiguration(input_data)
+        self.main_layout.addWidget(self._item_data,3)            
 
-        if item_data:
+        if input_data:
             
             # Create new configuration widget
-            
+            input_data.is_axis = input_id.is_axis
             change_cb = self._create_change_cb(index)
-            widget.action_model.data_changed.connect(change_cb)
-            widget.description_changed.connect(change_cb)
+            self._item_data.action_model.data_changed.connect(change_cb)
+            self._item_data.description_changed.connect(change_cb)
+
+
     
 
 
@@ -1583,6 +1601,7 @@ class MidiDeviceTabWidget(QDataWidget):
         self._edit_dialog = MidiInputConfigDialog(self.current_mode, index, data, self)
         self._edit_dialog.accepted.connect(self._dialog_ok_cb)
         self._edit_dialog.showNormal()
+        self._index = index
 
     def _dialog_ok_cb(self):
         ''' called when the ok button is pressed on the edit dialog '''
@@ -1591,13 +1610,19 @@ class MidiDeviceTabWidget(QDataWidget):
         port_name = self._edit_dialog.port_name
         mode = self._edit_dialog.mode
 
+        
 
         data = self.input_item_list_model.data(index)
         data.input_id.port_name = port_name
         data.input_id.message = message
         data.input_id.mode = mode
-        self.input_item_list_view.update_item(index)
-        
+
+        is_axis = mode == MidiInputItem.InputMode.Axis
+        self._item_data.is_axis = is_axis
+        self._item_data.item_data.is_axis = is_axis
+
+        #self.input_item_list_view.update_item(index)
+        self._select_item_cb(self._index) # forces update and redraw if mode changed
 
     def _close_item_cb(self, widget, index, data):
         ''' called when the close button is clicked '''
