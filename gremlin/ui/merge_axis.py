@@ -212,7 +212,7 @@ class MergeAxisEntry(QtWidgets.QDockWidget):
         )
 
         # Operation selection
-        self.operation_selector = QtWidgets.QComboBox()
+        self.operation_selector = ui_common.QComboBox()
         self.operation_selector.addItem("Average")
         self.operation_selector.addItem("Minimum")
         self.operation_selector.addItem("Maximum")

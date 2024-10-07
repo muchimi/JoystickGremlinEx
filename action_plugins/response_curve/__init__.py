@@ -31,6 +31,7 @@ from gremlin.input_types import InputType
 import gremlin.joystick_handling
 from gremlin.ui.ui_common import DynamicDoubleSpinBox, DualSlider, get_text_width
 import gremlin.ui.input_item
+import gremlin.ui.ui_common
 import gremlin.util
 import gremlin.shared_state
 
@@ -1189,7 +1190,7 @@ class ResponseCurveWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.container_options_layout = QtWidgets.QHBoxLayout(self.container_options_widget)
 
         # Dropdown menu for the different curve types
-        self.curve_type_selection = QtWidgets.QComboBox()
+        self.curve_type_selection = gremlin.ui.ui_common.QComboBox()
         self.curve_type_selection.addItem("Cubic Spline")
         self.curve_type_selection.addItem("Cubic Bezier Spline")
         self.curve_type_selection.currentTextChanged.connect(

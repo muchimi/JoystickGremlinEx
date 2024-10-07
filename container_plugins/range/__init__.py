@@ -127,7 +127,7 @@ class RangeContainerWidget(AbstractContainerWidget):
         add_button_top_90.setToolTip("Configures the container for the top 90 percent range.  When used with the symmetry option, sets a trigger for bottom 10 percent or top 10 percent of the input range")
 
         action_label = QtWidgets.QLabel("Actions")
-        self.ui_action_dropdown = QtWidgets.QComboBox()
+        self.ui_action_dropdown = gremlin.ui.ui_common.QComboBox()
 
         for entry in gremlin.plugin_manager.ActionPlugins().repository.values():
             self.ui_action_dropdown.addItem(entry.name, entry)

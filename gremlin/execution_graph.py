@@ -57,13 +57,12 @@ class ContainerCallback:
         Creates a Value object from the event and passes the two through the
         execution graph until every entry has run or it is aborted.
         """
-        if event.event_type in [
-            InputType.JoystickAxis,
-            InputType.JoystickHat
-        ]:
+        if event.is_axis:
             value = gremlin.actions.Value(event.value)
         elif event.event_type in [
             InputType.JoystickButton,
+            InputType.Midi,
+            InputType.OpenSoundControl,
             InputType.Keyboard,
             InputType.VirtualButton
         ]:

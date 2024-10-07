@@ -342,6 +342,7 @@ class EventListener(QtCore.QObject):
 		''' processes an item the keyboard buffer queue '''
 		item, is_pressed = self._keyboard_queue.get()
 		verbose = gremlin.config.Configuration().verbose_mode_keyboard
+		is_error = False
 		if verbose:
 			logging.getLogger("system").info(f"process_queue: found item: {item} is presseD: {is_pressed}")
 
@@ -356,19 +357,26 @@ class EventListener(QtCore.QObject):
 			key_id = item
 			scan_code, is_extended = item
 			key = gremlin.keyboard.KeyMap.find(scan_code, is_extended)
-			virtual_code = key.virtual_code
-			self._keyboard_buffer[key_id] = is_pressed
-		if verbose:
-			logging.getLogger("system").info(f"DEQUEUE KEY {gremlin.keyboard.KeyMap.keyid_tostring(key_id)} vk: {virtual_code} (0x{virtual_code:X}) name: {key.name} pressed: {is_pressed}")
-		
-		self.keyboard_event.emit(Event(
-			event_type= InputType.Keyboard,
-			device_guid=dinput.GUID_Keyboard,
-			identifier=key_id,
-			virtual_code = virtual_code,
-			is_pressed=is_pressed,
-			data = self._keyboard_buffer
-		))
+			if key is None:
+				logging.getLogger("system").error(f"DEQUEUE KEY: don't know how to handle scancode: {scan_code:x} extended: {is_extended}")	
+				is_error = True
+			else:				
+				virtual_code = key.virtual_code
+				self._keyboard_buffer[key_id] = is_pressed
+
+		if not is_error:
+			if verbose:
+				logging.getLogger("system").info(f"DEQUEUE KEY {gremlin.keyboard.KeyMap.keyid_tostring(key_id)} vk: {virtual_code} (0x{virtual_code:X}) name: {key.name} pressed: {is_pressed}")
+			
+
+			self.keyboard_event.emit(Event(
+				event_type= InputType.Keyboard,
+				device_guid=dinput.GUID_Keyboard,
+				identifier=key_id,
+				virtual_code = virtual_code,
+				is_pressed=is_pressed,
+				data = self._keyboard_buffer
+			))
 
 		# process the events
 		QtWidgets.QApplication.processEvents()

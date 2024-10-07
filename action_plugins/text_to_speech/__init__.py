@@ -39,7 +39,7 @@ class TextToSpeechWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _create_ui(self):
 
 
-        self.voice_widget = QtWidgets.QComboBox()
+        self.voice_widget = gremlin.ui.ui_common.QComboBox()
         tts = gremlin.tts.TextToSpeech()
         for voice in tts.getVoices():
             self.voice_widget.addItem(voice.name, voice.id)

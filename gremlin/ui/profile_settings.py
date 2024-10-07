@@ -184,7 +184,7 @@ class DefaultModeSelector(QtWidgets.QGroupBox):
         """Creates the UI used to configure the startup mode."""
         self.setTitle("Startup Mode")
 
-        self.dropdown = QtWidgets.QComboBox()
+        self.dropdown = gremlin.ui.ui_common.QComboBox()
         # self.dropdown.addItem("Use Heuristic")
         for mode in gremlin.profile.mode_list(self.profile_data):
             self.dropdown.addItem(mode)

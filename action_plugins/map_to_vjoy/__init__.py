@@ -1947,8 +1947,11 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         
     def input_is_axis(self):
         ''' true if the input is an axis type input '''
+
         is_axis = hasattr(self.hardware_input_id, "is_axis") and self.hardware_input_id.is_axis
-        return is_axis or self.input_type == InputType.JoystickAxis
+        is_axis = is_axis or self.input_type == InputType.JoystickAxis \
+            or (self.input_type == InputType.OpenSoundControl and self.input_item.is_axis)
+        return is_axis
 
     @property
     def exec_on_release(self):

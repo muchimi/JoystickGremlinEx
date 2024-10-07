@@ -64,9 +64,11 @@ class InputItemConfiguration(QtWidgets.QFrame):
         self.widget_layout = QtWidgets.QVBoxLayout()
         self._input_type = InputType.NotSet
         if input_type is not None:
+            # override input type
             self._input_type = input_type
-        elif item_data is not None:
-            self._input_type = item_data.input_type
+        else:
+            if item_data is not None:
+                self._input_type = item_data.input_type
 
         if item_data is None:
             parent = self.parent()
@@ -84,7 +86,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
         verbose = gremlin.config.Configuration().verbose
         if verbose:
             syslog = logging.getLogger("system")
-            syslog.info(f"Create InputItemConfiguation for {item_data.debug_display}")
+            syslog.info(f"Create InputItemConfiguration for {item_data.debug_display}")
 
         
         if not item_data.is_action:
@@ -133,8 +135,8 @@ class InputItemConfiguration(QtWidgets.QFrame):
         
         self.action_model.data_changed.emit()
 
-        eh = gremlin.event_handler.EventListener()
-        eh.mapping_changed.emit(self.item_data)
+        el = gremlin.event_handler.EventListener()
+        el.mapping_changed.emit(self.item_data)
         
 
     def _paste_action(self, action):
@@ -411,6 +413,9 @@ class ActionContainerModel(gremlin.ui.ui_common.AbstractModel):
 
             del self._containers[self._containers.index(container)]
         self.data_changed.emit()
+
+        el = gremlin.event_handler.EventListener()
+        el.mapping_changed.emit(self.item_data)
 
 
 class ActionContainerView(gremlin.ui.ui_common.AbstractView):

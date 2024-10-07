@@ -47,11 +47,14 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         InputType.JoystickButton: "Button",
         InputType.JoystickHat: "Hat",
         InputType.Keyboard: "Button",
+        InputType.Midi: "Button",
+        InputType.Keyboard: "Button",
+        InputType.OpenSoundControl: "Button",
     }
     name_to_type_map = {
         "Axis": InputType.JoystickAxis,
         "Button": InputType.JoystickButton,
-        "Hat": InputType.JoystickHat
+        "Hat": InputType.JoystickHat,
     }
 
     def __init__(self, action_data, parent=None):
@@ -91,6 +94,7 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
                 InputType.JoystickButton,
                 InputType.JoystickHat
             ]
+
         }
         self.vjoy_selector = ui_common.VJoySelector(
             lambda x: self.save_changes(),  # handler when selection changes
@@ -105,7 +109,7 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         # Create UI widgets for absolute / relative axis modes if the remap
         # action is being added to an axis input type
-        if self.action_data.get_input_type() == InputType.JoystickAxis:
+        if self.action_data.is_axis:
             self.remap_type_widget = QtWidgets.QWidget()
             self.remap_type_layout = QtWidgets.QHBoxLayout(self.remap_type_widget)
 
@@ -180,7 +184,7 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
                 vjoy_input_id
             )
 
-            if self.action_data.input_type == InputType.JoystickAxis:
+            if self.action_data.is_axis:
                 if self.action_data.axis_mode == "absolute":
                     self.absolute_checkbox.setChecked(True)
                 else:
@@ -236,6 +240,7 @@ class RemapFunctor(gremlin.base_classes.AbstractFunctor):
         self.input_type = action.input_type
         self.axis_mode = action.axis_mode
         self.axis_scaling = action.axis_scaling
+        self.is_axis = action.is_axis
 
         self.needs_auto_release = self._check_for_auto_release(action)
         self.thread_running = False
@@ -247,7 +252,7 @@ class RemapFunctor(gremlin.base_classes.AbstractFunctor):
         self.test = False
 
     def process_event(self, event, value):
-        if self.input_type == InputType.JoystickAxis:
+        if self.is_axis:
             if self.axis_mode == "absolute":
                 joystick_handling.VJoyProxy()[self.vjoy_device_id] \
                     .axis(self.vjoy_input_id).value = value.current
@@ -350,9 +355,11 @@ class Remap(gremlin.base_profile.AbstractAction):
     default_button_activation = (True, True)
     input_types = [
         InputType.JoystickAxis,
+        InputType.OpenSoundControl,
         InputType.JoystickButton,
         InputType.JoystickHat,
-        InputType.Keyboard
+        InputType.Keyboard,
+        InputType.Midi,
     ]
 
     @property
@@ -374,14 +381,20 @@ class Remap(gremlin.base_profile.AbstractAction):
         self.parent = parent
         self.vjoy_device_id = None
         self.vjoy_input_id = None
-        self.input_type = self.parent.parent.input_type
+        input_type = self.parent.parent.input_type
+        self.input_type = input_type
+        if input_type == InputType.OpenSoundControl:
+            self.is_axis = self.parent.parent.input_id.is_axis
+        else:
+            self.is_axis = input_type == InputType.JoystickAxis
+        
         self.axis_mode = "absolute"
         self.axis_scaling = 1.0
 
     def display_name(self):
         ''' returns a display string for the current configuration '''
         input_string = "Axis"
-        if self.input_type == InputType.JoystickButton:
+        if self.input_type in (InputType.JoystickButton):
             input_string = "Button"
         elif self.input_type == InputType.JoystickHat:
             input_string = "Hat"

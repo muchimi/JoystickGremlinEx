@@ -1286,7 +1286,9 @@ class OscClient(QtCore.QObject):
                 # button press mode - if the value is in the top half of the range, the button is considered pressed
                 is_axis = False
                 raw_value = args[0]
+
                 
+                input_type = InputType.OpenSoundControl
                 if input_item.mode == OscInputItem.InputMode.Button:
                     is_pressed = raw_value != 0.0   #for OSC pressed is any value except 0
                     value = 1 if is_pressed else 0
@@ -1304,9 +1306,9 @@ class OscClient(QtCore.QObject):
 
                 self._event_listener.osc_event.emit(
                 gremlin.event_handler.Event(
-                    event_type= InputType.OpenSoundControl,
-                    device_guid= OscDeviceTabWidget.device_guid,
-                    identifier= input_item,
+                    event_type = input_type,
+                    device_guid = OscDeviceTabWidget.device_guid,
+                    identifier = input_item,
                     is_pressed = is_pressed,
                     value = value,
                     raw_value = raw_value,

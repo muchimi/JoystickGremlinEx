@@ -24,6 +24,7 @@ from PySide6.QtGui import QIcon
 import gremlin.base_profile 
 from gremlin.input_types import InputType
 import gremlin.ui.input_item
+import gremlin.ui.ui_common
 
 
 class CycleModesWidget(gremlin.ui.input_item.AbstractActionWidget):
@@ -50,7 +51,7 @@ class CycleModesWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.view.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
 
             # Add widgets which allow modifying the mode list
-            self.mode_list = QtWidgets.QComboBox()
+            self.mode_list = gremlin.ui.ui_common.NoWheelComboBox()
             for entry in gremlin.profile.mode_list(self.action_data):
                 self.mode_list.addItem(entry)
             self.add = QtWidgets.QPushButton(load_icon("list_add.svg"),  "Add") 

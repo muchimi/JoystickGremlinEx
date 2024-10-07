@@ -35,6 +35,7 @@ import gremlin.joystick_handling
 import gremlin.shared_state
 import gremlin.types
 import gremlin.ui
+import gremlin.ui.ui_common
 
 import gremlin.ui.ui_about as ui_about
 import gremlin.ui.ui_common as ui_common
@@ -86,7 +87,7 @@ class ProfileOptionsUi(QtWidgets.QDialog):
         self.profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
         self.start_label = QtWidgets.QLabel("Start Mode")
         self.start_label.setSizePolicy(min_min_sp)
-        self.start_mode_selector = QtWidgets.QComboBox()
+        self.start_mode_selector = gremlin.ui.ui_common.QComboBox()
         self.start_mode_selector.setSizePolicy(exp_min_sp)
         self.start_mode_selector.setMinimumContentsLength(20)
         self.start_mode_selector.setToolTip("Selects the startup mode when the profile is activated and the restore last mode option is not set")
@@ -485,7 +486,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         
 
         self.default_action_label = QtWidgets.QLabel("Default action")
-        self.default_action_dropdown = QtWidgets.QComboBox()
+        self.default_action_dropdown = gremlin.ui.ui_common.QComboBox()
         self.default_action_layout.addWidget(self.default_action_label)
         self.default_action_layout.addWidget(self.default_action_dropdown)
         self._init_action_dropdown()
@@ -1836,7 +1837,7 @@ class ModeManagerUi(ui_common.BaseDialogUi):
         self.mode_layout.addWidget(QtWidgets.QLabel("<b>Name</b>"), 0, 0)
         self.mode_layout.addWidget(QtWidgets.QLabel("<b>Parent</b>"), 0, 1)
 
-        self.mode_default_selector = QtWidgets.QComboBox()
+        self.mode_default_selector = gremlin.ui.ui_common.QComboBox()
         self.mode_default_selector.setToolTip("Specifies the default startup mode for this profile when it is loaded. This setting can be overriden if the restore last active mode option is set.")
 
 
@@ -1844,7 +1845,7 @@ class ModeManagerUi(ui_common.BaseDialogUi):
         row = 1
         for mode, inherit in sorted(mode_list.items()):
             self.mode_layout.addWidget(QtWidgets.QLabel(mode), row, 0)
-            self.mode_dropdowns[mode] = QtWidgets.QComboBox()
+            self.mode_dropdowns[mode] = gremlin.ui.ui_common.QComboBox()
             self.mode_dropdowns[mode].addItem("None")
             self.mode_dropdowns[mode].setMinimumContentsLength(20)
             self.mode_default_selector.addItem(mode)
@@ -2479,8 +2480,8 @@ class SubstituteDialog(QtWidgets.QDialog):
         profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
 
         
-        self.profile_device_widget = QtWidgets.QComboBox()
-        self.hardware_device_widget = QtWidgets.QComboBox()
+        self.profile_device_widget = gremlin.ui.ui_common.QComboBox()
+        self.hardware_device_widget = gremlin.ui.ui_common.QComboBox()
         
         self.replace_button_widget = QtWidgets.QPushButton("Replace")
         self.replace_button_widget.clicked.connect(self._replace_cb)

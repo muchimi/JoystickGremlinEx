@@ -705,6 +705,7 @@ class InputItem():
         self._selected = False # true if the item is selected
         self._is_action = False # true if the object is a sub-item for a sub-action (GateHandler for example)
         self._device_type = None
+        self._is_axis = False # true if the item is an axis input
         if parent is not None:
             # find the missing properties from the parenting hierarchy
             self._is_action = isinstance(parent, AbstractAction)
@@ -746,18 +747,28 @@ class InputItem():
         
 
     @property
-    def selected(self):
+    def selected(self) -> bool:
+        ''' true if the item is selected'''
         return self._selected
     @selected.setter
-    def selected(self, value):
+    def selected(self, value : bool):
         self._selected = value
 
     @property
-    def is_action(self):
+    def is_action(self) -> bool:
+        ''' true if the item is action '''
         return self._is_action
     @is_action.setter
-    def is_action(self, value):
+    def is_action(self, value : bool):
         self._is_action = value
+
+    @property
+    def is_axis(self) -> bool:
+        ''' true if this item is setup as an axis input (non momentary'''
+        return self._is_axis
+    @is_axis.setter
+    def is_axis(self, value : bool):
+        self._is_axis = value
 
     def add_container(self, container):
         self._containers.append(container)
@@ -886,6 +897,7 @@ class InputItem():
                 if child.tag == "input":
                     osc_input_item.parse_xml(child)
             self.input_id = osc_input_item
+            self.is_axis = osc_input_item.is_axis
 
         assert self.input_id is not None,"Error processing input - check types"
             
@@ -1770,13 +1782,7 @@ class Profile():
             for i in range(entry.hat_count):
                 vjoy[entry.vjoy_id]["hat"].append(i+1)
 
-        # List all input types
-        all_input_types = [
-            InputType.JoystickAxis,
-            InputType.JoystickButton,
-            InputType.JoystickHat,
-            InputType.Keyboard
-        ]
+        
 
         # Create a list of all used remap actions
         remap_actions = self.list_actions()
@@ -2032,7 +2038,9 @@ class Profile():
             InputType.JoystickAxis,
             InputType.JoystickButton,
             InputType.JoystickHat,
-            InputType.Keyboard
+            InputType.Keyboard,
+            InputType.Midi,
+            InputType.OpenSoundControl
         ]
 
         # Process all devices

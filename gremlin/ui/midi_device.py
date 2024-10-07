@@ -36,7 +36,7 @@ from gremlin.util import parse_guid, byte_list_to_string
 import gremlin.event_handler
 import gremlin.config 
 from gremlin.base_classes import AbstractInputItem
-
+import gremlin.ui.ui_common
 
 ''' these MIDI objects are based on the MIDO and python-rtMIDI libraries '''
 
@@ -706,12 +706,12 @@ class MidiInputConfigDialog(QtWidgets.QDialog):
         interface : MidiInterface = MidiInterface()
 
         # MIDI port selector
-        self._midi_port_selector_widget = QtWidgets.QComboBox()
+        self._midi_port_selector_widget = gremlin.ui.ui_common.QComboBox()
         ports = interface.ports
         self._midi_port_selector_widget.addItems(ports)
         self._midi_port_selector_widget.currentIndexChanged.connect(self._update_port)
 
-        self._midi_command_selector_widget = QtWidgets.QComboBox()
+        self._midi_command_selector_widget = gremlin.ui.ui_common.QComboBox()
         for name, it in MidiCommandType.to_pairs():
             self._midi_command_selector_widget.addItem(name, it)
         self._midi_command_selector_widget.currentIndexChanged.connect(self._update_command)

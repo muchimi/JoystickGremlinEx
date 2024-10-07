@@ -233,7 +233,7 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.mouse_container_layout.addWidget(self.mouse_button)
 
 
-        self.mouse_button_widget = QtWidgets.QComboBox()
+        self.mouse_button_widget = gremlin.ui.ui_common.QComboBox()
         self.mouse_button_widget.addItem("Left (mouse 1)",gremlin.types.MouseButton.Left)
         self.mouse_button_widget.addItem("Middle (mouse 2)",gremlin.types.MouseButton.Middle)
         self.mouse_button_widget.addItem("Right (mouse 3)",gremlin.types.MouseButton.Right)

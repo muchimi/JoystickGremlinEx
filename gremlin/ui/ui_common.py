@@ -45,7 +45,7 @@ from qtpy.QtGui import QColor, QBrush, QPaintEvent, QPen, QPainter
 
 from gremlin.util import load_pixmap, load_icon
 import gremlin.util
-
+import gremlin.ui.ui_common
 
 
 class ContainerViewTypes(enum.Enum):
@@ -662,7 +662,7 @@ class AbstractInputSelector(QtWidgets.QWidget):
         )
 
     def _create_device_dropdown(self):
-        self.device_dropdown = QtWidgets.QComboBox(self)
+        self.device_dropdown = gremlin.ui.ui_common.QComboBox(self)
         for device in self.device_list:
             self.device_dropdown.addItem(self._format_device_name(device))
             self._device_id_registry.append(self._device_identifier(device))
@@ -684,7 +684,7 @@ class AbstractInputSelector(QtWidgets.QWidget):
         # Create input item selections for the devices. Each selection
         # will be invisible unless it is selected as the active device
         for device in self.device_list:
-            selection = QtWidgets.QComboBox(self)
+            selection = QComboBox(self)
             # limit drop down size
             selection.setMaxVisibleItems(20)
             selection.setStyleSheet("QComboBox { combobox-popup: 0; }")
@@ -846,7 +846,7 @@ class ActionSelector(QtWidgets.QWidget):
         self.action_label = QtWidgets.QLabel("Action")
         self.main_layout.addWidget(self.action_label)
  
-        self.action_dropdown = QtWidgets.QComboBox()
+        self.action_dropdown = QComboBox()
         # warning_icon = load_icon("fa.warning", use_qta=True, qta_color = QtGui.QColor('#918B16'))
         for name in self._valid_action_list():
             # if name in ("Remap","Map to Keyboard","Map to Mouse"):
@@ -1165,7 +1165,7 @@ class ModeWidget(QtWidgets.QWidget):
         # Create mode selector and related widgets
         self.edit_label = QtWidgets.QLabel("Profile Edit Mode")
         self.edit_label.setSizePolicy(min_min_sp)
-        self.edit_mode_selector = QtWidgets.QComboBox()
+        self.edit_mode_selector = QComboBox()
         self.edit_mode_selector.setSizePolicy(exp_min_sp)
         self.edit_mode_selector.setMinimumContentsLength(20)
         self.edit_mode_selector.setToolTip("Selects the active profile mode being edited")
@@ -1464,18 +1464,33 @@ def get_layout_widgets(layout) -> list:
     return widgets
         
 
-class NoWheelComboBox (QtWidgets.QComboBox):
+        
+class QComboBox (QtWidgets.QComboBox):
+    ''' a max limited combo box '''
+    def __init__(self, parent = None):
+        super().__init__(parent)
+        
+        # hack to ensure maximum items property is respected 
+        #self.setEditable(True) # this is so max items works
+        # self.lineEdit().setFrame(False)
+        # self.lineEdit().setReadOnly(True)
+        self.setStyleSheet('QComboBox {combobox-popup: 0}')
+        
+        
+        self.setMaxVisibleItems(20)
+        
+class NoWheelComboBox (QComboBox):
     ''' implements a combo box with no-wheel scrolling to avoid inadvertent switching of entries while scolling containers '''
 
     def __init__(self, parent = None):
         super().__init__(parent)
         self.setFocusPolicy(QtCore.Qt.FocusPolicy.StrongFocus)
 
+
     def wheelEvent(self, event) -> None:
         # blitz wheel events if the box is not in focus
         if self.hasFocus():
             return super().wheelEvent(event)
-        
     
 class ConfirmPushButton(QtWidgets.QPushButton):
     ''' confirmation push button '''
@@ -1720,7 +1735,7 @@ class QDataLineEdit(QtWidgets.QLineEdit):
         self._data = value
 
 
-class QDataComboBox(QtWidgets.QComboBox):
+class QDataComboBox(QComboBox):
     ''' a combo box that has a data property to track an object associated with the checkbox '''
     def __init__(self, data = None, parent = None):
         super().__init__(parent)

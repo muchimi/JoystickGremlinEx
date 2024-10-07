@@ -25,9 +25,10 @@ import threading
 import gremlin.config
 from gremlin.types import DeviceType
 from gremlin.input_types import InputType
-
+import gremlin.shared_state
 from gremlin.keyboard import Key
-
+import gremlin.ui.device_tab
+import gremlin.base_profile
 import uuid
 from gremlin.singleton_decorator import SingletonDecorator
 import collections
@@ -1755,13 +1756,8 @@ class OscInputItem(AbstractInputItem):
         self._max_range = 1.0 
 
 
-
     @property
-    def is_axis(self):
-        return self._mode == OscInputItem.InputMode.Axis
-
-    @property
-    def message(self):
+    def message(self) -> str:
         return self._message
     
     @message.setter
@@ -1769,35 +1765,38 @@ class OscInputItem(AbstractInputItem):
         self._message = value
         self._update()
 
-    
     @property 
-    def mode(self):
+    def mode(self) -> OscInputItem.InputMode:
         ''' input mode '''
         return self._mode
     
     @mode.setter
-    def mode(self, value):
+    def mode(self, value : OscInputItem.InputMode):
         self._mode = value
         self._update()
 
+    @property
+    def is_axis(self) -> bool:
+        return self._mode == OscInputItem.InputMode.Axis
+
     
     @property 
-    def command_mode(self):
+    def command_mode(self) -> OscInputItem.CommandMode:
         ''' command mode '''
         return self._command_mode 
     
     @command_mode.setter
-    def command_mode(self, value):
+    def command_mode(self, value : OscInputItem.CommandMode):
         self._command_mode = value
         self._update()
 
     @property
-    def title_name(self):
+    def title_name(self) -> str:
         ''' title for this input '''
         return self._title_name
 
     @property
-    def display_name(self):
+    def display_name(self) -> str:
         ''' display name for this input '''
         return self._display_name
     
@@ -2016,7 +2015,6 @@ class OscInputListenerWidget(QtWidgets.QFrame):
 
         """
         super().__init__(parent)
-        from gremlin.shared_state import set_suspend_input_highlighting
 
 
         # setup and listen for the osc message
@@ -2050,7 +2048,7 @@ class OscInputListenerWidget(QtWidgets.QFrame):
         self.setPalette(palette)
 
         # Disable ui input selection on joystick input
-        push_suspend_highlighting()
+        gremlin.shared_state.push_suspend_highlighting()
 
         # listen for the escape key
         event_listener = gremlin.event_handler.EventListener()
@@ -2059,6 +2057,10 @@ class OscInputListenerWidget(QtWidgets.QFrame):
         # start listening on all ports 
         self._interface.start()
 
+
+    def closeEvent(self, event: QtGui.QCloseEvent) -> None:
+        gremlin.shared_state.pop_suspend_highlighting()
+        return super().closeEvent(event)
 
     def _kb_event_cb(self, event):
         from gremlin.keyboard import key_from_code, key_from_name
@@ -2109,11 +2111,12 @@ class OscInputConfigDialog(QtWidgets.QDialog):
         self._current_mode = current_mode
         self.index = index
         self.identifier = data
-        self._mode = OscInputItem.InputMode.Button
-        self._command_mode = OscInputItem.CommandMode.Message
+        self._mode : OscInputItem = OscInputItem.InputMode.Button
+        self._command_mode : OscInputItem = OscInputItem.CommandMode.Message
         self._mode_locked = False # if set, prevents flipping input modes axis to a button mode
         self._min_range = 0.0 # min value for axis mapping (maps to -1.0 in vjoy)
         self._max_range = 1.0 # max value for axis mapping (maps to 1.0 in vjoy)
+        
 
         # midi message
         self._command = None # OSC command text
@@ -2240,7 +2243,7 @@ class OscInputConfigDialog(QtWidgets.QDialog):
             # see if this input has any containers 
             profile = gremlin.shared_state.current_profile
             for device in profile.devices.values():
-                if device.name == "midi":
+                if device.name == "osc":
                     if current_mode in device.modes:
                         for input_items in device.modes[current_mode].config.values():
                             if data in input_items:
@@ -2369,7 +2372,6 @@ class OscInputConfigDialog(QtWidgets.QDialog):
     def _max_range_cb(self):
         self._min_range = self._max_range_widget.value()  
         self._validate()     
-
 
     @property
     def min_range(self):
@@ -2591,8 +2593,8 @@ class OscDeviceTabWidget(QDataWidget):
         if right_panel:
             self.main_layout.removeItem(right_panel)
 
-        widget = gremlin.ui.device_tab.InputItemConfiguration()     
-        self.main_layout.addWidget(widget,3)
+        self._item_data = gremlin.ui.device_tab.InputItemConfiguration()
+        self.main_layout.addWidget(self._item_data,3)
 
         button_container_widget = QtWidgets.QWidget()
         button_container_layout = QtWidgets.QHBoxLayout(button_container_widget)
@@ -2612,6 +2614,8 @@ class OscDeviceTabWidget(QDataWidget):
         button_container_layout.addWidget(button)
 
         self.left_panel_layout.addWidget(button_container_widget)
+
+        # self._is_axis = False # true if the widget's input item should be an axis item
         
 
         # Select default entry
@@ -2657,6 +2661,8 @@ class OscDeviceTabWidget(QDataWidget):
         
         index = self.input_item_list_view.current_index
 
+        
+
         # redraw the UI
         self._select_item_cb(index)
 
@@ -2693,24 +2699,27 @@ class OscDeviceTabWidget(QDataWidget):
         if right_panel:
             self.main_layout.removeItem(right_panel)
 
-        item_data = self.input_item_list_model.data(index)
-        widget = gremlin.ui.device_tab.InputItemConfiguration(item_data)
-        self.main_layout.addWidget(widget,3)            
+        input_data : gremlin.base_profile.InputItem = self.input_item_list_model.data(index)
+        
+        self._item_data = gremlin.ui.device_tab.InputItemConfiguration(input_data)
+        self.main_layout.addWidget(self._item_data,3)            
 
         # remember the last input
         config = gremlin.config.Configuration()
         device_guid = self.device_guid
         input_type = InputType.OpenSoundControl
-        input_id = item_data.input_id if item_data else None
+        input_id = input_data.input_id if input_data else None
+        input_data.is_axis = input_id.is_axis
+
         config.set_last_input(device_guid, input_type, input_id)
 
-        if item_data:
+        if input_data:
             
             # Create new configuration widget
             
             change_cb = self._create_change_cb(index)
-            widget.action_model.data_changed.connect(change_cb)
-            widget.description_changed.connect(change_cb)
+            self._item_data.action_model.data_changed.connect(change_cb)
+            self._item_data.description_changed.connect(change_cb)
     
 
     def _close_item_cb(self, widget, index, data):
@@ -2736,7 +2745,7 @@ class OscDeviceTabWidget(QDataWidget):
         widget = gremlin.ui.input_item.InputItemWidget(identifier = identifier, populate_ui_callback = self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True, parent = parent)
         #identifier = identifier.input_id
         widget.create_action_icons(data)
-        widget.setDescription(data.description)
+        widget.setInputDescription(data.input_id.display_name)
         widget.enable_close()
         widget.enable_edit()
         widget.setIcon("mdi.surround-sound")
@@ -2835,6 +2844,7 @@ class OscDeviceTabWidget(QDataWidget):
         self._edit_dialog = OscInputConfigDialog(self.current_mode, index, data, self)
         self._edit_dialog.accepted.connect(self._dialog_ok_cb)
         self._edit_dialog.showNormal()
+        self._index = index
 
     def _dialog_ok_cb(self):
         ''' called when the ok button is pressed on the edit dialog '''
@@ -2855,9 +2865,16 @@ class OscDeviceTabWidget(QDataWidget):
         input_item._command_mode = command_mode
         input_item._min_range = min_range
         input_item._max_range = max_range
-        input_item._update() # refresh other properties
 
+        is_axis = mode == OscInputItem.InputMode.Axis
+
+        self._item_data.is_axis = is_axis
+        self._item_data.item_data.is_axis = is_axis
+
+        input_item._update() # refresh other properties
         self.input_item_list_view.update_item(index)
+        
+        self._select_item_cb(self._index)
 
     def _index_for_key(self, input_id):
         ''' returns the index of the selected input id'''

@@ -326,7 +326,7 @@ class ImportProfileDialog(QtWidgets.QDialog):
         self.create_mode_widget = QtWidgets.QCheckBox("Import modes")
         self.target_mode_label_widget = QtWidgets.QLabel("Target Mode:")
 
-        self.target_mode_selector = QtWidgets.QComboBox()
+        self.target_mode_selector = ui_common.QComboBox()
         # populate the modes of the current device being imported into
         self.populate_mode_selector(self.target_mode_selector, self.target_profile)
 
@@ -334,7 +334,7 @@ class ImportProfileDialog(QtWidgets.QDialog):
         self.import_modes_widget.setToolTip("Import all modes from profile and add them to the existing profile if they don't exist")
         self.import_single_mode_widget = QtWidgets.QRadioButton("Import single mode")
         self.import_single_mode_widget.setToolTip("Import specific mode")
-        self.import_mode_selector = QtWidgets.QComboBox()
+        self.import_mode_selector = ui_common.QComboBox()
 
         self.import_mode_list_widget = QtWidgets.QListWidget()
 

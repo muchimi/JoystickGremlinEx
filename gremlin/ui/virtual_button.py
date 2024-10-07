@@ -21,6 +21,7 @@ from PySide6 import QtWidgets, QtCore, QtGui
 import gremlin
 import gremlin.types
 from gremlin.util import load_icon
+import gremlin.ui.ui_common
 
 class AbstractVirtualButtonWidget(QtWidgets.QGroupBox):
 
@@ -90,7 +91,7 @@ class VirtualAxisButtonWidget(AbstractVirtualButtonWidget):
             self.upper_limit = gremlin.ui.ui_common.DynamicDoubleSpinBox()
             self.upper_limit.setRange(-1.0, 1.0)
             self.upper_limit.setSingleStep(0.05)
-            self.direction = QtWidgets.QComboBox()
+            self.direction = gremlin.ui.ui_common.QComboBox()
             self.direction.addItem("Anywhere")
             self.direction.addItem("Above")
             self.direction.addItem("Below")

@@ -112,7 +112,7 @@ class MergeAxisEntryWidget(QtWidgets.QDockWidget):
 
 
         # Operation selection
-        self.operation_selector = QtWidgets.QComboBox()
+        self.operation_selector = ui_common.QComboBox()
         self.operation_selector.addItem("Average", gremlin.types.MergeAxisOperation.Average)
         self.operation_selector.addItem("Minimum", gremlin.types.MergeAxisOperation.Minimum)
         self.operation_selector.addItem("Maximum", gremlin.types.MergeAxisOperation.Maximum)

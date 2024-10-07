@@ -273,8 +273,7 @@ class InputItemListModel(ui_common.AbstractModel):
             offset_map[InputType.OpenSoundControl] + \
             len(input_items.config[InputType.OpenSoundControl
             ])
-
-
+        
 
         if event.event_type in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat):
             # Generate a mapping from axis index to linear axis index
@@ -1295,7 +1294,7 @@ class ContainerSelector(QtWidgets.QWidget):
         self.main_layout = QtWidgets.QHBoxLayout(self)
         self.main_layout.addWidget(QtWidgets.QLabel("Container"))
 
-        self.container_dropdown = QtWidgets.QComboBox()
+        self.container_dropdown = ui_common.QComboBox()
         for name in self._valid_container_list():
             self.container_dropdown.addItem(name)
         self.add_button = QtWidgets.QPushButton("Add")
@@ -1573,7 +1572,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
         return action_set_view
 
-    def _container_remove(self, _):
+    def _container_remove(self):
         """Emits the closed event when this widget is being closed."""
         self.closed.emit(self)
 
@@ -1837,7 +1836,7 @@ class TitleBar(QtWidgets.QFrame):
     about the content of the widget.
     """
 
-    def __init__(self, label, hint, close_cb, clipboard_cb = None, parent=None):
+    def __init__(self, label, hint, close_callback, clipboard_cb = None, parent=None):
         """Creates a new instance.
 
         :param label the label of the title bar
@@ -1850,7 +1849,7 @@ class TitleBar(QtWidgets.QFrame):
 
         self.hint = hint
         self.label = QtWidgets.QLabel(label)
-
+        self._close_callback = close_callback
         size = 12
 
         # help button
@@ -1879,7 +1878,7 @@ class TitleBar(QtWidgets.QFrame):
             self.close_button.setIcon(icon)
         self.close_button.setToolTip("Delete")
 
-        self.close_button.clicked.connect(close_cb)
+        self.close_button.clicked.connect(self._close_cb)
 
         # clipboard copy button - only if a handler is given
         if clipboard_cb:
@@ -1920,6 +1919,9 @@ class TitleBar(QtWidgets.QFrame):
             self.hint
         )
 
+    def _close_cb(self):
+        if self._close_callback:
+            self._close_callback()
 
 
 class BasicActionWrapper(AbstractActionWrapper):

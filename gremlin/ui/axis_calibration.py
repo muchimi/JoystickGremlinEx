@@ -20,6 +20,7 @@ from PySide6 import QtWidgets, QtCore
 import gremlin
 from . import ui_common
 from gremlin.input_types import InputType
+import gremlin.ui.ui_common
 
 class CalibrationUi(ui_common.BaseDialogUi):
 
@@ -55,7 +56,7 @@ class CalibrationUi(ui_common.BaseDialogUi):
             return
 
         # Device selection drop down
-        self.device_dropdown = QtWidgets.QComboBox()
+        self.device_dropdown = gremlin.ui.ui_common.QComboBox()
         self.device_dropdown.currentIndexChanged.connect(
             self._create_axes
         )

@@ -1019,7 +1019,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._action_selector_layout.setContentsMargins(0,0,0,0)
 
         # list of possible events to trigger
-        self._command_selector_widget = QtWidgets.QComboBox()
+        self._command_selector_widget = ui_common.QComboBox()
         self._command_list = self.action_data.sm.get_command_name_list()
         self._command_selector_widget.setEditable(True)
         self._command_selector_widget.addItems(self._command_list)
