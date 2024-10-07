@@ -973,8 +973,12 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         
         '''
         # always read the current input as the value could be from another device for merged inputs
-        value = self.action_data.get_filtered_axis_value()
-        self._axis_repeater_widget.setValue(value)
+        if self.input_type == InputType.JoystickAxis:
+            self._axis_repeater_widget.setVisible(True)
+            value = self.action_data.get_filtered_axis_value()
+            self._axis_repeater_widget.setValue(value)
+        else:
+            self._axis_repeater_widget.setVisible(False)
 
 
     @QtCore.Slot(bool)
@@ -2335,7 +2339,7 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
     def get_filtered_axis_value(self) -> float:
         ''' computes the output value for the current configuration  '''
         value = gremlin.joystick_handling.get_axis(self.hardware_device_guid, 
-                                                    self.hardware_input_id) 
+                                                        self.hardware_input_id) 
         if self.merge_mode != MergeOperationType.NotSet:
             if self.merge_device_id and self.merge_input_id:
                 v1 = value
@@ -2344,9 +2348,9 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
                 match self.merge_mode:
                     case MergeOperationType.Add:
                         value = scale_to_range(v1+v2,
-                                               target_min=self.output_range_min, 
-                                               target_max=self.output_range_max,
-                                               invert = self.merge_invert)
+                                            target_min=self.output_range_min, 
+                                            target_max=self.output_range_max,
+                                            invert = self.merge_invert)
                     case MergeOperationType.Average:
                         value = scale_to_range((v1+v2)/2,
                                                 target_min=self.output_range_min, 
@@ -2366,9 +2370,7 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
     def merge_mode(self, value : MergeOperationType):
         self._merge_mode = value
         self.merged = value != MergeOperationType.NotSet
-        if self.merged:
-            pass
-
+ 
     @property
     def merge_device_id(self) -> str:
         return self._merge_device_id
