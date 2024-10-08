@@ -1321,6 +1321,10 @@ class Configuration:
         
         '''
         save_input_id = input_id
+        if not dinput_device_guid in gremlin.shared_state.device_type_map:
+            # input is missing
+            logging.getLogger("system").warning(f"Config: get last input: Unable to find device {dinput_device_guid} in device map")
+            return (None, None, None)
         device_type = gremlin.shared_state.device_type_map[dinput_device_guid]
         if device_type == gremlin.types.DeviceType.Joystick:
             device_info = gremlin.joystick_handling.device_info_from_guid(dinput_device_guid)
@@ -1392,6 +1396,10 @@ class Configuration:
             input_type, input_id = data[device_guid]
             if input_id is not None:
                 input_type, save_input_id, input_id = self._get_input_id(dinput_device_guid, input_id)
+                if input_type is None:
+                    if verbose:
+                        logging.getLogger("system").info(f"Loading input selection: nothing found for {device_guid} {device_name}")
+                    return (None, None, None)
                 if verbose:
                     logging.getLogger("system").info(f"Loading saved input selection: {device_guid} {device_name} {input_type} {input_id}")
                 return (device_guid, gremlin.input_types.InputType.to_enum(input_type), input_id)
