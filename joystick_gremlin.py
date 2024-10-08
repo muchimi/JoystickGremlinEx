@@ -1495,8 +1495,9 @@ class GremlinUi(QtWidgets.QMainWindow):
 
     def _get_input_item(self, device_guid : str, index : int) -> gremlin.base_profile.InputItem:
         widget = self._get_tab_widget_guid(device_guid)
-        if widget is None:
+        if widget is None or not hasattr(widget,"input_item_list_model"):
             return None
+        
         row_count = widget.input_item_list_model.rows()
         if row_count == 0 or index > row_count:
             return None
