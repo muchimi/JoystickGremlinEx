@@ -216,7 +216,7 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.action_data.vjoy_input_id = vjoy_data["input_id"]
             self.action_data.input_type = vjoy_data["input_type"]
 
-            if self.action_data.input_type == InputType.JoystickAxis:
+            if self.action_data.is_axis:
                 self.action_data.axis_mode = "absolute"
                 if self.relative_checkbox.isChecked():
                     self.action_data.axis_mode = "relative"
@@ -439,7 +439,7 @@ class Remap(gremlin.base_profile.AbstractAction):
 
         if input_type in [InputType.JoystickButton, InputType.Keyboard]:
             return False
-        elif input_type == InputType.JoystickAxis:
+        elif self.is_axis:
             if self.input_type == InputType.JoystickAxis:
                 return False
             else:

@@ -965,11 +965,7 @@ class Configuration:
         value = self._data.get("verbose", None)
         if value is None:
             # not set - set other defaults
-            self.verbose_mode_details = False
-            self.verbose_mode_inputs = False
-            self.verbose_mode_mouse = False
-            self.verbose_mode_joystick = False
-            self.verbose_mode_keyboard = False
+            self._data["verbose_mode"] = 0
             self._data["verbose"] = False
             return False
         return value
