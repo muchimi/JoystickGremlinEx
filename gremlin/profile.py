@@ -74,6 +74,9 @@ class ProfileConverter:
 
         :param fname path to the profile to evaluate
         """
+        if not os.path.isfile(fname):
+            return True
+        
         tree = ElementTree.parse(fname)
         root = tree.getroot()
 

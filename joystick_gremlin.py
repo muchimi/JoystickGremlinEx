@@ -108,7 +108,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.15ex (m2.4)"
+APPLICATION_VERSION = "13.40.15ex (m2.5)"
 
 # the main ui
 ui = None
@@ -752,7 +752,10 @@ class GremlinUi(QtWidgets.QMainWindow):
         """
         # Don't attempt to create the mapping for the "Getting Started"
         # widget
-        if isinstance(self.ui.devices.currentWidget(), QtWidgets.QTextEdit):
+        tab_device_type : TabDeviceType
+        tab_device_type, _ = self.ui.devices.currentWidget().data
+        if not tab_device_type in (TabDeviceType.Joystick, TabDeviceType.VjoyInput):
+            gremlin.ui.ui_common.MessageBox("Information","1:1 mapping is only available on input joysticks")
             return
 
         device_profile = self.ui.devices.currentWidget().device_profile

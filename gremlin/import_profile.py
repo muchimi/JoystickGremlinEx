@@ -1297,6 +1297,7 @@ class ImportProfileDialog(QtWidgets.QDialog):
     def _cmd_one_to_one(self):
         ''' maps the inputs one to one as best able to '''
         # get list of all input items
+
         input_items = [item for item in self._map.keys() if isinstance(item, ImportInputItem)]
         input_item : ImportInputItem
         for input_item in input_items:

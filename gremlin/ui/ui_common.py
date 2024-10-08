@@ -1559,12 +1559,24 @@ class ConfirmBox():
 
     def show(self):
         return self._message_box.exec()
+    
+class QMessageBox(QtWidgets.QMessageBox):
+    def __init__(self, width = 400, height = 100, parent = None):
+        super().__init__(parent)
+        self._width = width
+        self._height = height
+
+    def resizeEvent(self, event):
+        self.setFixedWidth(self._width)
+        self.setFixedHeight(self._height)
+
 
 class MessageBox():
     def __init__(self, title = "Notice", prompt = "Operation", is_warning = True, parent = None):
 
         from gremlin.util import load_pixmap
-        self._message_box = QtWidgets.QMessageBox(parent = parent)
+        self._message_box = QMessageBox(parent = parent)
+        
         if is_warning:
             pixmap = load_pixmap("warning.svg")
             pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
