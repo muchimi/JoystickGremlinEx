@@ -258,7 +258,10 @@ class VJoyUsageState():
 
     def set_inverted(self, device_id, input_id, inverted):
         ''' sets the inversion flag for a given vjoy device '''
-        VJoyUsageState._axis_invert_map[device_id][input_id] = inverted
+        if device_id in VJoyUsageState._axis_invert_map:
+            vjoy = VJoyUsageState._axis_invert_map[device_id]
+            if input_id in vjoy:
+                vjoy[input_id] = inverted
         
     def is_inverted(self, device_id, input_id):
         ''' returns true if the specified device/axis is inverted '''
