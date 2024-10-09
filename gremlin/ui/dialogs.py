@@ -158,6 +158,7 @@ class ProfileOptionsUi(QtWidgets.QDialog):
 
     @QtCore.Slot(bool)
     def _restore_mode_cb(self, checked):
+        
         self.profile.set_restore_mode(checked)
 
     def _close_cb(self):

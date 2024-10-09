@@ -373,7 +373,7 @@ class SimconnectOptions(QtCore.QObject):
             return
         #gremlin.util.pushCursor()
 
-        progress = QtWidgets.QProgressDialog(parent = owner, labelText ="Scanning folders...", cancelButtonText = "Cancel", minimum = 0, maximum= 100) #, flags = QtCore.Qt.FramelessWindowHint)
+        progress = QtWidgets.QProgressDialog(parent = owner, labelText ="Scanning folders... (this can take a very long time)", cancelButtonText = "Cancel", minimum = 0, maximum= 100) #, flags = QtCore.Qt.FramelessWindowHint)
         progress.setWindowModality(QtCore.Qt.WindowModality.WindowModal)
         progress.setValue(0)
         progress.show()
@@ -382,7 +382,7 @@ class SimconnectOptions(QtCore.QObject):
         search_folder = os.path.dirname(self._community_folder)
         source_files = gremlin.util.find_files(search_folder,"aircraft.cfg")
 
-        
+
         cmp_icao_type =  r'(?i)icao_type_designator\s*=\s*\"?(.*?)\"?$'
         cmp_icao_manuf =  r'(?i)icao_manufacturer\s*=\s*\"?(.*?)\"?$'
         cmp_icao_model =  r'(?i)icao_model\s*=\s*\"?(.*?)\"?$'
@@ -390,10 +390,17 @@ class SimconnectOptions(QtCore.QObject):
         file_count = len(source_files)
 
         progress.setLabelText = f"Processing {file_count:,} aircraft..."
+        verbose = gremlin.config.Configuration().verbose
+        
         is_canceled = False
         items = []
         keys = []
+
+        if verbose:
+            syslog.info(f"Processing {len(source_files):,}...")
         for count, file in enumerate(source_files):
+
+            
 
             progress.setValue(int(100 * count / file_count))
             if progress.wasCanceled():
@@ -410,6 +417,9 @@ class SimconnectOptions(QtCore.QObject):
             icao_type = None
             icao_model = None
             icao_manuf = None
+
+            if verbose:
+                syslog.info(f"File: {file}")
 
             with open(file,"r",encoding="utf8") as f:
                 for line in f.readlines():
@@ -430,7 +440,7 @@ class SimconnectOptions(QtCore.QObject):
                     if matches:
                         titles.extend(matches)
                         
-
+            
             
             if titles:
                 titles = list(set(titles))
@@ -447,6 +457,8 @@ class SimconnectOptions(QtCore.QObject):
                     # avoid duplicate entries
                     items.append(item)
                     keys.append(item.display_name)
+                    if verbose:
+                        syslog.info(f"\tFound: {item.display_name}")
 
         if not is_canceled:
             # update modes that exist already so they are preserved between scans

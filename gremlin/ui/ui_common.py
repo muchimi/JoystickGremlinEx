@@ -45,7 +45,7 @@ from qtpy.QtGui import QColor, QBrush, QPaintEvent, QPen, QPainter
 
 from gremlin.util import load_pixmap, load_icon
 import gremlin.util
-import gremlin.ui.ui_common
+
 
 
 class ContainerViewTypes(enum.Enum):
@@ -230,6 +230,7 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
         #self.setText("0")
         self.setValue(value)
         self._data = data
+
 
     @property
     def data(self):
@@ -1190,12 +1191,22 @@ class ModeWidget(QtWidgets.QWidget):
 
     def _manage_modes_cb(self):
         ''' calls up the mode change dialog '''
+        import gremlin.ui.ui_common
+        if not self.profile.profile_file or not os.path.isfile(self.profile.profile_file):
+            gremlin.ui.ui_common.MessageBox(prompt = "Please save the profile before configuring modes.")
+            return
+
         import gremlin.shared_state
         ui = gremlin.shared_state.ui
         ui.manage_modes()
 
     def _profile_options_cb(self):
         import gremlin.ui.dialogs
+        import gremlin.ui.ui_common
+        if not self.profile.profile_file or not os.path.isfile(self.profile.profile_file):
+            gremlin.ui.ui_common.MessageBox(prompt = "Please save the profile before setting options.")
+            return
+
         dialog = gremlin.ui.dialogs.ProfileOptionsUi()
         dialog.exec()
 
@@ -3497,6 +3508,10 @@ class QFlowLayout(QtWidgets.QLayout):
         y = effective.y()
         lineheight = 0
 
+        
+        # visible_count = len(self._items)
+        # invisible_count = 0
+
         if self._grid_layout:
             # compute max width
             max_w = 0
@@ -3506,7 +3521,10 @@ class QFlowLayout(QtWidgets.QLayout):
             for item in self._items:
                 widget = item.widget()
                 if not widget.isVisible():
+                    #invisible_count+=1
                     continue
+                # if hasattr(widget,"display_name"):
+                #     print (f"layout: {str(widget.display_name())}")
                 hspace = self.horizontalSpacing()
                 if hspace == -1:
                     hspace = widget.style().layoutSpacing(
@@ -3555,6 +3573,10 @@ class QFlowLayout(QtWidgets.QLayout):
 
             self._row = row
             self._col = max_col
+
+
+            #print (f"layout visible: {visible_count} invisible: {invisible_count}")
+
             return y + lineheight - rect.y() + bottom
 
         else:
@@ -3652,3 +3674,5 @@ class ActionLabel(QtWidgets.QLabel):
             self.setPixmap(QtGui.QPixmap(icon.pixmap(self._width)))
         else:
             self.setPixmap(QtGui.QPixmap(icon))
+
+

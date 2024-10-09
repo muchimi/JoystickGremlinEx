@@ -394,7 +394,7 @@ class Remap(gremlin.base_profile.AbstractAction):
     def display_name(self):
         ''' returns a display string for the current configuration '''
         input_string = "Axis"
-        if self.input_type in (InputType.JoystickButton):
+        if self.input_type == InputType.JoystickButton:
             input_string = "Button"
         elif self.input_type == InputType.JoystickHat:
             input_string = "Hat"

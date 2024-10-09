@@ -810,31 +810,14 @@ class ActionSetView(ui_common.AbstractView):
             self.action_selector.action_paste.connect(self._paste_action)
             self.group_layout.addWidget(self.action_selector, 1, 0)
 
-        # if parent:
-        #     ''' hook container closing '''
-        #     parent.closing.connect(self._container_closing)
-
-        #self._widgets = [] # holds the list of widgets for this action set
-
-    # def _container_closing(self):
-    #     for widget in self._widgets:
-    #         if hasattr(widget,"_cleanup_ui"):
-    #             widget._cleanup_ui()
-    #     # clear
-    #     self._widgets.clear()
+        # holds the widgets created in this action set
+        self._widgets = []
 
     def redraw(self):
 
-        # if self._widgets:
-        #     for widget in self._widgets:
-        #         if hasattr(widget,"clean_ui"):
-        #             widget.clean_ui()
-
-        #     self._widgets.clear()
-
+        self._widgets.clear()
         ui_common.clear_layout(self.action_layout)
-
-
+        
         if self.model is None:
             return
 
@@ -848,7 +831,7 @@ class ActionSetView(ui_common.AbstractView):
                 wrapped_widget = BasicActionWrapper(widget)
                 wrapped_widget.closed.connect(self._create_closed_cb(widget))
                 self.action_layout.addWidget(wrapped_widget)
-                #self._widgets.append(widget)
+                self._widgets.append(widget)
         elif self.view_type == ui_common.ContainerViewTypes.Condition:
             for index in range(self.model.rows()):
                 data = self.model.data(index)
@@ -1946,7 +1929,7 @@ class BasicActionWrapper(AbstractActionWrapper):
 
         self.main_layout.addWidget(self.action_widget)
 
-    def _remove(self, _):
+    def _remove(self):
         """Emits the closed event when this widget is being closed."""
         self.closed.emit(self)
 

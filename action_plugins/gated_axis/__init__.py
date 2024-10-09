@@ -45,14 +45,12 @@ class GatedAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
         # cache = gremlin.gated_handler.GatedAxisWidgetCache()
         # widget = cache.retrieve(self.action_data)
         # if not widget:
-        widget = gremlin.gated_handler.GatedAxisWidget(action_data = self.action_data,
-                                                                show_configuration=False
+        self.gate_widget  = gremlin.gated_handler.GatedAxisWidget(action_data = self.action_data,
+                                                                show_configuration=False,
+                                                                parent=self
                                                                 )
         #cache.register(self.action_data, widget)
-        
-        
-        self.gate_widget = widget
-        self.main_layout.addWidget(widget)
+        self.main_layout.addWidget(self.gate_widget)
         
 
     def _populate_ui(self):

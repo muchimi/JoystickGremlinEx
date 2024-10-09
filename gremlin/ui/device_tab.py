@@ -455,6 +455,8 @@ class ActionContainerView(gremlin.ui.ui_common.AbstractView):
         # Add the scroll area to the main layout
         self.main_layout.addWidget(self.scroll_area)
 
+        self._widgets = []
+
     def redraw(self):
         """Redraws the entire view."""
 
@@ -462,6 +464,15 @@ class ActionContainerView(gremlin.ui.ui_common.AbstractView):
             try:
                 self.redraw_lock = True
                 import gremlin.ui.ui_common
+                
+                # if there is a cleanup handler defined for any actions widgets - call them before removing them
+                for container_widget in self._widgets:
+                    for action_widget in container_widget.action_widgets:
+                        for widget in action_widget._widgets:
+                            if hasattr(widget,"_cleanup_ui"):
+                                widget._cleanup_ui()
+                self._widgets.clear()
+
                 gremlin.ui.ui_common.clear_layout(self.scroll_layout)
                 container_count = self.model.rows()
                 if container_count:
@@ -470,6 +481,7 @@ class ActionContainerView(gremlin.ui.ui_common.AbstractView):
                         widget.closed.connect(self._create_closed_cb(widget))
                         widget.container_modified.connect(self.model.data_changed.emit)
                         self.scroll_layout.addWidget(widget)
+                        self._widgets.append(widget)
                 else:
                     input_type = self.model.input_type # InputType.JoystickAxis
                     label = QtWidgets.QLabel(f"Please add an action or container for {self.model.item_data.display_name} ({InputType.to_display_name(input_type)})")

@@ -51,6 +51,7 @@ import gremlin.plugin_manager
 import gremlin.shared_state
 from gremlin.singleton_decorator import SingletonDecorator
 import gremlin.util
+import gremlin.ui.ui_common
 
 
 
@@ -2135,6 +2136,11 @@ class Profile():
 
     def save(self):
         ''' saves the profile '''
+
+        if self._profile_fname is None or  not os.path.isfile(self._profile_fname):
+            gremlin.ui.ui_common.MessageBox(prompt = "File is not set, please save the profile first")
+            return
+
         assert self._profile_fname,"File name is not set"
         self.to_xml(self._profile_fname)
         self._dirty = False

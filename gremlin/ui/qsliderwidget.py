@@ -494,7 +494,7 @@ class QSliderWidget(QtWidgets.QWidget):
         range_corner = 0
         range_top = self._range_top
 
-        color_index = 0
+        
         if self._single_range:
             # single range used across all gates
             color_fill = range_colors[color_index]
@@ -523,13 +523,14 @@ class QSliderWidget(QtWidgets.QWidget):
 
         else:
             # individual ranges between handles
-
+            color_index = 0
             for a, b in pairwise(range(handle_count)):
 
                 x1 = self._handle_positions[a]
                 x2 = self._handle_positions[b]
 
                 color_fill = range_colors[color_index]
+                #print (f"range color index: {color_index}")
                 color_pen = self.rangeBorderColor
                 if self._hover_range:
                     ah, bh = self._hover_range_handle_pair
@@ -542,10 +543,8 @@ class QSliderWidget(QtWidgets.QWidget):
                 painter.setBrush(color_fill)
                 painter.setPen(color_pen)    
                 
-                color_index += 1
-                if color_index == color_count:
-                    color_index = 0
-
+                color_index = (color_index + 1) % 2
+                
                 range_left = x1 + self._handle_radius
                 range_width = x2 - x1
                 

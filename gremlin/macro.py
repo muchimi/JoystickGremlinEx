@@ -797,8 +797,7 @@ class MouseButtonAction(MacroAbstractAction):
         else:
             if is_local:
                 if self.is_pressed:
-                    if is_remote:
-                        gremlin.sendinput.mouse_press(self.button)
+                    gremlin.sendinput.mouse_press(self.button)
                 else:
                     gremlin.sendinput.mouse_release(self.button)
             if is_remote:
