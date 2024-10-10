@@ -108,7 +108,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.15ex (m2.6)"
+APPLICATION_VERSION = "13.40.15ex (m2.7)"
 
 # the main ui
 ui = None
@@ -296,8 +296,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         ''' handles joystick events in the UI'''
         if gremlin.shared_state.is_running or self._input_highlight_stack > 0:
             return 
-        if self._input_highlighting_enabled:
-            InvokeUiMethod(lambda: self._process_joystick_input_selection(event,self._button_highlighting_enabled))
+        #InvokeUiMethod(lambda: self._process_joystick_input_selection(event,self._button_highlighting_enabled))
+        self._process_joystick_input_selection(event)
     
 
     def _recreate_tab_widget(self):
@@ -1407,10 +1407,13 @@ class GremlinUi(QtWidgets.QMainWindow):
     
     def _find_tab_data_guid(self, search_guid):
         ''' gets tab data based on the device guid '''
+        if not isinstance(search_guid,str):
+            search_guid = str(search_guid) # tab map stores the GUID as a string
         tab_map = self._get_tab_map()
         data = [(device_guid, device_name, device_type, tab_index) for device_guid, device_name, device_type, tab_index in tab_map.values() if device_guid == search_guid]
         if data:
             return data[0]
+        
         return None, None, None, None
     
     def _get_tab_widget_guid(self, device_guid):
@@ -1441,7 +1444,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         return None
     
     def _get_tab_name_guid(self, device_guid):
-        _, device_name, _ = self._find_tab_data_guid(device_guid)
+        data = self._find_tab_data_guid(device_guid)
+        _, device_name, _, _ = data
         return device_name
 
     
@@ -1841,7 +1845,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
     
 
-    def _process_joystick_input_selection(self, event : gremlin.event_handler.Event, buttons_only = False):
+    def _process_joystick_input_selection(self, event : gremlin.event_handler.Event):
         """Handles joystick events to select the appropriate input item for device highligthing in the UI
 
         :param event the event to process
@@ -1851,11 +1855,49 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         if self.locked:
             return
+    
+        if gremlin.shared_state.is_running or self.current_mode is None:
+            # do not highlight if running or no mode is set yet
+            return
         
+        if not event.event_type in ( InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat):
+            # ignore non joystick inputs
+            return
+        
+            
+        if gremlin.shared_state.is_highlighting_suspended():
+            # skip if highlighting is currently suspended
+            return
+
         config = self.config
+        verbose = config.verbose_mode_inputs
+
         if not config.highlight_enabled:
-            # highlighting turned off
+            # skip if highlighting master is turned off
             return 
+        
+        eh = gremlin.event_handler.EventListener()
+        
+        # button must be enabled or via the shifted state (shift keys)
+        is_button = self.config.highlight_input_buttons or eh.get_shifted_state()
+
+        # axis must be enabled or via the shifted state (control keys)
+        is_axis = self.config.highlight_input_axis or eh.get_control_state()
+
+        # tab switch master switch
+        is_tabswitch_enabled = self.config.highlight_autoswitch
+
+
+        if verbose:
+            logging.getLogger("system").info(f"Highlight: axis: {is_axis} button: {is_button}")
+
+        if not (is_button or is_axis):
+            # no highlighting mode enabled - skip
+            return 
+        
+        buttons_only = is_button and not is_axis
+
+        
         
         # avoid specific axis input spamming
         if self._last_input_timestamp + self._input_delay > time.time():
@@ -1866,8 +1908,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         if event.event_type == InputType.JoystickAxis:
             # only process if there is a significant deviation for that axis to avoid noisy input an inadvertent motion
 
-            if not config.highlight_input_axis:
-                # ignore if axis highlighting is disabled
+            if not is_axis:
                 return
             device_guid = str(event.device_guid).casefold()
             if not device_guid in self._joystick_axis_highlight_map.keys():
@@ -1884,23 +1925,15 @@ class GremlinUi(QtWidgets.QMainWindow):
             
                 
 
-        verbose = config.verbose_mode_inputs
+        
 
         # enter critical section
         try:
 
             self.locked = True
 
-            if not event.event_type in ( InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat):
-                # ignore non joystick inputs
-                return
-            
-            if self.runner.is_running() or self.current_mode is None:
-                return
-            
-            if gremlin.shared_state.is_highlighting_suspended():
-                # skip if auto highlight of tabs/inputs is disabled
-                return
+                        
+         
             
         
             # Switch to the tab corresponding to the event's device if the option
@@ -1910,6 +1943,10 @@ class GremlinUi(QtWidgets.QMainWindow):
             widget = self.ui.devices.currentWidget()
             (_, tab_device_guid) = widget.data
             tab_switch_needed = tab_device_guid != device_guid
+
+
+            if verbose:
+                logging.getLogger("system").info(f"Highlight: axis: {is_axis} button: {is_button} switch: {tab_switch_needed}")
 
             if tab_switch_needed and not config.highlight_autoswitch:
                 # not setup to auto change tabs
@@ -1928,6 +1965,10 @@ class GremlinUi(QtWidgets.QMainWindow):
                     return
                 # remember the switch time for next request
                 self._last_tab_switch = time.time()
+
+            if tab_switch_needed and not is_tabswitch_enabled:
+                # skip because the trigger is on a different device and device switching is disabled
+                return 
                         
             # get the widget for the tab corresponding to the device
             if not isinstance(widget, gremlin.ui.device_tab.JoystickDeviceTabWidget):
@@ -1936,12 +1977,13 @@ class GremlinUi(QtWidgets.QMainWindow):
                 return
             
             # prevent switching based on user options
-            if not config.highlight_input_axis and event.event_type == InputType.JoystickAxis:
+            if not is_axis and event.event_type == InputType.JoystickAxis:
                 # ignore axis input
                 if verbose:
                     logging.getLogger("system").info(f"Event: highlight axis input ignored (option off)")
                 return
-            if not config.highlight_input_buttons and event.event_type == InputType.JoystickButton:
+            
+            if not is_button and event.event_type in (InputType.JoystickButton, InputType.JoystickHat):
                 # ignore button input
                 if verbose:
                     logging.getLogger("system").info(f"Event: highlight button input ignored (option off)")
@@ -1967,11 +2009,13 @@ class GremlinUi(QtWidgets.QMainWindow):
             eh = gremlin.event_handler.EventListener()
             
 
-            if config.highlight_autoswitch and tab_switch_needed:
+            if tab_switch_needed:
+                # change tabs and select
                 if verbose:
                     logging.getLogger("system").info(f"Event: execute tab switch begin")
                 eh.select_input.emit(event.device_guid, event.event_type, event.identifier)
             else:
+                # highlight the specififed item in the current device
                 eh.select_input.emit(event.device_guid, event.event_type, event.identifier)
 
 
@@ -2219,24 +2263,22 @@ class GremlinUi(QtWidgets.QMainWindow):
         # ignore if we're running
         if key is None or self.runner.is_running() or gremlin.shared_state.ui_keyinput_suspended():
             return
-        
 
-
-        if (self.config.highlight_input_axis or self.config.highlight_input_buttons):
-            if key.lookup_name == "leftshift":
-                if event.is_pressed:
-                    # temporarily force the listening to joystick axes changes
-                    self._set_joystick_input_highlighting(True)
-                    if not self._temp_input_axis_override:
-                        self._input_delay = 0 # eliminate delay in processing when triggering this so it switches immediately
-                        self._temp_input_axis_override = True
-                else:
-                    self._set_joystick_input_highlighting(self.config.highlight_input_axis)
-                    self._temp_input_axis_override = False
+        # if (self.config.highlight_enabled):
+        #     if key.lookup_name in ("leftshift","rightshift"):
+        #         if event.is_pressed:
+        #             # temporarily force the listening to joystick axes changes
+        #             self._set_joystick_input_highlighting(True)
+        #             if not self._temp_input_axis_override:
+        #                 self._input_delay = 0 # eliminate delay in processing when triggering this so it switches immediately
+        #                 self._temp_input_axis_override = True
+        #         else:
+        #             self._set_joystick_input_highlighting(self.config.highlight_input_axis)
+        #             self._temp_input_axis_override = False
             
-            elif key.lookup_name == "leftcontrol":
-                # temporarily force the listening to joystick axes changes
-                self._temp_input_axis_only_override = event.is_pressed
+        #     elif key.lookup_name == "leftcontrol":
+        #         # temporarily force the listening to joystick axes changes
+        #         self._temp_input_axis_only_override = event.is_pressed
             
         if key.lookup_name == "f5":
             # activate mode on F5

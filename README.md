@@ -174,6 +174,7 @@ Joystick Gremlin EX
 - Fixed an issue with OSC and MIDI UI due to prior UI refactors
 - Further refactor of **ComboBoxes** to only display up to 20 items before scrolling
 - Update to QT 6.7.3
+- Refinement of device highlight to clarify options.  If highlighting is enabled, button highlighting can be enabled by holding shift down, and axis highlighting can be enabled temporary by holding the control key.
 
 ### (m1)
 - **Gamepad support** JGEX supports up to four (4) virtual XBox 360 gamepads via VIGEM.  See gamepad section.  Gamepads can be mapped via the new **map to gamepad** action.

@@ -22,11 +22,16 @@ def gamepadAvailable():
         return True
 
     syslog = logging.getLogger("system")
-    _gamepad_available = vc.initalized
-    if _gamepad_available:
-        syslog.info(f"gamepad: enabled")
-    else:
-        syslog.info(f"gamepad: not found")
+    try:
+        _gamepad_available = vc.initalized
+        
+        if _gamepad_available:
+            syslog.info(f"gamepad: enabled")
+        else:
+            syslog.info(f"gamepad: not found")
+    except:
+        syslog.info("VIGEM not found or did not load correctly.  If you have VIGEM installed, check the version and ensure it is the 64 bit version.  This message is normal if VIGEM is not installed.")
+
 
    
     return _gamepad_available

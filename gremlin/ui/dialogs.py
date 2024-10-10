@@ -272,34 +272,33 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.general_layout = QtWidgets.QVBoxLayout()
         self.general_page.setLayout(self.general_layout)
 
+
+        # Switch to highlighted device (master switch)
+        self.highlight_enabled = QtWidgets.QCheckBox("Enable Input Highlighting")
+        self.highlight_enabled.clicked.connect(self._highlight_enabled_cb)
+        self.highlight_enabled.setToolTip("Enable device highlighting.")
+        self.highlight_enabled.setChecked(self.config.highlight_enabled)
+
+
         # highlight autoswitch
-        self.highlight_autoswitch = QtWidgets.QCheckBox(
-            "Switch to new device on input highlight trigger"
-        )
+        self.highlight_autoswitch = QtWidgets.QCheckBox("Switch to new device on input highlight trigger")
         self.highlight_autoswitch.clicked.connect(self._highlight_autoswitch)
         self.highlight_autoswitch.setChecked(self.config.highlight_autoswitch)
-        self.highlight_autoswitch.setToolTip("This option enables automatic device tab switching on device input triggers (physical hardware only)")
+        self.highlight_autoswitch.setToolTip("This option enables automatic device tab switching between device on device input triggers (physical hardware only).<br>Requires axis or button highlight options to be enabled as well.")
 
         # Highlight input option
-        self.highlight_input_axis = QtWidgets.QCheckBox(
-            "Highlight currently triggered axis"
-        )
+        self.highlight_input_axis = QtWidgets.QCheckBox("Highlight currently triggered axis")
         self.highlight_input_axis.clicked.connect(self._highlight_input_axis)
-        self.highlight_input_axis.setToolTip("This otion will enable automatic selection and highlighting of device inputs when they are triggered.")
+        self.highlight_input_axis.setToolTip("This otion will enable automatic selection and highlighting of detected axis input (physical hardware only).<br>To switch devices automatically, also enable the device switch option.<br>This can also be enabled temporarily while holding a control key while moving an input.")
         self.highlight_input_axis.setChecked(self.config.highlight_input_axis)
 
         # Highlight input option buttons
-        self.highlight_input_buttons = QtWidgets.QCheckBox(
-            "Highlight currently triggered button"
-        )
+        self.highlight_input_buttons = QtWidgets.QCheckBox("Highlight currently triggered button")
         self.highlight_input_buttons.clicked.connect(self._highlight_input_buttons)
+        self.highlight_input_buttons.setToolTip("This otion will enable automatic selection and highlighting of detected button input (physical hardware only).<br>To switch devices automatically, also enable the device switch option.<br>This can also be enabled temporarily while holding a shift key while pressing a button.")
         self.highlight_input_buttons.setChecked(self.config.highlight_input_buttons)
 
-        # Switch to highlighted device
-        self.highlight_enabled = QtWidgets.QCheckBox("Highlight swaps device tabs")
-        self.highlight_enabled.clicked.connect(self._highlight_enabled)
-        self.highlight_enabled.setChecked(self.config.highlight_enabled)
-
+   
         # Close to system tray option
         self.close_to_systray = QtWidgets.QCheckBox("Closing minimizes to system tray")
         self.close_to_systray.clicked.connect(self._close_to_systray)
@@ -562,13 +561,14 @@ class OptionsUi(ui_common.BaseDialogUi):
         # column 1
         col = 0
         row = 0
+        self.column_layout.addWidget(self.highlight_enabled, row, col)
+        row+=1
         self.column_layout.addWidget(self.highlight_autoswitch, row, col)
         row+=1
         self.column_layout.addWidget(self.highlight_input_axis, row, col)
         row+=1
         self.column_layout.addWidget(self.highlight_input_buttons, row, col)
-        row+=1
-        self.column_layout.addWidget(self.highlight_enabled, row, col)
+        
         row+=1
         self.column_layout.addWidget(self.sync_last_selection, row, col)
         row+=1
@@ -628,7 +628,8 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.general_layout.addWidget(self.enable_broadcast_speech)
         self.general_layout.addStretch()
         self.tab_container.addTab(self.general_page, "General")
-
+        
+        self._update_highlight_options() # update highlight state for checkboxes
 
     def _create_profile_page(self):
         """Creates the profile options page."""
@@ -875,6 +876,20 @@ This setting is also available on a profile by profile basis on the profile tab,
     # def _profile_restore_flag_cb(self, checked):
     #     ''' called when the restore last mode checked state is changed '''
     #     self.config.current_profile.set_restore_mode(checked)
+
+
+    def _update_highlight_options(self):
+        ''' enables/disables device highlight options based on state '''
+        enabled = self.config.highlight_enabled
+        self.highlight_autoswitch.setEnabled(enabled)
+        self.highlight_input_buttons.setEnabled(enabled)
+        self.highlight_input_axis.setEnabled(enabled)
+
+    @QtCore.Slot(bool)
+    def _highlight_enabled_cb(self, checked):
+        self.config.highlight_enabled = checked
+        self._update_highlight_options()
+
 
     @QtCore.Slot(bool)
     def _autoload_mapped_profile(self, checked):

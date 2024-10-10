@@ -446,6 +446,7 @@ class EventListener(QtCore.QObject):
 		if self.mouse_hook:
 			self.mouse_hook.stop()
 
+
 	def reload_calibrations(self):
 		"""Reloads the calibration data from the configuration file."""
 		from gremlin.ui.ui_util import create_calibration_function
@@ -595,27 +596,20 @@ class EventListener(QtCore.QObject):
 		# verbose = True
 		virtual_code = event.virtual_code
 		key_id = (event.scan_code, event.is_extended)
-		# print (f"recorded key: {key_id} vk: {virtual_code} (0x{virtual_code:X})")
+		#print (f"recorded key: {key_id} sc: {event.scan_code:X} vk: {virtual_code} (0x{virtual_code:X})")
 
 		# deal with any code translations needed
 		key_id, virtual_code = gremlin.keyboard.KeyMap.translate(key_id) # modify scan codes if needed
-		# print (f"translated key: {KeyMap.keyid_tostring(key_id)}  vk: {virtual_code} (0x{virtual_code:X})")
+		#print (f"translated key: {key_id} sc: {event.scan_code:X} vk: {virtual_code} (0x{virtual_code:X})")
 
 		is_pressed = event.is_pressed
-		# if virtual_code > 0:
-		# 	is_repeat = self._keyboard_state.get(virtual_code) and is_pressed
-		# else:
 		is_repeat = self._keyboard_state.get(key_id) and is_pressed
 
 		if is_repeat:
 			# ignore repeats
 			return True
 
-		# if virtual_code > 0:
-		# 	self._keyboard_state[virtual_code] = is_pressed
-		
 		self._keyboard_state[key_id] = is_pressed
-		# print (f"set state: {key_id} state: {is_pressed}")
 		
 		if gremlin.shared_state.is_running:
 			# RUN mode - queue input events
@@ -656,14 +650,25 @@ class EventListener(QtCore.QObject):
 		return self._keyboard_state.get(key.index_tuple(), False)
 	
 	def get_shifted_state(self):
+		''' returns true if either of the shift keys are down'''
 		lshift_key = gremlin.keyboard.Key(scan_code = gremlin.keyboard.scan_codes.sc_shiftLeft)
 		if self.get_key_state(lshift_key):
 			return True
 		rshift_key = gremlin.keyboard.Key(scan_code = gremlin.keyboard.scan_codes.sc_shiftRight)
 		if self.get_key_state(rshift_key):
 			return True
-		
 		return False
+	
+	def get_control_state(self):
+		''' returns true if either of the control keys are down '''
+		lctrl_key = gremlin.keyboard.Key(scan_code = gremlin.keyboard.scan_codes.sc_controlLeft)
+		if self.get_key_state(lctrl_key):
+			return True
+		rctrl_key = gremlin.keyboard.Key(scan_code = gremlin.keyboard.scan_codes.sc_controlRight)
+		if self.get_key_state(rctrl_key):
+			return True
+		return False
+
 
 	def _mouse_handler(self, event):
 		"""Callback for mouse events.

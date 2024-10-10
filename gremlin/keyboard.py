@@ -135,18 +135,25 @@ class Key():
         self._latched_keys = [] # TraceableList() #[] # list of keys latched to this keystroke (modifiers)
         # self._latched_keys.add_callback(self._changed_cb)            
 
+        
+
         if not name:
             self._load(scan_code, is_extended, virtual_code, is_mouse)
-
-        self._scan_code = scan_code
-        self._is_extended = is_extended
-        self._virtual_code = virtual_code            
+        
+        else:
+            self._key_id = (scan_code, is_extended)   
+            self._scan_code = scan_code
+            self._is_extended = is_extended
+            self._virtual_code = virtual_code            
 
 
         self._name = name
         self._is_mouse = is_mouse
         self._update()
 
+    @property
+    def key_id(self):
+        return self._key_id
 
     @property
     def virtual_code(self):
@@ -173,7 +180,7 @@ class Key():
     def _load(self, scan_code : int, is_extended : bool, virtual_code : int, is_mouse : bool):
         self._mouse_button = None
         name = None
-        if is_mouse or scan_code >= 0x1000:
+        if is_mouse:
             if scan_code >= 0x1000:
                 # convert fake scan code to convert to a mouse button
                 mouse_button = MouseButton(scan_code - 0x1000)
@@ -197,6 +204,9 @@ class Key():
 
         else:
             # regular key
+            if scan_code >= 0x1000:
+                scan_code = scan_code & 0xFF
+                is_extended = True
 
             if virtual_code > 0 and scan_code == 0:
                 # get scan code from VK
@@ -208,6 +218,7 @@ class Key():
                     self._name = key.name
                     self._lookup_name = key.lookup_name
 
+        self._key_id = (scan_code, is_extended)
         self._scan_code = scan_code
         self._is_extended = is_extended
         self._virtual_code = virtual_code

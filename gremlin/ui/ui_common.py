@@ -930,11 +930,9 @@ class ActionSelector(QtWidgets.QWidget):
                 self.action_paste.emit(clipboard.data)
             else:
                 # dish out a message
-                message_box = QtWidgets.QMessageBox(
-                    QtWidgets.QSystemTrayIcon.MessageIcon.Warning,
-                    f"Invalid Action type ({action_name})",
-                    "Unable to paste action because it is not valid for the current input")
-                message_box.showNormal()
+                MessageBox(title =  f"Invalid Action type ({action_name})",
+                    prompt = "Unable to paste action because it is not valid for the current input")
+                
 
     def _clipboard_changed(self, clipboard):
         ''' handles paste button state based on clipboard data '''

@@ -53,6 +53,8 @@ class MergeOperationType (enum.IntEnum):
     Add = 1 # the two inputs are added
     Average = 2 # the two inputs are averaged
     Center = 3 # centered (left - right)/2
+    Min = 4 # min of two axes
+    Max = 5 # max of two axes
 
     @staticmethod
     def to_display_name(value : MergeOperationType):
@@ -65,19 +67,29 @@ class MergeOperationType (enum.IntEnum):
     @staticmethod
     def to_string(value : MergeOperationType):
         return _merge_operation_to_string_lookup[value]
+    
+    @staticmethod
+    def to_description(value : MergeOperationType):
+        return _merge_operation_to_description_lookup[value]
+    
 
 _merge_operation_to_enum_lookup = {
     "none" : MergeOperationType.NotSet,
     "add" : MergeOperationType.Add,
     "average" : MergeOperationType.Average,
     "center" : MergeOperationType.Center,
+    "min" : MergeOperationType.Min,
+    "max" : MergeOperationType.Max,
+
 }        
 
 _merge_operation_to_string_lookup = {
     MergeOperationType.NotSet : "none",
     MergeOperationType.Add : "add",
     MergeOperationType.Average : "average",
-    MergeOperationType.Center : "center"
+    MergeOperationType.Center : "center",
+    MergeOperationType.Min : "min",
+    MergeOperationType.Max : "max",
 }        
 
 
@@ -85,7 +97,19 @@ _merge_operation_display_lookup = {
     MergeOperationType.NotSet : "N/A",
     MergeOperationType.Add : "Add",
     MergeOperationType.Average : "Average",
-    MergeOperationType.Center : "Center"
+    MergeOperationType.Center : "Center",
+    MergeOperationType.Min : "Minimum",
+    MergeOperationType.Max : "Maximum",
+}
+
+_merge_operation_to_description_lookup = {
+    MergeOperationType.NotSet : "Not set",
+    MergeOperationType.Add : "A + B",
+    MergeOperationType.Average : "Average (A+B)/2",
+    MergeOperationType.Center : "Centered (A-B)/2",
+    MergeOperationType.Min : "Min(A, B)",
+    MergeOperationType.Max : "Max(A, B)",
+
 }
 
 
@@ -2361,6 +2385,16 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
                                                 invert = self.merge_invert)
                     case MergeOperationType.Center:
                         value = scale_to_range((v1-v2)/2,
+                                                target_min=self.output_range_min, 
+                                                target_max=self.output_range_max,
+                                                invert = self.merge_invert)
+                    case MergeOperationType.Min:
+                        value = scale_to_range(min(v1,v2),
+                                                target_min=self.output_range_min, 
+                                                target_max=self.output_range_max,
+                                                invert = self.merge_invert)
+                    case MergeOperationType.Max:
+                        value = scale_to_range(max(v1,v2),
                                                 target_min=self.output_range_min, 
                                                 target_max=self.output_range_max,
                                                 invert = self.merge_invert)
