@@ -58,10 +58,11 @@ class GatedAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _cleanup_ui(self):
         ''' cleanup the UI and widget hooks '''
-        self.gate_widget.unhook()
-        self.main_layout.removeWidget(self.gate_widget)
-        self.gate_widget.deleteLater()
-        self.gate_widget = None
+        if self.gate_widget:
+            self.gate_widget.unhook()
+            self.main_layout.removeWidget(self.gate_widget)
+            self.gate_widget.deleteLater()
+            self.gate_widget = None
 
     
 
