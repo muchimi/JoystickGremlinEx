@@ -108,7 +108,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.15ex (m2.7)"
+APPLICATION_VERSION = "13.40.15ex (m2.8)"
 
 # the main ui
 ui = None
@@ -939,8 +939,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         )
         if fname != "":
             self.profile._profile_fname = fname
-            self.profile.save()
             self._profile_fname = fname
+            self.profile.save()
             self.config.last_profile = fname
             self._create_recent_profiles()
         self._update_window_title()

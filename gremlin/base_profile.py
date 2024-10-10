@@ -2137,7 +2137,7 @@ class Profile():
     def save(self):
         ''' saves the profile '''
 
-        if self._profile_fname is None or  not os.path.isfile(self._profile_fname):
+        if self._profile_fname is None:
             gremlin.ui.ui_common.MessageBox(prompt = "File is not set, please save the profile first")
             return
 
