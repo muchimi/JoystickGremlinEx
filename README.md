@@ -158,6 +158,11 @@ Joystick Gremlin EX
 
 ## 13.40.15ex (pre-release)
 
+
+### (m3)
+
+- VjoyRemap plugin now supports curved output directly in the action without having to add a response curve.  The curve can be added or removed.  The curve dialog now has a number of bezier curve presets.  The curve is applied after all the other transforms, including merging.
+
 ### (m2)
 - First attempt with multiple code refactors and bug fixes detailed below.
 - Added cleanup events for action plugins so they can release resources via _cleanup() \[AbstractAction] and _cleanup_ui() \[AbstractActionWidget] - the methods are virtual so are optional but will be called when an action is deleted or unloaded.  This helps with releasing references that could cause problems with the automatic garbage collection and hooks into various events.

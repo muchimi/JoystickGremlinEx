@@ -44,6 +44,7 @@ IdMapToButton = -2 # map to button special ID
 import gremlin.ui.input_item
 import gremlin.base_profile
 import gremlin.shared_state
+import gremlin.curve_handler
 
 
 
@@ -561,6 +562,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         super().__init__(action_data, parent=parent)
         assert(isinstance(action_data, VjoyRemap))
 
+
     
 
     def _create_ui(self):
@@ -596,7 +598,10 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
             # init default widget tracking
             self.button_grid_widget  = None
-            self.axis_widget = None
+            self.container_axis_widget = None
+
+            # handler to update curve widget if displayed
+            self.curve_update_handler = None
 
             # if self.action_data.input_type in (InputType.Midi, InputType.OpenSoundControl):
             #     pass
@@ -633,9 +638,12 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 
 
-        self.axis_widget = QtWidgets.QWidget()
-        axis_grid = QtWidgets.QGridLayout(self.axis_widget)
-        axis_grid.setColumnStretch(8,1)
+        self.container_axis_widget = QtWidgets.QWidget()
+        self.container_axis_widget.setContentsMargins(0,0,0,0)
+
+        self.container_axis_layout = QtWidgets.QGridLayout(self.container_axis_widget)
+        self.container_axis_layout.setColumnStretch(8,1)
+        self.container_axis_layout.setContentsMargins(0,0,0,0)
         
         self.reverse_checkbox = QtWidgets.QCheckBox("Reverse")
 
@@ -673,66 +681,90 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         # output axis repeater
         self.container_repeater_widget = QtWidgets.QWidget()
-        self.container_repeater_layout = QtWidgets.QVBoxLayout(self.container_repeater_widget)
+        self.container_repeater_layout = QtWidgets.QHBoxLayout(self.container_repeater_widget)
         self._axis_repeater_widget = gremlin.ui.ui_common.AxisStateWidget(show_percentage=False,orientation=QtCore.Qt.Orientation.Horizontal)
-        self.container_repeater_layout.addWidget(self._axis_repeater_widget)
+        self.curve_button_widget = QtWidgets.QPushButton("Output Curve")
+        
+        
+        self.curve_icon_inactive = util.load_icon("mdi.chart-bell-curve",qta_color="gray")
+        self.curve_icon_active = util.load_icon("mdi.chart-bell-curve",qta_color="blue")
+        self.curve_button_widget.setToolTip("Curve output")
+        self.curve_button_widget.clicked.connect(self._curve_button_cb)
 
+        self.curve_clear_widget = QtWidgets.QPushButton("Clear curve")
+        delete_icon = load_icon("mdi.delete")
+        self.curve_clear_widget.setIcon(delete_icon)
+        self.curve_clear_widget.setToolTip("Removes the curve output")
+        self.curve_clear_widget.clicked.connect(self._curve_delete_button_cb)
+
+
+        self.container_repeater_layout.addWidget(self.curve_button_widget)
+        self.container_repeater_layout.addWidget(self.curve_clear_widget)
+        self.container_repeater_layout.addWidget(self._axis_repeater_widget)
+        self.container_repeater_layout.addStretch()
+        self._update_curve_icon()
+        
 
         row = 0
         col = 0
-        axis_grid.addWidget(QtWidgets.QLabel("Reverse Axis:"),row,col)
+        self.container_axis_layout.addWidget(QtWidgets.QLabel("Reverse Axis:"),row,col)
         row+=1
-        axis_grid.addWidget(self.reverse_checkbox,row,col)
+        self.container_axis_layout.addWidget(self.reverse_checkbox,row,col)
 
         row = 0
         col+=1
-        axis_grid.addWidget(QtWidgets.QLabel("Output Mode:"),row,col)
+        self.container_axis_layout.addWidget(QtWidgets.QLabel("Output Mode:"),row,col)
         row+=1
-        axis_grid.addWidget(self.absolute_checkbox,row,col)
+        self.container_axis_layout.addWidget(self.absolute_checkbox,row,col)
         row+=1
-        axis_grid.addWidget(self.relative_checkbox,row,col)
+        self.container_axis_layout.addWidget(self.relative_checkbox,row,col)
 
 
         row = 0
         col+=1
-        axis_grid.addWidget(QtWidgets.QLabel("Start Value:"),row,col,1,3)
+        self.container_axis_layout.addWidget(QtWidgets.QLabel("Start Value:"),row,col,1,3)
 
         row+=1
-        axis_grid.addWidget(self.sb_start_value,row,col,1,3)
+        self.container_axis_layout.addWidget(self.sb_start_value,row,col,1,3)
 
         row+=1
-        axis_grid.addWidget(self.b_min_value,row,col)
+        self.container_axis_layout.addWidget(self.b_min_value,row,col)
         col+=1
-        axis_grid.addWidget(self.b_center_value,row,col)
+        self.container_axis_layout.addWidget(self.b_center_value,row,col)
         col+=1
-        axis_grid.addWidget(self.b_max_value,row,col)
-
-        row = 0
-        col+=1
-        axis_grid.addWidget(QtWidgets.QLabel("Axis"),row,col)
-        row+=1
-        axis_grid.addWidget(QtWidgets.QLabel("Scale:"),row,col)
-        row+=1
-        axis_grid.addWidget(self.relative_scaling,row,col)
+        self.container_axis_layout.addWidget(self.b_max_value,row,col)
 
         row = 0
         col+=1
-        axis_grid.addWidget(QtWidgets.QLabel("Axis Output Range:"),row,col,1,2)
+        self.container_axis_layout.addWidget(QtWidgets.QLabel("Axis"),row,col)
         row+=1
-        axis_grid.addWidget(QtWidgets.QLabel("Min:"),row,col)
+        self.container_axis_layout.addWidget(QtWidgets.QLabel("Scale:"),row,col)
         row+=1
-        axis_grid.addWidget(self.sb_axis_range_low,row,col)
+        self.container_axis_layout.addWidget(self.relative_scaling,row,col)
+
+        row = 0
+        col+=1
+        self.container_axis_layout.addWidget(QtWidgets.QLabel("Axis Output Range:"),row,col,1,2)
+        row+=1
+        self.container_axis_layout.addWidget(QtWidgets.QLabel("Min:"),row,col)
+        row+=1
+        self.container_axis_layout.addWidget(self.sb_axis_range_low,row,col)
 
         col+=1
         row=1
-        axis_grid.addWidget(QtWidgets.QLabel("Max:"),row,col)
+        self.container_axis_layout.addWidget(QtWidgets.QLabel("Max:"),row,col)
         row+=1
-        axis_grid.addWidget(self.sb_axis_range_high,row,col)
+        self.container_axis_layout.addWidget(self.sb_axis_range_high,row,col)
+
+        
 
 
-        self.main_layout.addWidget(self.axis_widget)
+
+        
+        self.main_layout.addWidget(self.container_axis_widget)
         self.main_layout.addWidget(self.container_repeater_widget)
         
+
         
 
         self.reverse_checkbox.clicked.connect(self._axis_reverse_changed)
@@ -903,6 +935,56 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             selected_input_index = 0
         self.merge_selector_input_widget.setCurrentIndex(selected_input_index)
 
+
+
+
+    def _update_curve_icon(self):
+        if self.action_data.curve_data:
+            self.curve_button_widget.setIcon(self.curve_icon_active)
+            self.curve_clear_widget.setEnabled(True)
+        else:
+            self.curve_button_widget.setIcon(self.curve_icon_inactive)
+            self.curve_clear_widget.setEnabled(False)
+
+    QtCore.Slot()
+    def _curve_button_cb(self):
+        if not self.action_data.curve_data:
+            curve_data = gremlin.curve_handler.AxisCurveData()
+            curve_data.curve_update()
+            self.action_data.curve_data = curve_data
+            
+        dialog = gremlin.curve_handler.AxisCurveDialog(self.action_data.curve_data)
+        util.centerDialog(dialog, dialog.width(), dialog.height())
+        self.curve_update_handler = dialog.curve_update_handler
+        self._update_axis_widget(self._current_input_axis())
+        dialog.exec()
+        self.curve_update_handler = None
+
+        self._update_curve_icon()
+
+    QtCore.Slot()
+    def _curve_delete_button_cb(self):
+        ''' removes the curve data '''
+        message_box = QtWidgets.QMessageBox()
+        message_box.setText("Confirmation")
+        message_box.setInformativeText("Delete curve data for this output?")
+        message_box.setStandardButtons(
+            QtWidgets.QMessageBox.StandardButton.Ok |
+            QtWidgets.QMessageBox.StandardButton.Cancel
+        )
+        message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
+        gremlin.util.centerDialog(message_box)
+        is_cursor = isCursorActive()
+        if is_cursor:
+            popCursor()
+        response = message_box.exec()
+        if is_cursor:
+            pushCursor()
+        if response == QtWidgets.QMessageBox.StandardButton.Ok:
+            self.action_data.curve_data = None
+            self._update_curve_icon()
+        
+
     QtCore.Slot()
     def _range_min_changed_cb(self):
         value = self.sb_range_min_widget.value()
@@ -950,7 +1032,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         
 
     def _joystick_event_handler(self, event):
-        ''' handles joystick events in the UI'''
+        ''' handles joystick events in the UI (functor handles the output when profile is running)'''
         if gremlin.shared_state.is_running:
             return 
 
@@ -978,7 +1060,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             if event.identifier != self.action_data.hardware_input_id:
                 return
         
-
+        #print (f"input value: {event.value}")
         self._update_axis_widget(event.value)
         
 
@@ -1002,10 +1084,21 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         # always read the current input as the value could be from another device for merged inputs
         if self.input_type == InputType.JoystickAxis:
             self._axis_repeater_widget.setVisible(True)
+            # filter and merge the data
             value = self.action_data.get_filtered_axis_value()
+            if self.action_data.curve_data is not None:
+                # curve the data 
+                value = self.action_data.curve_data.curve_value(value)
             self._axis_repeater_widget.setValue(value)
+
+            # update the curved window if displayed
+            if self.curve_update_handler is not None:
+                self.curve_update_handler(value)            
         else:
             self._axis_repeater_widget.setVisible(False)
+
+        
+
 
 
     @QtCore.Slot(bool)
@@ -1437,6 +1530,9 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         exec_on_release_visible = False
         paired_visible = False
         merge_visible =  False
+        repeater_visible = False
+        
+        
         
 
         if self._is_axis:
@@ -1444,6 +1540,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             range_visible = action in (VjoyAction.VJoyRangeAxis, VjoyAction.VJoyAxisToButton)
             axis_visible = not (grid_visible or range_visible) # or hardware_widget_visible)
             merge_visible = action == VjoyAction.VjoyMergeAxis and axis_visible
+            repeater_visible = True
 
         elif input_type in VJoyWidget.input_type_buttons:
             pulse_visible = action == VjoyAction.VJoyPulse
@@ -1455,6 +1552,9 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         elif input_type == InputType.JoystickHat:
             pass
 
+
+        self.container_repeater_widget.setVisible(repeater_visible)
+
         is_command = VjoyAction.is_command(action)
         selector_visible = not is_command
 
@@ -1464,8 +1564,8 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.start_widget.setVisible(start_visible)
         if self.button_grid_widget:
             self.button_grid_widget.setVisible(grid_visible)
-        if self.axis_widget:
-            self.axis_widget.setVisible(axis_visible)
+        if self.container_axis_widget:
+            self.container_axis_widget.setVisible(axis_visible)
         
         # merge axis options
         if self._merge_enabled:
@@ -2001,10 +2101,15 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
             if event.identifier != self.action_data.hardware_input_id:
                 return            
             
-        # process
+        # process input options and any merge operation
         value = self.action_data.get_filtered_axis_value()
+
+        if self.action_data.curve_data is not None:
+            # curve the output 
+            value = self.action_data.curve_data.curve_value(value)
+
         value = gremlin.actions.Value(value)
-        # update the merged value if we're merging axes
+        
         self._process_event(event, value)
         
 	
@@ -2327,13 +2432,16 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         self.axis_mode = "absolute"
         self.axis_scaling : float  = 1.0
         self.axis_start_value : float = 0.0
+        self.curve_data = None # present if curve data is needed
+
+
         self._exec_on_release : bool = False
         self._paired : bool = False
 
         self._merge_device_id : str = None # input guid (str) of the merged device
         self._merge_device_guid : dinput.GUID = None # input guid for the merge device
         self.merge_input_id : int = None # input id of the merged input
-        self._merge_mode : MergeOperationType = MergeOperationType.Average # default merge method
+        self._merge_mode : MergeOperationType = MergeOperationType.NotSet # default merge method
         self.output_range_min : float = -1.0 # min for merged output
         self.output_range_max : float = 1.0 # max for merged output
         self.merge_invert : bool = False # inversion flag for merged output
@@ -2691,7 +2799,12 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
             if "merge_max" in node.attrib:
                 self.output_range_max = safe_read(node,"merge_max", float, 1.0)
 
-
+            # curve data
+            curve_node = util.get_xml_child(node,"response-curve")
+            if curve_node is not None:
+                self.curve_data = gremlin.curve_handler.AxisCurveData()
+                self.curve_data._parse_xml(curve_node)
+                self.curve_data.curve_update()
 
 
         except ProfileError:
@@ -2751,6 +2864,11 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
 
             case VjoyAction.VJoyPulse:
                 node.set("pulse_delay", safe_format(self.pulse_delay, int))
+
+
+        if self.curve_data is not None:
+            curve_node =  self.curve_data._generate_xml()
+            node.append(curve_node)
 
         if VjoyAction.is_command(self.action_mode) or self.action_mode:
             node.set("start_pressed", safe_format(self.start_pressed, bool))
