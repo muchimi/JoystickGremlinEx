@@ -957,7 +957,11 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         util.centerDialog(dialog, dialog.width(), dialog.height())
         self.curve_update_handler = dialog.curve_update_handler
         self._update_axis_widget(self._current_input_axis())
+
+        # disable highlighting
+        gremlin.shared_state.push_suspend_highlighting()
         dialog.exec()
+        gremlin.shared_state.pop_suspend_highlighting()
         self.curve_update_handler = None
 
         self._update_curve_icon()

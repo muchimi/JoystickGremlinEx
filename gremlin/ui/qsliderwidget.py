@@ -86,6 +86,7 @@ class QSliderWidget(QtWidgets.QWidget):
         self._usable_left = 0 # left range start position, pixel
         self._usable_right = 0 # right range start position, pixel
         self._marker_size = 16 # size of the marker icons in pixels
+        self._marker_visible = True # show marker
 
         self._range_left = 0 # position of the first gate in pixels
         self._range_right = 0 # position of the last gate in pixels
@@ -116,7 +117,7 @@ class QSliderWidget(QtWidgets.QWidget):
         self._tooltip_timer : QTimer = None # tooltip delay timer
         self._tooltip_handle_map = {} # tooltips to display for the given handle, key is the index of the handle, 0 based
         self._tooltip_range_map = {} # tooltips for a given range, the key is a tuple of the index two bounding gates (a,b)
-
+        self._desired_height = 32
 
         
         #self.sizePolicy().setHorizontalPolicy(QtWidgets.QSizePolicy.Expanding)
@@ -136,6 +137,16 @@ class QSliderWidget(QtWidgets.QWidget):
         self._update_offsets()
         self._update_all_handle_pixmaps()
         self.setMouseTracking(True) # track mouse movements
+
+    @property 
+    def desired_height(self) -> int:
+        return self._desired_height
+        
+    @desired_height.setter
+    def desired_height(self, value : int):
+        self._desired_height = value
+        self.resize(self.minimumSizeHint())
+
         
     def minimumSizeHint(self):
         '''
@@ -144,7 +155,7 @@ class QSliderWidget(QtWidgets.QWidget):
         Returns:
             Minimum widget size (Qsize)
         '''
-        return QtCore.QSize(160,32)
+        return QtCore.QSize(100,self._desired_height)
     
     @property
     def values(self) -> list:
@@ -214,7 +225,14 @@ class QSliderWidget(QtWidgets.QWidget):
     
 
 
-
+    def setValueIndex(self, index : int, value : int | float):
+        ''' sets a specific value by index '''
+        try:
+            values = self._values
+            values[index] = value
+            self.setValue(values)
+        except:
+            logging.getLogger("system").error(f"Unable to set value index {index} - out of index range error")
 
         
     def setValue(self, value : int | float | list | tuple):
@@ -237,6 +255,12 @@ class QSliderWidget(QtWidgets.QWidget):
     def value(self) -> list:
         ''' gets the list of values in the slider - a single value is returned as a list of one'''
         return self._values
+    
+    
+    
+    def setMarkerVisible(self, value : bool):
+        self._marker_visible = value
+        self.update()
 
     @property
     def marker_size(self):
@@ -256,7 +280,6 @@ class QSliderWidget(QtWidgets.QWidget):
     def readOnly(self) -> bool:
         return self._readOnly
     
-        
 
     def _update_offsets(self):
         ''' recomputes pixel offsets based on gate values '''
@@ -300,10 +323,13 @@ class QSliderWidget(QtWidgets.QWidget):
 
         # print (f"Range width: {self._usable_width} range left: {self._usable_left} range right: {self._usable_right}  range width: {self._usable_width}  widget width: {widget_width}  height {widget_height} handle diameter: {handle_size} radius: {self._handle_radius}")
 
+        #handle_offsets = []
         for value in self._values:
-            x = gremlin.util.scale_to_range(value, target_min = self._usable_left, target_max = self._usable_right)
+            x = gremlin.util.scale_to_range(value, source_min=self._minimum, source_max=self._maximum, target_min = self._usable_left, target_max = self._usable_right)
             gate_positions.append(x - self._handle_radius)
-            # print(f"Handle offset: {x}")
+            #handle_offsets.append((value, x))
+
+        #print(f"Handle offset: {handle_offsets}")
 
         # leftmost position of the first gate
         if len(gate_positions) == 1:
@@ -322,7 +348,7 @@ class QSliderWidget(QtWidgets.QWidget):
         self._range_corner = int(self._range_height * 0.33)
         self._range_top = int((widget_height - self._range_height)*0.5)
         self._handle_positions = gate_positions
-       # print (f"Range left: {self._range_left}  right: {self._range_right}  width: {self._range_width} height: {self._range_height} top margin: {self._range_top}")
+        # print (f"Range left: {self._range_left}  right: {self._range_right}  width: {self._range_width} height: {self._range_height} top margin: {self._range_top}")
         self._update_marker_offsets()
         self._update_all_handle_pixmaps()
 
@@ -393,6 +419,10 @@ class QSliderWidget(QtWidgets.QWidget):
         self._update_targets()
         self._update_offsets()
 
+    
+    def range(self):
+        ''' returns the range of the slider '''
+        return (self._minimum, self._maximum)
 
     def paintEvent(self, event : QPaintEvent):
         ''' paint event
@@ -407,7 +437,8 @@ class QSliderWidget(QtWidgets.QWidget):
         painter.setRenderHint(QPainter.Antialiasing)
 
         self._draw_widget(painter)
-        self._draw_markers(painter)
+        if self._marker_visible:
+            self._draw_markers(painter)
 
         painter.end()
 
@@ -613,10 +644,10 @@ class QSliderWidget(QtWidgets.QWidget):
         if x >= self._usable_left and x <= self._usable_right:
             # x is in the "value" zone
             value = gremlin.util.scale_to_range(x, self._usable_left, self._usable_right, self._minimum, self._maximum)
-            #print (f"click value: {x} -> {value}")
+            print (f"click value: {x} -> {value}")
             return value
         # not in range
-        #print (f"click value: {x} -> N/A")
+        print (f"not in range click value: {x} -> N/A")
         return None
     
     def _get_min_max_handles(self):
@@ -823,10 +854,11 @@ class QSliderWidget(QtWidgets.QWidget):
             # left mouse drag operation
             point = event.pos()
             x = point.x()
+
             if not self._drag_active and self._mouse_down and abs(self._drag_x - x) > 2: # move at least 3 pixels
                 # drag started
                 self._drag_active = True
-                # print ("mouse drag starting")
+                #print ("mouse drag starting")
                 
 
             if self._drag_active:
@@ -835,38 +867,45 @@ class QSliderWidget(QtWidgets.QWidget):
                     # mouse moved
                     #print ("mouse drag detected")
                     current_x = self._handle_positions[self._drag_handle_index]
+                    old_x = current_x
+                    
                     x_offset = x - self._drag_x
                     current_x += x_offset
+                    
 
                     # drag bounds check
                     if current_x < self._handle_min:
                         current_x = self._handle_min
                     elif current_x > self._handle_max:
                         current_x = self._handle_max
-
-                    value = self._mouse_position_to_value(current_x + self._handle_radius)
-                    # get the index of the value relative to the other gates
-                    self._values[self._drag_handle_index] = value
-                    values = [(value, index) for index, value in enumerate(self._values)]
-                    pair = values[self._drag_handle_index]
-                    values.sort(key = lambda x: x[0])
-                    self._values.sort()
-                    new_index = values.index(pair)
-
-                    #print (f"new index: {new_index}")
-                    self._drag_handle_index = new_index
-
-                    self._handle_positions[self._drag_handle_index] = current_x
-                    index_min, index_max = self._get_min_max_handles()
                     
-                    self._range_left = self._handle_positions[index_min] + self._handle_radius
-                    self._range_right = self._handle_positions[index_max] + self._handle_radius
-                    self._range_width = self._range_right - self._range_left
-                    self._drag_x = x
-                    # print (f"drag offset: {x_offset}  new position: {current_x}  new value: {value}  min index: {index_min}  max index: {index_max}")
+                    value = self._mouse_position_to_value(current_x + self._handle_radius)
 
-                    # fire the gate value change
-                    self.valueChanged.emit(self._drag_handle_index, value)
+                    # get the index of the value relative to the other gates
+                    old_value = self._values[self._drag_handle_index] 
+                    print (f"Current x: {old_x} -> {current_x}  offset: {x_offset}  old value: {old_value}  new value: {value}")
+                    if old_value != value:
+                        self._values[self._drag_handle_index] = value
+                        values = [(value, index) for index, value in enumerate(self._values)]
+                        pair = values[self._drag_handle_index]
+                        values.sort(key = lambda x: x[0])
+                        self._values.sort()
+                        new_index = values.index(pair)
+
+                        #print (f"new index: {new_index}")
+                        self._drag_handle_index = new_index
+
+                        self._handle_positions[self._drag_handle_index] = current_x
+                        index_min, index_max = self._get_min_max_handles()
+                        
+                        self._range_left = self._handle_positions[index_min] + self._handle_radius
+                        self._range_right = self._handle_positions[index_max] + self._handle_radius
+                        self._range_width = self._range_right - self._range_left
+                        self._drag_x = x
+                        #print (f"drag offset: {x_offset}  new position: {current_x}  new value: {value}  min index: {index_min}  max index: {index_max}")
+
+                        # fire the gate value change
+                        self.valueChanged.emit(self._drag_handle_index, value)
                 
                     hover_changed = True
 

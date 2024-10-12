@@ -3674,3 +3674,28 @@ class ActionLabel(QtWidgets.QLabel):
             self.setPixmap(QtGui.QPixmap(icon))
 
 
+
+class MarkdownDialog(QtWidgets.QDialog):
+    '''
+    Dialog box for instructions in markdown format
+    '''
+    def __init__(self, title = "Markdown Instructions", source = None, parent = None):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.setWindowModality(QtCore.Qt.ApplicationModal)
+        self._view = QtWidgets.QTextEdit()
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.addWidget(self._view)
+        if source is not None:
+            self.load(source)
+
+
+    def load(self, source : str):
+        ''' loads a source '''
+        location = gremlin.util.find_file(source, gremlin.shared_state.root_path)
+        if os.path.isfile(location):
+            self._source = location
+            with open(location,"+rt") as f:
+                md = f.read()
+            self._view.setMarkdown(md)
+

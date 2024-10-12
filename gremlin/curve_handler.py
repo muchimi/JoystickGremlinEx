@@ -50,6 +50,7 @@ from itertools import pairwise
 
 from gremlin.ui.ui_common import DynamicDoubleSpinBox, DualSlider, get_text_width
 import enum
+from lxml import etree
 
 g_scene_size = 250.0
 
@@ -71,6 +72,28 @@ _curve_preset_string_lookup = {
     CurvePreset.Bezier4 : "Bezier 4",
 }
 
+class DeadzonePreset(enum.IntEnum):
+    center_two = 1
+    center_five = 2
+    center_ten = 3
+    end_two = 4
+    end_five = 5
+    end_ten = 6
+    reset = 7
+
+    @staticmethod
+    def to_display(value : DeadzonePreset) -> str:
+        return _deadzon_preset_string_lookup[value]
+
+_deadzon_preset_string_lookup = {    
+    DeadzonePreset.center_two : "Center 2%",
+    DeadzonePreset.center_five : "Center 5%",
+    DeadzonePreset.center_ten : "Center 10%",
+    DeadzonePreset.end_two : "End 2%",
+    DeadzonePreset.end_five : "End 5%",
+    DeadzonePreset.end_ten : "End 10%",
+    DeadzonePreset.reset : "Reset"
+}
 
 
 class CurveType(enum.Enum):
@@ -609,6 +632,7 @@ class CubicBezierSplineModel(AbstractCurveModel):
             key=lambda entry: entry.center.x
         )
         self._action_data.control_points = []
+
         for cp in control_points:
             if cp.center.x == -1: # left point
                 self._action_data.control_points.append(
@@ -624,7 +648,7 @@ class CubicBezierSplineModel(AbstractCurveModel):
                 self._action_data.control_points.append(
                     [cp.center.x, cp.center.y]
                 )
-            elif cp.center.x == 0: # middle point
+            else: # other points in the middle 
                 self._action_data.control_points.append(
                     [cp.handles[0].x, cp.handles[0].y]
                 )
@@ -634,8 +658,7 @@ class CubicBezierSplineModel(AbstractCurveModel):
                 self._action_data.control_points.append(
                     [cp.handles[1].x, cp.handles[1].y]
                 )
-            else:
-                assert True,f"Invalid point: center {cp.center.x}  {str(cp)}"
+            
 
 
 
@@ -684,6 +707,8 @@ class ControlPointGraphicsItem(QtWidgets.QGraphicsEllipseItem):
         assert(isinstance(control_point, ControlPoint))
 
         self.control_point = control_point
+        self.parent = parent
+        
 
         self.setPos(
             g_scene_size * self.control_point.center.x,
@@ -699,6 +724,8 @@ class ControlPointGraphicsItem(QtWidgets.QGraphicsEllipseItem):
                 dy = -(self.control_point.center.y - handle.y) * g_scene_size
                 item = CurveHandleGraphicsItem(i, Point2D(dx, dy), self)
                 self.handles.append(item)
+
+        self.eh = gremlin.event_handler.EventListener()
 
     def redraw(self):
         """Forces a position update of the ui element."""
@@ -721,6 +748,8 @@ class ControlPointGraphicsItem(QtWidgets.QGraphicsEllipseItem):
             if self.scene() and self.scene().mouseGrabberItem() == self:
                 self.ungrabMouse()
 
+
+
     def mouseReleaseEvent(self, evt):
         """Releases the mouse grab when the mouse is released.
 
@@ -736,10 +765,30 @@ class ControlPointGraphicsItem(QtWidgets.QGraphicsEllipseItem):
         :param evt the mouse event to process
         """
         # Create desired point
-        new_point = Point2D(
-            gremlin.util.clamp(evt.scenePos().x() / g_scene_size, -1.0, 1.0),
-            gremlin.util.clamp(-evt.scenePos().y() / g_scene_size, -1.0, 1.0)
-        )
+        x = gremlin.util.clamp(evt.scenePos().x() / g_scene_size, -1.0, 1.0)
+        y = gremlin.util.clamp(-evt.scenePos().y() / g_scene_size, -1.0, 1.0)
+
+        
+
+        # snap to grid if shift key is down
+        if self.parent:
+            center = self.parent.control_point.center
+        else:
+            center = None
+        if self.eh.get_control_state():
+            # coarse snap
+            if center:
+                x,y = gremlin.util.snap_to_grid(x, y, 25, center.x, center.y)
+            else:
+                x,y = gremlin.util.snap_to_grid(x, y, 25)
+        elif self.eh.get_shifted_state():
+            # fine snap
+            if center:
+                x,y = gremlin.util.snap_to_grid(x, y, 50, center.x, center.y)
+            else:
+                x,y = gremlin.util.snap_to_grid(x, y, 50)
+            
+        new_point = Point2D(x,y)
 
         # Only allow movement along the y axis if the point is on either
         # end of the area
@@ -768,6 +817,9 @@ class CurveHandleGraphicsItem(QtWidgets.QGraphicsRectItem):
         self.line = QtWidgets.QGraphicsLineItem(point.x, point.y, 0, 0, parent)
         self.line.setZValue(0)
         self.setZValue(1)
+
+
+        self.eh = gremlin.event_handler.EventListener()
 
     def redraw(self):
         """Forces a position update of the ui element."""
@@ -809,10 +861,29 @@ class CurveHandleGraphicsItem(QtWidgets.QGraphicsRectItem):
         :param evt the mouse event to process
         """
         # Create desired point
-        new_point = Point2D(
-            gremlin.util.clamp(evt.scenePos().x() / g_scene_size, -1.0, 1.0),
-            gremlin.util.clamp(-evt.scenePos().y() / g_scene_size, -1.0, 1.0)
-        )
+        x = gremlin.util.clamp(evt.scenePos().x() / g_scene_size, -1.0, 1.0)
+        y = gremlin.util.clamp(-evt.scenePos().y() / g_scene_size, -1.0, 1.0)
+        
+        # snap to grid if shift key is down
+        if self.parent:
+            center = self.parent.control_point.center
+        else:
+            center = None
+        if self.eh.get_control_state():
+            # coarse snap
+            if center:
+                x,y = gremlin.util.snap_to_grid(x, y, 25, center.x, center.y)
+            else:
+                x,y = gremlin.util.snap_to_grid(x, y, 25)
+        elif self.eh.get_shifted_state():
+            # fine snap
+            if center:
+                x,y = gremlin.util.snap_to_grid(x, y, 50, center.x, center.y)
+            else:
+                x,y = gremlin.util.snap_to_grid(x, y, 50)
+            
+            
+        new_point = Point2D(x,y)
 
         self.parent.control_point.set_handle(self.index, new_point)
 
@@ -834,8 +905,8 @@ class CurveView(QtWidgets.QGraphicsScene):
         self.model.content_added.connect(self._populate_from_model)
         self.point_editor = point_editor
         from gremlin.util import load_image
-
-        self.background_image = load_image("response_curve/grid.svg")
+        
+        self.background_image = load_image("curve_grid_ex.svg")
 
         # Connect editor widget signals
         self.point_editor.x_input.valueChanged.connect(self._editor_update)
@@ -873,6 +944,7 @@ class CurveView(QtWidgets.QGraphicsScene):
         """
         self.model.add_control_point(point, handles)
         self._populate_from_model()
+
 
     def _editor_update(self, value):
         """Callback for changes in the point editor UI.
@@ -932,7 +1004,7 @@ class CurveView(QtWidgets.QGraphicsScene):
             )
             for x in range(-int(g_scene_size), int(g_scene_size+1), 2):
                 path.lineTo(x, -g_scene_size * curve_fn(x / g_scene_size))
-            self.addPath(path, QtGui.QPen(QtGui.QColor(0, 200, 0)))
+            self.addPath(path, QtGui.QPen(QtGui.QColor("#8FBC8F"), 4))
 
         # Update editor widget fields
         if self.current_item:
@@ -1038,9 +1110,10 @@ class ControlPointEditorWidget(QtWidgets.QWidget):
 
 
 class DeadzoneWidget(QtWidgets.QWidget):
+    ''' deadzone widget '''
 
-    """Widget visualizing deadzone settings as well as allowing the
-    modification of these."""
+    changed = QtCore.Signal() # indicates the data has changed
+    
 
     def __init__(self, profile_data, parent=None):
         """Creates a new instance.
@@ -1051,37 +1124,48 @@ class DeadzoneWidget(QtWidgets.QWidget):
         super().__init__(parent)
 
         self.profile_data = profile_data
-
         self.main_layout = QtWidgets.QGridLayout(self)
+        self.event_lock = False
 
         # Create the two sliders
-        self.left_slider = DualSlider()
-        self.left_slider.setRange(-100, 0)
-        self.right_slider = DualSlider()
-        self.right_slider.setRange(0, 100)
+        self.left_slider = QSliderWidget()
+        self.left_slider.setMarkerVisible(False)
+        self.left_slider.desired_height = 24
+        self.left_slider.setRange(-1, 0)
+        self.right_slider = QSliderWidget()
+        self.right_slider.setMarkerVisible(False)
+        self.right_slider.setRange(0, 1)
+        self.right_slider.desired_height = 24
 
         # Create spin boxes for the left slider
-        self.left_lower = DynamicDoubleSpinBox()
+        self.left_lower = ui_common.QFloatLineEdit()
         self.left_lower.setMinimum(-1.0)
         self.left_lower.setMaximum(0.0)
         self.left_lower.setSingleStep(0.05)
-        self.left_upper = DynamicDoubleSpinBox()
+        self.left_lower.setValue(-1)
+        self.left_lower.setToolTip("Low (-1.0) deadzone")
+
+        self.left_upper = ui_common.QFloatLineEdit()
         self.left_upper.setMinimum(-1.0)
         self.left_upper.setMaximum(0.0)
         self.left_upper.setSingleStep(0.05)
+        self.left_upper.setValue(0)
+        self.left_upper.setToolTip("Center left deadzone")
 
         # Create spin boxes for the right slider
-        self.right_lower = DynamicDoubleSpinBox()
+        self.right_lower = ui_common.QFloatLineEdit()
         self.right_lower.setSingleStep(0.05)
         self.right_lower.setMinimum(0.0)
         self.right_lower.setMaximum(1.0)
-        self.right_upper = DynamicDoubleSpinBox()
+        self.right_lower.setValue(0)
+        self.right_lower.setToolTip("Center right deadzone")
+
+        self.right_upper = ui_common.QFloatLineEdit()
+        self.right_lower.setToolTip("High (+1.0) deadzone")
         self.right_upper.setSingleStep(0.05)
         self.right_upper.setMinimum(0.0)
         self.right_upper.setMaximum(1.0)
-
-        self._normalizer =\
-            self.left_slider.range()[1] - self.left_slider.range()[0]
+        self.right_upper.setValue(1)
 
         # Hook up all the required callbacks
         self.left_slider.valueChanged.connect(self._update_left)
@@ -1089,33 +1173,33 @@ class DeadzoneWidget(QtWidgets.QWidget):
         self.left_lower.valueChanged.connect(
             lambda value: self._update_from_spinner(
                 value,
-                DualSlider.LowerHandle,
+                0,
                 self.left_slider
             )
         )
         self.left_upper.valueChanged.connect(
             lambda value: self._update_from_spinner(
                 value,
-                DualSlider.UpperHandle,
+                1,
                 self.left_slider
             )
         )
         self.right_lower.valueChanged.connect(
             lambda value: self._update_from_spinner(
                 value,
-                DualSlider.LowerHandle,
+                0,
                 self.right_slider
             )
         )
         self.right_upper.valueChanged.connect(
             lambda value: self._update_from_spinner(
                 value,
-                DualSlider.UpperHandle,
+                1,
                 self.right_slider
             )
         )
 
-        # Set slider positions
+        # Set deadzone positions
         self.set_values(self.profile_data.deadzone)
 
         # Put everything into the layout
@@ -1126,15 +1210,28 @@ class DeadzoneWidget(QtWidgets.QWidget):
         self.main_layout.addWidget(self.right_lower, 1, 2)
         self.main_layout.addWidget(self.right_upper, 1, 3)
 
+
     def set_values(self, values):
         """Sets the deadzone values.
 
         :param values the new deadzone values
         """
-        self.left_slider.setLowerPosition(values[0] * self._normalizer)
-        self.left_slider.setUpperPosition(values[1] * self._normalizer)
-        self.right_slider.setLowerPosition(values[2] * self._normalizer)
-        self.right_slider.setUpperPosition(values[3] * self._normalizer)
+        v1, v2 = values[0], values[1]
+        with QtCore.QSignalBlocker(self.left_slider):
+            self.left_slider.setValue((v1,v2))
+        with QtCore.QSignalBlocker(self.left_lower):
+            self.left_lower.setValue(v1)
+        with QtCore.QSignalBlocker(self.left_upper):            
+            self.left_upper.setValue(v2)
+
+        v1, v2 = values[2], values[3]
+        with QtCore.QSignalBlocker(self.right_slider):
+            self.right_slider.setValue((v1,v2))
+        with QtCore.QSignalBlocker(self.right_lower):
+            self.right_lower.setValue(v1)
+        with QtCore.QSignalBlocker(self.right_upper):
+            self.right_upper.setValue(v2)
+
 
     def get_values(self):
         """Returns the current deadzone values.
@@ -1154,12 +1251,17 @@ class DeadzoneWidget(QtWidgets.QWidget):
         :param handle the handle which was moved
         :param value the new value
         """
-        if handle == DualSlider.LowerHandle:
-            self.left_lower.setValue(value / self._normalizer)
-            self.profile_data.deadzone[0] = value / self._normalizer
-        elif handle == DualSlider.UpperHandle:
-            self.left_upper.setValue(value / self._normalizer)
-            self.profile_data.deadzone[1] = value / self._normalizer
+        if not self.event_lock:
+            self.event_lock = True
+            if handle == 0:
+                self.left_lower.setValue(value)
+                self.profile_data.deadzone[0] = value
+            elif handle == 1:
+                self.left_upper.setValue(value)
+                self.profile_data.deadzone[1] = value
+
+            self.changed.emit()
+            self.event_lock = False
 
     def _update_right(self, handle, value):
         """Updates the right spin boxes.
@@ -1167,24 +1269,34 @@ class DeadzoneWidget(QtWidgets.QWidget):
         :param handle the handle which was moved
         :param value the new value
         """
-        if handle == DualSlider.LowerHandle:
-            self.right_lower.setValue(value / self._normalizer)
-            self.profile_data.deadzone[2] = value / self._normalizer
-        elif handle == DualSlider.UpperHandle:
-            self.right_upper.setValue(value / self._normalizer)
-            self.profile_data.deadzone[3] = value / self._normalizer
+        if not self.event_lock:
+            self.event_lock = True
+            if handle == 0:
+                self.right_lower.setValue(value)
+                self.profile_data.deadzone[2] = value
+            elif handle == 1:
+                self.right_upper.setValue(value)
+                self.profile_data.deadzone[3] = value
 
-    def _update_from_spinner(self, value, handle, widget):
+            self.changed.emit()
+            self.event_lock = False
+
+        
+
+    def _update_from_spinner(self, value, index, widget):
         """Updates the slider position.
 
         :param value the new value
         :param handle the handle to move
         :param widget which slider widget to update
         """
-        if handle == DualSlider.LowerHandle:
-            widget.setLowerPosition(value * self._normalizer)
-        elif handle == DualSlider.UpperHandle:
-            widget.setUpperPosition(value * self._normalizer)
+        with QtCore.QSignalBlocker(widget):
+            values = widget.value()
+            if values[index] != value:
+                widget.setValueIndex(index,value)
+                print (f"index {index} set value {value} new values: {widget.value()}")
+
+
 
 
 class AxisCurveWidget(QtWidgets.QWidget):
@@ -1202,9 +1314,10 @@ class AxisCurveWidget(QtWidgets.QWidget):
         self.action_data : AxisCurveData = curve_data
         self.is_inverted = False
         self.last_value = 0
+        
         self._create_ui()
 
-    def _update_value(self, value):
+    def update_value(self, value):
         ''' updates dot on the curve based on the value -1 to +1 '''
         curve_value = gremlin.joystick_handling.scale_to_range(value, target_min = -g_scene_size, target_max= +g_scene_size+1)  # value on the curve by pixel x
     
@@ -1229,39 +1342,14 @@ class AxisCurveWidget(QtWidgets.QWidget):
         self.action_data = None 
 
 
-
-    def _joystick_handler(self, event):
-        ''' handles joystick input '''
-
-        if not event.is_axis:
-            # ignore if not an axis event
-            return
-        
-        if gremlin.shared_state.is_running:
-            # ignore if profile is running
-            return
-
-        if self.action_data.hardware_device_guid != event.device_guid:
-            # ignore if a different input device
-            return
-            
-        if self.action_data.hardware_input_id != event.identifier:
-            # ignore if a different input axis on the input device
-            return
-        
-        if self.curve_scene.tracker is None:
-            return
-
-        value = gremlin.joystick_handling.scale_to_range(event.raw_value, source_min = -32767, source_max = 32767) # -1 to 1 value
-        self._update_value(value)
-       
-
     def _create_ui(self):
         """Creates the required UI elements."""
 
 
         self.container_options_widget = QtWidgets.QWidget()
+        self.container_options_widget.setContentsMargins(0,0,0,0)
         self.container_options_layout = QtWidgets.QHBoxLayout(self.container_options_widget)
+        self.container_options_layout.setContentsMargins(0,0,0,0)
 
         # Dropdown menu for the different curve types
         self.curve_type_selection = gremlin.ui.ui_common.QComboBox()
@@ -1270,8 +1358,18 @@ class AxisCurveWidget(QtWidgets.QWidget):
         self.curve_type_selection.setCurrentIndex(0)
         self.curve_type_selection.currentIndexChanged.connect(self._curve_type_changed)
 
-        # Curve manipulation options
+        # help button
+        help_button = QtWidgets.QPushButton()
+        help_icon = gremlin.util.load_icon("mdi.help-circle-outline")
+        help_button.setIcon(help_icon)
+        help_button.setToolTip("Help")
+        help_button.setFlat(True)
+        help_button.setStyleSheet("QPushButton { background-color: transparent }")
+        help_button.setMaximumWidth(32)
         
+        help_button.clicked.connect(self._show_help)        
+
+        # Curve manipulation options
         
         self.container_options_layout.addWidget(QtWidgets.QLabel("Curve Type:"))
         self.container_options_layout.addWidget(self.curve_type_selection)
@@ -1289,10 +1387,38 @@ class AxisCurveWidget(QtWidgets.QWidget):
         self.curve_symmetry.clicked.connect(self._curve_symmetry_cb)
         self.container_options_layout.addWidget(self.curve_symmetry)
 
+        # Handle symmetry
+        self.handle_symmetry_widget = QtWidgets.QCheckBox("Force smooth curves")
+        
+        if self.action_data.mapping_type == "cubic-bezier-spline":
+            self.handle_symmetry_widget.setChecked(self.curve_model.handle_symmetry_enabled)
+            self.handle_symmetry_widget.stateChanged.connect(self._handle_symmetry_cb)
+        else:
+            self.handle_symmetry_widget.setVisible(False)
+
+        self.container_options_layout.addWidget(self.handle_symmetry_widget)        
+
+
+        self.container_options_layout.addStretch()
+        self.container_options_layout.addWidget(help_button)
+
 
         self.container_presets_widget = QtWidgets.QWidget()
+        self.container_presets_widget.setContentsMargins(0,0,0,0)
         self.container_presets_layout = QtWidgets.QHBoxLayout(self.container_presets_widget)
+        self.container_presets_layout.setContentsMargins(0,0,0,0)
         self.container_presets_layout.addWidget(QtWidgets.QLabel("Presets:"))
+        
+
+                
+        self.preset_save_button_widget = QtWidgets.QPushButton("Save preset")
+        self.preset_save_button_widget.setToolTip("Saves a preset to a file")
+        self.preset_save_button_widget.clicked.connect(self._save_preset_cb)
+        self.preset_load_button_widget = QtWidgets.QPushButton("Load preset")
+        self.preset_load_button_widget.setToolTip("Load preset from a previously saved preset")
+        self.preset_load_button_widget.clicked.connect(self._load_preset_cb)
+        self.container_presets_layout.addWidget(self.preset_save_button_widget)
+        self.container_presets_layout.addWidget(self.preset_load_button_widget)
 
         for preset in CurvePreset:
             button = ui_common.QDataPushButton(CurvePreset.to_display(preset))
@@ -1300,10 +1426,33 @@ class AxisCurveWidget(QtWidgets.QWidget):
             button.clicked.connect(self._curve_set_preset_cb)
             self.container_presets_layout.addWidget(button)
         self.container_presets_layout.addStretch()
+
+
       
+        self.container_control_widget = QtWidgets.QWidget()
+        self.container_control_widget.setContentsMargins(0,0,0,0)
+        self.container_control_layout = QtWidgets.QHBoxLayout(self.container_control_widget)
+        self.container_control_layout.setContentsMargins(0,0,0,0)
 
         # Create all objects required for the response curve UI
         self.control_point_editor = ControlPointEditorWidget()
+        self.container_control_layout.addWidget(self.control_point_editor)        
+
+        if self.action_data.show_axis_input:
+            width = get_text_width("M") * 8
+
+            self.input_raw_widget = QtWidgets.QLineEdit()
+            self.input_raw_widget.setMaximumWidth(width)
+            self.input_raw_widget.setReadOnly(True)
+            self.input_curved_widget = QtWidgets.QLineEdit()
+            self.input_curved_widget.setMaximumWidth(width)
+            self.input_curved_widget.setReadOnly(True)
+            
+            self.container_control_layout.addWidget(QtWidgets.QLabel("Input:"))
+            self.container_control_layout.addWidget(self.input_raw_widget)
+            self.container_control_layout.addWidget(QtWidgets.QLabel("Curved:"))
+            self.container_control_layout.addWidget(self.input_curved_widget)
+
         # Response curve model used
         if self.action_data.mapping_type == CurveType.Cubic:
             self.curve_model = CubicSplineModel(self.action_data)
@@ -1315,35 +1464,9 @@ class AxisCurveWidget(QtWidgets.QWidget):
         # mode
         self.curve_model.set_symmetry_mode(self.action_data.symmetry_mode)
 
-
-          # Handle symmetry
-        self.handle_symmetry = QtWidgets.QCheckBox("Force smooth curves")
-        
-        if self.action_data.mapping_type == "cubic-bezier-spline":
-            self.handle_symmetry.setChecked(self.curve_model.handle_symmetry_enabled)
-            self.handle_symmetry.stateChanged.connect(self._handle_symmetry_cb)
-        else:
-            self.handle_symmetry.setVisible(False)
-
-        self.container_options_layout.addWidget(self.handle_symmetry)
-
-        self.container_options_layout.addStretch()
-
-        # input repeater
-        if self.action_data.show_axis_input:
-            width = get_text_width("M") * 8
-
-            self.input_raw_widget = QtWidgets.QLineEdit()
-            self.input_raw_widget.setMaximumWidth(width)
-            self.input_raw_widget.setReadOnly(True)
-            self.input_curved_widget = QtWidgets.QLineEdit()
-            self.input_curved_widget.setMaximumWidth(width)
-            self.input_curved_widget.setReadOnly(True)
-            
-            self.container_options_layout.addWidget(QtWidgets.QLabel("Input:"))
-            self.container_options_layout.addWidget(self.input_raw_widget)
-            self.container_options_layout.addWidget(QtWidgets.QLabel("Curved:"))
-            self.container_options_layout.addWidget(self.input_curved_widget)
+        self.container_curve_widget = QtWidgets.QFrame()
+        self.container_curve_widget.setStyleSheet('.QFrame{background-color: #ffffff; border-radius: 10px;}')
+        self.container_curve_layout = QtWidgets.QHBoxLayout(self.container_curve_widget)
 
         # Graphical curve editor
         self.curve_scene = CurveView(
@@ -1353,21 +1476,39 @@ class AxisCurveWidget(QtWidgets.QWidget):
         )
 
         # Create view displaying the curve scene
-        self.curve_view_layout = QtWidgets.QHBoxLayout()
+        
         self.curve_view = QtWidgets.QGraphicsView(self.curve_scene)
         self._configure_response_curve_view()
 
         # Deadzone configuration
-        self.deadzone_label = QtWidgets.QLabel("Deadzone")
-        self.deadzone = DeadzoneWidget(self.action_data)
+        self.container_deadzone_widget = QtWidgets.QWidget()
+        self.container_deadzone_widget.setContentsMargins(0,0,0,0)
+        self.container_deadzone_layout = QtWidgets.QHBoxLayout(self.container_deadzone_widget)
+        self.container_deadzone_layout.setContentsMargins(0,0,0,0)
+
+        self.container_deadzone_layout.addWidget(QtWidgets.QLabel("Deadzone"))
+        for preset in DeadzonePreset:
+            button = ui_common.QDataPushButton(DeadzonePreset.to_display(preset))
+            button.data = preset
+            button.clicked.connect(self._deadzone_preset_cb)
+            self.container_deadzone_layout.addWidget(button)
+
+        self.container_deadzone_layout.addStretch()
+        
+        
+
+        
+        
+        self.deadzone_widget = DeadzoneWidget(self.action_data)
+        self.deadzone_widget.changed.connect(self._deadzone_modified_cb)
 
         # Add all widgets to the layout
         self.main_layout.addWidget(self.container_options_widget)
         self.main_layout.addWidget(self.container_presets_widget)
-        self.main_layout.addLayout(self.curve_view_layout)
-        self.main_layout.addWidget(self.control_point_editor)
-        self.main_layout.addWidget(self.deadzone_label)
-        self.main_layout.addWidget(self.deadzone)
+        self.main_layout.addWidget(self.container_curve_widget)
+        self.main_layout.addWidget(self.container_control_widget)
+        self.main_layout.addWidget(self.container_deadzone_widget)
+        self.main_layout.addWidget(self.deadzone_widget)
 
         self._update_ui()
 
@@ -1383,7 +1524,89 @@ class AxisCurveWidget(QtWidgets.QWidget):
         self.curve_scene.redraw_scene()
 
         # Set deadzone values
-        self.deadzone.set_values(self.action_data.deadzone)
+        self.deadzone_widget.set_values(self.action_data.deadzone)
+
+    @QtCore.Slot()
+    def _show_help(self):
+        dialog = ui_common.MarkdownDialog("Axis Response Curve Instructions")
+        w = 600
+        h = 400
+        geom = self.geometry()
+        dialog.setGeometry(
+            int(geom.x() + geom.width() / 2 - w/2),
+            int(geom.y() + geom.height() / 2 - h/2),
+            w,
+            h
+        )
+        dialog.load("curve_handler_instructions.md")
+        
+        gremlin.util.centerDialog(dialog,w,h)
+        dialog.show()
+
+
+    @QtCore.Slot()
+    def _save_preset_cb(self):
+        ''' save the current curve information to a preset '''
+        xml_source, _ = QtWidgets.QFileDialog.getSaveFileName(
+            None,
+            "Save Preset",
+            gremlin.util.userprofile_path(),
+            "XML files (*.xml)"
+        )
+
+        if xml_source != "":
+            try:
+            
+                if os.path.isfile(xml_source):
+                    # blitz it
+                    os.unlink(xml_source)
+                root = etree.Element("curve_preset")
+                #self.curve_model.save_to_profile() # sync the coords
+                node = self.action_data._generate_xml()
+                root.append(node)
+                tree = etree.ElementTree(root)
+                tree.write(xml_source, pretty_print=True,xml_declaration=True,encoding="utf-8")
+                base_name = os.path.basename(xml_source)
+                gremlin.ui.ui_common.MessageBox(prompt = f"Preset saved to {base_name}", is_warning=False)
+            except Exception as err:
+                gremlin.ui.ui_common.MessageBox(prompt = f"Error saving preset: {err}")
+
+
+    @QtCore.Slot()
+    def _load_preset_cb(self):
+        ''' save the current curve information to a preset '''
+        xml_source, _ = QtWidgets.QFileDialog.getOpenFileName(
+            None,
+            "Load Preset",
+            gremlin.util.userprofile_path(),
+            "XML files (*.xml)"
+        )
+
+        if xml_source != "":
+            try:
+                base_name = os.path.basename(xml_source)
+                parser = etree.XMLParser(remove_blank_text=True)
+                tree = etree.parse(xml_source, parser)            
+                root = tree.getroot()
+                if root is None or root.tag != "curve_preset":
+                    gremlin.ui.ui_common.MessageBox(prompt = f"File {base_name} does not appear to be a valid preset file.")    
+                    return
+                node = gremlin.util.get_xml_child(root,"response-curve")
+                if node is None:
+                    gremlin.ui.ui_common.MessageBox(prompt = f"File {base_name} does not appear to be a valid preset file.")    
+                    return
+                
+                self.action_data._parse_xml(node)
+                self._change_curve_type(self.action_data.mapping_type, self.action_data.control_points)
+                self.action_data.curve_update()
+                self._update_ui()
+                self.update_value(self.last_value)
+
+            except Exception as err:
+                gremlin.ui.ui_common.MessageBox(prompt = f"Error loading preset: {err}")
+
+            
+
 
     @QtCore.Slot(int)
     def _curve_type_changed(self):
@@ -1412,12 +1635,12 @@ class AxisCurveWidget(QtWidgets.QWidget):
 
         # Update curve settings UI
         if self.action_data.mapping_type == CurveType.Cubic:
-            if self.handle_symmetry is not None:
-                self.handle_symmetry.setVisible(False)
-                self.handle_symmetry = None
+            if self.handle_symmetry_widget is not None:
+                self.handle_symmetry_widget.setVisible(False)
+                self.handle_symmetry_widget = None
         elif self.action_data.mapping_type == CurveType.Bezier:
-            self.handle_symmetry.setVisible(True)
-            self.handle_symmetry.stateChanged.connect(
+            self.handle_symmetry_widget.setVisible(True)
+            self.handle_symmetry_widget.stateChanged.connect(
                 self._handle_symmetry_cb
             )
             
@@ -1491,7 +1714,52 @@ class AxisCurveWidget(QtWidgets.QWidget):
         self.action_data.mapping_type = CurveType.Bezier
         self._change_curve_type(CurveType.Bezier, control_points)
         self._update_ui()
-        self._update_value(self.last_value)
+        self.update_value(self.last_value)
+
+    @QtCore.Slot() 
+    def _deadzone_preset_cb(self):
+        ''' handles deadzone presets '''
+        widget = self.sender()
+        preset : DeadzonePreset = widget.data
+
+        dd = self.deadzone_widget
+        d_start, d_left, d_right, d_end = dd.get_values()
+        
+        match preset:
+            case DeadzonePreset.center_two :
+                d_left = -0.02 * 2
+                d_right = 0.02 * 2
+            case DeadzonePreset.center_five :
+                d_left = -0.05 * 2
+                d_right = 0.05 * 2
+            case DeadzonePreset.center_ten :
+                d_left = -0.1 * 2
+                d_right = 0.1 * 2
+            case DeadzonePreset.end_two : 
+                d_start = -1 + 0.02 * 2
+                d_end = 1 - 0.02 * 2
+            case DeadzonePreset.end_five :
+                d_start = -1 + 0.05 * 2
+                d_end = 1 - 0.05 * 2
+            case DeadzonePreset.end_ten : 
+                d_start = -1 + 0.1 * 2
+                d_end = 1 - 0.1 * 2
+
+            case DeadzonePreset.reset : 
+                d_start = -1
+                d_left = 0
+                d_right = 0
+                d_end = 1
+        
+        
+        dd.set_values([d_start, d_left, d_right, d_end])
+
+    @QtCore.Slot() 
+    def _deadzone_modified_cb(self):
+        ''' called when deadzones are modified '''
+        self.action_data.curve_update()
+        self._update_ui()
+        self.update_value(self.last_value)
 
 
     def _handle_symmetry_cb(self, state):
@@ -1514,10 +1782,10 @@ class AxisCurveWidget(QtWidgets.QWidget):
             2*g_scene_size,
             2*g_scene_size
         ))
-        gremlin.ui.ui_common.clear_layout(self.curve_view_layout)
-        self.curve_view_layout.addStretch()
-        self.curve_view_layout.addWidget(self.curve_view)
-        self.curve_view_layout.addStretch()
+        gremlin.ui.ui_common.clear_layout(self.container_curve_layout)
+        self.container_curve_layout.addStretch()
+        self.container_curve_layout.addWidget(self.curve_view)
+        self.container_curve_layout.addStretch()
 
     def _invert_curve(self):
         self.curve_model.invert()
@@ -1601,17 +1869,17 @@ class AxisCurveData():
             mapping_node.set("type", CurveType.to_string(self.mapping_type))
             for point in self.control_points:
                 cp_node = ElementTree.Element("control-point")
-                cp_node.set("x", str(point[0]))
-                cp_node.set("y", str(point[1]))
+                cp_node.set("x", float_to_xml(point[0]))
+                cp_node.set("y", float_to_xml(point[1]))
                 mapping_node.append(cp_node)
             node.append(mapping_node)
 
         # Deadzone settings
         deadzone_node = ElementTree.Element("deadzone")
-        deadzone_node.set("low", str(self.deadzone[0]))
-        deadzone_node.set("center-low", str(self.deadzone[1]))
-        deadzone_node.set("center-high", str(self.deadzone[2]))
-        deadzone_node.set("high", str(self.deadzone[3]))
+        deadzone_node.set("low", float_to_xml(self.deadzone[0]))
+        deadzone_node.set("center-low", float_to_xml(self.deadzone[1]))
+        deadzone_node.set("center-high", float_to_xml(self.deadzone[2]))
+        deadzone_node.set("high", float_to_xml(self.deadzone[3]))
         node.append(deadzone_node)
 
         return node
@@ -1634,10 +1902,11 @@ class AxisCurveData():
         else:
             raise gremlin.error.GremlinError("Invalid curve type")
 
-    def curve_value(self, value):
+    def curve_value(self, value : float):
         ''' processes an input value -1 to +1 and outputs the curved value based on the current curve model '''
         return self.response_fn(self.deadzone_fn(value))
         
+
 
 class AxisCurveDialog(QtWidgets.QDialog):
     ''' dialog box for curve configuration '''
@@ -1661,7 +1930,7 @@ class AxisCurveDialog(QtWidgets.QDialog):
 
     @property
     def curve_update_handler(self):
-        return self.widget._update_value
+        return self.widget.update_value
 
 
 

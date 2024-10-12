@@ -1298,3 +1298,52 @@ def highlight_color(hex_color:str, factor : float = 1.1):
     v = v * factor
     r, g, b = colorsys.hsv_to_rgb(h, s, v)
     return f"#{r:02x}{g:02x}{b:02x}"
+
+a_90 = math.radians(90)
+a_45 = math.radians(45)
+
+def snap_to_grid(x : float, y: float, grid_size : int = 50, 
+                 ref_x : float= None, ref_y : float = None, 
+                 ) -> tuple[float, float]:
+    ''' snaps a coordinate 0 to 1 to a grid '''
+    spacing = 1/grid_size
+    gx = spacing * round(x / spacing)
+    gy = spacing * round(y / spacing)
+
+    sx = gx
+    sy = gy
+
+    # get the rotational snaps 
+    if ref_x is not None and ref_y is not None:
+        # reference point provided
+        dx = x - ref_x
+        dy = y - ref_y
+        d = math.dist([ref_x, ref_y],[x,y])
+        signed_a = math.atan2(dy, dx)
+        a = abs(signed_a)
+        factor = 1 if signed_a > 0 else -1
+        a_t = math.radians(3)
+        
+        if a <= a_t:
+            # snap horizontal
+            sy = ref_y
+            sx = x
+        elif a_t >= (a_90 - a_t):
+            # snap vertical
+            sx = ref_x
+            sy = y
+            pass
+        elif a >= a_45 - a_t and a <= a_45 + a_t:
+            # snap 45 degrees    
+            sy = ref_y + d * math.sin(a_45) * factor
+            sy = ref_x + d * math.cos(a_45) * factor
+
+
+    return (sx,sy)
+
+
+            
+
+def float_to_xml(value : float, decimals = 5) -> str:
+    ''' converts a float to a string for xml saving'''
+    return f"{value:0.{decimals}f}"

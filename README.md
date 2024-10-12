@@ -159,6 +159,17 @@ Joystick Gremlin EX
 ## 13.40.15ex (pre-release)
 
 
+### (m4)
+
+- Updated plugin - Response Curve EX - uses revamped internal curve mapper
+- Updated response curve mapper (standalone in Response Curve EX) and built-in to Map to Vjoy (VjoyRemap):
+	+ ability to store and load curve presets - presets are stored as XML files
+	+ snap to grid of control points (and handles) including 0, 45 and 90 degree snap
+	+ use shift for fine grid, control for coarse grid
+	+ updated look
+	+ help guide
+
+
 ### (m3)
 
 - VjoyRemap plugin now supports curved output directly in the action without having to add a response curve.  The curve can be added or removed.  The curve dialog now has a number of bezier curve presets.  The curve is applied after all the other transforms, including merging.

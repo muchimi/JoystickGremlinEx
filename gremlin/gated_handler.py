@@ -2718,16 +2718,6 @@ class TriggerData():
             return f"{stub} value: {value_stub}% gate: {self.gate.slider_index+1} {self.gate.gate_display()}"
         
 
-# def _helper():
-#     helper = ui_common.QHelper()
-#     helper.min_range = -1.0
-#     helper.max_range = 1.0
-#     helper.decimals = 3
-#     helper.show_percent = False
-    
-#     return helper
-
-
 class GateWidgetInfo(ui_common.QDataWidget):
     ''' holds the data for a single gate '''
 
@@ -2853,7 +2843,6 @@ class GateWidgetInfo(ui_common.QDataWidget):
         self.data = gate
     
         label_width = ui_common.get_text_width("Range MM")
-        #helper = _helper()
 
         self.label_widget = QtWidgets.QLabel(f"Gate {gate.slider_index + 1}:") # the slider index is the ordered gate number
         self.label_widget.setMaximumWidth(label_width)
@@ -2867,8 +2856,6 @@ class GateWidgetInfo(ui_common.QDataWidget):
         
         self.value_widget = ui_common.QFloatLineEdit(gate, range_min, range_max, value = gate.display_value)
 
-        
-        # self.value_widget = helper.get_double_spinbox(gate.id, value, range_min, range_max)
         self.value_widget.valueChanged.connect(self._value_changed_cb) # hook manual changes made to the widget
 
         self.grab_widget = ui_common.QDataPushButton()
@@ -4365,7 +4352,8 @@ class ActionContainerUi(QtWidgets.QDialog):
             self.slider_frame_widget = QtWidgets.QFrame()
             self.slider_frame_layout = QtWidgets.QVBoxLayout(self.slider_frame_widget)
             self.slider_frame_widget.setStyleSheet('.QFrame{background-color: transparent;}')
-            self.slider = QSliderWidget() # ui_common.QMarkerDoubleRangeSlider()
+            self.slider = QSliderWidget() 
+            self.slider.setMinimumHeight(48)
             self.slider.setRange(-1,1)
             self.slider_frame_layout.addWidget(self.slider)
 
