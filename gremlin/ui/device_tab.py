@@ -260,11 +260,11 @@ class InputItemConfiguration(QtWidgets.QFrame):
         self.action_layout = QtWidgets.QHBoxLayout()
 
         # repeat the current active mode for editing
-        mode_widget = QtWidgets.QLineEdit(text=gremlin.shared_state.current_mode)
-        mode_widget.setReadOnly(True)
+        # mode_widget = QtWidgets.QLineEdit(text=gremlin.shared_state.current_mode)
+        # mode_widget.setReadOnly(True)
 
-        self.action_layout.addWidget(QtWidgets.QLabel("Mode:"))
-        self.action_layout.addWidget(mode_widget)
+        # self.action_layout.addWidget(QtWidgets.QLabel("Mode:"))
+        # self.action_layout.addWidget(mode_widget)
 
         self.action_selector = ui_common.ActionSelector(
             self._input_type

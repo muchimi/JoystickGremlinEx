@@ -294,6 +294,9 @@ class ActionPlugins:
         if not os.path.isdir(walk_path):
             raise error(f"Unable to find action_plugins: {walk_path}")
         
+        log_sys("Action plugins:")
+        plugin_count = 0
+        error_count = 0
         for root, dirs, files in os.walk(walk_path):
             for _ in [v for v in files if v == "__init__.py"]:
                 try:
@@ -309,12 +312,18 @@ class ActionPlugins:
                     if "version" in plugin.__dict__:
                         self._plugins[plugin.name] = plugin.create
                         log_sys(f"\tLoaded action plugin: {plugin.name}")
+                        plugin_count += 1
                     else:
                         del plugin
                 except Exception as e:
                     # Log an error and ignore the action_plugins if
                     # anything is wrong with it
                     log_sys_warn(f"\tLoading action_plugins '{root.split("\\")[-1]}' failed due to: {e}")
+                    error_count += 1
+
+        log_sys(f"Found {plugin_count} plugins")
+        if error_count > 0:
+            log_sys_error(f"{error_count} plugin(s) failed to load")
 
 
     def duplicate(self, action, container):

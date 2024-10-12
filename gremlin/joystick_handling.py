@@ -293,9 +293,19 @@ def joystick_devices_initialization():
     # device registry
     devices = []
     device_count = dinput.DILL.get_device_count()
+    virtual_count = 0
+    real_count = 0
     for i in range(device_count):
         info = dinput.DILL.get_device_information_by_index(i)
         devices.append(info)
+        syslog.info(f"\t[{i}] {info.device_id} {info.name}")
+        if info.is_virtual: 
+            virtual_count += 1
+        else:
+            real_count += 1
+
+    syslog.info(f"Found {real_count} hardware devices and {virtual_count} virtual devices")
+
 
     # Process all devices again to detect those that have been added and those
     # that have been removed since the last time this function ran.

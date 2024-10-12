@@ -112,7 +112,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.15ex (m4)"
+APPLICATION_VERSION = "13.40.15ex (m4.1)"
 
 # the main ui
 ui = None
@@ -279,20 +279,8 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         GremlinUi.ui = self
 
-    # def push_idle_callback(self, callback):
-    #     ''' adds a function to call when the UI is idle '''
-    #     with self._idle_lock:
-    #         self._idle_callbacks.append(callback)
-
-    # def _idle_processing(self):
-    #     ''' loop for idle processing '''
-    #     while self._idle_run:
-    #         if self._idle_callbacks:
-    #             callback = self._idle_callbacks.pop()
-    #             InvokeUiMethod(callback)
-                
-        
-
+        # update status nar
+        self._update_mode_status_bar()
 
 
 
@@ -1111,8 +1099,11 @@ class GremlinUi(QtWidgets.QMainWindow):
                 
 
                 # this needs to be registered before widgets are created because widgets may need this data
-                gremlin.shared_state.device_profile_map[device_profile.device_guid] = device_profile
-                gremlin.shared_state.device_type_map[device_profile.device_guid] = DeviceType.Joystick
+                gremlin.shared_state.device_profile_map[device.device_guid] = device_profile
+                gremlin.shared_state.device_type_map[device.device_guid] = DeviceType.Joystick
+                tab_label = device.name.strip()
+                gremlin.shared_state.device_guid_to_name_map[device.device_guid] = tab_label
+
 
                 widget = gremlin.ui.device_tab.JoystickDeviceTabWidget(
                     device,
@@ -1123,8 +1114,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                 device_guid = str(device.device_guid)
                 widget.data = (TabDeviceType.Joystick, device_guid)
                 self._joystick_device_guids.append(device_guid)
-                tab_label = device.name.strip()
-                device_name_map[device.device_guid] = tab_label
+                
                 self.ui.devices.addTab(widget, tab_label)
 
                 gremlin.shared_state.device_widget_map[device_profile.device_guid] = widget
@@ -1347,8 +1337,9 @@ class GremlinUi(QtWidgets.QMainWindow):
 
             gremlin.shared_state.is_tab_loading = False
             device_guid = self.config.last_device_guid
-            _, restore_input_type, restore_input_id = self.config.get_last_input(device_guid)
-            self._select_input(device_guid, restore_input_type, restore_input_id)
+            if device_guid is not None:
+                _, restore_input_type, restore_input_id = self.config.get_last_input(device_guid)
+                self._select_input(device_guid, restore_input_type, restore_input_id)
         finally:
             self.pop_highlighting()
 
@@ -1483,7 +1474,12 @@ class GremlinUi(QtWidgets.QMainWindow):
         ''' gets the name of the specified device '''
         if isinstance(device_guid, str):
             device_guid = gremlin.util.parse_guid(device_guid)
-        return gremlin.shared_state.device_guid_to_name_map[device_guid]
+        if device_guid in gremlin.shared_state.device_guid_to_name_map:
+            return gremlin.shared_state.device_guid_to_name_map[device_guid]
+        syslog.error(f"GetDeviceName: device {device_guid} not found in device list.")
+        syslog.info(f"Available registered devices: ({len(gremlin.shared_state.device_guid_to_name_map)})")
+        for key in gremlin.shared_state.device_guid_to_name_map.keys():
+            syslog.info(f"\tdevice [{str(key)} type: {type(key).__name__}] : {gremlin.shared_state.device_guid_to_name_map[key]}")
     
     def _get_last_input(self, device_guid : str) -> tuple:
         ''' Gets the last input selection for the given device
@@ -2221,6 +2217,9 @@ class GremlinUi(QtWidgets.QMainWindow):
             is_running = gremlin.shared_state.is_running
             runtime_mode = gremlin.shared_state.runtime_mode
             edit_mode = gremlin.shared_state.edit_mode
+            if not edit_mode: 
+                # get it from the mode drop down
+                edit_mode = self.mode_selector.currentMode()
 
             msg = f"<b>Runtime Mode:</b> {runtime_mode if runtime_mode else "n/a"}"
             if not is_running:
@@ -2437,7 +2436,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
             # Make the first root node the default active mode
             self.mode_selector.populate_selector(new_profile, current_mode, emit = True)
-            self._update_mode_status_bar()
+            
 
             # Save the profile at this point if it was converted from a prior
             # profile version, as otherwise the change detection logic will
@@ -2460,7 +2459,12 @@ class GremlinUi(QtWidgets.QMainWindow):
             gremlin.util.display_error(f"Failed to load the profile {fname} due to:\n\n{error}")
 
         finally:
+            # update the status bar
+            self._update_mode_status_bar()
+
+            # restore the mouse cursor
             popCursor()
+            
 
     def refresh(self):
         ''' refresh the UI '''

@@ -1208,8 +1208,14 @@ class ModeWidget(QtWidgets.QWidget):
         dialog = gremlin.ui.dialogs.ProfileOptionsUi()
         dialog.exec()
 
-    def currentIndex(self):
+    def currentIndex(self) -> int:
+        ''' current selector index '''
         return self.edit_mode_selector.currentIndex()
+    
+    def currentMode(self) -> str:
+        ''' current selection text '''
+        return self.edit_mode_selector.currentText()
+
     
     def setCurrentIndex(self, index):
         self.edit_mode_selector.setCurrentIndex(index)

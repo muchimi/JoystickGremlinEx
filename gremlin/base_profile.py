@@ -593,9 +593,7 @@ class AbstractContainer(ProfileData):
 
 
 class Device:
-
-    """Stores the information about a single device including its modes."""
-
+    ''' device information '''
     def __init__(self, parent):
         """Creates a new instance.
 
@@ -611,13 +609,21 @@ class Device:
         self.connected = False # true if the device was found in the detected hardware list
 
     @property
-    def device_guid(self):
+    def device_guid(self) -> dinput.GUID:
+        ''' device ID as a GUID '''
         return self._device_guid
+    
     @device_guid.setter
     def device_guid(self, value : dinput.GUID):
         assert isinstance(value, dinput.GUID) if value is not None else True
         self._device_guid = value
         self.connected = gremlin.joystick_handling.is_device_connected(value) if value is not None else False
+
+    @property
+    def device_id(self) -> str:
+        ''' device ID a a string '''
+        return str(self.device_guid)
+
         
 
     def ensure_mode_exists(self, mode_name, device=None):
@@ -1462,7 +1468,7 @@ class Profile():
         """Constructor creating a new instance."""
 
         
-        self.devices = {} # holds devices attached to this profile
+        self.devices : dict[Device] = {} # holds devices attached to this profile
         self.vjoy_devices = {}
         self.merge_axes = []
         self.plugins = []
@@ -1996,7 +2002,9 @@ class Profile():
         # with codecs.open(fname, "w", "utf-8-sig") as out:
         #     out.write(dom_xml.toprettyxml(indent="    "))
 
-    def get_device_modes(self, device_guid, device_type, device_name=None):
+    def get_device_modes(self, device_guid : dinput.GUID,
+                               device_type : DeviceType,
+                               device_name : str =None) -> Device:
         """Returns the modes associated with the given device.
 
         :param device_guid the device's GUID
