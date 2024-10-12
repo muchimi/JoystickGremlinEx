@@ -681,7 +681,9 @@ class DataPointGraphicsItem(QtWidgets.QGraphicsEllipseItem):
         self.setPos(x, y)
             
         self.setZValue(3)
-        self.setBrush(QtGui.QBrush(QtCore.Qt.red))
+        color = QtGui.QColor("#f27e0a")
+        color.setAlpha(128)
+        self.setBrush(QtGui.QBrush(color))
 
     def update(self, x, y):
         self.x = x

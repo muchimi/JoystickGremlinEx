@@ -159,6 +159,15 @@ Joystick Gremlin EX
 ## 13.40.15ex (pre-release)
 
 
+### (m4.2) hotfix
+- removed button timer on auto input highlighting causing some buttons inputs from being ignored
+- allowed shift/control overrides to also change devices for auto input highlighting
+- response curve - adjusted opacity on input marker to make it easier to see behind it
+
+### (m4.1) hotfix
+- added additional log output for device and plugin load
+- added additional log output on device naming mapping
+
 ### (m4)
 
 - Updated plugin - Response Curve EX - uses revamped internal curve mapper

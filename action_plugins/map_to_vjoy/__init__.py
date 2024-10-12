@@ -2602,7 +2602,7 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
     @action_mode.setter
     def action_mode(self, value : VjoyAction):
         self._action_mode = value
-        print (f"action mode set to : {value}")
+        # print (f"action mode set to : {value}")
 
 
     @property

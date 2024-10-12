@@ -112,7 +112,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.15ex (m4.1)"
+APPLICATION_VERSION = "13.40.15ex (m4.2)"
 
 # the main ui
 ui = None
@@ -286,8 +286,16 @@ class GremlinUi(QtWidgets.QMainWindow):
 
     def _joystick_input_handler(self, event):
         ''' handles joystick events in the UI'''
-        if gremlin.shared_state.is_running or self._input_highlight_stack > 0:
+        if gremlin.shared_state.is_running:
             return 
+        if self._input_highlight_stack > 0:
+            if gremlin.config.Configuration().verbose:
+                syslog.info(f"Highlight:  stack disabled  {self._input_highlight_stack} - skip input")
+            return
+        if not gremlin.config.Configuration().highlight_enabled:
+            if gremlin.config.Configuration().verbose:
+                syslog.info(f"Highlight: disabled - skip input")
+            return
         #InvokeUiMethod(lambda: self._process_joystick_input_selection(event,self._button_highlighting_enabled))
         self._process_joystick_input_selection(event)
     
@@ -1562,12 +1570,12 @@ class GremlinUi(QtWidgets.QMainWindow):
             
             if current_device_guid.casefold() != device_guid.casefold():
                 # change tabs
-                syslog.info("Tab change requested")
+                #syslog.info("Tab change requested")
                 index = self._find_tab_index(device_guid)
                 if index is not None:
                     with QtCore.QSignalBlocker(self.ui.devices):
                         self.ui.devices.setCurrentIndex(index)
-                    syslog.info("Tab change complete")
+                    #syslog.info("Tab change complete")
 
             if input_id is None:
                 # get the default item to select
@@ -1579,7 +1587,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
             if input_id is not None:
                 # within the inputs = select it
-                syslog.info("ID change started")
+                #syslog.info("ID change started")
                 widget = self.ui.devices.currentWidget()
                 if widget:
                     widget.input_item_list_view.select_input(input_type, input_id)
@@ -1588,7 +1596,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                     
 
                 #QtWidgets.QApplication.processEvents()
-                syslog.info("ID change complete")
+                #syslog.info("ID change complete")
 
             # save settings as the last input
             gremlin.shared_state.set_last_input_id(device_guid, input_type, input_id)
@@ -1877,15 +1885,18 @@ class GremlinUi(QtWidgets.QMainWindow):
             return 
         
         eh = gremlin.event_handler.EventListener()
+
+        is_shifted = eh.get_shifted_state()
+        is_control = eh.get_control_state()
         
         # button must be enabled or via the shifted state (shift keys)
-        is_button = self.config.highlight_input_buttons or eh.get_shifted_state()
+        is_button = self.config.highlight_input_buttons or is_shifted
 
         # axis must be enabled or via the shifted state (control keys)
-        is_axis = self.config.highlight_input_axis or eh.get_control_state()
+        is_axis = self.config.highlight_input_axis or is_control
 
         # tab switch master switch
-        is_tabswitch_enabled = self.config.highlight_autoswitch
+        is_tabswitch_enabled = self.config.highlight_autoswitch or is_shifted or is_control
 
 
         if verbose:
@@ -1899,17 +1910,19 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         
         
-        # avoid specific axis input spamming
-        if self._last_input_timestamp + self._input_delay > time.time():
-            # delay not occured yet
-            return
-        self._last_input_timestamp = time.time()
-            
+
         if event.event_type == InputType.JoystickAxis:
             # only process if there is a significant deviation for that axis to avoid noisy input an inadvertent motion
 
             if not is_axis:
                 return
+            
+            # avoid specific axis input spamming
+            if self._last_input_timestamp + self._input_delay > time.time():
+                # delay not occured yet
+                return
+            self._last_input_timestamp = time.time()
+
             device_guid = str(event.device_guid).casefold()
             if not device_guid in self._joystick_axis_highlight_map.keys():
                 self._joystick_axis_highlight_map[device_guid] = {}
@@ -1948,8 +1961,8 @@ class GremlinUi(QtWidgets.QMainWindow):
             if verbose:
                 logging.getLogger("system").info(f"Highlight: axis: {is_axis} button: {is_button} switch: {tab_switch_needed}")
 
-            if tab_switch_needed and not config.highlight_autoswitch:
-                # not setup to auto change tabs
+            if tab_switch_needed and not is_tabswitch_enabled:
+                # not setup to auto change tabs (override via shift/control keys)
                 return
             
             
