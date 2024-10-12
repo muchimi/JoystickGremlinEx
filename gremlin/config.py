@@ -634,7 +634,7 @@ class Configuration:
         return self._data.get("highlight_device", False)
 
     @highlight_enabled.setter
-    def highlight_enabled(self, value):
+    def highlight_enabled(self, value) -> bool:
         """Sets whether or not to swap device tabs to highlight inputs.
 
         This enables / disables the feature where using a physical input
@@ -646,6 +646,15 @@ class Configuration:
         if type(value) == bool:
             self._data["highlight_device"] = value
             self.save()
+
+    @property
+    def highlight_hotkey_autoswitch(self):
+        ''' when enabled - pressing the control or shift hotkeys to toggle axis / button highlight also allows tab switch '''
+        return self._data.get("highlight_hotkey_autoswitch", False)
+    
+    @highlight_hotkey_autoswitch.setter
+    def highlight_hotkey_autoswitch(self, value : bool):
+        self._data["highlight_hotkey_autoswitch"] = value
 
 
     @property

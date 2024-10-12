@@ -286,6 +286,13 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.highlight_autoswitch.setChecked(self.config.highlight_autoswitch)
         self.highlight_autoswitch.setToolTip("This option enables automatic device tab switching between device on device input triggers (physical hardware only).<br>Requires axis or button highlight options to be enabled as well.")
 
+
+        self.highlight_hotkey_autoswitch = QtWidgets.QCheckBox("Allow autoswitch override on hotkey")
+        self.highlight_hotkey_autoswitch.clicked.connect(self._highlight_hotkey_autoswitch)
+        self.highlight_hotkey_autoswitch.setChecked(self.config.highlight_hotkey_autoswitch)
+        self.highlight_hotkey_autoswitch.setToolTip("This option enables automatic device tab switching between device if the hotkeys are pressed for the axis/button overrides even when the autoswitch option is off.")
+
+
         # Highlight input option
         self.highlight_input_axis = QtWidgets.QCheckBox("Highlight currently triggered axis")
         self.highlight_input_axis.clicked.connect(self._highlight_input_axis)
@@ -565,6 +572,9 @@ class OptionsUi(ui_common.BaseDialogUi):
         row+=1
         self.column_layout.addWidget(self.highlight_autoswitch, row, col)
         row+=1
+        self.column_layout.addWidget(self.highlight_hotkey_autoswitch, row, col)
+        row+=1
+        
         self.column_layout.addWidget(self.highlight_input_axis, row, col)
         row+=1
         self.column_layout.addWidget(self.highlight_input_buttons, row, col)
@@ -884,6 +894,7 @@ This setting is also available on a profile by profile basis on the profile tab,
         self.highlight_autoswitch.setEnabled(enabled)
         self.highlight_input_buttons.setEnabled(enabled)
         self.highlight_input_axis.setEnabled(enabled)
+        self.highlight_hotkey_autoswitch.setEnabled(enabled)
 
     @QtCore.Slot(bool)
     def _highlight_enabled_cb(self, checked):
@@ -1054,7 +1065,11 @@ This setting is also available on a profile by profile basis on the profile tab,
         """Stores preference for input highlighting  """
         self.config.highlight_autoswitch = clicked
 
-
+    
+    @QtCore.Slot(bool)
+    def _highlight_hotkey_autoswitch(self, clicked):
+        """Stores preference for input highlighting  """
+        self.config.highlight_hotkey_autoswitch = clicked
 
 
     @QtCore.Slot(bool)

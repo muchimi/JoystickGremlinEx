@@ -1888,6 +1888,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         is_shifted = eh.get_shifted_state()
         is_control = eh.get_control_state()
+        is_hotkey_autoswitch = config.highlight_hotkey_autoswitch
         
         # button must be enabled or via the shifted state (shift keys)
         is_button = self.config.highlight_input_buttons or is_shifted
@@ -1896,7 +1897,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         is_axis = self.config.highlight_input_axis or is_control
 
         # tab switch master switch
-        is_tabswitch_enabled = self.config.highlight_autoswitch or is_shifted or is_control
+        is_tabswitch_enabled = self.config.highlight_autoswitch or (is_hotkey_autoswitch and (is_shifted or is_control))
 
 
         if verbose:
