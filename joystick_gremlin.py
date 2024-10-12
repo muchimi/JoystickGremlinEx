@@ -34,6 +34,7 @@ import webbrowser
 
 import dinput
 
+
 import gremlin.gamepad_handling
 import gremlin.import_profile
 import gremlin.joystick_handling
@@ -42,6 +43,9 @@ import gremlin.ui.keyboard_device
 import gremlin.ui.midi_device
 import gremlin.ui.osc_device
 import gremlin.util
+import gremlin.curve_handler
+import gremlin.gated_handler
+
 from gremlin.util import InvokeUiMethod, assert_ui_thread
 
 
