@@ -325,7 +325,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         
         
         # synchronize action/container drop downs
-        self.sync_last_selection = QtWidgets.QCheckBox("Sync action &amp; container selections")
+        self.sync_last_selection = QtWidgets.QCheckBox("Sync action and container selections")
         self.sync_last_selection.setToolTip("When enabled, action and container drop downs will remain synchronized with the last selected entry")
         self.sync_last_selection.setChecked(self.config.sync_last_selection)
         self.sync_last_selection.clicked.connect(self._sync_last_selection)

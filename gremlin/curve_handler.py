@@ -1321,20 +1321,24 @@ class AxisCurveWidget(QtWidgets.QWidget):
 
     def update_value(self, value):
         ''' updates dot on the curve based on the value -1 to +1 '''
-        curve_value = gremlin.joystick_handling.scale_to_range(value, target_min = -g_scene_size, target_max= +g_scene_size+1)  # value on the curve by pixel x
-    
-        ''' draw the current value on the curve '''
-        curve_fn = self.curve_model.get_curve_function()
-        if curve_fn:
-            # get the position of the marker
-            x = curve_value
-            y = -g_scene_size * curve_fn(x / g_scene_size)
-            #print(f"{x} {y}")
-            self.curve_scene.tracker.update(x,y)
 
-            self.input_raw_widget.setText(f"{value:0.3f}")
-            curved = curve_fn(value)
-            self.input_curved_widget.setText(f"{curved:0.3f}")
+        if self.action_data.show_axis_input:
+            curve_value = gremlin.joystick_handling.scale_to_range(value, target_min = -g_scene_size, target_max= +g_scene_size+1)  # value on the curve by pixel x
+        
+            ''' draw the current value on the curve '''
+            curve_fn = self.curve_model.get_curve_function()
+            if curve_fn:
+                # get the position of the marker
+                x = curve_value
+                y = -g_scene_size * curve_fn(x / g_scene_size)
+                #print(f"{x} {y}")
+                
+                # tracker only exists when input repeater mode is enabled
+                self.curve_scene.tracker.update(x,y)
+
+                self.input_raw_widget.setText(f"{value:0.3f}")
+                curved = curve_fn(value)
+                self.input_curved_widget.setText(f"{curved:0.3f}")
 
         self.last_value = value
                 
