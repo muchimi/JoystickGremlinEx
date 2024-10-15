@@ -266,6 +266,8 @@ class EventListener(QtCore.QObject):
 	# mapping changed - either container or action added -
 	mapping_changed = QtCore.Signal(object) # fires when a container or action changes on an InputItem - passes the InputItem as the parameter
 	
+	# suspend keyboard input
+	suspend_keyboard_input = QtCore.Signal(bool) # arg = state, true = suspend, false = resume
 
 	def __init__(self):
 		"""Creates a new instance."""

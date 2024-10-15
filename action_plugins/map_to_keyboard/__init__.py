@@ -24,6 +24,7 @@ import gremlin.base_profile
 
 from gremlin.input_types import InputType
 from gremlin.input_devices import ButtonReleaseActions
+import gremlin.shared_state
 import gremlin.ui.ui_common
 import gremlin.ui.input_item
 from gremlin.keyboard import key_from_code
@@ -79,6 +80,8 @@ class MapToKeyboardWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _record_keys_cb(self):
         """Prompts the user to press the desired key combination."""
+
+
         
         self.button_press_dialog = gremlin.ui.ui_common.InputListenerWidget(
             [InputType.Keyboard],

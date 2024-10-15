@@ -129,14 +129,27 @@ def ui_keyinput_suspended():
 
 def push_suspend_ui_keyinput():
     ''' suspends keyboard input to the UI'''
+    import gremlin.event_handler
     global _suspend_ui_keyinput
+
+    if _suspend_ui_keyinput == 0:
+        eh = gremlin.event_handler.EventListener()
+        eh.suspend_keyboard_input.emit(True)
+
     _suspend_ui_keyinput += 1
+
+    
+    
 
 def pop_suspend_ui_keyinput():
     ''' restores keyboard input to the UI'''
+    import gremlin.event_handler
     global _suspend_ui_keyinput
     if _suspend_ui_keyinput > 0:
         _suspend_ui_keyinput -= 1
+    if _suspend_ui_keyinput == 0:
+        eh = gremlin.event_handler.EventListener()
+        eh.suspend_keyboard_input.emit(False)
 
 def is_highlighting_suspended():
     """Returns whether or not input highlighting is suspended.

@@ -60,6 +60,7 @@ class CurvePreset(enum.IntEnum):
     Bezier2 = 2
     Bezier3 = 3
     Bezier4 = 4
+    Reset = 5
 
     @staticmethod
     def to_display(value : CurvePreset) -> str:
@@ -70,6 +71,7 @@ _curve_preset_string_lookup = {
     CurvePreset.Bezier2 : "Bezier 2",
     CurvePreset.Bezier3 : "Bezier 3",
     CurvePreset.Bezier4 : "Bezier 4",
+    CurvePreset.Reset : "Reset",
 }
 
 class DeadzonePreset(enum.IntEnum):
@@ -1322,7 +1324,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
     def update_value(self, value):
         ''' updates dot on the curve based on the value -1 to +1 '''
 
-        if self.action_data.show_axis_input:
+        if self.action_data.show_input_axis:
             curve_value = gremlin.joystick_handling.scale_to_range(value, target_min = -g_scene_size, target_max= +g_scene_size+1)  # value on the curve by pixel x
         
             ''' draw the current value on the curve '''
@@ -1444,7 +1446,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
         self.control_point_editor = ControlPointEditorWidget()
         self.container_control_layout.addWidget(self.control_point_editor)        
 
-        if self.action_data.show_axis_input:
+        if self.action_data.show_input_axis:
             width = get_text_width("M") * 8
 
             self.input_raw_widget = QtWidgets.QLineEdit()
@@ -1478,7 +1480,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
         self.curve_scene = CurveView(
             self.curve_model,
             self.control_point_editor,
-            self.action_data.show_axis_input
+            self.action_data.show_input_axis
         )
 
         # Create view displaying the curve scene
@@ -1534,6 +1536,9 @@ class AxisCurveWidget(QtWidgets.QWidget):
 
     @QtCore.Slot()
     def _show_help(self):
+  
+        
+    
         dialog = ui_common.MarkdownDialog("Axis Response Curve Instructions")
         w = 600
         h = 400
@@ -1544,10 +1549,14 @@ class AxisCurveWidget(QtWidgets.QWidget):
             w,
             h
         )
-        dialog.load("curve_handler_instructions.md")
-        
-        gremlin.util.centerDialog(dialog,w,h)
-        dialog.show()
+        if dialog.load("curve_handler_instructions.md"):
+            gremlin.util.centerDialog(dialog,w,h)
+            dialog.exec()
+            return
+        else:
+            ui_common.MessageBox(prompt ="Unable to locate help file")
+
+
 
 
     @QtCore.Slot()
@@ -1632,7 +1641,10 @@ class AxisCurveWidget(QtWidgets.QWidget):
             if curve_type == CurveType.Cubic:
                 self.action_data.control_points = [(-1.0, -1.0), (1.0, 1.0)]
             elif curve_type == CurveType.Bezier:
-                self.action_data.control_points = [(-1.0, 1.0), (-0.8, -0.8), (0.8, 0.8), (1.0, 1.0)]
+                self.action_data.control_points = [(-1.0, -1.0), (-1.0, 0),
+                                (-0.08, 0.0), (0.0, 0.0), (0.08, 0.0),
+                                (1.0, 0.0), (1.0, 1.0),
+                                    ]
         else:
             self.action_data.control_points = control_points
             
@@ -1641,9 +1653,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
 
         # Update curve settings UI
         if self.action_data.mapping_type == CurveType.Cubic:
-            if self.handle_symmetry_widget is not None:
-                self.handle_symmetry_widget.setVisible(False)
-                self.handle_symmetry_widget = None
+            self.handle_symmetry_widget.setVisible(False)
         elif self.action_data.mapping_type == CurveType.Bezier:
             self.handle_symmetry_widget.setVisible(True)
             self.handle_symmetry_widget.stateChanged.connect(
@@ -1656,7 +1666,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
         self.curve_scene = CurveView(
             self.curve_model,
             self.control_point_editor,
-            self.action_data.show_axis_input
+            self.action_data.show_input_axis
         )
         self.curve_view = QtWidgets.QGraphicsView(self.curve_scene)
         self._configure_response_curve_view()
@@ -1686,7 +1696,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
 
         widget = self.sender()
         preset : CurvePreset = widget.data
-
+        curve_type = CurveType.Bezier
         match preset:
             case CurvePreset.Bezier1:
                 # max 10% 
@@ -1712,13 +1722,18 @@ class AxisCurveWidget(QtWidgets.QWidget):
                                     (-0.1, 0.0), (0.0, 0.0), (0.1, 0.0),
                                     (0.5, 0.0), (1.0, 1.0),
                     ]
+            case CurvePreset.Reset:
+                # reset to cubic linear
+                curve_type = CurveType.Cubic
+                control_points =  [(-1.0, -1.0), (1.0, 1.0)]
+
             case _:
                 syslog.error(f"Curve preset: don't know how to handle {preset}")
                 return
 
         self.action_data.symmetry_mode = SymmetryMode.NoSymmetry
-        self.action_data.mapping_type = CurveType.Bezier
-        self._change_curve_type(CurveType.Bezier, control_points)
+        self.action_data.mapping_type = curve_type
+        self._change_curve_type(curve_type, control_points)
         self._update_ui()
         self.update_value(self.last_value)
 
@@ -1812,7 +1827,7 @@ class AxisCurveData():
         self._mapping_type = CurveType.Cubic
         self.control_points = [(-1.0, -1.0), (1.0, 1.0)]
         self.symmetry_mode = SymmetryMode.NoSymmetry
-        self.show_axis_input = gremlin.config.Configuration().show_input_axis
+        self.show_input_axis = gremlin.config.Configuration().show_input_axis
 
         el = gremlin.event_handler.EventListener()
         el.profile_start.connect(self.profile_start)
@@ -1937,6 +1952,10 @@ class AxisCurveDialog(QtWidgets.QDialog):
     @property
     def curve_update_handler(self):
         return self.widget.update_value
+    
+
+    def closeEvent(self, arg__1):
+        return super().closeEvent(arg__1)
 
 
 

@@ -3042,18 +3042,16 @@ class GatedAxisInstructions(QtWidgets.QDialog):
         self._view = QtWidgets.QTextEdit()
         layout = QtWidgets.QVBoxLayout(self)
         layout.addWidget(self._view)
-        self._load()
 
 
-    def _load(self):
-        location = gremlin.util.find_file("gated_handler_instructions.md", gremlin.shared_state.root_path)
-        if location:
+    def load(self, location):
+        if location is not None and os.path.isfile(location):
             with open(location,"+rt") as f:
                 md = f.read()
-
             self._view.setMarkdown(md)
-            # url = QtCore.QUrl.fromLocalFile(location)
-            # self._view.load(url)
+            return True
+        return False
+            
 
 
 
@@ -3260,19 +3258,24 @@ class GatedAxisWidget(QtWidgets.QWidget):
 
     @QtCore.Slot()
     def _show_help(self):
-        dialog = GatedAxisInstructions(self)
-        w = 600
-        h = 400
-        geom = self.geometry()
-        dialog.setGeometry(
-            int(geom.x() + geom.width() / 2 - w/2),
-            int(geom.y() + geom.height() / 2 - h/2),
-            w,
-            h
-        )
-        
-        gremlin.util.centerDialog(dialog,w,h)
-        dialog.show()
+        location = gremlin.util.find_file("gated_handler_instructions.md", gremlin.shared_state.root_path)
+        if location is not None and os.path.isfile(location):
+            dialog = GatedAxisInstructions(self)
+            dialog.load(location)
+            w = 600
+            h = 400
+            geom = self.geometry()
+            dialog.setGeometry(
+                int(geom.x() + geom.width() / 2 - w/2),
+                int(geom.y() + geom.height() / 2 - h/2),
+                w,
+                h
+            )
+            
+            gremlin.util.centerDialog(dialog,w,h)
+            dialog.show()
+        else:
+            ui_common.MessageBox(prompt ="Unable to locate help file")
 
 
     def hook(self):

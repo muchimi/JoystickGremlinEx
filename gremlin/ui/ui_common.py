@@ -1289,16 +1289,15 @@ class InputListenerWidget(QtWidgets.QFrame):
             QtWidgets.QLabel(f"""<center>Please press the desired {self._valid_event_types_string()}.<br/><br/>Hold ESC{'' if self._close_on_key else ' for one second'} to abort.</center>""")
         )
 
+        gremlin.shared_state.push_suspend_highlighting()
+        gremlin.shared_state.push_suspend_ui_keyinput()
+
         self.setWindowModality(QtCore.Qt.ApplicationModal)
         self.setWindowFlags(QtCore.Qt.FramelessWindowHint)
         self.setFrameStyle(QtWidgets.QFrame.Plain | QtWidgets.QFrame.Box)
         palette = QtGui.QPalette()
         palette.setColor(QtGui.QPalette.ColorRole.Window, QtGui.QColorConstants.DarkGray)
         self.setPalette(palette)
-        
-
-        # Disable ui input selection on joystick input
-        gremlin.shared_state.push_suspend_highlighting()
 
         # Start listening to user key presses
         event_listener = gremlin.event_handler.EventListener()
@@ -1427,6 +1426,7 @@ class InputListenerWidget(QtWidgets.QFrame):
 
         # restore highlighting
         gremlin.shared_state.pop_suspend_highlighting()
+        gremlin.shared_state.pop_suspend_ui_keyinput()
 
         # print ("input widget close")
         super().closeEvent(evt)
@@ -3698,10 +3698,16 @@ class MarkdownDialog(QtWidgets.QDialog):
 
     def load(self, source : str):
         ''' loads a source '''
-        location = gremlin.util.find_file(source, gremlin.shared_state.root_path)
-        if os.path.isfile(location):
+        if source is not None and os.path.isfile(source):
+            location = source
+        else:
+            location = gremlin.util.find_file(source, gremlin.shared_state.root_path)
+        if location is not None and os.path.isfile(location):
+            logging.getLogger("system").info(f"dialog: found file : {location}")
             self._source = location
             with open(location,"+rt") as f:
                 md = f.read()
             self._view.setMarkdown(md)
+            return True
+        return False
 

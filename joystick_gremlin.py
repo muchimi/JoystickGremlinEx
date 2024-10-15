@@ -112,7 +112,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.15ex (m4.4)"
+APPLICATION_VERSION = "13.40.15ex (m4.5)"
 
 # the main ui
 ui = None
@@ -228,6 +228,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         el = gremlin.event_handler.EventListener()
         el.broadcast_changed.connect(self._update_status_bar)
         el.keyboard_event.connect(self._kb_event_cb)
+        el.suspend_keyboard_input.connect(self._kb_suspend_cb)
         el.profile_start.connect(lambda: self._update_status_bar_active(True))
         el.profile_stop.connect(lambda: self._update_status_bar_active(False))
         el.joystick_event.connect(self._joystick_input_handler)
@@ -2269,8 +2270,16 @@ class GremlinUi(QtWidgets.QMainWindow):
             self._update_mode_status_bar()
             gremlin.util.popCursor()
 
-            
- 
+    @QtCore.Slot(bool)
+    def _kb_suspend_cb(self, suspend):
+        el = gremlin.event_handler.EventListener()
+        if suspend:
+            el.keyboard_event.disconnect(self._kb_event_cb)
+            # syslog.info("Suspend keyboard events")
+        else:
+            el.keyboard_event.connect(self._kb_event_cb)
+            # syslog.info("Enable keyboard events")
+        
 
     def _kb_event_cb(self, event):
         ''' listen for keyboard modifiers and keyboard events at runtime '''
@@ -2281,22 +2290,6 @@ class GremlinUi(QtWidgets.QMainWindow):
         if key is None or self.runner.is_running() or gremlin.shared_state.ui_keyinput_suspended():
             return
 
-        # if (self.config.highlight_enabled):
-        #     if key.lookup_name in ("leftshift","rightshift"):
-        #         if event.is_pressed:
-        #             # temporarily force the listening to joystick axes changes
-        #             self._set_joystick_input_highlighting(True)
-        #             if not self._temp_input_axis_override:
-        #                 self._input_delay = 0 # eliminate delay in processing when triggering this so it switches immediately
-        #                 self._temp_input_axis_override = True
-        #         else:
-        #             self._set_joystick_input_highlighting(self.config.highlight_input_axis)
-        #             self._temp_input_axis_override = False
-            
-        #     elif key.lookup_name == "leftcontrol":
-        #         # temporarily force the listening to joystick axes changes
-        #         self._temp_input_axis_only_override = event.is_pressed
-            
         if key.lookup_name == "f5":
             # activate mode on F5
             if not self.config.is_debug:

@@ -22,6 +22,7 @@ import time
 from lxml import etree as ElementTree
 
 from PySide6 import QtWidgets, QtCore, QtGui
+import gremlin.actions
 import gremlin.event_handler
 import gremlin.joystick_handling
 from gremlin.util import load_icon
@@ -2064,17 +2065,17 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
             joystick_handling.VJoyProxy()[self.vjoy_device_id].axis(self.vjoy_input_id).value = self.axis_start_value
             self.remote_client.send_axis(self.vjoy_device_id, self.vjoy_input_id, self.axis_start_value)
 
-        if self.action_data.merged:
-            # hook inputs 
-            el = gremlin.event_handler.EventListener()
-            el.joystick_event.connect(self._joystick_event_handler)
+        # if self.action_data.merged:
+        #     # hook inputs 
+        #     el = gremlin.event_handler.EventListener()
+        #     el.joystick_event.connect(self._joystick_event_handler)
 
     def profile_stop(self):
         ''' profile stop event - unhook if in merged mode '''
-        if self.action_data.merged:
-            # un hook inputs 
-            el = gremlin.event_handler.EventListener()
-            el.joystick_event.disconnect(self._joystick_event_handler)
+        # if self.action_data.merged:
+        #     # un hook inputs 
+        #     el = gremlin.event_handler.EventListener()
+        #     el.joystick_event.disconnect(self._joystick_event_handler)
 
     def _joystick_event_handler(self, event):
         ''' handles joystick events in the UI'''
@@ -2105,7 +2106,7 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
             if event.identifier != self.action_data.hardware_input_id:
                 return            
             
-        # process input options and any merge operation
+        # process input options and any merge and curve operation
         value = self.action_data.get_filtered_axis_value()
 
         if self.action_data.curve_data is not None:
@@ -2158,13 +2159,22 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
     #     return pow((value - v_start) / v_end, power) * v_end + v_start
 
 
-    def process_event(self, event, value):
+    def process_event(self, event, action_value : gremlin.actions.Value):
         ''' runs when a joystick event occurs like a button press or axis movement when a profile is running '''
-        if self.action_data.merged and event.is_axis:
-            # merged axis data is handled by the internal hook - ignore
-            return True
+        # if self.action_data.merged and event.is_axis:
+        #     # merged axis data is handled by the internal hook - ignore
+        #     return True
+        if event.is_axis:
+            # process input options and any merge and curve operation
+            value = self.action_data.get_filtered_axis_value(action_value.current)
+
+            if self.action_data.curve_data is not None:
+                # curve the output 
+                value = self.action_data.curve_data.curve_value(value)
+
+            action_value = gremlin.actions.Value(value)
         
-        return self._process_event(event, value)
+        return self._process_event(event, action_value)
     
     def _process_event(self, event, value):
         ''' runs when a joystick even occurs like a button press or axis movement when a profile is running '''
@@ -2475,9 +2485,10 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
 
 
 
-    def get_filtered_axis_value(self) -> float:
+    def get_filtered_axis_value(self, value : float = None) -> float:
         ''' computes the output value for the current configuration  '''
-        value = gremlin.joystick_handling.get_axis(self.hardware_device_guid, 
+        if value is None:
+            value = gremlin.joystick_handling.get_axis(self.hardware_device_guid, 
                                                         self.hardware_input_id) 
         if self.merge_mode != MergeOperationType.NotSet:
             if self.merge_device_id and self.merge_input_id:

@@ -1090,11 +1090,11 @@ class Configuration:
     @property
     def show_input_axis(self):
         ''' shows input axis values for axis inputs '''
-        return self._data.get("show_axis_input",True)
+        return self._data.get("show_input_axis",True)
     
     @show_input_axis.setter
     def show_input_axis(self, value):
-        self._data["show_axis_input"] = value
+        self._data["show_input_axis"] = value
         self.save()
 
 
