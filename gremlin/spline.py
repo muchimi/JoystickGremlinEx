@@ -61,7 +61,10 @@ class CubicSpline:
 
         for i in range(n):
             h[i] = self.x[i+1] - self.x[i]
-            b[i] = (self.y[i+1] - self.y[i]) / h[i]
+            if h[i] == 0:
+                b[i] = (self.y[i+1] - self.y[i]) 
+            else:
+                b[i] = (self.y[i+1] - self.y[i]) / h[i]
 
         u[1] = 2 * (h[0] + h[1])
         v[1] = 6 * (b[1] - b[0])

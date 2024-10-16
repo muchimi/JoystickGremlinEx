@@ -161,20 +161,27 @@ class Point2D:
 
     """Represents a 2D point with support for addition and subtraction."""
 
-    def __init__(self, x=0.0, y=0.0):
+    def __init__(self, x : float =0.0, y : float =0.0):
         """Creates a new instance.
 
         :param x the x coordinate
         :param y the y coordinate
         """
-        self.x = x
-        self.y = y
+        assert isinstance(x, float) or isinstance(x, int)
+        assert isinstance(y, float) or isinstance(y, int)
+        self.x = float(x)
+        self.y = float(y)
 
     def __add__(self, other):
         return Point2D(self.x + other.x, self.y + other.y)
 
     def __sub__(self, other):
         return Point2D(self.x - other.x, self.y - other.y)
+    
+    def __eq__(self, other):
+        return gremlin.util.is_close(self.x, other.x) and \
+                gremlin.util.is_close(self.y, other.y)
+        
 
     def __str__(self):
         return f"[{self.x:.2f}, {self.y:.2f}]"
@@ -233,6 +240,7 @@ class ControlPoint:
         :param emit_model_update if True a message will be emitted when the
             model changes
         """
+        eh = CurveEventHandler()
         if self._model.is_valid_point(point, self.identifier):
             # Update handle locations if any are present
             delta = self.center - point
@@ -246,6 +254,17 @@ class ControlPoint:
             self._last_modified = time.time()
             if emit_model_update:
                 self._model.model_updated()
+            eh.message.emit(None)
+        else:
+            
+            eh.message.emit(f"Invalid point")
+
+    @property
+    def x(self) -> float:
+        return self._center.x
+    @property
+    def y(self) -> float:
+        return self._center.y
 
     @property
     def identifier(self):
@@ -255,7 +274,7 @@ class ControlPoint:
     def handles(self):
         return self._handles
 
-    def set_handle(self, index, point):
+    def set_handle(self, index : int, point : Point2D):
         """Sets the location of the specified handle.
 
         :param index the id of the handle to modify
@@ -284,6 +303,17 @@ class ControlPoint:
         :return True of the control points are the same, False otherwise
         """
         return self.identifier == other.identifier
+
+
+@gremlin.singleton_decorator.SingletonDecorator
+class CurveEventHandler(QtCore.QObject):
+    ''' handler of events related to the curve handler '''
+    message = QtCore.Signal(str) # displays an informational message
+    selected_item = QtCore.Signal(object, int) # (item selected, index of item select : int) - the graphics item selected
+    next_point = QtCore.Signal() # navigate to the next control point
+    prev_point = QtCore.Signal() # navigate to the previous control point
+    handle_match_x = QtCore.Signal() # match control point x value
+    handle_match_y = QtCore.Signal() # match control point y value
 
 
 class AbstractCurveModel(QtCore.QObject):
@@ -806,7 +836,7 @@ class CurveHandleGraphicsItem(QtWidgets.QGraphicsRectItem):
 
     """UI Item representing a handle of a control point."""
 
-    def __init__(self, index, point, parent):
+    def __init__(self, index : int, point : Point2D, parent : ControlPointGraphicsItem):
         """Creates a new control point handle UI element.
 
         :param index the id of the handle
@@ -816,11 +846,12 @@ class CurveHandleGraphicsItem(QtWidgets.QGraphicsRectItem):
         super().__init__(-4, -4, 8, 8, parent)
         self.setPos(point.x, point.y)
         self.setBrush(QtGui.QBrush(QtCore.Qt.gray))
-        self.parent = parent
+        self.parent : ControlPointGraphicsItem = parent
         self.index = index
         self.line = QtWidgets.QGraphicsLineItem(point.x, point.y, 0, 0, parent)
         self.line.setZValue(0)
         self.setZValue(1)
+        
 
 
         self.eh = gremlin.event_handler.EventListener()
@@ -919,11 +950,36 @@ class CurveView(QtWidgets.QGraphicsScene):
         self.show_input_axis = show_input_axis
         self.current_item = None
         self.tracker = None
+        self.item_list = [] # map of control points to items
         self._populate_from_model()
+
+        eh = CurveEventHandler()
+        eh.next_point.connect(self._next_item)
+        eh.prev_point.connect(self._prev_item)
+        eh.handle_match_x.connect(self._handle_match_x)
+        eh.handle_match_y.connect(self._handle_match_y)
+
+
+    def _dist(self, a, b):
+        return ((b.x - a.x)**2 + (b.y - a.y)**2) ** 0.5
+
+
+    def _shortest_path(self, points):
+        ''' sorts the points by the shortest distance '''
+        start = points[0]
+        pass_by = points
+        path = [start]
+        pass_by.remove(start)
+        while pass_by:
+            nearest = min(pass_by, key=lambda x: self._dist(path[-1], x))
+            path.append(nearest)
+            pass_by.remove(nearest)
+        return path
 
     def _populate_from_model(self):
         """Populates the UI based on content stored in the model."""
         # Remove old curve path and update control points
+        self.item_list = []
         for item in self.items():
             if type(item) in [
                 ControlPointGraphicsItem,
@@ -931,14 +987,21 @@ class CurveView(QtWidgets.QGraphicsScene):
             ]:
                 self.removeItem(item)
 
-        for cp in self.model.get_control_points():
-            self.addItem(ControlPointGraphicsItem(cp))
+        points = [cp for cp in self.model.get_control_points()]
+        points.sort(key = lambda p: (p.x, p.y)) # do a pre-sort by x value then y value
+        points = self._shortest_path(points)
+
+        for cp in points:
+            item = ControlPointGraphicsItem(cp)
+            self.item_list.append(item)
+            self.addItem(item)
 
         if self.show_input_axis:
             self.tracker = DataPointGraphicsItem(0,0)
             self.addItem(self.tracker)
         
         self.redraw_scene()
+
 
     def add_control_point(self, point, handles=()):
         """Adds a new control point to the model and scene.
@@ -956,19 +1019,98 @@ class CurveView(QtWidgets.QGraphicsScene):
         :param value the new value entered using the editor UI
         """
         # We can only move control points around using the numerical inputs
-        if not isinstance(self.current_item, ControlPointGraphicsItem):
+        if self.current_item is None:
             return
-
-        if self.current_item:
-            new_point = Point2D(
+        new_point = Point2D(
                 self.point_editor.x_input.value(),
                 self.point_editor.y_input.value()
             )
+        if isinstance(self.current_item, CurveHandleGraphicsItem):
+            # move a handle
+            item : CurveHandleGraphicsItem = self.current_item
+            item.parent.control_point.set_handle(item.index, new_point)
+        elif isinstance(self.current_item, ControlPointGraphicsItem):
             if abs(self.current_item.control_point.center.x) == 1.0:
                 new_point.x = self.current_item.control_point.center.x
             self.current_item.control_point.set_center(new_point)
-            self.model.save_to_profile()
-            # self.redraw_scene()
+        self.model.save_to_profile()
+        
+
+    @QtCore.Slot()
+    def _next_item(self):
+        ''' selects the next item '''
+        item = self.current_item
+        if item and isinstance(item, CurveHandleGraphicsItem):
+            
+            handle_list = item.parent.handles
+            index = item.index
+            index -= 1
+            self._select_item(handle_list[index])
+            return
+
+                
+        if self.current_item is None:
+            index = 0
+        else:
+            count = len(self.item_list)
+            index = self.item_list.index(self.current_item)
+            index += 1
+            if index >= count:
+                index = 0
+        self._select_item(self.item_list[index])
+
+    @QtCore.Slot()
+    def _prev_item(self):
+        ''' selects the next item '''
+
+        item = self.current_item
+        if item and isinstance(item, CurveHandleGraphicsItem):
+            
+            handle_list = item.parent.handles
+            index = item.index
+            index += 1
+            if index >= len(handle_list):
+                index = 0
+            self._select_item(handle_list[index])
+            return
+        
+        count = len(self.item_list)
+        if self.current_item is None:
+            index = count - 1 
+        else:
+            index = self.item_list.index(self.current_item)
+            index -= 1
+            if index < 0:
+                index = count - 1
+        self._select_item(self.item_list[index])        
+
+    @QtCore.Slot()
+    def _handle_match_x(self):
+        ''' handles the x '''
+        item = self.current_item
+        if not item or not isinstance(item, CurveHandleGraphicsItem):
+            return
+        y = gremlin.util.clamp(item.y() / g_scene_size, -1.0, 1.0)
+        point = Point2D(item.parent.control_point.x, y)
+        
+        # if point == item.parent.control_point.center:
+        #     point = item.parent.control_point.center + Point2D(0.001,0.0)
+
+        item.parent.control_point.set_handle(item.index, point)
+        
+        
+    @QtCore.Slot()
+    def _handle_match_y(self):
+        ''' handles the y '''
+        item = self.current_item
+        if not item or not isinstance(item, CurveHandleGraphicsItem):
+            return
+        x = gremlin.util.clamp(item.x() / g_scene_size, -1.0, 1.0)
+        point = Point2D(x, item.parent.control_point.y)
+        # if point == item.parent.control_point.center:
+        #     point = item.parent.control_point.center + Point2D(0.0,0.001)
+        item.parent.control_point.set_handle(item.index, point)
+        
 
     def _select_item(self, item):
         """Handles drawing of an item being selected.
@@ -982,6 +1124,13 @@ class CurveView(QtWidgets.QGraphicsScene):
                 self.current_item.set_active(False)
             self.current_item = item
             self.current_item.set_active(True)
+            eh = CurveEventHandler()
+            if item in self.item_list:
+                index = self.item_list.index(item)
+            else:
+                index = -1
+            eh.selected_item.emit(item, index)
+            
         self.redraw_scene()
 
     def redraw_scene(self):
@@ -1047,8 +1196,9 @@ class CurveView(QtWidgets.QGraphicsScene):
 
         :param evt the keyboard event to process.
         """
-        if evt.key() == QtCore.Qt.Key_Delete and \
-                isinstance(self.current_item, ControlPointGraphicsItem):
+        key = evt.key()
+        item = self.current_item
+        if key == QtCore.Qt.Key_Delete and isinstance(item, ControlPointGraphicsItem):
             # Disallow removing edge points
             if abs(self.current_item.control_point.center.x) == 1.0:
                 return
@@ -1057,6 +1207,10 @@ class CurveView(QtWidgets.QGraphicsScene):
             self.model.remove_control_point(self.current_item.control_point)
             self._populate_from_model()
             self.current_item = None
+
+        elif key == QtCore.Qt.Key_Escape and isinstance(item, CurveHandleGraphicsItem):
+            # return control to the control point
+            self._select_item(item.parent)
 
     def drawBackground(self, painter, rect):
         """Draws the grid background image.
@@ -1083,26 +1237,128 @@ class ControlPointEditorWidget(QtWidgets.QWidget):
 
         # Generate controls
         self.main_layout = QtWidgets.QHBoxLayout(self)
-        self.label = QtWidgets.QLabel("Control Point")
+        self.point_label = QtWidgets.QLabel("Control Point")
         self.x_label = QtWidgets.QLabel("X")
         self.y_label = QtWidgets.QLabel("Y")
+        self.message = QtWidgets.QLabel("")
 
-        self.x_input = DynamicDoubleSpinBox()
+        self.x_input = ui_common.QFloatLineEdit() # DynamicDoubleSpinBox()
         self.x_input.setRange(-1, 1)
         self.x_input.setDecimals(3)
         self.x_input.setSingleStep(0.1)
 
-        self.y_input = DynamicDoubleSpinBox()
+        self.y_input = ui_common.QFloatLineEdit() #DynamicDoubleSpinBox()
         self.y_input.setRange(-1, 1)
-        self.y_input.setSingleStep(0.1)
         self.y_input.setDecimals(3)
+        self.y_input.setSingleStep(0.1)
 
-        self.main_layout.addWidget(self.label)
+        self.next_control_point = QtWidgets.QPushButton()
+        self.next_control_point.setIcon(gremlin.util.load_icon("fa.caret-up"))
+        self.next_control_point.setMaximumWidth(20)
+        self.next_control_point.setToolTip("Select next control point")
+
+        self.prev_control_point = QtWidgets.QPushButton()
+        self.prev_control_point.setIcon(gremlin.util.load_icon("fa.caret-down"))
+        self.prev_control_point.setMaximumWidth(20)
+        self.prev_control_point.setToolTip("Select previous control point")
+
+        self.handle_match_x = QtWidgets.QPushButton("x")
+        self.handle_match_x.setToolTip("Match control X")
+        self.handle_match_x.setMaximumWidth(20)
+
+        self.handle_match_y = QtWidgets.QPushButton("y")
+        self.handle_match_y.setToolTip("Match control Y")
+        self.handle_match_y.setMaximumWidth(20)
+
+        self.next_control_point.clicked.connect(self._next_control_point)
+        self.prev_control_point.clicked.connect(self._prev_control_point)
+        self.handle_match_x.clicked.connect(self._handle_match_x)
+        self.handle_match_y.clicked.connect(self._handle_match_y)
+
+        self.selected_label = QtWidgets.QLabel("")
+
+        self.main_layout.addWidget(self.point_label)
         self.main_layout.addWidget(self.x_label)
         self.main_layout.addWidget(self.x_input)
         self.main_layout.addWidget(self.y_label)
         self.main_layout.addWidget(self.y_input)
+        self.main_layout.addWidget(self.prev_control_point)
+        self.main_layout.addWidget(self.next_control_point)
+        self.main_layout.addWidget(self.handle_match_x)
+        self.main_layout.addWidget(self.handle_match_y)
+        self.main_layout.addWidget(self.selected_label)
+
         self.main_layout.addStretch()
+
+        eh = CurveEventHandler()
+        eh.message.connect(self._update_message)
+        eh.selected_item.connect(self._selected_item_changed)
+
+        self._selected_item_changed(None, 0)
+
+
+    @QtCore.Slot(object)
+    def _selected_item_changed(self, item, index):
+        msg = ""
+        handle_visible = False
+        if item is None:
+            pass
+        elif isinstance(item, CurveHandleGraphicsItem):
+            self.point_label.setText("Handle")
+            handle_visible = True
+        elif isinstance(item, ControlPointGraphicsItem):
+            self.point_label.setText("Control Point")
+            msg = f"{[index+1]}"
+
+        else:
+            self.point_label.setText("???")
+        
+        self.selected_label.setText(msg)
+
+        self.handle_match_x.setVisible(handle_visible)
+        self.handle_match_y.setVisible(handle_visible)
+
+        
+        
+
+    @QtCore.Slot()
+    def _next_control_point(self):
+        ''' switches to the enxt selected control point'''
+        eh = CurveEventHandler()
+        eh.next_point.emit()
+
+    @QtCore.Slot()
+    def _prev_control_point(self):
+        ''' switches to the enxt selected control point'''
+        eh = CurveEventHandler()
+        eh.prev_point.emit()
+
+    @QtCore.Slot()
+    def _handle_match_x(self):
+        ''' called when match x button called'''
+        eh = CurveEventHandler()
+        eh.handle_match_x.emit()
+
+    @QtCore.Slot()
+    def _handle_match_y(self):
+        ''' called when match x button called'''
+        eh = CurveEventHandler()
+        eh.handle_match_y.emit()        
+
+    @QtCore.Slot(str)
+    def _update_message(self, message):
+        if message is None:
+            self.message.setText("")    
+        else:
+            self.message.setText(message)
+
+    @QtCore.Slot(str)
+    def _update_selected_message(self, message):
+        if message is None:
+            self.selected_label.setText("")    
+        else:
+            self.selected_label.setText(message)
+
 
     def set_values(self, point):
         """Sets the values in the input fields to those of the provided point.
@@ -1952,6 +2208,14 @@ class AxisCurveDialog(QtWidgets.QDialog):
     @property
     def curve_update_handler(self):
         return self.widget.update_value
+    
+
+    def keyPressEvent(self, event):
+        ''' disable escape key to prevent conflict with handle deselect'''
+        if event.key() == QtCore.Qt.Key_Escape:
+            pass
+        else:
+            super().keyPressEvent(event)
     
 
     def closeEvent(self, arg__1):

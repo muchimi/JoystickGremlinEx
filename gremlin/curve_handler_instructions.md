@@ -34,6 +34,23 @@ Points and handles (if in bezier mode) can be selected and clicked/dragged with 
 
 The control point coordinates (-1.0 to +1.0) in x and y can also be entered manually in the input boxes below the graph.
 
+## Deselect a handle
+
+Press the Escape key to deselect a handle and select its control point instead.
+
+## Cycle through handles or control points
+
+The up and down arrow cycle through control points or handles.  If a handle is selected, it cycles through the handles.  If a control point is selected, it cycles through the control points.
+
+
+The sequence of control points is determined through the shortest path so it's possible that the sequence is not linear depending on the position of the points and if they cross the line.
+
+## Align in X and Y
+
+The X and Y buttons become available when a handle is selected (Bezier mode).  The buttons match the X (or Y) value of the control point.
+
+Press both the X and Y buttons to place the handle directly on the control point.
+
 ## Removing points
 
 The point can be selected (will highlight in red) and you can press the DEL key to delete it.
