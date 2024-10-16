@@ -1290,18 +1290,18 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         
 
         
-        self.target_value_widget = QtWidgets.QWidget()
-        target_value_box = QtWidgets.QHBoxLayout(self.target_value_widget)
-        lbl = QtWidgets.QLabel("Value:")
-        target_value_box.addWidget(lbl)
-        self.target_value_text = QtWidgets.QLineEdit()
-        v = QtGui.QDoubleValidator(-1.0, 1.0, 2)
-        v.setNotation(QtGui.QDoubleValidator.Notation.StandardNotation)
-        self.target_value_text.setText(f"{self.action_data.target_value:0.2f}")
-        self.target_value_text.setValidator(v)
-        target_value_box.addWidget(self.target_value_text)
-        target_value_box.addWidget(QtWidgets.QLabel("-1.00 .. 0.00 .. +1.00"))
-        target_value_box.addStretch()
+        # self.target_value_widget = QtWidgets.QWidget()
+        # target_value_box = QtWidgets.QHBoxLayout(self.target_value_widget)
+        # lbl = QtWidgets.QLabel("Value:")
+        # target_value_box.addWidget(lbl)
+        # self.target_value_text = QtWidgets.QLineEdit()
+        # v = QtGui.QDoubleValidator(-1.0, 1.0, 2)
+        # v.setNotation(QtGui.QDoubleValidator.Notation.StandardNotation)
+        # self.target_value_text.setText(f"{self.action_data.target_value:0.2f}")
+        # self.target_value_text.setValidator(v)
+        # target_value_box.addWidget(self.target_value_text)
+        # target_value_box.addWidget(QtWidgets.QLabel("-1.00 .. 0.00 .. +1.00"))
+        # target_value_box.addStretch()
 
 
         # start button state widget
@@ -1330,8 +1330,8 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         start_layout.addStretch()
 
         # set axis range widget
-        self.axis_range_value_widget = QtWidgets.QWidget()
-        box = QtWidgets.QHBoxLayout(self.axis_range_value_widget)
+        self.axis_range_container_widget = QtWidgets.QWidget()
+        box = QtWidgets.QHBoxLayout(self.axis_range_container_widget)
         self.sb_button_range_low = gremlin.ui.ui_common.DynamicDoubleSpinBox()
         self.sb_button_range_low.setMinimum(-1.0)
         self.sb_button_range_low.setMaximum(1.0)
@@ -1361,22 +1361,21 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         box.addStretch()
 
         # button to axis value widget
-        self.button_to_axis_widget = QtWidgets.QWidget()
-        box = QtWidgets.QHBoxLayout(self.button_to_axis_widget)
+        self.target_value_container_widget = QtWidgets.QWidget()
+        self.target_value_container_layout = QtWidgets.QHBoxLayout(self.target_value_container_widget)
         self.sb_button_to_axis_value = gremlin.ui.ui_common.DynamicDoubleSpinBox()
         self.sb_button_to_axis_value.setMinimum(-1.0)
         self.sb_button_to_axis_value.setMaximum(1.0)
         self.sb_button_to_axis_value.setDecimals(3)
-        box.addWidget(QtWidgets.QLabel("Axis Value:"))
-        box.addWidget(self.sb_button_to_axis_value)
-        box.addStretch()
+        self.target_value_container_layout.addWidget(QtWidgets.QLabel("Axis Value:"))
+        self.target_value_container_layout.addWidget(self.sb_button_to_axis_value)
+        self.target_value_container_layout.addStretch()
 
         self.main_layout.addWidget(self.selector_widget)
         self.main_layout.addWidget(self.pulse_widget)
         self.main_layout.addWidget(self.start_widget)
-        self.main_layout.addWidget(self.target_value_widget)
-        self.main_layout.addWidget(self.axis_range_value_widget)
-        self.main_layout.addWidget(self.button_to_axis_widget)
+        self.main_layout.addWidget(self.axis_range_container_widget)
+        self.main_layout.addWidget(self.target_value_container_widget)
        
         # hook events
 
@@ -1385,7 +1384,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self.chkb_exec_on_release.clicked.connect(self._exec_on_release_changed)
         self.chkb_paired.clicked.connect(self._paired_changed)
-        self.target_value_text.textChanged.connect(self._target_value_changed)
+        #self.target_value_text.textChanged.connect(self._target_value_changed)
         self.pulse_spin_widget.valueChanged.connect(self._pulse_value_changed)
         self.start_button_group.buttonClicked.connect(self._start_changed)
         self.sb_button_range_low.valueChanged.connect(self._button_range_low_changed)
@@ -1486,7 +1485,8 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             action_mode = self._get_action_mode()
 
             dev = self.vjoy_map[self.action_data.vjoy_device_id]
-            if self.action_data.input_is_axis() and action_mode != VjoyAction.VJoyAxisToButton:
+            #if self.action_data.input_is_axis() and action_mode != VjoyAction.VJoyAxisToButton:
+            if action_mode != VjoyAction.VJoyAxisToButton:
                 count = dev.axis_count
                 for id in range(1, count+1):
                     self.cb_vjoy_input_selector.addItem(f"Axis {id} ({self.get_axis_name(id)})",id)
@@ -1556,6 +1556,14 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             exec_on_release_visible =  action_data.input_type in VJoyWidget.input_type_buttons
         elif input_type == InputType.JoystickHat:
             pass
+        
+        match action:
+            case VjoyAction.VJoyRangeAxis:
+                range_visible = True
+                grid_visible = False
+            case VjoyAction.VJoySetAxis:
+                target_value_visible = True
+                range_visible = False
 
 
         self.container_repeater_widget.setVisible(repeater_visible)
@@ -1578,11 +1586,11 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 
         # self.hardware_input_container_widget.setVisible(hardware_widget_visible)
-        self.axis_range_value_widget.setVisible(range_visible)
+        self.axis_range_container_widget.setVisible(range_visible)
         self.chkb_exec_on_release.setVisible(exec_on_release_visible)
         self.chkb_paired.setVisible(paired_visible)
-        self.target_value_widget.setVisible(target_value_visible)
-        self.button_to_axis_widget.setVisible(button_to_axis_visible)
+        # self.target_value_widget.setVisible(target_value_visible)
+        self.target_value_container_widget.setVisible(button_to_axis_visible)
 
         self.lbl_vjoy_device_selector.setVisible(selector_visible)
         self.cb_vjoy_device_selector.setVisible(selector_visible)
@@ -1856,13 +1864,15 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
                     self.sb_axis_range_high.setValue(self.action_data.range_high)
 
 
+
             elif self.action_data.input_type in (InputType.JoystickButton, InputType.Keyboard, InputType.KeyboardLatched, InputType.OpenSoundControl, InputType.Midi):
                 is_button_mode = True
 
             if self.action_data.action_mode == VjoyAction.VJoyAxisToButton:
                 is_button_mode = True
             
-            
+            with QtCore.QSignalBlocker(self.sb_button_to_axis_value):
+                self.sb_button_to_axis_value.setValue(self.action_data.target_value)
 
             if is_button_mode:
                 self.pulse_spin_widget.setValue(self.action_data.pulse_delay)

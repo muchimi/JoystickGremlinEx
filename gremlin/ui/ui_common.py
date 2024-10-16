@@ -924,7 +924,8 @@ class ActionSelector(QtWidgets.QWidget):
         # validate the clipboard data is an action and is of the correct type for the input/container
         if clipboard.is_action:
             action_name = clipboard.data.name
-            if action_name in self._valid_action_list():
+            valid_actions = self._valid_action_list()
+            if action_name in valid_actions:
                 # valid action - clone it and add it
                 # logging.getLogger("system").info("Clipboard paste action trigger...")
                 self.action_paste.emit(clipboard.data)

@@ -158,6 +158,16 @@ Joystick Gremlin EX
 
 ## 13.40.15ex (pre-release)
 
+### (m4.6) hotfix
+- Fix for paste of some actions or containers failing
+- Fix for output values of vjoy remap in certain modes not having display axes
+- Fix for loading certain vjoy remap modes not updating some UI fields correctly
+- Additional verbose logging if certain TTS voice cannot be loaded or executed with fall-back to default voice if possible.
+- Fix for restore last input feature not consistently restoring the correct last input
+
+### (m4.5) hotfix
+- Added remap curve ex additional functionality to traverse and edit control and handle coordinates
+
 
 ### (m4.2) hotfix
 - removed button timer on auto input highlighting causing some buttons inputs from being ignored

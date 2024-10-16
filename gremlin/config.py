@@ -1273,11 +1273,12 @@ class Configuration:
         elif input_id is None:
             # no data is ok
             pass
-        elif not isinstance(input_id, int):
+        elif isinstance(input_id, int):
+            input_id = int(input_id)
+        else:
             assert False, f"Don't know how to handle input_id type: {type(input_id).__name__}"
 
-           
-        data[device_guid] = (input_type, input_id)
+        data[device_guid] = (input_type.value, input_id)
         self._profile_data["last_input"] = data
         self._data["last_device_guid"] = device_guid
         self._profile_data["last_device_guid"] = device_guid
@@ -1399,6 +1400,11 @@ class Configuration:
         data : dict = self._profile_data.get("last_input", {})
         if device_guid in data:
             input_type, input_id = data[device_guid]
+            input_type = gremlin.input_types.InputType.to_enum(input_type)
+
+            if input_id is not None and isinstance(input_id, int):
+                return (device_guid, input_type, input_id)
+            
             if input_id is not None:
                 input_type, save_input_id, input_id = self._get_input_id(dinput_device_guid, input_id)
                 if input_type is None:

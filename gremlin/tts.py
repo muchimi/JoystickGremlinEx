@@ -22,6 +22,7 @@ to speech system.
 
 import logging
 import time
+import gremlin.config
 import gremlin.shared_state
 import gremlin.threading
 from . import event_handler, util
@@ -38,20 +39,53 @@ class TextToSpeech:
 
     def __init__(self):
         """Creates a new instance."""
-        self.engine = pyttsx3.init()
-        self.voices = self.engine.getProperty('voices')
-        self._started = False
+        syslog = logging.getLogger("system")
+        self.valid = False
+        try:
+            self.engine = pyttsx3.init()
+            self.voices = self.engine.getProperty('voices')
+            self.default_voice = next((voice for voice in self.voices if "David Desktop" in voice.name), None)
+            self._started = False
+            self.valid = True
+            verbose = gremlin.config.Configuration().verbose
+            if verbose:
+                syslog.info(f"TTS voice listing:")
+                for voice in self.voices:
+                    syslog.info(f"\t{voice.name}  (id: {voice.id})")
+                if self.default_voice:
+                    syslog.info(f"TTS default voice: {self.default_voice.name}  (id: {self.default_voice.id})")
+        except Exception as err:
+            syslog.error(f"TTS: unable to initialize TTS: {err}")
+                
 
     def getVoices(self):
         ''' gets a list of defined voices'''
-        return self.voices
+        if self.valid:
+            return self.voices  
+        return []
     
     def set_voice(self, voice):
         ''' sets the voice'''
-        self.engine.setProperty("voice", voice.id)
+        if not self.valid:
+            return
+        try:
+            self.engine.setProperty("voice", voice.id)
+        except:
+            syslog = logging.getLogger("system")
+            syslog.warning(f"TTS: unable to select voice {voice.name}")
+            if self.default_voice:
+                try:
+                    self.engine.setProperty("voice", self.default_voice.id)
+                    syslog.warning(f"TTS: selecting default voice {voice.name}")
+                except Exception as err:
+                    syslog.error(f"TTS: unable to activate TTS: {err}")
+
+
 
     def speak(self, text):        
         ''' speaks the text'''
+        if not self.valid:
+            return
         try:
             text = self.text_substitution(text)
             self.engine.say(text)
@@ -61,6 +95,8 @@ class TextToSpeech:
 
     def speak_single(self, text):
         ''' speaks the test as a single event (don't use this inside an event loop)'''
+        if not self.valid:
+            return
         try:
             text = self.text_substitution(text)
             self.engine.say(text)
@@ -71,6 +107,8 @@ class TextToSpeech:
 
     def stop(self):
         ''' stops any speech '''
+        if not self.valid:
+            return
         try:
             self.engine.stop()
         except Exception as err:
@@ -78,6 +116,8 @@ class TextToSpeech:
 
     def start(self):
         ''' starts the loop '''
+        if not self.valid:
+            return
         if not self._started:
             self._tts_thread = gremlin.threading.AbortableThread(target = self._tts_runner)
             self._tts_thread.start()
@@ -85,6 +125,8 @@ class TextToSpeech:
             
     def _tts_runner(self):
         ''' runner thread for the TTS engine '''
+        if not self.valid:
+            return
         self.engine.startLoop(False)
         while not self._tts_thread.stopped():
             time.sleep(0.1)
@@ -95,6 +137,8 @@ class TextToSpeech:
 
     def end(self):
         ''' ends the loop '''
+        if not self.valid:
+            return
         if self._started:
             self._tts_thread.stop()
             self._tts_thread.join()
@@ -106,6 +150,8 @@ class TextToSpeech:
 
         :param value the new volume value
         """
+        if not self.valid:
+            return
         volume = int(util.clamp(value, 0, 100))
         self.engine.setProperty('volume', volume / 100) # value is 0 to 1 floating point
 
@@ -118,6 +164,8 @@ class TextToSpeech:
         :param value the new speaking rate
         """
         # default is 200 words per minute
+        if not self.valid:
+            return
         rate = self.rate_playback + int(util.clamp(value, self.rate_offset_min, self.rate_offset_max))
         self.engine.setProperty('rate', rate )
         

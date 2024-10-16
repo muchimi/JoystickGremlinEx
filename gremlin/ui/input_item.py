@@ -1563,7 +1563,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         container = self.profile_data
         node = container.to_xml()
         xml = lxml.etree.tostring(node)
-        oc = ObjectEncoder(container, xml, EncoderType.Container)
+        oc = ObjectEncoder(container, xml, container.name, EncoderType.Container)
         oc.name = container.name
         clipboard.data = oc
         #clipboard.data = self.profile_data
@@ -1939,7 +1939,7 @@ class BasicActionWrapper(AbstractActionWrapper):
         action =  self.action_widget.action_data
         node = action.to_xml()
         xml = lxml.etree.tostring(node)
-        oc =  ObjectEncoder(action, xml, EncoderType.Action)
+        oc =  ObjectEncoder(action, xml, action.name, EncoderType.Action)
         #clipboard.data = action
         clipboard.data = oc
         logging.getLogger("system").info(f"copy to clipboard: {action.name}")

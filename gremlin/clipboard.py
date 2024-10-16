@@ -22,12 +22,14 @@ class EncoderType(IntEnum):
 
 class ObjectEncoder():
     ''' helper class to encode objects '''
-    def __init__(self, obj, data, encoder_type : EncoderType ):
+    def __init__(self, obj, data, name, encoder_type : EncoderType ):
         cls = type(obj)
-        self._name = cls.__name__
+        self._name = name
+        self._class_name = cls.__name__
         self._module = cls.__module__
         self._data = data
         self._type : EncoderType = encoder_type
+        
 
     @property
     def data(self):
@@ -40,6 +42,10 @@ class ObjectEncoder():
     @property
     def name(self):
         return self._name
+    
+    @property
+    def class_name(self):
+        return self._class_name
     
     @name.setter
     def name(self, value):
