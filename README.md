@@ -158,6 +158,10 @@ Joystick Gremlin EX
 
 ## 13.40.15ex (pre-release)
 
+### (m4.8) hotfix
+- Added a latched functor ability to register extra functor callbacks to trigger on defined inputs.  This enables a functor to register additional triggers on inputs other than the one it is attached to.  This is much cleaner than hooking inputs directly in the functor and follows the GremlinEx "wiring" model.
+- Fixed vjoy remap's computation of merged data and enabled the latched functor feature for that action when input is merged.
+
 ### (m4.6) hotfix
 - Fix for paste of some actions or containers failing
 - Fix for output values of vjoy remap in certain modes not having display axes

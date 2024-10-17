@@ -24,6 +24,7 @@ from threading import Thread, Timer
 from typing import Callable
 
 
+
 import gremlin.joystick_handling
 import gremlin.threading
 
@@ -776,6 +777,7 @@ class EventHandler(QtCore.QObject):
 		self.midi_callbacks = {}
 		self.osc_callbacks = {}
 		self._event_lookup = {}
+		self.latched_functors = {}
 		
 
 	@property
@@ -887,6 +889,18 @@ class EventHandler(QtCore.QObject):
 				for event in self.callbacks[device_guid][mode]:
 					self.dump_exectree(device_guid, mode, event)
 
+
+	def add_latched_functor(self, device_guid, mode, event, functor):
+		''' registers an extra latched functor on inputs if a functor uses multiple inputs '''
+		# regular event
+		if device_guid not in self.latched_functors:
+			self.latched_functors[device_guid] = {}
+		if mode not in self.latched_functors[device_guid]:
+			self.latched_functors[device_guid][mode] = {}
+		if event not in self.latched_functors[device_guid][mode]:
+			self.latched_functors[device_guid][mode][event] = []
+		self.latched_functors[device_guid][mode][event].append(functor)
+		
 				
 
 	def add_callback(self, device_guid, mode, event, callback, permanent=False):
@@ -1220,7 +1234,7 @@ class EventHandler(QtCore.QObject):
 
 		# list of callbacks
 		m_list = []
-
+		f_list = []
 		
 		
 		verbose = gremlin.config.Configuration().verbose_mode_inputs
@@ -1302,12 +1316,12 @@ class EventHandler(QtCore.QObject):
 		elif event.event_type in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat):
 			verbose = gremlin.config.Configuration().verbose_mode_joystick
 			m_list = self._matching_callbacks(event)
+			f_list = self._matching_functors(event)
 		else:
 			# other inputs
 			verbose = gremlin.config.Configuration().verbose_mode_details
 			m_list = self._matching_callbacks(event)
-
-		
+			f_list = self._matching_functors(event)
 
 		
 		if m_list:
@@ -1315,11 +1329,14 @@ class EventHandler(QtCore.QObject):
 				logging.getLogger("system").info(f"TRIGGER: mode: [{self.runtime_mode}] callbacks: {len(m_list)} event: {event}")
 			self._trigger_callbacks(m_list, event)
 
+		if f_list:
+			if verbose:
+				logging.getLogger("system").info(f"TRIGGER: mode: [{self.runtime_mode}] functors: {len(f_list)} event: {event}")
+			self._trigger_functor_callbacks(f_list, event)
+
 
 	def _trigger_callbacks(self, callbacks, event):
 		#verbose = gremlin.config.Configuration().verbose'
-		if event.event_type == InputType.JoystickAxis:
-			pass
 		for cb in callbacks:
 			try:
 				# if verbose:
@@ -1329,6 +1346,15 @@ class EventHandler(QtCore.QObject):
 				# 	logging.getLogger("system").info(f"CALLBACK: execute done")
 			except Exception as ex:
 				logging.getLogger("system").error(f"CALLBACK: error {ex}")
+
+	def _trigger_functor_callbacks(self, functors, event : Event):
+		#verbose = gremlin.config.Configuration().verbose'
+		import gremlin.actions
+		for functor in functors:
+			try:
+				functor.process_event(event, gremlin.actions.Value(event.value))
+			except Exception as ex:
+				logging.getLogger("system").error(f"FUNCTOR CALLBACK: error {ex}")				
 
 
 	def _matching_midi_callbacks(self, event):
@@ -1365,7 +1391,20 @@ class EventHandler(QtCore.QObject):
 			return [c[0] for c in callback_list if c[1]]
 		else:
 			return [c[0] for c in callback_list]
-			
+
+
+	def _matching_functors(self, event) -> list:
+		''' gets the list of matching functors to call when an event occurs '''	
+		functors_list = []
+		device_guid = event.device_guid
+		if device_guid in self.callbacks:
+			mode = self.runtime_mode
+			if mode in self.latched_functors[device_guid].keys():
+				if event in self.latched_functors[device_guid][mode].keys():
+					functors_list = self.latched_functors[device_guid][mode][event]
+
+		return functors_list
+
 
 	def _matching_callbacks(self, event):
 		"""Returns the list of callbacks to execute in response to

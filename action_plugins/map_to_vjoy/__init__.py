@@ -24,6 +24,7 @@ from lxml import etree as ElementTree
 from PySide6 import QtWidgets, QtCore, QtGui
 import gremlin.actions
 import gremlin.event_handler
+import gremlin.input_types
 import gremlin.joystick_handling
 from gremlin.util import load_icon
 
@@ -1016,6 +1017,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.action_data.merge_device_id = device_id
         self.action_data.merge_input_id = first_input_id
         
+        
     @QtCore.Slot()
     def _input_changed_cb(self):
         ''' merge input changed '''
@@ -1037,7 +1039,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         
 
     def _joystick_event_handler(self, event):
-        ''' handles joystick events in the UI (functor handles the output when profile is running)'''
+        ''' handles joystick events in the UI (functor handles the output when profile is running) so we see the output at design time '''
         if gremlin.shared_state.is_running:
             return 
 
@@ -1486,7 +1488,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
             dev = self.vjoy_map[self.action_data.vjoy_device_id]
             #if self.action_data.input_is_axis() and action_mode != VjoyAction.VJoyAxisToButton:
-            if action_mode != VjoyAction.VJoyAxisToButton:
+            if action_mode in (VjoyAction.VJoySetAxis, VjoyAction.VJoyRangeAxis, VjoyAction.VJoyAxis, VjoyAction.VJoyInvertAxis):
                 count = dev.axis_count
                 for id in range(1, count+1):
                     self.cb_vjoy_input_selector.addItem(f"Axis {id} ({self.get_axis_name(id)})",id)
@@ -2043,10 +2045,6 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
         self.axis_start_value = action_data.axis_start_value
 
         self.remote_client = input_devices.remote_client
-        # self.merge_guid = action.merge_device_b_guid
-        # self.merge_axis = action.merge_device_b_axis
-        # if self.merge_guid:
-        #     pass
 
         self.lock = threading.Lock()
 
@@ -2062,6 +2060,12 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
         usage_data.set_inverted(self.vjoy_device_id, self.vjoy_input_id, not value)
         log_sys(f"toggle reverse: {self.vjoy_device_id} {self.vjoy_input_id} new state: {self.reverse}")
 
+    def latch_extra_inputs(self):
+        ''' returns the list of extra devices to latch to this functor (device_guid, input_type, input_id) '''
+        if self.action_data.merged:
+            return [(self.action_data.merge_device_guid, self.action_data.merge_input_type, self.action_data.merge_input_id)]
+        return []
+
 
     def profile_start(self):
         # setup initial state
@@ -2075,58 +2079,6 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
             joystick_handling.VJoyProxy()[self.vjoy_device_id].axis(self.vjoy_input_id).value = self.axis_start_value
             self.remote_client.send_axis(self.vjoy_device_id, self.vjoy_input_id, self.axis_start_value)
 
-        # if self.action_data.merged:
-        #     # hook inputs 
-        #     el = gremlin.event_handler.EventListener()
-        #     el.joystick_event.connect(self._joystick_event_handler)
-
-    def profile_stop(self):
-        ''' profile stop event - unhook if in merged mode '''
-        # if self.action_data.merged:
-        #     # un hook inputs 
-        #     el = gremlin.event_handler.EventListener()
-        #     el.joystick_event.disconnect(self._joystick_event_handler)
-
-    def _joystick_event_handler(self, event):
-        ''' handles joystick events in the UI'''
-        if not gremlin.shared_state.is_running:
-            return 
-
-        if not event.is_axis:
-            return 
-        
-        if self.action_data.action_mode == VjoyAction.VjoyMergeAxis:
-            # merge - check two sets 
-            if event.device_guid == self.action_data.hardware_device_guid and event.device_guid == self.action_data.merge_device_guid:
-                # merge hardware is the same as current input - accept only the two input itds
-                if event.identifier != self.action_data.hardware_input_id and event.identifier != self.action_data.merge_input_id:
-                    return
-            else:
-                # not the same:
-                if event.device_guid == self.action_data.hardware_device_guid and event.identifier != self.action_data.hardware_input_id:
-                    return
-                if event.device_guid == self.action_data.merge_device_guid and event.identifier != self.action_data.merge_input_id:
-                    return
-            
-        
-        else:
-            if event.device_guid != self.action_data.hardware_device_guid:
-                return
-            
-            if event.identifier != self.action_data.hardware_input_id:
-                return            
-            
-        # process input options and any merge and curve operation
-        value = self.action_data.get_filtered_axis_value()
-
-        if self.action_data.curve_data is not None:
-            # curve the output 
-            value = self.action_data.curve_data.curve_value(value)
-
-        value = gremlin.actions.Value(value)
-        
-        self._process_event(event, value)
-        
 	
     # async routine to pulse a button
     def _fire_pulse(self, *args):
@@ -2196,11 +2148,8 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
 
         if event.is_axis: # self.input_type == InputType.JoystickAxis:
             # axis response mode
-
          
             target = value.current
-
-            
 
             # axis mode
             if self.action_mode == VjoyAction.VJoyAxisToButton:
@@ -2225,15 +2174,9 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
 
             elif self.axis_mode == "absolute":
                 # apply any range function to the raw position
-                #input_min = -1.0
-                #input_max = +1.0
-                # sub-range is r_min, r_max
-                # y = r_min + (x - input_min)*(r_max - r_min)/(input_max - input_min)
                 r_min, r_max = usage_data.get_range(self.vjoy_device_id, self.vjoy_input_id)
                 if self.reverse:
                     target = -target
-                    # log_sys(f"reversed: {target}")
-                    
 
                 value = r_min + (target + 1.0)*((r_max - r_min)/2.0)
                 
@@ -2465,6 +2408,7 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         self._merge_device_id : str = None # input guid (str) of the merged device
         self._merge_device_guid : dinput.GUID = None # input guid for the merge device
         self.merge_input_id : int = None # input id of the merged input
+        self.merge_input_type : gremlin.input_types.InputType =  gremlin.input_types.InputType.JoystickAxis # only merging axes at this point
         self._merge_mode : MergeOperationType = MergeOperationType.NotSet # default merge method
         self.output_range_min : float = -1.0 # min for merged output
         self.output_range_max : float = 1.0 # max for merged output
@@ -2497,14 +2441,18 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
 
     def get_filtered_axis_value(self, value : float = None) -> float:
         ''' computes the output value for the current configuration  '''
+
         if value is None:
             value = gremlin.joystick_handling.get_axis(self.hardware_device_guid, 
                                                         self.hardware_input_id) 
         if self.merge_mode != MergeOperationType.NotSet:
             if self.merge_device_id and self.merge_input_id:
-                v1 = value
+                # always read v1 and v2 because the input value may be of either inputs
+                v1 = gremlin.joystick_handling.get_axis(self.hardware_device_guid, 
+                                                        self.hardware_input_id) 
                 v2 = gremlin.joystick_handling.get_axis(self.merge_device_guid, 
                                                     self.merge_input_id) 
+                
                 match self.merge_mode:
                     case MergeOperationType.Add:
                         value = scale_to_range(v1+v2,
@@ -2810,6 +2758,10 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
             if "merge_input_id" in node.attrib:
                 self.merge_input_id = safe_read(node,"merge_input_id", int, 0)
 
+            if "merge_input_type" in node.attrib:
+                merge_input_type = safe_read(node,"merge_input_type", str, "")
+                self.merge_input_type = gremlin.input_types.InputType.to_enum(merge_input_type)
+
             if "merge_mode" in node.attrib:
                 mode = node.get("merge_mode")
                 try:
@@ -2885,6 +2837,7 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
                 node.set("merge_invert", safe_format(self.merge_invert, bool))
                 node.set("merge_min", safe_format(self.output_range_min, float))
                 node.set("merge_max", safe_format(self.output_range_max, float))
+                node.set("merge_input_type", gremlin.input_types.InputType.to_string(self.merge_input_type))
                 
 
             case VjoyAction.VJoyPulse:

@@ -238,6 +238,11 @@ class ProfileData(metaclass=ABCMeta):
         ''' gets the type name of hardware device attached to this '''
         return InputType.to_display_name(self.hardware_input_type)
     
+    @property 
+    def profile_mode(self) -> str:
+        ''' gets the mode of this action '''
+        return self.get_mode()
+    
     @property
     def hardware_device_guid(self) -> dinput.GUID:
         ''' gets the currently attached hardware GUID '''
