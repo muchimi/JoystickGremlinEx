@@ -1397,7 +1397,7 @@ class EventHandler(QtCore.QObject):
 		''' gets the list of matching functors to call when an event occurs '''	
 		functors_list = []
 		device_guid = event.device_guid
-		if device_guid in self.callbacks:
+		if device_guid in self.latched_functors:
 			mode = self.runtime_mode
 			if mode in self.latched_functors[device_guid].keys():
 				if event in self.latched_functors[device_guid][mode].keys():
