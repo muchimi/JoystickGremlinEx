@@ -1183,6 +1183,11 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         else:
             action_name = None
 
+        match self.action_data.action_mode:
+            case VjoyAction.VJoyAxisToButton:
+                action_name = f"Vjoy device {vjoy_device_id} button {vjoy_input_id}"
+
+
         is_axis = self.action_data.input_is_axis()
         if is_axis:
             if not action_name:
@@ -1334,11 +1339,11 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         # set axis range widget
         self.axis_range_container_widget = QtWidgets.QWidget()
         box = QtWidgets.QHBoxLayout(self.axis_range_container_widget)
-        self.sb_button_range_low = gremlin.ui.ui_common.DynamicDoubleSpinBox()
+        self.sb_button_range_low = gremlin.ui.ui_common.QFloatLineEdit()
         self.sb_button_range_low.setMinimum(-1.0)
         self.sb_button_range_low.setMaximum(1.0)
         self.sb_button_range_low.setDecimals(3)
-        self.sb_button_range_high = gremlin.ui.ui_common.DynamicDoubleSpinBox()
+        self.sb_button_range_high = gremlin.ui.ui_common.QFloatLineEdit()
         self.sb_button_range_high.setMinimum(-1.0)
         self.sb_button_range_high.setMaximum(1.0)
         self.sb_button_range_high.setDecimals(3)
@@ -1487,7 +1492,6 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             action_mode = self._get_action_mode()
 
             dev = self.vjoy_map[self.action_data.vjoy_device_id]
-            #if self.action_data.input_is_axis() and action_mode != VjoyAction.VJoyAxisToButton:
             if action_mode in (VjoyAction.VJoySetAxis, VjoyAction.VJoyRangeAxis, VjoyAction.VJoyAxis, VjoyAction.VJoyInvertAxis):
                 count = dev.axis_count
                 for id in range(1, count+1):
@@ -1554,18 +1558,18 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             start_visible = action in (VjoyAction.VJoyButton, VjoyAction.VjoyButtonRelease)
             grid_visible = action in (VjoyAction.VJoyPulse, VjoyAction.VJoyButton, VjoyAction.VJoyToggle, VjoyAction.VjoyButtonRelease)
             paired_visible = action == VjoyAction.VJoyButton
-            target_value_visible = action == VjoyAction.VJoyButton
             exec_on_release_visible =  action_data.input_type in VJoyWidget.input_type_buttons
         elif input_type == InputType.JoystickHat:
             pass
-        
+
         match action:
             case VjoyAction.VJoyRangeAxis:
                 range_visible = True
                 grid_visible = False
             case VjoyAction.VJoySetAxis:
-                target_value_visible = True
                 range_visible = False
+            case VjoyAction.VJoyAxisToButton:
+                repeater_visible = False
 
 
         self.container_repeater_widget.setVisible(repeater_visible)
@@ -1841,7 +1845,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
                 self.cb_action_list.setCurrentIndex(index)
                
             is_axis = self._is_axis
-            if is_axis:
+            if is_axis and self.action_data.action_mode == VjoyAction.VJoyAxis:
                 
                 with QtCore.QSignalBlocker(self.reverse_checkbox):
                     self.reverse_checkbox.setChecked(self.action_data.reverse)
@@ -1865,16 +1869,18 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
                 with QtCore.QSignalBlocker(self.sb_axis_range_high):
                     self.sb_axis_range_high.setValue(self.action_data.range_high)
 
-
-
             elif self.action_data.input_type in (InputType.JoystickButton, InputType.Keyboard, InputType.KeyboardLatched, InputType.OpenSoundControl, InputType.Midi):
                 is_button_mode = True
 
             if self.action_data.action_mode == VjoyAction.VJoyAxisToButton:
                 is_button_mode = True
+                with QtCore.QSignalBlocker(self.sb_button_range_low):
+                    self.sb_button_range_low.setValue(self.action_data.range_low)
+                with QtCore.QSignalBlocker(self.sb_button_range_high):
+                    self.sb_button_range_high.setValue(self.action_data.range_high)
             
-            with QtCore.QSignalBlocker(self.sb_button_to_axis_value):
-                self.sb_button_to_axis_value.setValue(self.action_data.target_value)
+                with QtCore.QSignalBlocker(self.sb_button_to_axis_value):
+                    self.sb_button_to_axis_value.setValue(self.action_data.target_value)
 
             if is_button_mode:
                 self.pulse_spin_widget.setValue(self.action_data.pulse_delay)
@@ -2076,8 +2082,22 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
             # set start axis range
             usage_data.set_range(self.vjoy_device_id, self.vjoy_input_id, self.range_low, self.range_high)
             # print(f"Axis start value: vjoy: {self.vjoy_device_id} axis: {self.vjoy_input_id}  value: {self.axis_start_value}")
-            joystick_handling.VJoyProxy()[self.vjoy_device_id].axis(self.vjoy_input_id).value = self.axis_start_value
-            self.remote_client.send_axis(self.vjoy_device_id, self.vjoy_input_id, self.axis_start_value)
+            match self.action_mode:
+                case VjoyAction.VJoyAxis:
+                    joystick_handling.VJoyProxy()[self.vjoy_device_id].axis(self.vjoy_input_id).value = self.axis_start_value
+                    self.remote_client.send_axis(self.vjoy_device_id, self.vjoy_input_id, self.axis_start_value)
+
+                case VjoyAction.VJoyAxisToButton:
+                    device_guid = self.action_data.hardware_device_guid
+                    input_id = self.action_data.hardware_input_id
+                    value = joystick_handling.get_axis(device_guid, input_id)
+                    action_value = gremlin.actions.Value(value)
+                    event = gremlin.event_handler.Event(gremlin.input_types.InputType.JoystickAxis,
+                                                        device_guid = device_guid,
+                                                        identifier=input_id,
+                                                        is_axis=True,
+                                                        value = action_value)
+                    self.process_event(event, action_value)
 
 	
     # async routine to pulse a button
@@ -2842,6 +2862,10 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
 
             case VjoyAction.VJoyPulse:
                 node.set("pulse_delay", safe_format(self.pulse_delay, int))
+
+            case VjoyAction.VJoyAxisToButton:
+                node.set("range_low", safe_format(self.range_low, float))
+                node.set("range_high", safe_format(self.range_high, float))
 
 
         if self.curve_data is not None:

@@ -23,7 +23,8 @@ def gamepadAvailable():
 
     syslog = logging.getLogger("system")
     try:
-        _gamepad_available = vc.initalized
+        pad = vg.VX360Gamepad()
+        _gamepad_available = vc.initalized and pad.valid
         
         if _gamepad_available:
             syslog.info(f"gamepad: enabled")

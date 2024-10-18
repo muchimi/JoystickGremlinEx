@@ -1278,7 +1278,10 @@ class Configuration:
         else:
             assert False, f"Don't know how to handle input_id type: {type(input_id).__name__}"
 
-        data[device_guid] = (input_type.value, input_id)
+        if isinstance(input_type, gremlin.input_types.InputType):
+            data[device_guid] = (input_type.value, input_id)    
+        else:
+            data[device_guid] = (input_type, input_id)
         self._profile_data["last_input"] = data
         self._data["last_device_guid"] = device_guid
         self._profile_data["last_device_guid"] = device_guid

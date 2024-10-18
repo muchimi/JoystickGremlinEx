@@ -161,6 +161,7 @@ Joystick Gremlin EX
 ### (m4.8) hotfix
 - Added a latched functor ability to register extra functor callbacks to trigger on defined inputs.  This enables a functor to register additional triggers on inputs other than the one it is attached to.  This is much cleaner than hooking inputs directly in the functor and follows the GremlinEx "wiring" model.
 - Fixed vjoy remap's computation of merged data and enabled the latched functor feature for that action when input is merged.
+- Fixed hat input causing an unknown input exception in callbacks
 
 ### (m4.6) hotfix
 - Fix for paste of some actions or containers failing
@@ -1472,7 +1473,11 @@ GremlinEx adds a Script Generator button to the Device Information dialog that c
 
 #### VJOY virtual joystick driver 
  
-https://github.com/shauleiz/vJoy
+https://github.com/shauleiz/vJoy (original)
+
+Recommended version 2.1.9.1 for Windows 10 (works with 11)
+
+https://github.com/jshafer817/vJoy/releases
 
 Installs one or more virtual programmable HID joysticks on Windows with up to 8 axes, 4 hats and 128 buttons per the DirectInput specification.
 

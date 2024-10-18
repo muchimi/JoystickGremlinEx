@@ -338,8 +338,6 @@ class MapToGamepad(gremlin.base_profile.AbstractAction):
         """
         node = ElementTree.Element(self.tag)
         mode = GamePadOutput.to_string(self.output_mode)
-        if mode == "none":
-            pass
         node.set("mode", mode)
         node.set("device_index",str(self.device_index))
         return node
@@ -350,9 +348,6 @@ class MapToGamepad(gremlin.base_profile.AbstractAction):
         :return True if the action is configured correctly, False otherwise
         """
         return gremlin.gamepad_handling.gamepadAvailable()
-    
-
-
 
 version = 1
 name = "map-to-gamepad"

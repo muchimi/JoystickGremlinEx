@@ -45,8 +45,8 @@ class VigemClient():
                     msg = f"Unable to continue - missing dll: {_dll_path}"
                     display_error(msg)
                     logging.getLogger("system").critical(msg)
-                    os._exit(1)
-
+                    return
+                    
             dll_version = get_dll_version(_dll_path)
             VigemClient._version = dll_version
 

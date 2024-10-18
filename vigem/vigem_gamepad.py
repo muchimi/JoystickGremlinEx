@@ -10,11 +10,14 @@ import ctypes
 from ctypes import CFUNCTYPE, c_void_p, c_ubyte
 from abc import ABC, abstractmethod
 from inspect import signature  # Check if user defined callback function is legal
+import logging
 
 
 def check_err(err):
     if err != vcom.VIGEM_ERRORS.VIGEM_ERROR_NONE:
-        raise Exception(vcom.VIGEM_ERRORS(err).name)
+        logging.getLogger("system").warning(f"VIGEM error: {vcom.VIGEM_ERRORS(err).name}")
+        return False
+    return True
 
 
 def dummy_callback(client, target, large_motor, small_motor, led_number, user_data):
@@ -40,7 +43,7 @@ class VBus:
         self.vigem_disconnect = vcli.vigem_disconnect
         self.vigem_free = vcli.vigem_free
         self._busp = vcli.vigem_alloc()
-        check_err(vcli.vigem_connect(self._busp))
+        self.valid = check_err(vcli.vigem_connect(self._busp))
 
     def get_busp(self):
         return self._busp
@@ -58,6 +61,9 @@ VBUS = VBus()
 class VGamepad(ABC):
     def __init__(self):
         self.vbus = VBUS
+        self.valid = self.vbus.valid
+        if not self.valid:
+            return
         # for GC purposes, keep a reference so the functions are available when the object is being deleted
         self.vigem_target_remove = vcli.vigem_target_remove
         self.vigem_target_free = vcli.vigem_target_free
@@ -69,6 +75,8 @@ class VGamepad(ABC):
         assert vcli.vigem_target_is_attached(self._devicep), "The virtual device could not connect to ViGEmBus."
 
     def __del__(self):
+        if not self.vbus.valid:
+            return
         self.vigem_target_remove(self._busp, self._devicep)
         self.vigem_target_free(self._devicep)
 
@@ -122,6 +130,8 @@ class VX360Gamepad(VGamepad):
     """
     def __init__(self):
         super().__init__()
+        if not self.valid:
+            return
         self.report = self.get_default_report()
         self.update()
 
