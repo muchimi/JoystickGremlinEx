@@ -231,6 +231,7 @@ class AbstractCurveModel(QtCore.QObject):
         self.save_to_profile()
         self.content_modified.emit()
 
+
     def get_curve_function(self):
         """Returns the curve function corresponding to the model.
 
@@ -339,12 +340,12 @@ class AbstractCurveModel(QtCore.QObject):
 
         :param mode the symmetry mode to use
         """
-        if len(self._control_points) == 2:
-            self.add_control_point(Point2D(0.0, 0.0))
-
-        self._enforce_symmetry()
         self.symmetry_mode = mode
-        self.content_added.emit()
+        if mode == SymmetryMode.Diagonal:
+            if len(self._control_points) == 2:
+                self.add_control_point(Point2D(0.0, 0.0))
+                self.content_added.emit()
+                self._enforce_symmetry()
 
 
 class CubicSplineModel(AbstractCurveModel):
@@ -774,8 +775,9 @@ class CurveView(QtWidgets.QGraphicsScene):
             self.addItem(ControlPointGraphicsItem(cp))
 
         if self.show_input_axis:
-            self.tracker = DataPointGraphicsItem(0,0)
-            self.addItem(self.tracker)
+            if not self.tracker:
+                self.tracker = DataPointGraphicsItem(0,0)
+                self.addItem(self.tracker)
         
         self.redraw_scene()
 
@@ -806,7 +808,7 @@ class CurveView(QtWidgets.QGraphicsScene):
                 new_point.x = self.current_item.control_point.center.x
             self.current_item.control_point.set_center(new_point)
             self.model.save_to_profile()
-            # self.redraw_scene()
+            
 
     def _select_item(self, item):
         """Handles drawing of an item being selected.
@@ -834,7 +836,7 @@ class CurveView(QtWidgets.QGraphicsScene):
                 self.removeItem(item)
             elif type(item) in [
                 ControlPointGraphicsItem,
-                CurveHandleGraphicsItem
+                CurveHandleGraphicsItem,
             ]:
                 item.redraw()
 
@@ -1138,7 +1140,7 @@ class ResponseCurveWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.curve_scene.tracker.update(x,y)
 
             self.input_raw_widget.setText(f"{value:0.3f}")
-            curved = curve_fn(value)
+            curved = gremlin.util.clamp(curve_fn(value),-1.0, +1.0)
             self.input_curved_widget.setText(f"{curved:0.3f}")
 
 
@@ -1184,6 +1186,10 @@ class ResponseCurveWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _create_ui(self):
         """Creates the required UI elements."""
+
+
+        warning_widget = gremlin.ui.ui_common.QIconLabel("fa.warning",use_qta=True,icon_color=QtGui.QColor("yellow"),text="Legacy mapper - consider using <i>Response Curve Ex</i> for additional functionality", use_wrap=False)
+        self.main_layout.addWidget(warning_widget)
 
 
         self.container_options_widget = QtWidgets.QWidget()
@@ -1285,6 +1291,8 @@ class ResponseCurveWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.main_layout.addWidget(self.control_point_editor)
         self.main_layout.addWidget(self.deadzone_label)
         self.main_layout.addWidget(self.deadzone)
+
+        
 
     def _populate_ui(self):
         """Populates the UI elements."""

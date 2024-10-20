@@ -314,6 +314,8 @@ class CurveEventHandler(QtCore.QObject):
     prev_point = QtCore.Signal() # navigate to the previous control point
     handle_match_x = QtCore.Signal() # match control point x value
     handle_match_y = QtCore.Signal() # match control point y value
+    delete_point = QtCore.Signal() # delete the control point
+    value_changed = QtCore.Signal(float) # output value changed (value:float) 
 
 
 class AbstractCurveModel(QtCore.QObject):
@@ -352,6 +354,7 @@ class AbstractCurveModel(QtCore.QObject):
             self._enforce_symmetry()
         self.save_to_profile()
         self.content_modified.emit()
+        
 
     def get_curve_function(self):
         """Returns the curve function corresponding to the model.
@@ -461,13 +464,13 @@ class AbstractCurveModel(QtCore.QObject):
 
         :param mode the symmetry mode to use
         """
-        if len(self._control_points) == 2:
-            self.add_control_point(Point2D(0.0, 0.0))
-
-        self._enforce_symmetry()
         self.symmetry_mode = mode
-        self.content_added.emit()
-
+        if mode == SymmetryMode.Diagonal:
+            if len(self._control_points) == 2:
+                self.add_control_point(Point2D(0.0, 0.0))
+                self.content_added.emit()
+                self._enforce_symmetry()
+        
 
 class CubicSplineModel(AbstractCurveModel):
 
@@ -717,6 +720,7 @@ class DataPointGraphicsItem(QtWidgets.QGraphicsEllipseItem):
         color.setAlpha(128)
         self.setBrush(QtGui.QBrush(color))
 
+
     def update(self, x, y):
         self.x = x
         self.y = y
@@ -773,14 +777,16 @@ class ControlPointGraphicsItem(QtWidgets.QGraphicsEllipseItem):
 
         :param is_active flag indicating if an item is selected or not
         """
-        if is_active:
-            self.setBrush(QtGui.QBrush(QtCore.Qt.red))
-            if self.scene().mouseGrabberItem() != self:
-                self.grabMouse()
-        else:
-            self.setBrush(QtGui.QBrush(QtCore.Qt.gray))
-            if self.scene() and self.scene().mouseGrabberItem() == self:
-                self.ungrabMouse()
+        scene = self.scene()
+        if scene is not None:
+            if is_active:
+                self.setBrush(QtGui.QBrush(QtCore.Qt.red))
+                if scene.mouseGrabberItem() != self:
+                    self.grabMouse()
+            else:
+                self.setBrush(QtGui.QBrush(QtCore.Qt.gray))
+                if scene.mouseGrabberItem() == self:
+                    self.ungrabMouse()
 
 
 
@@ -936,7 +942,7 @@ class CurveView(QtWidgets.QGraphicsScene):
         """
         super().__init__(parent)
         self.model = curve_model
-        self.model.content_modified.connect(self.redraw_scene)
+        self.model.content_modified.connect(self._model_changed)
         self.model.content_added.connect(self._populate_from_model)
         self.point_editor = point_editor
         from gremlin.util import load_image
@@ -950,6 +956,7 @@ class CurveView(QtWidgets.QGraphicsScene):
         self.show_input_axis = show_input_axis
         self.current_item = None
         self.tracker = None
+        self.value = 0.0
         self.item_list = [] # map of control points to items
         self._populate_from_model()
 
@@ -958,6 +965,16 @@ class CurveView(QtWidgets.QGraphicsScene):
         eh.prev_point.connect(self._prev_item)
         eh.handle_match_x.connect(self._handle_match_x)
         eh.handle_match_y.connect(self._handle_match_y)
+        eh.delete_point.connect(self._delete_point)
+
+        if self.item_list:
+            self._select_item(self.item_list[0])
+
+    def _model_changed(self):
+        eh = CurveEventHandler()
+        self.redraw_scene()
+        eh.value_changed.emit(self.value)
+
 
 
     def _dist(self, a, b):
@@ -996,7 +1013,7 @@ class CurveView(QtWidgets.QGraphicsScene):
             self.item_list.append(item)
             self.addItem(item)
 
-        if self.show_input_axis:
+        if self.show_input_axis and self.tracker is None:
             self.tracker = DataPointGraphicsItem(0,0)
             self.addItem(self.tracker)
         
@@ -1048,15 +1065,16 @@ class CurveView(QtWidgets.QGraphicsScene):
             self._select_item(handle_list[index])
             return
 
-                
-        if self.current_item is None:
-            index = 0
-        else:
+        index = 0
+            
+        if not self.current_item is None:
             count = len(self.item_list)
-            index = self.item_list.index(self.current_item)
-            index += 1
-            if index >= count:
-                index = 0
+            if self.current_item in self.item_list:
+                index = self.item_list.index(self.current_item)
+                index += 1
+                if index >= count:
+                    index = 0
+            
         self._select_item(self.item_list[index])
 
     @QtCore.Slot()
@@ -1082,7 +1100,51 @@ class CurveView(QtWidgets.QGraphicsScene):
             index -= 1
             if index < 0:
                 index = count - 1
-        self._select_item(self.item_list[index])        
+        self._select_item(self.item_list[index])       
+
+    @QtCore.Slot()
+    def _delete_point(self):   
+        item = self.current_item
+        if item and isinstance(item, ControlPointGraphicsItem):
+            if self.current_item is None:
+                return # nothin selected
+            
+            count = len(self.item_list)
+            if count < 3:
+                # must have at least two points
+                ui_common.MessageBox("At least two points must exist. Unable to remove end points")
+                return
+
+            # don't remove the edges
+            if abs(self.current_item.control_point.center.x) == 1.0:
+                ui_common.MessageBox("Unable to remove end points")
+                return
+    
+        message_box = QtWidgets.QMessageBox()
+        message_box.setIcon(QtWidgets.QMessageBox.Icon.Warning)
+        message_box.setText("Delete this control point?")
+        message_box.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok | QtWidgets.QMessageBox.StandardButton.Cancel)
+        gremlin.util.centerDialog(message_box)
+        result = message_box.exec()
+        if result == QtWidgets.QMessageBox.StandardButton.Ok:
+            self._delete_point_confirmed()
+
+    @QtCore.Slot()
+    def _delete_point_confirmed(self):         
+        ''' deletes the current control point '''
+        
+        index = self.item_list.index(self.current_item)
+        index-=1
+        if index < 0:
+            index = len(self.item_list)-1
+        select_item = self.item_list[index]
+
+
+        self.model.remove_control_point(self.current_item.control_point)
+        self._populate_from_model()
+        self._select_item(select_item)
+            
+            
 
     @QtCore.Slot()
     def _handle_match_x(self):
@@ -1131,7 +1193,6 @@ class CurveView(QtWidgets.QGraphicsScene):
                 index = -1
             eh.selected_item.emit(item, index)
             
-        self.redraw_scene()
 
     def redraw_scene(self):
         """Updates the scene
@@ -1145,7 +1206,7 @@ class CurveView(QtWidgets.QGraphicsScene):
                 self.removeItem(item)
             elif type(item) in [
                 ControlPointGraphicsItem,
-                CurveHandleGraphicsItem
+                CurveHandleGraphicsItem,
             ]:
                 item.redraw()
 
@@ -1158,6 +1219,14 @@ class CurveView(QtWidgets.QGraphicsScene):
             for x in range(-int(g_scene_size), int(g_scene_size+1), 2):
                 path.lineTo(x, -g_scene_size * curve_fn(x / g_scene_size))
             self.addPath(path, QtGui.QPen(QtGui.QColor("#8FBC8F"), 4))
+
+            # update the tracking item
+            if self.show_input_axis:
+                x = self.value
+                y = -g_scene_size * curve_fn(x / g_scene_size)
+                self.tracker.update(x,y)
+                #self.tracker.redraw()
+            
 
         # Update editor widget fields
         if self.current_item:
@@ -1226,8 +1295,6 @@ class ControlPointEditorWidget(QtWidgets.QWidget):
     """Widgets allowing the control point coordinates to be changed
     via text fields."""
 
-    # TODO: how does this synchronize with the points / model?
-
     def __init__(self, parent=None):
         """Creates a new instance.
 
@@ -1237,10 +1304,13 @@ class ControlPointEditorWidget(QtWidgets.QWidget):
 
         # Generate controls
         self.main_layout = QtWidgets.QHBoxLayout(self)
+        self.main_layout.setContentsMargins(0,0,0,0)
         self.point_label = QtWidgets.QLabel("Control Point")
         self.x_label = QtWidgets.QLabel("X")
         self.y_label = QtWidgets.QLabel("Y")
         self.message = QtWidgets.QLabel("")
+
+        self.data = None 
 
         self.x_input = ui_common.QFloatLineEdit() # DynamicDoubleSpinBox()
         self.x_input.setRange(-1, 1)
@@ -1262,6 +1332,11 @@ class ControlPointEditorWidget(QtWidgets.QWidget):
         self.prev_control_point.setMaximumWidth(20)
         self.prev_control_point.setToolTip("Select previous control point")
 
+        self.remove_control_point = QtWidgets.QPushButton()
+        self.remove_control_point.setIcon(gremlin.util.load_icon("mdi.delete"))
+        self.remove_control_point.setMaximumWidth(20)
+        self.remove_control_point.setToolTip("Delete Control Point")
+
         self.handle_match_x = QtWidgets.QPushButton("x")
         self.handle_match_x.setToolTip("Match control X")
         self.handle_match_x.setMaximumWidth(20)
@@ -1274,6 +1349,7 @@ class ControlPointEditorWidget(QtWidgets.QWidget):
         self.prev_control_point.clicked.connect(self._prev_control_point)
         self.handle_match_x.clicked.connect(self._handle_match_x)
         self.handle_match_y.clicked.connect(self._handle_match_y)
+        self.remove_control_point.clicked.connect(self._delete_control_point)
 
         self.selected_label = QtWidgets.QLabel("")
 
@@ -1284,10 +1360,10 @@ class ControlPointEditorWidget(QtWidgets.QWidget):
         self.main_layout.addWidget(self.y_input)
         self.main_layout.addWidget(self.prev_control_point)
         self.main_layout.addWidget(self.next_control_point)
+        self.main_layout.addWidget(self.remove_control_point)
         self.main_layout.addWidget(self.handle_match_x)
         self.main_layout.addWidget(self.handle_match_y)
         self.main_layout.addWidget(self.selected_label)
-
         self.main_layout.addStretch()
 
         eh = CurveEventHandler()
@@ -1351,6 +1427,20 @@ class ControlPointEditorWidget(QtWidgets.QWidget):
             self.message.setText("")    
         else:
             self.message.setText(message)
+
+    @QtCore.Slot()
+    def _delete_control_point(self):
+        ''' deletes the current control point '''
+        if self.data:
+            curve_model = self.data
+            if curve_model.current_item is None:
+                return
+            
+            if abs(curve_model.current_item.control_point.center.x) == 1.0:
+                gremlin.ui.ui_common.MessageBox(prompt="Unable to delete first or last points")
+                return
+        eh = CurveEventHandler()
+        eh.delete_point.emit()
 
     @QtCore.Slot(str)
     def _update_selected_message(self, message):
@@ -1574,31 +1664,41 @@ class AxisCurveWidget(QtWidgets.QWidget):
         self.action_data : AxisCurveData = curve_data
         self.is_inverted = False
         self.last_value = 0
-        
+        self.curve_model = None
         self._create_ui()
 
+        eh = CurveEventHandler()
+        eh.value_changed.connect(self.update_value)
+
+    @QtCore.Slot(float)
     def update_value(self, value):
         ''' updates dot on the curve based on the value -1 to +1 '''
 
         if self.action_data.show_input_axis:
-            curve_value = gremlin.joystick_handling.scale_to_range(value, target_min = -g_scene_size, target_max= +g_scene_size+1)  # value on the curve by pixel x
+            
         
             ''' draw the current value on the curve '''
             curve_fn = self.curve_model.get_curve_function()
             if curve_fn:
                 # get the position of the marker
+                curve_value = gremlin.joystick_handling.scale_to_range(value, target_min = -g_scene_size, target_max = g_scene_size)  # value on the curve by pixel x
                 x = curve_value
                 y = -g_scene_size * curve_fn(x / g_scene_size)
-                #print(f"{x} {y}")
-                
+
+                #print (f"value: {value} cv: {curve_value}  x: {x} y: {y}")
+
                 # tracker only exists when input repeater mode is enabled
                 self.curve_scene.tracker.update(x,y)
 
                 self.input_raw_widget.setText(f"{value:0.3f}")
-                curved = curve_fn(value)
+                curved = gremlin.util.clamp(curve_fn(value),-1.0, +1.0)
                 self.input_curved_widget.setText(f"{curved:0.3f}")
 
+                self.reapeater_widget.setValue(curved)
+
         self.last_value = value
+        self.curve_scene.value = value
+
                 
 
     def _cleanup_ui(self):
@@ -1700,22 +1800,17 @@ class AxisCurveWidget(QtWidgets.QWidget):
 
         # Create all objects required for the response curve UI
         self.control_point_editor = ControlPointEditorWidget()
+        self.control_point_editor.setContentsMargins(0,0,0,0)
         self.container_control_layout.addWidget(self.control_point_editor)        
 
-        if self.action_data.show_input_axis:
-            width = get_text_width("M") * 8
+        width = get_text_width("M") * 8
 
-            self.input_raw_widget = QtWidgets.QLineEdit()
-            self.input_raw_widget.setMaximumWidth(width)
-            self.input_raw_widget.setReadOnly(True)
-            self.input_curved_widget = QtWidgets.QLineEdit()
-            self.input_curved_widget.setMaximumWidth(width)
-            self.input_curved_widget.setReadOnly(True)
-            
-            self.container_control_layout.addWidget(QtWidgets.QLabel("Input:"))
-            self.container_control_layout.addWidget(self.input_raw_widget)
-            self.container_control_layout.addWidget(QtWidgets.QLabel("Curved:"))
-            self.container_control_layout.addWidget(self.input_curved_widget)
+        self.input_raw_widget = QtWidgets.QLineEdit()
+        self.input_raw_widget.setMaximumWidth(width)
+        self.input_raw_widget.setReadOnly(True)
+        self.input_curved_widget = QtWidgets.QLineEdit()
+        self.input_curved_widget.setMaximumWidth(width)
+        self.input_curved_widget.setReadOnly(True)
 
         # Response curve model used
         if self.action_data.mapping_type == CurveType.Cubic:
@@ -1724,6 +1819,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
             self.curve_model = CubicBezierSplineModel(self.action_data)
         else:
             raise gremlin.error.ProfileError("Invalid curve type")
+        
         
         # mode
         self.curve_model.set_symmetry_mode(self.action_data.symmetry_mode)
@@ -1744,6 +1840,9 @@ class AxisCurveWidget(QtWidgets.QWidget):
         self.curve_view = QtWidgets.QGraphicsView(self.curve_scene)
         self._configure_response_curve_view()
 
+        self.control_point_editor.data = self.curve_scene
+        
+
         # Deadzone configuration
         self.container_deadzone_widget = QtWidgets.QWidget()
         self.container_deadzone_widget.setContentsMargins(0,0,0,0)
@@ -1759,9 +1858,20 @@ class AxisCurveWidget(QtWidgets.QWidget):
 
         self.container_deadzone_layout.addStretch()
         
-        
+        self.container_repeater_widget = QtWidgets.QWidget()
+        self.container_repeater_widget.setContentsMargins(0,0,0,0)
+        self.container_repeater_layout = QtWidgets.QHBoxLayout(self.container_repeater_widget)
+        self.container_repeater_layout.setContentsMargins(0,0,0,0)
+        self.reapeater_widget = ui_common.AxisStateWidget(orientation=QtCore.Qt.Orientation.Horizontal)
 
-        
+
+        self.container_repeater_layout.addWidget(QtWidgets.QLabel("Input:"))
+        self.container_repeater_layout.addWidget(self.input_raw_widget)
+        self.container_repeater_layout.addWidget(QtWidgets.QLabel("Curved:"))
+        self.container_repeater_layout.addWidget(self.input_curved_widget)
+        self.container_repeater_layout.addWidget(self.reapeater_widget)
+        self.container_repeater_layout.addStretch()
+
         
         self.deadzone_widget = DeadzoneWidget(self.action_data)
         self.deadzone_widget.changed.connect(self._deadzone_modified_cb)
@@ -1770,6 +1880,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
         self.main_layout.addWidget(self.container_options_widget)
         self.main_layout.addWidget(self.container_presets_widget)
         self.main_layout.addWidget(self.container_curve_widget)
+        self.main_layout.addWidget(self.container_repeater_widget)
         self.main_layout.addWidget(self.container_control_widget)
         self.main_layout.addWidget(self.container_deadzone_widget)
         self.main_layout.addWidget(self.deadzone_widget)
@@ -2132,6 +2243,10 @@ class AxisCurveData():
                     ))
 
 
+        # for cp in self.control_points:
+        #     print (f"Read CP: {cp[0]} {cp[1]}")
+
+
     def _generate_xml(self):
         """Generates a XML node corresponding to this object.
 
@@ -2181,7 +2296,12 @@ class AxisCurveData():
 
     def curve_value(self, value : float):
         ''' processes an input value -1 to +1 and outputs the curved value based on the current curve model '''
-        return self.response_fn(self.deadzone_fn(value))
+        if self.deadzone_fn is not None:
+            value = self.deadzone_fn(value)
+        if self.response_fn is not None:
+            value = self.response_fn(value)
+        
+        return value
         
 
 

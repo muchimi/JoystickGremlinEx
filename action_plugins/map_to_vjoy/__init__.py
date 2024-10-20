@@ -1077,11 +1077,6 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
                                                   self.action_data.hardware_input_id) 
         
 
-  
-
-
-
-
     def _update_axis_widget(self, value : float = None):
         ''' updates the axis output repeater with the value 
         
@@ -1090,17 +1085,18 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         '''
         # always read the current input as the value could be from another device for merged inputs
         if self.input_type == InputType.JoystickAxis:
+            raw_value = self.action_data.get_raw_axis_value()
             self._axis_repeater_widget.setVisible(True)
             # filter and merge the data
-            value = self.action_data.get_filtered_axis_value()
+            filtered_value = self.action_data.get_filtered_axis_value(raw_value)
             if self.action_data.curve_data is not None:
                 # curve the data 
-                value = self.action_data.curve_data.curve_value(value)
-            self._axis_repeater_widget.setValue(value)
+                filtered_value = self.action_data.curve_data.curve_value(filtered_value)
+            self._axis_repeater_widget.setValue(filtered_value)
 
             # update the curved window if displayed
             if self.curve_update_handler is not None:
-                self.curve_update_handler(value)            
+                self.curve_update_handler(raw_value)
         else:
             self._axis_repeater_widget.setVisible(False)
 
@@ -2405,12 +2401,6 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         self.vjoy_input_id : int  = 1
         self.input_type : InputType = self.hardware_input_type
 
-        # name = gremlin.joystick_handling.device_name_from_guid(self.hardware_device_guid)
-        # if name and "MFG" in name:
-        #     input_id = self.hardware_input_id
-        #     pass
-
-
         self.vjoy_axis_id = 1
         self.vjoy_button_id = 1
         self.vjoy_hat_id = 1
@@ -2458,6 +2448,8 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         self.target_value_valid = True
 
 
+    def get_raw_axis_value(self):
+        return gremlin.joystick_handling.get_axis(self.hardware_device_guid, self.hardware_input_id)
 
     def get_filtered_axis_value(self, value : float = None) -> float:
         ''' computes the output value for the current configuration  '''

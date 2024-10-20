@@ -158,6 +158,11 @@ Joystick Gremlin EX
 
 ## 13.40.15ex (pre-release)
 
+### (m4.10) hotfix
+- Slight rework of curve editor UI (added repeater)
+- Output display is now clamped in case the computed axis value is out of bounds due to the curve settings
+- Bug fix: an extra point at the center is no longer created when loading control points, and fix for a log error when saving gated axis data.
+
 ### (m4.8) hotfix
 - Added a latched functor ability to register extra functor callbacks to trigger on defined inputs.  This enables a functor to register additional triggers on inputs other than the one it is attached to.  This is much cleaner than hooking inputs directly in the functor and follows the GremlinEx "wiring" model.
 - Fixed vjoy remap's computation of merged data and enabled the latched functor feature for that action when input is merged.

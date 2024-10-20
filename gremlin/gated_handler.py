@@ -2383,7 +2383,7 @@ class GateData():
                 continue
             
             if verbose:
-                log_info(f"Saving gate {gate.id} value: {gate.value} containers count: {gate.container_count:,}")
+                log_info(f"Saving gate {gate.id} value: {gate.value} containers count: {gate.containerCount:,}")
             child = ElementTree.SubElement(node, "gate")
             if gate.is_default:
                 child.set("default",str(gate.is_default))
@@ -2405,7 +2405,7 @@ class GateData():
         range_info : RangeInfo
         for range_info in self.getUsedRanges():
             if verbose:
-                log_info(f"Saving range {range_info.id} default: {range_info.is_default} min: {range_info.range_min}  max: {range_info.range_max} containers count: {range_info.container_count:,}")
+                log_info(f"Saving range {range_info.id} default: {range_info.is_default} min: {range_info.range_min}  max: {range_info.range_max} containers count: {range_info.containerCount:,}")
             child_comment = ElementTree.Comment(f"Range: [{range_info.v1:0.{_decimals}f},{range_info.v2:0.{_decimals}f}]  Gates: [{range_info.g1.slider_index}/{range_info.g2.slider_index}] Condition: [{_gate_condition_to_display_name[range_info.condition]}] Mode: [{_gate_range_to_display_name[range_info.mode]}]")
             node.append(child_comment)
             child = ElementTree.SubElement(node,"range")
