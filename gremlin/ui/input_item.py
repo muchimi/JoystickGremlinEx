@@ -1397,11 +1397,6 @@ class ContainerSelector(QtWidgets.QWidget):
         self.paste_button.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Minimum)
         self.paste_button.setToolTip("Paste container")
 
-        # clipboard = Clipboard()
-        # clipboard.clipboard_changed.connect(self._clipboard_changed)
-        # self._clipboard_changed(clipboard)
-
-
         self.main_layout.addWidget(self.container_dropdown)
         self.main_layout.addWidget(self.add_button)
         self.main_layout.addWidget(self.paste_button)

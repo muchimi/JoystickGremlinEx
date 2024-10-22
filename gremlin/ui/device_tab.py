@@ -635,9 +635,14 @@ class JoystickDeviceTabWidget(QDataWidget):
         self.right_panel_layout.addWidget(self.right_container_widget)
         #self.right_panel_layout.addStretch()
 
+        eh = gremlin.event_handler.EventHandler()
+        eh.mode_changed.connect(self._mode_change_cb)
 
         # # listen to device changes
         el = gremlin.event_handler.EventListener()
+        
+        
+
         # el.joystick_event.connect(self._device_update)
 
 
@@ -720,6 +725,10 @@ class JoystickDeviceTabWidget(QDataWidget):
         if index in self.curve_update_handler and self.curve_update_handler[index] is not None:
             self.curve_update_handler[index](value)
 
+    @QtCore.Slot(str)
+    def _mode_change_cb(self, mode):
+        ''' occurs on mode change '''
+        self.update_curve_icons()
 
     def update_curve_icons(self):
         for index, widget in self.input_item_list_view.widget_map.items():

@@ -871,10 +871,6 @@ class ActionSelector(QtWidgets.QWidget):
         self.paste_button.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Minimum)
         self.paste_button.setToolTip("Paste Action")
 
-        #clipboard = Clipboard()
-        #clipboard.clipboard_changed.connect(self._clipboard_changed)
-        #self._clipboard_changed(clipboard)
-
         self.main_layout.addWidget(self.action_dropdown)
         self.main_layout.addWidget(self.add_button)
         self.main_layout.addWidget(self.paste_button)

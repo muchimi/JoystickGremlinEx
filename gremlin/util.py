@@ -1347,3 +1347,10 @@ def snap_to_grid(x : float, y: float, grid_size : int = 50,
 def float_to_xml(value : float, decimals = 5) -> str:
     ''' converts a float to a string for xml saving'''
     return f"{value:0.{decimals}f}"
+
+
+def is_binary_string(data):
+  ''' true if the string is a binary string '''
+  if data is None:
+      return False
+  return isinstance(data, bytes)

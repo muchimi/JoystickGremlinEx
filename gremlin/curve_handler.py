@@ -39,6 +39,7 @@ from gremlin.ui.qsliderwidget import QSliderWidget
 import gremlin.util
 from gremlin.util import *
 from gremlin.types import *
+import gremlin.clipboard
 
 from enum import Enum, auto
 from gremlin.macro_handler import *
@@ -1669,6 +1670,9 @@ class AxisCurveWidget(QtWidgets.QWidget):
         eh = CurveEventHandler()
         eh.value_changed.connect(self.update_value)
 
+        clipboard = gremlin.clipboard.Clipboard()
+        clipboard.clipboard_changed.connect(self._update_clipboard)
+
     @QtCore.Slot(float)
     def update_value(self, value):
         ''' updates dot on the curve based on the value -1 to +1 '''
@@ -1763,6 +1767,23 @@ class AxisCurveWidget(QtWidgets.QWidget):
 
 
         self.container_options_layout.addStretch()
+
+        self.copy_button_widget = QtWidgets.QPushButton()
+        icon = gremlin.util.load_icon("button_copy.svg")
+        self.copy_button_widget.setIcon(icon)
+        self.copy_button_widget.setMaximumWidth(24)
+        self.copy_button_widget.setToolTip("Copy curve")
+        self.copy_button_widget.clicked.connect(self._copy_curve_cb)
+        
+        self.paste_button_widget = QtWidgets.QPushButton()
+        icon = gremlin.util.load_icon("button_paste.svg")
+        self.paste_button_widget.setIcon(icon)
+        self.paste_button_widget.setMaximumWidth(24)
+        self.paste_button_widget.setToolTip("Paste curve")
+        self.paste_button_widget.clicked.connect(self._paste_curve_cb)
+
+        self.container_options_layout.addWidget(self.copy_button_widget)
+        self.container_options_layout.addWidget(self.paste_button_widget)
         self.container_options_layout.addWidget(help_button)
 
 
@@ -1780,6 +1801,10 @@ class AxisCurveWidget(QtWidgets.QWidget):
         self.preset_load_button_widget = QtWidgets.QPushButton("Load preset")
         self.preset_load_button_widget.setToolTip("Load preset from a previously saved preset")
         self.preset_load_button_widget.clicked.connect(self._load_preset_cb)
+
+
+        
+
         self.container_presets_layout.addWidget(self.preset_save_button_widget)
         self.container_presets_layout.addWidget(self.preset_load_button_widget)
 
@@ -1885,6 +1910,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
         self.main_layout.addWidget(self.deadzone_widget)
 
         self._update_ui()
+        self._update_clipboard(gremlin.clipboard.Clipboard())
 
     def _update_ui(self):
         """Populates the UI elements."""
@@ -1986,8 +2012,46 @@ class AxisCurveWidget(QtWidgets.QWidget):
             except Exception as err:
                 gremlin.ui.ui_common.MessageBox(prompt = f"Error loading preset: {err}")
 
+    def _clipboard_valid(self, clipboard) -> bool:
+        ''' true if the clipboard data is valid '''
+        data = clipboard.data
+        if gremlin.util.is_binary_string(data):
+            data = data.decode("utf-8")
+        return isinstance(data, str) and "</response-curve>" in data
+
+            
+    @QtCore.Slot()
+    def _copy_curve_cb(self):
+        ''' copies current curve data to the clipboard '''
+        node = self.action_data._generate_xml()
+        xml = etree.tostring(node)
+        clipboard = gremlin.clipboard.Clipboard()
+        clipboard.data = xml
+
+
+    @QtCore.Slot()
+    def _paste_curve_cb(self):
+        ''' paste curve data from clipboard '''
+        clipboard = gremlin.clipboard.Clipboard()
+        if self._clipboard_valid(clipboard):
+            try:
+                xml = clipboard.data
+                node = etree.fromstring(xml)
+                self.action_data._parse_xml(node)
+                self._change_curve_type(self.action_data.mapping_type, self.action_data.control_points)
+                self.action_data.curve_update()
+                self._update_ui()
+                self.update_value(self.last_value)
+            except:
+                # invalid
+                return
             
 
+
+    def _update_clipboard(self, clipboard):
+        ''' updates the state of the clipboard buttons '''
+        self.paste_button_widget.setEnabled(self._clipboard_valid(clipboard))
+    
 
     @QtCore.Slot(int)
     def _curve_type_changed(self):

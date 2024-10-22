@@ -258,6 +258,7 @@ class EventListener(QtCore.QObject):
 	# occurs on mode edit/update/delete
 	modes_changed = QtCore.Signal()
 
+
 	# functor enable flag changed
 	action_created = QtCore.Signal(object) # runs when an action is created - object = the object that triggered the event 
 
@@ -1235,6 +1236,8 @@ class EventHandler(QtCore.QObject):
 				logging.getLogger("system").debug(f"Profile: {current_profile.name} - Design time Mode switch to: {new_mode}")
 				if emit:
 					self.mode_changed.emit(self.edit_mode)
+					
+
 
 		# update the status bar
 		self.mode_status_update.emit()
