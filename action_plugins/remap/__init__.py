@@ -252,7 +252,7 @@ class RemapFunctor(gremlin.base_classes.AbstractFunctor):
         self.test = False
 
     def process_event(self, event, value):
-        if self.is_axis:
+        if event.is_axis:
             if self.axis_mode == "absolute":
                 joystick_handling.VJoyProxy()[self.vjoy_device_id] \
                     .axis(self.vjoy_input_id).value = value.current

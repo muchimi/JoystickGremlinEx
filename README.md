@@ -185,6 +185,13 @@ Joystick Gremlin EX
 <!-- TOC --><a name="134015ex-pre-release"></a>
 ## 13.40.15ex (pre-release)
 
+
+### (m5.2) hotfix
+
+- Bug fix: joystick hat incorrect output
+- Bug fix: Joystick axis value not functional with legacy "Remap" mapper in m5
+- Added invert flag to Map to Mouse Ex for motion output
+
 <!-- TOC --><a name="m5"></a>
 ### (m5)
 

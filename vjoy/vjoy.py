@@ -394,7 +394,7 @@ class Hat:
             self._set_continuous_direction(direction)
         else:
             raise VJoyError(
-                f"Invalid hat type specified - {_error_string(self.vjoy_id, self.axis_id, self.direction)}")
+                f"Invalid hat type specified - {_error_string(self.vjoy_id, self.hat_id, self.direction)}")
         self.vjoy_dev.used()
 
     def _set_discrete_direction(self, direction):
@@ -404,7 +404,7 @@ class Hat:
         """
         if direction not in Hat.to_discrete_direction:
             raise VJoyError(
-                f"Invalid direction specified - {_error_string(self.vjoy_id, self.axis_id, self._direction)}"
+                f"Invalid direction specified - {_error_string(self.vjoy_id, self.hat_id, self._direction)}"
             )
 
         self._direction = direction
@@ -414,7 +414,7 @@ class Hat:
                 self.hat_id
         ):
             raise VJoyError(
-               f"Failed to set hat direction - {_error_string(self.vjoy_id, self.axis_id, self._direction)}"
+               f"Failed to set hat direction - {_error_string(self.vjoy_id, self.hat_id, self._direction)}"
             )
 
     def _set_continuous_direction(self, direction):
@@ -424,7 +424,7 @@ class Hat:
         """
         if direction not in Hat.to_continuous_direction:
             raise VJoyError(
-                f"Invalid direction specified - {_error_string(self.vjoy_id, self.axis_id, direction)}"
+                f"Invalid direction specified - {_error_string(self.vjoy_id, self.hat_id, direction)}"
             )
 
         self._direction = direction
@@ -434,7 +434,7 @@ class Hat:
                 self.hat_id
         ):
             raise VJoyError(
-                f"Failed to set hat direction - {_error_string(self.vjoy_id, self.axis_id, self._direction)}"
+                f"Failed to set hat direction - {_error_string(self.vjoy_id, self.hat_id, self._direction)}"
             )
 
 

@@ -1346,15 +1346,13 @@ class ResponseCurveWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.curve_model = model_map[curve_type](self.action_data)
 
         # Update curve settings UI
-        if self.action_data.mapping_type == "cubic-spline":
-            if self.handle_symmetry is not None:
+        if self.handle_symmetry is not None:
+            if self.action_data.mapping_type == "cubic-spline":
                 self.handle_symmetry.setVisible(False)
                 self.handle_symmetry = None
-        elif self.action_data.mapping_type == "cubic-bezier-spline":
-            self.handle_symmetry.setVisible(True)
-            self.handle_symmetry.stateChanged.connect(
-                self._handle_symmetry_cb
-            )
+            elif self.action_data.mapping_type == "cubic-bezier-spline":
+                self.handle_symmetry.setVisible(True)
+                self.handle_symmetry.stateChanged.connect(self._handle_symmetry_cb)
             
         self.curve_symmetry.setChecked(False)
 

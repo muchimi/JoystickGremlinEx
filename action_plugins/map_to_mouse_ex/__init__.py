@@ -23,6 +23,8 @@ from gremlin import input_devices
 
 import enum, threading,time, random
 
+import gremlin.util
+
 
 syslog = logging.getLogger("system")
 
@@ -159,6 +161,8 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.x_axis = QtWidgets.QRadioButton("X Axis")
         self.x_axis.setChecked(True)
         self.y_axis = QtWidgets.QRadioButton("Y Axis")
+        self.invert_widget = QtWidgets.QCheckBox("Invert")
+        self.invert_widget.clicked.connect(self._invert_cb)
 
         self.motion_layout.addWidget(
             QtWidgets.QLabel("Control"),
@@ -168,6 +172,7 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         )
         self.motion_layout.addWidget(self.x_axis, 0, 1, QtCore.Qt.AlignLeft)
         self.motion_layout.addWidget(self.y_axis, 0, 2, 1, 2, QtCore.Qt.AlignLeft)
+        self.motion_layout.addWidget(self.invert_widget, 0, 3, 1, 2, QtCore.Qt.AlignLeft)
 
         self.min_speed = QtWidgets.QSpinBox()
         self.min_speed.setRange(0, 1e5)
@@ -181,6 +186,8 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
             QtWidgets.QLabel("Maximum speed"), 1, 2, QtCore.Qt.AlignLeft
         )
         self.motion_layout.addWidget(self.max_speed, 1, 3, QtCore.Qt.AlignLeft)
+        self.motion_layout.addWidget(QtWidgets.QLabel(" "), 0, 4)
+        self.motion_layout.setColumnStretch(4,2)
 
         self._connect_axis()
 
@@ -320,6 +327,13 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
             gremlin.types.MouseButton.to_string(self.action_data.button_id)
         )
 
+    @QtCore.Slot(bool)
+    def _invert_cb(self, checked):
+        self.action_data.invert = checked
+
+
+
+    @QtCore.Slot()
     def _change_mouse_button_cb(self):
         ''' mouse event drop down selected '''
         self.action_data.button_id = self.mouse_button_widget.currentData()
@@ -327,7 +341,7 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
             gremlin.types.MouseButton.to_string(self.action_data.button_id)
         )
 
-
+    @QtCore.Slot(int)
     def _action_mode_changed(self, index):
         ''' called when the action mode drop down value changes '''
         with QtCore.QSignalBlocker(self.mode_widget):
@@ -335,6 +349,7 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.action_data.action_mode = action
             self._change_mode()
 
+    
     def _exec_on_release_changed(self, value):
         self.action_data.exec_on_release = self.chkb_exec_on_release.isChecked()
 
@@ -626,6 +641,13 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
         :param event the event triggering the code execution
         :param value the current value of the event chain
         """
+
+
+        if self.action.invert:
+            # invert the input
+            inverted_value = gremlin.util.scale_to_range(value.current, invert=True)
+            value.current = inverted_value
+
         delta_motion = self.action.min_speed + abs(value.current) * \
                 (self.action.max_speed - self.action.min_speed)
         delta_motion = math.copysign(delta_motion, value.current)
@@ -805,6 +827,8 @@ class MapToMouseEx(gremlin.base_profile.AbstractAction):
         self.max_speed = 15
         # Time to reach maximum speed in sec
         self.time_to_max_speed = 1.0
+        # invert motion
+        self.invert = False
 
         self.action_mode = MouseAction.MouseButton
         self.exec_on_release = False
@@ -877,6 +901,11 @@ class MapToMouseEx(gremlin.base_profile.AbstractAction):
         if "click_mode" in node.attrib:
             self.click_mode = MouseClickMode.from_string(safe_read(node,"click_mode", str, "normal"))
 
+        if "invert" in node.attrib:
+            self.invert = safe_read(node,"invert",bool, False)
+
+
+
 
     def _generate_xml(self):
         """Returns an XML node containing this instance's information.
@@ -896,6 +925,7 @@ class MapToMouseEx(gremlin.base_profile.AbstractAction):
         node.set("force_remote_output", safe_format(self.force_remote_output, bool))
         node.set("force_remote_output_only", safe_format(self.force_remote_output_only, bool))
         node.set("click_mode", self.click_mode.name)
+        node.set("invert", safe_format(self.invert, bool))
 
         return node
 
