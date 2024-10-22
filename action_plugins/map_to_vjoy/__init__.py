@@ -1067,13 +1067,12 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             if event.identifier != self.action_data.hardware_input_id:
                 return
         
-        #print (f"input value: {event.value}")
-        self._update_axis_widget(event.value)
+        self._update_axis_widget()
         
 
     def _current_input_axis(self):
         ''' gets the current input axis value '''
-        return gremlin.joystick_handling.get_axis(self.action_data.hardware_device_guid, 
+        return gremlin.joystick_handling.get_curved_axis(self.action_data.hardware_device_guid, 
                                                   self.action_data.hardware_input_id) 
         
 
@@ -1089,10 +1088,17 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             self._axis_repeater_widget.setVisible(True)
             # filter and merge the data
             filtered_value = self.action_data.get_filtered_axis_value(raw_value)
+            value = filtered_value
             if self.action_data.curve_data is not None:
                 # curve the data 
-                filtered_value = self.action_data.curve_data.curve_value(filtered_value)
-            self._axis_repeater_widget.setValue(filtered_value)
+                curved_value = self.action_data.curve_data.curve_value(filtered_value)
+                self._axis_repeater_widget.show_curved = True
+                self._axis_repeater_widget.setValue(raw_value, curved_value)
+            else:
+                self._axis_repeater_widget.show_curved = False
+                self._axis_repeater_widget.setValue(filtered_value)
+                
+                
 
             # update the curved window if displayed
             if self.curve_update_handler is not None:
@@ -1290,22 +1296,6 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         delay_box.addWidget(lbl)
         delay_box.addWidget(self.pulse_spin_widget)
         delay_box.addStretch()
-        
-
-        
-        # self.target_value_widget = QtWidgets.QWidget()
-        # target_value_box = QtWidgets.QHBoxLayout(self.target_value_widget)
-        # lbl = QtWidgets.QLabel("Value:")
-        # target_value_box.addWidget(lbl)
-        # self.target_value_text = QtWidgets.QLineEdit()
-        # v = QtGui.QDoubleValidator(-1.0, 1.0, 2)
-        # v.setNotation(QtGui.QDoubleValidator.Notation.StandardNotation)
-        # self.target_value_text.setText(f"{self.action_data.target_value:0.2f}")
-        # self.target_value_text.setValidator(v)
-        # target_value_box.addWidget(self.target_value_text)
-        # target_value_box.addWidget(QtWidgets.QLabel("-1.00 .. 0.00 .. +1.00"))
-        # target_value_box.addStretch()
-
 
         # start button state widget
         
@@ -1488,7 +1478,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             action_mode = self._get_action_mode()
 
             dev = self.vjoy_map[self.action_data.vjoy_device_id]
-            if action_mode in (VjoyAction.VJoySetAxis, VjoyAction.VJoyRangeAxis, VjoyAction.VJoyAxis, VjoyAction.VJoyInvertAxis):
+            if action_mode in (VjoyAction.VJoySetAxis, VjoyAction.VJoyRangeAxis, VjoyAction.VJoyAxis, VjoyAction.VJoyInvertAxis, VjoyAction.VjoyMergeAxis):
                 count = dev.axis_count
                 for id in range(1, count+1):
                     self.cb_vjoy_input_selector.addItem(f"Axis {id} ({self.get_axis_name(id)})",id)
@@ -2086,7 +2076,7 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
                 case VjoyAction.VJoyAxisToButton:
                     device_guid = self.action_data.hardware_device_guid
                     input_id = self.action_data.hardware_input_id
-                    value = joystick_handling.get_axis(device_guid, input_id)
+                    value = joystick_handling.get_curved_axis(device_guid, input_id)
                     action_value = gremlin.actions.Value(value)
                     event = gremlin.event_handler.Event(gremlin.input_types.InputType.JoystickAxis,
                                                         device_guid = device_guid,
@@ -2449,20 +2439,21 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
 
 
     def get_raw_axis_value(self):
-        return gremlin.joystick_handling.get_axis(self.hardware_device_guid, self.hardware_input_id)
+        return gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, self.hardware_input_id)
 
     def get_filtered_axis_value(self, value : float = None) -> float:
         ''' computes the output value for the current configuration  '''
 
         if value is None:
-            value = gremlin.joystick_handling.get_axis(self.hardware_device_guid, 
-                                                        self.hardware_input_id) 
+            value = gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, 
+                                                        self.hardware_input_id)
+
         if self.merge_mode != MergeOperationType.NotSet:
             if self.merge_device_id and self.merge_input_id:
                 # always read v1 and v2 because the input value may be of either inputs
-                v1 = gremlin.joystick_handling.get_axis(self.hardware_device_guid, 
+                v1 = gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, 
                                                         self.hardware_input_id) 
-                v2 = gremlin.joystick_handling.get_axis(self.merge_device_guid, 
+                v2 = gremlin.joystick_handling.get_curved_axis(self.merge_device_guid, 
                                                     self.merge_input_id) 
                 
                 match self.merge_mode:

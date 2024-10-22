@@ -124,8 +124,11 @@ class AbstractView(QtWidgets.QWidget):
 
     # Signal emitted when a entry is selected
     item_selected = QtCore.Signal(int) # index of the item being selected
-    item_edit = QtCore.Signal(object, int, object)  # widget, index, model data object
+    item_edit = QtCore.Signal(object, int, object)  # widget, index, model data object 
+    item_edit_curve = QtCore.Signal(object, int, object) # widget, index , model data object
+    item_delete_curve = QtCore.Signal(object, int, object) # widget, index , model data object
     item_closed = QtCore.Signal(object, int, object)  # widget, index, model data object
+    
 
     def __init__(self, parent=None):
         """Creates a new view instance.
@@ -1994,7 +1997,7 @@ class AxisStateWidget(QtWidgets.QWidget):
     #css_horizontal = r"QProgressBar::chunk {background: QLinearGradient( x1: 0, y1: 0, x2: 0, y2: 1,stop: 0 #78d,stop: 0.4999 #46a,stop: 0.5 #45a,stop: 1 #238 ); border-radius: 7px; border: 1px solid black;}"
     css_horizontal = r"QProgressBar::chunk {background: QLinearGradient( x1: 0, y1: 0, x2: 0, y2: 1,stop: 0 #77a ,stop: 0.4999 #477,stop: 0.5 #45a,stop: 1 #238 ); border-radius: 7px; border: 1px solid black;}"
     
-    valueChanged = QtCore.Signal(float)
+    valueChanged = QtCore.Signal(float, float) # (input_value, curved_value)
 
     def __init__(self, axis_id = None, show_percentage = True, show_value = True, show_label = True, orientation = QtCore.Qt.Orientation.Vertical, parent=None):
         """Creates a new instance.
@@ -2020,7 +2023,7 @@ class AxisStateWidget(QtWidgets.QWidget):
         self._show_label = show_label
 
         self._readout_widget = QtWidgets.QLabel()
-        #self._readout_widget.setVisible(show_percentage or show_label)
+        self._readout_curved_widget = QtWidgets.QLabel()
 
         self._label_widget = QtWidgets.QLabel()
         self._label_widget.setVisible(show_label)
@@ -2030,6 +2033,7 @@ class AxisStateWidget(QtWidgets.QWidget):
         self.main_layout.addWidget(self._label_widget)
         self.main_layout.addWidget(self._progress_widget)
         self.main_layout.addWidget(self._readout_widget)
+        self.main_layout.addWidget(self._readout_curved_widget)
         self.main_layout.addStretch()
         self._min_range = -1.0
         self._max_range = 1.0
@@ -2038,14 +2042,27 @@ class AxisStateWidget(QtWidgets.QWidget):
         self._value = 0
         self._raw_value = 0
         self._reverse = False
-        self_decimals = 3
+        self._decimals = 3
+
+        # show the curved data by default
+        self._show_curved = True
         
         self._width = 10
         self._update_css()
         self._update_range()
 
     
+    @property
+    def show_curved(self) -> bool:
+        ''' true if repeater shows curved data '''
+        return self._show_curved
+    @show_curved.setter
+    def show_curved(self, value: bool):
+        if value != self._show_curved:
+            self._show_curved = value
+            self.setValue(self._value, self._curve_value)
     
+
     
 
     def _create_primitives(self):
@@ -2091,7 +2108,7 @@ class AxisStateWidget(QtWidgets.QWidget):
     def value(self):
         return self._value
 
-    def setValue(self, value):
+    def setValue(self, value, curve_value = None):
         """Sets the value shown by the widget.
 
         :param value new value to show
@@ -2103,23 +2120,42 @@ class AxisStateWidget(QtWidgets.QWidget):
         value += 0   # avoid negative 0 (WHY?)
         self._value = value
 
-        if self._reverse:
-            value = gremlin.util.scale_to_range(value, invert=True)
+        if curve_value is None:
+            eh = gremlin.event_handler.EventListener()
+            curve_value = eh._apply_curve_ex(self._device_guid, self._input_id, value)
+        self._curve_value = curve_value
 
-        scaled_value = self._scale_factor * value
+        display_value = curve_value if self._show_curved else value
+
+        if self._reverse:
+            display_value = gremlin.util.scale_to_range(display_value, invert=True)
+
+        scaled_value = self._scale_factor * display_value
         #print (f"{scaled_value}")
         self._progress_widget.setValue(scaled_value)
         self._progress_widget.update()
         readout = ""
+        readout_curved = ""
         if self._show_value:
             readout = f"{value:+0.3f}"
+            readout_curved = f"C{curve_value:+0.3f}"
         if self._show_percentage:
             percent = int(round(100 * value / (self._max_range - self._min_range)))
             if readout:
                 readout += " "
             readout += f"{percent:d} %"
+            curved_percent = int(round(100 * curve_value / (self._max_range - self._min_range)))
+            if readout_curved:
+                readout_curved += " "
+            readout_curved += f"{curved_percent:d} %"
+
         self._readout_widget.setText(readout)
-        self.valueChanged.emit(self._value)
+        if self._show_curved:
+            self._readout_curved_widget.setText(readout_curved)
+        else:
+            self._readout_curved_widget.setText("")
+
+        self.valueChanged.emit(self._value, self._curve_value)
 
     def value(self):
         ''' gets the current value '''
@@ -2186,8 +2222,11 @@ class AxisStateWidget(QtWidgets.QWidget):
 
     def _update_value(self, raw_value):
         # invert the input if needed
-        value = gremlin.util.scale_to_range(raw_value, source_min = -32767, source_max = 32767, target_min = self._min_range, target_max = self._max_range)
-        self.setValue(value)
+        eh = gremlin.event_handler.EventListener()
+        value = eh._apply_calibration_ex(self._device_guid, self._input_id, raw_value)
+        curve_value = eh._apply_curve_ex(self._device_guid, self._input_id, value)
+        self.setValue(value, curve_value)
+
         
 
         

@@ -158,6 +158,13 @@ Joystick Gremlin EX
 
 ## 13.40.15ex (pre-release)
 
+### (m5)
+
+- New feature (experimental): It is now possible to assign a response curve directly to the input axis.  This directly impacts the value passed to a container/action. The curve can be edited directly on an axis input and removed as needed.
+- API: joystick event has a new member, curve_value that contains any curved data.  
+- bug fix: merge axis option on vjoy remap now shows the output axis in the drop down again.
+- bug fix: input icons now appear for the tempo ex container.
+
 ### (m4.10) hotfix
 - Slight rework of curve editor UI (added repeater)
 - Output display is now clamped in case the computed axis value is out of bounds due to the curve settings

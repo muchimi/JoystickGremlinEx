@@ -1320,7 +1320,7 @@ class ResponseCurveWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         # update the joystick input
         if self.action_data.show_input_axis:
-            value = gremlin.joystick_handling.get_axis(self.action_data.hardware_device_guid, self.action_data.hardware_input_id)
+            value = gremlin.joystick_handling.get_curved_axis(self.action_data.hardware_device_guid, self.action_data.hardware_input_id)
             self._update_value(value)
 
     def _change_curve_type(self, curve_type):

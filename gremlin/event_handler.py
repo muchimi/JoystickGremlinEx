@@ -25,6 +25,7 @@ from typing import Callable
 
 
 
+
 import gremlin.joystick_handling
 import gremlin.threading
 
@@ -68,10 +69,11 @@ class Event:
 			event_type,
 			identifier,
 			device_guid,
-			value=None,
+			value=None, # normal calibrated value that comes in
 			virtual_code = 0,
 			is_pressed=False,
-			raw_value=None,
+			raw_value=None, # raw value that comes in from dinput
+			curved_value = None, # value if curved
 			force_remote = False,
 			action_id = None,
 			data = None,
@@ -97,6 +99,7 @@ class Event:
 		self.is_pressed = is_pressed
 		self.value = value
 		self.raw_value = raw_value
+		self.curve_value = curved_value
 		self.force_remote = force_remote
 		self.action_id = action_id # the current action id to load
 		self.data = data # extra data passed along with the event
@@ -287,6 +290,8 @@ class EventListener(QtCore.QObject):
 		# Calibration function for each axis of all devices
 		self._calibrations = {}
 
+		# map of axis input items that could be curved
+		self._joystick_input_item_map = {}
 		
 		# Joystick device change update timeout timer
 		self._device_update_timer = None
@@ -312,6 +317,13 @@ class EventListener(QtCore.QObject):
 		self._process_device_change.connect(self._process_device_change_cb)
 
 		Thread(target=self._run).start()
+
+	def registerInput(self, item):
+		''' registers an input item '''
+		if item.input_type == InputType.JoystickAxis:
+			key = (item.device_guid, item.input_id)
+			self._joystick_input_item_map[key] = item
+		
 
 	def push_joystick(self):
 		self._joystick_suspend_count += 1
@@ -501,14 +513,19 @@ class EventListener(QtCore.QObject):
 		if event.input_type == dinput.InputType.Axis:
 			if verbose:
 				logging.getLogger("system").info(event)
-			
+
+			# get the curved input if the input is curved
+			raw_value = event.value
+			value = self._apply_calibration(event)
+			curved_value = self._apply_curve_ex(event.device_guid, event.input_index, value)
 			
 			self.joystick_event.emit(Event(
 				event_type= InputType.JoystickAxis,
 				device_guid=event.device_guid,
 				identifier=event.input_index,
-				value=self._apply_calibration(event),
-				raw_value=event.value,
+				value = value,
+				curved_value = curved_value,
+				raw_value= raw_value,
 				is_axis = True,
 				is_virtual = is_virtual
 			))
@@ -706,12 +723,37 @@ class EventListener(QtCore.QObject):
 		return True
 
 	def _apply_calibration(self, event):
+		''' applies calibration data to the vent'''
+		return self._apply_calibration_ex(event.device_guid, event.input_index, event.value)
+	
+	def _apply_curve(self, event):
+		''' applies input curves to the input '''
+		return self._apply_curve_ex(event.device_guid, event.input_index, event.value)
+		
+	def _apply_calibration_ex(self, device_guid, input_id, value):
 		from gremlin.util import axis_calibration
-		key = (event.device_guid, event.input_index)
+		key = (device_guid, input_id)
 		if key in self._calibrations:
-			return self._calibrations[key](event.value)
+			return self._calibrations[key](value)
 		else:
-			return axis_calibration(event.value, -32768, 0, 32767)
+			return axis_calibration(value, -32768, 0, 32767)
+		
+	def _apply_curve_ex(self, device_guid, input_id, value):
+		key = (device_guid, input_id)
+		if key in self._joystick_input_item_map:
+			item = self._joystick_input_item_map[key]
+			if item.curve_data is not None:
+				curved_value = item.curve_data.curve_value(value)
+				#print(f"curved: {value:0.4f} -> {curved_value:0.4f}")
+				return curved_value
+		return value
+	
+	def apply_transforms(self, device_guid, input_id, raw_value):
+		''' applies raw transforms to the data - input is expected in dinput range (-32K to +32k)'''
+		calib_value = self._apply_calibration_ex(device_guid, input_id, raw_value)
+		curved_value = self._apply_curve_ex(device_guid, input_id, calib_value)
+		#print(f"Raw value: {raw_value:0.4f} filtered: {calib_value:0.4f} Curved value: {curved_value:0.4f}")
+		return curved_value
 
 	def _init_joysticks(self):
 		"""Initializes joystick devices."""

@@ -28,6 +28,7 @@ import gremlin.actions
 import gremlin.base_buttons
 import gremlin.base_profile
 import gremlin.config
+import gremlin.curve_handler
 import gremlin.event_handler
 import gremlin.execution_graph
 import gremlin.keyboard
@@ -718,6 +719,8 @@ class InputItem():
         self._is_action = False # true if the object is a sub-item for a sub-action (GateHandler for example)
         self._device_type = None
         self._is_axis = False # true if the item is an axis input
+        self._curve_data = None # true if the item has its input curved
+
         if parent is not None:
             # find the missing properties from the parenting hierarchy
             self._is_action = isinstance(parent, AbstractAction)
@@ -732,6 +735,9 @@ class InputItem():
                 if not hasattr(item, "parent"):
                     break
                 item = item.parent
+
+
+
                 
     @property
     def id(self):
@@ -801,6 +807,8 @@ class InputItem():
     @input_type.setter
     def input_type(self, value):
         self._input_type = value
+        self._register_axis()
+
 
     @property
     def input_id(self):
@@ -808,6 +816,7 @@ class InputItem():
     @input_id.setter
     def input_id(self, value):
         self._input_id = value
+        self._register_axis()
 
     @property
     def device_guid(self):
@@ -815,6 +824,7 @@ class InputItem():
     @device_guid.setter
     def device_guid(self, value):
         self._device_guid = value
+        self._register_axis()
 
     @property
     def profile_mode(self):
@@ -844,6 +854,29 @@ class InputItem():
     def data(self, value):
         self._data = value
         
+    
+    @property
+    def curve_data(self) -> gremlin.curve_handler.AxisCurveData:
+        ''' axis curve data '''
+        return self._curve_data
+    
+    @curve_data.setter
+    def curve_data(self, value : gremlin.curve_handler.AxisCurveData):
+        ''' axis curve data'''
+        self._curve_data = value
+        self._register_axis()
+
+    @property
+    def is_curve(self) -> bool:
+        ''' true if the input is curved '''
+        return self._curve_data is not None
+    
+
+    def _register_axis(self):
+        if self._input_type == InputType.JoystickAxis and self._input_id is not None and self._device_guid is not None:
+            eh = gremlin.event_handler.EventListener()
+            eh.registerInput(self)
+    
 
     def from_xml(self, node):
         """Parses an InputItem node.
@@ -911,12 +944,20 @@ class InputItem():
             self.input_id = osc_input_item
             self.is_axis = osc_input_item.is_axis
 
+        elif self.input_type == InputType.JoystickAxis:
+            # check for curve data
+            for child in node:
+                if child.tag == "response-curve":
+                    self.curve_data = gremlin.curve_handler.AxisCurveData()
+                    self.curve_data._parse_xml(child)
+                    break
+
         assert self.input_id is not None,"Error processing input - check types"
             
 
         
         for child in container_node:
-            if child.tag in ("latched", "input", "keylatched"):
+            if child.tag in ("latched", "input", "keylatched","response-curve"):
                 # ignore extra data
                 continue
             container_type = child.attrib["type"]
@@ -931,6 +972,8 @@ class InputItem():
             if hasattr(entry, "action_model"):
                 entry.action_model = self.containers
             container_plugins.set_container_data(self, entry)
+
+        # register joystic axis items
 
 
     def to_xml(self):
@@ -966,6 +1009,11 @@ class InputItem():
             node.append(child)
         else:
             node.set("id", safe_format(self.input_id, int))
+
+        if self.curve_data is not None:
+            curve_node = self.curve_data._generate_xml()
+            node.append(curve_node)
+
 
         if self.always_execute:
             node.set("always-execute", "True")

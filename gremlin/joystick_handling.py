@@ -143,6 +143,11 @@ def get_axis(guid, index, normalized = True):
         return gremlin.util.scale_to_range(value, source_min = -32767, source_max = 32767, target_min = -1, target_max = 1)
 
 
+def get_curved_axis(guid, index):
+    ''' returns curved data same as the event handler '''
+    eh = gremlin.event_handler.EventListener()
+    value = dinput.DILL.get_axis(guid, index)
+    return eh.apply_transforms(guid, index, value)
 
     
 

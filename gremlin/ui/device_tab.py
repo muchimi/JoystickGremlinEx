@@ -26,6 +26,8 @@ import gremlin.base_profile
 import gremlin.config
 import gremlin.config
 import gremlin.event_handler
+import gremlin.event_handler
+import gremlin.joystick_handling
 import gremlin.profile
 import gremlin.shared_state
 import gremlin.types
@@ -529,10 +531,10 @@ class JoystickDeviceTabWidget(QDataWidget):
 
         import gremlin.plugin_manager
 
-
         # Store parameters
         self.device_profile = device_profile
         self.current_mode = current_mode
+        self.curve_update_handler = {} # map of curve handlers to the input by index
 
         self.device = device
         self.last_item_data_key = None
@@ -575,6 +577,9 @@ class JoystickDeviceTabWidget(QDataWidget):
         if device.is_virtual and not vjoy_as_input.get(device.vjoy_id, False):
             self.input_item_list_view.limit_input_types([InputType.JoystickAxis])
         self.input_item_list_view.set_model(self.input_item_list_model)
+
+        self.input_item_list_view.item_edit_curve.connect(self._edit_curve_item_cb)
+        self.input_item_list_view.item_delete_curve.connect(self._delete_curve_item_cb)
 
         # load the model
         self.input_item_list_view.redraw()
@@ -644,11 +649,12 @@ class JoystickDeviceTabWidget(QDataWidget):
         if selected_index is not None and selected_index != -1:
             self.input_item_selected_cb(selected_index)
 
-
-        
-
         # update display on config change
         el.config_changed.connect(self._config_changed_cb)
+
+        # update all curve icons
+        self.update_curve_icons()
+
 
     def clear_layout(self):
         ''' clear data references '''
@@ -657,7 +663,73 @@ class JoystickDeviceTabWidget(QDataWidget):
         gremlin.util.clear_layout(self.main_layout)
         
         
+    def _edit_curve_item_cb(self, widget, index, data):
+        ''' edit curve request '''
+        import gremlin.curve_handler
+        import gremlin.event_handler
+        curve_data : gremlin.curve_handler.AxisCurveData = data.curve_data
+        if not curve_data:
+            curve_data = gremlin.curve_handler.AxisCurveData()
+            curve_data.curve_update()
+            data.curve_data = curve_data
+            
+        dialog = gremlin.curve_handler.AxisCurveDialog(curve_data)
+        gremlin.util.centerDialog(dialog, dialog.width(), dialog.height())
+
+        # hook input value changed handler
+        update_handler = dialog.curve_update_handler
+        self.curve_update_handler[index] = update_handler
+        # update the dialog with the current input value
+        value = gremlin.joystick_handling.get_axis(data.device_guid, data.input_id)
+        update_handler(value)
+
+        # disable highlighting
+        gremlin.shared_state.push_suspend_highlighting()
+        dialog.exec()
+        self.curve_update_handler[index] = None
+        print ("update curve data")
+        data.curve_data.curve_update()
+
+        # update the registered curve state
+        eh = gremlin.event_handler.EventListener()
+        eh.registerInput(data)
+
+        # renable highlighting
+        gremlin.shared_state.pop_suspend_highlighting()
+
         
+        
+        self._update_curve_icon(index, data)
+
+    def _delete_curve_item_cb(self, widget, index, data):
+        ''' delete curve request '''
+        message_box = QtWidgets.QMessageBox()
+        message_box.setIcon(QtWidgets.QMessageBox.Icon.Warning)
+        message_box.setText("Delete this input curve?")
+        message_box.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok | QtWidgets.QMessageBox.StandardButton.Cancel)
+        gremlin.util.centerDialog(message_box)
+        result = message_box.exec()
+        if result == QtWidgets.QMessageBox.StandardButton.Ok:
+            print ("delete curve data")
+            data.curve_data = None
+            self._update_curve_icon(index, data)
+        
+
+
+    def _update_input_value_changed_cb(self, index : int, value : float):
+        if index in self.curve_update_handler and self.curve_update_handler[index] is not None:
+            self.curve_update_handler[index](value)
+
+
+    def update_curve_icons(self):
+        for index, widget in self.input_item_list_view.widget_map.items():
+            if widget is not None:
+                self._update_curve_icon(index, self.input_item_list_view.model.data(index))
+
+    def _update_curve_icon(self, index : int, data):
+        widget = self.input_item_list_view.widget_map[index]
+        widget.update_curve_icon(data.curve_data is not None)
+
 
     def _config_changed_cb(self):
         self.input_item_list_view.redraw()
@@ -678,6 +750,8 @@ class JoystickDeviceTabWidget(QDataWidget):
             #widget = input_item.InputItemWidget(identifier = identifier, parent=parent,  populate_ui_callback=self._populate_axis_input_widget_ui, data = data)
             widget = input_item.InputItemWidget(identifier = identifier, parent=parent, data = data)
             widget.setIcon("joystick_no_frame.png",use_qta=False)
+            if widget.axis_widget is not None:
+                widget.axis_widget.valueChanged.connect(lambda x: self._update_input_value_changed_cb(index, x))
         elif data.input_type == InputType.JoystickButton:
             #widget = input_item.InputItemWidget(identifier = identifier, parent=parent, populate_ui_callback=self._populate_button_input_widget_ui, data = data)
             widget = input_item.InputItemWidget(identifier = identifier, parent=parent, data = data)
@@ -690,6 +764,7 @@ class JoystickDeviceTabWidget(QDataWidget):
         widget.disable_edit()
         widget.setDescription(data.description)
         widget.index = index
+
 
         return widget
     
@@ -708,6 +783,7 @@ class JoystickDeviceTabWidget(QDataWidget):
             layout.setContentsMargins(0,0,0,0)
             layout.addWidget(widget)
             layout.addStretch()
+            widget.valueChanged.connect(self._input_value_changed) # hook value changed event on the axis repeater when displayed
             return widget
         return None
     

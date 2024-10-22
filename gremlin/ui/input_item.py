@@ -21,6 +21,7 @@ import lxml.etree
 
 import gremlin
 import gremlin.config
+
 import gremlin.event_handler
 import gremlin.shared_state
 import gremlin.ui.midi_device
@@ -65,6 +66,7 @@ class InputIdentifier:
         self._device_type = device_type
         self._input_guid = get_guid() # unique internal GUID for this entry
 
+
     @property
     def device_guid(self):
         return self._device_guid
@@ -88,7 +90,6 @@ class InputIdentifier:
     @property
     def guid(self):
         return self._input_guid
-
 
 class InputItemListModel(ui_common.AbstractModel):
 
@@ -367,6 +368,7 @@ class InputItemListView(ui_common.AbstractView):
 
         el = gremlin.event_handler.EventListener()
         el.profile_device_mapping_changed.connect(self._profile_device_mapping_changed)
+        self.widget_map = {} # list of created widgets
 
         
 
@@ -429,6 +431,7 @@ class InputItemListView(ui_common.AbstractView):
 
 
         verbose = gremlin.config.Configuration().verbose_mode_inputs
+        self.widget_map.clear()
 
         if self.model is None:
             return
@@ -490,7 +493,12 @@ class InputItemListView(ui_common.AbstractView):
                     selected_index = index
 
                 widget.edit.connect(self._create_edit_callback(index))
+                widget.edit_curve.connect(self._create_edit_curve_callback(index))
+                widget.delete_curve.connect(self._create_delete_curve_callback(index))
                 widget.closed.connect(self._create_closed_callback(index))
+
+                self.widget_map[index] = widget
+                
 
                 
                 if verbose:
@@ -511,7 +519,7 @@ class InputItemListView(ui_common.AbstractView):
 
 
 
-    def itemAt(self, index):
+    def itemAt(self, index : int):
         ''' gets the input widget as the given index'''
         item =  self.scroll_layout.itemAt(index)
         if item:
@@ -519,7 +527,7 @@ class InputItemListView(ui_common.AbstractView):
         return None
 
 
-    def redraw_index(self, index):
+    def redraw_index(self, index : int):
         """Redraws the view entry at the given index.
 
         :param index the index of the entry to redraw
@@ -538,7 +546,7 @@ class InputItemListView(ui_common.AbstractView):
                 widget.create_action_icons(data)
                 widget.setDescription(data.description)
 
-    def _create_edit_callback(self, index):
+    def _create_edit_callback(self, index : int):
         """Creates a callback handling the edit action of an input widget
 
         :param index the index of the item to create the callback for
@@ -548,7 +556,14 @@ class InputItemListView(ui_common.AbstractView):
         return lambda x: self._edit_item_cb(index)
 
 
-    def _create_closed_callback(self, index):
+    def _create_edit_curve_callback(self, index : int):
+        return lambda x: self._edit_curve_item_cb(index)
+    
+    def _create_delete_curve_callback(self, index : int):
+        return lambda x: self._delete_curve_item_cb(index)
+    
+
+    def _create_closed_callback(self, index : int):
         """Creates a callback handling the close action of an input widget
 
         :param index the index of the item to create the callback for
@@ -615,9 +630,18 @@ class InputItemListView(ui_common.AbstractView):
     def _confirmed_close(self, index):
         self.removeRow(index)
 
-    def _edit_item_cb(self, index):
+    def _edit_item_cb(self, index : int):
         ''' emits the edit event along with the item being edited '''
         self.item_edit.emit(self, index, self.model.data(index).input_id) # widget, index, data
+
+    def _edit_curve_item_cb(self, index : int):
+        self.item_edit_curve.emit(self, index, self.model.data(index))
+
+    def _delete_curve_item_cb(self, index : int):
+        self.item_delete_curve.emit(self, index, self.model.data(index))
+
+    def _update_value_changed(self, index : int, value : float):
+        self.item_input_value_changed.emit(self, index, self.model.data(index), value)
 
     def _closed_item_cb(self):
         ''' emits the edit event along with the item is closed '''
@@ -950,6 +974,15 @@ class InputItemWidget(QtWidgets.QFrame):
     # signal when button's edit button is pressed
     edit =  QtCore.Signal(InputIdentifier)
 
+    # signal when the edit curve button is pressed
+    edit_curve = QtCore.Signal(InputIdentifier)
+
+    # signal when the clear curve button is pressed
+    delete_curve = QtCore.Signal(InputIdentifier)
+
+    # signal input value changed
+    input_value_changed = QtCore.Signal(InputIdentifier, float)
+
 
     def __init__(self, identifier, parent=None, populate_ui_callback = None, populate_name_callback = None, update_callback = None, config_external = False, data = None):
         """Creates a new instance.
@@ -1003,7 +1036,7 @@ class InputItemWidget(QtWidgets.QFrame):
 
         data_row = 1 if self._multi_row else 0
 
-        self._data = data
+        self._data = data # InputItem
 
         self.setFrameShape(QtWidgets.QFrame.Box)
 
@@ -1027,6 +1060,30 @@ class InputItemWidget(QtWidgets.QFrame):
         
         self._close_button_widget.setFixedSize(16,16)
         self._close_button_widget.clicked.connect(self._close_button_cb)
+        self.curve_icon_inactive = load_icon("mdi.chart-bell-curve",qta_color="gray")
+        self.curve_icon_active = load_icon("mdi.chart-bell-curve",qta_color="blue")
+        
+        self.curve_button_widget = QtWidgets.QPushButton() 
+        self.curve_button_widget.setIcon(self.curve_icon_active)
+        self.curve_button_widget.setToolTip("Input Curve")
+        self.curve_button_widget.setFixedSize(24,16)
+        self.curve_button_widget.clicked.connect(self._curve_button_cb)
+
+        self.clear_curve_widget = QtWidgets.QPushButton()
+        self.clear_curve_widget.setToolTip("Clear Curve")
+        self.clear_curve_widget.setIcon(load_icon("mdi.delete"))
+        self.clear_curve_widget.setFixedSize(24,16)
+        self.clear_curve_widget.clicked.connect(self._clear_curve_cb)
+
+        self._curve_container_widget = QtWidgets.QWidget()
+        self._curve_container_widget.setContentsMargins(0,0,0,0)
+        self._curve_container_layout = QtWidgets.QHBoxLayout(self._curve_container_widget)
+        self._curve_container_layout.setContentsMargins(0,0,0,0)
+
+        self._curve_container_layout.addStretch()
+        self._curve_container_layout.addWidget(self.curve_button_widget)
+        self._curve_container_layout.addWidget(self.clear_curve_widget)
+
 
         self._title_container_layout.addWidget(self._close_button_widget, data_row, 3)
         self._title_container_layout.addWidget(QtWidgets.QLabel(" "), data_row, 4)        
@@ -1053,13 +1110,17 @@ class InputItemWidget(QtWidgets.QFrame):
         self._row_input_description = row + 1
         self._row_custom_content = row + 2
         self._row_comment = row + 3
+
+        self._container_input_axis_widget = QtWidgets.QWidget()
+        self._container_input_axis_layout = QtWidgets.QHBoxLayout(self._container_input_axis_widget)
+        self._container_input_axis_widget.setContentsMargins(0,0,0,0)
+        self._container_input_axis_layout.setContentsMargins(0,0,0,0)
         
         config = gremlin.config.Configuration()
+        self.axis_widget = None
+
         if self.identifier.input_type in (InputType.JoystickAxis, InputType.JoystickButton) and config.show_input_axis:
-            self._container_input_axis_widget = QtWidgets.QWidget()
-            self._container_input_axis_layout = QtWidgets.QHBoxLayout(self._container_input_axis_widget)
-            self._container_input_axis_widget.setContentsMargins(0,0,0,0)
-            self._container_input_axis_layout.setContentsMargins(0,0,0,0)
+            
             if self.identifier.input_type == InputType.JoystickAxis:
                 widget = gremlin.ui.ui_common.AxisStateWidget(show_label = False, orientation=QtCore.Qt.Orientation.Horizontal, show_percentage=False)
             else:
@@ -1068,7 +1129,12 @@ class InputItemWidget(QtWidgets.QFrame):
             widget.hookDevice(identifier.device_guid, identifier.input_id)
             self._container_input_axis_layout.addWidget(widget)
             self._container_input_axis_layout.addStretch()
-            self.main_layout.addWidget(self._container_input_axis_widget)
+            
+            self.axis_widget = widget
+
+        self._container_input_axis_layout.addWidget(self._curve_container_widget)
+        self.main_layout.addWidget(self._container_input_axis_widget)
+
         
         if self._multi_row:
 
@@ -1085,13 +1151,24 @@ class InputItemWidget(QtWidgets.QFrame):
         
        
         self.setMinimumWidth(300)
-
-        
-        
         self.main_layout.addWidget(self._container_widget)
-              
         self.update_display()
 
+
+    def update_curve_icon(self, enabled : bool):
+        ''' enables or disables curve buttons '''
+        if enabled:
+            self.curve_button_widget.setIcon(self.curve_icon_active)
+        else:
+            self.curve_button_widget.setIcon(self.curve_icon_inactive)
+        self.clear_curve_widget.setEnabled(enabled)
+
+
+    @QtCore.Slot(float)
+    def _input_value_changed(self, value):
+        ''' called when the input changes '''
+        self.input_value_changed.emit(self, value)
+        
     @property
     def data(self):
         ''' gets any data object associated with this widget '''
@@ -1108,7 +1185,6 @@ class InputItemWidget(QtWidgets.QFrame):
     @index.setter
     def index(self, value):
         self._index = value
-
 
     @property
     def config_external(self):
@@ -1177,6 +1253,17 @@ class InputItemWidget(QtWidgets.QFrame):
         if not self._config_external:
             display_text = self.populate_name(self, self.identifier) if self.populate_name else gremlin.common.input_to_ui_string( self.identifier.input_type,self.identifier.input_id)
             self._title_widget.setText(display_text)
+
+        curve_visible = self.data.input_type == InputType.JoystickAxis
+        self._curve_container_widget.setVisible(curve_visible)
+        if self.data.is_curve is None:
+            self.curve_button_widget.setIcon(self.curve_icon_active)
+            self.clear_curve_widget.setEnabled(True)
+        else:
+            self.curve_button_widget.setIcon(self.curve_icon_inactive)
+            self.clear_curve_widget.setEnabled(False)
+
+        
         
 
     @property
@@ -1230,10 +1317,19 @@ class InputItemWidget(QtWidgets.QFrame):
         # FIXME: this currently ignores the containers themselves
         self._icon_layout.addStretch(1)
         for container in profile_data.containers:
-            for actions in [a for a in container.action_sets if a is not None]:
-                for action in actions:
-                    if action is not None:
-                        self._icon_layout.addWidget(ui_common.ActionLabel(action))
+            action_sets = container.get_action_sets()
+            if action_sets:
+                for actions in [a for a in action_sets if a is not None]:
+                    for action in actions:
+                        if action is not None:
+                            self._icon_layout.addWidget(ui_common.ActionLabel(action))
+            else:
+                for actions in [a for a in container.action_sets if a is not None]:
+                    for action in actions:
+                        if action is not None:
+                            self._icon_layout.addWidget(ui_common.ActionLabel(action))
+            
+
 
     def mousePressEvent(self, event):
         """Emits the input_item_changed event when this instance is
@@ -1244,15 +1340,23 @@ class InputItemWidget(QtWidgets.QFrame):
         if not self.selected:
             self.selected_changed.emit(self)
 
+    QtCore.Slot()
     def _close_button_cb(self):
         ''' fires the closed event when the close button has been pressed '''
         self.closed.emit(self)
 
+    QtCore.Slot()
     def _edit_button_cb(self):
         ''' edit button clicked '''
         self.edit.emit(self)
 
+    QtCore.Slot()
+    def _curve_button_cb(self):
+        self.edit_curve.emit(self)
 
+    QtCore.Slot()
+    def _clear_curve_cb(self):
+        self.delete_curve.emit(self)
 
 
 

@@ -187,7 +187,11 @@ class TempoExContainerWidget(AbstractContainerWidget):
             widget.redraw()
             widget.model.data_changed.connect(self.container_modified.emit)
 
+    
 
+
+
+    
 
     def _create_condition_ui(self):
         if self.profile_data.activation_condition_type == "action":
@@ -632,7 +636,7 @@ class TempoExContainer(AbstractContainer):
         return len(self.short_action_sets) > 0 or len(self.long_action_sets) > 0
     
     def get_action_sets(self):
-        """ returns action sets - override because we have custom sets """
+        """ override method: returns action sets - override because we have custom sets """
         return self.short_action_sets + self.long_action_sets
 
 

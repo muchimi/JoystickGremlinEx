@@ -242,8 +242,8 @@ class MergeAxisEntryWidget(QtWidgets.QDockWidget):
 
         self.action_data.operation = self.operation_selector.currentData()
 
-        self._joy1_value = gremlin.joystick_handling.get_axis(self.action_data.joy1_guid, self.action_data.joy1_input_id)
-        self._joy2_value = gremlin.joystick_handling.get_axis(self.action_data.joy2_guid, self.action_data.joy2_input_id)
+        self._joy1_value = gremlin.joystick_handling.get_curved_axis(self.action_data.joy1_guid, self.action_data.joy1_input_id)
+        self._joy2_value = gremlin.joystick_handling.get_curved_axis(self.action_data.joy2_guid, self.action_data.joy2_input_id)
 
 
     def _event_handler(self, event):
@@ -316,8 +316,8 @@ class MergeAxisEntryWidget(QtWidgets.QDockWidget):
         self.operation_selector.setCurrentIndex(index)
 
         
-        self._joy1_value = gremlin.joystick_handling.get_axis(action_data.joy1_guid, action_data.joy1_input_id)
-        self._joy2_value = gremlin.joystick_handling.get_axis(action_data.joy2_guid, action_data.joy2_input_id)
+        self._joy1_value = gremlin.joystick_handling.get_curved_axis(action_data.joy1_guid, action_data.joy1_input_id)
+        self._joy2_value = gremlin.joystick_handling.get_curved_axis(action_data.joy2_guid, action_data.joy2_input_id)
         self._update_axis(self._joy1_value, self._joy2_value)
 
 
@@ -454,8 +454,8 @@ class MergedAxisFunctor(gremlin.base_profile.AbstractContainerActionFunctor):
 
         self._callbacks = callbacks_map  
 
-        self._joy1_value = gremlin.joystick_handling.get_axis(self.action_data.joy1_guid, self.action_data.joy1_input_id)
-        self._joy2_value = gremlin.joystick_handling.get_axis(self.action_data.joy2_guid, self.action_data.joy2_input_id)
+        self._joy1_value = gremlin.joystick_handling.get_curved_axis(self.action_data.joy1_guid, self.action_data.joy1_input_id)
+        self._joy2_value = gremlin.joystick_handling.get_curved_axis(self.action_data.joy2_guid, self.action_data.joy2_input_id)
 
         el = gremlin.event_handler.EventListener()
         el.joystick_event.connect(self._event_handler)

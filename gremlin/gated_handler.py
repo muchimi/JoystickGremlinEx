@@ -3122,7 +3122,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
         self._setup_container_icon = load_icon("ei.cog-alt",qta_color="#365a75")
         
         # get the curent axis normalized value -1 to +1
-        value = gremlin.joystick_handling.get_axis(action_data.hardware_device_guid, action_data.hardware_input_id)
+        value = gremlin.joystick_handling.get_curved_axis(action_data.hardware_device_guid, action_data.hardware_input_id)
         self._axis_value = value
 
         # axis input gate widget
@@ -4497,7 +4497,7 @@ class ActionContainerUi(QtWidgets.QDialog):
 
     def _current_input_axis(self):
         ''' gets the current input axis value '''
-        return gremlin.joystick_handling.get_axis(self._action_data.hardware_device_guid, 
+        return gremlin.joystick_handling.get_curved_axis(self._action_data.hardware_device_guid, 
                                                   self._action_data.hardware_input_id) 
 
 

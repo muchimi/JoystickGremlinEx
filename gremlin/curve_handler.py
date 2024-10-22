@@ -1666,7 +1666,6 @@ class AxisCurveWidget(QtWidgets.QWidget):
         self.last_value = 0
         self.curve_model = None
         self._create_ui()
-
         eh = CurveEventHandler()
         eh.value_changed.connect(self.update_value)
 
@@ -2195,6 +2194,8 @@ class AxisCurveData():
         self.control_points = [(-1.0, -1.0), (1.0, 1.0)]
         self.symmetry_mode = SymmetryMode.NoSymmetry
         self.show_input_axis = gremlin.config.Configuration().show_input_axis
+        self.deadzone_fn = None
+        self.response_fn = None
 
         el = gremlin.event_handler.EventListener()
         el.profile_start.connect(self.profile_start)
@@ -2243,8 +2244,7 @@ class AxisCurveData():
                     ))
 
 
-        # for cp in self.control_points:
-        #     print (f"Read CP: {cp[0]} {cp[1]}")
+        self.curve_update()
 
 
     def _generate_xml(self):
@@ -2294,8 +2294,10 @@ class AxisCurveData():
         else:
             raise gremlin.error.GremlinError("Invalid curve type")
 
-    def curve_value(self, value : float):
+    def curve_value(self, value : float, update : bool = False):
         ''' processes an input value -1 to +1 and outputs the curved value based on the current curve model '''
+        if update or self.deadzone_fn is None or self.response_fn is None:
+            self.curve_update()
         if self.deadzone_fn is not None:
             value = self.deadzone_fn(value)
         if self.response_fn is not None:
