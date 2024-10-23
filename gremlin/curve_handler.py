@@ -1378,14 +1378,17 @@ class ControlPointEditorWidget(QtWidgets.QWidget):
     def _selected_item_changed(self, item, index):
         msg = ""
         handle_visible = False
+        point = None
         if item is None:
             pass
         elif isinstance(item, CurveHandleGraphicsItem):
             self.point_label.setText("Handle")
             handle_visible = True
+            point = item.parent.control_point.handles[item.index]
         elif isinstance(item, ControlPointGraphicsItem):
             self.point_label.setText("Control Point")
             msg = f"{[index+1]}"
+            point = item.control_point.center
 
         else:
             self.point_label.setText("???")
@@ -1394,6 +1397,10 @@ class ControlPointEditorWidget(QtWidgets.QWidget):
 
         self.handle_match_x.setVisible(handle_visible)
         self.handle_match_y.setVisible(handle_visible)
+
+        # update the data 
+        if point is not None:
+            self.set_values(point)
 
         
         

@@ -308,6 +308,7 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.x_axis.setChecked(True)
         else:
             self.y_axis.setChecked(True)
+        self.invert_widget.setChecked(self.action_data.invert)
 
         self.min_speed.setValue(self.action_data.min_speed)
         self.max_speed.setValue(self.action_data.max_speed)

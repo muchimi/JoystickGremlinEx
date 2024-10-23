@@ -235,6 +235,7 @@ def device_info_from_guid(guid : str | dinput.GUID) -> DeviceSummary:
         return _joystick_device_guid_map[guid]
     return None
 
+
 def is_device_connected(guid : str | dinput.GUID) -> bool:
     ''' true if the device is connected (reported in) '''
     if isinstance(guid, str):

@@ -18,6 +18,8 @@
 
 import logging
 from lxml import etree as ElementTree
+import gremlin.actions
+import gremlin.event_handler
 from gremlin.input_types import InputType
 from gremlin.util import rad2deg, get_guid
 from gremlin.profile import safe_format, safe_read
@@ -29,6 +31,7 @@ from gremlin.base_profile import AbstractContainer
 
 from action_plugins.map_to_keyboard import *
 from action_plugins.map_to_mouse import *
+
 
 syslog = logging.getLogger("system")
 
@@ -395,29 +398,39 @@ class RangeContainerWidget(AbstractContainerWidget):
                     container._widget._add_action(action_name)
 
                 
+class RangeReleaseTrigger():
+    ''' holds a release trigger when a value is out of range '''
+    def __init__(self, ranges, event, action):
+        self.id = get_guid()
+        self.ranges = ranges
+        self.event = event
+        self.action = action
 
+    def __hash__(self):
+        return hash(self.id)
 
 class RangeContainerFunctor(gremlin.base_classes.AbstractFunctor):
 
     """Executes the contents of the associated range container."""
 
 
-    def __init__(self, container):
-        container: RangeContainer
-        super().__init__(container)
+    def __init__(self, action_data):
+        action_data: RangeContainer
+        super().__init__(action_data)
         
         self.action_sets = []
-        for action_set in container.action_sets:
+        for action_set in action_data.action_sets:
             self.action_sets.append(
                 gremlin.execution_graph.ActionSetExecutionGraph(action_set)
             )
 
-        self.any_change_mode = container.any_change_mode
+        self.action_data = action_data
+        self.any_change_mode = action_data.any_change_mode
         self.reset_range()
 
-        self.any_change_delta =  container.any_change_delta / 200 # 2 * 100 because the range is -1 to +1, so 2 total, to actual range value
-        self.range_min = container.range_min
-        self.range_max = container.range_max
+        self.any_change_delta =  action_data.any_change_delta / 200 # 2 * 100 because the range is -1 to +1, so 2 total, to actual range value
+        self.range_min = action_data.range_min
+        self.range_max = action_data.range_max
         if self.range_min > self.range_max:
             # swap
             tmp = self.range_min
@@ -443,9 +456,37 @@ class RangeContainerFunctor(gremlin.base_classes.AbstractFunctor):
         :return True if execution was successful, False otherwise
         """
 
-        if event.event_type != InputType.JoystickAxis:
+        if not event.is_axis: 
             return
         
+        # process release triggers
+        releases = set()
+        for exit_trigger in self.action_data.exit_range_triggers:
+            for range_min, range_max in exit_trigger.ranges:
+                if value.current < range_min or value.current > range_max:
+                    # value is out of a triggered range - process the release trigger for that range
+                    releases.add(exit_trigger)
+                elif value.current >= range_min and value.current <= range_max:
+                    # no further processing if the value is in range of a triggered range
+                    return True
+
+        for exit_trigger in releases:
+            self.action_data.exit_range_triggers.remove(exit_trigger)
+            #print (f"process release event: {exit_trigger.id}")
+
+            # trigger the release
+            release_event = exit_trigger.event
+            release_event.is_pressed = False # trigger button based values OFF
+            action = exit_trigger.action
+            release_event.value = value.current
+            
+            release_value = gremlin.actions.Value(False,False)
+            action.process_event(release_event, release_value)
+
+                
+            
+
+
 
         trigger = False
 
@@ -469,23 +510,23 @@ class RangeContainerFunctor(gremlin.base_classes.AbstractFunctor):
 
             # verify the event is in the correct range
             container : RangeContainer
-            container = self.container
+            container = self.action_data
 
             range_min = self.range_min
             range_max = self.range_max
 
 
+            #print (f"Add range: {range_min:0.4f} {range_max:0.4f}")
             ranges = [(range_min, range_max)]
 
             if container.symmetrical:
                 # duplicate the ranges for symmetrical
                 sym_min = -range_min
                 sym_max = -range_max
-                if sim_max < sim_min:
-                    tmp = sim_max
-                    sim_max = sim_min
-                    sim_min = tmp
+                if sym_max < sym_min:
+                    sym_max, sym_min = sym_min, sym_max
 
+                #print (f"Add range: {sym_min:0.4f} {sym_max:0.4f}")
                 ranges.append((sym_min, sym_max))
 
 
@@ -501,19 +542,45 @@ class RangeContainerFunctor(gremlin.base_classes.AbstractFunctor):
                         continue
 
                 #syslog.info(f"{target:0.3f} range {range_min:0.3f} {range_max:0.3f} bracket {self.last_range_min:0.3f} {self.last_range_max:0.3f}")    
+                #print (f"{target:0.4f} is in range")
                 in_range = True
-                    
                 break
 
             if in_range:
                 # axis value is in a bracket range - make sure it hasn't been processed already
-                trigger = self.last_range_min != range_min and self.last_range_max != range_max
+                trigger = True # self.last_range_min != range_min and self.last_range_max != range_max
+
+                for exit_trigger in self.action_data.exit_range_triggers:
+                    for range_min, range_max in exit_trigger.ranges:
+                        if target < range_min or target > range_max: 
+                            continue
+                        if not container.range_min_included:
+                            if target == range_min:
+                                continue
+                        if not container.range_max_included:
+                            if target == range_max:
+                                continue
+                        trigger = False
+                        break
+            # else:
+            #     print (f"{target:0.4f} not in range")
 
         if trigger:
             #syslog.info("trigger!")
-
+            event_clone = event.clone()
+            event_clone.event_type = InputType.JoystickButton
+            event_clone.identifier = 1 
+            event_clone.is_axis = False # make this a button event 
+            event_clone.is_pressed = True # button press is ON
+            event_clone.is_virtual_button = True # indicate this is a virtual button press
+            value_clone = gremlin.actions.Value(True, True)
             for action in self.action_sets:
-                action.process_event(event, value)
+                # execute the action
+                action.process_event(event_clone, value_clone)
+                # register a range exit trigger
+                exit_trigger = RangeReleaseTrigger(ranges, event_clone, action)
+                self.action_data.exit_range_triggers.append(exit_trigger)
+                #print (f"process press event: {exit_trigger.id}")
             if in_range:
                 self.last_range_min = range_min
                 self.last_range_max = range_max
@@ -524,11 +591,11 @@ class RangeContainerFunctor(gremlin.base_classes.AbstractFunctor):
                     functor.reset_range()
 
             self.last_target = target
-                
 
-            return True
+            
+            
 
-        return False
+        return True
 
 class RangeContainer(AbstractContainer):
     ''' action data for the map to Range action '''
@@ -573,7 +640,11 @@ class RangeContainer(AbstractContainer):
         self.any_change_delta = 10 # percentage move that must be detected before the action is triggered 0 to 100
         self.condition_enabled = False
         self.virtual_button_enabled = False
-
+        self.exit_range_triggers = [] # triggers to execute when the range is exited
+        
+        # make actions think we're attached to a button
+        self.override_input_id = 1
+        self.override_input_type = InputType.JoystickButton
 
 
     def icon(self):

@@ -104,6 +104,14 @@ class ProfileData(metaclass=ABCMeta):
         else:
             self._generic_icon = None
 
+        # reported device type to actions so they can configure themselves to a different hardware input type if needed
+        if isinstance(parent, ProfileData):
+            self.override_input_type = parent.override_input_type
+            self.override_input_id = parent.override_input_id
+        else:
+            self.override_input_type = None
+            self.override_input_id = None
+
 
     def icon(self):
         ''' gets the default icon'''
@@ -137,12 +145,16 @@ class ProfileData(metaclass=ABCMeta):
         
         :return InputType of this entry
         """
+        if self.override_input_type is not None:
+            return self.override_input_type
         if self._input_item is not None:
             return self._input_item.input_type
         return None
 
     def get_input_id(self):
         ''' gets the input id'''
+        if self.override_input_id is not None:
+            return self.override_input_id
         if self._input_item is not None:
             return self._input_item.input_id
         return None
@@ -214,10 +226,9 @@ class ProfileData(metaclass=ABCMeta):
     def input_item(self):
         return self._input_item
     
-    
     @property
     def hardware_device(self):
-        ''' gets the hardware device attached to this action '''
+        ''' gets the hardware device attached to this action or container '''
         profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
         device_guid = self.hardware_device_guid
         if device_guid in profile.devices.keys():
@@ -227,17 +238,24 @@ class ProfileData(metaclass=ABCMeta):
     @property
     def hardware_input_id(self):
         ''' gets the input id on the hardware device attached to this '''
+        if self.override_input_id is not None:
+            return self.override_input_id
         return self.input_item.input_id if self.input_item else None
     
     @property
     def hardware_input_type(self) -> InputType :
         ''' gets the type of hardware device attached to this '''
+        if self.override_input_type is not None:
+            return self.override_input_type
         return self.input_item.input_type if self.input_item else None
     
     @property
     def hardware_input_type_name(self) -> str:
         ''' gets the type name of hardware device attached to this '''
         return InputType.to_display_name(self.hardware_input_type)
+
+    
+
     
     @property 
     def profile_mode(self) -> str:
@@ -327,10 +345,13 @@ class AbstractContainer(ProfileData):
             self.device_guid = input_item.device_guid
             self.device_input_id = input_item.input_id
             self.device_input_type = input_item.input_type
+            self.device = gremlin.joystick_handling.device_info_from_guid(self.device_guid)
         else:
             self.device_guid = None
             self.device_input_id = None
             self.device_input_type = None
+            self.device = None
+
 
     @property
     def id(self):
@@ -359,27 +380,7 @@ class AbstractContainer(ProfileData):
         self._virtual_button_enabled = value
 
 
-    @property
-    def hardware_device(self):
-        ''' gets the hardware device attached to this '''
-        return self.device
-
-
-    @property
-    def hardware_device_guid(self):
-        ''' gets the GUID of the mapped hardware device'''
-        return self.input_item.device_guid if self.input_item else None #self.device_guid
-    
-    @property
-    def hardware_input_id(self):
-        ''' gets the input id on the hardware device attached to this '''
-        return self.input_item.input_id if self.input_item else None # self.device_input_id
-    
-    @property
-    def hardware_input_type(self):
-        ''' gets the type of hardware device attached to this '''
-        return self.input_item.input_type if self.input_item else None # self.device_input_type
-    
+  
     @property
     def input_display_name(self):
         return f"{gremlin.shared_state.get_device_name(self.device_guid)} {InputType.to_display_name(self.device_input_type)} {self.device_input_id}"
@@ -543,10 +544,10 @@ class AbstractContainer(ProfileData):
 
         self.virtual_button = None
         if vb_node is not None:
-            self.virtual_button = AbstractContainer.virtual_button_lut[
-                self.get_input_type()
-            ]()
-            self.virtual_button.from_xml(vb_node)
+            item = AbstractContainer.virtual_button_lut[self.get_input_type()]
+            if item is not None:
+                self.virtual_button = item()
+                self.virtual_button.from_xml(vb_node)
 
     def _parse_activation_condition_xml(self, node):
         for child in node.findall("activation-condition"):

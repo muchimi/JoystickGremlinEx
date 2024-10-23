@@ -185,6 +185,10 @@ Joystick Gremlin EX
 <!-- TOC --><a name="134015ex-pre-release"></a>
 ## 13.40.15ex (pre-release)
 
+### (m5.3) hotfix
+- The range container now supports press and release actions automatically an mimic a button mapping being "pressed" while in the range and "released" when the axis value exits the range.
+- API: containers and actions now have the concept of an "override" input type and input id for containers that change the behavior of the input to something else so the actions configure themselves correctly (example, containers that split up an axis range)
+- TTS is threaded by default now to avoid text to speech from delaying the execution of containers/actions. This is experimental. All speech will now run in parallel to the rest of the execution graph so the actions will run while the speech executes.  This could lead to unexpected consequences but in general avoids TTS from being such a terrible impact on the timely execution of other commands.
 
 ### (m5.2) hotfix
 

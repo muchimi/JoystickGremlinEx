@@ -106,6 +106,7 @@ class Event:
 		self.is_axis = is_axis
 		self.virtual_code = virtual_code # vk if a keyboard event (the identifier will be the key_id (scancode, extended))
 		self.is_virtual = is_virtual # true if the item is a vjoy device input
+		self.is_virtual_button = False # true if a virtual button
 
 	def clone(self):
 		"""Returns a clone of the event.

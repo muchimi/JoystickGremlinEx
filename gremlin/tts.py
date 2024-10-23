@@ -24,6 +24,7 @@ import logging
 import time
 import gremlin.config
 import gremlin.shared_state
+import threading
 import gremlin.threading
 from . import event_handler, util
 import pyttsx3
@@ -81,8 +82,15 @@ class TextToSpeech:
                     syslog.error(f"TTS: unable to activate TTS: {err}")
 
 
+    def speak(self, text, threaded = True):        
+        if threaded:
+            t = threading.Thread(target= self._speak, args=[text])
+            t.start()
+        else:
+            self._speak(text)
 
-    def speak(self, text):        
+
+    def _speak(self, text):        
         ''' speaks the text'''
         if not self.valid:
             return
@@ -93,7 +101,14 @@ class TextToSpeech:
         except Exception as err:
             logging.getLogger(f"system").error(f"Error in TTS: {err}")
 
-    def speak_single(self, text):
+    def speak_single(self, text, threaded = True):        
+        if threaded:
+            t = threading.Thread(target= self._speak_single, args=[text])
+            t.start()
+        else:
+            self._speak_single(text)
+
+    def _speak_single(self, text):
         ''' speaks the test as a single event (don't use this inside an event loop)'''
         if not self.valid:
             return

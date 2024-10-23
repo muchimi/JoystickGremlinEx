@@ -594,7 +594,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
             # Create UI widgets for absolute / relative axis modes if the remap
             # action is being added to an axis input type
-            self.input_type = self._get_input_type() # self.action_data.input_type
+            self.input_type = self.action_data.hardware_input_type #._get_input_type() # self.action_data.input_type
         
             #self.main_layout.addWidget(self.vjoy_selector)
 
@@ -610,6 +610,9 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
             self._is_axis = self.action_data.input_is_axis()
             
+
+            # type_label = QtWidgets.QLabel(f"Input type: {InputType.to_display_name(self.input_type)}")
+            # self.main_layout.addWidget(type_label)
 
             # create UI components
             self._create_selector()
@@ -627,13 +630,14 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _get_selector_input_type(self):
         ''' gets a modified input type based on the current mode '''
-        input_type = self._get_input_type()
+        input_type = self.action_data.hardware_input_type
+
         if input_type in VJoyWidget.input_type_buttons and \
                         self.action_data.action_mode in (VjoyAction.VJoySetAxis,
                                                          VjoyAction.VJoyInvertAxis,
                                                          VjoyAction.VJoyRangeAxis):
             return InputType.JoystickAxis
-        return self._get_input_type()
+        return input_type
 
     def _create_input_axis(self):
         ''' creates the axis input widget '''
