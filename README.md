@@ -185,6 +185,10 @@ Joystick Gremlin EX
 <!-- TOC --><a name="134015ex-pre-release"></a>
 ## 13.40.15ex (pre-release)
 
+
+### (m5.4) hotfix
+- Allow vjoy devices setup as wheel that then misreport direct input data to function in GremlinEx (the hack causes the devices to report fewer axes than they actually have causing a mismatch).  GremlinEx will use the misreported information as "correct".
+
 ### (m5.3) hotfix
 - The range container now supports press and release actions automatically an mimic a button mapping being "pressed" while in the range and "released" when the axis value exits the range.
 - API: containers and actions now have the concept of an "override" input type and input id for containers that change the behavior of the input to something else so the actions configure themselves correctly (example, containers that split up an axis range)

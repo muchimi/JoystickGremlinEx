@@ -344,8 +344,10 @@ def joystick_devices_initialization():
     # terminate as this is a non-recoverable error.
 
     vjoy_lookup = {}
+    vjoy_wheel_lookup = {}
     for dev in [dev for dev in devices if dev.is_virtual]:
         hash_value = (dev.axis_count, dev.button_count, dev.hat_count)
+        hash_value_wheel = (dev.axis_count+1, dev.button_count, dev.hat_count)
         if verbose:
             syslog.debug(f"vJoy guid={dev.device_guid}: {hash_value}")
 
@@ -360,6 +362,8 @@ def joystick_devices_initialization():
             )
 
         vjoy_lookup[hash_value] = dev
+        vjoy_wheel_lookup[hash_value_wheel] = dev
+
 
     # Query all vJoy devices in sequence until all have been processed and
     # their matching SDL counterparts have been found.
@@ -389,6 +393,12 @@ def joystick_devices_initialization():
             vjoy_lookup[hash_value].set_vjoy_id(i)
             if verbose:
                 syslog.debug(f"vjoy id {i:d}: {hash_value} - MATCH")
+        elif hash_value in vjoy_wheel_lookup:
+            vjoy_wheel_lookup[hash_value].set_vjoy_id(i)
+            vjoy_lookup[hash_value] = vjoy_wheel_lookup[hash_value]
+            if verbose:
+                syslog.debug(f"vjoy id {i:d}: {hash_value} - WHEEL MATCH")
+
         else:
             # should_terminate = True
             syslog.debug(f"vjoy id {i:d}: {hash_value} - ERROR - vJoy device exists but DILL does not see it - check HIDHide config if enabled and process is whitelisted")
