@@ -736,8 +736,10 @@ class JoystickDeviceTabWidget(QDataWidget):
                 self._update_curve_icon(index, self.input_item_list_view.model.data(index))
 
     def _update_curve_icon(self, index : int, data):
-        widget = self.input_item_list_view.widget_map[index]
-        widget.update_curve_icon(data.curve_data is not None)
+        widget : input_item.InputItemWidget = self.input_item_list_view.widget_map[index]
+        enabled = data.curve_data is not None
+        widget.update_curve_icon(enabled)
+
 
 
     def _config_changed_cb(self):

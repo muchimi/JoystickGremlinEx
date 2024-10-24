@@ -1029,6 +1029,8 @@ class InputItemWidget(QtWidgets.QFrame):
         self._icon_widget = QtWidgets.QWidget()
         self._icon_layout = QtWidgets.QHBoxLayout(self._icon_widget)
         self._icons = []
+        
+
 
         # top row
         self._multi_row = populate_ui_callback is not None
@@ -1162,6 +1164,8 @@ class InputItemWidget(QtWidgets.QFrame):
         else:
             self.curve_button_widget.setIcon(self.curve_icon_inactive)
         self.clear_curve_widget.setEnabled(enabled)
+        if self.identifier.input_type == InputType.JoystickAxis:
+            self.axis_widget.show_curved = enabled
 
 
     @QtCore.Slot(float)
