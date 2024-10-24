@@ -31,7 +31,7 @@ class InputType(enum.IntEnum):
     Mouse = 5
     VirtualButton = 6
     KeyboardLatched = 7 # latched keyboard input
-    OpenSoundControl = 8 # open sound control
+    OpenSoundControl = 8 # open sound control button input
     Midi = 9 # midi input
 
 
@@ -49,7 +49,10 @@ class InputType(enum.IntEnum):
         try:
             if value is None:
                 return InputType.NotSet
-            return _InputType_to_enum_lookup[value]
+            if isinstance(value, int):
+                return InputType(value)
+            else:
+                return _InputType_to_enum_lookup[value]
         except KeyError:
             raise ValueError("Invalid type in lookup")
         
@@ -90,7 +93,7 @@ _InputType_to_display_lookup = {
     InputType.JoystickHat: "Hat",
     InputType.Keyboard: "Key",
     InputType.KeyboardLatched: "Latched Key",
-    InputType.OpenSoundControl: "OSC",
+    InputType.OpenSoundControl: "OSC Button",
     InputType.Midi: "MIDI",
 }
 

@@ -306,23 +306,6 @@ class DeviceActionType(Enum):
             raise DILLError(f"Invalid device action type {value:d}")
 
 
-# @SingletonDecorator
-# class DeviceNames:
-#     ''' holds a map of device names '''
-
-#     def __init__(self):
-#         self._map = {}
-
-#     def get_name(self, device_guid):
-#         ''' caches the device name '''
-#         if device_guid in self._map.keys():
-#             return self._map[device_guid]
-#         name = DILL.get_device_name(device_guid)
-#         self._map[device_guid] = name
-#         return name
-    
-
-
 class InputEvent:
 
     """Holds information about a single event.
@@ -418,7 +401,10 @@ class DeviceSummary:
         bool
             True if the device is a virtual vJoy device, False otherwise
         """
-        return self.vendor_id == 0x1234 and self.product_id == 0xBEAD
+        if self.vendor_id == 0x1234 and self.product_id == 0xBEAD:
+            return True
+        #if self.vendor_id == 0x
+        return False
 
     def set_vjoy_id(self, vjoy_id):
         """Sets the vJoy id for this device summary.
@@ -528,7 +514,7 @@ class DILL:
                     msg = f"Unable to continue - missing dll: {_dll_path}"
                     display_error(msg)
                     logging.getLogger("system").critical(msg)
-                    os._exit(1) 
+                    os._exit(1)
 
             dll_version = get_dll_version(_dll_path)
             DILL.version = dll_version
@@ -555,6 +541,9 @@ class DILL:
                 os._exit(1)
 
             DILL.initalized = True
+
+
+
 
     @staticmethod
     def set_input_event_callback(callback):

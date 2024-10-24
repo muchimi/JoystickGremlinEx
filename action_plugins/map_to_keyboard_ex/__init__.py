@@ -372,8 +372,16 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
                     self.is_pressed = True
 
             elif self.mode == KeyboardOutputMode.Hold:
-                gremlin.macro.MacroManager().queue_macro(self.press)
-                if self.needs_auto_release:
+                auto_release = self.needs_auto_release
+                # if event.is_virtual_button:
+                #     auto_release = False
+                if event.is_pressed:
+                    # press event
+                    gremlin.macro.MacroManager().queue_macro(self.press)
+                # else:
+                #     gremlin.macro.MacroManager().queue_macro(self.release)
+
+                if auto_release:
                     ButtonReleaseActions().register_callback(
                         lambda: gremlin.macro.MacroManager().queue_macro(self.release),
                         event

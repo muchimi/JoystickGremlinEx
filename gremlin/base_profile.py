@@ -1,3 +1,21 @@
+# -*- coding: utf-8; -*-
+
+# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+
 from abc import abstractmethod, ABCMeta
 from collections import namedtuple
 import codecs
@@ -10,6 +28,7 @@ import gremlin.actions
 import gremlin.base_buttons
 import gremlin.base_profile
 import gremlin.config
+import gremlin.curve_handler
 import gremlin.event_handler
 import gremlin.execution_graph
 import gremlin.keyboard
@@ -33,6 +52,7 @@ import gremlin.plugin_manager
 import gremlin.shared_state
 from gremlin.singleton_decorator import SingletonDecorator
 import gremlin.util
+import gremlin.ui.ui_common
 
 
 
@@ -70,11 +90,11 @@ class ProfileData(metaclass=ABCMeta):
     def __init__(self, parent):
         """Creates a new instance.
 
-        :param parent the parent item of this instance in the profile tree
+        :param: parent the parent item of this instance in the profile tree (type: InputItem)
         """
         assert parent is not None
         self.code = None
-        self._id = None  # unique ID for this entry
+        self._id = gremlin.util.get_guid(no_brackets=True)
         self._input_item : gremlin.base_profile.InputItem = _get_input_item(parent)
         
         
@@ -83,6 +103,14 @@ class ProfileData(metaclass=ABCMeta):
             self._generic_icon = generic_icon
         else:
             self._generic_icon = None
+
+        # reported device type to actions so they can configure themselves to a different hardware input type if needed
+        if isinstance(parent, ProfileData):
+            self.override_input_type = parent.override_input_type
+            self.override_input_id = parent.override_input_id
+        else:
+            self.override_input_type = None
+            self.override_input_id = None
 
 
     def icon(self):
@@ -117,12 +145,16 @@ class ProfileData(metaclass=ABCMeta):
         
         :return InputType of this entry
         """
+        if self.override_input_type is not None:
+            return self.override_input_type
         if self._input_item is not None:
             return self._input_item.input_type
         return None
 
     def get_input_id(self):
         ''' gets the input id'''
+        if self.override_input_id is not None:
+            return self.override_input_id
         if self._input_item is not None:
             return self._input_item.input_id
         return None
@@ -168,6 +200,13 @@ class ProfileData(metaclass=ABCMeta):
         if self._input_item is not None:
             return self._input_item.device_name
         return None
+    
+    @property
+    def input_display_name(self):
+        ''' gets a config display string for the input '''
+        return f"{gremlin.shared_state.get_device_name(self.get_device_guid())} {InputType.to_display_name(self.get_input_type())} {self.get_input_id()}"
+    
+
 
     def get_settings(self):
         """Returns the Settings data of the profile.
@@ -187,12 +226,11 @@ class ProfileData(metaclass=ABCMeta):
     def input_item(self):
         return self._input_item
     
-    
     @property
     def hardware_device(self):
-        ''' gets the hardware device attached to this action '''
+        ''' gets the hardware device attached to this action or container '''
         profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
-        device_guid = self.get_device_guid()
+        device_guid = self.hardware_device_guid
         if device_guid in profile.devices.keys():
             return profile.devices[device_guid]
         return None
@@ -200,25 +238,37 @@ class ProfileData(metaclass=ABCMeta):
     @property
     def hardware_input_id(self):
         ''' gets the input id on the hardware device attached to this '''
-        return self.get_input_id()
+        if self.override_input_id is not None:
+            return self.override_input_id
+        return self.input_item.input_id if self.input_item else None
     
     @property
-    def hardware_input_type(self):
+    def hardware_input_type(self) -> InputType :
         ''' gets the type of hardware device attached to this '''
-        return self.get_input_type()
+        if self.override_input_type is not None:
+            return self.override_input_type
+        return self.input_item.input_type if self.input_item else None
     
     @property
-    def hardware_input_type_name(self):
+    def hardware_input_type_name(self) -> str:
         ''' gets the type name of hardware device attached to this '''
-        return InputType.to_display_name(self.get_input_type())
+        return InputType.to_display_name(self.hardware_input_type)
+
+    
+
+    
+    @property 
+    def profile_mode(self) -> str:
+        ''' gets the mode of this action '''
+        return self.get_mode()
     
     @property
-    def hardware_device_guid(self):
+    def hardware_device_guid(self) -> dinput.GUID:
         ''' gets the currently attached hardware GUID '''
-        return self.get_device_guid()
+        return self.input_item.device_guid if self.input_item else None
     
     @property
-    def hardware_device_name(self):
+    def hardware_device_name(self) -> str:
         ''' gets the currently attached hardware name '''
         return self.get_device_name()
 
@@ -295,11 +345,20 @@ class AbstractContainer(ProfileData):
             self.device_guid = input_item.device_guid
             self.device_input_id = input_item.input_id
             self.device_input_type = input_item.input_type
+            self.device = gremlin.joystick_handling.device_info_from_guid(self.device_guid)
         else:
             self.device_guid = None
             self.device_input_id = None
             self.device_input_type = None
+            self.device = None
 
+
+    @property
+    def id(self):
+        return self._id
+    @id.setter
+    def id(self, value):
+        self._id = value
 
     
     @property
@@ -321,26 +380,10 @@ class AbstractContainer(ProfileData):
         self._virtual_button_enabled = value
 
 
+  
     @property
-    def hardware_device(self):
-        ''' gets the hardware device attached to this '''
-        return self.device
-
-
-    @property
-    def hardware_device_guid(self):
-        ''' gets the GUID of the mapped hardware device'''
-        return self.device_guid
-    
-    @property
-    def hardware_input_id(self):
-        ''' gets the input id on the hardware device attached to this '''
-        return self.device_input_id
-    
-    @property
-    def hardware_input_type(self):
-        ''' gets the type of hardware device attached to this '''
-        return self.device_input_type
+    def input_display_name(self):
+        return f"{gremlin.shared_state.get_device_name(self.device_guid)} {InputType.to_display_name(self.device_input_type)} {self.device_input_id}"
     
 
 
@@ -360,6 +403,13 @@ class AbstractContainer(ProfileData):
 
         # Create activation condition data if needed
         self.create_or_delete_virtual_button()
+
+    @property
+    def action_count(self):
+        ''' returns the count of defined actions in this container '''
+        count = sum(len(action_list) for action_list in self.action_sets)
+        return count
+        
 
     def create_or_delete_virtual_button(self):
         """Creates activation condition data as required."""
@@ -420,6 +470,9 @@ class AbstractContainer(ProfileData):
         :param node the XML node to populate fields with
         """
         super().from_xml(node)
+        if "container_id" in node.attrib:
+            self.id = node.get("container_id")
+
         self._parse_action_set_xml(node)
         self._parse_virtual_button_xml(node)
         self._parse_activation_condition_xml(node)
@@ -430,6 +483,7 @@ class AbstractContainer(ProfileData):
         :return XML node representing the state of this instance
         """
         node = super().to_xml()
+        node.set("container_id", self.id)
         # Add activation condition if needed
         if self.virtual_button:
             node.append(self.virtual_button.to_xml())
@@ -490,10 +544,10 @@ class AbstractContainer(ProfileData):
 
         self.virtual_button = None
         if vb_node is not None:
-            self.virtual_button = AbstractContainer.virtual_button_lut[
-                self.get_input_type()
-            ]()
-            self.virtual_button.from_xml(vb_node)
+            item = AbstractContainer.virtual_button_lut[self.get_input_type()]
+            if item is not None:
+                self.virtual_button = item()
+                self.virtual_button.from_xml(vb_node)
 
     def _parse_activation_condition_xml(self, node):
         for child in node.findall("activation-condition"):
@@ -546,9 +600,7 @@ class AbstractContainer(ProfileData):
 
 
 class Device:
-
-    """Stores the information about a single device including its modes."""
-
+    ''' device information '''
     def __init__(self, parent):
         """Creates a new instance.
 
@@ -557,10 +609,29 @@ class Device:
         self.parent = parent  # profile
         self.name = None
         self.label = ""
-        self.device_guid = None
+        self._device_guid = None
         self.modes = {}
         self.type = None
-        self.virtual = False # true if the device was found in the detected hardware list
+        self.virtual = False # true if the device is virtual (vjoy)
+        self.connected = False # true if the device was found in the detected hardware list
+
+    @property
+    def device_guid(self) -> dinput.GUID:
+        ''' device ID as a GUID '''
+        return self._device_guid
+    
+    @device_guid.setter
+    def device_guid(self, value : dinput.GUID):
+        assert isinstance(value, dinput.GUID) if value is not None else True
+        self._device_guid = value
+        self.connected = gremlin.joystick_handling.is_device_connected(value) if value is not None else False
+
+    @property
+    def device_id(self) -> str:
+        ''' device ID a a string '''
+        return str(self.device_guid)
+
+        
 
     def ensure_mode_exists(self, mode_name, device=None):
         """Ensures that a specified mode exists, creating it if needed.
@@ -601,6 +672,7 @@ class Device:
         self.label = safe_read(node, "label", default_value=self.name)
         self.type = DeviceType.to_enum(safe_read(node, "type", str))
         self.device_guid = parse_guid(node.get("device-guid"))
+        self.connected = gremlin.joystick_handling.is_device_connected(self.device_guid)
 
         for child in node:
             mode = Mode(self)
@@ -634,7 +706,7 @@ class InputItem():
 
         :param parent the parent mode of this input item
         """
-        
+        self._id = gremlin.util.get_guid() # unique ID of this object
         self.parent = parent
         self._input_type = None
         self._device_guid = None # hardware input ID
@@ -647,6 +719,9 @@ class InputItem():
         self._selected = False # true if the item is selected
         self._is_action = False # true if the object is a sub-item for a sub-action (GateHandler for example)
         self._device_type = None
+        self._is_axis = False # true if the item is an axis input
+        self._curve_data = None # true if the item has its input curved
+
         if parent is not None:
             # find the missing properties from the parenting hierarchy
             self._is_action = isinstance(parent, AbstractAction)
@@ -661,12 +736,18 @@ class InputItem():
                 if not hasattr(item, "parent"):
                     break
                 item = item.parent
+
+
+
                 
-      
+    @property
+    def id(self):
+        ''' id of the InputItem '''
+        return self._id
 
     @property
     def description(self):
-        if not self._description:
+        if self._description is None:
             # see if there is a container
             if self.containers:
                 for container in self.containers:
@@ -681,21 +762,32 @@ class InputItem():
     
     @description.setter
     def description(self, value):
-        return self._description
+        self._description = value
+        
 
     @property
-    def selected(self):
+    def selected(self) -> bool:
+        ''' true if the item is selected'''
         return self._selected
     @selected.setter
-    def selected(self, value):
+    def selected(self, value : bool):
         self._selected = value
 
     @property
-    def is_action(self):
+    def is_action(self) -> bool:
+        ''' true if the item is action '''
         return self._is_action
     @is_action.setter
-    def is_action(self, value):
+    def is_action(self, value : bool):
         self._is_action = value
+
+    @property
+    def is_axis(self) -> bool:
+        ''' true if this item is setup as an axis input (non momentary'''
+        return self._is_axis
+    @is_axis.setter
+    def is_axis(self, value : bool):
+        self._is_axis = value
 
     def add_container(self, container):
         self._containers.append(container)
@@ -716,6 +808,8 @@ class InputItem():
     @input_type.setter
     def input_type(self, value):
         self._input_type = value
+        self._register_axis()
+
 
     @property
     def input_id(self):
@@ -723,6 +817,7 @@ class InputItem():
     @input_id.setter
     def input_id(self, value):
         self._input_id = value
+        self._register_axis()
 
     @property
     def device_guid(self):
@@ -730,6 +825,7 @@ class InputItem():
     @device_guid.setter
     def device_guid(self, value):
         self._device_guid = value
+        self._register_axis()
 
     @property
     def profile_mode(self):
@@ -759,6 +855,29 @@ class InputItem():
     def data(self, value):
         self._data = value
         
+    
+    @property
+    def curve_data(self) -> gremlin.curve_handler.AxisCurveData:
+        ''' axis curve data '''
+        return self._curve_data
+    
+    @curve_data.setter
+    def curve_data(self, value : gremlin.curve_handler.AxisCurveData):
+        ''' axis curve data'''
+        self._curve_data = value
+        self._register_axis()
+
+    @property
+    def is_curve(self) -> bool:
+        ''' true if the input is curved '''
+        return self._curve_data is not None
+    
+
+    def _register_axis(self):
+        if self._input_type == InputType.JoystickAxis and self._input_id is not None and self._device_guid is not None:
+            eh = gremlin.event_handler.EventListener()
+            eh.registerInput(self)
+    
 
     def from_xml(self, node):
         """Parses an InputItem node.
@@ -768,13 +887,11 @@ class InputItem():
 
         container_node = node # node that holds the container information
         container_plugins = ContainerPlugins()
-        container_name_map = container_plugins.tag_map
-        if node.tag == "key":
-            pass
+        container_tag_map = container_plugins.tag_map
         self.input_type = InputType.to_enum(node.tag)
         if "id" in node.attrib.keys():
             self.input_id = safe_read(node, "id", int)
-        self.description = safe_read(node, "description", str)
+        self._description = safe_read(node, "description", str)
         self.always_execute = read_bool(node, "always-execute", False)
 
         if self.input_type in (InputType.KeyboardLatched, InputType.Keyboard):
@@ -785,7 +902,7 @@ class InputItem():
             # see if old style keyboard entry
             if "extended" in node.attrib:
                 scan_code = self.input_id
-                is_extended = read_bool(node, "extended")
+                is_extended = read_bool(node, "extended", False)
                 is_mouse = safe_read(node,"mouse", bool, False)
                 key = Key(scan_code=scan_code, is_extended=is_extended, is_mouse = is_mouse)
                 input_item.key = key
@@ -826,27 +943,38 @@ class InputItem():
                 if child.tag == "input":
                     osc_input_item.parse_xml(child)
             self.input_id = osc_input_item
+            self.is_axis = osc_input_item.is_axis
+
+        elif self.input_type == InputType.JoystickAxis:
+            # check for curve data
+            for child in node:
+                if child.tag == "response-curve":
+                    self.curve_data = gremlin.curve_handler.AxisCurveData()
+                    self.curve_data._parse_xml(child)
+                    break
 
         assert self.input_id is not None,"Error processing input - check types"
             
 
         
         for child in container_node:
-            if child.tag in ("latched", "input", "keylatched"):
+            if child.tag in ("latched", "input", "keylatched","response-curve"):
                 # ignore extra data
                 continue
             container_type = child.attrib["type"]
-            if container_type not in container_name_map:
+            if container_type not in container_tag_map:
                 logging.getLogger("system").warning(
                     f"Unknown container type used: {container_type}"
                 )
                 continue
-            entry = container_name_map[container_type](self)
+            entry = container_tag_map[container_type](self)
             entry.from_xml(child)
             self.add_container(entry)
             if hasattr(entry, "action_model"):
                 entry.action_model = self.containers
             container_plugins.set_container_data(self, entry)
+
+        # register joystic axis items
 
 
     def to_xml(self):
@@ -883,11 +1011,16 @@ class InputItem():
         else:
             node.set("id", safe_format(self.input_id, int))
 
+        if self.curve_data is not None:
+            curve_node = self.curve_data._generate_xml()
+            node.append(curve_node)
+
+
         if self.always_execute:
             node.set("always-execute", "True")
 
-        if self.description:
-            node.set("description", safe_format(self.description, str))
+        if self._description:
+            node.set("description", safe_format(self._description, str))
         else:
             node.set("description", "")
         
@@ -941,6 +1074,12 @@ class InputItem():
         elif self._input_type == InputType.Midi:
             return f"Midi {self._input_id}"
         return f"Unknown input: {self._input_type}"
+    
+
+    @property
+    def debug_display(self):
+        ''' debug string for this item'''
+        return f"InputItem: {gremlin.shared_state.get_device_name(self.device_guid)} Input: {InputType.to_display_name(self.input_type)} Type: {self.display_name} mode: {self.profile_mode}"
 
     # def __eq__(self, other):
     #     """Checks whether or not two InputItem instances are identical.
@@ -1001,6 +1140,18 @@ class AbstractAction(ProfileData):
         self._enabled = False # true if the action is enabled
         eh = gremlin.event_handler.EventListener()
         eh.action_created.emit(self)
+        eh.profile_unload.connect(self._cleanup)
+        eh.action_delete.connect(self._action_delete)
+        
+    def _action_delete(self, action_data):
+        if self._id == action_data._id:
+            self._cleanup()
+
+    def _cleanup(self):
+        ''' called when the action should clean itself up '''
+        eh = gremlin.event_handler.EventListener()
+        eh.profile_unload.disconnect(self._cleanup)
+        eh.action_delete.disconnect(self._action_delete)
         
 
     def setEnabled(self, value):
@@ -1043,6 +1194,8 @@ class AbstractAction(ProfileData):
         ''' type name of this action '''
         return self._action_type
     
+    
+
     def display_name(self):
         ''' display name for this action '''
         return "N/A"
@@ -1369,7 +1522,7 @@ class Profile():
         """Constructor creating a new instance."""
 
         
-        self.devices = {} # holds devices attached to this profile
+        self.devices : dict[Device] = {} # holds devices attached to this profile
         self.vjoy_devices = {}
         self.merge_axes = []
         self.plugins = []
@@ -1384,9 +1537,7 @@ class Profile():
         self._restore_last_mode = False # True if the profile should start with the last active mode (profile specific)
         self._dirty = False # dirty flag - indicates the profile data was changed but not saved yet
         self._force_numlock_off = True # if set, forces numlock to be off if it isn't so numpad keys report the correct scan codes
-
-
-
+        
 
     @property
     def dirty(self):
@@ -1395,6 +1546,17 @@ class Profile():
     @property
     def name(self):
         return self._profile_name
+    
+
+    def get_ordered_device_list(self):
+        ''' gets the devices ordered by the current UI order '''
+        id_list = gremlin.shared_state.ui.get_ordered_device_guid_list()
+        device_list = []
+        for id in id_list:
+            if id in self.devices.keys():
+                device_list.append(self.devices[id])
+        return device_list
+    
 
     def initialize_joystick_device(self, device, modes):
         """Ensures a joystick is properly initialized in the profile.
@@ -1558,7 +1720,7 @@ class Profile():
 
 
 
-    def add_mode(self, name):
+    def add_mode(self, name, inherited_name = None, emit = True):
         import gremlin.event_handler
         ''' adds a new mode'''
         if name in self.mode_list():
@@ -1567,12 +1729,24 @@ class Profile():
         for device in self.devices.values():
             new_mode = Mode(device)
             new_mode.name = name
-            new_mode.parent = self.get_default_mode()
+            if inherited_name is not None:
+                new_mode.inherit = inherited_name
+            else:
+                new_mode.inherit = self.get_default_mode()
+            new_mode.parent = device
             device.modes[name] = new_mode
 
-        eh = gremlin.event_handler.EventListener()
-        eh.modes_changed.emit()
+        if emit:
+            eh = gremlin.event_handler.EventListener()
+            eh.modes_changed.emit()
         return True
+    
+    def mode_tree(self):
+        ''' gets the parent/child hiearchy of modes - returns a map '''
+        return self.build_inheritance_tree()
+        
+
+
     
     def remove_mode(self, name):
         ''' removes a mode from this profile '''
@@ -1606,7 +1780,7 @@ class Profile():
         eh = gremlin.event_handler.EventListener()
         eh.modes_changed.emit()
 
-    def get_root_modes(self):
+    def get_root_modes(self) -> list[str]:
         """Returns a list of root modes.
 
         :return list of root modes
@@ -1620,8 +1794,8 @@ class Profile():
                     root_modes.append(mode_name)
         return list(set(root_modes))  # unduplicated
     
-    def get_modes(self):
-        ''' get all profile modes '''
+    def get_modes(self) -> list[str]:
+        ''' get all profile mode names '''
         modes = []
         for device in self.devices.values():
             if device.type != DeviceType.Keyboard:
@@ -1629,7 +1803,8 @@ class Profile():
             for mode_name, mode in device.modes.items():
                 modes.append(mode_name)
         return list(set(modes))  # unduplicated
-        
+    
+
 
     def list_actions(self):
         ''' lists all actions in the current profile '''
@@ -1668,13 +1843,7 @@ class Profile():
             for i in range(entry.hat_count):
                 vjoy[entry.vjoy_id]["hat"].append(i+1)
 
-        # List all input types
-        all_input_types = [
-            InputType.JoystickAxis,
-            InputType.JoystickButton,
-            InputType.JoystickHat,
-            InputType.Keyboard
-        ]
+        
 
         # Create a list of all used remap actions
         remap_actions = self.list_actions()
@@ -1803,12 +1972,15 @@ class Profile():
             # use a default mode
             self._start_mode = self.get_default_mode()
 
-        self._profile_fname = fname
+        self._profile_fname = fname.casefold()
 
         name, _ = os.path.splitext(os.path.basename(fname))
         self._profile_name = name
 
-        
+        # have config use updated profile settings
+        config = gremlin.config.Configuration()
+        config.ensure_profile(self)
+
 
         return profile_was_updated
     
@@ -1884,7 +2056,9 @@ class Profile():
         # with codecs.open(fname, "w", "utf-8-sig") as out:
         #     out.write(dom_xml.toprettyxml(indent="    "))
 
-    def get_device_modes(self, device_guid, device_type, device_name=None):
+    def get_device_modes(self, device_guid : dinput.GUID,
+                               device_type : DeviceType,
+                               device_name : str =None) -> Device:
         """Returns the modes associated with the given device.
 
         :param device_guid the device's GUID
@@ -1927,7 +2101,9 @@ class Profile():
             InputType.JoystickAxis,
             InputType.JoystickButton,
             InputType.JoystickHat,
-            InputType.Keyboard
+            InputType.Keyboard,
+            InputType.Midi,
+            InputType.OpenSoundControl
         ]
 
         # Process all devices
@@ -2022,6 +2198,11 @@ class Profile():
 
     def save(self):
         ''' saves the profile '''
+
+        if self._profile_fname is None:
+            gremlin.ui.ui_common.MessageBox(prompt = "File is not set, please save the profile first")
+            return
+
         assert self._profile_fname,"File name is not set"
         self.to_xml(self._profile_fname)
         self._dirty = False
@@ -2038,8 +2219,8 @@ class Mode:
         :param parent the parent device of this mode
         """
         self.parent = parent
-        self.inherit = None
-        self.name = None
+        self.inherit = None # name of the mode we inherit properties from
+        self.name = None # name of the current mode
 
         self.config = {
             InputType.JoystickAxis: {},

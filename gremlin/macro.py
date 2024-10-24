@@ -499,13 +499,16 @@ class MacroManager:
 
         # Remove macro from active set, notify manager, and remove any
         # potential callbacks
-        del self._active[macro.id]
-        if macro.exclusive:
-            self._is_executing_exclusive = False
-        with self._flags_lock:
-            if macro.id in self._flags:
-                self._flags[macro.id] = False
-        self._schedule_event.set()
+        try:
+            del self._active[macro.id]
+            if macro.exclusive:
+                self._is_executing_exclusive = False
+            with self._flags_lock:
+                if macro.id in self._flags:
+                    self._flags[macro.id] = False
+            self._schedule_event.set()
+        except:
+            pass
 
     def _preprocess_macro(self, macro):
         """Inserts pauses as necessary into the macro."""
@@ -794,8 +797,7 @@ class MouseButtonAction(MacroAbstractAction):
         else:
             if is_local:
                 if self.is_pressed:
-                    if is_remote:
-                        gremlin.sendinput.mouse_press(self.button)
+                    gremlin.sendinput.mouse_press(self.button)
                 else:
                     gremlin.sendinput.mouse_release(self.button)
             if is_remote:

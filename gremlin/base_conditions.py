@@ -4,8 +4,6 @@ import enum
 import logging
 from lxml import etree as ElementTree
 from gremlin.input_types import InputType
-
-
 from gremlin.util import *
 
 class ActivationRule(enum.Enum):
@@ -328,6 +326,7 @@ class AbstractFunctor(metaclass=ABCMeta):
     def latch_extra_inputs(self):
         ''' returns any extra inputs as a list of (device_guid, input_id) to latch to this action (trigger on change) '''
         return []
+
 
 
 class AbstractContainerActionFunctor(AbstractFunctor):

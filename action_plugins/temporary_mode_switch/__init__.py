@@ -24,7 +24,7 @@ import gremlin.base_profile
 from gremlin.input_types import InputType
 import gremlin.profile
 import gremlin.ui.input_item
-
+import gremlin.ui.ui_common
 
 class TemporaryModeSwitchWidget(gremlin.ui.input_item.AbstractActionWidget):
 
@@ -35,7 +35,7 @@ class TemporaryModeSwitchWidget(gremlin.ui.input_item.AbstractActionWidget):
         assert isinstance(action_data, TemporaryModeSwitch)
 
     def _create_ui(self):
-        self.mode_list = QtWidgets.QComboBox()
+        self.mode_list = gremlin.ui.ui_common.QComboBox()
         for entry in gremlin.profile.mode_list(self.action_data):
             self.mode_list.addItem(entry)
         self.mode_list.activated.connect(self._mode_list_changed_cb)

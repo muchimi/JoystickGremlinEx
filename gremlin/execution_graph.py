@@ -25,9 +25,11 @@ import gremlin.base_buttons
 import gremlin.base_classes
 import gremlin.base_profile
 import gremlin.config
+import gremlin.event_handler
 from gremlin.input_types import InputType
 import gremlin.actions
 import gremlin.error
+import gremlin.input_types
 import gremlin.plugin_manager
 import gremlin.base_conditions
 import gremlin.shared_state
@@ -57,13 +59,14 @@ class ContainerCallback:
         Creates a Value object from the event and passes the two through the
         execution graph until every entry has run or it is aborted.
         """
-        if event.event_type in [
-            InputType.JoystickAxis,
-            InputType.JoystickHat
-        ]:
+        if event.is_axis:
+            value = gremlin.actions.Value(event.curve_value)
+        elif event.event_type == InputType.JoystickHat:
             value = gremlin.actions.Value(event.value)
         elif event.event_type in [
             InputType.JoystickButton,
+            InputType.Midi,
+            InputType.OpenSoundControl,
             InputType.Keyboard,
             InputType.VirtualButton
         ]:
@@ -432,7 +435,23 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
                 sequence.append("Condition")
 
             # Create action functor
-            functor = action.functor(action)
+            functor : gremlin.base_classes.AbstractFunctor = action.functor(action)
+            extra_inputs = functor.latch_extra_inputs()
+            if extra_inputs:
+                # register the extra inputs for this functor
+                eh = gremlin.event_handler.EventHandler()
+                # add_latched_functor(self, device_guid, mode, event, functor):
+                mode = action.profile_mode
+                for device_guid, input_type, input_id in extra_inputs:
+                    
+                    event = gremlin.event_handler.Event(
+                            event_type= input_type,
+                            device_guid = device_guid,
+                            identifier= input_id
+                    )
+                    eh.add_latched_functor(device_guid, mode, event, functor)
+                
+
             action.setEnabled(True)
             self.functors.append(functor)
             sequence.append("Action")

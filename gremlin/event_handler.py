@@ -21,6 +21,8 @@ import logging
 import time
 import queue
 from threading import Thread, Timer
+from typing import Callable
+
 
 
 
@@ -67,10 +69,11 @@ class Event:
 			event_type,
 			identifier,
 			device_guid,
-			value=None,
+			value=None, # normal calibrated value that comes in
 			virtual_code = 0,
 			is_pressed=False,
-			raw_value=None,
+			raw_value=None, # raw value that comes in from dinput
+			curved_value = None, # value if curved
 			force_remote = False,
 			action_id = None,
 			data = None,
@@ -96,12 +99,14 @@ class Event:
 		self.is_pressed = is_pressed
 		self.value = value
 		self.raw_value = raw_value
+		self.curve_value = curved_value
 		self.force_remote = force_remote
 		self.action_id = action_id # the current action id to load
 		self.data = data # extra data passed along with the event
 		self.is_axis = is_axis
 		self.virtual_code = virtual_code # vk if a keyboard event (the identifier will be the key_id (scancode, extended))
 		self.is_virtual = is_virtual # true if the item is a vjoy device input
+		self.is_virtual_button = False # true if a virtual button
 
 	def clone(self):
 		"""Returns a clone of the event.
@@ -219,6 +224,9 @@ class EventListener(QtCore.QObject):
 	# Signal emitted when a joystick is attached or removed
 	device_change_event = QtCore.Signal()
 
+	# fires when the number of gamepad devices changes
+	gamepad_change_event = QtCore.Signal()
+
 	# called when a process device change should be handled
 	_process_device_change = QtCore.Signal()
 	
@@ -237,9 +245,10 @@ class EventListener(QtCore.QObject):
 	# signal emitted when the UI tabs are loaded and profiles are loaded - some widgets use this for post-UI initialization update that needs to occur after the UI data is completely loaded
 	tabs_loaded = QtCore.Signal()
 
-	profile_reset = QtCore.Signal() # issues the reset signal (when runtime for a profile needs to reset)
-	profile_start = QtCore.Signal() # issues the start signal (when a profile starts)
-	profile_stop = QtCore.Signal() # issues the stop signal (when a profile stops)
+	profile_reset = QtCore.Signal() # profile reset signal (when runtime for a profile needs to reset)
+	profile_start = QtCore.Signal() # profile start signal (when a profile starts)
+	profile_stop = QtCore.Signal() # profile stop signal (when a profile stops)
+	profile_unload = QtCore.Signal() # profile unload signal (when a profile is unloaded and a new profile loaded)
 	
 	# occurs on broadcast configuration change
 	config_changed =  QtCore.Signal()
@@ -250,10 +259,21 @@ class EventListener(QtCore.QObject):
 	# occurs on mode edit/update/delete
 	modes_changed = QtCore.Signal()
 
+
 	# functor enable flag changed
-	action_created = QtCore.Signal(object) # runs when an action is created
+	action_created = QtCore.Signal(object) # runs when an action is created - object = the object that triggered the event 
 
+	# remove action
+	action_delete = QtCore.Signal(object) # fires when an action is about to be deleted, passes the action as a parameters
 
+	# selection event - tells the UI to show a different input
+	select_input = QtCore.Signal(object, object, object) # selects a particular input (device_guid, input_type, input_id)
+
+	# mapping changed - either container or action added -
+	mapping_changed = QtCore.Signal(object) # fires when a container or action changes on an InputItem - passes the InputItem as the parameter
+	
+	# suspend keyboard input
+	suspend_keyboard_input = QtCore.Signal(bool) # arg = state, true = suspend, false = resume
 
 	def __init__(self):
 		"""Creates a new instance."""
@@ -272,6 +292,8 @@ class EventListener(QtCore.QObject):
 		# Calibration function for each axis of all devices
 		self._calibrations = {}
 
+		# map of axis input items that could be curved
+		self._joystick_input_item_map = {}
 		
 		# Joystick device change update timeout timer
 		self._device_update_timer = None
@@ -279,6 +301,9 @@ class EventListener(QtCore.QObject):
 		self._running = True
 
 		self._process_device_change_lock = False
+
+		self._joystick_suspend_count = 0 # stack count for suspend joystick
+
 
 		# keyboard input handling buffer
 		self._keyboard_state = {}
@@ -294,6 +319,21 @@ class EventListener(QtCore.QObject):
 		self._process_device_change.connect(self._process_device_change_cb)
 
 		Thread(target=self._run).start()
+
+	def registerInput(self, item):
+		''' registers an input item '''
+		if item.input_type == InputType.JoystickAxis:
+			key = (item.device_guid, item.input_id)
+			self._joystick_input_item_map[key] = item
+		
+
+	def push_joystick(self):
+		self._joystick_suspend_count += 1
+
+	def pop_joystick(self):
+		if self._joystick_suspend_count > 0:
+			self._joystick_suspend_count -= 1
+
 
 	def _device_changed_cb(self):
 		self._init_joysticks()
@@ -319,6 +359,7 @@ class EventListener(QtCore.QObject):
 		''' processes an item the keyboard buffer queue '''
 		item, is_pressed = self._keyboard_queue.get()
 		verbose = gremlin.config.Configuration().verbose_mode_keyboard
+		is_error = False
 		if verbose:
 			logging.getLogger("system").info(f"process_queue: found item: {item} is presseD: {is_pressed}")
 
@@ -333,19 +374,26 @@ class EventListener(QtCore.QObject):
 			key_id = item
 			scan_code, is_extended = item
 			key = gremlin.keyboard.KeyMap.find(scan_code, is_extended)
-			virtual_code = key.virtual_code
-			self._keyboard_buffer[key_id] = is_pressed
-		if verbose:
-			logging.getLogger("system").info(f"DEQUEUE KEY {gremlin.keyboard.KeyMap.keyid_tostring(key_id)} vk: {virtual_code} (0x{virtual_code:X}) name: {key.name} pressed: {is_pressed}")
-		
-		self.keyboard_event.emit(Event(
-			event_type= InputType.Keyboard,
-			device_guid=dinput.GUID_Keyboard,
-			identifier=key_id,
-			virtual_code = virtual_code,
-			is_pressed=is_pressed,
-			data = self._keyboard_buffer
-		))
+			if key is None:
+				logging.getLogger("system").error(f"DEQUEUE KEY: don't know how to handle scancode: {scan_code:x} extended: {is_extended}")	
+				is_error = True
+			else:				
+				virtual_code = key.virtual_code
+				self._keyboard_buffer[key_id] = is_pressed
+
+		if not is_error:
+			if verbose:
+				logging.getLogger("system").info(f"DEQUEUE KEY {gremlin.keyboard.KeyMap.keyid_tostring(key_id)} vk: {virtual_code} (0x{virtual_code:X}) name: {key.name} pressed: {is_pressed}")
+			
+
+			self.keyboard_event.emit(Event(
+				event_type= InputType.Keyboard,
+				device_guid=dinput.GUID_Keyboard,
+				identifier=key_id,
+				virtual_code = virtual_code,
+				is_pressed=is_pressed,
+				data = self._keyboard_buffer
+			))
 
 		# process the events
 		QtWidgets.QApplication.processEvents()
@@ -415,6 +463,7 @@ class EventListener(QtCore.QObject):
 		if self.mouse_hook:
 			self.mouse_hook.stop()
 
+
 	def reload_calibrations(self):
 		"""Reloads the calibration data from the configuration file."""
 		from gremlin.ui.ui_util import create_calibration_function
@@ -450,6 +499,10 @@ class EventListener(QtCore.QObject):
 		:param data the joystick event
 		"""
 
+		if self._joystick_suspend_count > 0:
+			# ignore if joystick input is suspended
+			return
+
 		from gremlin.util import dill_hat_lookup
 		verbose = config.Configuration().verbose_mode_joystick
 		
@@ -462,14 +515,19 @@ class EventListener(QtCore.QObject):
 		if event.input_type == dinput.InputType.Axis:
 			if verbose:
 				logging.getLogger("system").info(event)
-			
+
+			# get the curved input if the input is curved
+			raw_value = event.value
+			value = self._apply_calibration(event)
+			curved_value = self._apply_curve_ex(event.device_guid, event.input_index, value)
 			
 			self.joystick_event.emit(Event(
 				event_type= InputType.JoystickAxis,
 				device_guid=event.device_guid,
 				identifier=event.input_index,
-				value=self._apply_calibration(event),
-				raw_value=event.value,
+				value = value,
+				curved_value = curved_value,
+				raw_value= raw_value,
 				is_axis = True,
 				is_virtual = is_virtual
 			))
@@ -501,6 +559,10 @@ class EventListener(QtCore.QObject):
 		:param data information about the device changing state
 		:param action whether the device was added or removed
 		"""
+
+		# ignore if a VIGEM device - these are handled, for the moment, directly by the action
+		if data.vendor_id == 0x045E and data.product_id == 0x28E and data.button_count == 10 and data.name == b'Controller (XBOX 360 For Windows)':
+			return
 
 
 		if self._device_update_timer is not None:
@@ -556,27 +618,20 @@ class EventListener(QtCore.QObject):
 		# verbose = True
 		virtual_code = event.virtual_code
 		key_id = (event.scan_code, event.is_extended)
-		# print (f"recorded key: {key_id} vk: {virtual_code} (0x{virtual_code:X})")
+		#print (f"recorded key: {key_id} sc: {event.scan_code:X} vk: {virtual_code} (0x{virtual_code:X})")
 
 		# deal with any code translations needed
 		key_id, virtual_code = gremlin.keyboard.KeyMap.translate(key_id) # modify scan codes if needed
-		# print (f"translated key: {KeyMap.keyid_tostring(key_id)}  vk: {virtual_code} (0x{virtual_code:X})")
+		#print (f"translated key: {key_id} sc: {event.scan_code:X} vk: {virtual_code} (0x{virtual_code:X})")
 
 		is_pressed = event.is_pressed
-		# if virtual_code > 0:
-		# 	is_repeat = self._keyboard_state.get(virtual_code) and is_pressed
-		# else:
 		is_repeat = self._keyboard_state.get(key_id) and is_pressed
 
 		if is_repeat:
 			# ignore repeats
 			return True
 
-		# if virtual_code > 0:
-		# 	self._keyboard_state[virtual_code] = is_pressed
-		
 		self._keyboard_state[key_id] = is_pressed
-		# print (f"set state: {key_id} state: {is_pressed}")
 		
 		if gremlin.shared_state.is_running:
 			# RUN mode - queue input events
@@ -616,6 +671,25 @@ class EventListener(QtCore.QObject):
 		''' returns the state of the given key '''
 		return self._keyboard_state.get(key.index_tuple(), False)
 	
+	def get_shifted_state(self):
+		''' returns true if either of the shift keys are down'''
+		lshift_key = gremlin.keyboard.Key(scan_code = gremlin.keyboard.scan_codes.sc_shiftLeft)
+		if self.get_key_state(lshift_key):
+			return True
+		rshift_key = gremlin.keyboard.Key(scan_code = gremlin.keyboard.scan_codes.sc_shiftRight)
+		if self.get_key_state(rshift_key):
+			return True
+		return False
+	
+	def get_control_state(self):
+		''' returns true if either of the control keys are down '''
+		lctrl_key = gremlin.keyboard.Key(scan_code = gremlin.keyboard.scan_codes.sc_controlLeft)
+		if self.get_key_state(lctrl_key):
+			return True
+		rctrl_key = gremlin.keyboard.Key(scan_code = gremlin.keyboard.scan_codes.sc_controlRight)
+		if self.get_key_state(rctrl_key):
+			return True
+		return False
 
 
 	def _mouse_handler(self, event):
@@ -651,12 +725,37 @@ class EventListener(QtCore.QObject):
 		return True
 
 	def _apply_calibration(self, event):
+		''' applies calibration data to the vent'''
+		return self._apply_calibration_ex(event.device_guid, event.input_index, event.value)
+	
+	def _apply_curve(self, event):
+		''' applies input curves to the input '''
+		return self._apply_curve_ex(event.device_guid, event.input_index, event.value)
+		
+	def _apply_calibration_ex(self, device_guid, input_id, value):
 		from gremlin.util import axis_calibration
-		key = (event.device_guid, event.input_index)
+		key = (device_guid, input_id)
 		if key in self._calibrations:
-			return self._calibrations[key](event.value)
+			return self._calibrations[key](value)
 		else:
-			return axis_calibration(event.value, -32768, 0, 32767)
+			return axis_calibration(value, -32768, 0, 32767)
+		
+	def _apply_curve_ex(self, device_guid, input_id, value):
+		key = (device_guid, input_id)
+		if key in self._joystick_input_item_map:
+			item = self._joystick_input_item_map[key]
+			if item.curve_data is not None:
+				curved_value = item.curve_data.curve_value(value)
+				#print(f"curved: {value:0.4f} -> {curved_value:0.4f}")
+				return curved_value
+		return value
+	
+	def apply_transforms(self, device_guid, input_id, raw_value):
+		''' applies raw transforms to the data - input is expected in dinput range (-32K to +32k)'''
+		calib_value = self._apply_calibration_ex(device_guid, input_id, raw_value)
+		curved_value = self._apply_curve_ex(device_guid, input_id, calib_value)
+		#print(f"Raw value: {raw_value:0.4f} filtered: {calib_value:0.4f} Curved value: {curved_value:0.4f}")
+		return curved_value
 
 	def _init_joysticks(self):
 		"""Initializes joystick devices."""
@@ -711,6 +810,10 @@ class EventHandler(QtCore.QObject):
 		self.reset()
 
 	def reset(self):
+		verbose = gremlin.config.Configuration().verbose
+		if verbose:
+			logging.getLogger("system").info("EventHandler: reset()")
+			
 		self.process_callbacks = True
 		self.callbacks = {}
 		self.latched_events = {}
@@ -718,6 +821,7 @@ class EventHandler(QtCore.QObject):
 		self.midi_callbacks = {}
 		self.osc_callbacks = {}
 		self._event_lookup = {}
+		self.latched_functors = {}
 		
 
 	@property
@@ -829,6 +933,18 @@ class EventHandler(QtCore.QObject):
 				for event in self.callbacks[device_guid][mode]:
 					self.dump_exectree(device_guid, mode, event)
 
+
+	def add_latched_functor(self, device_guid, mode, event, functor):
+		''' registers an extra latched functor on inputs if a functor uses multiple inputs '''
+		# regular event
+		if device_guid not in self.latched_functors:
+			self.latched_functors[device_guid] = {}
+		if mode not in self.latched_functors[device_guid]:
+			self.latched_functors[device_guid][mode] = {}
+		if event not in self.latched_functors[device_guid][mode]:
+			self.latched_functors[device_guid][mode][event] = []
+		self.latched_functors[device_guid][mode][event].append(functor)
+		
 				
 
 	def add_callback(self, device_guid, mode, event, callback, permanent=False):
@@ -1121,6 +1237,8 @@ class EventHandler(QtCore.QObject):
 				logging.getLogger("system").debug(f"Profile: {current_profile.name} - Design time Mode switch to: {new_mode}")
 				if emit:
 					self.mode_changed.emit(self.edit_mode)
+					
+
 
 		# update the status bar
 		self.mode_status_update.emit()
@@ -1162,7 +1280,7 @@ class EventHandler(QtCore.QObject):
 
 		# list of callbacks
 		m_list = []
-
+		f_list = []
 		
 		
 		verbose = gremlin.config.Configuration().verbose_mode_inputs
@@ -1244,12 +1362,12 @@ class EventHandler(QtCore.QObject):
 		elif event.event_type in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat):
 			verbose = gremlin.config.Configuration().verbose_mode_joystick
 			m_list = self._matching_callbacks(event)
+			f_list = self._matching_functors(event)
 		else:
 			# other inputs
 			verbose = gremlin.config.Configuration().verbose_mode_details
 			m_list = self._matching_callbacks(event)
-
-		
+			f_list = self._matching_functors(event)
 
 		
 		if m_list:
@@ -1257,11 +1375,14 @@ class EventHandler(QtCore.QObject):
 				logging.getLogger("system").info(f"TRIGGER: mode: [{self.runtime_mode}] callbacks: {len(m_list)} event: {event}")
 			self._trigger_callbacks(m_list, event)
 
+		if f_list:
+			if verbose:
+				logging.getLogger("system").info(f"TRIGGER: mode: [{self.runtime_mode}] functors: {len(f_list)} event: {event}")
+			self._trigger_functor_callbacks(f_list, event)
+
 
 	def _trigger_callbacks(self, callbacks, event):
 		#verbose = gremlin.config.Configuration().verbose'
-		if event.event_type == InputType.JoystickAxis:
-			pass
 		for cb in callbacks:
 			try:
 				# if verbose:
@@ -1271,6 +1392,15 @@ class EventHandler(QtCore.QObject):
 				# 	logging.getLogger("system").info(f"CALLBACK: execute done")
 			except Exception as ex:
 				logging.getLogger("system").error(f"CALLBACK: error {ex}")
+
+	def _trigger_functor_callbacks(self, functors, event : Event):
+		#verbose = gremlin.config.Configuration().verbose'
+		import gremlin.actions
+		for functor in functors:
+			try:
+				functor.process_event(event, gremlin.actions.Value(event.value))
+			except Exception as ex:
+				logging.getLogger("system").error(f"FUNCTOR CALLBACK: error {ex}")				
 
 
 	def _matching_midi_callbacks(self, event):
@@ -1307,7 +1437,20 @@ class EventHandler(QtCore.QObject):
 			return [c[0] for c in callback_list if c[1]]
 		else:
 			return [c[0] for c in callback_list]
-			
+
+
+	def _matching_functors(self, event) -> list:
+		''' gets the list of matching functors to call when an event occurs '''	
+		functors_list = []
+		device_guid = event.device_guid
+		if device_guid in self.latched_functors:
+			mode = self.runtime_mode
+			if mode in self.latched_functors[device_guid].keys():
+				if event in self.latched_functors[device_guid][mode].keys():
+					functors_list = self.latched_functors[device_guid][mode][event]
+
+		return functors_list
+
 
 	def _matching_callbacks(self, event):
 		"""Returns the list of callbacks to execute in response to
@@ -1369,3 +1512,5 @@ class EventHandler(QtCore.QObject):
 			if keyword in signature:
 				callback = plugin.install(callback, functools.partial)
 		return callback
+
+

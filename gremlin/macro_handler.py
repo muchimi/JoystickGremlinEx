@@ -33,6 +33,7 @@ import gremlin.input_devices
 from gremlin.input_devices import VjoyAction
 from gremlin.keyboard import key_from_code, key_from_name
 import gremlin.types
+import gremlin.ui.ui_common
 
 syslog = logging.getLogger("system")
 
@@ -120,7 +121,7 @@ class MacroActionEditor(QtWidgets.QWidget):
         try:
             MacroActionEditor.locked = True
 
-            self.action_selector = QtWidgets.QComboBox()
+            self.action_selector = gremlin.ui.ui_common.QComboBox()
             for action_name in sorted(self.action_types):
                 self.action_selector.addItem(action_name)
             self.action_selector.currentTextChanged.connect(self._change_action)
@@ -499,7 +500,7 @@ class MacroActionEditor(QtWidgets.QWidget):
 
         elif action.input_type == InputType.JoystickHat:
             if not "hat_direction" in self.ui_elements.keys():
-                self.ui_elements["hat_direction"] = QtWidgets.QComboBox()
+                self.ui_elements["hat_direction"] = gremlin.ui.ui_common.QComboBox()
                 directions = [
                     "Center", "North", "North East", "East", "South East",
                     "South", "South West", "West", "North West"
@@ -520,7 +521,7 @@ class MacroActionEditor(QtWidgets.QWidget):
 
     def _remote_control_ui(self):
         self.ui_elements["remote_control_cb_label"] = QtWidgets.QLabel("Remote control command:") 
-        cb = QtWidgets.QComboBox()
+        cb = gremlin.ui.ui_common.QComboBox()
         self.ui_elements["remote_control_cb"] = cb
         self.ui_elements["remote_control_label"] = QtWidgets.QLabel()
         commands = [
@@ -1192,7 +1193,7 @@ class MacroSettingsWidget(QtWidgets.QWidget):
         # Create UI elements
         self.exclusive_checkbox = QtWidgets.QCheckBox("Exclusive")
         self.force_remote_checkbox = QtWidgets.QCheckBox("Remote Only")
-        self.repeat_dropdown = QtWidgets.QComboBox()
+        self.repeat_dropdown = gremlin.ui.ui_common.QComboBox()
         self.repeat_dropdown.addItems(["None", "Count", "Toggle", "Hold"])
         self.repeat_widget = None
         if type(self.data.repeat) in MacroSettingsWidget.storage_to_name:

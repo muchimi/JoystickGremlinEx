@@ -11,18 +11,25 @@ import lxml.etree
 import jsonpickle
 import importlib
 import msgpack
-
+from enum import IntEnum
 
 import gremlin.base_profile
 from gremlin.singleton_decorator import SingletonDecorator
 
+class EncoderType(IntEnum):
+    Action = 1
+    Container = 2
+
 class ObjectEncoder():
     ''' helper class to encode objects '''
-    def __init__(self, obj, data):
+    def __init__(self, obj, data, name, encoder_type : EncoderType ):
         cls = type(obj)
-        self._name = cls.__name__
+        self._name = name
+        self._class_name = cls.__name__
         self._module = cls.__module__
-        self._data =data
+        self._data = data
+        self._type : EncoderType = encoder_type
+        
 
     @property
     def data(self):
@@ -35,6 +42,18 @@ class ObjectEncoder():
     @property
     def name(self):
         return self._name
+    
+    @property
+    def class_name(self):
+        return self._class_name
+    
+    @name.setter
+    def name(self, value):
+        self._name = value
+    
+    @property
+    def encoder_type(self)->EncoderType:
+        return self._type
 
 @SingletonDecorator
 class Clipboard(QtCore.QObject):
@@ -58,6 +77,7 @@ class Clipboard(QtCore.QObject):
 
         # user profile path
         
+
 
     @property
     def data(self):
@@ -109,7 +129,8 @@ class Clipboard(QtCore.QObject):
                 pass
 
         if data and isinstance(data, AbstractContainer) \
-            or isinstance(data, AbstractAction):
+            or isinstance(data, AbstractAction) \
+                or isinstance(data, ObjectEncoder):
             self._data = data
 
 
@@ -147,7 +168,7 @@ class Clipboard(QtCore.QObject):
                         logging.getLogger("system").error(f"DILL serializationf failed: {error}")        
 
 
-    def set_windows_clipboard_text(self, value):
+    def set_windows_clipboard_text(self, value : str):
         ''' sets the windows clipboard text '''
         # method 1
         clipboard = QApplication.clipboard()
@@ -161,7 +182,7 @@ class Clipboard(QtCore.QObject):
         # win32clipboard.SetClipboardText(value, win32clipboard.CF_TEXT)
         # win32clipboard.CloseClipboard()
 
-    def get_windows_clipboard_text(self):
+    def get_windows_clipboard_text(self) -> str:
         ''' gets the windows clipboard text '''
 
         try:
@@ -201,12 +222,18 @@ class Clipboard(QtCore.QObject):
     def is_container(self):
         ''' true if the data item is a container '''
         from gremlin.base_profile import AbstractContainer
+        data = self.data
+        if isinstance(data, ObjectEncoder):
+            return data.encoder_type == EncoderType.Container
         return self.data is not None and isinstance(self.data, AbstractContainer)
     
     @property
     def is_action(self):
         ''' true if the data item is an action '''
         from gremlin.base_profile import AbstractAction
+        data = self.data
+        if isinstance(data, ObjectEncoder):
+            return data.encoder_type == EncoderType.Action
         return self.data is not None and isinstance(self.data, AbstractAction)
     
     @property

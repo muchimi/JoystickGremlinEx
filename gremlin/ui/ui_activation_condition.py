@@ -63,7 +63,7 @@ class ActivationConditionWidget(QtWidgets.QWidget):
 
         try:
             ActivationConditionWidget.locked = True
-            self.granularity_selector = QtWidgets.QComboBox()
+            self.granularity_selector = ui_common.QComboBox()
             self.granularity_selector.addItem("None")
             self.granularity_selector.addItem("Action")
             self.granularity_selector.addItem("Container")
@@ -209,7 +209,7 @@ class KeyboardConditionWidget(AbstractConditionWidget):
                 lambda: self.deleted.emit(self.condition_data)
             )
 
-            self.comparison_dropdown = QtWidgets.QComboBox()
+            self.comparison_dropdown = ui_common.QComboBox()
             self.comparison_dropdown.addItem("Pressed")
             self.comparison_dropdown.addItem("Released")
             if self.condition_data.comparison:
@@ -343,7 +343,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
         self.upper.setValue(self.condition_data.range[1])
         self.upper.valueChanged.connect(self._range_upper_changed_cb)
 
-        self.comparison_dropdown = QtWidgets.QComboBox()
+        self.comparison_dropdown = ui_common.QComboBox()
         self.comparison_dropdown.addItem("Inside")
         self.comparison_dropdown.addItem("Outside")
         self.comparison_dropdown.setCurrentText(
@@ -371,7 +371,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
 
     def _button_ui(self):
         """Creates the UI needed to configure a button based condition."""
-        self.comparison_dropdown = QtWidgets.QComboBox()
+        self.comparison_dropdown = ui_common.QComboBox()
         self.comparison_dropdown.addItem("Pressed")
         self.comparison_dropdown.addItem("Released")
         self.comparison_dropdown.setCurrentText(
@@ -399,7 +399,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
             "Center", "North", "North East", "East", "South East",
             "South", "South West", "West", "North West"
         ]
-        self.comparison_dropdown = QtWidgets.QComboBox()
+        self.comparison_dropdown = ui_common.QComboBox()
         for entry in directions:
             self.comparison_dropdown.addItem(entry)
         self.comparison_dropdown.setCurrentText(
@@ -582,7 +582,7 @@ class VJoyConditionWidget(AbstractConditionWidget):
         self.upper.setValue(self.condition_data.range[1])
         self.upper.valueChanged.connect(self._range_upper_changed_cb)
 
-        self.comparison_dropdown = QtWidgets.QComboBox()
+        self.comparison_dropdown = ui_common.QComboBox()
         self.comparison_dropdown.addItem("Inside")
         self.comparison_dropdown.addItem("Outside")
         self.comparison_dropdown.setCurrentText(
@@ -610,7 +610,7 @@ class VJoyConditionWidget(AbstractConditionWidget):
 
     def _button_ui(self):
         """Creates the UI needed to configure a button based condition."""
-        self.comparison_dropdown = QtWidgets.QComboBox()
+        self.comparison_dropdown = ui_common.QComboBox()
         self.comparison_dropdown.addItem("Pressed")
         self.comparison_dropdown.addItem("Released")
         self.comparison_dropdown.setCurrentText(
@@ -638,7 +638,7 @@ class VJoyConditionWidget(AbstractConditionWidget):
             "Center", "North", "North East", "East", "South East",
             "South", "South West", "West", "North West"
         ]
-        self.comparison_dropdown = QtWidgets.QComboBox()
+        self.comparison_dropdown = ui_common.QComboBox()
         for entry in directions:
             self.comparison_dropdown.addItem(entry)
         self.comparison_dropdown.setCurrentText(
@@ -733,7 +733,7 @@ class InputActionConditionWidget(AbstractConditionWidget):
         try:
             InputActionConditionWidget.locked = True
 
-            self.state_dropdown = QtWidgets.QComboBox()
+            self.state_dropdown = ui_common.QComboBox()
             self.state_dropdown.addItem("Pressed")
             self.state_dropdown.addItem("Released")
             if self.condition_data.comparison:
@@ -881,7 +881,7 @@ class ConditionView(ui_common.AbstractView):
         self.main_layout.addLayout(self.conditions_layout)
 
         # Condition truth rules
-        self.rule_selector = QtWidgets.QComboBox()
+        self.rule_selector = ui_common.QComboBox()
         self.rule_selector.addItem("All")
         self.rule_selector.addItem("Any")
         self.rule_selector.currentTextChanged.connect(self._rule_changed_cb)
@@ -894,7 +894,7 @@ class ConditionView(ui_common.AbstractView):
         self.controls_layout.addStretch()
 
         # Condition selector
-        self.condition_selector = QtWidgets.QComboBox()
+        self.condition_selector = ui_common.QComboBox()
         self.condition_selector.addItem("Keyboard Condition")
         self.condition_selector.addItem("Joystick Condition")
         self.condition_selector.addItem("vJoy Condition")

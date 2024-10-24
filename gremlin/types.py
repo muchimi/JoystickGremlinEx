@@ -18,14 +18,16 @@
 
 from __future__ import annotations
 
-import enum
+from enum import Enum, auto, IntFlag, IntEnum, unique
 
 from typing import Tuple, Union
 
 import gremlin.error
 
+import logging
 
-class VisualizationType(enum.Enum):
+
+class VisualizationType(Enum):
 
     """Enumeration of possible visualization types."""
 
@@ -33,7 +35,7 @@ class VisualizationType(enum.Enum):
     AxisCurrent = 2
     ButtonHat = 3
 
-class KeyboardOutputMode(enum.Enum):
+class KeyboardOutputMode(Enum):
     Both = 0 # keyboard make and break (press/release) (pulse mode)
     Press = 1 # keyboard make only
     Release = 2 # keyboard release only
@@ -41,7 +43,7 @@ class KeyboardOutputMode(enum.Enum):
     AutoRepeat = 4 # repeated pulse mode - key pulses while the input is held
 
     
-class ActivationRule(enum.Enum):
+class ActivationRule(Enum):
 
     """Activation rules for collections of conditions.
 
@@ -54,7 +56,7 @@ class ActivationRule(enum.Enum):
 
 
 
-class AxisNames(enum.Enum):
+class AxisNames(Enum):
 
     """Names associated with axis indices."""
 
@@ -72,18 +74,16 @@ class AxisNames(enum.Enum):
         try:
             return _AxisNames_to_string_lookup[value]
         except KeyError:
-            raise gremlin.error.GremlinError(
-                f"Invalid AxisName lookup, {value}"
-            )
+            logging.getLogger("system").error(f"AxisNames: Don't know how to convert axis to string: '{value}' to a string - defaulting to X (1)")
+            return "X"
 
     @staticmethod
     def to_enum(value: str) -> AxisNames:
         try:
             return _AxisNames_to_enum_lookup[value]
         except KeyError:
-            raise gremlin.error.GremlinError(
-                f"Invalid AxisName lookup, {value}"
-            )
+            logging.getLogger("system").error(f"AxisNames: Don't know how to convert axis to enum: '{value}' to a string - defaulting to X (1)")
+            return AxisNames.X
         
     @staticmethod
     def to_list():
@@ -108,11 +108,11 @@ _AxisNames_to_enum_lookup = {
     "Y Rotation (5)": AxisNames.RY,
     "Z Rotation (6)": AxisNames.RZ,
     "Slider (7)": AxisNames.SLIDER,
-    "Dial (9)": AxisNames.DIAL
+    "Dial (8)": AxisNames.DIAL
 }
 
 
-class AxisButtonDirection(enum.Enum):
+class AxisButtonDirection(Enum):
 
     """Possible activation directions for axis button instances."""
 
@@ -151,7 +151,7 @@ _AxisButtonDirection_to_enum_lookup = {
 }
 
 
-class MouseButton(enum.Enum):
+class MouseButton(Enum):
 
     """Enumeration of all possible mouse buttons."""
 
@@ -197,7 +197,7 @@ _MouseButton_to_enum_lookup = {
     "Wheel Down": MouseButton.WheelDown,
 }
 
-class xIntEnum(enum.IntEnum):
+class xIntEnum(IntEnum):
     def __eq__(self, other):
         if type(self).__name__ == type(other).__name__:
             return self.value == other.value
@@ -209,7 +209,7 @@ class xIntEnum(enum.IntEnum):
         return hash(self.value)
         
 
-class DeviceType(enum.IntEnum):
+class DeviceType(IntEnum):
 
     """Enumeration of the different possible input types."""
 
@@ -232,7 +232,21 @@ class DeviceType(enum.IntEnum):
             return _DeviceType_to_enum_lookup[value]
         except KeyError:
             raise gremlin.error.GremlinError("Invalid type in lookup")
+        
+    @staticmethod
+    def to_display_name(value):
+        return _DeviceType_to_display_name[value]
 
+
+
+
+_DeviceType_to_display_name = {
+    DeviceType.Keyboard: "Keyboard",
+    DeviceType.Joystick: "Joystick",
+    DeviceType.VJoy: "VJoy",
+    DeviceType.Midi: "MIDI",
+    DeviceType.Osc: "OSC"
+}
 
 _DeviceType_to_string_lookup = {
     DeviceType.Keyboard: "keyboard",
@@ -311,7 +325,7 @@ _PluginVariableType_to_enum_lookup = {
 }
 
 
-class MergeAxisOperation(enum.Enum):
+class MergeAxisOperation(Enum):
 
     """Possible merge axis operation modes."""
 
@@ -353,7 +367,7 @@ _MergeAxisOperation_to_enum_lookup = {
 }
 
 
-class PropertyType(enum.Enum):
+class PropertyType(Enum):
 
     """Enumeration of all known property types."""
 
@@ -430,7 +444,7 @@ _PropertyType_to_enum_lookup = {
 }
 
 
-class AxisMode(enum.Enum):
+class AxisMode(Enum):
 
     Absolute = 1
     Relative = 2
@@ -463,7 +477,7 @@ _AxisMode_to_enum_lookup = {
 }
 
 
-class HatDirection(enum.Enum):
+class HatDirection(Enum):
 
     """Represents the possible directions a hat can take on."""
 
@@ -534,7 +548,7 @@ _HatDirection_to_enum_lookup = {
 }
 
 
-class LogicalOperator(enum.Enum):
+class LogicalOperator(Enum):
 
     """Enumeration of possible condition combinations."""
 
@@ -581,7 +595,7 @@ class LogicalOperator(enum.Enum):
         return value
 
 
-class ConditionType(enum.Enum):
+class ConditionType(Enum):
 
     """Enumeration of possible condition types."""
 
@@ -633,7 +647,7 @@ class ConditionType(enum.Enum):
 
 
 
-class MouseClickMode(enum.Enum):
+class MouseClickMode(Enum):
     Normal = 0 # click on/off
     Press = 1 # press only
     Release = 2 # release only
@@ -687,7 +701,7 @@ class MouseClickMode(enum.Enum):
             return "Mouse button release"
         return f"Unknown {action}"
     
-class MouseAction(enum.Enum):
+class MouseAction(Enum):
     MouseButton = 0 # output a mouse button
     MouseMotion = 1 # output a mouse motion
     MouseWiggleOnLocal = 2 # enable mouse wiggle - local machine only
@@ -760,7 +774,7 @@ class MouseAction(enum.Enum):
                 
         return f"Unknown {action}"
     
-class MouseButton(enum.Enum):
+class MouseButton(Enum):
 
     """Enumeration of all possible mouse buttons."""
 
@@ -867,23 +881,23 @@ _MouseButton_lookup_to_button_lookup = {
 }
 
 
-@enum.unique
-class VerboseMode(enum.IntFlag):
+@unique
+class VerboseMode(IntFlag):
     NotSet = 0
-    Keyboard = enum.auto() # keyboard input only
-    Joystick = enum.auto() # joystick input
-    Inputs = enum.auto() # list inputs
-    Mouse = enum.auto() # mouse input
-    SimConnect = enum.auto() # simconnect interface
-    Details = enum.auto() # user interface details
+    Keyboard = auto() # keyboard input only
+    Joystick = auto() # joystick input
+    Inputs = auto() # list inputs
+    Mouse = auto() # mouse input
+    SimConnect = auto() # simconnect interface
+    Details = auto() # user interface details
     All = Keyboard | Joystick | Inputs | Mouse | Details | SimConnect
 
     def __contains__(self, item):
         return  (self.value & item.value) == item.value
 
 
-@enum.unique
-class TabDeviceType(int, enum.Enum):
+@unique
+class TabDeviceType(int, Enum):
     ''' types of devices shown on device tabs '''
     NotSet = 0
     Joystick = 1
@@ -894,3 +908,117 @@ class TabDeviceType(int, enum.Enum):
     VjoyOutput = 6
     Settings = 7
     Plugins = 8
+
+
+
+class GamePadOutput(Enum):
+    ''' outputs for gamepads '''
+    NotSet = auto()
+    LeftStickX = auto()
+    LeftStickY = auto()
+    RightStickX = auto()
+    RightStickY = auto()
+    LeftTrigger = auto()
+    RightTrigger = auto()
+    ButtonA = auto()
+    ButtonB = auto()
+    ButtonX = auto()
+    ButtonY = auto()
+    ButtonStart = auto()
+    ButtonBack = auto()
+    ButtonThumbLeft = auto()
+    ButtonThumbRight = auto()
+    ButtonGuide = auto()
+    ButtonShoulderLeft = auto()
+    ButtonShoulderRight = auto()
+    ButtonDpadUp = auto()
+    ButtonDpadDown = auto()
+    ButtonDpadLeft = auto()
+    ButtonDpadRight = auto()
+
+    @staticmethod
+    def to_string(value):
+        return _gamepad_output_to_string[value]
+    
+    @staticmethod
+    def to_enum(value):
+        return _gamepad_output_to_enum[value]
+    
+    @staticmethod
+    def to_display_name(value):
+        return _gamepad_output_to_display_name[value]
+    
+_gamepad_output_to_string = {
+    GamePadOutput.NotSet : "none",
+    GamePadOutput.LeftStickX: "left_x",
+    GamePadOutput.LeftStickY: "left_y",
+    GamePadOutput.RightStickX: "right_x",
+    GamePadOutput.RightStickY: "right_y",
+    GamePadOutput.LeftTrigger: "left_trigger",
+    GamePadOutput.RightTrigger: "right_trigger",
+    GamePadOutput.ButtonA: "button_a",
+    GamePadOutput.ButtonB:"button_b",
+    GamePadOutput.ButtonX: "button_x",
+    GamePadOutput.ButtonY:"button_y",
+    GamePadOutput.ButtonStart:"button_start",
+    GamePadOutput.ButtonBack:"button_back",
+    GamePadOutput.ButtonThumbLeft:"button_thumb_left",
+    GamePadOutput.ButtonThumbRight:"button_thumb_right",
+    GamePadOutput.ButtonGuide:"button_guide",
+    GamePadOutput.ButtonShoulderLeft:"button_shoulder_left",
+    GamePadOutput.ButtonShoulderRight:"button_shoulder_right",
+    GamePadOutput.ButtonDpadUp:"button_dpad_up",
+    GamePadOutput.ButtonDpadDown:"button_dpad_down",
+    GamePadOutput.ButtonDpadLeft:"button_dpad_left",
+    GamePadOutput.ButtonDpadRight:"button_dpad_right",
+}
+
+_gamepad_output_to_display_name = {
+    GamePadOutput.NotSet : "N/A",
+    GamePadOutput.LeftStickX: "Left Stick X",
+    GamePadOutput.LeftStickY: "Left Stick Y",
+    GamePadOutput.RightStickX: "Right Stick X",
+    GamePadOutput.RightStickY: "Right Stick Y",
+    GamePadOutput.LeftTrigger: "Left Trigger",
+    GamePadOutput.RightTrigger: "Right Trigger",
+    GamePadOutput.ButtonA: "A",
+    GamePadOutput.ButtonB:"B",
+    GamePadOutput.ButtonX: "X",
+    GamePadOutput.ButtonY:"Y",
+    GamePadOutput.ButtonStart:"Start",
+    GamePadOutput.ButtonBack:"Back",
+    GamePadOutput.ButtonThumbLeft:"Thumb Left",
+    GamePadOutput.ButtonThumbRight:"Thumb Right",
+    GamePadOutput.ButtonGuide:"Guide",
+    GamePadOutput.ButtonShoulderLeft:"Shoulder Left",
+    GamePadOutput.ButtonShoulderRight:"Shoulder Right",
+    GamePadOutput.ButtonDpadUp:"Dpad Up",
+    GamePadOutput.ButtonDpadDown:"Dpad Down",
+    GamePadOutput.ButtonDpadLeft:"Dpad Left",
+    GamePadOutput.ButtonDpadRight:"Dpad Right",
+}
+
+_gamepad_output_to_enum = {
+    "none": GamePadOutput.NotSet ,
+    "left_x" : GamePadOutput.LeftStickX,
+    "left_y": GamePadOutput.LeftStickY ,
+    "right_x" : GamePadOutput.RightStickX,
+    "right_y": GamePadOutput.RightStickY,
+    "left_trigger": GamePadOutput.LeftTrigger,
+    "right_trigger": GamePadOutput.RightTrigger,
+    "button_a": GamePadOutput.ButtonA,
+    "button_b": GamePadOutput.ButtonB,
+    "button_x": GamePadOutput.ButtonX,
+    "button_y": GamePadOutput.ButtonY,
+    "button_start": GamePadOutput.ButtonStart,
+    "button_back": GamePadOutput.ButtonBack,
+    "button_thumb_left": GamePadOutput.ButtonThumbLeft,
+    "button_thumb_right": GamePadOutput.ButtonThumbRight,
+    "button_guide": GamePadOutput.ButtonGuide,
+    "button_shoulder_left": GamePadOutput.ButtonShoulderLeft,
+    "button_shoulder_right": GamePadOutput.ButtonShoulderRight,
+    "button_dpad_up": GamePadOutput.ButtonDpadUp,
+    "button_dpad_down": GamePadOutput.ButtonDpadDown,
+    "button_dpad_left": GamePadOutput.ButtonDpadLeft,
+    "button_dpad_right": GamePadOutput.ButtonDpadRight,
+}

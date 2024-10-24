@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" xmlns:cc="http://creativecommons.org/ns#" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns:svg="http://www.w3.org/2000/svg" viewBox="0 0 500 500">
+  <defs>
+    <style>
+      .cls-1, .cls-2, .cls-3, .cls-4, .cls-5, .cls-6, .cls-7, .cls-8, .cls-9, .cls-10, .cls-11, .cls-12, .cls-13, .cls-14, .cls-15, .cls-16, .cls-17 {
+        fill: none;
+      }
+
+      .cls-1, .cls-4, .cls-5, .cls-9, .cls-14 {
+        stroke: #d9d9d9;
+      }
+
+      .cls-1, .cls-12 {
+        stroke-dasharray: 0 0 0 0 0 0 6 6 6 6 6 6;
+      }
+
+      .cls-2, .cls-7, .cls-10, .cls-12, .cls-15 {
+        stroke: #cecbe6;
+      }
+
+      .cls-3 {
+        stroke-width: 1.9px;
+      }
+
+      .cls-3, .cls-18, .cls-11 {
+        stroke: #ccc;
+        stroke-miterlimit: 10;
+      }
+
+      .cls-4, .cls-10 {
+        stroke-dasharray: 0 0 0 0 6 6 6 6;
+      }
+
+      .cls-18 {
+        fill: #f2f2f2;
+      }
+
+      .cls-18, .cls-11 {
+        stroke-width: 1.8px;
+      }
+
+      .cls-6 {
+        stroke: #a0a0a0;
+      }
+
+      .cls-7, .cls-9 {
+        stroke-dasharray: 0 0 0 0 0 0 5.9 5.9 5.9 5.9 5.9 5.9;
+      }
+
+      .cls-8 {
+        stroke-dasharray: 0 0 2 2;
+      }
+
+      .cls-8, .cls-16, .cls-17 {
+        stroke: #dedede;
+      }
+
+      .cls-13 {
+        stroke: #b0b0b0;
+      }
+
+      .cls-14, .cls-15 {
+        stroke-dasharray: 0 0 0 0 5.9 5.9 5.9 5.9;
+      }
+
+      .cls-19 {
+        display: none;
+      }
+
+      .cls-16 {
+        stroke-dasharray: 0 0 2 2;
+      }
+    </style>
+  </defs>
+  <g id="svg2987" class="cls-19" inkscape:version="0.92.1 r15371" sodipodi:docname="grid.svg">
+    <sodipodi:namedview id="base" bordercolor="#666666" borderopacity="1.0" inkscape:current-layer="layer1" inkscape:cx="256.9791" inkscape:cy="296.55015" inkscape:document-units="px" inkscape:pageopacity="0.0" inkscape:pageshadow="2" inkscape:window-height="1127" inkscape:window-maximized="0" inkscape:window-width="1426" inkscape:window-x="504" inkscape:window-y="667" inkscape:zoom="1.2625" pagecolor="#ffffff" showgrid="false"/>
+  </g>
+  <g id="Layer_2" data-name="Layer 2">
+    <rect class="cls-18" width="499.8" height="500"/>
+    <g>
+      <rect class="cls-13" x="2" y=".4" width="499.6" height="499.6"/>
+      <g id="LINES">
+        <rect class="cls-6" x="1.8" width="500" height="499.6"/>
+        <g>
+          <line class="cls-17" x1="1.8" y1="437.1" x2="2.8" y2="437.1"/>
+          <line class="cls-16" x1="4.8" y1="437.1" x2="499.8" y2="437.1"/>
+          <line class="cls-17" x1="500.8" y1="437.1" x2="501.8" y2="437.1"/>
+        </g>
+        <g>
+          <line class="cls-2" x1="1.8" y1="374.7" x2="4.8" y2="374.7"/>
+          <line class="cls-10" x1="10.7" y1="374.7" x2="31.6" y2="374.7"/>
+          <line class="cls-12" x1="34.5" y1="374.7" x2="495.8" y2="374.7"/>
+          <line class="cls-2" x1="498.8" y1="374.7" x2="501.8" y2="374.7"/>
+        </g>
+        <g>
+          <line class="cls-17" x1="1.8" y1="312.2" x2="2.8" y2="312.2"/>
+          <line class="cls-16" x1="4.8" y1="312.2" x2="499.8" y2="312.2"/>
+          <line class="cls-17" x1="500.8" y1="312.2" x2="501.8" y2="312.2"/>
+        </g>
+        <g class="cls-19">
+          <g>
+            <line class="cls-5" x1="1.8" y1="249.8" x2="4.8" y2="249.8"/>
+            <line class="cls-4" x1="10.7" y1="249.8" x2="31.6" y2="249.8"/>
+            <line class="cls-1" x1="34.5" y1="249.8" x2="495.8" y2="249.8"/>
+            <line class="cls-5" x1="498.8" y1="249.8" x2="501.8" y2="249.8"/>
+          </g>
+        </g>
+        <g>
+          <line class="cls-17" x1="1.8" y1="187.3" x2="2.8" y2="187.3"/>
+          <line class="cls-16" x1="4.8" y1="187.3" x2="499.8" y2="187.3"/>
+          <line class="cls-17" x1="500.8" y1="187.3" x2="501.8" y2="187.3"/>
+        </g>
+        <g>
+          <line class="cls-2" x1="1.8" y1="124.9" x2="4.8" y2="124.9"/>
+          <line class="cls-10" x1="10.7" y1="124.9" x2="31.6" y2="124.9"/>
+          <line class="cls-12" x1="34.5" y1="124.9" x2="495.8" y2="124.9"/>
+          <line class="cls-2" x1="498.8" y1="124.9" x2="501.8" y2="124.9"/>
+        </g>
+        <g>
+          <line class="cls-17" x1="1.8" y1="62.4" x2="2.8" y2="62.4"/>
+          <line class="cls-16" x1="4.8" y1="62.4" x2="499.8" y2="62.4"/>
+          <line class="cls-17" x1="500.8" y1="62.4" x2="501.8" y2="62.4"/>
+        </g>
+        <g>
+          <line class="cls-17" x1="439.3" x2="439.3" y2="1"/>
+          <line class="cls-8" x1="439.3" y1="3" x2="439.3" y2="497.6"/>
+          <line class="cls-17" x1="439.3" y1="498.6" x2="439.3" y2="499.6"/>
+        </g>
+        <g>
+          <line class="cls-2" x1="376.8" x2="376.8" y2="3"/>
+          <line class="cls-15" x1="376.8" y1="8.9" x2="376.8" y2="29.8"/>
+          <line class="cls-7" x1="376.8" y1="32.7" x2="376.8" y2="493.6"/>
+          <line class="cls-2" x1="376.8" y1="496.6" x2="376.8" y2="499.6"/>
+        </g>
+        <g>
+          <line class="cls-17" x1="314.3" x2="314.3" y2="1"/>
+          <line class="cls-8" x1="314.3" y1="3" x2="314.3" y2="497.6"/>
+          <line class="cls-17" x1="314.3" y1="498.6" x2="314.3" y2="499.6"/>
+        </g>
+        <g class="cls-19">
+          <g>
+            <line class="cls-5" x1="251.8" x2="251.8" y2="3"/>
+            <line class="cls-14" x1="251.8" y1="8.9" x2="251.8" y2="29.8"/>
+            <line class="cls-9" x1="251.8" y1="32.7" x2="251.8" y2="493.6"/>
+            <line class="cls-5" x1="251.8" y1="496.6" x2="251.8" y2="499.6"/>
+          </g>
+        </g>
+        <g>
+          <line class="cls-17" x1="189.3" x2="189.3" y2="1"/>
+          <line class="cls-8" x1="189.3" y1="3" x2="189.3" y2="497.6"/>
+          <line class="cls-17" x1="189.3" y1="498.6" x2="189.3" y2="499.6"/>
+        </g>
+        <g>
+          <line class="cls-2" x1="126.8" x2="126.8" y2="3"/>
+          <line class="cls-15" x1="126.8" y1="8.9" x2="126.8" y2="29.8"/>
+          <line class="cls-7" x1="126.8" y1="32.7" x2="126.8" y2="493.6"/>
+          <line class="cls-2" x1="126.8" y1="496.6" x2="126.8" y2="499.6"/>
+        </g>
+        <g>
+          <line class="cls-17" x1="64.3" x2="64.3" y2="1"/>
+          <line class="cls-8" x1="64.3" y1="3" x2="64.3" y2="497.6"/>
+          <line class="cls-17" x1="64.3" y1="498.6" x2="64.3" y2="499.6"/>
+        </g>
+      </g>
+    </g>
+    <line class="cls-3" x1="250" x2="250" y2="500"/>
+    <line class="cls-11" y1="248.7" x2="500" y2="248.7"/>
+  </g>
+</svg>

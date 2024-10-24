@@ -602,7 +602,7 @@ class SimConnectData(QtCore.QObject):
                 aircraft_events_scope_map[command] = scope
                 data = (b_command, command, description, scope)
                 category_commands[category].append(data)
-                commands.append(data)
+                #commands.append(data)
                 aircraft_events_description_map[command] = description
                 command_category_map[command] = category
                 command_map[command] = ("e", data)
@@ -611,13 +611,13 @@ class SimConnectData(QtCore.QObject):
             # build request commands
             for data in self._aircraft_requests.list:
                 for command, data in data.list.items():
-                    self._command_map[command] = ("r", data)
+                    command_map[command] = ("r", data)
             
-        commands = list(self._command_map.keys())
+        commands = list(command_map.keys())
         commands.sort()
         root = etree.Element("commands")
         for command in commands:
-            data = self._command_map[command]
+            data = command_map[command]
 
             command_node = etree.SubElement(root,"command", value = command)
 

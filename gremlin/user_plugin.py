@@ -826,7 +826,7 @@ class SelectionVariable(AbstractVariable):
         layout.addWidget(label, 0, 0)
 
         # Populate drop down list
-        value_widget = QtWidgets.QComboBox()
+        value_widget = gremlin.ui.ui_common.QComboBox()
         for entry in self.options:
             value_widget.addItem(str(entry))
 

@@ -19,11 +19,12 @@
 import os
 from lxml import etree as ElementTree
 
-from PySide6 import QtWidgets
+from PySide6 import QtWidgets, QtGui
 import gremlin.base_profile
 
 from gremlin.input_types import InputType
 from gremlin.input_devices import ButtonReleaseActions
+import gremlin.shared_state
 import gremlin.ui.ui_common
 import gremlin.ui.input_item
 from gremlin.keyboard import key_from_code
@@ -49,7 +50,13 @@ class MapToKeyboardWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self.main_layout.addWidget(self.key_combination)
         self.main_layout.addWidget(self.record_button)
-        self.main_layout.addStretch(1)
+
+        warning_container = QtWidgets.QWidget()
+        warning_layout = QtWidgets.QHBoxLayout(warning_container)
+        warning_widget = gremlin.ui.ui_common.QIconLabel("fa.warning",use_qta=True,icon_color=QtGui.QColor("yellow"),text="Legacy mapper - consider using <i>Map to Keyboard Ex</i> for additional functionality", use_wrap=False)
+        warning_layout.addWidget(warning_widget)
+        warning_layout.addStretch()
+        self.main_layout.addWidget(warning_container)                   
 
     def _populate_ui(self):
         """Populates the UI components."""
@@ -73,6 +80,8 @@ class MapToKeyboardWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _record_keys_cb(self):
         """Prompts the user to press the desired key combination."""
+
+
         
         self.button_press_dialog = gremlin.ui.ui_common.InputListenerWidget(
             [InputType.Keyboard],
@@ -189,6 +198,8 @@ class MapToKeyboard(gremlin.base_profile.AbstractAction):
                 gremlin.profile.parse_bool(child.get("extended"))
             ))
 
+        pass
+
     def _generate_xml(self):
         """Returns an XML node containing this instance's information.
 
@@ -208,7 +219,15 @@ class MapToKeyboard(gremlin.base_profile.AbstractAction):
         :return True if the action is configured correctly, False otherwise
         """
         return len(self.keys) > 0
-
+    
+    def display_name(self):
+        ''' friendly display name '''
+        names = []
+        text = ""
+        for key in self.keys:
+            names.append(key_from_code(key[0],key[1]).name)
+        text += " + ".join(names)
+        return text
 
 version = 1
 name = "map-to-keyboard"

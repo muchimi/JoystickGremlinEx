@@ -32,6 +32,7 @@ from PySide6 import QtCore
 
 import dinput
 import gremlin.shared_state
+import gremlin.actions
 from gremlin.util import *
 from gremlin.input_types import InputType
 from . import error, joystick_handling
@@ -45,16 +46,6 @@ def mode_list(node):
     # Get profile root node
     profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
     mode_names = profile.mode_list().copy()
-
-    # parent = node
-    # while parent.parent is not None:
-    #     parent = parent.parent
-    # assert(type(parent) == gremlin.base_profile.Profile)
-    # # Generate list of modes
-    # mode_names = []
-    # for device in parent.devices.values():
-    #     mode_names.extend(device.modes.keys())
-
     return mode_names
 
 
@@ -74,6 +65,9 @@ class ProfileConverter:
 
         :param fname path to the profile to evaluate
         """
+        if not os.path.isfile(fname):
+            return True
+        
         tree = ElementTree.parse(fname)
         root = tree.getroot()
 

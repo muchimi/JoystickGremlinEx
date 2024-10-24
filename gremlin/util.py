@@ -29,11 +29,12 @@ import uuid
 import dinput
 import qtawesome as qta
 from lxml import etree as ElementTree
+from typing import Callable
 
 
 from PySide6 import QtCore, QtWidgets, QtGui
 from win32api import GetFileVersionInfo, LOWORD, HIWORD
-
+from PySide6.QtGui import QColor
 
 from . import error
 
@@ -365,6 +366,21 @@ def clear_layout(layout):
             child.widget().deleteLater()
         layout.removeItem(child)
 
+def get_layout_widgets(layout : QtWidgets.QLayout) -> list:
+    ''' returns a list of layout widgets '''
+    widgets = []
+    index = layout.count()
+    while index >= 0:
+        child = layout.itemAt(index)
+        if child is not None:
+            if child.layout():
+                widgets.extend(get_layout_widgets(child.layout()))
+            elif child.widget():
+                widgets.append(child.widget())
+        index -= 1
+
+    return widgets
+
 def layout_contains(layout, widget):
     ''' true if widget is contained in the given layout '''
     while layout.count() > 0:
@@ -515,12 +531,14 @@ def grouped(iterable, n):
     ''' returns n items for a given iterable item '''
     return zip(*[iter(iterable)]*n)
 
-def get_guid(strip=True):
+def get_guid(strip=True,no_brackets = False):
     ''' generates a reasonably lowercase unique guid string '''
     import uuid
     guid = f"{uuid.uuid4()}"
     if strip:
-        return guid.replace("-",'')
+        guid = guid.replace("-",'')
+    if no_brackets:
+        guid = guid.replace("{",'').replace("}",'')
     return guid
     
 def find_files(root_folder, source_pattern = "*") -> list:
@@ -849,6 +867,8 @@ def parse_guid(value):
     :param value the string representation of the GUID
     :param dinput.GUID object representing the provided value
     """
+    if value is None:
+        return None
     try:
         tmp = uuid.UUID(value)
         raw_guid = dinput._GUID()
@@ -972,14 +992,13 @@ def scale_to_range(value, source_min = -1.0, source_max = 1.0, target_min = -1.0
     if value is None:
         return None
     
-    r_delta = source_max - source_min
-    if r_delta == 0:
-        # frame the value if no valid range given
-        if value < source_min:
-            value = -1.0
-        if value > source_max:
-            value = 1.0
-
+    assert source_min != source_max, "Invalid source range - cannot be the same"
+    # bracket value to input range if outside that range
+    if value < source_min: 
+        value = source_min
+    elif value > source_max:
+        value = source_max
+    
     if invert:
         result = (((source_max - value) * (target_max - target_min)) / (source_max - source_min)) + target_min
     else:
@@ -1207,3 +1226,131 @@ def debug_pickle(instance, exception=None, string='', first_only=True):
     return problems
 
 
+def is_close(a, b, tolerance = 0.0001):
+    ''' compares two floating point numbers with approximate precision '''
+    return math.isclose(a, b, abs_tol=tolerance)
+
+class InvokeUiMethod(QtCore.QObject):
+    ''' invokes a call on the UI thread as QT is not thread safe '''
+    def __init__(self, method: Callable):
+        ''' Invokes a method on the main ui thread. 
+        
+        :params: method: lambda expression
+        
+        '''
+        super().__init__()
+        current_thread = QtCore.QThread.currentThread()
+        ui_thread = QtWidgets.QApplication.instance().thread() # QT thread
+        if current_thread != ui_thread:
+            self.moveToThread(ui_thread)
+            self.setParent(QtWidgets.QApplication.instance())
+            self.method = method
+            self.called.connect(self.execute)
+            self.called.emit()
+        else:
+            method()
+
+    called = QtCore.Signal()
+
+    @QtCore.Slot()
+    def execute(self):
+        self.method()
+        # trigger garbage collector
+        self.setParent(None)
+
+
+def assert_ui_thread():
+    current_thread = QtCore.QThread.currentThread()
+    ui_thread = QtWidgets.QApplication.instance().thread() # UI thread
+    if current_thread != ui_thread:
+        assert False,"call not on UI thread"
+
+
+def highlight_qcolor(color : QColor, factor : float = 1.1) -> QColor:
+    '''
+    computes a highlight color from a QT color object
+
+    :param color: a QT color
+    :param factor: optional, factor
+    :returns: the new QColor object
+    
+    '''
+    h,s,v,a = color.getHsv()
+    v = v * factor
+    new_color = color.fromHsv(h, s, v, a)
+    return new_color
+
+
+
+def highlight_color(hex_color:str, factor : float = 1.1):
+    ''''
+    computes a highlight color from a hex color
+
+    :param hex_color: a hex color in the format "#aabbcc
+    :param factor: optional, factor
+    :returns: the new hex color as a string 
+    '''
+    import colorsys
+    hex_color = hex_color.lstrip('#')
+    r, g, b = tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+    #luminance = 0.299 * r + 0.587 * g + 0.114 * b
+    h, s, v = colorsys.rgb_to_hsv(r, g, b)
+    v = v * factor
+    r, g, b = colorsys.hsv_to_rgb(h, s, v)
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+a_90 = math.radians(90)
+a_45 = math.radians(45)
+
+def snap_to_grid(x : float, y: float, grid_size : int = 50, 
+                 ref_x : float= None, ref_y : float = None, 
+                 ) -> tuple[float, float]:
+    ''' snaps a coordinate 0 to 1 to a grid '''
+    spacing = 1/grid_size
+    gx = spacing * round(x / spacing)
+    gy = spacing * round(y / spacing)
+
+    sx = gx
+    sy = gy
+
+    # get the rotational snaps 
+    if ref_x is not None and ref_y is not None:
+        # reference point provided
+        dx = x - ref_x
+        dy = y - ref_y
+        d = math.dist([ref_x, ref_y],[x,y])
+        signed_a = math.atan2(dy, dx)
+        a = abs(signed_a)
+        factor = 1 if signed_a > 0 else -1
+        a_t = math.radians(3)
+        
+        if a <= a_t:
+            # snap horizontal
+            sy = ref_y
+            sx = x
+        elif a_t >= (a_90 - a_t):
+            # snap vertical
+            sx = ref_x
+            sy = y
+            pass
+        elif a >= a_45 - a_t and a <= a_45 + a_t:
+            # snap 45 degrees    
+            sy = ref_y + d * math.sin(a_45) * factor
+            sy = ref_x + d * math.cos(a_45) * factor
+
+
+    return (sx,sy)
+
+
+            
+
+def float_to_xml(value : float, decimals = 5) -> str:
+    ''' converts a float to a string for xml saving'''
+    return f"{value:0.{decimals}f}"
+
+
+def is_binary_string(data):
+  ''' true if the string is a binary string '''
+  if data is None:
+      return False
+  return isinstance(data, bytes)

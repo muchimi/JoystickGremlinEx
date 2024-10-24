@@ -43,10 +43,6 @@ from qtpy.QtCore import (
 from qtpy.QtWidgets import QCheckBox
 from qtpy.QtGui import QColor, QBrush, QPaintEvent, QPen, QPainter
 
-from .ui_sliders import QDoubleRangeSlider
-
-
-
 from gremlin.util import load_pixmap, load_icon
 import gremlin.util
 
@@ -128,8 +124,11 @@ class AbstractView(QtWidgets.QWidget):
 
     # Signal emitted when a entry is selected
     item_selected = QtCore.Signal(int) # index of the item being selected
-    item_edit = QtCore.Signal(object, int, object)  # widget, index, model data object
+    item_edit = QtCore.Signal(object, int, object)  # widget, index, model data object 
+    item_edit_curve = QtCore.Signal(object, int, object) # widget, index , model data object
+    item_delete_curve = QtCore.Signal(object, int, object) # widget, index , model data object
     item_closed = QtCore.Signal(object, int, object)  # widget, index, model data object
+    
 
     def __init__(self, parent=None):
         """Creates a new view instance.
@@ -218,7 +217,7 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
 
     valueChanged = QtCore.Signal(float) # fires when the value changes
 
-    def __init__(self, data = None, min_range = -1.0, max_range = 1.0, decimals = 3, step = 0.01, parent = None):
+    def __init__(self, data = None, min_range = -1.0, max_range = 1.0, decimals = 3, step = 0.01, value = 0.0, parent = None):
         super().__init__(parent)
         self._min_range = min_range
         self._max_range = max_range
@@ -231,9 +230,10 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
         self.setValidator(self._validator)
         self.textChanged.connect(self._validate)
         self.installEventFilter(self)
-        self.setText("0")
-        self.setValue(0.0)
+        #self.setText("0")
+        self.setValue(value)
         self._data = data
+
 
     @property
     def data(self):
@@ -248,12 +248,15 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
             # handle wheel up/down change
             v = self.value()
             if v is not None:
+                eh = gremlin.event_handler.EventListener()
+                is_shifted = eh.get_shifted_state()
+                factor = 0.1 if is_shifted else 1.0
                 if event.angleDelta().y() > 0:
                     # up
-                    v += self._step
+                    v += self._step * factor
                 else:
                     # down
-                    v -= self._step
+                    v -= self._step * factor
                 v = gremlin.util.clamp(v, self._min_range, self._max_range)
                 self.setValue(v)
                 self.valueChanged.emit(v)
@@ -269,13 +272,14 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
 
         
     def _update_value(self, value):
-        other = self.value()
-        if value is None or other is None:
+        if value is None:
             return
-        s_value = f"{value:0.{self._decimals}f}"
-        if s_value != self.text():
-            self.setText(s_value)
-        if other != value:
+        other = self.value()
+        if other is None or other != value:
+            s_value = f"{value:0.{self._decimals}f}"
+            if s_value != self.text():
+                self.setText(s_value)
+            
             self.valueChanged.emit(value)
 
 
@@ -357,7 +361,7 @@ class QIntLineEdit(QtWidgets.QLineEdit):
 
     valueChanged = QtCore.Signal(float) # fires when the value changes
 
-    def __init__(self, data = None, min_range = -1.0, max_range = 1.0, step = 1, parent = None):
+    def __init__(self, data = None, min_range = -1.0, max_range = 1.0, step = 1, value = 0, parent = None):
         super().__init__(parent)
         self._min_range = min_range
         self._max_range = max_range
@@ -369,8 +373,7 @@ class QIntLineEdit(QtWidgets.QLineEdit):
         self.setValidator(self._validator)
         self.textChanged.connect(self._validate)
         self.installEventFilter(self)
-        self.setText("0")
-        self.setValue(0)
+        self.setValue(value)
         self._data = data
 
     @property
@@ -558,7 +561,6 @@ class DynamicDoubleSpinBox_legacy(QtWidgets.QDoubleSpinBox):
 
 class AbstractInputSelector(QtWidgets.QWidget):
 
-
     def __init__(self, change_cb, valid_types, parent=None):
         super().__init__(parent)
 
@@ -647,6 +649,7 @@ class AbstractInputSelector(QtWidgets.QWidget):
             entry.setCurrentIndex(0)
         self._execute_callback()
 
+
     def _initialize(self):
         raise gremlin.error.MissingImplementationError(
             "Missing implementation of AbstractInputSelector._initialize"
@@ -663,12 +666,13 @@ class AbstractInputSelector(QtWidgets.QWidget):
         )
 
     def _create_device_dropdown(self):
-        self.device_dropdown = QtWidgets.QComboBox(self)
+        self.device_dropdown = gremlin.ui.ui_common.QComboBox(self)
         for device in self.device_list:
             self.device_dropdown.addItem(self._format_device_name(device))
             self._device_id_registry.append(self._device_identifier(device))
         self.main_layout.addWidget(self.device_dropdown)
         self.device_dropdown.activated.connect(self._update_device)
+        
         
 
     def _create_input_dropdown(self):
@@ -684,10 +688,10 @@ class AbstractInputSelector(QtWidgets.QWidget):
         # Create input item selections for the devices. Each selection
         # will be invisible unless it is selected as the active device
         for device in self.device_list:
-            selection = QtWidgets.QComboBox(self)
-            # selection.setEditable(True)
-            # selection.setInsertPolicy(QtWidgets.QComboBox.InsertPolicy.NoInsert)
+            selection = QComboBox(self)
+            # limit drop down size
             selection.setMaxVisibleItems(20)
+            selection.setStyleSheet("QComboBox { combobox-popup: 0; }")
             self._input_type_registry.append([])
             self.selection_widget = selection
             
@@ -846,10 +850,13 @@ class ActionSelector(QtWidgets.QWidget):
         self.action_label = QtWidgets.QLabel("Action")
         self.main_layout.addWidget(self.action_label)
  
-        self.action_dropdown = QtWidgets.QComboBox()
-
+        self.action_dropdown = QComboBox()
+        # warning_icon = load_icon("fa.warning", use_qta=True, qta_color = QtGui.QColor('#918B16'))
         for name in self._valid_action_list():
-            self.action_dropdown.addItem(name)
+            # if name in ("Remap","Map to Keyboard","Map to Mouse"):
+            #     self.action_dropdown.addItem(warning_icon, name)
+            # else:
+                self.action_dropdown.addItem(name)
         cfg = gremlin.config.Configuration()
         self.action_dropdown.setCurrentText(cfg.last_action)
         self.action_dropdown.currentIndexChanged.connect(self._action_changed)
@@ -863,10 +870,6 @@ class ActionSelector(QtWidgets.QWidget):
         self.paste_button.clicked.connect(self._paste_action)
         self.paste_button.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Minimum)
         self.paste_button.setToolTip("Paste Action")
-
-        #clipboard = Clipboard()
-        #clipboard.clipboard_changed.connect(self._clipboard_changed)
-        #self._clipboard_changed(clipboard)
 
         self.main_layout.addWidget(self.action_dropdown)
         self.main_layout.addWidget(self.add_button)
@@ -920,17 +923,16 @@ class ActionSelector(QtWidgets.QWidget):
         # validate the clipboard data is an action and is of the correct type for the input/container
         if clipboard.is_action:
             action_name = clipboard.data.name
-            if action_name in self._valid_action_list():
+            valid_actions = self._valid_action_list()
+            if action_name in valid_actions:
                 # valid action - clone it and add it
                 # logging.getLogger("system").info("Clipboard paste action trigger...")
                 self.action_paste.emit(clipboard.data)
             else:
                 # dish out a message
-                message_box = QtWidgets.QMessageBox(
-                    QtWidgets.QSystemTrayIcon.MessageIcon.Warning,
-                    f"Invalid Action type ({action_name})",
-                    "Unable to paste action because it is not valid for the current input")
-                message_box.showNormal()
+                MessageBox(title =  f"Invalid Action type ({action_name})",
+                    prompt = "Unable to paste action because it is not valid for the current input")
+                
 
     def _clipboard_changed(self, clipboard):
         ''' handles paste button state based on clipboard data '''
@@ -1162,7 +1164,7 @@ class ModeWidget(QtWidgets.QWidget):
         # Create mode selector and related widgets
         self.edit_label = QtWidgets.QLabel("Profile Edit Mode")
         self.edit_label.setSizePolicy(min_min_sp)
-        self.edit_mode_selector = QtWidgets.QComboBox()
+        self.edit_mode_selector = QComboBox()
         self.edit_mode_selector.setSizePolicy(exp_min_sp)
         self.edit_mode_selector.setMinimumContentsLength(20)
         self.edit_mode_selector.setToolTip("Selects the active profile mode being edited")
@@ -1187,17 +1189,33 @@ class ModeWidget(QtWidgets.QWidget):
 
     def _manage_modes_cb(self):
         ''' calls up the mode change dialog '''
+        import gremlin.ui.ui_common
+        if not self.profile.profile_file or not os.path.isfile(self.profile.profile_file):
+            gremlin.ui.ui_common.MessageBox(prompt = "Please save the profile before configuring modes.")
+            return
+
         import gremlin.shared_state
         ui = gremlin.shared_state.ui
         ui.manage_modes()
 
     def _profile_options_cb(self):
         import gremlin.ui.dialogs
+        import gremlin.ui.ui_common
+        if not self.profile.profile_file or not os.path.isfile(self.profile.profile_file):
+            gremlin.ui.ui_common.MessageBox(prompt = "Please save the profile before setting options.")
+            return
+
         dialog = gremlin.ui.dialogs.ProfileOptionsUi()
         dialog.exec()
 
-    def currentIndex(self):
+    def currentIndex(self) -> int:
+        ''' current selector index '''
         return self.edit_mode_selector.currentIndex()
+    
+    def currentMode(self) -> str:
+        ''' current selection text '''
+        return self.edit_mode_selector.currentText()
+
     
     def setCurrentIndex(self, index):
         self.edit_mode_selector.setCurrentIndex(index)
@@ -1271,16 +1289,15 @@ class InputListenerWidget(QtWidgets.QFrame):
             QtWidgets.QLabel(f"""<center>Please press the desired {self._valid_event_types_string()}.<br/><br/>Hold ESC{'' if self._close_on_key else ' for one second'} to abort.</center>""")
         )
 
+        gremlin.shared_state.push_suspend_highlighting()
+        gremlin.shared_state.push_suspend_ui_keyinput()
+
         self.setWindowModality(QtCore.Qt.ApplicationModal)
         self.setWindowFlags(QtCore.Qt.FramelessWindowHint)
         self.setFrameStyle(QtWidgets.QFrame.Plain | QtWidgets.QFrame.Box)
         palette = QtGui.QPalette()
         palette.setColor(QtGui.QPalette.ColorRole.Window, QtGui.QColorConstants.DarkGray)
         self.setPalette(palette)
-        
-
-        # Disable ui input selection on joystick input
-        gremlin.shared_state.push_suspend_highlighting()
 
         # Start listening to user key presses
         event_listener = gremlin.event_handler.EventListener()
@@ -1409,6 +1426,7 @@ class InputListenerWidget(QtWidgets.QFrame):
 
         # restore highlighting
         gremlin.shared_state.pop_suspend_highlighting()
+        gremlin.shared_state.pop_suspend_ui_keyinput()
 
         # print ("input widget close")
         super().closeEvent(evt)
@@ -1443,23 +1461,51 @@ def clear_layout(layout):
         if child.layout():
             clear_layout(child.layout())
         elif child.widget():
-            child.widget().hide()
-            child.widget().deleteLater()
+            widget = child.widget()
+            widget.hide()
+            widget.deleteLater()
         layout.removeItem(child)
 
+def get_layout_widgets(layout) -> list:
+    ''' returns a list of layout widgets '''
+    widgets = []
+    while layout.count() > 0:
+        child = layout.takeAt(0)
+        if child.layout():
+            widgets.extend(get_layout_widgets(child.layout()))
+        elif child.widget():
+            widgets.append(child.widget())
 
-class NoWheelComboBox (QtWidgets.QComboBox):
+    return widgets
+        
+
+        
+class QComboBox (QtWidgets.QComboBox):
+    ''' a max limited combo box '''
+    def __init__(self, parent = None):
+        super().__init__(parent)
+        
+        # hack to ensure maximum items property is respected 
+        #self.setEditable(True) # this is so max items works
+        # self.lineEdit().setFrame(False)
+        # self.lineEdit().setReadOnly(True)
+        self.setStyleSheet('QComboBox {combobox-popup: 0}')
+        
+        
+        self.setMaxVisibleItems(20)
+        
+class NoWheelComboBox (QComboBox):
     ''' implements a combo box with no-wheel scrolling to avoid inadvertent switching of entries while scolling containers '''
 
     def __init__(self, parent = None):
         super().__init__(parent)
         self.setFocusPolicy(QtCore.Qt.FocusPolicy.StrongFocus)
 
+
     def wheelEvent(self, event) -> None:
         # blitz wheel events if the box is not in focus
         if self.hasFocus():
             return super().wheelEvent(event)
-        
     
 class ConfirmPushButton(QtWidgets.QPushButton):
     ''' confirmation push button '''
@@ -1528,15 +1574,28 @@ class ConfirmBox():
 
     def show(self):
         return self._message_box.exec()
+    
+class QMessageBox(QtWidgets.QMessageBox):
+    def __init__(self, width = 400, height = 100, parent = None):
+        super().__init__(parent)
+        self._width = width
+        self._height = height
+
+    def resizeEvent(self, event):
+        self.setFixedWidth(self._width)
+        self.setFixedHeight(self._height)
+
 
 class MessageBox():
-    def __init__(self, title = "Notice", prompt = "Operation", parent = None):
+    def __init__(self, title = "Notice", prompt = "Operation", is_warning = True, parent = None):
 
         from gremlin.util import load_pixmap
-        self._message_box = QtWidgets.QMessageBox(parent = parent)
-        pixmap = load_pixmap("warning.svg")
-        pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
-        self._message_box.setIconPixmap(pixmap)
+        self._message_box = QMessageBox(parent = parent)
+        
+        if is_warning:
+            pixmap = load_pixmap("warning.svg")
+            pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
+            self._message_box.setIconPixmap(pixmap)
         self._message_box.setText(title)
         self._message_box.setInformativeText(prompt)
         self._message_box.setStandardButtons(
@@ -1573,26 +1632,32 @@ class QIconLabel(QtWidgets.QWidget):
     IconSize = QtCore.QSize(16, 16)
     HorizontalSpacing = 2
 
-    def __init__(self, icon_path = None, text = None, stretch=True, use_qta = False, icon_color = None, parent = None):
+    def __init__(self, icon_path = None, text = None, stretch=True, use_qta = False, icon_color = None, use_wrap = True, parent = None):
         super().__init__(parent)
 
-        layout = QtWidgets.QHBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        self.setLayout(layout)
+        container_widget = QtWidgets.QWidget()
+        container_widget.setContentsMargins(0, 0, 0, 0)
+        container_layout = QtWidgets.QHBoxLayout(container_widget)
+        container_layout.setContentsMargins(0, 0, 0, 0)
+        
 
         self._icon_widget = QtWidgets.QLabel()
         if icon_path:
             self.setIcon(icon_path, use_qta, color = icon_color)
             
-        layout.addWidget(self._icon_widget)
-        layout.addSpacing(self.HorizontalSpacing)
-
-        self._label_widget =  QWrapableLabel(text)
-        self._label_widget.setWordWrap(True)
-        layout.addWidget(self._label_widget)
-
+        container_layout.addWidget(self._icon_widget)
+        container_layout.addSpacing(self.HorizontalSpacing)
+        if use_wrap:
+            self._label_widget =  QWrapableLabel(text)
+            self._label_widget.setWordWrap(True)
+        else:
+            self._label_widget = QtWidgets.QLabel(text)
+        container_layout.addWidget(self._label_widget)
         if stretch:
-            layout.addStretch()
+            container_layout.addStretch()
+
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.addWidget(container_widget)
 
     def setIcon(self, icon_path = None, use_qta = True, color = None):
         ''' sets the icon of the label, pass a blank or None path to clear the icon'''
@@ -1634,7 +1699,23 @@ class QIconLabel(QtWidgets.QWidget):
     def text(self):
         ''' gets the text of the widget '''
         return self._icon_widget.text()
+
+class QDataWidget(QtWidgets.QWidget):
+    ''' data widgets '''
+    def __init__(self, data = None, parent = None):
+        super().__init__(parent)
+        self._data = data
+
+    @property
+    def data(self):
+        return self._data
     
+    @data.setter
+    def data(self, value):
+        self._data = value
+    
+
+
 class QDataCheckbox(QtWidgets.QCheckBox):
     ''' a checkbox that has a data property to track an object associated with the checkbox '''
     def __init__(self, text = None, data = None, parent = None):
@@ -1649,6 +1730,21 @@ class QDataCheckbox(QtWidgets.QCheckBox):
     def data(self, value):
         self._data = value
 
+
+
+class QDataRadioButton(QtWidgets.QRadioButton):
+    ''' a radio button that has a data property to track an object associated with the checkbox '''
+    def __init__(self, text = None, data = None, parent = None):
+        super().__init__(text, parent)
+        self._data = data
+
+    @property
+    def data(self):
+        return self._data
+    
+    @data.setter
+    def data(self, value):
+        self._data = value
 
 class QDataPushButton(QtWidgets.QPushButton):
     ''' a checkbox that has a data property to track an object associated with the checkbox '''
@@ -1681,7 +1777,7 @@ class QDataLineEdit(QtWidgets.QLineEdit):
         self._data = value
 
 
-class QDataComboBox(QtWidgets.QComboBox):
+class QDataComboBox(QComboBox):
     ''' a combo box that has a data property to track an object associated with the checkbox '''
     def __init__(self, data = None, parent = None):
         super().__init__(parent)
@@ -1897,7 +1993,7 @@ class AxisStateWidget(QtWidgets.QWidget):
     #css_horizontal = r"QProgressBar::chunk {background: QLinearGradient( x1: 0, y1: 0, x2: 0, y2: 1,stop: 0 #78d,stop: 0.4999 #46a,stop: 0.5 #45a,stop: 1 #238 ); border-radius: 7px; border: 1px solid black;}"
     css_horizontal = r"QProgressBar::chunk {background: QLinearGradient( x1: 0, y1: 0, x2: 0, y2: 1,stop: 0 #77a ,stop: 0.4999 #477,stop: 0.5 #45a,stop: 1 #238 ); border-radius: 7px; border: 1px solid black;}"
     
-    valueChanged = QtCore.Signal(float)
+    valueChanged = QtCore.Signal(float, float) # (input_value, curved_value)
 
     def __init__(self, axis_id = None, show_percentage = True, show_value = True, show_label = True, orientation = QtCore.Qt.Orientation.Vertical, parent=None):
         """Creates a new instance.
@@ -1923,7 +2019,7 @@ class AxisStateWidget(QtWidgets.QWidget):
         self._show_label = show_label
 
         self._readout_widget = QtWidgets.QLabel()
-        #self._readout_widget.setVisible(show_percentage or show_label)
+        self._readout_curved_widget = QtWidgets.QLabel()
 
         self._label_widget = QtWidgets.QLabel()
         self._label_widget.setVisible(show_label)
@@ -1933,6 +2029,7 @@ class AxisStateWidget(QtWidgets.QWidget):
         self.main_layout.addWidget(self._label_widget)
         self.main_layout.addWidget(self._progress_widget)
         self.main_layout.addWidget(self._readout_widget)
+        self.main_layout.addWidget(self._readout_curved_widget)
         self.main_layout.addStretch()
         self._min_range = -1.0
         self._max_range = 1.0
@@ -1941,14 +2038,27 @@ class AxisStateWidget(QtWidgets.QWidget):
         self._value = 0
         self._raw_value = 0
         self._reverse = False
-        self_decimals = 3
+        self._decimals = 3
+
+        # show the curved data by default
+        self._show_curved = True
         
         self._width = 10
         self._update_css()
         self._update_range()
 
     
+    @property
+    def show_curved(self) -> bool:
+        ''' true if repeater shows curved data '''
+        return self._show_curved
+    @show_curved.setter
+    def show_curved(self, value: bool):
+        if value != self._show_curved:
+            self._show_curved = value
+            self.setValue(self._value, self._curve_value)
     
+
     
 
     def _create_primitives(self):
@@ -1994,7 +2104,7 @@ class AxisStateWidget(QtWidgets.QWidget):
     def value(self):
         return self._value
 
-    def setValue(self, value):
+    def setValue(self, value, curve_value = None):
         """Sets the value shown by the widget.
 
         :param value new value to show
@@ -2006,23 +2116,42 @@ class AxisStateWidget(QtWidgets.QWidget):
         value += 0   # avoid negative 0 (WHY?)
         self._value = value
 
-        if self._reverse:
-            value = gremlin.util.scale_to_range(value, invert=True)
+        if curve_value is None:
+            eh = gremlin.event_handler.EventListener()
+            curve_value = eh._apply_curve_ex(self._device_guid, self._input_id, value)
+        self._curve_value = curve_value
 
-        scaled_value = self._scale_factor * value
+        display_value = curve_value if self._show_curved else value
+
+        if self._reverse:
+            display_value = gremlin.util.scale_to_range(display_value, invert=True)
+
+        scaled_value = self._scale_factor * display_value
         #print (f"{scaled_value}")
         self._progress_widget.setValue(scaled_value)
         self._progress_widget.update()
         readout = ""
+        readout_curved = ""
         if self._show_value:
             readout = f"{value:+0.3f}"
+            readout_curved = f"C{curve_value:+0.3f}"
         if self._show_percentage:
             percent = int(round(100 * value / (self._max_range - self._min_range)))
             if readout:
                 readout += " "
             readout += f"{percent:d} %"
+            curved_percent = int(round(100 * curve_value / (self._max_range - self._min_range)))
+            if readout_curved:
+                readout_curved += " "
+            readout_curved += f"{curved_percent:d} %"
+
         self._readout_widget.setText(readout)
-        self.valueChanged.emit(self._value)
+        if self._show_curved:
+            self._readout_curved_widget.setText(readout_curved)
+        else:
+            self._readout_curved_widget.setText("")
+
+        self.valueChanged.emit(self._value, self._curve_value)
 
     def value(self):
         ''' gets the current value '''
@@ -2084,12 +2213,16 @@ class AxisStateWidget(QtWidgets.QWidget):
         
         if self._device_guid != event.device_guid or self._input_id != event.identifier:
             return
+        
         self._update_value(event.raw_value)
 
     def _update_value(self, raw_value):
         # invert the input if needed
-        value = gremlin.util.scale_to_range(raw_value, source_min = -32767, source_max = 32767, target_min = self._min_range, target_max = self._max_range)
-        self.setValue(value)
+        eh = gremlin.event_handler.EventListener()
+        value = eh._apply_calibration_ex(self._device_guid, self._input_id, raw_value)
+        curve_value = eh._apply_curve_ex(self._device_guid, self._input_id, value)
+        self.setValue(value, curve_value)
+
         
 
         
@@ -2194,31 +2327,34 @@ class HatWidget(QtWidgets.QWidget):
         brush_active = QtGui.QBrush(QtGui.QColor("#b22823"))
 
         # Prepare painter instance
-        painter = QtGui.QPainter(self)
-        painter.setRenderHint(QtGui.QPainter.Antialiasing | QtGui.QPainter.SmoothPixmapTransform)
-        painter.setPen(pen_default)
-        painter.setBrush(brush_default)
+        p = QtGui.QPainter(self)
+        # p.begin(self)
+        p.setRenderHint(QtGui.QPainter.Antialiasing | QtGui.QPainter.SmoothPixmapTransform)
+        p.setPen(pen_default)
+        p.setBrush(brush_default)
 
-        painter.translate(50, 50)
+        p.translate(50, 50)
 
         # Center dot
         if self.angle == -1:
-            painter.setBrush(brush_active)
-        painter.drawEllipse(-8, -8, 16, 16)
-        painter.setBrush(brush_default)
+            p.setBrush(brush_active)
+        p.drawEllipse(-8, -8, 16, 16)
+        p.setBrush(brush_default)
         # Directions
         for angle in [0, 45, 90, 135, 180, 225, 270, 315]:
-            painter.save()
-            painter.rotate(angle)
-            painter.translate(0, 35)
+            p.save()
+            p.rotate(angle)
+            p.translate(0, 35)
 
             if angle == self.angle:
-                painter.setBrush(brush_active)
-                painter.setPen(pen_active)
+                p.setBrush(brush_active)
+                p.setPen(pen_active)
 
-            painter.drawPolygon(HatWidget.triangle)
-            painter.restore()
+            p.drawPolygon(HatWidget.triangle)
+            p.restore()
 
+
+        p.end()
 
 class HatState(QtWidgets.QGroupBox):
 
@@ -2268,7 +2404,7 @@ class AxesTimeline(QtWidgets.QGroupBox):
         3: "#4daf4a",
         4: "#984ea3",
         5: "#ff7f00",
-        6: "#ffff33",
+        6: "#8a8a2c", 
         7: "#a65628",
         8: "#f781bf"
     }
@@ -2389,8 +2525,12 @@ class TimeLinePlotWidget(QtWidgets.QWidget):
 
         :param event the paint event
         """
-        widget_painter = QtGui.QPainter(self)
-        widget_painter.drawPixmap(0, 0, self._pixmap)
+        p = QtGui.QPainter(self)
+        # p.begin(self)
+        p.drawPixmap(0, 0, self._pixmap)
+        p.end()
+
+        
 
     def add_point(self, value, series_id=0):
         """Adds a data point to a time series.
@@ -2404,15 +2544,16 @@ class TimeLinePlotWidget(QtWidgets.QWidget):
 
     def _update_pixmap(self):
         """Updates the pixmap that contains the moving timeline."""
-        pixmap_painter = QtGui.QPainter(self._pixmap)
-        pixmap_painter.setRenderHint(self._render_flags)
+        p = QtGui.QPainter(self._pixmap)
+        # p.begin(self)
+        p.setRenderHint(self._render_flags)
 
         self._pixmap.scroll(
             -self._step_size,
             0,
             QtCore.QRect(0, 0, self._pixmap.width(), self._pixmap.height())
         )
-        pixmap_painter.eraseRect(
+        p.eraseRect(
             self._pixmap.width() - self._step_size,
             0,
             1,
@@ -2420,9 +2561,9 @@ class TimeLinePlotWidget(QtWidgets.QWidget):
         )
 
         # Draw vertical line in one second intervals
-        pixmap_painter.setPen(TimeLinePlotWidget.pens[0])
+        p.setPen(TimeLinePlotWidget.pens[0])
         if self._vertical_timestep < time.time()-1:
-            pixmap_painter.drawLine(
+            p.drawLine(
                 self._pixmap.width()-1,
                 0,
                 self._pixmap.width() - 1,
@@ -2433,16 +2574,16 @@ class TimeLinePlotWidget(QtWidgets.QWidget):
         if self._horizontal_steps <= 5:
             quarter = int(self._pixmap.height() / 4)
             x = self._pixmap.width()-1
-            pixmap_painter.drawPoint(x, quarter)
-            pixmap_painter.drawPoint(x, 2*quarter)
-            pixmap_painter.drawPoint(x, 3*quarter)
+            p.drawPoint(x, quarter)
+            p.drawPoint(x, 2*quarter)
+            p.drawPoint(x, 3*quarter)
         elif self._horizontal_steps > 10:
             self._horizontal_steps = 0
 
         # Draw onto the pixmap all series data that has been accumulated
         for key, value in self._series.items():
-            pixmap_painter.setPen(TimeLinePlotWidget.pens[key])
-            pixmap_painter.drawLine(
+            p.setPen(TimeLinePlotWidget.pens[key])
+            p.drawLine(
                 self._pixmap.width()-self._step_size-1,
                 int(2 + (self._pixmap.height()-4) * (value[0] + 1) / 2.0),
                 self._pixmap.width()-1,
@@ -2451,6 +2592,7 @@ class TimeLinePlotWidget(QtWidgets.QWidget):
             value[0] = value[1]
 
 
+        p.end()
 
 class JoystickDeviceWidget(QtWidgets.QWidget):
 
@@ -2687,179 +2829,6 @@ def get_text_width(text):
 def get_char_width(count = 1):
     return get_text_width("w") * count
 
-class QMarkerDoubleRangeSlider(QDoubleRangeSlider):
-
-    icon_size = QtCore.QSize(16, 16)
-
-    # background: #8FBC8F;  add-page is the background color of the groove
-    
-    css = '''
-
-QSlider::groove:vertical { background: white; position: absolute; left: 8px; right: 7px; }
-
-QMarkerDoubleRangeSlider::handle:horizontal {
-    background: #8FBC8F;
-    border: 2px solid #565a5e;
-    width: 8px;
-    height: 8px;
-    border-radius: 4px;
-}
-
-QMarkerDoubleRangeSlider::sub-page:vertical { background: #8FBC8F; border-style:solid; border-color: grey;border-width:1px;border-radius:2px;}
-QMarkerDoubleRangeSlider::sub-page:horizontal { background: #8FBC8F; border-style:solid; border-color: grey;border-width:1px;border-radius:2px;}
-QMarkerDoubleRangeSlider::add-page:vertical { background: #979EA8; border-style:solid; border-color: grey;border-width:1px;border-radius:2px;}
-QMarkerDoubleRangeSlider::add-page:horizontal { background: #979EA8; border-style:solid; border-color: grey;border-width:1px;border-radius:2px;}
-   
-'''
-
-    class PixmapData():
-        ''' holds a pixmap definition '''
-        def __init__(self, pixmap : QtGui.QPixmap = None, offset_x = None, offset_y = None):
-            self.pixmap = pixmap
-            self.offset_x = offset_x
-            self.offset_y = offset_y
-            if pixmap is not None:
-                self.width = pixmap.width()
-                self.height = pixmap.height()
-            else:
-                self.width = 0
-                self.height = 0
-
-    def __init__(self, *args):
-        super().__init__(*args)
-        self._marker_pos = []
-        self._internal_pixmaps = [] # default marker object
-        self._pixmaps = [] # list of pixmap data marker definition objects
-
-        # setup a single default marker
-        self._update_pixmaps()
-        self._update_targets()
-        self.setMarkerValue(0)
-
-        #self.setStyleSheet(self.css)
-
-    def _get_pixmaps(self):
-        if self._pixmaps: return self._pixmaps
-        return self._internal_pixmaps
-    
-    def _update_pixmaps(self):
-        orientation = self.orientation()
-        if orientation == QtCore.Qt.Orientation.Horizontal:
-            icon = gremlin.util.load_icon("ei.chevron-up")
-            pixmap = icon.pixmap(self.icon_size)
-            center = self.height() / 2
-            if pixmap.height() > center:
-                pixmap = pixmap.scaledToHeight(center)
-            pd = QMarkerDoubleRangeSlider.PixmapData(pixmap = pixmap, offset_x = -pixmap.width()/2, offset_y=0)
-        else:
-            # vertical
-            icon = gremlin.util.load_icon("ei.chevron-right")
-            pixmap = icon.pixmap(self.icon_size)
-            center = self.width() / 2
-            if pixmap.width() > center:
-                pixmap = pixmap.scaledToWidth(center)
-            pd = QMarkerDoubleRangeSlider.PixmapData(pixmap = pixmap, offset_x = 0, offset_y = -pixmap.height()/2)
-        
-        self._internal_pixmaps = [pd]
-        
-
-    def setOrientation(self, orientation : QtCore.Qt.Orientation):
-        ''' sets the widget's orientation '''
-        super().setOrientation(orientation)
-        self._update_pixmaps()
-
-
-    def setMarkerValue(self, value):
-        ''' sets the marker(s) value - single float is one marker, passing a tuple creates multiple markers'''
-        if isinstance(value, float) or isinstance(value, int):
-            list_value = [value]
-        else:
-            list_value = value
-        self._marker_pos = list_value
-        # compute the positions relative to the size of the widget
-        source_min = self._minimum
-        source_max = self._maximum
-        target_min = self._to_qinteger_space(self._minimum)
-        target_max = self._to_qinteger_space(self._maximum)
-        self._int_marker_pos = [((v - source_min) * (target_max - target_min)) / (source_max - source_min) + target_min for v in list_value]
-        
-        # force a repaint to update to the new positions
-        self.repaint()
-
-    def minimum(self) -> float:  # type: ignore
-        ''' gets the slider's minimum value '''
-        return self._minimum
-
-    def setMinimum(self, value: float) -> None:
-        ''' sets the slider's minimum value '''
-        super().setMinimum(value)
-        self._update_targets()
-
-    def maximum(self) -> float:  # type: ignore
-        ''' gets the slider's maximum value '''
-        return self._maximum
-
-    def setMaximum(self, value: float) -> None:
-        ''' sets the slider's maximum value '''
-        super().setMaximum(value)
-        self._update_targets()
-
-    def setRange(self, range_min, range_max):
-        ''' sets the slider's min/max values'''
-        super().setRange(range_min, range_max)
-        self._update_targets()
-
-    def _update_targets(self):
-        self._target_min = self._to_qinteger_space(self._minimum)
-        self._target_max = self._to_qinteger_space(self._maximum)
-
-
-    def setMarkerPixmaps(self, pixmaps):
-        ''' sets the marker pixmaps if not using the default
-
-        :param: pixmaps - a single pixmadata object, or a tuple of pixmapdata objects if multiple markers
-        
-        '''
-        if isinstance(pixmaps, tuple):
-            self._pixmaps = list(pixmaps)
-        elif isinstance(pixmaps, list):
-            self._pixmaps = pixmaps
-        elif isinstance(pixmaps,QMarkerDoubleRangeSlider.PixmapData):
-            self._pixmaps = [pixmaps]
-
-
-    def paintEvent(self, ev: QtGui.QPaintEvent) -> None:
-        # draw the main widget
-        super().paintEvent(ev)
-
-        # draw markers on top of the main widget
-        
-        painter = QtGui.QPainter(self)
-        orientation = self.orientation()
-        if orientation == QtCore.Qt.Orientation.Horizontal:
-            positions = [QtWidgets.QStyle.sliderPositionFromValue(self._target_min, self._target_max, v, self.width(), False) for v in self._int_marker_pos]
-            center = self.height() / 2
-        else:
-            # vertical
-            positions = [QtWidgets.QStyle.sliderPositionFromValue(self._target_min, self._target_max, v, self.height(), False) for v in self._int_marker_pos]
-            center = self.width() / 2
-        pixmaps = self._get_pixmaps()
-        p_count = len(pixmaps)
-        for index, value in enumerate(positions):
-            if index < p_count:
-                pd = pixmaps[index]
-                if orientation == QtCore.Qt.Orientation.Horizontal:
-                    painter.drawPixmap(value + pd.offset_x, center + pd.offset_y, pd.pixmap)
-                else:
-                    # vertical
-                    painter.drawPixmap(center + pd.offset_x, value + pd.offset_y, pd.pixmap)
-
-      
-
-
-
-
-
 
 
 
@@ -2903,6 +2872,7 @@ class QToggle(QCheckBox):
         handleRadius = round(0.24 * contRect.height())
 
         p = QPainter(self)
+        # p.begin(self)
         p.setRenderHint(QPainter.Antialiasing)
 
         p.setPen(self._transparent_pen)
@@ -3008,6 +2978,7 @@ class QAnimatedToggle(QToggle):
         handleRadius = round(0.24 * contRect.height())
 
         p = QPainter(self)
+        # p.begin(self)
         p.setRenderHint(QPainter.Antialiasing)
 
         p.setPen(self._transparent_pen)
@@ -3484,19 +3455,37 @@ class DualSlider(QtWidgets.QWidget):
         painter.drawComplexControl(QtWidgets.QStyle.CC_Slider, option_lower)
         painter.drawComplexControl(QtWidgets.QStyle.CC_Slider, option_upper)
 
+
+
 class QFlowLayout(QtWidgets.QLayout):
     def __init__(self, parent=None, margin=-1, hspacing=-1, vspacing=-1):
+        '''
+        :params:
+        parent = parent of the object
+        margin = margin, -1 for auto
+        hspacing = horizontal spacing, -1 for auto
+        vspacing = vertical spacing, -1 for auto
+        sort_property = name of the index member of the item to set the display order, None to disable
+        '''
         super().__init__(parent)
         self._hspacing = hspacing
         self._vspacing = vspacing
         self._items = []
         self.setContentsMargins(margin, margin, margin, margin)
+        self._grid_layout = True
+        self._row = 0
+        self._col = 0
+
 
     def __del__(self):
         del self._items[:]
 
     def addItem(self, item):
         self._items.append(item)
+
+    def sortItems(self, callback):
+        ''' sorts the items based on the given sort property '''
+        self._items.sort(key = lambda item: callback(item))
 
     def horizontalSpacing(self):
         if self._hspacing >= 0:
@@ -3541,10 +3530,15 @@ class QFlowLayout(QtWidgets.QLayout):
 
     def minimumSize(self):
         size = QtCore.QSize()
+        lineheight = 0
+        for item in self._items:
+            lineheight = max(lineheight, item.sizeHint().height())
         for item in self._items:
             size = size.expandedTo(item.minimumSize())
+            #size = size.expandedTo(item.sizeHint()) + QSize(item.geometry().x(), item.geometry().y())
         left, top, right, bottom = self.getContentsMargins()
         size += QtCore.QSize(left + right, top + bottom)
+        size += QSize(0, lineheight * self._row)
         return size
 
     def doLayout(self, rect, testonly):
@@ -3553,29 +3547,107 @@ class QFlowLayout(QtWidgets.QLayout):
         x = effective.x()
         y = effective.y()
         lineheight = 0
-        for item in self._items:
-            widget = item.widget()
-            hspace = self.horizontalSpacing()
-            if hspace == -1:
-                hspace = widget.style().layoutSpacing(
-                    QtWidgets.QSizePolicy.PushButton,
-                    QtWidgets.QSizePolicy.PushButton, QtCore.Qt.Horizontal)
-            vspace = self.verticalSpacing()
-            if vspace == -1:
-                vspace = widget.style().layoutSpacing(
-                    QtWidgets.QSizePolicy.PushButton,
-                    QtWidgets.QSizePolicy.PushButton, QtCore.Qt.Vertical)
-            nextX = x + item.sizeHint().width() + hspace
-            if nextX - hspace > effective.right() and lineheight > 0:
-                x = effective.x()
-                y = y + lineheight + vspace
+
+        
+        # visible_count = len(self._items)
+        # invisible_count = 0
+
+        if self._grid_layout:
+            # compute max width
+            max_w = 0
+            pos_x = {}
+            pos_x[0] = x
+
+            for item in self._items:
+                widget = item.widget()
+                if not widget.isVisible():
+                    #invisible_count+=1
+                    continue
+                # if hasattr(widget,"display_name"):
+                #     print (f"layout: {str(widget.display_name())}")
+                hspace = self.horizontalSpacing()
+                if hspace == -1:
+                    hspace = widget.style().layoutSpacing(
+                        QtWidgets.QSizePolicy.PushButton,
+                        QtWidgets.QSizePolicy.PushButton, QtCore.Qt.Horizontal)
+                vspace = self.verticalSpacing()
+                if vspace == -1:
+                    vspace = widget.style().layoutSpacing(
+                        QtWidgets.QSizePolicy.PushButton,
+                        QtWidgets.QSizePolicy.PushButton, QtCore.Qt.Vertical)
+                item_w = item.sizeHint().width() + hspace    
+                max_w = max(max_w,item_w)
+                lineheight = max(lineheight, item.sizeHint().height())
+            # compute columns
+            
+            usable_width = effective.right() - x
+            if max_w == 0:
+                max_w = usable_width
+            max_col = max(1, usable_width // max_w)
+            
+            # print (f"available width {usable_width} max widget {max_w} columns: {max_col}")
+            for col in range(max_col):
+                pos_x[col] = col * max_w
+                # print(f"\tcol {col} position {pos_x[col]}")
+
+            col = 0
+            row = 0
+            index = 0
+            for item in self._items:
+                widget = item.widget()
+                if not widget.isVisible():
+                    continue
+                x = pos_x[col]
+
+                if not testonly:
+                    item.setGeometry(
+                        QtCore.QRect(QtCore.QPoint(x, y), item.sizeHint()))
+                    # print (f"flow [{index}] position {x} {y}")
+                    index+=1
+
+                col += 1
+                if col == max_col:
+                    col = 0
+                    row += 1
+                    y += lineheight + vspace
+
+            self._row = row
+            self._col = max_col
+
+
+            #print (f"layout visible: {visible_count} invisible: {invisible_count}")
+
+            return y + lineheight - rect.y() + bottom
+
+        else:
+            item : QtWidgets.QWidgetItem
+            for item in self._items:
+                widget = item.widget()
+                hspace = self.horizontalSpacing()
+                if hspace == -1:
+                    hspace = widget.style().layoutSpacing(
+                        QtWidgets.QSizePolicy.PushButton,
+                        QtWidgets.QSizePolicy.PushButton, QtCore.Qt.Horizontal)
+                vspace = self.verticalSpacing()
+                if vspace == -1:
+                    vspace = widget.style().layoutSpacing(
+                        QtWidgets.QSizePolicy.PushButton,
+                        QtWidgets.QSizePolicy.PushButton, QtCore.Qt.Vertical)
                 nextX = x + item.sizeHint().width() + hspace
-                lineheight = 0
-            if not testonly:
-                item.setGeometry(
-                    QtCore.QRect(QtCore.QPoint(x, y), item.sizeHint()))
-            x = nextX
-            lineheight = max(lineheight, item.sizeHint().height())
+                
+                if nextX - hspace > effective.right() and lineheight > 0:
+                    x = effective.x()
+                    y = y + lineheight + vspace
+                    nextX = x + item.sizeHint().width() + hspace
+                    lineheight = 0
+                    
+                if not testonly:
+                    item.setGeometry(
+                        QtCore.QRect(QtCore.QPoint(x, y), item.sizeHint()))
+                x = nextX
+            
+                lineheight = max(lineheight, item.sizeHint().height())
+
         return y + lineheight - rect.y() + bottom
 
     def smartSpacing(self, pm):
@@ -3594,12 +3666,84 @@ class QBubble(QtWidgets.QLabel):
         self.setContentsMargins(5, 5, 5, 5)
 
     def paintEvent(self, event):
-        painter = QtGui.QPainter(self)
-        painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
-        painter.drawRoundedRect(
+        p = QtGui.QPainter(self)
+        # p.begin(self)
+        p.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        p.drawRoundedRect(
             0, 0, self.width() - 1, self.height() - 1, 5, 5)
         super(QBubble, self).paintEvent(event)
+        p.end()
 
 
 
     
+class ActionLabel(QtWidgets.QLabel):
+
+    """Handles showing the correct icon for the given action."""
+
+    
+
+    def __init__(self, action_entry, parent=None):
+        """Creates a new label for the given entry.
+
+        :param action_entry the entry to create the label for
+        :param parent the parent
+        """
+        QtWidgets.QLabel.__init__(self, parent)
+        icon = action_entry.icon()
+        self._width = 20
+        if isinstance(icon, str):
+            # convert to icon if a path is given
+            icon = load_icon(icon)
+        
+        if isinstance(icon, QtGui.QIcon):
+            pixmap = icon.pixmap(self._width)
+        else:
+            pixmap = QtGui.QPixmap(icon)
+        pixmap = pixmap.scaled(self._width, self._width, QtCore.Qt.KeepAspectRatio)
+        self.setPixmap(pixmap)
+
+        self.action_entry = action_entry
+
+        el = gremlin.event_handler.EventListener()
+        el.icon_changed.connect(self._icon_change)
+
+    def _icon_change(self, event):
+        icon = self.action_entry.icon()
+        if isinstance(icon, QtGui.QIcon):
+            self.setPixmap(QtGui.QPixmap(icon.pixmap(self._width)))
+        else:
+            self.setPixmap(QtGui.QPixmap(icon))
+
+
+
+class MarkdownDialog(QtWidgets.QDialog):
+    '''
+    Dialog box for instructions in markdown format
+    '''
+    def __init__(self, title = "Markdown Instructions", source = None, parent = None):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.setWindowModality(QtCore.Qt.ApplicationModal)
+        self._view = QtWidgets.QTextEdit()
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.addWidget(self._view)
+        if source is not None:
+            self.load(source)
+
+
+    def load(self, source : str):
+        ''' loads a source '''
+        if source is not None and os.path.isfile(source):
+            location = source
+        else:
+            location = gremlin.util.find_file(source, gremlin.shared_state.root_path)
+        if location is not None and os.path.isfile(location):
+            logging.getLogger("system").info(f"dialog: found file : {location}")
+            self._source = location
+            with open(location,"+rt") as f:
+                md = f.read()
+            self._view.setMarkdown(md)
+            return True
+        return False
+

@@ -18,6 +18,12 @@ for root, _, files in os.walk("container_plugins"):
         if fname.endswith(".pyc"):
             continue
         container_plugins_files.append((os.path.join(root, fname), root))
+doc_files = []
+for root, _, files in os.walk("gremlin"):
+    for fname in files:
+        if fname.endswith(".md"):
+            doc_files.append((os.path.join(root, fname), root))
+
 
 added_files = [
     ("about", "about"),
@@ -26,9 +32,11 @@ added_files = [
 ]
 added_files.extend(action_plugins_files)
 added_files.extend(container_plugins_files)
+added_files.extend(doc_files)
 added_binaries = [
     ("vjoy/vJoyInterface.dll", "."),
     ("dill.dll", "."),
+    ("vigem/ViGEmClient.dll", "."),
 	
 ]
 

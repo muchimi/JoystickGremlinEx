@@ -35,6 +35,7 @@ import gremlin.joystick_handling
 import gremlin.shared_state
 import gremlin.types
 import gremlin.ui
+import gremlin.ui.ui_common
 
 import gremlin.ui.ui_about as ui_about
 import gremlin.ui.ui_common as ui_common
@@ -86,7 +87,7 @@ class ProfileOptionsUi(QtWidgets.QDialog):
         self.profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
         self.start_label = QtWidgets.QLabel("Start Mode")
         self.start_label.setSizePolicy(min_min_sp)
-        self.start_mode_selector = QtWidgets.QComboBox()
+        self.start_mode_selector = gremlin.ui.ui_common.QComboBox()
         self.start_mode_selector.setSizePolicy(exp_min_sp)
         self.start_mode_selector.setMinimumContentsLength(20)
         self.start_mode_selector.setToolTip("Selects the startup mode when the profile is activated and the restore last mode option is not set")
@@ -157,6 +158,7 @@ class ProfileOptionsUi(QtWidgets.QDialog):
 
     @QtCore.Slot(bool)
     def _restore_mode_cb(self, checked):
+        
         self.profile.set_restore_mode(checked)
 
     def _close_cb(self):
@@ -202,8 +204,6 @@ class OptionsUi(ui_common.BaseDialogUi):
 
         # do not create the page for now as this serves no purpose with new version of HID guardian
         # self._create_hidguardian_page()
-
-        
 
         # closing bar
         close_button = QtWidgets.QPushButton("Close")
@@ -272,34 +272,40 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.general_layout = QtWidgets.QVBoxLayout()
         self.general_page.setLayout(self.general_layout)
 
+
+        # Switch to highlighted device (master switch)
+        self.highlight_enabled = QtWidgets.QCheckBox("Enable Input Highlighting")
+        self.highlight_enabled.clicked.connect(self._highlight_enabled_cb)
+        self.highlight_enabled.setToolTip("Enable device highlighting.")
+        self.highlight_enabled.setChecked(self.config.highlight_enabled)
+
+
         # highlight autoswitch
-        self.highlight_autoswitch = QtWidgets.QCheckBox(
-            "Switch to new device on input highlight trigger"
-        )
+        self.highlight_autoswitch = QtWidgets.QCheckBox("Switch to new device on input highlight trigger")
         self.highlight_autoswitch.clicked.connect(self._highlight_autoswitch)
         self.highlight_autoswitch.setChecked(self.config.highlight_autoswitch)
-        self.highlight_autoswitch.setToolTip("This option enables automatic device tab switching on device input triggers (physical hardware only)")
+        self.highlight_autoswitch.setToolTip("This option enables automatic device tab switching between device on device input triggers (physical hardware only).<br>Requires axis or button highlight options to be enabled as well.")
+
+
+        self.highlight_hotkey_autoswitch = QtWidgets.QCheckBox("Allow autoswitch override on hotkey")
+        self.highlight_hotkey_autoswitch.clicked.connect(self._highlight_hotkey_autoswitch)
+        self.highlight_hotkey_autoswitch.setChecked(self.config.highlight_hotkey_autoswitch)
+        self.highlight_hotkey_autoswitch.setToolTip("This option enables automatic device tab switching between device if the hotkeys are pressed for the axis/button overrides even when the autoswitch option is off.")
+
 
         # Highlight input option
-        self.highlight_input_axis = QtWidgets.QCheckBox(
-            "Highlight currently triggered axis"
-        )
-        self.highlight_input_axis.clicked.connect(self._highlight_input)
-        self.highlight_input_axis.setToolTip("This otion will enable automatic selection and highlighting of device inputs when they are triggered.")
-        self.highlight_input_axis.setChecked(self.config.highlight_input)
+        self.highlight_input_axis = QtWidgets.QCheckBox("Highlight currently triggered axis")
+        self.highlight_input_axis.clicked.connect(self._highlight_input_axis)
+        self.highlight_input_axis.setToolTip("This otion will enable automatic selection and highlighting of detected axis input (physical hardware only).<br>To switch devices automatically, also enable the device switch option.<br>This can also be enabled temporarily while holding a control key while moving an input.")
+        self.highlight_input_axis.setChecked(self.config.highlight_input_axis)
 
         # Highlight input option buttons
-        self.highlight_input_buttons = QtWidgets.QCheckBox(
-            "Highlight currently triggered button"
-        )
+        self.highlight_input_buttons = QtWidgets.QCheckBox("Highlight currently triggered button")
         self.highlight_input_buttons.clicked.connect(self._highlight_input_buttons)
+        self.highlight_input_buttons.setToolTip("This otion will enable automatic selection and highlighting of detected button input (physical hardware only).<br>To switch devices automatically, also enable the device switch option.<br>This can also be enabled temporarily while holding a shift key while pressing a button.")
         self.highlight_input_buttons.setChecked(self.config.highlight_input_buttons)
 
-        # Switch to highlighted device
-        self.highlight_device = QtWidgets.QCheckBox("Highlight swaps device tabs")
-        self.highlight_device.clicked.connect(self._highlight_device)
-        self.highlight_device.setChecked(self.config.highlight_device)
-
+   
         # Close to system tray option
         self.close_to_systray = QtWidgets.QCheckBox("Closing minimizes to system tray")
         self.close_to_systray.clicked.connect(self._close_to_systray)
@@ -310,10 +316,16 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.enable_ui_runtime.setToolTip("When enabled, the UI will remain interactable while a profile is running.<br>This can create conflicts if the profile or mode is changed while a profile is running,<b>use caution.</b>")
         self.enable_ui_runtime.setChecked(self.config.runtime_ui_active)
         self.enable_ui_runtime.clicked.connect(self._runtime_ui_active)
+
+
+        self.debug_ui = QtWidgets.QCheckBox("Debug UI")
+        self.debug_ui.setToolTip("Enabled additional diagnostics widgets on the UI - only use for troubleshooting/debug purposes<br>Restart required to take effect.")
+        self.debug_ui.setChecked(self.config.debug_ui)
+        self.debug_ui.clicked.connect(self._debug_ui)
         
         
         # synchronize action/container drop downs
-        self.sync_last_selection = QtWidgets.QCheckBox("Sync action &amp; container selections")
+        self.sync_last_selection = QtWidgets.QCheckBox("Sync action and container selections")
         self.sync_last_selection.setToolTip("When enabled, action and container drop downs will remain synchronized with the last selected entry")
         self.sync_last_selection.setChecked(self.config.sync_last_selection)
         self.sync_last_selection.clicked.connect(self._sync_last_selection)
@@ -481,7 +493,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         
 
         self.default_action_label = QtWidgets.QLabel("Default action")
-        self.default_action_dropdown = QtWidgets.QComboBox()
+        self.default_action_dropdown = gremlin.ui.ui_common.QComboBox()
         self.default_action_layout.addWidget(self.default_action_label)
         self.default_action_layout.addWidget(self.default_action_dropdown)
         self._init_action_dropdown()
@@ -531,6 +543,22 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.runtime_ui_update.clicked.connect(self._runtime_ui_update)
         self.runtime_ui_update.setToolTip("When set, Joystick Gremlin Ex will update the UI on profile or mode changes at runtime - this can be turned off to enhance performance at runtime")
 
+
+        # gamepad device count
+        self.gamepad_container_widget = QtWidgets.QWidget()
+        self.gamepad_container_widget.setContentsMargins(0,0,0,0)
+        self.gamepad_container_layout = QtWidgets.QHBoxLayout(self.gamepad_container_widget)
+        self.gamepad_container_layout.setContentsMargins(0,0,0,0)
+        self.gamepad_device_count_widget = QtWidgets.QSpinBox()
+        self.gamepad_device_count_widget.setRange(0,4) # 0 (none), 1 to 4 devices
+        self.gamepad_device_count_widget.setValue(self.config.vigem_device_count)
+        self.gamepad_device_count_widget.setToolTip("Number of virtual gamepad devices to create, 0 for none, 1 to 4")
+        self.gamepad_device_count_widget.valueChanged.connect(self._device_count_changed)
+        self.gamepad_container_layout.addWidget(QtWidgets.QLabel("Gamepad count:"))
+        self.gamepad_container_layout.addWidget(self.gamepad_device_count_widget)
+        self.gamepad_container_layout.addStretch()
+
+
         self.column_widget = QtWidgets.QWidget()
         self.column_widget.setContentsMargins(0,0,0,0)
         self.column_layout = QtWidgets.QGridLayout(self.column_widget)
@@ -540,13 +568,17 @@ class OptionsUi(ui_common.BaseDialogUi):
         # column 1
         col = 0
         row = 0
+        self.column_layout.addWidget(self.highlight_enabled, row, col)
+        row+=1
         self.column_layout.addWidget(self.highlight_autoswitch, row, col)
         row+=1
+        self.column_layout.addWidget(self.highlight_hotkey_autoswitch, row, col)
+        row+=1
+        
         self.column_layout.addWidget(self.highlight_input_axis, row, col)
         row+=1
         self.column_layout.addWidget(self.highlight_input_buttons, row, col)
-        row+=1
-        self.column_layout.addWidget(self.highlight_device, row, col)
+        
         row+=1
         self.column_layout.addWidget(self.sync_last_selection, row, col)
         row+=1
@@ -577,8 +609,14 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.column_layout.addWidget(self.verbose_container_widget, row, col)
         row+=1
         self.column_layout.addWidget(self.runtime_ignore_device_change, row, col)
+        row+=1
+        self.column_layout.addWidget(self.debug_ui, row, col)
 
         self.general_layout.addWidget(self.column_widget)
+
+
+        self.general_layout.addWidget(self.gamepad_container_widget)
+
         
         container = QtWidgets.QWidget()
         layout = QtWidgets.QHBoxLayout(container)
@@ -600,7 +638,8 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.general_layout.addWidget(self.enable_broadcast_speech)
         self.general_layout.addStretch()
         self.tab_container.addTab(self.general_page, "General")
-
+        
+        self._update_highlight_options() # update highlight state for checkboxes
 
     def _create_profile_page(self):
         """Creates the profile options page."""
@@ -848,6 +887,21 @@ This setting is also available on a profile by profile basis on the profile tab,
     #     ''' called when the restore last mode checked state is changed '''
     #     self.config.current_profile.set_restore_mode(checked)
 
+
+    def _update_highlight_options(self):
+        ''' enables/disables device highlight options based on state '''
+        enabled = self.config.highlight_enabled
+        self.highlight_autoswitch.setEnabled(enabled)
+        self.highlight_input_buttons.setEnabled(enabled)
+        self.highlight_input_axis.setEnabled(enabled)
+        self.highlight_hotkey_autoswitch.setEnabled(enabled)
+
+    @QtCore.Slot(bool)
+    def _highlight_enabled_cb(self, checked):
+        self.config.highlight_enabled = checked
+        self._update_highlight_options()
+
+
     @QtCore.Slot(bool)
     def _autoload_mapped_profile(self, checked):
         """Stores profile autoloading preference.
@@ -893,6 +947,10 @@ This setting is also available on a profile by profile basis on the profile tab,
         :param clicked whether or not the checkbox is ticked
         """
         self.config.close_to_tray = checked
+
+    @QtCore.Slot(bool)
+    def _debug_ui(self, checked):
+        self.config.debug_ui = checked
 
     @QtCore.Slot(bool)
     def _runtime_ui_active(self, checked):
@@ -998,22 +1056,29 @@ This setting is also available on a profile by profile basis on the profile tab,
                 return True
         return False
 
+    def _device_count_changed(self):
+        self.config.vigem_device_count = self.gamepad_device_count_widget.value()
+
 
     @QtCore.Slot(bool)
     def _highlight_autoswitch(self, clicked):
         """Stores preference for input highlighting  """
         self.config.highlight_autoswitch = clicked
 
-
+    
+    @QtCore.Slot(bool)
+    def _highlight_hotkey_autoswitch(self, clicked):
+        """Stores preference for input highlighting  """
+        self.config.highlight_hotkey_autoswitch = clicked
 
 
     @QtCore.Slot(bool)
-    def _highlight_input(self, clicked):
+    def _highlight_input_axis(self, clicked):
         """Stores preference for input highlighting.
 
         :param clicked whether or not the checkbox is ticked
         """
-        self.config.highlight_input = clicked
+        self.config.highlight_input_axis = clicked
 
     @QtCore.Slot(bool)
     def _highlight_input_buttons(self, clicked):
@@ -1026,12 +1091,12 @@ This setting is also available on a profile by profile basis on the profile tab,
 
 
     @QtCore.Slot(bool)
-    def _highlight_device(self, clicked):
+    def _highlight_enabled(self, clicked):
         """Stores preference for device highlighting.
 
         :param clicked whether or not the checkbox is ticked
         """
-        self.config.highlight_device = clicked
+        self.config.highlight_enabled = clicked
         self.config.save()
 
     def _select_profile(self):
@@ -1803,7 +1868,7 @@ class ModeManagerUi(ui_common.BaseDialogUi):
         self.mode_layout.addWidget(QtWidgets.QLabel("<b>Name</b>"), 0, 0)
         self.mode_layout.addWidget(QtWidgets.QLabel("<b>Parent</b>"), 0, 1)
 
-        self.mode_default_selector = QtWidgets.QComboBox()
+        self.mode_default_selector = gremlin.ui.ui_common.QComboBox()
         self.mode_default_selector.setToolTip("Specifies the default startup mode for this profile when it is loaded. This setting can be overriden if the restore last active mode option is set.")
 
 
@@ -1811,7 +1876,7 @@ class ModeManagerUi(ui_common.BaseDialogUi):
         row = 1
         for mode, inherit in sorted(mode_list.items()):
             self.mode_layout.addWidget(QtWidgets.QLabel(mode), row, 0)
-            self.mode_dropdowns[mode] = QtWidgets.QComboBox()
+            self.mode_dropdowns[mode] = gremlin.ui.ui_common.QComboBox()
             self.mode_dropdowns[mode].addItem("None")
             self.mode_dropdowns[mode].setMinimumContentsLength(20)
             self.mode_default_selector.addItem(mode)
@@ -2446,8 +2511,8 @@ class SubstituteDialog(QtWidgets.QDialog):
         profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
 
         
-        self.profile_device_widget = QtWidgets.QComboBox()
-        self.hardware_device_widget = QtWidgets.QComboBox()
+        self.profile_device_widget = gremlin.ui.ui_common.QComboBox()
+        self.hardware_device_widget = gremlin.ui.ui_common.QComboBox()
         
         self.replace_button_widget = QtWidgets.QPushButton("Replace")
         self.replace_button_widget.clicked.connect(self._replace_cb)
