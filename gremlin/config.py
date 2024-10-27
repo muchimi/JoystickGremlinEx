@@ -1479,3 +1479,12 @@ class Configuration:
     def debug_ui(self, value):
         self._data["debug_ui"] = value
         self.save()
+
+    @property
+    def button_grid_visible(self) -> bool:
+        ''' default state of the button grid in vjoy remap '''
+        return self._data.get("button_grid_visible", True)
+    @button_grid_visible.setter
+    def button_grid_visible(self, value : bool):
+        self._data["button_grid_visible"] = value
+        self.save()

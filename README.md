@@ -187,6 +187,12 @@ Joystick Gremlin EX
 
 ## 13.40.16ex (pre-release)
 
+
+### (m2)
+- Added option to show or hide the button grid in vjoy remap
+
+### (m1)
+
 - Ensure mode names ignore leading/trailing spaces
 - Add log entry if action reports invalid (to the log file) thus disabling the container at profile runtime
 - Reworked priority of Cycle Modes action to match other mode actions (to execute last)

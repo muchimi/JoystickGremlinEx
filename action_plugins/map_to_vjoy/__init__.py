@@ -23,6 +23,7 @@ from lxml import etree as ElementTree
 
 from PySide6 import QtWidgets, QtCore, QtGui
 import gremlin.actions
+import gremlin.config
 import gremlin.event_handler
 import gremlin.input_types
 import gremlin.joystick_handling
@@ -564,9 +565,6 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         super().__init__(action_data, parent=parent)
         assert(isinstance(action_data, VjoyRemap))
 
-
-    
-
     def _create_ui(self):
         """Creates the UI components."""
 
@@ -584,6 +582,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
                     InputType.OpenSoundControl,
                 ]
 
+            self.grid_visible_widget = None
 
             self.usage_state = VJoyUsageState()
 
@@ -1324,6 +1323,13 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         start_layout.addWidget(QtWidgets.QLabel("Start Mode:"))
         start_layout.addWidget(self.rb_start_released )
         start_layout.addWidget(self.rb_start_pressed )
+
+        grid_visible_container_widget = QtWidgets.QWidget()
+        grid_visible_container_widget.setContentsMargins(0,0,0,0)
+        self.grid_visible_container_layout = QtWidgets.QHBoxLayout(grid_visible_container_widget)
+        self.grid_visible_container_layout.setContentsMargins(0,0,0,0)
+
+        start_layout.addWidget(grid_visible_container_widget)
         start_layout.addStretch()
 
         # set axis range widget
@@ -1569,6 +1575,8 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         button_to_axis_visible = action == VjoyAction.VJoySetAxis
 
+        grid_visible = grid_visible and self.action_data.grid_visible
+
         self.pulse_widget.setVisible(pulse_visible)
         self.start_widget.setVisible(start_visible)
         if self.button_grid_widget:
@@ -1629,9 +1637,18 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _create_input_grid(self):
         ''' create a grid of buttons for easy selection'''
-        
+
+        grid_visible = self.action_data.grid_visible   
+        if self.grid_visible_widget is None:
+            self.grid_visible_widget = QtWidgets.QCheckBox("Show button grid")
+            self.grid_visible_widget.clicked.connect(self._grid_visible_cb)
+            self.grid_visible_container_layout.addWidget(self.grid_visible_widget)
+
+        with QtCore.QSignalBlocker(self.grid_visible_widget):
+            self.grid_visible_widget.setChecked(grid_visible)
 
         self.button_grid_widget = QtWidgets.QWidget()
+
 
         # link all radio buttons
         self.button_group = QtWidgets.QButtonGroup()
@@ -1711,9 +1728,14 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
                 col=0
 
         self.main_layout.addWidget(self.button_grid_widget)
+        self.button_grid_widget.setVisible(grid_visible)
    
-    
-            
+    @QtCore.Slot(bool)
+    def _grid_visible_cb(self, checked):
+        self.action_data.grid_visible = checked
+        self.button_grid_widget.setVisible(checked)
+
+    @QtCore.Slot()            
     def _grid_button_clicked(self):
         sender = self.sender()
         vjoy_device_id = sender.vjoy_device_id
@@ -2207,8 +2229,6 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
                     self.thread.start()
 
         elif self.input_type in VJoyWidget.input_type_buttons:
-
-            target_press = not self.exec_on_release
             is_paired = remote_state.paired
             force_remote = event.force_remote or is_paired
             
@@ -2405,6 +2425,8 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         self.axis_start_value : float = 0.0
         self.curve_data = None # present if curve data is needed
 
+        config = gremlin.config.Configuration()
+        self._grid_visible = config.button_grid_visible # true if the button grid is visible
 
         self._exec_on_release : bool = False
         self._paired : bool = False
@@ -2561,7 +2583,6 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
     @paired.setter
     def paired(self, value):
         self._paired = value
-        
 
     @property
     def vjoy_device_id(self):
@@ -2597,9 +2618,18 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
 
 
     @property
-    def reverse_configured(self):
+    def reverse_configured(self) -> bool:
         ''' returns the configured reverse value rather than the live mode '''
         return  self._reverse
+    
+    @property
+    def grid_visible(self) -> bool:
+        return self._grid_visible
+    @grid_visible.setter
+    def grid_visible(self, value : bool):
+        self._grid_visible = value
+        config = gremlin.config.Configuration()
+        config.button_grid_visible = value
 
     def icon(self):
         """Returns the icon corresponding to the remapped input.
@@ -2783,6 +2813,9 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
             if "merge_max" in node.attrib:
                 self.output_range_max = safe_read(node,"merge_max", float, 1.0)
 
+            if "grid_visible" in node.attrib:
+                self.grid_visible = safe_read(node,"grid_visible", bool, True)
+
             # curve data
             curve_node = util.get_xml_child(node,"response-curve")
             if curve_node is not None:
@@ -2865,6 +2898,8 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
 
         if save_exec_on_release:
             node.set("exec_on_release", safe_format(self.exec_on_release, bool))
+
+        node.set("grid_visible", safe_format(self.grid_visible, bool))
 
         return node
 
