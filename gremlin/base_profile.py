@@ -2268,9 +2268,13 @@ class Mode:
     def name(self) -> str:
         return self._name
 
+    @name.setter
+    def name(self, value: str):
+        self._name = value.strip() if value else ""
+
     def setName(self, value : str):
-        self._name = value.strip()
-        
+        self._name = value.strip() if value else ""
+
     def from_xml(self, node):
         """Parses the XML mode data.
 
