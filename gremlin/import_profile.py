@@ -523,7 +523,7 @@ class ImportProfileDialog(QtWidgets.QDialog):
         self._update_map()
 
 
-    def populate_mode_selector(self, selector : QtWidgets.QComboBox, profile : gremlin.base_profile.Profile):
+    def populate_mode_selector(self, selector : ui_common.QDataComboBox, profile : gremlin.base_profile.Profile):
         ''' populates profile modes for the specified profile
 
         :param: selector = the combo box to populate (will be cleared)
@@ -641,11 +641,14 @@ class ImportProfileDialog(QtWidgets.QDialog):
         osc_index = 0
         keyboard_index = 0
         item : NodeItem
+        discovered_modes = set()
         for item in item_list:
             node = item.node
-            node_mode = gremlin.util.get_xml_child(node,"mode")
-            if node_mode is not None:
+            # get modes
+            node_modes = gremlin.util.get_xml_child(node,"mode",True)
+            for node_mode in node_modes:
                 mode = node_mode.get("name")
+                discovered_modes.add(mode)
                 dm_pair = (item.device_guid, mode)
                 if dm_pair in device_mode_pairs:
                     syslog.warning(f"Found duplicated device/mode entries in import profile - only the fist entry will be used: device {item.device_name} ID: {item.device_guid}")
@@ -1020,6 +1023,11 @@ class ImportProfileDialog(QtWidgets.QDialog):
                     map_to_widget, widget = self._create_target_mode_widget()
                     mode_item.map_to_widget = widget
 
+                    mode_index = widget.findData(mode_item.mode)
+                    if mode_index != -1:
+                        widget.setCurrentIndex(mode_index)
+                    
+
                     cb = ui_common.QDataCheckbox(f"Mode: [{mode_item.mode}]")
                     cb.data = mode_item
                     mode_item.selected_widget = cb
@@ -1157,7 +1165,7 @@ class ImportProfileDialog(QtWidgets.QDialog):
         widget.setStyleSheet("QComboBox { combobox-popup: 0; }")
 
 
-        self.populate_mode_selector(widget, self.target_profile)
+        self.populate_mode_selector(widget, self.source_profile)
 
         return container_widget, widget
 
@@ -1306,16 +1314,20 @@ class ImportProfileDialog(QtWidgets.QDialog):
             if widget is not None:
                 # get the device guid for the mapped item
                 data : ImportInputItem = widget.currentData()
-                device_guid = data.device_guid
-                # get the list of possible inputs for that device
-                items = self._target_input_item_map[device_guid]
-                first = next((item for item in items if item.input_type == input_item.input_type and item.input_id == input_item.input_id), None)
-                if not first:
-                    # id doesn't exist, match by type only
-                    first = next((item for item in items if item.input_type == input_item.input_type), None)
-                if first:
-                    index = widget.findData(first)
-                    widget.setCurrentIndex(index)
+                if data:
+                    device_guid = data.device_guid
+                    # get the list of possible inputs for that device
+                    items_map = self._target_input_item_map[device_guid]
+                    for input_type in items_map.keys():
+                        items = items_map[input_type]
+                        if items:
+                            first = next((item for item in items if item.input_type == input_item.input_type and item.input_id == input_item.input_id), None)
+                            if not first:
+                                # id doesn't exist, match by type only
+                                first = next((item for item in items if item.input_type == input_item.input_type), None)
+                            if first:
+                                index = widget.findData(first)
+                                widget.setCurrentIndex(index)
 
 
     @QtCore.Slot()
@@ -1434,6 +1446,8 @@ class ImportProfileDialog(QtWidgets.QDialog):
 
                             # get the target input on that device
                             target_input_item : ImportInputItem = widget.currentData()
+                            if not target_input_item:
+                                continue
                             target_input_id = target_input_item.input_id
                             target_input_type = target_input_item.input_type
 
@@ -1490,6 +1504,7 @@ class ImportProfileDialog(QtWidgets.QDialog):
 
                                 # mode.config is a dictionary of [input_type][input_id] holding gremlin.base_profile.InputItem
                                 # InputItems hold the containers for that input
+                                target_device.modes[target_mode].get_data(target_input_type, target_input_id) 
                                 profile_target_input_item = profile_target_mode.config[target_input_type][target_input_id]
 
 

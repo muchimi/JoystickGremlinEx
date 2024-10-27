@@ -267,6 +267,12 @@ class ProfileData(metaclass=ABCMeta):
         ''' gets the currently attached hardware GUID '''
         return self.input_item.device_guid if self.input_item else None
     
+    
+    @property
+    def hardware_device_id(self) -> str:
+        ''' gets the currently attached hardware GUID '''
+        return str(self.input_item.device_guid) if self.input_item else None
+    
     @property
     def hardware_device_name(self) -> str:
         ''' gets the currently attached hardware name '''
@@ -569,7 +575,10 @@ class AbstractContainer(ProfileData):
         # Check state of all linked actions
         for actions in [a for a in self.action_sets if a is not None]:
             for action in actions:
-                state = state & action.is_valid()
+                action_valid = action.is_valid()
+                if not action_valid:
+                    logging.getLogger("system").warning(f"Action warning: {type(action).__name__} reports invalid - hardware {self.hardware_device_name} input: {self.hardware_input_type_name}  {self.hardware_input_id}")
+                state = state & action_valid
         return state
     
 
@@ -582,6 +591,10 @@ class AbstractContainer(ProfileData):
             for action in actions:
                 state = state & action.is_valid_for_save()
         return state
+    
+    def latch_extra_inputs(self):
+        ''' returns any extra inputs as a list of (device_guid, input_id) to latch to this action (trigger on change) '''
+        return []
         
 
     @abstractmethod
@@ -721,7 +734,7 @@ class InputItem():
         self._device_type = None
         self._is_axis = False # true if the item is an axis input
         self._curve_data = None # true if the item has its input curved
-
+        self._profile_mode = None
         if parent is not None:
             # find the missing properties from the parenting hierarchy
             self._is_action = isinstance(parent, AbstractAction)
@@ -1800,10 +1813,29 @@ class Profile():
         for device in self.devices.values():
             if device.type != DeviceType.Keyboard:
                 continue
-            for mode_name, mode in device.modes.items():
-                modes.append(mode_name)
+            for _, mode in device.modes.items():
+                modes.append(mode.name)
         return list(set(modes))  # unduplicated
     
+
+    def find_mode(self, mode_text) -> str:
+        ''' finds a mode by name or value '''
+        if not mode_text:
+            return None
+        for device in self.devices.values():
+            if device.type != DeviceType.Keyboard:
+                continue
+            
+            for mode_name, mode in device.modes.items():
+                if mode_text == mode.name:
+                    return mode.name
+                if mode_text.casefold() == mode.name.casefold():
+                    return mode.name
+                if mode_text == mode_name:
+                    return mode.name
+                if mode_text.strip().casefold() == mode_name.strip().casefold():
+                    return mode.name
+        return None # not found
 
 
     def list_actions(self):
@@ -2150,13 +2182,13 @@ class Profile():
 
     def get_start_mode(self):
         ''' gets the start mode for this profile '''
-        mode = self._start_mode
+        mode = self.find_mode(self._start_mode)
         # verify the mode is in the mode list
-        modes = self.get_modes()
-        if mode is None or not mode in modes:
+        if not mode:        
+            modes = self.get_modes()
             mode = modes[0]
             self._start_mode = mode
-        return self._start_mode
+        return mode
     
     def set_start_mode(self, value : str):
         ''' sets the profile auto-activated start up mode '''
@@ -2220,8 +2252,8 @@ class Mode:
         """
         self.parent = parent
         self.inherit = None # name of the mode we inherit properties from
-        self.name = None # name of the current mode
-
+        self._name = None # name of the current mode
+       
         self.config = {
             InputType.JoystickAxis: {},
             InputType.JoystickButton: {},
@@ -2232,13 +2264,23 @@ class Mode:
             InputType.Midi: {}
         }
 
+    @property
+    def name(self) -> str:
+        return self._name
+
+    def setName(self, value : str):
+        self._name = value.strip()
+        
     def from_xml(self, node):
         """Parses the XML mode data.
 
         :param node XML node to parse
         """
         from gremlin.base_profile import InputItem
-        self.name = safe_read(node, "name", str)
+        name = safe_read(node, "name", str)
+        name = name.strip()
+        self._name = name
+
         self.inherit = node.get("inherit", None)
         for child in node:
             item = InputItem(self)

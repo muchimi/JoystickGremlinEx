@@ -194,7 +194,11 @@ class CycleModes(gremlin.base_profile.AbstractAction):
             node.append(child)
         return node
 
-
+    @property
+    def priority(self):
+        # priority relative to other actions in this sequence - 0 is the default for all actions unless specified - higher numbers run last
+        return 999
+    
 version = 1
 name = "cycle-modes"
 create = CycleModes

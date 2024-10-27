@@ -279,12 +279,12 @@ class RemapFunctor(gremlin.base_classes.AbstractFunctor):
                 )
 
 
-            if joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed != value.is_pressed:
-                if not self.test and not value.is_pressed:
-                    self.test = True
-                if self.test and value.is_pressed:
-                    pass
-                print (f"test button state toggle: {value.is_pressed}")
+            # if joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed != value.is_pressed:
+            #     if not self.test and not value.is_pressed:
+            #         self.test = True
+            #     if self.test and value.is_pressed:
+            #         pass
+            #     print (f"test button state toggle: {value.is_pressed}")
 
             joystick_handling.VJoyProxy()[self.vjoy_device_id] \
                 .button(self.vjoy_input_id).is_pressed = value.is_pressed
@@ -364,6 +364,7 @@ class Remap(gremlin.base_profile.AbstractAction):
 
     @property
     def priority(self):
+        # priority relative to other actions in this sequence - 0 is the default for all actions unless specified - higher numbers run last
         return 9
 
     functor = RemapFunctor

@@ -183,7 +183,18 @@ Joystick Gremlin EX
 # Changelog
 
 <!-- TOC --><a name="134015ex-pre-release"></a>
-## 13.40.15ex (pre-release)
+
+
+## 13.40.16ex (pre-release)
+
+- Ensure mode names ignore leading/trailing spaces
+- Add log entry if action reports invalid (to the log file) thus disabling the container at profile runtime
+- Reworked priority of Cycle Modes action to match other mode actions (to execute last)
+- Improved handling of mode mapping in profile import (still not ideal but workable)
+- New switch container (experimental).  The switch container is designed to map a switch with multiple positions to make it easier to map a set of input buttons to actions.  The container is not essential but can be used to map two-way, three-way and rotary buttons more easily, and the functionality is not new - the only "new" aspect is to do this in a single container rather than multiple buttons.
+
+
+## 13.40.15ex 
 
 
 ### (m5.4) hotfix

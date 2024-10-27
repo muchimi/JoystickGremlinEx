@@ -831,8 +831,8 @@ class ActionSelector(QtWidgets.QWidget):
     """Widget permitting the selection of actions."""
 
     # Signal emitted when an action is going to be added
-    action_added = QtCore.Signal(str)
-    action_paste = QtCore.Signal(object)
+    action_added = QtCore.Signal(str)  # add button pressed
+    action_paste = QtCore.Signal(object) # paste button pressed
     
 
     def __init__(self, input_type, parent=None):
@@ -1244,7 +1244,7 @@ class ModeWidget(QtWidgets.QWidget):
 class InputListenerWidget(QtWidgets.QFrame):
 
     """Widget overlaying the main gui while waiting for the user
-    to press a key."""
+    to press a key or a joystick button """
 
     item_selected = QtCore.Signal(object) # called when the items are selected
 

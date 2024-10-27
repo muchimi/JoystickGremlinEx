@@ -93,6 +93,9 @@ def axis_input_devices() -> list[DeviceSummary]:
     devices = [dev for dev in _joystick_devices if dev.axis_count]
     return devices
     
+def button_input_devices() -> list[DeviceSummary]:
+    devices = [dev for dev in _joystick_devices if dev.button_count]
+    return devices
 
 
 def vjoy_devices() -> list[DeviceSummary]:

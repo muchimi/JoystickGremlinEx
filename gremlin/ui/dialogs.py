@@ -2043,6 +2043,7 @@ The setting can be overriden by the global mode reload option set in Options for
                 QtWidgets.QLineEdit.Normal,
                 mode_name
         )
+        name = name.strip()
         if user_input:
             if name in gremlin.profile.mode_list(self._profile):
                 gremlin.util.display_error(
@@ -2152,6 +2153,7 @@ The setting can be overriden by the global mode reload option set in Options for
         :param checked flag indicating whether or not the checkbox is active
         """
         name, user_input = QtWidgets.QInputDialog.getText(None, "Mode name", "")
+        name = name.strip()
         if user_input:
             if name in gremlin.profile.mode_list(self._profile):
                 gremlin.util.display_error(

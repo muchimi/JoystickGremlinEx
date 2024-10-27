@@ -320,7 +320,22 @@ class ContainerExecutionGraph(AbstractExecutionGraph):
         functor = container.functor(container)
         verbose = gremlin.config.Configuration().verbose
         if verbose:
-            logging.getLogger("system").info(f"Enable functor: {type(functor).__name__}")
+            logging.getLogger("system").info(f"Enable container functor: {type(functor).__name__}")
+
+        extra_inputs = functor.latch_extra_inputs()
+        if extra_inputs:
+            # register the extra inputs for this functor
+            eh = gremlin.event_handler.EventHandler()
+            mode = container.profile_mode
+            for device_guid, input_type, input_id in extra_inputs:
+                
+                event = gremlin.event_handler.Event(
+                        event_type= input_type,
+                        device_guid = device_guid,
+                        identifier= input_id
+                )
+                eh.add_latched_functor(device_guid, mode, event, functor)
+                
         
 
         container_plugins = gremlin.plugin_manager.ContainerPlugins()

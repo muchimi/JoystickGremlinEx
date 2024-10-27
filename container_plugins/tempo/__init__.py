@@ -238,10 +238,10 @@ class TempoContainerFunctor(gremlin.base_classes.AbstractFunctor):
         self.value_press = None
         self.event_press = None
 
-        el = gremlin.event_handler.EventListener()
-        el.profile_start.connect(self._profile_start)
+        # el = gremlin.event_handler.EventListener()
+        # el.profile_start.connect(self._profile_start)
 
-    def _profile_start(self):
+    def profile_start(self):
         # reset any prior values before start
         self.start_time = 0
         self.timer = None
@@ -270,14 +270,18 @@ class TempoContainerFunctor(gremlin.base_classes.AbstractFunctor):
             self.timer.start()
 
             if self.activate_on == "press":
+                #print ("tempo short (activate on press)")
                 self.short_set.process_event(self.event_press, self.value_press)
         else:
             # Short press
+            
             if (self.start_time + self.delay) > time.time():
                 if self.timer:
                     self.timer.cancel()
 
+
                 if self.activate_on == "release":
+                    #print ("tempo short (activate on release)")
                     threading.Thread(target=lambda: self._short_press(
                         self.event_press,
                         self.value_press,
@@ -288,6 +292,7 @@ class TempoContainerFunctor(gremlin.base_classes.AbstractFunctor):
                     self.short_set.process_event(event, value)
             # Long press
             else:
+                #print ("tempo long")
                 self.long_set.process_event(event, value)
                 if self.activate_on == "press":
                     self.short_set.process_event(event, value)
@@ -379,7 +384,7 @@ class TempoContainer(AbstractContainer):
 
         :return True if the container is configured properly, False otherwise
         """
-        return len(self.action_sets) == 2 and None not in self.action_sets
+        return True # len(self.action_sets) == 2 and None not in self.action_sets
 
 
 # Plugin definitions

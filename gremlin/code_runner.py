@@ -267,6 +267,7 @@ class CodeRunner:
                             callbacks = []
                             for container in input_item.containers:
                                 if not container.is_valid():
+                                    test = container.is_valid()
                                     logging.getLogger("system").warning(
                                         "Incomplete container ignored"
                                     )
@@ -351,8 +352,8 @@ class CodeRunner:
             
 
 
-            for action in self._actions:
-                logging.getLogger("system").info(f"ACTION DATA: {action.name} {type(action).__name__}  enabled: {action.enabled}")
+            # for action in self._actions:
+            #     logging.getLogger("system").info(f"ACTION DATA: {action.name} {type(action).__name__}  enabled: {action.enabled}")
 
             # tell callbacks they are starting
             el.profile_start.emit()

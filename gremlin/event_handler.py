@@ -115,6 +115,11 @@ class Event:
 		"""
 		import copy
 		return copy.deepcopy(self)
+	
+	@property
+	def device_id(self) -> str:
+		''' id as a string '''
+		return str(self.device_guid)
 
 
 	def __eq__(self, other):
@@ -148,6 +153,7 @@ class Event:
 				self.identifier,
 				0
 			))
+		
 
 	@staticmethod
 	def from_key(key):
@@ -174,7 +180,7 @@ class Event:
 		elif self.event_type == InputType.JoystickAxis or self.is_axis:
 			return f"Event: Axis : {self.identifier} raw value: {self.raw_value} value: {self.value}"
 		elif self.event_type == InputType.JoystickButton:
-			return f"Event: Axis : {self.identifier} pressed: {self.is_pressed}"
+			return f"Event: Button : {self.identifier} pressed: {self.is_pressed} value: {self.value}"
 		return f"Event: {self.event_type} identifier {self.identifier}"
 
 class DeviceChangeEvent:
@@ -1183,8 +1189,8 @@ class EventHandler(QtCore.QObject):
 			# already in this mode
 			return
 		
-		mode_exists = new_mode in current_profile.get_modes()
-
+		profile_modes = current_profile.get_modes()
+		mode_exists = new_mode in profile_modes
 		
 		if not mode_exists:
 			for device in self.callbacks.values():
@@ -1211,7 +1217,7 @@ class EventHandler(QtCore.QObject):
 			# verbose = gremlin.config.Configuration().verbose
 			# if verbose:
 			logging.getLogger("system").warning(
-				f"The mode \"{new_mode}\" does not exist or has no associated callbacks - profile '{current_profile.name}'"
+				f"Mode Change Error: The mode \"{new_mode}\" does not exist or has no associated callbacks - profile '{current_profile.name}'"
 			)
 			return
 
