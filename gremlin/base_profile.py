@@ -1550,7 +1550,39 @@ class Profile():
         self._restore_last_mode = False # True if the profile should start with the last active mode (profile specific)
         self._dirty = False # dirty flag - indicates the profile data was changed but not saved yet
         self._force_numlock_off = True # if set, forces numlock to be off if it isn't so numpad keys report the correct scan codes
+
+        el = gremlin.event_handler.EventListener()
+        el.modes_changed.connect(self._modes_changed_cb)
         
+
+    @QtCore.Slot()        
+    def _modes_changed_cb(self):
+        ''' available mode list has changed - check data '''
+
+        # remove any merged axis data using a missing mode
+        modes = self.get_modes()
+        valid_list = []
+        for entry in self.merge_axes:
+            if entry["mode"] in modes:
+                valid_list.append(entry)
+        self.merge_axes = valid_list
+
+        # update vjoy device list
+        remove_list = []
+        for device in self.vjoy_devices.values():
+            for mode in device.modes.keys():
+                if not mode in modes:
+                    remove_list.append(mode)
+
+            for mode in remove_list:
+                if mode in device.modes:
+                    del device.modes[mode]
+
+        # check default startup mode
+        mode = self._default_start_mode
+        if not mode in modes:
+            self._default_start_mode = self.get_default_mode()
+            
 
     @property
     def dirty(self):
@@ -2043,10 +2075,14 @@ class Profile():
         root.append(devices)
 
         # VJoy settings
+        add_vjoy = False
         vjoy_devices = ElementTree.Element("vjoy-devices")
         for device in self.vjoy_devices.values():
-            vjoy_devices.append(device.to_xml())
-        root.append(vjoy_devices)
+            if device.modes:
+                vjoy_devices.append(device.to_xml())
+                add_vjoy = True
+        if add_vjoy:
+            root.append(vjoy_devices)
 
         # Merge axis data
         for entry in self.merge_axes:
@@ -2214,6 +2250,10 @@ class Profile():
         if not self._default_start_mode:
             # use the default mode if not setup
             self._default_start_mode = self.get_default_mode()
+        mode = self._default_start_mode
+        modes = self.get_modes()
+        if not mode in modes:
+            self._default_start_mode = self.get_root_mode()
         return self._default_start_mode
 
     def get_restore_mode(self):

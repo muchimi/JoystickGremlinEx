@@ -23,6 +23,7 @@ from lxml import etree as ElementTree
 import gremlin.base_profile
 from gremlin.input_types import InputType
 import gremlin.profile
+import gremlin.shared_state
 import gremlin.ui.input_item
 import gremlin.ui.ui_common
 
@@ -54,15 +55,33 @@ class TemporaryModeSwitchFunctor(gremlin.base_profile.AbstractFunctor):
 
     def __init__(self, action):
         super().__init__(action)
-        self.mode_name = action.mode_name
+        self.action_data : TemporaryModeSwitch = action
+        
 
     def process_event(self, event, value):
         import gremlin.control_action
-        gremlin.input_devices.ButtonReleaseActions().register_callback(
-            gremlin.control_action.switch_to_previous_mode,
-            event
-        )
-        gremlin.control_action.switch_mode(self.mode_name)
+        if event.is_pressed:
+            next_mode = self.action_data.mode_name
+            current_mode = gremlin.shared_state.current_mode
+            if next_mode != current_mode:
+                self.action_data.restore_mode = current_mode
+                gremlin.event_handler.EventHandler().change_mode(next_mode)
+                gremlin.input_devices.ButtonReleaseActions().register_callback(
+                    lambda : gremlin.event_handler.EventHandler().change_mode(current_mode),
+                    event
+                )
+
+            else:
+                # nothing to come back to
+                self.action_data.restore_mode = None
+
+
+        # gremlin.input_devices.ButtonReleaseActions().register_callback(
+        #     gremlin.control_action.switch_to_previous_mode,
+        #     event
+        # )
+        # gremlin.control_action.switch_mode(self.mode_name)
+
         return True
 
 
@@ -89,6 +108,7 @@ class TemporaryModeSwitch(gremlin.base_profile.AbstractAction):
         super().__init__(parent)
         self.mode_name = self.get_mode()
         self.parent = parent
+        self.restore_mode = None
 
     @property
     def priority(self):

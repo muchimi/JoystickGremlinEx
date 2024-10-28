@@ -112,7 +112,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.16ex (m2)"
+APPLICATION_VERSION = "13.40.16ex (m3)"
 
 # the main ui
 ui = None
@@ -2431,6 +2431,14 @@ class GremlinUi(QtWidgets.QMainWindow):
             if not last_runtime_mode:
                 last_runtime_mode = self.profile.get_root_mode()
                 gremlin.config.Configuration().set_profile_last_runtime_mode(last_runtime_mode)
+
+            modes = new_profile.get_modes()
+            if not last_edit_mode in modes:
+                # no longer in the current mode list
+                last_edit_mode = new_profile.get_default_mode()
+            if not last_runtime_mode in modes:
+                last_runtime_mode = new_profile.get_default_mode()
+        
 
 
             eh = gremlin.event_handler.EventHandler()

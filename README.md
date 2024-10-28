@@ -187,6 +187,10 @@ Joystick Gremlin EX
 
 ## 13.40.16ex (pre-release)
 
+### (m3)
+- Refactored behavior of *cycle mode* and *temporary mode* switch actions to handle gremlinEx backend changes
+- Bug fix: deleting a mode from a profile did not remove all references or mappings from actions
+
 
 ### (m2)
 - Added option to show or hide the button grid in vjoy remap

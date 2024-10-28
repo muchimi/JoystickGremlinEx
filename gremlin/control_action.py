@@ -17,7 +17,9 @@
 
 """Collection of actions that allow controlling JoystickGremlin."""
 
+import gremlin.base_profile
 import gremlin.event_handler
+import gremlin.shared_state
 
 
 class ModeList:
@@ -55,7 +57,7 @@ def switch_to_previous_mode():
     eh.change_mode(eh.previous_mode)
 
 
-def cycle_modes(mode_list):
+def cycle_modes(mode_list : list):
     """Cycles to the next mode in the provided mode list.
 
     If the currently active mode is not in the provided list of modes
@@ -63,7 +65,18 @@ def cycle_modes(mode_list):
 
     :param mode_list list of mode names to cycle through
     """
-    gremlin.event_handler.EventHandler().change_mode(mode_list.next())
+    next_mode = mode_list.next()
+    current_mode = gremlin.shared_state.current_mode
+    if current_mode in mode_list and current_mode == next_mode:
+        # find the next mode as the current mode is alredy the mode to cycle to so pick the next one
+        index = mode_list.index(current_mode)
+        index += 1
+        if index == len(mode_list):
+            index = 0
+        next_mode = mode_list[index]
+    
+
+    gremlin.event_handler.EventHandler().change_mode(next_mode)
 
 
 def pause():

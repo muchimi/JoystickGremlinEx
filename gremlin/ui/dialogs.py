@@ -1838,6 +1838,7 @@ class ModeManagerUi(ui_common.BaseDialogUi):
         self.close()
 
     def _get_mode_list(self):
+        modes = gremlin.shared_state.current_profile.get_modes()
         mode_list = {}
         for device in self._profile.devices.values():
             for mode in device.modes.values():
@@ -2127,7 +2128,8 @@ The setting can be overriden by the global mode reload option set in Options for
 
         # Remove the mode from the profile
         for device in self._profile.devices.values():
-            del device.modes[mode_name]
+            if mode_name in device.modes:
+                del device.modes[mode_name]
 
 
         

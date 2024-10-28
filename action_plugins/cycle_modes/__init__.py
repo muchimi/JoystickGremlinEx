@@ -22,7 +22,9 @@ from lxml import etree as ElementTree
 
 from PySide6.QtGui import QIcon
 import gremlin.base_profile 
+import gremlin.event_handler
 from gremlin.input_types import InputType
+import gremlin.shared_state
 import gremlin.ui.input_item
 import gremlin.ui.ui_common
 
@@ -41,47 +43,43 @@ class CycleModesWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         from gremlin.util import load_icon
 
-        if CycleModesWidget.locked:
-            return
-        try:
-            CycleModesWidget.locked = True
-            self.model = QtCore.QStringListModel()
-            self.view = QtWidgets.QListView()
-            self.view.setModel(self.model)
-            self.view.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        self.model = QtCore.QStringListModel()
+        self.view = QtWidgets.QListView()
+   
+        self.view.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
 
-            # Add widgets which allow modifying the mode list
-            self.mode_list = gremlin.ui.ui_common.NoWheelComboBox()
-            for entry in gremlin.profile.mode_list(self.action_data):
-                self.mode_list.addItem(entry)
-            self.add = QtWidgets.QPushButton(load_icon("list_add.svg"),  "Add") 
-            self.add.clicked.connect(self._add_cb)
-            self.delete = QtWidgets.QPushButton(load_icon("list_delete.svg"), "Delete")
-            
-            self.delete.clicked.connect(self._remove_cb)
-            self.up = QtWidgets.QPushButton(load_icon("list_up.svg"), "Up")
-            
-            self.up.clicked.connect(self._up_cb)
-            self.down = QtWidgets.QPushButton(load_icon("list_down.svg"), "Down")
+        # Add widgets which allow modifying the mode list
+        self.mode_list_widget = gremlin.ui.ui_common.NoWheelComboBox()
+        self.add = QtWidgets.QPushButton(load_icon("list_add.svg"),  "Add") 
+        self.add.clicked.connect(self._add_cb)
+        self.delete = QtWidgets.QPushButton(load_icon("list_delete.svg"), "Delete")
+        
+        self.delete.clicked.connect(self._remove_cb)
+        self.up = QtWidgets.QPushButton(load_icon("list_up.svg"), "Up")
+        
+        self.up.clicked.connect(self._up_cb)
+        self.down = QtWidgets.QPushButton(load_icon("list_down.svg"), "Down")
 
-            self.down.clicked.connect(self._down_cb)
+        self.down.clicked.connect(self._down_cb)
 
-            self.actions_layout = QtWidgets.QGridLayout()
-            self.actions_layout.addWidget(self.mode_list, 0, 0)
-            self.actions_layout.addWidget(self.add, 0, 1)
-            self.actions_layout.addWidget(self.delete, 0, 2)
-            self.actions_layout.addWidget(self.up, 1, 1)
-            self.actions_layout.addWidget(self.down, 1, 2)
+        self.actions_layout = QtWidgets.QGridLayout()
+        self.actions_layout.addWidget(self.mode_list_widget, 0, 0)
+        self.actions_layout.addWidget(self.add, 0, 1)
+        self.actions_layout.addWidget(self.delete, 0, 2)
+        self.actions_layout.addWidget(self.up, 1, 1)
+        self.actions_layout.addWidget(self.down, 1, 2)
 
-            self.main_layout.addWidget(self.view)
-            self.main_layout.addLayout(self.actions_layout)
-            self.main_layout.setContentsMargins(0, 0, 0, 0)
-            
-        finally:
-            CycleModesWidget.locked = False
+        self.main_layout.addWidget(self.view)
+        self.main_layout.addLayout(self.actions_layout)
+        self.main_layout.setContentsMargins(0, 0, 0, 0)
+
+        eh = gremlin.event_handler.EventListener()
+        eh.modes_changed.connect(self._modes_changed)
+
+
 
     def _populate_ui(self):
-        self.model.setStringList(self.action_data.mode_list)
+        self._update_mode_list()
 
     def save_changes(self):
         """Saves UI state to the profile."""
@@ -89,13 +87,42 @@ class CycleModesWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.action_data.mode_list = mode_list
         self.action_modified.emit()
 
+    def _update_mode_list(self):
+        with QtCore.QSignalBlocker(self.mode_list_widget):
+            self.mode_list_widget.clear()
+            modes = gremlin.shared_state.current_profile.get_modes()
+            for mode in modes:
+                self.mode_list_widget.addItem(mode)
+
+        # verify the modes in the cycle are valid
+        mode_list = self.action_data.mode_list
+        modes = gremlin.shared_state.current_profile.get_modes()
+        for mode in mode_list:
+            if not mode in modes:
+                mode_list.remove(mode)
+        self.model.setStringList(mode_list)
+        self.view.setModel(self.model)
+      
+        
+
+            
+            
+
+    @QtCore.Slot()
+    def _modes_changed(self):
+        ''' occurs when the modes are edited or changed '''
+        self._update_mode_list()
+
+
+    @QtCore.Slot()
     def _add_cb(self):
         """Adds the currently selected mode to the list of modes."""
         mode_list = self.model.stringList()
-        mode_list.append(self.mode_list.currentText())
+        mode_list.append(self.mode_list_widget.currentText())
         self.model.setStringList(mode_list)
         self.save_changes()
 
+    @QtCore.Slot()
     def _up_cb(self):
         """Moves the currently selected mode upwards."""
         mode_list = self.model.stringList()
@@ -108,6 +135,7 @@ class CycleModesWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.view.setCurrentIndex(self.model.index(new_index, 0))
             self.save_changes()
 
+    @QtCore.Slot()
     def _down_cb(self):
         """Moves the currently selected mode downwards."""
         mode_list = self.model.stringList()
@@ -120,6 +148,7 @@ class CycleModesWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.view.setCurrentIndex(self.model.index(new_index, 0))
             self.save_changes()
 
+    @QtCore.Slot()
     def _remove_cb(self):
         """Removes the currently selected mode from the list of modes."""
         mode_list = self.model.stringList()
@@ -135,12 +164,38 @@ class CycleModesFunctor(gremlin.base_profile.AbstractFunctor):
 
     def __init__(self, action):
         super().__init__(action)
-        import gremlin.control_action
-        self.mode_list = gremlin.control_action.ModeList(action.mode_list)
+        self.action_data : CycleModes = action
+        
 
     def process_event(self, event, value):
-        import gremlin.control_action
-        gremlin.control_action.cycle_modes(self.mode_list)
+        if event.is_pressed:
+            mode_list = self.action_data.mode_list
+            index = self.action_data.mode_index
+            index += 1
+            if index == len(mode_list):
+                # loop around
+                index = 0
+            next_mode = mode_list[index]
+
+            current_mode = gremlin.shared_state.current_mode
+            if current_mode in mode_list and current_mode == next_mode:
+                # find the next mode as the current mode is alredy the mode to cycle to so pick the next one
+                index = mode_list.index(current_mode)
+                index += 1
+                if index == len(mode_list):
+                    index = 0
+                next_mode = self.action_data.mode_list[index]
+
+            self.action_data.mode_index = index
+
+            gremlin.event_handler.EventHandler().change_mode(next_mode)
+            
+        
+
+    
+
+
+        
         return True
 
 
@@ -169,6 +224,7 @@ class CycleModes(gremlin.base_profile.AbstractAction):
         super().__init__(parent)
         self.parent = parent
         self.mode_list = []
+        self.mode_index = 0 # index of the current cycle mode
 
     def icon(self):
         return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"

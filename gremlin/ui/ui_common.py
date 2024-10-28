@@ -990,7 +990,7 @@ def _inheritance_tree_to_labels(labels, tree, level):
 def get_mode_list(profile_data):
     profile = profile_data
     mode_list = []
-
+    modes = gremlin.shared_state.current_profile.get_modes()
     # Create mode name labels visualizing the tree structure
     inheritance_tree = profile.build_inheritance_tree()
     labels = []
@@ -1001,14 +1001,17 @@ def get_mode_list(profile_data):
     mode_names = []
     display_names = []
     for entry in labels:
+        if not entry[0] in modes:
+            continue
         if entry[0] in mode_names:
-            idx = mode_names.index(entry[0])
-            if len(entry[1]) > len(display_names[idx]):
-                del mode_names[idx]
-                del display_names[idx]
-                mode_names.append(entry[0])
-                display_names.append(entry[1])
+                idx = mode_names.index(entry[0])
+                if len(entry[1]) > len(display_names[idx]):
+                    del mode_names[idx]
+                    del display_names[idx]
+                    mode_names.append(entry[0])
+                    display_names.append(entry[1])
         else:
+            
             mode_names.append(entry[0])
             display_names.append(entry[1])
 
@@ -1078,8 +1081,7 @@ class ModeWidget(QtWidgets.QWidget):
         with QtCore.QSignalBlocker(self.edit_mode_selector):
             self.profile = profile_data
 
-            # Remove all existing items in QT6 clear() doesn't always work
-            #self.edit_mode_selector.clear()
+            modes = gremlin.shared_state.current_profile.get_modes()
             while self.edit_mode_selector.count() > 0:
                     self.edit_mode_selector.removeItem(0)
             
@@ -1116,6 +1118,9 @@ class ModeWidget(QtWidgets.QWidget):
             index = 0
             current_index = 0
             last_edit_mode = gremlin.config.Configuration().get_profile_last_edit_mode()
+  
+            if not last_edit_mode in modes:
+                last_edit_mode = gremlin.shared_state.current_profile.get_default_mode()
             for display_name, mode_name in zip(display_names, mode_names):
                 self.edit_mode_selector.addItem(display_name, mode_name)
                 self.mode_list.append(mode_name)
