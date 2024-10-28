@@ -1654,6 +1654,7 @@ class OscInterface(QtCore.QObject):
         self._input_port = gremlin.config.Configuration().osc_port
         self._output_port = self._input_port + 1
         self._osc_server = OscServer() # the OSC server
+        self.osc_enabled = True # always able to listen to ports
 
         # find our current IP address
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)

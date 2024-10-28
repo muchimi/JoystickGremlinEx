@@ -524,7 +524,7 @@ class DILL:
                 _di_listener_dll = ctypes.cdll.LoadLibrary(_dll_path)
 
             except Exception as error:
-                msg = f"Unable to load DirectInput interface dll: {_dll_path}\n{error}"
+                msg = f"Unable to load DirectInput interface dll: {_dll_path}\nThis could be due to UAC (try running in Administrator mode) or {error}"
                 display_error(msg)
                 logging.getLogger("system").critical(msg)
                 os._exit(1)

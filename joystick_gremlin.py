@@ -112,7 +112,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.16ex (m3)"
+APPLICATION_VERSION = "13.40.16ex (m4)"
 
 # the main ui
 ui = None
@@ -1190,37 +1190,39 @@ class GremlinUi(QtWidgets.QMainWindow):
             )
 
             # Create MIDI tab
-            widget = gremlin.ui.midi_device.MidiDeviceTabWidget(
-                device_profile,
-                self.current_mode
-            )
-            device_guid = str(gremlin.ui.midi_device.MidiDeviceTabWidget.device_guid)
-            widget.data = (TabDeviceType.Midi, device_guid)
-            self.ui.devices.addTab(widget, "MIDI")
-            self._midi_device_guid = device_guid
-            device_name_map[gremlin.ui.midi_device.MidiDeviceTabWidget.device_guid] = "MIDI"
-            gremlin.shared_state.device_type_map[gremlin.ui.midi_device.MidiDeviceTabWidget.device_guid] = DeviceType.Midi
-            gremlin.shared_state.device_widget_map[gremlin.ui.midi_device.MidiDeviceTabWidget.device_guid] = widget
-            
-            device_profile = self.profile.get_device_modes(
-                gremlin.ui.osc_device.OscDeviceTabWidget.device_guid,
-                DeviceType.Osc,
-                DeviceType.to_string(DeviceType.Osc)
-            )
+            if self.config.midi_enabled:
+                widget = gremlin.ui.midi_device.MidiDeviceTabWidget(
+                    device_profile,
+                    self.current_mode
+                )
+                device_guid = str(gremlin.ui.midi_device.MidiDeviceTabWidget.device_guid)
+                widget.data = (TabDeviceType.Midi, device_guid)
+                self.ui.devices.addTab(widget, "MIDI")
+                self._midi_device_guid = device_guid
+                device_name_map[gremlin.ui.midi_device.MidiDeviceTabWidget.device_guid] = "MIDI"
+                gremlin.shared_state.device_type_map[gremlin.ui.midi_device.MidiDeviceTabWidget.device_guid] = DeviceType.Midi
+                gremlin.shared_state.device_widget_map[gremlin.ui.midi_device.MidiDeviceTabWidget.device_guid] = widget
+                
+                device_profile = self.profile.get_device_modes(
+                    gremlin.ui.osc_device.OscDeviceTabWidget.device_guid,
+                    DeviceType.Osc,
+                    DeviceType.to_string(DeviceType.Osc)
+                )
 
             # Create OSC tab
-            widget = gremlin.ui.osc_device.OscDeviceTabWidget(
-                device_profile,
-                self.current_mode
-            )
-            device_guid = str(gremlin.ui.osc_device.OscDeviceTabWidget.device_guid)
-            widget.data = (TabDeviceType.Osc, device_guid)
-            self.ui.devices.addTab(widget, "OSC")
-            self._osc_device_guid = device_guid
-            device_name_map[gremlin.ui.osc_device.OscDeviceTabWidget.device_guid] = "OSC"
-            gremlin.shared_state.device_type_map[gremlin.ui.osc_device.OscDeviceTabWidget.device_guid] = DeviceType.Osc
-            gremlin.shared_state.device_widget_map[gremlin.ui.osc_device.OscDeviceTabWidget.device_guid] = widget
-        
+            if self.config.osc_enabled:
+                widget = gremlin.ui.osc_device.OscDeviceTabWidget(
+                    device_profile,
+                    self.current_mode
+                )
+                device_guid = str(gremlin.ui.osc_device.OscDeviceTabWidget.device_guid)
+                widget.data = (TabDeviceType.Osc, device_guid)
+                self.ui.devices.addTab(widget, "OSC")
+                self._osc_device_guid = device_guid
+                device_name_map[gremlin.ui.osc_device.OscDeviceTabWidget.device_guid] = "OSC"
+                gremlin.shared_state.device_type_map[gremlin.ui.osc_device.OscDeviceTabWidget.device_guid] = DeviceType.Osc
+                gremlin.shared_state.device_widget_map[gremlin.ui.osc_device.OscDeviceTabWidget.device_guid] = widget
+            
         
             self._vjoy_output_device_guids = []
 

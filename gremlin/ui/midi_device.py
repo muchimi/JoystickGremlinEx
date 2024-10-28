@@ -475,18 +475,25 @@ class MidiInterface(QtCore.QObject):
         self._listeners = {} # map of port numer to its listener
 
         self._monitored_ports = set()
+        self.midi_enabled = False
         
+        try:
 
-        # get a list of available devices to listen into
-        mido.set_backend('mido.backends.rtmidi')
-        self._port_names = []
-        self._port_map = {}
-        for index, name in enumerate(mido.get_input_names()):
-            self._port_names.append(name)
-            self._port_map[name] = index
-        self._port_count = len(self._port_names)
+            # get a list of available devices to listen into
+            mido.set_backend('mido.backends.rtmidi')
+            self._port_names = []
+            self._port_map = {}
+            for index, name in enumerate(mido.get_input_names()):
+                self._port_names.append(name)
+                self._port_map[name] = index
+            self._port_count = len(self._port_names)
 
-        self._port_names.sort()
+            self._port_names.sort()
+
+            self.midi_enabled = True
+
+        except:
+            pass
 
     
         for port in self._port_names:

@@ -59,6 +59,11 @@ class Configuration:
         self._profile_fname = None # current profile to use for the conig
         self._profile_config_fname = None # config file specific to the profile
 
+
+
+        self._midi_enabled = None
+        self._osc_enabled = None
+
         fname = self.get_config()
         if not os.path.isfile(fname):
             # create a stub - first time run
@@ -1389,6 +1394,8 @@ class Configuration:
            
         '''
 
+        syslog = logging.getLogger("system")
+
         if device_guid is None:
             device_guid = self.get_last_device_guid()
 
@@ -1403,7 +1410,11 @@ class Configuration:
         data : dict = self._profile_data.get("last_input", {})
         if device_guid in data:
             input_type, input_id = data[device_guid]
-            input_type = gremlin.input_types.InputType.to_enum(input_type)
+            try:
+                input_type = gremlin.input_types.InputType.to_enum(input_type)
+            except:
+                syslog.error(f"GetLastInput(): unable to convert input type {input_type} to a known type")
+                input_type = gremlin.input_types.InputType.NotSet
 
             if input_id is not None and isinstance(input_id, int):
                 return (device_guid, input_type, input_id)
@@ -1412,11 +1423,17 @@ class Configuration:
                 input_type, save_input_id, input_id = self._get_input_id(dinput_device_guid, input_id)
                 if input_type is None:
                     if verbose:
-                        logging.getLogger("system").info(f"Loading input selection: nothing found for {device_guid} {device_name}")
+                        syslog.info(f"Loading input selection: nothing found for {device_guid} {device_name}")
                     return (None, None, None)
                 if verbose:
-                    logging.getLogger("system").info(f"Loading saved input selection: {device_guid} {device_name} {input_type} {input_id}")
-                return (device_guid, gremlin.input_types.InputType.to_enum(input_type), input_id)
+                    syslog.info(f"Loading saved input selection: {device_guid} {device_name} {input_type} {input_id}")
+
+                try:
+                    input_type = gremlin.input_types.InputType.to_enum(input_type)
+                except:
+                    syslog.error(f"GetLastInput(): unable to convert input type {input_type} to a known type")
+                    input_type = gremlin.input_types.InputType.NotSet
+                return (device_guid, input_type, input_id)
         # provide a suitable default for the input
         input_id = None
         if dinput_device_guid in gremlin.shared_state.device_type_map:
@@ -1488,3 +1505,22 @@ class Configuration:
     def button_grid_visible(self, value : bool):
         self._data["button_grid_visible"] = value
         self.save()
+
+    @property
+    def midi_enabled(self) -> bool:
+        ''' true if MIDI support is enabled '''
+        if self._midi_enabled is None:
+            from gremlin.ui.midi_device import MidiInterface
+            midi = MidiInterface()
+            self._midi_enabled = midi.midi_enabled
+        return self._midi_enabled
+
+    @property
+    def osc_enabled(self) -> bool:
+        ''' True if OSC support is enabled'''
+        if self._osc_enabled is None:
+            from gremlin.ui.osc_device import OscInterface
+            osc = OscInterface()
+            self._osc_enabled = osc.osc_enabled
+        return self._osc_enabled
+

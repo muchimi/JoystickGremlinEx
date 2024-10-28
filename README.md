@@ -187,6 +187,11 @@ Joystick Gremlin EX
 
 ## 13.40.16ex (pre-release)
 
+### (m4)
+
+- Added descriptive error message on DirectInput interface load errors if UAC (user access control) prevents it from loading depending on the permissions of the logged in account.  If a DLL load error occurs at startup, running the process in administrator mode usually solves the load issue.
+- Added check for MIDI ports to be available before offering the MIDI device tab.  If you get an exception when changing to the MIDI or OSC devices, please create a GitHub issue and attach the screenshot of the exception.
+
 ### (m3)
 - Refactored behavior of *cycle mode* and *temporary mode* switch actions to handle gremlinEx backend changes
 - Bug fix: deleting a mode from a profile did not remove all references or mappings from actions
@@ -407,7 +412,6 @@ Because the name "dill" conflicts with the Python module "dill", renamed to "din
 Introduction
 
 ------------
-
 
 <!-- TOC --><a name="virus-false-positives"></a>
 # Virus false-positives

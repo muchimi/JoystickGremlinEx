@@ -162,14 +162,19 @@ class Point2D:
 
     """Represents a 2D point with support for addition and subtraction."""
 
-    def __init__(self, x : float =0.0, y : float =0.0):
+    def __init__(self, x : float = 0.0, y : float = 0.0):
         """Creates a new instance.
 
         :param x the x coordinate
         :param y the y coordinate
         """
-        assert isinstance(x, float) or isinstance(x, int)
-        assert isinstance(y, float) or isinstance(y, int)
+
+        if not isinstance(x, float) or isinstance(x, int):
+            log_sys_error(f"Point2D: invalid type encountered: x {x}")
+            x = 0.0
+        if not isinstance(y, float) or isinstance(y, int):
+            log_sys_error(f"Point2D: invalid type encountered: y {y}")
+            y = 0.0
         self.x = float(x)
         self.y = float(y)
 
