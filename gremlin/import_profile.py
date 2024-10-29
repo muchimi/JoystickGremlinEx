@@ -657,6 +657,7 @@ class ImportProfileDialog(QtWidgets.QDialog):
                 # read all mode node children - these are all the inputs by input type
                 for node_input in node_mode:
                     node_containers = gremlin.util.get_xml_child(node_input,"container",multiple=True)
+                    input_description = ""
                     if len(node_containers) == 0:
                         # no mapping - skip node
                         if verbose:
@@ -665,7 +666,8 @@ class ImportProfileDialog(QtWidgets.QDialog):
                     if node_input.tag == "axis":
                         # axis node
                         input_id = safe_read(node_input,"id",int, 0)
-                        input_description = safe_read(node_input,"description",str,"")
+                        if "description" in node_input.attrib:
+                            input_description = safe_read(node_input,"description",str,"")
                         data = ContainerItem(device_name=item.device_name,
                                             device_guid=item.device_guid,
                                             device_type=item.device_type,
@@ -680,7 +682,8 @@ class ImportProfileDialog(QtWidgets.QDialog):
                     elif node_input.tag == "button":
                         # button node
                         input_id = safe_read(node_input,"id",int, 0)
-                        input_description = safe_read(node_input,"description",str,"")
+                        if "description" in node_input.attrib:
+                            input_description = safe_read(node_input,"description",str,"")
                         data = ContainerItem(device_name=item.device_name,
                                             device_guid=item.device_guid,
                                             device_type=item.device_type,
@@ -696,7 +699,8 @@ class ImportProfileDialog(QtWidgets.QDialog):
                     elif node_input.tag == "hat":
                         # button node
                         input_id = safe_read(node_input,"id",int, 0)
-                        input_description = safe_read(node_input,"description",str,"")
+                        if "description" in node_input.attrib:
+                            input_description = safe_read(node_input,"description",str,"")
                         data = ContainerItem(device_name=item.device_name,
                                             device_guid=item.device_guid,
                                             device_type=item.device_type,
@@ -720,6 +724,8 @@ class ImportProfileDialog(QtWidgets.QDialog):
                         keyboard_input_item.id = input_id
                         if verbose:
                             syslog.info(f"Import: read KeyboardLatched node {input_id}")
+                        if "description" in child_input_node.attrib:
+                            input_description = safe_read(child_input_node,"description",str,"")
                         data = ContainerItem(device_name=item.device_name,
                                             device_guid=item.device_guid,
                                             device_type=item.device_type,
@@ -746,6 +752,8 @@ class ImportProfileDialog(QtWidgets.QDialog):
                         midi_input_item.id = input_id
                         if verbose:
                             syslog.info(f"Import: read MIDI node {input_id}")
+                        if "description" in child_input_node.attrib:                            
+                            input_description = safe_read(child_input_node,"description",str,"")
                         data = ContainerItem(device_name=item.device_name,
                                             device_guid=item.device_guid,
                                             device_type=item.device_type,
@@ -768,6 +776,8 @@ class ImportProfileDialog(QtWidgets.QDialog):
                         osc_index += 1
                         osc_input_item.parse_xml(child_input_node)
                         osc_input_item.id = input_id
+                        if "description" in child_input_node.attrib:                            
+                            input_description = safe_read(child_input_node,"description",str,"")                        
                         if verbose:
                             syslog.info(f"Import: read OSC node {input_id}")
                         data = ContainerItem(device_name=item.device_name,
