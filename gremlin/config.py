@@ -1279,24 +1279,35 @@ class Configuration:
             # no data is ok
             pass
         elif isinstance(input_id, int):
-            input_id = int(input_id)
-        else:
-            assert False, f"Don't know how to handle input_id type: {type(input_id).__name__}"
-
-        if isinstance(input_type, gremlin.input_types.InputType):
-            data[device_guid] = (input_type.value, input_id)    
-        else:
-            data[device_guid] = (input_type, input_id)
-        self._profile_data["last_input"] = data
-        self._data["last_device_guid"] = device_guid
-        self._profile_data["last_device_guid"] = device_guid
-        
-        self.save_profile()
-
-        if verbose:
-            device_name = gremlin.shared_state.get_device_name(device_guid)
-            logging.getLogger("system").info(f"Saving last input selection: {device_guid} {device_name} {input_type} {input_id}")
             pass
+        elif isinstance(input_id, str):
+            if input_id.isnumeric():
+                input_id = int(input_id)
+            else:
+                guid = gremlin.util.parse_guid(input_id)
+                if guid is not None:
+                    input_id = str(guid)
+                else:
+                    logging.getLogger("system").warning(f"SetLastInput(): Don't know how to handle input_id [{input_id}] type: {type(input_id).__name__}")
+                    input_id = None
+        else:
+            logging.getLogger("system").warning(f"SetLastInput(): Don't know how to handle input_id [{input_id}] type: {type(input_id).__name__}")
+            input_id = None
+
+        input_type = gremlin.input_types.InputType.convert(input_type)
+        if input_type is not None:
+            data[device_guid] = (input_type, input_id)
+
+            self._profile_data["last_input"] = data
+            self._data["last_device_guid"] = device_guid
+            self._profile_data["last_device_guid"] = device_guid
+        
+            self.save_profile()
+
+            if verbose:
+                device_name = gremlin.shared_state.get_device_name(device_guid)
+                logging.getLogger("system").info(f"Saving last input selection: {device_guid} {device_name} {input_type} {input_id}")
+                pass
 
     # @property
     # def last_tab_guid(self):

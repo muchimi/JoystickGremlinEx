@@ -2908,8 +2908,6 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
 
         :return True if the action is configured correctly, False otherwise
         """
-
-
         
         if self.vjoy_device_id is None or self.vjoy_input_id is None:
             return False

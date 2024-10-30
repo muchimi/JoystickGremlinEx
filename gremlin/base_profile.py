@@ -1786,6 +1786,20 @@ class Profile():
             eh.modes_changed.emit()
         return True
     
+
+    def set_mode_parent(self, name, inherited_name, emit = True):
+        ''' sets the parent of a current mode'''
+        mode_list = self.mode_list()
+        if name in mode_list and inherited_name in mode_list:
+            for device in self.devices.values():
+                 if name in device.modes.keys():
+                    device.modes[name].inherit = inherited_name
+            if emit:
+                eh = gremlin.event_handler.EventListener()
+                eh.modes_changed.emit()
+            return True
+        return False
+    
     def mode_tree(self):
         ''' gets the parent/child hiearchy of modes - returns a map '''
         return self.build_inheritance_tree()
@@ -1793,7 +1807,7 @@ class Profile():
 
 
     
-    def remove_mode(self, name):
+    def remove_mode(self, name, force = False):
         ''' removes a mode from this profile '''
         from PySide6.QtWidgets import QMessageBox
         import gremlin.event_handler
@@ -1802,7 +1816,7 @@ class Profile():
             logging.getLogger("system").warning(f"Remove Mode: error: mode {name} not found")
             return False
                 
-        if len(mode_list.keys()) == 1:
+        if not force and len(mode_list.keys()) == 1:
             QMessageBox.warning(self, "Warning","Cannot delete last mode - one mode must exist")
             return False
 

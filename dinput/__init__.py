@@ -378,6 +378,7 @@ class DeviceSummary:
         data : _DeviceSummary
             The data received from DILL and to be held by this instance
         """
+        
         self.device_guid = GUID(data.device_guid)
         self.device_id = str(self.device_guid)
         self.vendor_id = data.vendor_id

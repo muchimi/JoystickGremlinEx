@@ -847,12 +847,13 @@ class JoystickDeviceTabWidget(QDataWidget):
             else:
                 syslog.info(f"Selecting input config item for input index [{index}] mode: {self.current_mode}: Empty content")
 
+        new_key = None
+        if item_data is not None:
+            new_key = _cache.getKey(item_data)
 
-        new_key = _cache.getKey(item_data)
-
-        if new_key == self.last_item_data_key:
-            # same input - nothing to do
-            return
+            if new_key == self.last_item_data_key:
+                # same input - nothing to do
+                return
 
         # hide all the existing widgets 
         widgets = gremlin.util.get_layout_widgets(self.right_container_layout)

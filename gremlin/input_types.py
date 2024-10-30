@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-
+from __future__ import annotations
 import enum
 
 class InputType(enum.IntEnum):
@@ -72,6 +72,20 @@ class InputType(enum.IntEnum):
         if value in _InputType_to_display_lookup.keys():
             return _InputType_to_string_lookup[value]
         return f"Unknown type: {value}"
+    
+    @staticmethod
+    def convert(value) -> InputType:
+        try:
+            if isinstance(value, int):
+                input_type = InputType(value)
+                return input_type
+            if value in _InputType_to_string_lookup.keys():
+                input_type = InputType(value)
+                return input_type
+                
+        except:
+            pass
+        return None
     
     # JSON serializer
 
