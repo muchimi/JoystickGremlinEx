@@ -168,15 +168,14 @@ class Point2D:
         :param x the x coordinate
         :param y the y coordinate
         """
-
-        if not isinstance(x, float) or isinstance(x, int):
-            log_sys_error(f"Point2D: invalid type encountered: x {x}")
-            x = 0.0
-        if not isinstance(y, float) or isinstance(y, int):
-            log_sys_error(f"Point2D: invalid type encountered: y {y}")
-            y = 0.0
-        self.x = float(x)
-        self.y = float(y)
+        try:
+            self.x = float(x)
+        except:
+            self.x = 0.0
+        try:    
+            self.y = float(y)
+        except:
+            self.y = 0.0
 
     def __add__(self, other):
         return Point2D(self.x + other.x, self.y + other.y)
@@ -1322,11 +1321,13 @@ class ControlPointEditorWidget(QtWidgets.QWidget):
         self.x_input.setRange(-1, 1)
         self.x_input.setDecimals(3)
         self.x_input.setSingleStep(0.1)
+        self.x_input.setValue(0)
 
         self.y_input = ui_common.QFloatLineEdit() #DynamicDoubleSpinBox()
         self.y_input.setRange(-1, 1)
         self.y_input.setDecimals(3)
         self.y_input.setSingleStep(0.1)
+        self.y_input.setValue(0)
 
         self.next_control_point = QtWidgets.QPushButton()
         self.next_control_point.setIcon(gremlin.util.load_icon("fa.caret-up"))
