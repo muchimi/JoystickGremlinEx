@@ -494,7 +494,7 @@ class AbstractContainer(ProfileData):
             node.append(self.virtual_button.to_xml())
         if self.activation_condition:
             condition_node = self.activation_condition.to_xml()
-            if condition_node:
+            if condition_node is not None:
                 node.append(condition_node)
         return node
 

@@ -946,6 +946,9 @@ class CurveView(QtWidgets.QGraphicsScene):
         :param parent parent of this widget
         """
         super().__init__(parent)
+
+        self._redraw = False
+
         self.model = curve_model
         self.model.content_modified.connect(self._model_changed)
         self.model.content_added.connect(self._populate_from_model)
@@ -1206,6 +1209,9 @@ class CurveView(QtWidgets.QGraphicsScene):
         otherwise the state gets lost.
         """
         # Remove old curve path and update control points
+        if self._redraw:
+            return
+        self._redraw = True
         for item in self.items():
             if isinstance(item, QtWidgets.QGraphicsPathItem):
                 self.removeItem(item)
@@ -1240,6 +1246,7 @@ class CurveView(QtWidgets.QGraphicsScene):
                     self.current_item.control_point.center
                 )
 
+        self._redraw = False
 
     def mousePressEvent(self, evt):
         """Informs the model about point selection if a point is clicked.
@@ -1469,8 +1476,10 @@ class ControlPointEditorWidget(QtWidgets.QWidget):
 
         :param point the point containing the new field values
         """
-        self.x_input.setValue(point.x)
-        self.y_input.setValue(point.y)
+        with QtCore.QSignalBlocker(self.x_input):
+            self.x_input.setValue(point.x)
+        with QtCore.QSignalBlocker(self.y_input):
+            self.y_input.setValue(point.y)
 
 
 class DeadzoneWidget(QtWidgets.QWidget):

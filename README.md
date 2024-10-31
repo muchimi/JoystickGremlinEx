@@ -188,6 +188,10 @@ Joystick Gremlin EX
 ## 13.40.16ex (pre-release)
 
 ### (m6)
+- Improved: still a WIP: import of profiles now includes un-mapped modes, deselecting a mode in one mapping deselects all, and input descriptions carry over.
+- Fix: curve input causing a recursive exception when moving control points.
+
+### (m6)
 - Fix: Updated logic used to determine if changes are made to a profile to avoid excessive prompting to save on profile load if an existing profile is already loaded: the updated check does away with hash values, ignores comments, internal IDs, file encodings and other non-relevant changes as these would trigger a save change prompt, even when there were none on a substantive basis.
 - Improved: still a WIP: improved handling of profile import logic and mapping to devices with fewer axes/buttons/hats. Fix for keyboard, MIDI and OSC inputs that cannot have a remap change - they import as they are since the input is fixed.
 - Fix: Update selection on tab change recalls correct input description

@@ -72,6 +72,7 @@ class ContainerItem():
                 mode: str = None ,
                 input_type : InputType = None,
                 input_id : int = 0,
+                description : str = None,
                 input_description : str = None,
                 container_nodes : list = [],
                 data = None,
@@ -83,6 +84,7 @@ class ContainerItem():
         self.mode: str = mode
         self.input_type : InputType = input_type
         self.input_id : int = input_id
+        self.description = description
         self.input_description : str = input_description
         self.container_nodes : list = container_nodes
         self.data = data
@@ -169,7 +171,6 @@ class ImportContainerItem(AbstractTreeItem):
         self.action_names = [] # action names mapped in the container
         self.container = None # the source container object
 
-
     def selectable_items(self):
         return self.actions
     
@@ -182,6 +183,7 @@ class ImportInputItem(AbstractTreeItem):
         super().__init__()
         self.device_guid = None # device the input belongs to
         self.input_id : int = 0
+        self.description : str = None
         self.input_description : str = None
         self.input_type : InputType = None
         self.input_name : str  = None
@@ -218,6 +220,8 @@ class ImportItem(AbstractTreeItem):
         self.device_type : DeviceType = None  
         self.device_guid = None # input GUID
         self.mode_map : dict[str, ImportModeItem ] = {} # map keyed by mode of list of input_items
+        self.description = None
+        self.input_description = None
 
 
     def selectable_items(self):
@@ -241,6 +245,7 @@ class ImportProfileDialog(QtWidgets.QDialog):
         # buid list of target devices in the current profile - these are devices that can be imported into
         self.target_devices_map = {}
         self.base_device_map = {}
+        self.description_map = {}
         
         base_devices = self.target_profile.get_ordered_device_list()
         if len(base_devices) == 0:
@@ -634,6 +639,36 @@ class ImportProfileDialog(QtWidgets.QDialog):
             return f"OSC {input_id}"
         return f"unknown: {input_type} {input_id}"
 
+    def _register_mode_item(self, mode, item):
+        ''' registers a mode item for a given mode '''
+        if not mode in self._import_mode_item_mode_map.keys():
+            self._import_mode_item_mode_map[mode] = []
+        if not item in self._import_mode_item_mode_map[mode]:
+            self._import_mode_item_mode_map[mode].append(item)
+
+    def _register_description(self, device_guid, mode, input_id, description):
+        ''' registers a description string '''
+        assert device_guid
+        assert mode
+        assert input_id
+        if description:
+            if not device_guid in self.description_map:
+                self.description_map[device_guid] = {}
+            if not mode in self.description_map[device_guid]:
+                self.description_map[device_guid][mode] = {}
+            self.description_map[device_guid][mode][input_id] = description
+            logging.getLogger("system").info(f"register description: device guid: {str(device_guid)} {gremlin.joystick_handling.device_name_from_guid(device_guid)} mode: {mode} input: {input_id} description: {description}")
+
+
+    def _get_description(self, device_guid, mode, input_id):
+        ''' gets a registered a description string '''
+        description = None
+        if device_guid in self.description_map:
+            if mode in self.description_map[device_guid]:
+                if input_id in self.description_map[device_guid][mode]:
+                    description = self.description_map[device_guid][mode][input_id]
+
+        return description
 
     def _load_import_profile(self):
         ''' imports a profile to the specified target device ID matching by name
@@ -661,6 +696,7 @@ class ImportProfileDialog(QtWidgets.QDialog):
         device_mode_pairs = [] # holds the list of seen device / mode pairs in case there are duplicates in an incorrect profile
         self._import_map = {}
         self._import_mode_item_map = {} # map of import items keyed by device guid
+        self._import_mode_item_mode_map = {} # map of ImportModeItems keyed by mode (contains a list of )
         self._input_items_by_source_device_guid = {}
 
         verbose = gremlin.config.Configuration().verbose
@@ -704,40 +740,61 @@ class ImportProfileDialog(QtWidgets.QDialog):
             node_modes = gremlin.util.get_xml_child(node,"mode",True)
             for node_mode in node_modes:
                 mode = node_mode.get("name")
+                if "EVA" in mode:
+                    pass
                 parent_mode = self.parent_mode_map[mode]
                 
                 import_mode_item = ImportModeItem()
                 import_mode_item.mode = mode
+                self._register_mode_item(mode, import_mode_item)
                 import_mode_item.parent_mode = parent_mode
                 if not item.device_guid in self._import_mode_item_map:
                     self._import_mode_item_map[item.device_guid] = {}
                 self._import_mode_item_map[item.device_guid][mode] = import_mode_item
-
+                
                 dm_pair = (item.device_guid, mode)
                 if dm_pair in device_mode_pairs:
                     syslog.warning(f"Found duplicated device/mode entries in import profile - only the fist entry will be used: device {item.device_name} ID: {item.device_guid}")
                     continue
+
                 device_mode_pairs.append(dm_pair)
                 # read all mode node children - these are all the inputs by input type
+                description = None
+                if "description" in node_mode.attrib:
+                    description = safe_read(node_mode,"description",str,"")
+                    self._register_description(item.device_guid, mode, item.input_id, description)
+                if len(node_mode) == 0:
+                        # no containers
+                        data = ContainerItem(device_name=item.device_name,
+                                            device_guid=item.device_guid,
+                                            device_type=item.device_type,
+                                            mode = mode,
+                                            input_type = InputType.NotSet,
+                                            input_id=None,
+                                            container_nodes = []
+                                            )
+                        import_list.append(data)
+                        continue
+                
                 for node_input in node_mode:
                     node_containers = gremlin.util.get_xml_child(node_input,"container",multiple=True)
-                    input_description = ""
                     if len(node_containers) == 0:
-                        # no mapping - skip node
-                        # if verbose:
-                        #     syslog.info(f"Import: Device: {item.device_name} Skip input {node_input.tag} - no source container found")
+                        # ignore nodes that don't have a mapping
                         continue
+   
                     if node_input.tag == "axis":
                         # axis node
                         input_id = safe_read(node_input,"id",int, 0)
+                        description = None
                         if "description" in node_input.attrib:
-                            input_description = safe_read(node_input,"description",str,"")
+                            description = safe_read(node_input,"description",str,"")
+                            self._register_description(item.device_guid, mode, input_id, description)
+
                         data = ContainerItem(device_name=item.device_name,
                                             device_guid=item.device_guid,
                                             device_type=item.device_type,
                                             mode = mode,
                                             input_type = InputType.JoystickAxis,
-                                            input_description = input_description,
                                             input_id=input_id,
                                             container_nodes = node_containers
                                             )
@@ -747,14 +804,16 @@ class ImportProfileDialog(QtWidgets.QDialog):
                     elif node_input.tag == "button":
                         # button node
                         input_id = safe_read(node_input,"id",int, 0)
+                        description = None
                         if "description" in node_input.attrib:
-                            input_description = safe_read(node_input,"description",str,"")
+                            description = safe_read(node_input,"description",str,"")
+                            self._register_description(item.device_guid, mode, input_id, description)
                         data = ContainerItem(device_name=item.device_name,
                                             device_guid=item.device_guid,
                                             device_type=item.device_type,
                                             mode = mode,
                                             input_type = InputType.JoystickButton,
-                                            input_description = input_description,
+                                            description = description,
                                             input_id=input_id,
                                             container_nodes = node_containers
                                             )
@@ -764,14 +823,16 @@ class ImportProfileDialog(QtWidgets.QDialog):
                     elif node_input.tag == "hat":
                         # button node
                         input_id = safe_read(node_input,"id",int, 0)
+                        description = None
                         if "description" in node_input.attrib:
-                            input_description = safe_read(node_input,"description",str,"")
+                            description = safe_read(node_input,"description",str,"")
+                            self._register_description(item.device_guid, mode, input_id, description)
                         data = ContainerItem(device_name=item.device_name,
                                             device_guid=item.device_guid,
                                             device_type=item.device_type,
                                             mode = mode,
                                             input_type = InputType.JoystickHat,
-                                            input_description = input_description,
+                                            description = description,
                                             input_id=input_id,
                                             container_nodes = node_containers
                                             )
@@ -789,14 +850,15 @@ class ImportProfileDialog(QtWidgets.QDialog):
                         keyboard_input_item.id = input_id
                         if verbose:
                             syslog.info(f"Import: read KeyboardLatched node {input_id}")
+                        description = None
                         if "description" in child_input_node.attrib:
-                            input_description = safe_read(child_input_node,"description",str,"")
+                            description = safe_read(child_input_node,"description",str,"")
+                            self._register_description(item.device_guid, mode, input_id, description)
                         data = ContainerItem(device_name=item.device_name,
                                             device_guid=item.device_guid,
                                             device_type=item.device_type,
                                             mode = mode,
                                             input_type = InputType.KeyboardLatched,
-                                            input_description = input_description,
                                             input_id=input_id,
                                             container_nodes = node_containers,
                                             data = keyboard_input_item
@@ -817,14 +879,16 @@ class ImportProfileDialog(QtWidgets.QDialog):
                         midi_input_item.id = input_id
                         if verbose:
                             syslog.info(f"Import: read MIDI node {input_id}")
+                        description = None
                         if "description" in child_input_node.attrib:                            
-                            input_description = safe_read(child_input_node,"description",str,"")
+                            description = safe_read(child_input_node,"description",str,"")
+                            self._register_description(item.device_guid, mode, input_id, description)
                         data = ContainerItem(device_name=item.device_name,
                                             device_guid=item.device_guid,
                                             device_type=item.device_type,
                                             mode = mode,
                                             input_type = InputType.Midi,
-                                            input_description = input_description,
+                                            description = description,
                                             input_id=input_id,
                                             container_nodes = node_containers,
                                             data = midi_input_item
@@ -841,8 +905,10 @@ class ImportProfileDialog(QtWidgets.QDialog):
                         osc_index += 1
                         osc_input_item.parse_xml(child_input_node)
                         osc_input_item.id = input_id
+                        description = None
                         if "description" in child_input_node.attrib:                            
-                            input_description = safe_read(child_input_node,"description",str,"")                        
+                            input_description = safe_read(child_input_node,"description",str,"")     
+                            self._register_description(item.device_guid, mode, input_id, description)                   
                         if verbose:
                             syslog.info(f"Import: read OSC node {input_id}")
                         data = ContainerItem(device_name=item.device_name,
@@ -850,7 +916,7 @@ class ImportProfileDialog(QtWidgets.QDialog):
                                             device_type=item.device_type,
                                             mode = mode,
                                             input_type = InputType.OpenSoundControl,
-                                            input_description = input_description,
+                                            description = description,
                                             input_id=input_id,
                                             container_nodes = node_containers,
                                             data = osc_input_item
@@ -877,6 +943,7 @@ class ImportProfileDialog(QtWidgets.QDialog):
             input_id = item.input_id
             input_type = item.input_type
             input_description = item.input_description
+            description = item.description
             mode = item.mode
             parent_mode =  self.parent_mode_map[mode]
 
@@ -892,6 +959,9 @@ class ImportProfileDialog(QtWidgets.QDialog):
                 import_item.device_type = item.device_type
                 import_item.input_id = input_id
                 import_item.input_type = input_type
+                if description:
+                    pass
+                import_item.description = description
                 import_item.input_description = input_description
                 self._import_map[item.device_guid] = import_item
                 import_item.parent = None
@@ -903,6 +973,7 @@ class ImportProfileDialog(QtWidgets.QDialog):
             if not mode in import_item.mode_map.keys():
                 import_mode_item = ImportModeItem()
                 import_mode_item.mode = mode
+                self._register_mode_item(mode, import_mode_item)
                 import_mode_item.parent_mode = parent_mode
                 import_mode_item.parent = import_item
                 import_item.mode_map[mode] = import_mode_item
@@ -975,6 +1046,7 @@ class ImportProfileDialog(QtWidgets.QDialog):
                 import_container_item.parent = import_input_item
                 import_container_item.mode = mode
                 import_container_item.container = container
+                
                 
 
                 profile_input_item.containers.append(container)
@@ -1112,11 +1184,14 @@ class ImportProfileDialog(QtWidgets.QDialog):
                     self._tree_device_nodes.append(device_node)
                     root_node.addChild(device_node)
 
+                    
+
                     cb = ui_common.QDataCheckbox(f"{import_item.device_name}")
                     cb.data = import_item
                     import_item.selected_widget = cb
                     cb.setChecked(import_item.selected)
                     cb.clicked.connect(self._select_import_item_cb)
+
 
                     container_layout.addWidget(cb)
                     # container_layout.addWidget(QtWidgets.QLabel(f"[{import_item.device_guid}]"))
@@ -1159,6 +1234,7 @@ class ImportProfileDialog(QtWidgets.QDialog):
                         cb.setChecked(import_item.selected)
                         cb.clicked.connect(self._select_import_item_cb)
                         device_node.addChild(mode_node)
+                        
 
                         container_layout.addWidget(cb)
                         container_layout.addStretch()
@@ -1171,43 +1247,33 @@ class ImportProfileDialog(QtWidgets.QDialog):
                         for input_item in mode_item.items:
 
                             # derive the target device
-                            if not input_item.input_type in self._default_info_map:
-                                syslog.warning(f"Import: unable to map {input_item.input_type} - no matching suitable device found ")
+
+                            has_mapping = True
+                            if input_item.input_type == InputType.NotSet:
+                                # no mapping 
                                 continue
+                            elif not input_item.input_type in self._default_info_map:
+                                syslog.warning(f"Import: unable to map {input_item.input_type} - no matching suitable device found ")
+                                has_mapping = False
 
-                            default_target_device_guid, default_target_input_id = self._default_info_map[input_item.input_type ]
+                            if has_mapping:
+                                default_target_device_guid, default_target_input_id = self._default_info_map[input_item.input_type ]
 
-                            # if not import_item.device_guid in self._input_device_guid_to_target_device_guid:
-                            #     data : import_item = widget.data
-                            #     target_device_guid = widget.data.device_guid
-                            #     self._input_device_guid_to_target_device_guid[import_item.device_guid] = target_device_guid
-                            # else:
-                            #     target_device_guid = self._input_device_guid_to_target_device_guid[import_item.device_guid]
+                                # derive the target input
 
-                            # if target_device_guid is not None:
-                            #     device = self.target_devices_map[target_device_guid] # device of the target device
-                            #     index = widget.findData(device) # index in the drop down
-                            #     if index == -1:
-                            #         # selector error - the target is not found
-                            #         syslog.error(f"Import: unable to map {input_item.input_type} - target device {target_device_guid} not populated in available device dropdown")
-                            #         continue
-
-        
-                            # derive the target input
-
-                            target_device_guid, target_input_id = self._find_target(source_device_guid, default_target_device_guid, input_item.input_type, input_item.input_id)
-                            if target_device_guid is None:
-                                target_device_guid = default_target_device_guid
-                            if target_input_id is None:
-                                target_device_guid = default_target_device_guid
-                                target_input_id = default_target_input_id
+                                target_device_guid, target_input_id = self._find_target(source_device_guid, default_target_device_guid, input_item.input_type, input_item.input_id)
+                                if target_device_guid is None:
+                                    target_device_guid = default_target_device_guid
+                                if target_input_id is None:
+                                    target_device_guid = default_target_device_guid
+                                    target_input_id = default_target_input_id
 
 
-                            self._input_device_guid_to_target_device_guid[source_device_guid] = target_device_guid
-                            base_device = self.base_device_map[target_device_guid]
-                            index = target_widget.findData(base_device)
-                            with QtCore.QSignalBlocker(target_widget):
-                                    target_widget.setCurrentIndex(index)
+                                self._input_device_guid_to_target_device_guid[source_device_guid] = target_device_guid
+                                base_device = self.base_device_map[target_device_guid]
+                                index = target_widget.findData(base_device)
+                                with QtCore.QSignalBlocker(target_widget):
+                                        target_widget.setCurrentIndex(index)
 
         
                             input_node = QtWidgets.QTreeWidgetItem()
@@ -1228,8 +1294,12 @@ class ImportProfileDialog(QtWidgets.QDialog):
 
                             container_layout.addWidget(cb)
                             container_layout.addStretch()
-
-                            map_to_input_widget, widget = self._create_target_input_widget(import_item, input_item, target_device_guid, target_input_id)
+                            map_to_input_widget = None
+                            if has_mapping:
+                                map_to_input_widget, widget = self._create_target_input_widget(import_item, input_item, target_device_guid, target_input_id)
+                            else:
+                                widget = ui_common.QDataLabel("N/A")
+                                map_to_input_widget = ui_common.QDataLabel("N/A")
 
                             tree.setItemWidget(input_node, 0, container_widget)
                             if map_to_input_widget is not None:
@@ -1345,34 +1415,42 @@ class ImportProfileDialog(QtWidgets.QDialog):
             source_input_type = InputType.KeyboardLatched # move to GremlinEX keyboard device
 
  
-
         if not target_device_guid in self._target_input_item_map.keys():
             items = {} # map of possible target input items keyed by input type
             for _, input_type in enumerate(InputType):
                 items[input_type] = []
 
+
                 # build the list of target inputs
                 if input_type == InputType.KeyboardLatched:
                     # keyboard input - single device
+
                     item = ImportInputItem()
-                    item.input_type = input_type
-                    item.device_guid = keyboard_device.get_keyboard_device_guid()
                     item.input_name = source_input_item.input_name
+                    item.input_description = source_input_item.input_description
+                    item.description = source_input_item.description
+                    item.input_type = input_type
+
+                    item.device_guid = keyboard_device.get_keyboard_device_guid()
                     items[input_type].append(item)
 
                 elif input_type == InputType.Midi:
                     # midi input - single device
                     item = ImportInputItem()
+                    item.input_name = source_input_item.input_name
+                    item.input_description = source_input_item.input_description
+                    item.description = source_input_item.description
                     item.input_type = input_type
                     item.device_guid = midi_device.get_midi_device_guid()
-                    item.input_name = source_input_item.input_name
                     items[input_type].append(item)
                 elif input_type == InputType.OpenSoundControl:
                     # OSC input - single device
                     item = ImportInputItem()
+                    item.input_name = source_input_item.input_name
+                    item.input_description = source_input_item.input_description
+                    item.description = source_input_item.description
                     item.input_type = input_type
                     item.device_guid = osc_device.get_osc_device_guid()
-                    item.input_name = source_input_item.input_name
                     items[input_type].append(item)
 
                 elif input_type == InputType.JoystickAxis:
@@ -1381,6 +1459,10 @@ class ImportProfileDialog(QtWidgets.QDialog):
                         # only create axis outputs that exist on the device
                         for index in range(info.axis_count):
                             item = ImportInputItem()
+                            item.input_name = source_input_item.input_name
+                            item.input_description = source_input_item.input_description
+                            item.description = source_input_item.description
+                            item.input_type = input_type
                             item.input_id = index + 1
                             item.input_type = input_type
                             item.input_name = self._get_input_name(item.input_type, item.input_id)
@@ -1393,6 +1475,10 @@ class ImportProfileDialog(QtWidgets.QDialog):
                     if info is not None:
                         for index in range(info.button_count):
                             item = ImportInputItem()
+                            item.input_name = source_input_item.input_name
+                            item.input_description = source_input_item.input_description
+                            item.description = source_input_item.description
+                            item.input_type = input_type
                             item.input_id = index + 1
                             item.input_type = input_type
                             item.input_name = self._get_input_name(item.input_type, item.input_id)
@@ -1404,6 +1490,10 @@ class ImportProfileDialog(QtWidgets.QDialog):
                     if info is not None:
                         for index in range(info.hat_count):
                             item = ImportInputItem()
+                            item.input_name = source_input_item.input_name
+                            item.input_description = source_input_item.input_description
+                            item.description = source_input_item.description
+                            item.input_type = input_type
                             item.input_id = index + 1
                             item.input_type = input_type
                             item.input_name = self._get_input_name(item.input_type, item.input_id)
@@ -1412,7 +1502,8 @@ class ImportProfileDialog(QtWidgets.QDialog):
 
             # remember the list for next time - the map contains all possible mappings keyed by input type
             self._target_input_item_map[target_device_guid] = items
-        
+            if item.description:
+                pass
 
         # grab the list of mappings for the given device
         items = self._target_input_item_map[target_device_guid][source_input_type]
@@ -1482,6 +1573,15 @@ class ImportProfileDialog(QtWidgets.QDialog):
         widget = self.sender()
         data = widget.data
         data.selected = checked
+
+        if isinstance(data, ImportModeItem):
+            # check/uncheck all the other import modes of that type
+            items = self._import_mode_item_mode_map[data.mode]
+            for item in items:
+                item.selected = checked
+                with QtCore.QSignalBlocker(data.selected_widget):
+                    data.selected_widget.setChecked(checked)
+        
 
     @QtCore.Slot(bool)
     def _import_mode_selection_cb(self, checked):
@@ -1599,6 +1699,9 @@ class ImportProfileDialog(QtWidgets.QDialog):
 
             for import_item in import_items:
                 # target output device
+                if not import_item.device_guid in self._input_device_guid_to_target_device_guid:
+                    # nothing mapped, skip
+                    continue
                 target_device_guid = self._input_device_guid_to_target_device_guid[import_item.device_guid]
                 target_device : gremlin.base_profile.Device = self.target_profile.devices[target_device_guid]
                 source_device_guid = import_item.device_guid
@@ -1665,6 +1768,14 @@ class ImportProfileDialog(QtWidgets.QDialog):
                                 input_device = next((device for device in self.source_profile.devices.values() if device.device_guid == source_device_guid), None)
                                 input_profile_mode = input_device.modes[source_mode]                            
                                 
+                                profile_target_mode : gremlin.base_profile.Mode = target_device.modes[target_mode]
+                                if isinstance(input_input_id, int) and input_input_id == 13:
+                                    pass
+
+                                description = self._get_description(source_device_guid, source_mode, input_input_id)
+                                if description:
+                                    pass
+
                                 for container_item in container_items:
                                     if not container_item.selected:
                                         # not selected for export
@@ -1678,10 +1789,12 @@ class ImportProfileDialog(QtWidgets.QDialog):
 
                                         # add the entry to the profile
                                         target_device.modes[target_mode].get_data(target_input_type, target)
-                                        profile_target_input_item = target_device.modes[target_mode].config[target_input_type][target]
+                                        profile_target_input_item = profile_target_mode.config[target_input_type][target]
+                                
+                                        
                                         #profile_target_input_item = target
                                         key = next((key for key in input_profile_mode.config[input_input_type].keys() if key.id == source.id), None)
-                                        profile_source_input_item = input_profile_mode.config[input_input_type][key]
+                                        #profile_source_input_item = input_profile_mode.config[input_input_type][key]
                                         
                                         
                                     elif target_input_type == InputType.OpenSoundControl:
@@ -1690,35 +1803,41 @@ class ImportProfileDialog(QtWidgets.QDialog):
                                         target = source.duplicate() # osc_device.OscInputItem()
 
                                         target_device.modes[target_mode].get_data(target_input_type, target) 
-                                        profile_target_input_item = target_device.modes[target_mode].config[target_input_type][target]
-                                        #profile_target_input_item = target
-                                        key = next((key for key in input_profile_mode.config[input_input_type].keys() if key.id == source.id), None)
-                                        profile_source_input_item = input_profile_mode.config[input_input_type][key]
+                                        profile_target_input_item = profile_target_mode.config[target_input_type][target]
+                                        # #profile_target_input_item = target
+                                        # key = next((key for key in input_profile_mode.config[input_input_type].keys() if key.id == source.id), None)
+                                        # #profile_source_input_item = input_profile_mode.config[input_input_type][key]
 
                                     elif target_input_type == InputType.KeyboardLatched:
                                         # Keyboard OSC source
                                         source : keyboard_device.KeyboardInputItem = input_item.data
                                         target = source.duplicate()
                                         
-                                        target_device.modes[target_mode].get_data(target_input_type, target) 
-                                        profile_target_input_item = target_device.modes[target_mode].config[target_input_type][target]
-                                        #profile_target_input_item = target
-                                        key = next((key for key in input_profile_mode.config[input_input_type].keys() if key.id == source.id), None)
-                                        profile_source_input_item = input_profile_mode.config[input_input_type][key]
+                                        target_device.modes[target_mode].get_data(target_input_type, target)
+                                        profile_target_input_item = profile_target_mode.config[target_input_type][target]
+                                        # key = next((key for key in input_profile_mode.config[input_input_type].keys() if key.id == source.id), None)
+                                        #profile_source_input_item = input_profile_mode.config[input_input_type][key]
                                         #profile_source_input_item = input_profile_mode.config[input_input_type][source]
 
 
                                     elif target_input_type in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat):
                                         profile_target_mode : gremlin.base_profile.Mode = target_device.modes[target_mode]
                                         profile_target_input_item : gremlin.base_profile.InputItem
-                                        profile_source_input_item = input_profile_mode.config[input_input_type][input_input_id]
+                                        #profile_source_input_item = input_profile_mode.config[input_input_type][input_input_id]
+                                        
 
                                         # mode.config is a dictionary of [input_type][input_id] holding gremlin.base_profile.InputItem
                                         # InputItems hold the containers for that input
                                         target_device.modes[target_mode].get_data(target_input_type, target_input_id) 
                                         profile_target_input_item = profile_target_mode.config[target_input_type][target_input_id]
+                                        #target = target_device.modes[target_mode][target_input_type][target_input_id]
+                                        
 
-                                
+                                    
+                                    if description:
+                                        profile_target_input_item.description = description
+                  
+
                                     container = container_item.container
                                     # found the matching input item on the target profile
                                     # use xml to serialize to avoid reference shenanigans

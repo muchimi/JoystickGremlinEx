@@ -115,7 +115,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.16ex (m6)"
+APPLICATION_VERSION = "13.40.16ex (m7)"
 
 # the main ui
 ui = None
@@ -200,7 +200,6 @@ class GremlinUi(QtWidgets.QMainWindow):
         # Setup profile storage
         
         self.profile = gremlin.base_profile.Profile()
-        self._profile_fname = None
         self._profile_auto_activated = False
         # Input selection storage
         self._last_input_timestamp = time.time()
@@ -469,7 +468,6 @@ class GremlinUi(QtWidgets.QMainWindow):
             self._do_load_profile(tmp_file)
             os.unlink(tmp_file)
             profile._profile_fname = None
-            self._profile_fname = None
             self._update_window_title("Untitled")
         else:
             self._load_recent_profile(new_profile)
@@ -505,7 +503,10 @@ class GremlinUi(QtWidgets.QMainWindow):
             # self._idle_thread.wait()
 
             self.process_monitor.running = False
-            del self.ui.tray_icon
+            try:
+                del self.ui.tray_icon
+            except:
+                pass
             QtCore.QCoreApplication.quit()
 
         # Terminate file watcher thread
@@ -914,7 +915,6 @@ class GremlinUi(QtWidgets.QMainWindow):
 
 
         # Update profile information
-        self._profile_fname = None
         self._update_window_title()
         
 
@@ -940,8 +940,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         If the file was loaded from an existing profile that file is
         updated, otherwise the user is prompted for a new file.
         """
-        if self._profile_fname:
-            self.profile._profile_fname = self._profile_fname
+        if self.profile._profile_fname is not None:
             self.profile.save()
         else:
             self.save_profile_as()
@@ -957,7 +956,6 @@ class GremlinUi(QtWidgets.QMainWindow):
         )
         if fname != "":
             self.profile._profile_fname = fname
-            self._profile_fname = fname
             self.profile.save()
             self.config.last_profile = fname
             self._create_recent_profiles()
@@ -965,18 +963,20 @@ class GremlinUi(QtWidgets.QMainWindow):
 
     def reveal_profile(self):
         ''' opens the profile in explorer '''
-        if self._profile_fname and os.path.isfile(self._profile_fname):
-            path = os.path.dirname(self._profile_fname)
+        profile_fname = self.profile._profile_fname
+        if profile_fname and os.path.isfile(profile_fname):
+            path = os.path.dirname(profile_fname)
             path = os.path.realpath(path)
             webbrowser.open(path)
 
     def open_profile_xml(self):
         ''' views the profile as an xml in the default text editor '''
-        if self._profile_fname:
+        profile_fname = self.profile._profile_fname
+        if profile_fname:
             # save first
-            self.profile.to_xml(self._profile_fname)
-            if  os.path.isfile(self._profile_fname):
-                path = os.path.realpath(self._profile_fname)
+            self.profile.to_xml(profile_fname)
+            if  os.path.isfile(profile_fname):
+                path = os.path.realpath(profile_fname)
                 webbrowser.open(path)
 
     # +---------------------------------------------------------------
@@ -2121,10 +2121,10 @@ class GremlinUi(QtWidgets.QMainWindow):
         mode = None # assume no mode change needed
         if profile_path:
             # profile entry found - see if we need to change profiles
-            if not compare_path(self._profile_fname, profile_path):
+            if not compare_path(self.profile._profile_fname, profile_path):
                 # change profile
                 if verbose:
-                    logging.getLogger("system").info(f"PROC: process change forces a profile load: switch from {os.path.basename(self._profile_fname)} ->  {os.path.basename(profile_path)}")
+                    logging.getLogger("system").info(f"PROC: process change forces a profile load: switch from {os.path.basename(self.profile._profile_fname)} ->  {os.path.basename(profile_path)}")
                 self.ui.actionActivate.setChecked(False)
                 self.activate(False)
                 self._do_load_profile(profile_path)
@@ -2435,8 +2435,6 @@ class GremlinUi(QtWidgets.QMainWindow):
                 sys.path.insert(0, profile_folder)
 
             self._sanitize_profile(new_profile)
-            
-            self._profile_fname = fname
             self._update_window_title()
 
 
@@ -2575,25 +2573,25 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         :return True if the profile has changed, false otherwise
         """
-        if self._profile_fname is None:
+        profile_fname = self.profile._profile_fname
+        if profile_fname is None:
+            # profile not saved yet
             return True
+        if not os.path.isfile(profile_fname):
+            # profile not saved yet
+            return True
+
         else:
             # save the profile and compare to the original file
-            tmp_path = os.path.join(os.getenv("temp"), gremlin.util.get_guid() + ".xml")
-            #tmp_path = os.path.join(os.getenv("temp"), "gremlin.xml")
+            #tmp_path = os.path.join(os.getenv("temp"), gremlin.util.get_guid() + ".xml")
+            tmp_path = os.path.join(os.getenv("temp"), "gremlin.xml")
             self.profile.to_xml(tmp_path)
             
             # remove blank text and comments from the XML files
             parser = etree.XMLParser(remove_comments=True, remove_blank_text=True)
             try:
                 t1 = etree.parse(tmp_path, parser=parser)
-                if self._profile_fname is None:
-                    # profile not saved yet
-                    return True
-                if not os.path.isfile(self._profile_fname):
-                        # profile not saved yet
-                    return True
-                t2 = etree.parse(self._profile_fname, parser=parser)
+                t2 = etree.parse(profile_fname, parser=parser)
             except:
                 # error loading file - assume no changes
                 return False
@@ -2607,7 +2605,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                     if "action_id" in node.attrib:
                         del node.attrib["action_id"]
 
-            is_changed = etree.tostring(t1) == etree.tostring(t2)
+            is_changed = etree.tostring(t1) != etree.tostring(t2)
 
             # current_sha = hashlib.sha256(
             #     open(tmp_path).read().encode("utf-8")
@@ -2615,14 +2613,14 @@ class GremlinUi(QtWidgets.QMainWindow):
             # profile_sha = hashlib.sha256(
             #     open(self._profile_fname).read().encode("utf-8")
             # ).hexdigest()
-
             # is_changed =  current_sha != profile_sha
+
             # if is_changed:
             #     gremlin.util.display_file(tmp_path)
-            #     gremlin.util.display_file(self._profile_fname)
+            #     gremlin.util.display_file(profile_fname)
 
             # clean up
-            os.unlink(tmp_path)
+            #os.unlink(tmp_path)
             
 
 
