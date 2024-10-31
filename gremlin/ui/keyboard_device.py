@@ -46,9 +46,9 @@ class KeyboardInputItem(AbstractInputItem):
         super().__init__()
         self._key = None # associated primary key (containing latched items)
         self._title_name = "Keyboard input (not configured)"
-        self._display_name = None
+        
         self._display_tooltip = None
-        self._description = None
+
         self._suspend_update = False
         self._update()
         
@@ -57,10 +57,6 @@ class KeyboardInputItem(AbstractInputItem):
         ''' title for this input '''
         return self._title_name
 
-    @property
-    def display_name(self):
-        ''' display name for this input '''
-        return self._display_name
     
     @property
     def display_tooltip(self):
@@ -267,6 +263,7 @@ class KeyboardInputItem(AbstractInputItem):
         target._key = copy.deepcopy(source._key)
         target._title_name = source._title_name
         target._display_name = source._display_name
+        target._input_description = source._input_description
         target._display_tooltip = source._display_tooltip
         target._description = source._description
         target._suspend_update = source._suspend_update
@@ -396,6 +393,9 @@ class KeyboardDeviceTabWidget(QDataWidget):
         # refresh on configuration change
         el = gremlin.event_handler.EventListener()
         el.config_changed.connect(self._config_changed_cb)
+
+
+        self.update()
 
 
     def _config_changed_cb(self):
@@ -637,6 +637,8 @@ class KeyboardDeviceTabWidget(QDataWidget):
         data = input_widget.identifier.input_id
         input_widget.setTitle(data.title_name)
         input_widget.setInputDescription(data.display_name)
+        input_widget.display_name = data.display_name
+        
         input_widget.setToolTip(data.display_tooltip)
         if data.has_mouse:
             input_widget.setInputDescriptionIcon("mdi.mouse")
@@ -657,7 +659,7 @@ class KeyboardDeviceTabWidget(QDataWidget):
             self._status_widget.setIcon() # clear it
         self._status_widget.setText(status_text)
         self._status_widget.setVisible(len(status_text)>0)
-
+   
 
 
     def _populate_input_widget_ui(self, input_widget, container_widget, data):

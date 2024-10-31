@@ -509,6 +509,31 @@ class InputItemListView(ui_common.AbstractView):
 
         self.updated.emit()
 
+
+    def redraw_index(self, index : int):
+        """Redraws the view entry at the given index.
+
+        :param index the index of the entry to redraw
+        """
+        if self.model is None:
+            return
+
+
+        # logging.getLogger("system").info(f"redraw_index: {index}")
+
+        data = self.model.data(index)
+        item = self.scroll_layout.itemAt(index)
+        if item is not None:
+            widget = self.scroll_layout.itemAt(index).widget()
+            if self.custom_widget_handler:
+                widget.update_display()
+            elif widget is not None:
+                widget.create_action_icons(data)
+                widget.setDescription(data.description)
+                widget.setInputDescription(data.display_name)
+            
+                        
+
     def _widget_selection_change_cb(self, widget):
         ''' called when a widget selection changes '''
         # data : gremlin.base_profile.InputItem = widget.data
@@ -527,24 +552,7 @@ class InputItemListView(ui_common.AbstractView):
         return None
 
 
-    def redraw_index(self, index : int):
-        """Redraws the view entry at the given index.
-
-        :param index the index of the entry to redraw
-        """
-        if self.model is None:
-            return
-
-
-        # logging.getLogger("system").info(f"redraw_index: {index}")
-
-        data = self.model.data(index)
-        item = self.scroll_layout.itemAt(index)
-        if item is not None:
-            widget = self.scroll_layout.itemAt(index).widget()
-            if widget is not None:
-                widget.create_action_icons(data)
-                widget.setDescription(data.description)
+   
 
     def _create_edit_callback(self, index : int):
         """Creates a callback handling the edit action of an input widget
@@ -1121,6 +1129,7 @@ class InputItemWidget(QtWidgets.QFrame):
         config = gremlin.config.Configuration()
         self.axis_widget = None
 
+
         if self.identifier.input_type in (InputType.JoystickAxis, InputType.JoystickButton) and config.show_input_axis:
             
             if self.identifier.input_type == InputType.JoystickAxis:
@@ -1152,6 +1161,10 @@ class InputItemWidget(QtWidgets.QFrame):
             self._container_layout.addWidget(self.custom_container_widget,self._row_custom_content,0) # custom container
         
        
+        curve_visible = self.identifier.input_type == InputType.JoystickAxis
+        self._curve_container_widget.setVisible(curve_visible)
+
+
         self.setMinimumWidth(300)
         self.main_layout.addWidget(self._container_widget)
         self.update_display()
@@ -1204,11 +1217,13 @@ class InputItemWidget(QtWidgets.QFrame):
 
     def setInputDescription(self, value):
         ''' sets the title of the input widget '''
-        if value:
+        if value is not None:
             self._input_description_widget.setText(value)
             self._container_layout.addWidget(self._input_description_widget, self._row_input_description,0)
         else:
+            self._input_description_widget.setText("")
             layout_remove(self._container_layout, self._input_description_widget)
+
         
 
     def setInputDescriptionIcon(self, icon_path, use_qta = True):

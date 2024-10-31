@@ -220,6 +220,9 @@ class AbstractInputItem():
     def __init__(self):
         self._id = uuid.uuid4() # GUID (unique) if loaded from XML - will reload that one
         self._guid = str(self.id).replace("-","")
+        self._display_name = None
+        self._description = None
+        self._input_description = None
 
     @property
     def guid(self):
@@ -234,3 +237,26 @@ class AbstractInputItem():
     def id(self, value):
         self._id = value
         self._guid = str(value).replace("-","")
+
+    @property
+    def display_name(self):
+        ''' display name for this input '''
+        return self._display_name
+    
+    def setDisplayName(self, value : str):
+        self._display_name = value
+    
+    @property
+    def description(self) -> str:
+        return self._description
+    
+    def setDescription(self, value : str):
+        self._description = value
+    
+
+    @property
+    def input_description(self) -> str:
+        return self._input_description
+    
+    def setInputDescription(self, value : str):
+        self._input_description = value

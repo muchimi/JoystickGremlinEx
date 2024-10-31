@@ -19,6 +19,8 @@
 Main UI of JoystickGremlin.
 """
 
+from __future__ import annotations
+
 import argparse
 import ctypes
 import hashlib
@@ -33,7 +35,7 @@ from threading import Lock
 import webbrowser
 
 import dinput
-
+from lxml import etree
 
 import gremlin.gamepad_handling
 import gremlin.import_profile
@@ -45,6 +47,7 @@ import gremlin.ui.osc_device
 import gremlin.util
 import gremlin.curve_handler
 import gremlin.gated_handler
+import gremlin.input_types
 
 from gremlin.util import InvokeUiMethod, assert_ui_thread
 
@@ -232,6 +235,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         el.profile_start.connect(lambda: self._update_status_bar_active(True))
         el.profile_stop.connect(lambda: self._update_status_bar_active(False))
         el.joystick_event.connect(self._joystick_input_handler)
+        el.profile_changed.connect(self._profile_changed_cb)
 
         # hook mode change
         el.modes_changed.connect(self._modes_changed)
@@ -454,10 +458,23 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.load_profile(profile.profile_file)
 
 
-    def _profile_changed_cb(self, new_profile):
+    def _profile_changed_cb(self, new_profile = None):
         ''' called when the a profile should be loaded '''
-        self._load_recent_profile(new_profile)
+
+        if new_profile is None:
+            # save current contents to a temporary file
+            profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
+            tmp_file = os.path.join(os.getenv("temp"), gremlin.util.get_guid() + ".xml")
+            profile.save(tmp_file)
+            self._do_load_profile(tmp_file)
+            os.unlink(tmp_file)
+            profile._profile_fname = None
+            self._profile_fname = None
+            self._update_window_title("Untitled")
+        else:
+            self._load_recent_profile(new_profile)
     
+
 
 
     @property
@@ -1526,7 +1543,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         eh.select_input.emit(device_guid, input_type, input_id)
 
        
-    def _select_input_handler(self, device_guid, input_type = None, input_id = None, force = False):
+    def _select_input_handler(self, device_guid : dinput.GUID, input_type : gremlin.input_types.InputType = None, input_id = None, force : bool = False):
         ''' Selects a specific input on the given tab 
         The tab is changed if different from the current tab.
 
@@ -1538,7 +1555,6 @@ class GremlinUi(QtWidgets.QMainWindow):
         
         '''
 
-        assert not self._selection_locked,"reentrant code detected"
         self._selection_locked = True
       
         try:
@@ -1582,9 +1598,9 @@ class GremlinUi(QtWidgets.QMainWindow):
 
             if input_id is None:
                 # get the default item to select
-                input_type, save_input_id, input_id  = self.config.get_last_input(device_guid)
+                last_device_guid, last_input_type, input_id  = self.config.get_last_input(device_guid)
                 if input_id is None:
-                    input_type, save_input_id, input_id  = self.config.get_last_input(device_guid)
+                    last_device_guid, last_input_type_type, input_id  = self.config.get_last_input(device_guid)
 
                 
 
@@ -1596,6 +1612,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                     widget.input_item_list_view.select_input(input_type, input_id)
                     index = widget.input_item_list_view.current_index
                     widget.input_item_list_view.redraw_index(index)
+                    
                     
 
                 #QtWidgets.QApplication.processEvents()
@@ -2562,19 +2579,52 @@ class GremlinUi(QtWidgets.QMainWindow):
             return True
         else:
             # save the profile and compare to the original file
-            tmp_path = os.path.join(os.getenv("temp"), "gremlin.xml")
+            tmp_path = os.path.join(os.getenv("temp"), gremlin.util.get_guid() + ".xml")
+            #tmp_path = os.path.join(os.getenv("temp"), "gremlin.xml")
             self.profile.to_xml(tmp_path)
-            current_sha = hashlib.sha256(
-                open(tmp_path).read().encode("utf-8")
-            ).hexdigest()
-            profile_sha = hashlib.sha256(
-                open(self._profile_fname).read().encode("utf-8")
-            ).hexdigest()
+            
+            # remove blank text and comments from the XML files
+            parser = etree.XMLParser(remove_comments=True, remove_blank_text=True)
+            try:
+                t1 = etree.parse(tmp_path, parser=parser)
+                if self._profile_fname is None:
+                    # profile not saved yet
+                    return True
+                if not os.path.isfile(self._profile_fname):
+                        # profile not saved yet
+                    return True
+                t2 = etree.parse(self._profile_fname, parser=parser)
+            except:
+                # error loading file - assume no changes
+                return False
 
-            is_changed =  current_sha != profile_sha
+            # remove container IDs and action IDs from xml
+            trees = (t1, t2)
+            for t in trees:
+                for node in t.findall(".//*"): 
+                    if "container_id" in node.attrib:
+                        del node.attrib["container_id"]
+                    if "action_id" in node.attrib:
+                        del node.attrib["action_id"]
+
+            is_changed = etree.tostring(t1) == etree.tostring(t2)
+
+            # current_sha = hashlib.sha256(
+            #     open(tmp_path).read().encode("utf-8")
+            # ).hexdigest()
+            # profile_sha = hashlib.sha256(
+            #     open(self._profile_fname).read().encode("utf-8")
+            # ).hexdigest()
+
+            # is_changed =  current_sha != profile_sha
             # if is_changed:
             #     gremlin.util.display_file(tmp_path)
             #     gremlin.util.display_file(self._profile_fname)
+
+            # clean up
+            os.unlink(tmp_path)
+            
+
 
             return is_changed
                 
@@ -2789,12 +2839,16 @@ class GremlinUi(QtWidgets.QMainWindow):
             "<b>Repeater: </b> {}".format(text)
         )
 
-    def _update_window_title(self):
+    def _update_window_title(self, title = None):
         """Updates the window title to include the current profile."""
-        if self._profile_fname is not None:
-            self.setWindowTitle(f"{os.path.basename(self._profile_fname)}")
+        if title is None:
+            profile_fname = gremlin.shared_state.current_profile.profile_file
+            if profile_fname is not None:
+                self.setWindowTitle(f"{os.path.basename(profile_fname)}")
+            else:
+                self.setWindowTitle("Untitled")
         else:
-            self.setWindowTitle("")
+            self.setWindowTitle(title)
 
 
 

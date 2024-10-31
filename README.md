@@ -187,6 +187,15 @@ Joystick Gremlin EX
 
 ## 13.40.16ex (pre-release)
 
+### (m6)
+- Fix: Updated logic used to determine if changes are made to a profile to avoid excessive prompting to save on profile load if an existing profile is already loaded: the updated check does away with hash values, ignores comments, internal IDs, file encodings and other non-relevant changes as these would trigger a save change prompt, even when there were none on a substantive basis.
+- Improved: still a WIP: improved handling of profile import logic and mapping to devices with fewer axes/buttons/hats. Fix for keyboard, MIDI and OSC inputs that cannot have a remap change - they import as they are since the input is fixed.
+- Fix: Update selection on tab change recalls correct input description
+- Fix: Curve option buttons sometimes appeared on non joystick inputs
+- Fix: Clicking on a curve or calling up a curve could cause a cast exception
+- Fix: Selecting a new mode does not select an active input in the UI
+- Improved: New profiles will show as "untitled" in the main window title bar
+
 ### (m4)
 
 - Added descriptive error message on DirectInput interface load errors if UAC (user access control) prevents it from loading depending on the permissions of the logged in account.  If a DLL load error occurs at startup, running the process in administrator mode usually solves the load issue.

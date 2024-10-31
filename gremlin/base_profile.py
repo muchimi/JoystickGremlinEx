@@ -37,8 +37,7 @@ import gremlin.shared_state
 from gremlin.util import *
 from gremlin.input_types import InputType
 from gremlin.types import *
-#from xml.dom import minidom
-from lxml import etree as ElementTree
+from lxml import etree
 from gremlin.types import DeviceType
 from gremlin.plugin_manager import ContainerPlugins
 from gremlin.base_conditions import *
@@ -698,7 +697,7 @@ class Device:
         :return xml node of this device's contents
         """
         node_tag = "device" if self.type != DeviceType.VJoy else "vjoy-device"
-        node = ElementTree.Element(node_tag)
+        node = etree.Element(node_tag)
         node.set("name", safe_format(self.name, str))
         node.set("label", safe_format(self.label, str))
         node.set("device-guid", write_guid(self.device_guid))
@@ -749,7 +748,6 @@ class InputItem():
                 if not hasattr(item, "parent"):
                     break
                 item = item.parent
-
 
 
                 
@@ -996,7 +994,7 @@ class InputItem():
         :return XML node representing this object
         """
         from gremlin.keyboard import Key
-        node = ElementTree.Element(InputType.to_string(self.input_type))
+        node = etree.Element(InputType.to_string(self.input_type))
         container_node = node # default container node to the input node
         if self.input_type in (InputType.Keyboard, InputType.KeyboardLatched):
             if isinstance(self.input_id, Key):
@@ -1007,7 +1005,7 @@ class InputItem():
                 node.set("extended", safe_format(key.is_extended, bool))
                 for latched_key in key.latched_keys:
                     # latched keys
-                    child = ElementTree.Element("latched")
+                    child = etree.Element("latched")
                     child.set("id", safe_format(latched_key.scan_code, int))
                     child.set("extended", safe_format(latched_key.is_extended, bool))
                     node.append(child)
@@ -1414,32 +1412,32 @@ class Settings:
 
         :return XML node containing the settings
         """
-        node = ElementTree.Element("settings")
+        node = etree.Element("settings")
 
         # Startup mode
         if self.startup_mode is not None:
-            mode_node = ElementTree.Element("startup-mode")
+            mode_node = etree.Element("startup-mode")
             mode_node.text = safe_format(self.startup_mode, str)
             node.append(mode_node)
 
         # Default delay
-        delay_node = ElementTree.Element("default-delay")
+        delay_node = etree.Element("default-delay")
         delay_node.text = safe_format(self.default_delay, float)
         node.append(delay_node)
 
         # Process vJoy as input settings
         for vid, value in self.vjoy_as_input.items():
             if value is True:
-                vjoy_node = ElementTree.Element("vjoy-input")
+                vjoy_node = etree.Element("vjoy-input")
                 vjoy_node.set("id", safe_format(vid, int))
                 node.append(vjoy_node)
 
         # Process vJoy axis initial values
         for vid, data in self.vjoy_initial_values.items():
-            vjoy_node = ElementTree.Element("vjoy")
+            vjoy_node = etree.Element("vjoy")
             vjoy_node.set("id", safe_format(vid, int))
             for aid, value in data.items():
-                axis_node = ElementTree.Element("axis")
+                axis_node = etree.Element("axis")
                 axis_node.set("id", safe_format(aid, int))
                 axis_node.set("value", safe_format(value, float))
                 vjoy_node.append(axis_node)
@@ -1966,7 +1964,7 @@ class Profile():
             profile_converter.convert_profile(fname)
             profile_was_updated = True
 
-        tree = ElementTree.parse(fname)
+        tree = etree.parse(fname)
         root = tree.getroot()
 
         self._start_mode = None
@@ -2070,7 +2068,7 @@ class Profile():
         :param fname name of the file to save the XML to
         """
         # Generate XML document
-        root = ElementTree.Element("profile")
+        root = etree.Element("profile")
         root.set("version", str(gremlin.profile.ProfileConverter.current_version))
         root.set("start_mode", self.get_start_mode())
         root.set("default_mode", self.get_default_start_mode())
@@ -2079,7 +2077,7 @@ class Profile():
 
 
         # Device settings
-        devices = ElementTree.Element("devices")
+        devices = etree.Element("devices")
         device_list = sorted(
             self.devices.values(),
             key=lambda x: str(x.device_guid)
@@ -2090,7 +2088,7 @@ class Profile():
 
         # VJoy settings
         add_vjoy = False
-        vjoy_devices = ElementTree.Element("vjoy-devices")
+        vjoy_devices = etree.Element("vjoy-devices")
         for device in self.vjoy_devices.values():
             if device.modes:
                 vjoy_devices.append(device.to_xml())
@@ -2100,14 +2098,14 @@ class Profile():
 
         # Merge axis data
         for entry in self.merge_axes:
-            node = ElementTree.Element("merge-axis")
+            node = etree.Element("merge-axis")
             node.set("mode", safe_format(entry["mode"], str))
             node.set("operation", safe_format(
                 MergeAxisOperation.to_string(entry["operation"]),
                 str
             ))
             for tag in ["vjoy"]:
-                sub_node = ElementTree.Element(tag)
+                sub_node = etree.Element(tag)
                 sub_node.set(
                     "vjoy-id",
                     safe_format(entry[tag]["vjoy_id"], int)
@@ -2115,7 +2113,7 @@ class Profile():
                 sub_node.set("axis-id", safe_format(entry[tag]["axis_id"], int))
                 node.append(sub_node)
             for tag in ["lower", "upper"]:
-                sub_node = ElementTree.Element(tag)
+                sub_node = etree.Element(tag)
                 sub_node.set("device-guid", write_guid(entry[tag]["device_guid"]))
                 sub_node.set("axis-id", safe_format(entry[tag]["axis_id"], int))
                 node.append(sub_node)
@@ -2125,18 +2123,14 @@ class Profile():
         root.append(self.settings.to_xml())
 
         # User plugins
-        plugins = ElementTree.Element("plugins")
+        plugins = etree.Element("plugins")
         for plugin in self.plugins:
             plugins.append(plugin.to_xml())
         root.append(plugins)
 
         # Serialize XML document
-        tree = ElementTree.ElementTree(root)
+        tree = etree.ElementTree(root)
         tree.write(fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
-        #ugly_xml = ElementTree.tostring(root, encoding="utf-8")
-        # dom_xml = minidom.parseString(ugly_xml)
-        # with codecs.open(fname, "w", "utf-8-sig") as out:
-        #     out.write(dom_xml.toprettyxml(indent="    "))
 
     def get_device_modes(self, device_guid : dinput.GUID,
                                device_type : DeviceType,
@@ -2282,16 +2276,25 @@ class Profile():
             logging.getLogger("system").info(f"Profile {self.name}: set auto-restore flag {value}")
         self.save()
 
-    def save(self):
+    def save(self, save_as_name = None):
         ''' saves the profile '''
 
-        if self._profile_fname is None:
-            gremlin.ui.ui_common.MessageBox(prompt = "File is not set, please save the profile first")
-            return
+        if save_as_name is None:
+            if self._profile_fname is None:
+                gremlin.ui.ui_common.MessageBox(prompt = "File is not set, please save the profile first")
+                return
+            
+            assert self._profile_fname,"File name is not set"
 
-        assert self._profile_fname,"File name is not set"
-        self.to_xml(self._profile_fname)
-        self._dirty = False
+            use_name = self._profile_fname
+        else:
+            use_name = save_as_name
+
+        self.to_xml(use_name)
+
+        if save_as_name is None:
+            self._profile_fname = None
+            self._dirty = False
 
         
 
@@ -2365,7 +2368,7 @@ class Mode:
 
         :return XML node representing this object's data
         """
-        node = ElementTree.Element("mode")
+        node = etree.Element("mode")
         node.set("name", safe_format(self.name, str))
         if self.inherit is not None:
             node.set("inherit", safe_format(self.inherit, str))
@@ -2460,7 +2463,7 @@ class Plugin:
             self.instances.append(instance)
 
     def to_xml(self):
-        node = ElementTree.Element("plugin")
+        node = etree.Element("plugin")
         node.set("file-name", safe_format(self.file_name, str))
         for instance in self.instances:
             if instance.is_configured():
@@ -2517,7 +2520,7 @@ class PluginInstance:
             
 
     def to_xml(self):
-        node = ElementTree.Element("instance")
+        node = etree.Element("instance")
         node.set("name", safe_format(self.name, str))
         for variable in self.variables.values():
             variable_node = variable.to_xml()
@@ -2641,7 +2644,7 @@ class PluginVariable:
     def to_xml(self):
         ''' read user plugin saved variable data '''
 
-        node = ElementTree.Element("variable")
+        node = etree.Element("variable")
         node.set("name", safe_format(self.name, str))
         node.set("type", PluginVariableType.to_string(self.type))
         node.set("is-optional", safe_format(self.is_optional, bool, str))
@@ -2803,8 +2806,8 @@ class ProfileMapItem():
             # profile not loaded - grab the info from the profile xml
             if os.path.isfile(profile):
                 try:
-                    parser = ElementTree.XMLParser(remove_blank_text=True)
-                    tree = ElementTree.parse(profile, parser)
+                    parser = etree.XMLParser(remove_blank_text=True)
+                    tree = etree.parse(profile, parser)
                     for element in tree.xpath("//mode"):
                         mode = element.get("name")
                         mode_list.add(mode)
@@ -2861,8 +2864,8 @@ class ProfileMapItem():
         if os.path.isfile(profile):
             # write the xml
             try:
-                parser = ElementTree.XMLParser(remove_blank_text=True)
-                tree = ElementTree.parse(profile, parser)
+                parser = etree.XMLParser(remove_blank_text=True)
+                tree = etree.parse(profile, parser)
                 for element in tree.xpath("//profile"):
                     element.set("restore_last", str(self._restore_mode))
                     if self._default_mode:
@@ -2886,9 +2889,9 @@ class ProfileMapItem():
                     # add the settings node
 
                     if settings_node is None:
-                        settings_node = ElementTree.SubElement(profile_node, "settings")
+                        settings_node = etree.SubElement(profile_node, "settings")
 
-                    startup_node = ElementTree.SubElement(settings_node,"startup-mode")
+                    startup_node = etree.SubElement(settings_node,"startup-mode")
                     startup_node.text = str(self._default_mode)
 
 
@@ -2945,8 +2948,8 @@ class ProfileMap():
         if os.path.isfile(fname):
             # read the xml
             try:
-                parser = ElementTree.XMLParser(remove_blank_text=True)
-                tree = ElementTree.parse(fname, parser)
+                parser = etree.XMLParser(remove_blank_text=True)
+                tree = etree.parse(fname, parser)
                 for element in tree.xpath("//map"):
                     process = element.get("process")
                     profile = element.get("profile")
@@ -2969,15 +2972,15 @@ class ProfileMap():
             # blitz
             os.unlink(fname)
         
-        root = ElementTree.Element("mappings")
+        root = etree.Element("mappings")
         for item in self._items:
             if item.valid:
                 # print (f"Saving item: process: {item.process} profile: {item.profile}")
-                ElementTree.SubElement(root,"map", profile = item.profile, process = item.process, startup_mode = item.default_mode)
+                etree.SubElement(root,"map", profile = item.profile, process = item.process, startup_mode = item.default_mode)
 
         try:
             # save the file
-            tree = ElementTree.ElementTree(root)
+            tree = etree.etree(root)
             tree.write(fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
             logging.getLogger("system").info(f"PROC MAP: saved preferences to {fname}")
 

@@ -85,10 +85,10 @@ class InputItemConfiguration(QtWidgets.QFrame):
             self.main_layout.addWidget(label)
             return
 
-        verbose = gremlin.config.Configuration().verbose
-        if verbose:
-            syslog = logging.getLogger("system")
-            syslog.info(f"Create InputItemConfiguration for {item_data.debug_display}")
+        # verbose = gremlin.config.Configuration().verbose
+        # if verbose:
+        #     syslog = logging.getLogger("system")
+        #     syslog.info(f"Create InputItemConfiguration for {item_data.debug_display}")
 
         
         if not item_data.is_action:
@@ -745,7 +745,8 @@ class JoystickDeviceTabWidget(QDataWidget):
                 self._update_curve_icon(index, self.input_item_list_view.model.data(index))
 
     def _update_curve_icon(self, index : int, data):
-        widget : input_item.InputItemWidget = self.input_item_list_view.widget_map[index]
+        widget = self.input_item_list_view.widget_map[index]
+        input_item = widget.data
         enabled = data.curve_data is not None
         widget.update_curve_icon(enabled)
 
