@@ -4101,7 +4101,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
     @QtCore.Slot()
     def _add_gate_cb(self):
         ''' adds a new gate at the current input position '''
-        value = self._axis_values
+        value = self.gate_data._axis_value
         count = len(self.gate_data.getGates())
         gate = self.gate_data.findGate(value)
         if not gate and count < 20:

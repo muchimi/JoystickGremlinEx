@@ -186,6 +186,10 @@ Joystick Gremlin EX
 
 
 ## 13.40.16ex (pre-release)
+### (m7)
+- Fix: saving calibration throws an exception (bad reference)
+- Fix: add gate via the add button throws an exception (bad reference)
+- WIP: profile import - added re-import button on device imports for automatic remap when device changes and axis/button/hat counts changed.
 
 ### (m6)
 - Improved: still a WIP: import of profiles now includes un-mapped modes, deselecting a mode in one mapping deselects all, and input descriptions carry over.

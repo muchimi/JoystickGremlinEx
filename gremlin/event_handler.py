@@ -472,7 +472,7 @@ class EventListener(QtCore.QObject):
 
 	def reload_calibrations(self):
 		"""Reloads the calibration data from the configuration file."""
-		from gremlin.ui.ui_util import create_calibration_function
+		from gremlin.util import create_calibration_function
 		cfg = config.Configuration()
 		for key in self._calibrations:
 			limits = cfg.get_calibration(key[0], key[1])

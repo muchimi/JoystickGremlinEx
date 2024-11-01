@@ -29,7 +29,7 @@ from gremlin import common
 from gremlin import error
 from gremlin import event_handler
 from gremlin import joystick_handling
-from gremlin.types import InputType
+from gremlin.input_types import InputType
 from gremlin.util import parse_guid
 
 from gremlin.ui import backend

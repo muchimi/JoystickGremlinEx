@@ -669,6 +669,14 @@ class ImportProfileDialog(QtWidgets.QDialog):
                     description = self.description_map[device_guid][mode][input_id]
 
         return description
+    
+    @QtCore.Slot()
+    def _re_import_device(self):
+        ''' re-imports a device '''
+        widget = self.sender()
+        import_item, device_node = widget.data
+        self._update_import_item(import_item, device_node)
+
 
     def _load_import_profile(self):
         ''' imports a profile to the specified target device ID matching by name
@@ -1123,15 +1131,15 @@ class ImportProfileDialog(QtWidgets.QDialog):
             case InputType.JoystickButton:
                 if target_device.button_count == 0:
                     target_device_guid, input_id = self._default_info_map[input_type]
-                if target_device.button_count <= input_id:
-                    target_input_id = 0
+                if input_id > target_device.button_count:
+                    target_input_id = 1
                 else:
                     target_input_id = input_id
             case InputType.JoystickHat:
                 if target_device.hat_count == 0:
                     target_device_guid, input_id = self._default_info_map[input_type]
-                if target_device.hat_count <= input_id:
-                    target_input_id = 0
+                if input_id > target_device.hat_count:
+                    target_input_id = 1
                 else:
                     target_input_id = input_id
             case _:
@@ -1139,6 +1147,160 @@ class ImportProfileDialog(QtWidgets.QDialog):
                 target_input_id = input_id
                     
         return target_device_guid, target_input_id
+    
+    def _update_import_item(self, import_item : ImportItem, device_node : QtWidgets.QTreeWidgetItem):
+        ''' updates an import item '''
+
+        tree = self.import_input_tree_widget
+        syslog = logging.getLogger("system")
+        mode_item: ImportModeItem
+        target_widget = self._map[import_item]
+        source_device_guid = import_item.device_guid
+
+        # clear the node from children
+        for _ in range(device_node.childCount()): 
+            device_node.removeChild(device_node.child(0))
+
+        for mode_item in import_item.mode_map.values():
+
+        
+            mode_node = QtWidgets.QTreeWidgetItem()
+            mode_node.setData(0,0,mode_item)
+            self._tree_mode_nodes.append(mode_node)
+
+            container_widget = QtWidgets.QWidget()
+            container_widget.setContentsMargins(0,0,0,0)
+            container_layout = QtWidgets.QHBoxLayout(container_widget)
+            container_layout.setContentsMargins(0,0,0,0)
+
+            map_to_widget, mode_widget = self._create_target_mode_widget()
+            mode_item.map_to_widget = mode_widget
+            mode_widget.data = mode_item
+            mode_index = mode_widget.findData(mode_item.mode)
+            if mode_index != -1:
+                mode_widget.setCurrentIndex(mode_index)
+            
+
+            cb = ui_common.QDataCheckbox(f"Mode: [{mode_item.mode}]")
+            cb.data = mode_item
+            mode_item.selected_widget = cb
+            cb.setChecked(import_item.selected)
+            cb.clicked.connect(self._select_import_item_cb)
+            device_node.addChild(mode_node)
+            
+
+            container_layout.addWidget(cb)
+            container_layout.addStretch()
+
+            tree.setItemWidget(mode_node, 0, container_widget)
+            tree.setItemWidget(mode_node, 2, map_to_widget)
+            self._map[mode_item] = mode_widget
+
+            input_item : ImportInputItem
+            for input_item in mode_item.items:
+
+                # derive the target device
+
+                has_mapping = True
+                if input_item.input_type == InputType.NotSet:
+                    # no mapping 
+                    continue
+                elif not input_item.input_type in self._default_info_map:
+                    syslog.warning(f"Import: unable to map {input_item.input_type} - no matching suitable device found ")
+                    has_mapping = False
+
+                if has_mapping:
+                    default_target_device_guid, default_target_input_id = self._default_info_map[input_item.input_type ]
+
+                    # derive the target input
+                    target_device_guid, target_input_id = self._find_target(source_device_guid, default_target_device_guid, input_item.input_type, input_item.input_id)
+                    if target_device_guid is None:
+                        target_device_guid = default_target_device_guid
+                    if target_input_id is None:
+                        target_device_guid = default_target_device_guid
+                        target_input_id = default_target_input_id
+
+
+                    self._input_device_guid_to_target_device_guid[source_device_guid] = target_device_guid
+                    base_device = self.base_device_map[target_device_guid]
+                    index = target_widget.findData(base_device)
+                    with QtCore.QSignalBlocker(target_widget):
+                            target_widget.setCurrentIndex(index)
+
+
+                input_node = QtWidgets.QTreeWidgetItem()
+                input_node.setData(0,0,input_item)
+                self._tree_input_nodes.append(input_node)
+
+                container_widget = QtWidgets.QWidget()
+                container_widget.setContentsMargins(0,0,0,0)
+                container_layout = QtWidgets.QHBoxLayout(container_widget)
+                container_layout.setContentsMargins(0,0,0,0)
+
+                cb = ui_common.QDataCheckbox(f"Input: {input_item.input_name}")
+                cb.data = input_item
+                input_item.selected_widget = cb
+                cb.clicked.connect(self._select_import_item_cb)
+                cb.setChecked(input_item.selected)
+                mode_node.addChild(input_node)
+
+                container_layout.addWidget(cb)
+                container_layout.addStretch()
+                map_to_input_widget = None
+                if has_mapping:
+                    map_to_input_widget, widget = self._create_target_input_widget(import_item, input_item, target_device_guid, target_input_id)
+                else:
+                    widget = ui_common.QDataLabel("N/A")
+                    map_to_input_widget = ui_common.QDataLabel("N/A")
+
+                tree.setItemWidget(input_node, 0, container_widget)
+                if map_to_input_widget is not None:
+                    tree.setItemWidget(input_node, 2, map_to_input_widget)
+
+                input_item.map_to_widget = widget
+                self._map[input_item] = widget
+
+                for container_item in input_item.containers:
+
+                    container_node = QtWidgets.QTreeWidgetItem()
+                    container_node.setData(0,0,container_item)
+                    self._tree_container_nodes.append(container_node)
+                    cb = ui_common.QDataCheckbox(f"Container: {container_item.container_name}")
+                    cb.data = container_item
+                    container_item.selected_widget = cb
+                    cb.clicked.connect(self._select_import_item_cb)
+                    cb.setChecked(container_item.selected)
+                    input_node.addChild(container_node)
+
+
+                    container_widget = QtWidgets.QWidget()
+                    container_widget.setContentsMargins(0,0,0,0)
+                    container_layout = QtWidgets.QHBoxLayout(container_widget)
+                    container_layout.setContentsMargins(0,0,0,0)
+
+                    container_layout.addWidget(cb)
+                    container_layout.addStretch()
+
+                    tree.setItemWidget(container_node, 0, container_widget)
+
+
+                    # icons for the items
+                    container_widget = QtWidgets.QWidget()
+                    container_widget.setContentsMargins(0,0,0,0)
+                    container_layout = QtWidgets.QHBoxLayout(container_widget)
+                    container_layout.setContentsMargins(0,0,0,0)
+
+                    #container_layout.addWidget(QtWidgets.QLabel("Actions:"))
+
+                    for action in container_item.actions:
+                        al = ui_common.ActionLabel(action)
+                        al.setToolTip(action.display_name())
+                        container_layout.addWidget(al)
+                    container_layout.addStretch()
+
+
+                    tree.setItemWidget(container_node, 1, container_widget)
+
             
                                 
     def _update_map(self):
@@ -1152,8 +1314,8 @@ class ImportProfileDialog(QtWidgets.QDialog):
             tree = self.import_input_tree_widget
             with QtCore.QSignalBlocker(tree):
                 tree.clear()
-                tree.setColumnCount(4)
-                tree.setHeaderLabels(["Device","Actions","Map To",""])
+                tree.setColumnCount(5)
+                tree.setHeaderLabels(["Device","Actions","Map To","",""])
                 
                 
                 syslog = logging.getLogger("system")
@@ -1172,7 +1334,7 @@ class ImportProfileDialog(QtWidgets.QDialog):
 
                 for import_item in self._import_map.values():
 
-                    source_device_guid = import_item.device_guid
+                    
 
                     container_widget = QtWidgets.QWidget()
                     container_widget.setContentsMargins(0,0,0,0)
@@ -1202,152 +1364,18 @@ class ImportProfileDialog(QtWidgets.QDialog):
                     target_widget.data = import_item  # indicate which import_item holds this device mapping
                     import_item.map_to_widget = target_widget
 
+                    remap_widget = ui_common.QDataPushButton("Re-Import")
+                    remap_widget.setToolTip("Re-imports the input profile on the new device")
+                    remap_widget.clicked.connect(self._re_import_device)
+                    remap_widget.data = (import_item, device_node)
+
                     self._map[import_item] = target_widget
 
                     tree.setItemWidget(device_node, 0, container_widget)
                     tree.setItemWidget(device_node, 2, map_to_widget)
+                    tree.setItemWidget(device_node, 3, remap_widget)
 
-                    mode_item: ImportModeItem
-                    for mode_item in import_item.mode_map.values():
-
-                    
-                        mode_node = QtWidgets.QTreeWidgetItem()
-                        mode_node.setData(0,0,mode_item)
-                        self._tree_mode_nodes.append(mode_node)
-
-                        container_widget = QtWidgets.QWidget()
-                        container_widget.setContentsMargins(0,0,0,0)
-                        container_layout = QtWidgets.QHBoxLayout(container_widget)
-                        container_layout.setContentsMargins(0,0,0,0)
-
-                        map_to_widget, mode_widget = self._create_target_mode_widget()
-                        mode_item.map_to_widget = mode_widget
-                        mode_widget.data = mode_item
-                        mode_index = mode_widget.findData(mode_item.mode)
-                        if mode_index != -1:
-                            mode_widget.setCurrentIndex(mode_index)
-                        
-
-                        cb = ui_common.QDataCheckbox(f"Mode: [{mode_item.mode}]")
-                        cb.data = mode_item
-                        mode_item.selected_widget = cb
-                        cb.setChecked(import_item.selected)
-                        cb.clicked.connect(self._select_import_item_cb)
-                        device_node.addChild(mode_node)
-                        
-
-                        container_layout.addWidget(cb)
-                        container_layout.addStretch()
-
-                        tree.setItemWidget(mode_node, 0, container_widget)
-                        tree.setItemWidget(mode_node, 2, map_to_widget)
-                        self._map[mode_item] = mode_widget
-
-                        input_item : ImportInputItem
-                        for input_item in mode_item.items:
-
-                            # derive the target device
-
-                            has_mapping = True
-                            if input_item.input_type == InputType.NotSet:
-                                # no mapping 
-                                continue
-                            elif not input_item.input_type in self._default_info_map:
-                                syslog.warning(f"Import: unable to map {input_item.input_type} - no matching suitable device found ")
-                                has_mapping = False
-
-                            if has_mapping:
-                                default_target_device_guid, default_target_input_id = self._default_info_map[input_item.input_type ]
-
-                                # derive the target input
-
-                                target_device_guid, target_input_id = self._find_target(source_device_guid, default_target_device_guid, input_item.input_type, input_item.input_id)
-                                if target_device_guid is None:
-                                    target_device_guid = default_target_device_guid
-                                if target_input_id is None:
-                                    target_device_guid = default_target_device_guid
-                                    target_input_id = default_target_input_id
-
-
-                                self._input_device_guid_to_target_device_guid[source_device_guid] = target_device_guid
-                                base_device = self.base_device_map[target_device_guid]
-                                index = target_widget.findData(base_device)
-                                with QtCore.QSignalBlocker(target_widget):
-                                        target_widget.setCurrentIndex(index)
-
-        
-                            input_node = QtWidgets.QTreeWidgetItem()
-                            input_node.setData(0,0,input_item)
-                            self._tree_input_nodes.append(input_node)
-
-                            container_widget = QtWidgets.QWidget()
-                            container_widget.setContentsMargins(0,0,0,0)
-                            container_layout = QtWidgets.QHBoxLayout(container_widget)
-                            container_layout.setContentsMargins(0,0,0,0)
-
-                            cb = ui_common.QDataCheckbox(f"Input: {input_item.input_name}")
-                            cb.data = input_item
-                            input_item.selected_widget = cb
-                            cb.clicked.connect(self._select_import_item_cb)
-                            cb.setChecked(input_item.selected)
-                            mode_node.addChild(input_node)
-
-                            container_layout.addWidget(cb)
-                            container_layout.addStretch()
-                            map_to_input_widget = None
-                            if has_mapping:
-                                map_to_input_widget, widget = self._create_target_input_widget(import_item, input_item, target_device_guid, target_input_id)
-                            else:
-                                widget = ui_common.QDataLabel("N/A")
-                                map_to_input_widget = ui_common.QDataLabel("N/A")
-
-                            tree.setItemWidget(input_node, 0, container_widget)
-                            if map_to_input_widget is not None:
-                                tree.setItemWidget(input_node, 2, map_to_input_widget)
-
-                            input_item.map_to_widget = widget
-                            self._map[input_item] = widget
-
-                            for container_item in input_item.containers:
-
-                                container_node = QtWidgets.QTreeWidgetItem()
-                                container_node.setData(0,0,container_item)
-                                self._tree_container_nodes.append(container_node)
-                                cb = ui_common.QDataCheckbox(f"Container: {container_item.container_name}")
-                                cb.data = container_item
-                                container_item.selected_widget = cb
-                                cb.clicked.connect(self._select_import_item_cb)
-                                cb.setChecked(container_item.selected)
-                                input_node.addChild(container_node)
-
-
-                                container_widget = QtWidgets.QWidget()
-                                container_widget.setContentsMargins(0,0,0,0)
-                                container_layout = QtWidgets.QHBoxLayout(container_widget)
-                                container_layout.setContentsMargins(0,0,0,0)
-
-                                container_layout.addWidget(cb)
-                                container_layout.addStretch()
-
-                                tree.setItemWidget(container_node, 0, container_widget)
-
-
-                                # icons for the items
-                                container_widget = QtWidgets.QWidget()
-                                container_widget.setContentsMargins(0,0,0,0)
-                                container_layout = QtWidgets.QHBoxLayout(container_widget)
-                                container_layout.setContentsMargins(0,0,0,0)
-
-                                #container_layout.addWidget(QtWidgets.QLabel("Actions:"))
-
-                                for action in container_item.actions:
-                                    al = ui_common.ActionLabel(action)
-                                    al.setToolTip(action.display_name())
-                                    container_layout.addWidget(al)
-                                container_layout.addStretch()
-
-
-                                tree.setItemWidget(container_node, 1, container_widget)
+                    self._update_import_item(import_item, device_node)
 
 
                 # set tree expansion level to the last selected level
@@ -1560,10 +1588,9 @@ class ImportProfileDialog(QtWidgets.QDialog):
         ''' called when the target input ID is changed '''
         widget = self.sender()
         import_item : ImportItem  = widget.data
-        source_input_item = widget.data # device
         input_id = widget.currentData()
         self._input_id_to_target_input_id[import_item] = input_id
-        self._input_id_to_target_input_id[import_item][source_input_item] = input_id
+
 
 
 
@@ -1765,16 +1792,12 @@ class ImportProfileDialog(QtWidgets.QDialog):
 
                                 # profile_input_item : gremlin.base_profile.InputItem
                                 input_device : gremlin.base_profile.Device
-                                input_device = next((device for device in self.source_profile.devices.values() if device.device_guid == source_device_guid), None)
-                                input_profile_mode = input_device.modes[source_mode]                            
+                                #input_device = next((device for device in self.source_profile.devices.values() if device.device_guid == source_device_guid), None)
+                                #input_profile_mode = input_device.modes[source_mode]                            
                                 
                                 profile_target_mode : gremlin.base_profile.Mode = target_device.modes[target_mode]
-                                if isinstance(input_input_id, int) and input_input_id == 13:
-                                    pass
 
                                 description = self._get_description(source_device_guid, source_mode, input_input_id)
-                                if description:
-                                    pass
 
                                 for container_item in container_items:
                                     if not container_item.selected:
@@ -1793,7 +1816,7 @@ class ImportProfileDialog(QtWidgets.QDialog):
                                 
                                         
                                         #profile_target_input_item = target
-                                        key = next((key for key in input_profile_mode.config[input_input_type].keys() if key.id == source.id), None)
+                                        #key = next((key for key in input_profile_mode.config[input_input_type].keys() if key.id == source.id), None)
                                         #profile_source_input_item = input_profile_mode.config[input_input_type][key]
                                         
                                         

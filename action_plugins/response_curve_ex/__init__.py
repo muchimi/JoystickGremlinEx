@@ -76,14 +76,14 @@ class ResponseCurveExWidget(gremlin.ui.input_item.AbstractActionWidget):
         # listen to hardware events
         if self.action_data.show_input_axis:
             el = gremlin.event_handler.EventListener()
-            el.joystick_event.disconnect(self._joystick_handler)
+            el.joystick_event.disconnect(self._joystick_event_handler)
 
     @QtCore.Slot()
     def _profile_stop(self):
         # listen to hardware events
         if self.action_data.show_input_axis:
             el = gremlin.event_handler.EventListener()
-            el.joystick_event.connect(self._joystick_handler)
+            el.joystick_event.connect(self._joystick_event_handler)
 
 
     def _joystick_event_handler(self, event):
