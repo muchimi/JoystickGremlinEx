@@ -2523,12 +2523,10 @@ class OscInputConfigDialog(QtWidgets.QDialog):
         self._command_data = value
         self._update_display()  
 
-from gremlin.ui.qdatawidget import QDataWidget
-
 def get_osc_device_guid():
     return parse_guid('ccb486e8-808e-4b3f-abe7-bcb380f39aa4')
 
-class OscDeviceTabWidget(QDataWidget):
+class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     """Widget used to configure open sound control (OSC) inputs """
     
@@ -2555,8 +2553,6 @@ class OscDeviceTabWidget(QDataWidget):
         self.device_profile = device_profile
         self.current_mode = current_mode
 
-        self.main_layout = QtWidgets.QHBoxLayout(self)
-        self.left_panel_layout = QtWidgets.QVBoxLayout()
         self.device_profile.ensure_mode_exists(self.current_mode)
         self.widget_storage = {}
 
@@ -2582,20 +2578,10 @@ class OscDeviceTabWidget(QDataWidget):
         self.input_item_list_view.item_edit.connect(self._edit_item_cb)
         self.input_item_list_view.item_closed.connect(self._close_item_cb)
 
-
-        self.left_panel_layout.addWidget(self.input_item_list_view)
-        self.main_layout.addLayout(self.left_panel_layout,1)
-
-        # add a blank input configuration if nothing is selected - the configuration widget is always the second widget of the main layout
-        right_panel = self.main_layout.takeAt(1)
-        if right_panel is not None and right_panel.widget():
-            right_panel.widget().hide()
-            right_panel.widget().deleteLater()
-        if right_panel:
-            self.main_layout.removeItem(right_panel)
+        self.addLeftPanelWidget(self.input_item_list_view)
 
         self._item_data = gremlin.ui.device_tab.InputItemConfiguration()
-        self.main_layout.addWidget(self._item_data,3)
+        self.setRightPanelWidget(self._item_data)
 
         button_container_widget = QtWidgets.QWidget()
         button_container_layout = QtWidgets.QHBoxLayout(button_container_widget)
@@ -2603,18 +2589,22 @@ class OscDeviceTabWidget(QDataWidget):
 
         # key clear button
         
-        clear_keyboard_button = ui_common.ConfirmPushButton("Clear OSC Inputs", show_callback = self._show_clear_cb)
-        clear_keyboard_button.confirmed.connect(self._clear_inputs_cb)
-        button_container_layout.addWidget(clear_keyboard_button)
+        clear_button = ui_common.ConfirmPushButton("Clear OSC Inputs", show_callback = self._show_clear_cb)
+        icon = gremlin.util.load_icon("fa.trash-o")
+        clear_button.setIcon(icon)
+        clear_button.confirmed.connect(self._clear_inputs_cb)
+        button_container_layout.addWidget(clear_button)
         button_container_layout.addStretch(1)
 
         # Key add button
-        button = QtWidgets.QPushButton("Add OSC Input")
-        button.clicked.connect(self._add_input_cb)
+        add_button = QtWidgets.QPushButton("Add OSC Input")
+        icon = gremlin.util.load_icon("fa.plus")
+        add_button.setIcon(icon)
+        add_button.clicked.connect(self._add_input_cb)
 
-        button_container_layout.addWidget(button)
+        button_container_layout.addWidget(add_button)
 
-        self.left_panel_layout.addWidget(button_container_widget)
+        self.addLeftPanelWidget(button_container_widget)
 
         # self._is_axis = False # true if the widget's input item should be an axis item
         
@@ -2641,15 +2631,9 @@ class OscDeviceTabWidget(QDataWidget):
         self.input_item_list_view.redraw()
 
         # add a blank input configuration if nothing is selected - the configuration widget is always the second widget of the main layout
-        right_panel = self.main_layout.takeAt(1)
-        if right_panel is not None and right_panel.widget():
-            right_panel.widget().hide()
-            right_panel.widget().deleteLater()
-        if right_panel:
-            self.main_layout.removeItem(right_panel)
-
+        
         widget = gremlin.ui.device_tab.InputItemConfiguration()     
-        self.main_layout.addWidget(widget,3)  
+        self.setRightPanelWidget(widget)
   
     def _add_input_cb(self):
         """Adds a new input to the inputs list  """
@@ -2693,17 +2677,10 @@ class OscDeviceTabWidget(QDataWidget):
             self.input_item_list_view.select_item(index, False)
         
 
-        right_panel = self.main_layout.takeAt(1)
-        if right_panel is not None and right_panel.widget():
-            right_panel.widget().hide()
-            right_panel.widget().deleteLater()
-        if right_panel:
-            self.main_layout.removeItem(right_panel)
-
         input_data : gremlin.base_profile.InputItem = self.input_item_list_model.data(index)
         
         self._item_data = gremlin.ui.device_tab.InputItemConfiguration(input_data)
-        self.main_layout.addWidget(self._item_data,3)            
+        self.setRightPanelWidget(self._item_data)
 
         # remember the last input
         config = gremlin.config.Configuration()

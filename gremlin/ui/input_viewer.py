@@ -149,7 +149,7 @@ class InputViewerUi(ui_common.BaseDialogUi):
         self.scroll_selector_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
 
         
-        self.scroll_selector_area.setMinimumWidth(300)
+        #self.scroll_selector_area.setMinimumWidth(300)
         self.scroll_selector_area.setWidgetResizable(True)
         self.scroll_selector_area.setWidget(self.scroll_selector_widget)
 

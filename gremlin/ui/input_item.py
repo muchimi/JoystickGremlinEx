@@ -1102,7 +1102,7 @@ class InputItemWidget(QtWidgets.QFrame):
         
         self._description_widget = gremlin.ui.ui_common.QIconLabel()
         self._description_widget.setObjectName("description")
-        self._description_widget.setTextMinWidth(280)
+        #self._description_widget.setTextMinWidth(280)
         
         self._comment_widget = gremlin.ui.ui_common.QIconLabel()
         self._comment_widget.setObjectName("comment")
@@ -1110,7 +1110,7 @@ class InputItemWidget(QtWidgets.QFrame):
 
         self._input_description_widget =gremlin.ui.ui_common.QIconLabel()
         self._input_description_widget.setObjectName("input_description")
-        self._input_description_widget.setTextMinWidth(280)
+        #self._input_description_widget.setTextMinWidth(280)
 
         self.main_layout.addWidget(self._title_container_widget)
 
@@ -1165,7 +1165,7 @@ class InputItemWidget(QtWidgets.QFrame):
         self._curve_container_widget.setVisible(curve_visible)
 
 
-        self.setMinimumWidth(300)
+        self.setMinimumWidth(200)
         self.main_layout.addWidget(self._container_widget)
         self.update_display()
 

@@ -46,6 +46,8 @@ from qtpy.QtGui import QColor, QBrush, QPaintEvent, QPen, QPainter
 from gremlin.util import load_pixmap, load_icon
 import gremlin.util
 
+from gremlin.singleton_decorator import SingletonDecorator
+
 
 
 class ContainerViewTypes(enum.Enum):
@@ -3766,3 +3768,148 @@ class MarkdownDialog(QtWidgets.QDialog):
             return True
         return False
 
+class QContentWidget(QtWidgets.QWidget):
+    ''' a widget that fires a resize event when its size changes '''
+
+    resized = QtCore.Signal(QtCore.QSize)
+    def __init__(self, parent = None):
+        super().__init__(parent)
+
+    def resizeEvent(self, event):
+        self.resized.emit(event.size)
+        return super().resizeEvent(event)
+        
+# @SingletonDecorator
+# class TabSplitterData():
+#     ''' helper class to sync positions for all splitters on all tabs '''
+#     def __init__(self):
+#         self.pos = gremlin.config.Configuration().splitter_pos
+#         self._splitters = []
+
+#     def register(self, splitter):
+#         if not splitter in self._splitters:
+#             self._splitters.append(splitter)
+
+#     def setPos(self, value):
+#         ''' sets the position on all registered splitters '''
+#         self.pos = value
+#         if value is not None:
+#             for splitter in self._splitters:
+#                 with QtCore.QSignalBlocker(splitter):
+#                     splitter.moveSplitter(value, 0)
+
+
+class QSplitTabWidget(QDataWidget):
+    ''' tab content widgeth split '''
+    def __init__(self, parent = None):
+        super().__init__(parent)
+
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+
+        self._content_widget = QContentWidget()
+        self._content_widget.resized.connect(self._content_resized)
+        self._content_widget.setContentsMargins(0,0,0,0)        
+
+        self._splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal, self._content_widget)
+        
+
+        self._left_panel_widget = QtWidgets.QWidget()
+        self._left_panel_widget.setContentsMargins(0,0,0,0)        
+        self._left_panel_widget.setMinimumWidth(200)
+
+        self._right_panel_widget = QtWidgets.QWidget()
+        self._right_panel_widget.setContentsMargins(0,0,0,0)        
+
+        self._left_panel_layout = QtWidgets.QVBoxLayout(self._left_panel_widget)
+        self._left_panel_layout.setContentsMargins(0,0,0,0)
+
+        self._right_panel_layout = QtWidgets.QVBoxLayout(self._right_panel_widget)
+        self._right_panel_layout.setContentsMargins(0,0,0,0)
+
+
+        # left panel, list view on top, buttons on bottom
+        self._left_container_widget = QtWidgets.QWidget()
+        self._left_container_widget.setContentsMargins(0,0,0,0)
+        self._left_container_layout = QtWidgets.QVBoxLayout(self._left_container_widget)
+        self._left_container_layout.setContentsMargins(0,0,0,0)
+
+        self._right_container_widget = QtWidgets.QWidget()
+        self._right_container_widget.setContentsMargins(0,0,0,0)
+        self._right_container_layout = QtWidgets.QVBoxLayout(self._right_container_widget)
+        self._right_container_layout.setContentsMargins(0,0,0,0)
+
+        self._left_panel_layout.addWidget(self._left_container_widget)
+        self._right_panel_layout.addWidget(self._right_container_widget)
+        
+        # tabSplitterData = TabSplitterData()
+        # tabSplitterData.register(self._splitter)
+
+
+        # self._splitter.splitterMoved.connect(self._splitter_moved)
+
+        
+        self._splitter.addWidget(self._left_panel_widget) 
+        self._splitter.addWidget(self._right_panel_widget)
+        self._splitter.setStretchFactor(0,1)
+        self._splitter.setStretchFactor(1,3)
+
+        width = self.frameGeometry().width()
+        w1 = width // 5
+        self._splitter.setSizes((w1, w1*4))
+
+        self._splitter.setCollapsible(0, False)
+        self._splitter.setCollapsible(1, False)
+        self.main_layout.addWidget(self._content_widget)
+
+    
+
+    @QtCore.Slot(QtCore.QSize)
+    def _content_resized(self, size : QtCore.QSize):
+        ''' called when the container object is resized '''
+
+        # resize the splitter to the container's size as it doesn't happen by itself for some reason
+        width = self._content_widget.frameGeometry().width()
+        height = self._content_widget.frameGeometry().height()
+        if width > 0:
+            self._splitter.setFixedWidth(width)
+            self._splitter.setFixedHeight(height)
+
+    
+
+    # @QtCore.Slot(int, int)
+    # def _splitter_moved(self, pos: int, index : int):
+    #     ''' called when the spliter handle is moved '''
+    #     gremlin.config.Configuration().splitter_pos = pos
+    #     TabSplitterData().setPos(pos)
+
+
+    def setLeftPanelWidget(self, widget : QtWidgets.QWidget):
+        ''' sets the left panel widget '''
+        gremlin.util.clear_layout(self._left_container_layout)
+        if widget is not None:
+            self._left_container_layout.addWidget(widget)
+
+    def addLeftPanelWidget(self, widget : QtWidgets.QWidget):
+        ''' sets the left panel widget '''
+        if widget is not None:
+            self._left_container_layout.addWidget(widget)
+
+    def setRightPanelWidget(self, widget : QtWidgets.QWidget):
+        ''' sets the right panel widget '''
+        gremlin.util.clear_layout(self._right_container_layout)
+        if widget is not None:
+            self._right_container_layout.addWidget(widget)
+
+    def addRightPanelWidget(self, widget : QtWidgets.QWidget):
+        ''' sets the left panel widget '''
+        if widget is not None:
+            self._right_container_layout.addWidget(widget)
+
+    def clearLeftPanel(self):
+        ''' removes all widgets from the left panel '''
+        gremlin.util.clear_layout(self._left_container_layout)
+
+    def clearRighttPanel(self):
+        ''' removes all widgets from the right panel '''
+        gremlin.util.clear_layout(self._right_container_layout)
+        

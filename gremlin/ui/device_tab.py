@@ -450,7 +450,7 @@ class ActionContainerView(gremlin.ui.ui_common.AbstractView):
         self.scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
 
         # Configure the scroll area
-        self.scroll_area.setMinimumWidth(800)
+        self.scroll_area.setMinimumWidth(400)
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setWidget(self.scroll_widget)
 
@@ -504,10 +504,12 @@ class ActionContainerView(gremlin.ui.ui_common.AbstractView):
         """
 
         return lambda: self.model.remove_container(widget.profile_data)
+    
 
 
-from gremlin.ui.qdatawidget import QDataWidget
-class JoystickDeviceTabWidget(QDataWidget):
+
+
+class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     """Widget used to display the input joystick device."""
 
@@ -540,24 +542,7 @@ class JoystickDeviceTabWidget(QDataWidget):
         self.last_item_data_key = None
         self.last_item_index = 0
 
-        # label = QtWidgets.QLabel("Please select an input to configure")
-        # label.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop | QtCore.Qt.AlignmentFlag.AlignLeft)
-        #self._empty_widget = label
-
-        # the main layout has a left input selection panel and a right configuration panel, two widgets, the last one is always the configuration panel
-        self.main_layout = QtWidgets.QHBoxLayout(self)
-        self.left_panel_layout = QtWidgets.QVBoxLayout()
-        self.left_panel_layout.setContentsMargins(0,0,0,0)
-
-        self.right_panel_layout = QtWidgets.QVBoxLayout()
-        self.right_panel_layout.setContentsMargins(0,0,0,0)
-
-        self.right_container_widget = QtWidgets.QWidget()
-        self.right_container_widget.setContentsMargins(0,0,0,0)
-
-        self.right_container_layout = QtWidgets.QVBoxLayout(self.right_container_widget)
-        self.right_container_layout.setContentsMargins(0,0,0,0)
-
+     
         self.device_profile.ensure_mode_exists(current_mode, self.device)
 
         # List of inputs
@@ -566,7 +551,7 @@ class JoystickDeviceTabWidget(QDataWidget):
             current_mode
         )
         self.input_item_list_view = input_item.InputItemListView(name=device.name, custom_widget_handler = self._custom_widget_handler)
-        self.input_item_list_view.setMinimumWidth(375)
+
         
 
         # Handle vJoy as input and vJoy as output devices properly
@@ -598,11 +583,10 @@ class JoystickDeviceTabWidget(QDataWidget):
         line_edit.setText(device_profile.label)
         line_edit.textChanged.connect(self.update_device_label)
         label_layout.addWidget(line_edit)
-        
 
-        self.left_panel_layout.addLayout(label_layout)
-        self.left_panel_layout.addWidget(self.input_item_list_view)
-        self.left_panel_layout.setContentsMargins(0,0,0,0)
+        self._left_panel_layout.addLayout(label_layout)
+        self._left_panel_layout.addWidget(self.input_item_list_view)
+        self._left_panel_layout.setContentsMargins(0,0,0,0)
 
         # Add a help text for the purpose of the vJoy tab
         if device is not None and \
@@ -618,10 +602,9 @@ class JoystickDeviceTabWidget(QDataWidget):
             label.setWordWrap(True)
             label.setFrameShape(QtWidgets.QFrame.Box)
             label.setMargin(10)
-            self.left_panel_layout.addWidget(label)
+            self._left_panel_layout.addWidget(label)
 
-        self.main_layout.addLayout(self.left_panel_layout,1) # 1/4 width
-        self.main_layout.addLayout(self.right_panel_layout,3) # 3/4 width
+
 
         #self._empty_widget = InputItemConfiguration(parent = self)
         
@@ -630,10 +613,9 @@ class JoystickDeviceTabWidget(QDataWidget):
         if config.debug_ui:
             self._debug_widget = QtWidgets.QLabel("Debug widget")
             self._debug_widget.setMaximumHeight(32)
-            self.right_panel_layout.addWidget(self._debug_widget)
+            self._right_panel_layout.addWidget(self._debug_widget)
 
-        self.right_panel_layout.addWidget(self.right_container_widget)
-        #self.right_panel_layout.addStretch()
+        
 
         # update on any specific mode change
         eh = gremlin.event_handler.EventHandler()
@@ -707,6 +689,7 @@ class JoystickDeviceTabWidget(QDataWidget):
         
         
         self._update_curve_icon(index, data)
+
 
     def _delete_curve_item_cb(self, widget, index, data):
         ''' delete curve request '''
@@ -857,14 +840,14 @@ class JoystickDeviceTabWidget(QDataWidget):
                 return
 
         # hide all the existing widgets 
-        widgets = gremlin.util.get_layout_widgets(self.right_container_layout)
+        widgets = gremlin.util.get_layout_widgets(self._right_container_layout)
         for widget in widgets:
             if isinstance(widget, InputItemConfiguration):
                 # if verbose:
                 #     syslog.info(f"Hide widget:{widget.id} {widget.item_data.debug_display if widget.item_data else 'N/A'}")
                 widget.setVisible(False)
             else:
-                self.right_container_layout.removeWidget(widget)
+                self._right_container_layout.removeWidget(widget)
                 widget.deleteLater()
             
         self.last_item_data_key = new_key
@@ -892,7 +875,7 @@ class JoystickDeviceTabWidget(QDataWidget):
                 input_type = item_data.input_type
                 input_id = item_data.input_id
                 self.inputChanged.emit(device_guid, input_type, input_id)
-                self.right_container_layout.addWidget(widget)       
+                self._right_container_layout.addWidget(widget)       
 
      
 
@@ -918,7 +901,7 @@ class JoystickDeviceTabWidget(QDataWidget):
         else:
             # show the empty widget
             self._debug_widget.setText(f"Contents for : N/A")
-            self.right_container_layout.insertWidget(0,QtWidgets.QLabel("Please select an input to configure"))
+            self._right_container_layout.insertWidget(0,QtWidgets.QLabel("Please select an input to configure"))
 
 
         

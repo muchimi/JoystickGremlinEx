@@ -186,7 +186,13 @@ Joystick Gremlin EX
 
 
 ## 13.40.16ex (pre-release)
-### (m7)
+
+### (m9)
+- New: left and right panels can be resized via a splitter
+- Fix: Gated Axis add/remove gate manually throws an exception when manually setting the gate count
+
+
+### (m7/8)
 - Fix: saving calibration throws an exception (bad reference)
 - Fix: add gate via the add button throws an exception (bad reference)
 - WIP: profile import - added re-import button on device imports for automatic remap when device changes and axis/button/hat counts changed.

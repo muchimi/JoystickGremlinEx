@@ -1535,3 +1535,12 @@ class Configuration:
             self._osc_enabled = osc.osc_enabled
         return self._osc_enabled
 
+
+    # @property
+    # def splitter_pos(self) -> int:
+    #     ''' splitter config  '''
+    #     return self._data.get("splitter_config", 250)
+    
+    # @splitter_pos.setter
+    # def splitter_pos(self, data : int):
+    #     self._data["splitter_config"] = data

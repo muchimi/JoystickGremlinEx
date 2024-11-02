@@ -39,6 +39,7 @@ from gremlin.base_classes import AbstractInputItem
 import gremlin.ui.ui_common
 import gremlin.ui.device_tab
 import gremlin.base_profile
+import gremlin.util
 
 ''' these MIDI objects are based on the MIDO and python-rtMIDI libraries '''
 
@@ -1342,13 +1343,11 @@ class MidiInputConfigDialog(QtWidgets.QDialog):
         ''' current input mode '''
         return self._mode
         
-from gremlin.ui.qdatawidget import QDataWidget
-
 
 def get_midi_device_guid():
     return parse_guid('1b56ecf7-0624-4049-b7b3-8d9b7d8ed7e0')
 
-class MidiDeviceTabWidget(QDataWidget):
+class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     """Widget used to configure open sound control (OSC) inputs """
 
@@ -1377,9 +1376,7 @@ class MidiDeviceTabWidget(QDataWidget):
         # Store parameters
         self.device_profile = device_profile
         self.current_mode = current_mode
-
-        self.main_layout = QtWidgets.QHBoxLayout(self)
-        self.left_panel_layout = QtWidgets.QVBoxLayout()
+        
         self.device_profile.ensure_mode_exists(self.current_mode)
         self.widget_storage = {}
 
@@ -1404,19 +1401,12 @@ class MidiDeviceTabWidget(QDataWidget):
         self.input_item_list_view.item_edit.connect(self._edit_item_cb)
         self.input_item_list_view.item_closed.connect(self._close_item_cb)
         
-        self.left_panel_layout.addWidget(self.input_item_list_view)
-        self.main_layout.addLayout(self.left_panel_layout,1)
+        
+        self.addLeftPanelWidget(self.input_item_list_view)
 
-        # add a blank input configuration if nothing is selected - the configuration widget is always the second widget of the main layout
-        right_panel = self.main_layout.takeAt(1)
-        if right_panel is not None and right_panel.widget():
-            right_panel.widget().hide()
-            right_panel.widget().deleteLater()
-        if right_panel:
-            self.main_layout.removeItem(right_panel)
 
         widget = gremlin.ui.device_tab.InputItemConfiguration()     
-        self.main_layout.addWidget(widget,3)
+        self.setRightPanelWidget(widget)
 
         button_container_widget = QtWidgets.QWidget()
         button_container_layout = QtWidgets.QHBoxLayout(button_container_widget)
@@ -1424,17 +1414,21 @@ class MidiDeviceTabWidget(QDataWidget):
 
         # clear inputs button
         clear_button = ui_common.ConfirmPushButton("Clear MIDI Inputs", show_callback = self._show_clear_cb)
+        icon = gremlin.util.load_icon("fa.trash-o")
+        clear_button.setIcon(icon)
         clear_button.confirmed.connect(self._clear_inputs_cb)
         button_container_layout.addWidget(clear_button)
         button_container_layout.addStretch(1)
 
         # add input button
         add_input_button = QtWidgets.QPushButton("Add MIDI Input")
+        icon = gremlin.util.load_icon("mdi.midi")
+        add_input_button.setIcon(icon)
         add_input_button.clicked.connect(self._add_input_cb)
 
         button_container_layout.addWidget(add_input_button)
 
-        self.left_panel_layout.addWidget(button_container_widget)
+        self.addLeftPanelWidget(button_container_widget)
 
         # Select default entry
         if self.input_item_list_model.rows() > 0:
@@ -1456,15 +1450,9 @@ class MidiDeviceTabWidget(QDataWidget):
         self.input_item_list_view.redraw()
         
         # add a blank input configuration if nothing is selected - the configuration widget is always the second widget of the main layout
-        right_panel = self.main_layout.takeAt(1)
-        if right_panel is not None and right_panel.widget():
-            right_panel.widget().hide()
-            right_panel.widget().deleteLater()
-        if right_panel:
-            self.main_layout.removeItem(right_panel)
-
+        
         widget = gremlin.ui.device_tab.InputItemConfiguration()     
-        self.main_layout.addWidget(widget,3)  
+        self.setRightPanelWidget(widget)
 
 
     def itemAt(self, index):
@@ -1486,15 +1474,8 @@ class MidiDeviceTabWidget(QDataWidget):
         input_id = input_data.input_id if input_data else None
         config.set_last_input(device_guid, input_type, input_id)
 
-        right_panel = self.main_layout.takeAt(1)
-        if right_panel is not None and right_panel.widget():
-            right_panel.widget().hide()
-            right_panel.widget().deleteLater()
-        if right_panel:
-            self.main_layout.removeItem(right_panel)
-
         self._item_data = gremlin.ui.device_tab.InputItemConfiguration(input_data)
-        self.main_layout.addWidget(self._item_data,3)            
+        self.setRightPanelWidget(self._item_data)           
 
         if input_data:
             

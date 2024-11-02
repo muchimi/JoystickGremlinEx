@@ -4144,7 +4144,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
             
     
     def _set_steps_confirm_cb(self, value):
-        self.gate_data.setGateCount(value)
+        self._set_gate_count(value)
         self._normalize_cb()
             
 

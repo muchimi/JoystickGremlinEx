@@ -587,7 +587,7 @@ class SimconnectOptionsUi(QtWidgets.QDialog):
         self.scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
 
         # Configure the scroll area
-        self.scroll_area.setMinimumWidth(300)
+        #self.scroll_area.setMinimumWidth(300)
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setWidget(self.scroll_widget)
 

@@ -28,6 +28,7 @@ import gremlin.config
 from gremlin.input_types import InputType
 import gremlin.keyboard
 import gremlin.shared_state
+import gremlin.util
 from . import input_item, ui_common
 from gremlin.keyboard import Key
 from .device_tab import InputItemConfiguration
@@ -292,12 +293,12 @@ class KeyboardInputItem(AbstractInputItem):
 
             
 
-from gremlin.ui.qdatawidget import QDataWidget
+
 
 def get_keyboard_device_guid():
     return parse_guid('6F1D2B61-D5A0-11CF-BFC7-444553540000')
 
-class KeyboardDeviceTabWidget(QDataWidget):
+class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     """Widget used to configure keyboard inputs """
 
@@ -323,8 +324,6 @@ class KeyboardDeviceTabWidget(QDataWidget):
         self.device_profile = device_profile
         self.current_mode = current_mode
 
-        self.main_layout = QtWidgets.QHBoxLayout(self)
-        self.left_panel_layout = QtWidgets.QVBoxLayout()
         self.device_profile.ensure_mode_exists(self.current_mode)
         self.widget_storage = {}
 
@@ -336,6 +335,7 @@ class KeyboardDeviceTabWidget(QDataWidget):
         )
 
 
+
         self.input_item_list_view = input_item.InputItemListView(custom_widget_handler=self._custom_widget_handler, parent=self)
         self.input_item_list_view.setMinimumWidth(350)
 
@@ -345,22 +345,13 @@ class KeyboardDeviceTabWidget(QDataWidget):
         # Handle user interaction
         self.input_item_list_view.item_selected.connect(self._select_item_cb)
         self.input_item_list_view.item_edit.connect(self._edit_item_cb)
+
+        self.addLeftPanelWidget(self.input_item_list_view)
         
-        self.left_panel_layout.addWidget(self.input_item_list_view)
-        self.main_layout.addLayout(self.left_panel_layout,1)
-
-
-
-        # add a blank input configuration if nothing is selected - the configuration widget is always the second widget of the main layout
-        right_panel = self.main_layout.takeAt(1)
-        if right_panel is not None and right_panel.widget():
-            right_panel.widget().hide()
-            right_panel.widget().deleteLater()
-        if right_panel:
-            self.main_layout.removeItem(right_panel)
+ 
 
         widget = InputItemConfiguration()
-        self.main_layout.addWidget(widget,3)
+        self.setRightPanelWidget(widget)
 
         button_container_widget = QtWidgets.QWidget()
         button_container_layout = QtWidgets.QHBoxLayout(button_container_widget)
@@ -370,20 +361,22 @@ class KeyboardDeviceTabWidget(QDataWidget):
         # key clear button
         
         clear_keyboard_button = ui_common.ConfirmPushButton("Clear Keys", show_callback = self._show_clear_cb)
+        icon = gremlin.util.load_icon("fa.trash-o")
+        clear_keyboard_button.setIcon(icon)
         clear_keyboard_button.confirmed.connect(self._clear_keys_cb)
         button_container_layout.addWidget(clear_keyboard_button)
         button_container_layout.addStretch(1)
 
         virtual_keyboard_button = QtWidgets.QPushButton("Add Key")
+        icon = gremlin.util.load_icon("fa.keyboard-o")
+        virtual_keyboard_button.setIcon(icon)
         virtual_keyboard_button.clicked.connect(self._add_key_dialog_cb)
         button_container_layout.addWidget(virtual_keyboard_button)
         
-
-        self.left_panel_layout.addWidget(button_container_widget)
+        self.addLeftPanelWidget(button_container_widget)
+        
         # Select default entry
-        
         self.input_item_list_view.redraw()
-        
 
         selected_index = self.input_item_list_view.current_index
 
@@ -426,15 +419,9 @@ class KeyboardDeviceTabWidget(QDataWidget):
         self.input_item_list_view.redraw()
 
         # add a blank input configuration if nothing is selected - the configuration widget is always the second widget of the main layout
-        right_panel = self.main_layout.takeAt(1)
-        if right_panel is not None and right_panel.widget():
-            right_panel.widget().hide()
-            right_panel.widget().deleteLater()
-        if right_panel:
-            self.main_layout.removeItem(right_panel)
 
         widget = InputItemConfiguration()
-        self.main_layout.addWidget(widget,3)
+        self.setRightPanelWidget(widget)
 
     def _add_key_dialog_cb(self):
         ''' display the keyboard input dialog '''
@@ -536,22 +523,11 @@ class KeyboardDeviceTabWidget(QDataWidget):
             input_type = InputType.KeyboardLatched
 
 
-            right_panel = self.main_layout.takeAt(1)
-            if right_panel is not None and right_panel.widget():
-                right_panel.widget().hide()
-                right_panel.widget().deleteLater()
-            if right_panel:
-                self.main_layout.removeItem(right_panel)        
-
-
-
             input_id = item_data.input_id if item_data else None
             config.set_last_input(device_guid, input_type, input_id)
 
             widget = InputItemConfiguration(item_data)
-            self.main_layout.addWidget(widget,3)
-
-        
+            self.setRightPanelWidget(widget)
             
             # Create new configuration widget
             
