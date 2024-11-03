@@ -115,7 +115,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.16ex (m9)"
+APPLICATION_VERSION = "13.40.16ex (m10)"
 
 # the main ui
 ui = None
@@ -2435,7 +2435,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                 sys.path.insert(0, profile_folder)
 
             self._sanitize_profile(new_profile)
-            self._update_window_title()
+
 
 
             last_edit_mode = gremlin.config.Configuration().get_profile_last_edit_mode()
@@ -2477,6 +2477,8 @@ class GremlinUi(QtWidgets.QMainWindow):
                 new_profile.to_xml(fname)
 
 
+
+
         except (KeyError, TypeError) as error:
             # An error occurred while parsing an existing profile,
             # creating an empty profile instead
@@ -2493,6 +2495,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         finally:
             # update the status bar
             self._update_mode_status_bar()
+            self._update_window_title()
 
             # restore the mouse cursor
             popCursor()
@@ -2598,12 +2601,39 @@ class GremlinUi(QtWidgets.QMainWindow):
 
             # remove container IDs and action IDs from xml
             trees = (t1, t2)
+            ignore_list = ("container_id","action_id")
+            gate_ignore_list = ("id","min_id","max_id")
+            
             for t in trees:
+                remove_nodes = []
                 for node in t.findall(".//*"): 
-                    if "container_id" in node.attrib:
-                        del node.attrib["container_id"]
-                    if "action_id" in node.attrib:
-                        del node.attrib["action_id"]
+                    for attrib in ignore_list:
+                        if attrib in node.attrib:
+                            del node.attrib[attrib]
+                    description = None
+                    if "description" in node.attrib:
+                        # clear blank description nodes
+                        description = node.get("description")
+                        if not description:
+                            del node.attrib["description"]
+                    if node.tag in ("button","axis","hat") and not description:
+                        children = list(node)
+                        if not children:
+                            # remove blank axis, button and hat nodes from the comparison
+                            remove_nodes.append(node)     
+                    if node.tag in ("gate","range"):
+                        # ignore IDs that will change
+                        for attrib in gate_ignore_list:
+                            if attrib in node.attrib:
+                                del node.attrib[attrib]
+
+                # remove don't care nodes
+                for node in remove_nodes:
+                    node.getparent().remove(node)
+
+
+                    
+                    
 
             is_changed = etree.tostring(t1) != etree.tostring(t2)
 
@@ -2615,9 +2645,9 @@ class GremlinUi(QtWidgets.QMainWindow):
             # ).hexdigest()
             # is_changed =  current_sha != profile_sha
 
-            # if is_changed:
-            #     gremlin.util.display_file(tmp_path)
-            #     gremlin.util.display_file(profile_fname)
+            if is_changed:
+                gremlin.util.display_file(tmp_path)
+                gremlin.util.display_file(profile_fname)
 
             # clean up
             #os.unlink(tmp_path)
@@ -2840,7 +2870,9 @@ class GremlinUi(QtWidgets.QMainWindow):
     def _update_window_title(self, title = None):
         """Updates the window title to include the current profile."""
         if title is None:
-            profile_fname = gremlin.shared_state.current_profile.profile_file
+            profile_fname = None
+            if gremlin.shared_state.current_profile is not None:
+                profile_fname = gremlin.shared_state.current_profile.profile_file
             if profile_fname is not None:
                 self.setWindowTitle(f"{os.path.basename(profile_fname)}")
             else:

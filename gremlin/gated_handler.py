@@ -494,7 +494,7 @@ class RangeInfo():
         #assert min_gate is not None and max_gate is not None, "Gates must be provided on range object"
         self.parent : GateData = parent
         self._id = gremlin.util.get_guid()
-        print (f"Range: create new range id: {id}")
+        # print (f"Range: create new range id: {id}")
         self._is_default = is_default
         self.profile_mode = profile_mode
         self._output_mode = None
@@ -532,7 +532,7 @@ class RangeInfo():
         self._fixed_value = None # fixed value to output for this range if the condition is Fixed
         self._swap_gates() # flip the gates so the values are always increasing 
 
-        print (f"RangeInfo: create {self.range_display()} {self.range_gate_display()}")
+        # print (f"RangeInfo: create {self.range_display()} {self.range_gate_display()}")
 
        
 
@@ -596,7 +596,7 @@ class RangeInfo():
         self._g2_id = other._g2_id
         self._g1_id = other._g1_id
         self.item_data_map = other.item_data_map
-        print (f"Range: copyfrom: {self.range_display()}")
+        # print (f"Range: copyfrom: {self.range_display()}")
         
 
     @property
@@ -639,7 +639,7 @@ class RangeInfo():
     @range_min.setter
     def range_min(self, value):
         self.g1.value = value
-        print (f"RangeInfo: set G1 value to {value:0.{_decimals}f}")
+        # print (f"RangeInfo: set G1 value to {value:0.{_decimals}f}")
     
     @property
     def range_max(self):
@@ -649,7 +649,7 @@ class RangeInfo():
     @range_max.setter
     def range_max(self, value):
         self.g2.value = value
-        print (f"RangeInfo: set G2 value to {value:0.{_decimals}f}")
+        # print (f"RangeInfo: set G2 value to {value:0.{_decimals}f}")
 
     @property
     def output_range_min(self):
@@ -752,7 +752,7 @@ class RangeInfo():
             self._g1_id = gate.id
             self._swap_gates()
             self._gate_value_changed_cb(gate)
-            print (f"Range G1: set to {self.v1}")
+            # print (f"Range G1: set to {self.v1}")
 
     @property
     def g2(self) -> GateInfo:
@@ -764,7 +764,7 @@ class RangeInfo():
             self._g2_id = gate.id
             self._swap_gates()
             self._gate_value_changed_cb(gate)
-            print (f"Range G2: set to {self.v2}")
+            # print (f"Range G2: set to {self.v2}")
 
     def set_gates(self, g1 : GateInfo, g2 : GateInfo):
         ''' sets both gates for the range '''
@@ -774,7 +774,7 @@ class RangeInfo():
             self._g2_id = g2.id
             self._swap_gates()
             self._gate_value_changed_cb(g1)
-            print (f"Range G1: set to {self.v1:0.{_decimals}f} G2: set to {self.v2:0.{_decimals}f}")
+            # print (f"Range G1: set to {self.v1:0.{_decimals}f} G2: set to {self.v2:0.{_decimals}f}")
 
 
 
@@ -784,7 +784,7 @@ class RangeInfo():
         if gate.id == self._g1_id or gate.id == self._g2_id:
             eh = GateEventHandler()
             eh.range_value_changed.emit(self)
-            print (f"Range: value changed: G1: set to {self.v1:0.{_decimals}f} G2: set to {self.v2:0.{_decimals}f}")
+            # print (f"Range: value changed: G1: set to {self.v1:0.{_decimals}f} G2: set to {self.v2:0.{_decimals}f}")
 
 
 
@@ -2023,7 +2023,7 @@ class GateData():
         #print ("------")
         selected = None
         for range_info in self._get_ranges(include_default = include_default, used_only = used_only):
-            print (f"{value:0.4f} - range: {range_info.range_display()} {range_info.range_gate_display()} in range: {range_info.inrange(value)}")
+            # print (f"{value:0.4f} - range: {range_info.range_display()} {range_info.range_gate_display()} in range: {range_info.inrange(value)}")
             if range_info.inrange(value):
                 selected = range_info
         return selected
@@ -2640,8 +2640,8 @@ class GateData():
             
         
         all_ranges = self.getUsedRanges()
-        for rng in all_ranges:
-            print (f"\t{str(rng)}")
+        # for rng in all_ranges:
+        #     print (f"\t{str(rng)}")
             
 
         # update the ranges based on the new gates
@@ -2649,8 +2649,8 @@ class GateData():
 
 
         all_ranges = self.getUsedRanges()
-        for rng in all_ranges:
-            print (f"\t{str(rng)}")
+        # for rng in all_ranges:
+        #     print (f"\t{str(rng)}")
 
         # filter
         filter_node = gremlin.util.get_xml_child(node, "filter")
@@ -4275,7 +4275,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
     def _update_ui(self):
         ''' updates visibility of UI components based on the active options '''
         # update the slider configuration
-        print ("gate axis: update ui")
+        # print ("gate axis: update ui")
         #self._load_gates()
         self._update_slider(self.gate_data.getGateValues())
         self._update_output_value()
@@ -4350,7 +4350,7 @@ class ActionContainerUi(QtWidgets.QDialog):
             range_info : RangeInfo = info_object
             self._range_info = range_info
             self.trigger_condition_layout.addWidget(QtWidgets.QLabel(f"Range Configuration: {info_object.range_display()}"))
-            print (f"Range: configuration: {range_info.range_display_ex()}")
+            # print (f"Range: configuration: {range_info.range_display_ex()}")
             
             self.slider_frame_widget = QtWidgets.QFrame()
             self.slider_frame_layout = QtWidgets.QVBoxLayout(self.slider_frame_widget)

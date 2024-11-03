@@ -186,6 +186,10 @@ Joystick Gremlin EX
 
 
 ## 13.40.16ex (pre-release)
+### (m10)
+- Improved: profiles no longer save empty entries (entries with no mappings and entries that use defaults) - this reduces the size of the saved profile and improves loading/save time.
+- Improved: detection of profile changes when loading a new profile (will now ignore default entries or entries with no mappings)
+- Fix: window title doesn't always get updated when loading a profile from the menu
 
 ### (m9)
 - New: left and right panels can be resized via a splitter

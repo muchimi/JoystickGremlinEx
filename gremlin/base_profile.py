@@ -28,6 +28,7 @@ import gremlin.actions
 import gremlin.base_buttons
 import gremlin.base_profile
 import gremlin.config
+import gremlin.config
 import gremlin.curve_handler
 import gremlin.event_handler
 import gremlin.execution_graph
@@ -585,11 +586,14 @@ class AbstractContainer(ProfileData):
         """ true if the container can be saved to a profile """
         state = self._is_container_valid()
 
+        action_count = 0
+        
         # Check state of all linked actions
         for actions in [a for a in self.action_sets if a is not None]:
+            action_count += len(actions)
             for action in actions:
                 state = state & action.is_valid_for_save()
-        return state
+        return state and action_count > 0
     
     def latch_extra_inputs(self):
         ''' returns any extra inputs as a list of (device_guid, input_id) to latch to this action (trigger on change) '''
@@ -987,6 +991,24 @@ class InputItem():
 
         # register joystic axis items
 
+    def is_valid_for_save(self) -> bool:
+        ''' true if the item has something to save to a profile '''
+        from gremlin.keyboard import Key
+        if self.input_type in (InputType.Keyboard, InputType.KeyboardLatched):
+            if isinstance(self.input_id, Key):
+                # has a key definition, save
+                return True
+        elif self.input_type in (InputType.Midi, InputType.OpenSoundControl):
+            return True
+        elif hasattr(self.input_id,"to_xml"):
+            # has a custom input that returns an XML node
+            return True
+            
+        if not self._containers and not self._description and not self.always_execute:
+            # has no containers, no description and execute flag is True (default)
+            return False
+        return True
+
 
     def to_xml(self):
         """Generates a XML node representing this object's data.
@@ -1041,7 +1063,8 @@ class InputItem():
             if valid:
                 container_node.append(entry.to_xml())
             else:
-                logging.getLogger("system").warning(f"SaveProfile: input: {self.input_type} input id: {self.input_id} container returned invalid configuration - won't save {entry.name}")
+                if gremlin.config.Configuration().verbose:
+                    logging.getLogger("system").info(f"SaveProfile: input: {self.input_type} {InputType.to_display_name(self.input_type)} input id: {self.input_id} container has no data - won't save {entry.name}")
 
         return node
 
@@ -1177,8 +1200,9 @@ class AbstractAction(ProfileData):
             return # nothing to do
         self._enabled = value
         
-        
-        if value:
+        verbose = gremlin.config.Configuration().verbose_mode_details
+
+        if verbose and value:
             logging.getLogger("system").info(f"Functor: {self.name} {type(self).__name__} enabled")
 
         
@@ -2387,7 +2411,8 @@ class Mode:
                 key=lambda x: x.input_id
             )
             for item in item_list:
-                node.append(item.to_xml())
+                if item.is_valid_for_save():
+                    node.append(item.to_xml())
         return node
 
     def delete_data(self, input_type, input_id):

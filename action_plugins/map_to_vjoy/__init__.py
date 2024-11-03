@@ -297,8 +297,11 @@ class VJoyUsageState():
     
     def toggle_inverted(self, device_id, input_id):
         ''' toggles inversion state of specified device/axis is inverted '''
-        VJoyUsageState._axis_invert_map[device_id][input_id] = not VJoyUsageState._axis_invert_map[device_id][input_id]
-        log_sys(f"Vjoy Axis {device_id} {input_id} inverted state: {VJoyUsageState._axis_invert_map[device_id][input_id]}")
+        if input_id in VJoyUsageState._axis_invert_map[device_id]:
+            VJoyUsageState._axis_invert_map[device_id][input_id] = not VJoyUsageState._axis_invert_map[device_id][input_id]
+            log_sys(f"Vjoy Axis {device_id} {input_id} inverted state: {VJoyUsageState._axis_invert_map[device_id][input_id]}")
+        else:
+            logging.getLogger("system").error(f"Vjoy Axis invert: {device_id} - axis {input_id} is not a valid output axis.")
 
     def set_range(self, device_id, input_id, min_range = -1.0, max_range = 1.0):
         ''' sets the axis min/max range for the active range computation '''
@@ -306,8 +309,8 @@ class VJoyUsageState():
             r = min_range
             min_range = max_range
             max_range = r
-            
-        VJoyUsageState._axis_range_map[device_id][input_id] = [min_range, max_range]
+        if input_id in VJoyUsageState._axis_invert_map[device_id]:
+            VJoyUsageState._axis_range_map[device_id][input_id] = [min_range, max_range]
 
     def get_range(self, device_id, input_id):
         ''' gets the current range for an axis (min,max)'''

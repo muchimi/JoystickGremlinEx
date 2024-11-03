@@ -318,7 +318,7 @@ class ContainerExecutionGraph(AbstractExecutionGraph):
             sequence.append("Condition")
 
         functor = container.functor(container)
-        verbose = gremlin.config.Configuration().verbose
+        verbose = gremlin.config.Configuration().verbose_mode_details
         if verbose:
             logging.getLogger("system").info(f"Enable container functor: {type(functor).__name__}")
 

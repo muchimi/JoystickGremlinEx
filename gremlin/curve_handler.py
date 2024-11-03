@@ -1590,6 +1590,11 @@ class DeadzoneWidget(QtWidgets.QWidget):
         :param values the new deadzone values
         """
         v1, v2 = values[0], values[1]
+        if v1 is None:
+            v1 = -1
+        if v2 is None:
+            v2 = 0
+
         with QtCore.QSignalBlocker(self.left_slider):
             self.left_slider.setValue((v1,v2))
         with QtCore.QSignalBlocker(self.left_lower):
@@ -1598,6 +1603,10 @@ class DeadzoneWidget(QtWidgets.QWidget):
             self.left_upper.setValue(v2)
 
         v1, v2 = values[2], values[3]
+        if v1 is None:
+            v1 = 0
+        if v2 is None:
+            v2 = 1
         with QtCore.QSignalBlocker(self.right_slider):
             self.right_slider.setValue((v1,v2))
         with QtCore.QSignalBlocker(self.right_lower):
@@ -2197,6 +2206,14 @@ class AxisCurveWidget(QtWidgets.QWidget):
 
         dd = self.deadzone_widget
         d_start, d_left, d_right, d_end = dd.get_values()
+        if d_start is None:
+            d_start = -1
+        if d_end is None:
+            d_end = 1
+        if d_left is None:
+            d_left = 0
+        if d_right is None:
+            d_right = 0
         
         match preset:
             case DeadzonePreset.center_two :
@@ -2223,6 +2240,8 @@ class AxisCurveWidget(QtWidgets.QWidget):
                 d_left = 0
                 d_right = 0
                 d_end = 1
+
+            
         
         
         dd.set_values([d_start, d_left, d_right, d_end])
