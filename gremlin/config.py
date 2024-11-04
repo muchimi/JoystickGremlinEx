@@ -1523,8 +1523,15 @@ class Configuration:
         if self._midi_enabled is None:
             from gremlin.ui.midi_device import MidiInterface
             midi = MidiInterface()
-            self._midi_enabled = midi.midi_enabled
+            self._midi_enabled = midi.midi_enabled and self._data.get("midi_enabled", True)
         return self._midi_enabled
+    
+    @midi_enabled.setter
+    def midi_enabled(self, value : bool):
+        self._data["midi_enabled"] = value
+        self._midi_enabled = None # force a re-read 
+        
+
 
     @property
     def osc_enabled(self) -> bool:
@@ -1532,8 +1539,14 @@ class Configuration:
         if self._osc_enabled is None:
             from gremlin.ui.osc_device import OscInterface
             osc = OscInterface()
-            self._osc_enabled = osc.osc_enabled
+            self._osc_enabled = osc.osc_enabled and self._data.get("osc_enabled", True)
         return self._osc_enabled
+    
+        
+    @osc_enabled.setter
+    def osc_enabled(self, value : bool):
+        self._data["osc_enabled"] = value
+        self._osc_enabled = None # force a re-read 
 
 
     # @property

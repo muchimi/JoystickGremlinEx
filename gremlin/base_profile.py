@@ -2314,9 +2314,9 @@ class Profile():
         else:
             use_name = save_as_name
 
-        self.to_xml(use_name)
-
-        if save_as_name is None:
+        if use_name:
+            self.to_xml(use_name)
+        else:
             self._profile_fname = None
             self._dirty = False
 
@@ -3005,7 +3005,7 @@ class ProfileMap():
 
         try:
             # save the file
-            tree = etree.etree(root)
+            tree = etree.ElementTree(root)
             tree.write(fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
             logging.getLogger("system").info(f"PROC MAP: saved preferences to {fname}")
 

@@ -115,7 +115,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.16ex (m10)"
+APPLICATION_VERSION = "13.40.16ex (m11)"
 
 # the main ui
 ui = None
@@ -944,7 +944,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             self.profile.save()
         else:
             self.save_profile_as()
-        self._update_window_title()
+        
 
     def save_profile_as(self):
         """Prompts the user for a file to save to profile to."""
@@ -959,7 +959,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             self.profile.save()
             self.config.last_profile = fname
             self._create_recent_profiles()
-        self._update_window_title()
+            self._update_window_title()
 
     def reveal_profile(self):
         ''' opens the profile in explorer '''
