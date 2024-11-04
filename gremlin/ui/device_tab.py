@@ -120,16 +120,29 @@ class InputItemConfiguration(QtWidgets.QFrame):
         """
         import container_plugins.basic
         import gremlin.plugin_manager
+        import gremlin.ui.ui_common
         # If this is a vJoy item then do not permit adding an action if
         # there is already one present, as only response curves can be added
         # and only one of them makes sense to exist
         if self.item_data.get_device_type() == DeviceType.VJoy:
             if len(self.item_data.containers) > 0:
                 return
-
+            
+        
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
         container = container_plugins.basic.BasicContainer(self.item_data)
         action = plugin_manager.get_class(action_name)(container)
+
+        if action.singleton:
+            # action can only exist once in the container list
+            if self.item_data.is_action:
+                gremlin.ui.ui_common.MessageBox(prompt=f"Unable to add [{action_name}].  The action cannot be added to a sub-container.")    
+                return
+            if self.item_data.hasAction(action_name):
+                gremlin.ui.ui_common.MessageBox(prompt=f"Unable to add: [{action_name}]. The action can only appear once per input.")
+                return 
+
+
         container.add_action(action)
       
         if len(container.action_sets) > 0:
@@ -411,13 +424,16 @@ class ActionContainerModel(gremlin.ui.ui_common.AbstractModel):
             # notify actions that the container is closing
             for action_set in container.action_sets:
                 for action in action_set:
-                    eh.action_delete.emit(action)
+                    eh.action_delete.emit(self._item_data, container, action)
 
             del self._containers[self._containers.index(container)]
         self.data_changed.emit()
 
         el = gremlin.event_handler.EventListener()
         el.mapping_changed.emit(self.item_data)
+        
+
+        
 
 
 class ActionContainerView(gremlin.ui.ui_common.AbstractView):

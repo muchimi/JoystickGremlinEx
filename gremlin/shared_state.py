@@ -98,7 +98,7 @@ current_profile = None
 runtime_mode = None
 
 # holds the edit mode
-edit_mode = None
+edit_mode = "Default"
 
 # true if a device change occurs when a profile is running
 has_device_changes = False

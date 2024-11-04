@@ -96,6 +96,8 @@ class GatedAxis(gremlin.base_profile.AbstractAction):
     def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
+        self.singleton = True # this action can only appear once per input
+
         # gate data
         gate_data = gremlin.gated_handler.GateData(profile_mode = gremlin.shared_state.current_mode, action_data=self)
         self.gate_data = gate_data

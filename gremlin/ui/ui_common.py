@@ -413,12 +413,12 @@ class QIntLineEdit(QtWidgets.QLineEdit):
         
     def _update_value(self, value):
         other = self.value()
-        if value is None or other is None:
+        if value is None and other is None:
             return
         s_value = str(value)
         if s_value != self.text():
             self.setText(s_value)
-        if other != value:
+        if other is not None and other != value:
             self.valueChanged.emit(value)
 
 

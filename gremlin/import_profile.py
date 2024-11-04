@@ -226,6 +226,38 @@ class ImportItem(AbstractTreeItem):
 
     def selectable_items(self):
         return list(self.mode_map.values())
+    
+    def getButtonCount(self):
+        ''' gets the count of mapped buttons in this import item '''
+        max_count = 0
+        for mode_item in self.mode_map.values():
+            for input_item in mode_item.items:
+                if input_item.input_type == InputType.JoystickButton:
+                    if input_item.input_id > max_count:
+                        max_count = input_item.input_id
+        return max_count
+    
+    def getAxisCount(self):
+        ''' gets the count of mapped axes in this import item '''
+        max_count = 0
+        for mode_item in self.mode_map.values():
+            for input_item in mode_item.items:
+                if input_item.input_type == InputType.JoystickAxis:
+                    if input_item.input_id > max_count:
+                        max_count = input_item.input_id
+        return max_count
+    
+    def getHatCount(self):
+        ''' gets the count of mapped hats in this import item '''
+        max_count = 0
+        for mode_item in self.mode_map.values():
+            for input_item in mode_item.items:
+                if input_item.input_type == InputType.JoystickHat:
+                    if input_item.input_id > max_count:
+                        max_count = input_item.input_id
+        return max_count
+
+
 
 class ImportProfileDialog(QtWidgets.QDialog):
     ''' dialog for import options '''
@@ -367,7 +399,6 @@ class ImportProfileDialog(QtWidgets.QDialog):
         self.container_mode_widget.setContentsMargins(0,0,0,0)
         self.container_mode_layout = QtWidgets.QHBoxLayout(self.container_mode_widget)
         self.container_mode_layout.setContentsMargins(0,0,0,0)
-
 
         self.create_mode_widget = QtWidgets.QCheckBox("Import modes")
         self.target_mode_label_widget = QtWidgets.QLabel("Target Mode:")
@@ -676,6 +707,20 @@ class ImportProfileDialog(QtWidgets.QDialog):
         widget = self.sender()
         import_item, device_node = widget.data
         self._update_import_item(import_item, device_node)
+
+
+    @QtCore.Slot()
+    def _view_details(self):
+        ''' displays the details  '''
+        import_item : ImportItem
+        import_item, _ = self.sender().data
+        target_widget = import_item.map_to_widget
+        device = target_widget.currentData()
+        target_device_guid = device.device_guid
+        
+        dialog = ImportDetailDialog(import_item, target_device_guid)
+        dialog.exec()
+
 
 
     def _load_import_profile(self):
@@ -1369,11 +1414,26 @@ class ImportProfileDialog(QtWidgets.QDialog):
                     remap_widget.clicked.connect(self._re_import_device)
                     remap_widget.data = (import_item, device_node)
 
+                    detail_widget = ui_common.QDataPushButton("...")
+                    detail_widget.setToolTip("Details")
+                    detail_widget.clicked.connect(self._view_details)
+                    detail_widget.data = (import_item, device_node)
+
+                    container_options_widget = QtWidgets.QWidget()
+                    container_options_widget.setContentsMargins(0,0,0,0)
+                    container_options_layout = QtWidgets.QHBoxLayout(container_options_widget)
+                    container_options_layout.setContentsMargins(0,0,0,0)
+                    container_options_layout.addWidget(remap_widget)
+                    container_options_layout.addWidget(detail_widget)
+
+
                     self._map[import_item] = target_widget
 
                     tree.setItemWidget(device_node, 0, container_widget)
                     tree.setItemWidget(device_node, 2, map_to_widget)
-                    tree.setItemWidget(device_node, 3, remap_widget)
+                    tree.setItemWidget(device_node, 3, container_options_widget)
+                    
+
 
                     self._update_import_item(import_item, device_node)
 
@@ -1438,6 +1498,8 @@ class ImportProfileDialog(QtWidgets.QDialog):
     def _create_target_input_widget(self, source_import_item : ImportItem, source_input_item : ImportInputItem, target_device_guid : dinput.GUID, target_input_id : int):
         ''' create a combo box for the mode mapping '''
 
+        syslog = logging.getLogger("system")
+
         source_input_type = source_input_item.input_type
         if source_input_type == InputType.Keyboard:
             source_input_type = InputType.KeyboardLatched # move to GremlinEX keyboard device
@@ -1501,6 +1563,7 @@ class ImportProfileDialog(QtWidgets.QDialog):
                     info : gremlin.joystick_handling.DeviceSummary = gremlin.joystick_handling.device_info_from_guid(target_device_guid)
                     # only create button outputs that exist on the device
                     if info is not None:
+                        
                         for index in range(info.button_count):
                             item = ImportInputItem()
                             item.input_name = source_input_item.input_name
@@ -1530,8 +1593,6 @@ class ImportProfileDialog(QtWidgets.QDialog):
 
             # remember the list for next time - the map contains all possible mappings keyed by input type
             self._target_input_item_map[target_device_guid] = items
-            if item.description:
-                pass
 
         # grab the list of mappings for the given device
         items = self._target_input_item_map[target_device_guid][source_input_type]
@@ -1901,8 +1962,56 @@ class ImportProfileDialog(QtWidgets.QDialog):
 
 
 
+class ImportDetailDialog(QtWidgets.QDialog):
+    def __init__(self, import_item : ImportItem, target_device_guid : dinput.GUID, parent=None):
+        super().__init__(parent)
+
+        # make modal
+        self.setWindowModality(QtCore.Qt.ApplicationModal)
+        syslog = logging.getLogger("system")
+
+        target_info : gremlin.joystick_handling.DeviceSummary = gremlin.joystick_handling.device_info_from_guid(target_device_guid)
+        self.main_layout = QtWidgets.QHBoxLayout(self)
+
+        source_widget = QtWidgets.QWidget()
+        source_layout = QtWidgets.QFormLayout(source_widget)
+
+        target_widget = QtWidgets.QWidget()
+        target_layout = QtWidgets.QFormLayout(target_widget)
 
 
+
+        
+        source_layout.addRow("Source:", self.getStrWidget(import_item.device_name))
+        source_layout.addRow("Axis count:", self.getIntWidget(import_item.getAxisCount()))
+        source_layout.addRow("Button count:", self.getIntWidget(import_item.getButtonCount()))
+        source_layout.addRow("Hat count:", self.getIntWidget(import_item.getHatCount()))
+
+        target_layout.addRow("Target:", self.getStrWidget(target_info.name))
+        target_layout.addRow("Axis count:", self.getIntWidget(target_info.axis_count))
+        target_layout.addRow("Button count:", self.getIntWidget(target_info.button_count))
+        target_layout.addRow("Hat count:", self.getIntWidget(target_info.hat_count))
+
+        self.main_layout.addWidget(source_widget)
+        self.main_layout.addWidget(target_widget)
+
+        self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        
+
+
+    def getIntWidget(self, value : int) -> ui_common.QIntLineEdit:
+        widget = ui_common.QIntLineEdit()
+        widget.setReadOnly(True)
+        widget.setValue(value)
+        return widget
+    
+    def getStrWidget(self, value : int) -> ui_common.QDataLineEdit:
+        widget = ui_common.QDataLineEdit()
+        widget.setReadOnly(True)
+        widget.setText(value)
+        return widget
+    
+    
 
 
 

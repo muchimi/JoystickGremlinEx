@@ -115,7 +115,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.16ex (m11)"
+APPLICATION_VERSION = "13.40.16ex (m12)"
 
 # the main ui
 ui = None
@@ -2588,6 +2588,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             # save the profile and compare to the original file
             #tmp_path = os.path.join(os.getenv("temp"), gremlin.util.get_guid() + ".xml")
             tmp_path = os.path.join(os.getenv("temp"), "gremlin.xml")
+            
             self.profile.to_xml(tmp_path)
             
             # remove blank text and comments from the XML files
@@ -2645,9 +2646,9 @@ class GremlinUi(QtWidgets.QMainWindow):
             # ).hexdigest()
             # is_changed =  current_sha != profile_sha
 
-            if is_changed:
-                gremlin.util.display_file(tmp_path)
-                gremlin.util.display_file(profile_fname)
+            # if is_changed:
+            #     gremlin.util.display_file(tmp_path)
+            #     gremlin.util.display_file(profile_fname)
 
             # clean up
             #os.unlink(tmp_path)

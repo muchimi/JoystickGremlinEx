@@ -887,6 +887,21 @@ class InputItem():
         ''' true if the input is curved '''
         return self._curve_data is not None
     
+    def hasAction(self, action_name : str) -> bool:
+        ''' true if the specified action type is found in the containers '''
+        plugins = ActionPlugins()
+        action_type = plugins.get_class(action_name)
+        if action_type is not None:
+            container : AbstractContainer
+            for container in self._containers:
+                for action_set in container.action_sets:
+                    action : AbstractAction
+                    for action in action_set:
+                        if type(action) == action_type:
+                            return True
+        return False
+
+    
 
     def _register_axis(self):
         if self._input_type == InputType.JoystickAxis and self._input_id is not None and self._device_guid is not None:
@@ -1172,13 +1187,15 @@ class AbstractAction(ProfileData):
         self._id = None
         self._action_type = None
         self._enabled = False # true if the action is enabled
+        self.singleton = False # true if the action can only appear once in the input's mapping
+
         eh = gremlin.event_handler.EventListener()
         eh.action_created.emit(self)
         eh.profile_unload.connect(self._cleanup)
         eh.action_delete.connect(self._action_delete)
         
-    def _action_delete(self, action_data):
-        if self._id == action_data._id:
+    def _action_delete(self, input_item, container, action):
+        if self._id == action._id:
             self._cleanup()
 
     def _cleanup(self):

@@ -295,7 +295,7 @@ class GateInfo():
 
         assert parent is not None, "Gates must be parented to a GateData object " # = must provide this parameter
         self.parent : GateData = parent
-
+        assert profile_mode is not None, "Mode must be provided"
         assert value is not None, "Gate must have a value"
         self.is_default = is_default # default gate setups (not saved)
         self._id = get_guid() if id is None else id
@@ -953,6 +953,7 @@ class GateData():
                  ):
         ''' GateData constructor '''
 
+        assert profile_mode is not None, "profile mode must be provided"
         self._process_trigger_lock = threading.Lock()
         self._action_data = action_data
         self.condition = condition
@@ -2372,6 +2373,7 @@ class GateData():
 
         node.set("use_default_range",str(self.use_default_range))
         node.set("show_mode", DisplayMode.to_string(self.display_mode))
+
         node.set("mode", self.profile_mode)
 
        
@@ -3255,6 +3257,10 @@ class GatedAxisWidget(QtWidgets.QWidget):
             logging.getLogger("system").info(f"gate axis widget: init {self.id} {self.action_data.input_display_name}")
 
         self.hook()
+
+
+    def closeEvent(self, event):
+        return super().closeEvent(event)
 
     @QtCore.Slot()
     def _show_help(self):

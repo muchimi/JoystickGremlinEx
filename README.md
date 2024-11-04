@@ -186,6 +186,13 @@ Joystick Gremlin EX
 
 
 ## 13.40.16ex (pre-release)
+### (m12)
+- Fix: With a new, unsaved profile, removing a container for a gate or range in the Gated Axis action results also removes the container on the parent action (this was a visual item, upon saving it would load correctly the next time).  This is resolved in m12.  
+- Improved: Singleton actions (actions that can only apply once per input) will generate a message box error if added more than once, or if nested.
+- API: Actions can now be marked as singleton at the plugin level to indicate they must be unique per input mapping.
+- Improved: Detail button in profile import will show the capabilities of the source and target for mapping purposes.
+- Fix: debug mode left on in m11 would call up XML profile in the default text editor if they differed.
+
 ### (m11)
 - Fix: for midi and osc enabled options not saving properly after changes to the validation logic for these two services introduced in m6.
 

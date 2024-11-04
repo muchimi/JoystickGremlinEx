@@ -20,6 +20,7 @@ from PySide6 import QtWidgets, QtCore, QtGui
 import lxml.etree
 
 import gremlin
+import gremlin.base_profile
 import gremlin.config
 
 import gremlin.event_handler
@@ -875,9 +876,23 @@ class ActionSetView(ui_common.AbstractView):
         clipboard.enable()
 
     def _add_action(self, action_name):
+        import gremlin.plugin_manager
+        import gremlin.base_profile
+        import gremlin.ui.ui_common
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.get_class(action_name)(self.profile_data)
-        self.model.add_action(action_item)
+
+        action = plugin_manager.get_class(action_name)(self.profile_data)
+        if action.singleton:
+            input_item : gremlin.base_profile.InputItem = self.profile_data.input_item
+            if input_item.is_action:
+                gremlin.ui.ui_common.MessageBox(prompt=f"Unable to add [{action_name}].  The action cannot be added to a sub-container.")    
+                return
+            if input_item.hasAction(action_name):
+                gremlin.ui.ui_common.MessageBox(prompt=f"Unable to add: [{action_name}]. The action can only appear once per input.")
+                return
+                
+
+        self.model.add_action(action)
 
     def _paste_action(self, action):
         ''' handles action paste operation '''
@@ -1751,8 +1766,9 @@ class AbstractActionWidget(QtWidgets.QFrame):
         self._create_ui()
         self._populate_ui()
 
-    def _action_delete(self, action_data):
-        if action_data._id == self.action_data._id:
+    @QtCore.Slot(object)
+    def _action_delete(self, input_item, container, action):
+        if self.action_data._id is not None and self.action_data._id == action._id:
             self._cleanup_ui()
             
 
