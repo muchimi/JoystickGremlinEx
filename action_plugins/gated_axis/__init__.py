@@ -107,6 +107,7 @@ class GatedAxis(gremlin.base_profile.AbstractAction):
         ''' clean ourselves up '''
         super()._cleanup()
         self.gates.clear()
+        self.gate_data.unhook()
         self.gate_data = None
 
 

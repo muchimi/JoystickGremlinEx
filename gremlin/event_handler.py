@@ -107,6 +107,8 @@ class Event:
 		self.virtual_code = virtual_code # vk if a keyboard event (the identifier will be the key_id (scancode, extended))
 		self.is_virtual = is_virtual # true if the item is a vjoy device input
 		self.is_virtual_button = False # true if a virtual button
+		self.is_custom = False # true if a custom event (should be processed)
+
 
 	def clone(self):
 		"""Returns a clone of the event.
@@ -214,6 +216,10 @@ class EventListener(QtCore.QObject):
 
 	# Signal emitted when joystick events are received
 	joystick_event = QtCore.Signal(Event)
+
+	# custom joystick event - this is a code based joystick event 
+	custom_joystick_event = QtCore.Signal(Event)
+
 	# Signal emitted when keyboard events are received
 	keyboard_event = QtCore.Signal(Event)
 	# Signal emitted when mouse events are received
@@ -280,6 +286,8 @@ class EventListener(QtCore.QObject):
 	
 	# suspend keyboard input
 	suspend_keyboard_input = QtCore.Signal(bool) # arg = state, true = suspend, false = resume
+
+	
 
 	def __init__(self):
 		"""Creates a new instance."""

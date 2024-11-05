@@ -611,6 +611,9 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             #     pass
 
             self._is_axis = self.action_data.input_is_axis()
+
+            # if the input is chained 
+            self.chained_input = self.action_data.input_item.is_action
             
 
             # type_label = QtWidgets.QLabel(f"Input type: {InputType.to_display_name(self.input_type)}")
@@ -792,7 +795,9 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         # hook the inputs and profile
         el = gremlin.event_handler.EventListener()
-        el.joystick_event.connect(self._joystick_event_handler)
+        el.custom_joystick_event.connect(self._joystick_event_handler)
+        if not self.chained_input:
+            el.joystick_event.connect(self._joystick_event_handler)
         el.profile_start.connect(self._profile_start)
         el.profile_stop.connect(self._profile_stop)
 
@@ -1035,14 +1040,18 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _profile_start(self):
         ''' called when the profile starts '''
         el = gremlin.event_handler.EventListener()
-        el.joystick_event.disconnect(self._joystick_event_handler)
+        el.custom_joystick_event.disconnect(self._joystick_event_handler)
+        if not self.chained_input:
+            el.joystick_event.disconnect(self._joystick_event_handler)
+        
 
     def _profile_stop(self):
         ''' called when the profile stops'''
         self._update_axis_widget()
         el = gremlin.event_handler.EventListener()
-        el.joystick_event.connect(self._joystick_event_handler)
-        
+        el.custom_joystick_event.connect(self._joystick_event_handler)
+        if not self.chained_input:
+            el.joystick_event.connect(self._joystick_event_handler)
 
     def _joystick_event_handler(self, event):
         ''' handles joystick events in the UI (functor handles the output when profile is running) so we see the output at design time '''
@@ -1051,6 +1060,8 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         if not event.is_axis:
             return 
+        
+        value = None
         
         if self.action_data.action_mode == VjoyAction.VjoyMergeAxis:
             # merge - check two sets 
@@ -1069,11 +1080,12 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         else:
             if event.device_guid != self.action_data.hardware_device_guid:
                 return
-            
             if event.identifier != self.action_data.hardware_input_id:
                 return
+            if event.is_custom:
+                value = event.value
         
-        self._update_axis_widget()
+        self._update_axis_widget(value)
         
 
     def _current_input_axis(self):
@@ -1090,19 +1102,20 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         '''
         # always read the current input as the value could be from another device for merged inputs
         if self.input_type == InputType.JoystickAxis:
-            raw_value = self.action_data.get_raw_axis_value()
             self._axis_repeater_widget.setVisible(True)
-            # filter and merge the data
-            filtered_value = self.action_data.get_filtered_axis_value(raw_value)
-            value = filtered_value
+            if value is None:
+                raw_value = self.action_data.get_raw_axis_value()
+                # filter and merge the data
+                filtered_value = self.action_data.get_filtered_axis_value(raw_value)
+                value = filtered_value
             if self.action_data.curve_data is not None:
                 # curve the data 
-                curved_value = self.action_data.curve_data.curve_value(filtered_value)
+                curved_value = self.action_data.curve_data.curve_value(value)
                 self._axis_repeater_widget.show_curved = True
-                self._axis_repeater_widget.setValue(raw_value, curved_value)
+                self._axis_repeater_widget.setValue(value, curved_value)
             else:
                 self._axis_repeater_widget.show_curved = False
-                self._axis_repeater_widget.setValue(filtered_value)
+                self._axis_repeater_widget.setValue(value)
                 
                 
 

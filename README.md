@@ -186,6 +186,13 @@ Joystick Gremlin EX
 
 
 ## 13.40.16ex (pre-release)
+### (m13)
+- Fix: Merge Axis action creating invalid axis reference for second device upon initialization if the first device was the last axis on the particular input device selected.
+- Fix: Merge Axis action not marked as a singleton action.
+- Fix: Merge Axis action not showing output value at design time in some situations.
+- Improved: Map to Vjoy action in an action container will display the correct design time axis output when nested or no data if the parent action does not support it.
+
+
 ### (m12)
 - Fix: With a new, unsaved profile, removing a container for a gate or range in the Gated Axis action results also removes the container on the parent action (this was a visual item, upon saving it would load correctly the next time).  This is resolved in m12.  
 - Improved: Singleton actions (actions that can only apply once per input) will generate a message box error if added more than once, or if nested.

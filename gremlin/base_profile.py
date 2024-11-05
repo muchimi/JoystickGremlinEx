@@ -26,7 +26,6 @@ import logging
 import time
 import gremlin.actions
 import gremlin.base_buttons
-import gremlin.base_profile
 import gremlin.config
 import gremlin.config
 import gremlin.curve_handler
@@ -1188,6 +1187,7 @@ class AbstractAction(ProfileData):
         self._action_type = None
         self._enabled = False # true if the action is enabled
         self.singleton = False # true if the action can only appear once in the input's mapping
+        self.parent_container = parent # holds the reference to the parent container holding this action
 
         eh = gremlin.event_handler.EventListener()
         eh.action_created.emit(self)
@@ -1203,6 +1203,8 @@ class AbstractAction(ProfileData):
         eh = gremlin.event_handler.EventListener()
         eh.profile_unload.disconnect(self._cleanup)
         eh.action_delete.disconnect(self._action_delete)
+
+
         
 
     def setEnabled(self, value):

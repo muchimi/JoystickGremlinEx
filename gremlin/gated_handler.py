@@ -928,6 +928,8 @@ class GateEventHandler(QtCore.QObject):
     gate_order_changed = QtCore.Signal() # fires when the gate order should be updated 
     visibility_changed = QtCore.Signal(object, bool) # fires when visibility changes
 
+    unhook_gate = QtCore.Signal(object) # fires when the gate is unhooked, object = the gate data object
+
     def __init__(self):
         super().__init__()
 
@@ -954,6 +956,8 @@ class GateData():
         ''' GateData constructor '''
 
         assert profile_mode is not None, "profile mode must be provided"
+
+
         self._process_trigger_lock = threading.Lock()
         self._action_data = action_data
         self.condition = condition
@@ -1046,6 +1050,8 @@ class GateData():
             el = gremlin.event_handler.EventListener()
             el.joystick_event.disconnect(self._joystick_event_handler)
             self._hooked = False
+
+
 
     @property
     def hooked(self) -> bool:
@@ -3090,6 +3096,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
         
         super().__init__(parent)
 
+     
         self.valid = True
 
         self.id = gremlin.util.get_guid() # unique ID for this widget
@@ -3259,8 +3266,8 @@ class GatedAxisWidget(QtWidgets.QWidget):
         self.hook()
 
 
-    def closeEvent(self, event):
-        return super().closeEvent(event)
+
+
 
     @QtCore.Slot()
     def _show_help(self):
@@ -3297,13 +3304,6 @@ class GatedAxisWidget(QtWidgets.QWidget):
 
         self._gate_data.registerValueChangedCallback(self._update_slider_marker)
         self._gate_data.hook()
-        
-        
-        #el = gremlin.event_handler.EventListener()
-        # el.joystick_event.connect(self._joystick_event_ui_update_cb)
-        #el.joystick_event.connect(self._joystick_event_handler)
-        # el.profile_start.connect(self._profile_start_cb)
-        # el.profile_stop.connect(self._profile_stop_cb)
 
         # hook events 
         eh = GateEventHandler()
@@ -3327,15 +3327,9 @@ class GatedAxisWidget(QtWidgets.QWidget):
             if verbose:
                 logging.getLogger("system").info(f"gate axis widget: unhook {self.id} {self.action_data.input_display_name}")
 
+            eh = GateEventHandler()
             self._gate_data.unhook()
             self._gate_data.unregisterValueChangedCallback(self._update_slider_marker)
-
-            #el = gremlin.event_handler.EventListener()
-            # el.joystick_event.disconnect(self._joystick_event_ui_update_cb)
-            # el.profile_start.disconnect(self._profile_start_cb)
-            # el.profile_stop.disconnect(self._profile_stop_cb)
-            # hook events 
-            eh = GateEventHandler()
             eh.gatedata_stepsChanged.disconnect(self._update_steps_cb)
             eh.gatedata_valueChanged.disconnect(self._update_values_cb)
             eh.slider_marker_update.disconnect(self._slider_marker_update_handler)
@@ -3344,6 +3338,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
             eh.use_default_range_changed.disconnect(self._update_range_display)
             eh.gate_configuration_changed.disconnect(self._gate_configuration_changed)
             self._hooked = False
+            
 
     @property
     def gate_data(self) -> GateData:
@@ -3362,15 +3357,12 @@ class GatedAxisWidget(QtWidgets.QWidget):
     def _profile_stop_cb(self):
         ''' profile stops - reconnect widget '''
         pass
-        # el = gremlin.event_handler.EventListener()
-        # el.joystick_event.connect(self._joystick_event_ui_update_cb)
+        
 
     @QtCore.Slot()
     def _profile_start_cb(self):
         ''' profile stops - disconnect widget '''
         pass
-        # el = gremlin.event_handler.EventListener()
-        # el.joystick_event.disconnect(self._joystick_event_ui_update_cb)
 
     def setDisplayRange(self, range_min, range_max):
         ''' sets/updates the slider's range - updates any existing gates to the new range based on prior position'''
@@ -4239,15 +4231,16 @@ class GatedAxisWidget(QtWidgets.QWidget):
 
     def _update_output_value(self):
         ''' updates triggers and UI when the slider input value changes '''
-        self.output_range_trigger_widget.setPlainText(self.gate_data.trigger_range_text)
-        # scroll to bottom
-        vbar = self.output_range_trigger_widget.verticalScrollBar()
-        vbar.setValue(vbar.maximum())
+        if self.gate_data is not None:
+            self.output_range_trigger_widget.setPlainText(self.gate_data.trigger_range_text)
+            # scroll to bottom
+            vbar = self.output_range_trigger_widget.verticalScrollBar()
+            vbar.setValue(vbar.maximum())
 
-        self.output_gate_trigger_widget.setPlainText(self.gate_data.trigger_gate_text)
-        # scroll to bottom
-        vbar = self.output_gate_trigger_widget.verticalScrollBar()
-        vbar.setValue(vbar.maximum())
+            self.output_gate_trigger_widget.setPlainText(self.gate_data.trigger_gate_text)
+            # scroll to bottom
+            vbar = self.output_gate_trigger_widget.verticalScrollBar()
+            vbar.setValue(vbar.maximum())
         
 
 

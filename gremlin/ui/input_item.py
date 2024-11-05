@@ -778,6 +778,8 @@ class ActionSetModel(ui_common.AbstractModel):
 
     def remove_action(self, action):
         if action in self._action_set:
+            if hasattr(action,"_cleanup"):
+                action._cleanup()
             del self._action_set[self._action_set.index(action)]
         self.data_changed.emit()
 
