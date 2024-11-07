@@ -424,6 +424,8 @@ class ActionContainerModel(gremlin.ui.ui_common.AbstractModel):
             # notify actions that the container is closing
             for action_set in container.action_sets:
                 for action in action_set:
+                    # if hasattr(action, "_cleanup"):
+                    #     action._cleanup()
                     eh.action_delete.emit(self._item_data, container, action)
 
             del self._containers[self._containers.index(container)]

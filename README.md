@@ -186,6 +186,10 @@ Joystick Gremlin EX
 
 
 ## 13.40.16ex (pre-release)
+### (m14)
+- Fix: Gated Axis delete gate does not update range data.
+- Fix: Gated Axis add/remove container or actions in range or gate action could disable input tracking and cause the Gated Axis action to become unresponsive.
+
 ### (m13)
 - Fix: Merge Axis action creating invalid axis reference for second device upon initialization if the first device was the last axis on the particular input device selected.
 - Fix: Merge Axis action not marked as a singleton action.

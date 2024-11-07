@@ -1196,7 +1196,8 @@ class AbstractAction(ProfileData):
         
     def _action_delete(self, input_item, container, action):
         if self._id == action._id:
-            self._cleanup()
+            if not input_item.is_action:
+                self._cleanup()
 
     def _cleanup(self):
         ''' called when the action should clean itself up '''

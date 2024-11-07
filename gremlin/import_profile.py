@@ -1196,19 +1196,22 @@ class ImportProfileDialog(QtWidgets.QDialog):
     def _update_import_item(self, import_item : ImportItem, device_node : QtWidgets.QTreeWidgetItem):
         ''' updates an import item '''
 
+        verbose = gremlin.config.Configuration()
+        syslog = logging.getLogger("system")
         tree = self.import_input_tree_widget
         syslog = logging.getLogger("system")
         mode_item: ImportModeItem
         target_widget = self._map[import_item]
         source_device_guid = import_item.device_guid
-
+        
         # clear the node from children
         for _ in range(device_node.childCount()): 
             device_node.removeChild(device_node.child(0))
 
-        for mode_item in import_item.mode_map.values():
+        if verbose:
+            syslog.info(f"Import: {import_item.device_name}")
 
-        
+        for mode_item in import_item.mode_map.values():
             mode_node = QtWidgets.QTreeWidgetItem()
             mode_node.setData(0,0,mode_item)
             self._tree_mode_nodes.append(mode_node)
@@ -1224,7 +1227,6 @@ class ImportProfileDialog(QtWidgets.QDialog):
             mode_index = mode_widget.findData(mode_item.mode)
             if mode_index != -1:
                 mode_widget.setCurrentIndex(mode_index)
-            
 
             cb = ui_common.QDataCheckbox(f"Mode: [{mode_item.mode}]")
             cb.data = mode_item
@@ -1232,7 +1234,6 @@ class ImportProfileDialog(QtWidgets.QDialog):
             cb.setChecked(import_item.selected)
             cb.clicked.connect(self._select_import_item_cb)
             device_node.addChild(mode_node)
-            
 
             container_layout.addWidget(cb)
             container_layout.addStretch()
@@ -1240,6 +1241,9 @@ class ImportProfileDialog(QtWidgets.QDialog):
             tree.setItemWidget(mode_node, 0, container_widget)
             tree.setItemWidget(mode_node, 2, map_to_widget)
             self._map[mode_item] = mode_widget
+
+            if verbose:
+                syslog.info(f"\tMode: {mode_item.mode}")
 
             input_item : ImportInputItem
             for input_item in mode_item.items:
@@ -1249,10 +1253,14 @@ class ImportProfileDialog(QtWidgets.QDialog):
                 has_mapping = True
                 if input_item.input_type == InputType.NotSet:
                     # no mapping 
+                    if verbose:
+                        syslog.info(f"\t\t{input_item.input_name} -> not set")
                     continue
                 elif not input_item.input_type in self._default_info_map:
                     syslog.warning(f"Import: unable to map {input_item.input_type} - no matching suitable device found ")
                     has_mapping = False
+                    if verbose:
+                        syslog.info(f"\t\t{input_item.input_name} -> not mapping found")
 
                 if has_mapping:
                     default_target_device_guid, default_target_input_id = self._default_info_map[input_item.input_type ]
@@ -1265,13 +1273,16 @@ class ImportProfileDialog(QtWidgets.QDialog):
                         target_device_guid = default_target_device_guid
                         target_input_id = default_target_input_id
 
+                    target_device_name = gremlin.joystick_handling.device_name_from_guid(target_device_guid)
+
+                    if verbose:
+                        syslog.info(f"\t\t{input_item.input_name} -> {target_device_name}")
 
                     self._input_device_guid_to_target_device_guid[source_device_guid] = target_device_guid
                     base_device = self.base_device_map[target_device_guid]
                     index = target_widget.findData(base_device)
                     with QtCore.QSignalBlocker(target_widget):
                             target_widget.setCurrentIndex(index)
-
 
                 input_node = QtWidgets.QTreeWidgetItem()
                 input_node.setData(0,0,input_item)
@@ -1352,6 +1363,7 @@ class ImportProfileDialog(QtWidgets.QDialog):
         ''' updates the mappings source to target '''
 
         self._map = {} # clear and rebuild the map
+        verbose = gremlin.config.Configuration().verbose
 
         try:
             gremlin.util.pushCursor() # long running op potentially
