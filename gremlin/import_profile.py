@@ -1152,6 +1152,10 @@ class ImportProfileDialog(QtWidgets.QDialog):
         : returns : (target_device_guid, target_input_id) 
           
             '''
+        
+
+        verbose = gremlin.config.Configuration().verbose
+        syslog = logging.getLogger("system")
         if device_guid in self.target_devices_map:
             target_device_guid = device_guid
             target_device = self.target_devices_map[device_guid]
@@ -1167,26 +1171,46 @@ class ImportProfileDialog(QtWidgets.QDialog):
             case InputType.JoystickAxis:
                 if target_device.axis_count == 0:
                     # problem - change to the first target that has an axis
-                    target_device_guid, input_id = self._default_info_map[input_type]
+                    target_device_guid, target_input_id = self._default_info_map[input_type]
+                    if verbose:
+                        syslog.info(f"\t\t\tMapping axis: target has no axes found - using default mapping {input_id} -> {target_input_id}")
                 
-                if target_device.axis_count <= input_id:
-                    target_input_id = 0
+                if input_id > target_device.axis_count:
+                    target_input_id = 1
+                    if verbose:
+                        syslog.info(f"\t\t\tMapping axis: target has too few axes {target_device.axis_count} found - mapping {input_id} -> axis {target_input_id}")
+                    
                 else:
                     target_input_id = input_id
+                    if verbose:
+                        syslog.info(f"\t\t\tMapping axis: ok - mapping {input_id} -> {target_input_id}")
+                    
             case InputType.JoystickButton:
                 if target_device.button_count == 0:
-                    target_device_guid, input_id = self._default_info_map[input_type]
+                    target_device_guid, target_input_id = self._default_info_map[input_type]
+                    if verbose:
+                        syslog.info(f"\t\t\tMapping axis: target has no buttons found - map {input_id} to default {target_input_id}")
                 if input_id > target_device.button_count:
                     target_input_id = 1
+                    if verbose:
+                        syslog.info(f"\t\t\tMapping button: target has too few buttons {target_device.button_count} found - mapping {input_id} -> axis {target_input_id}")
                 else:
                     target_input_id = input_id
+                    if verbose:
+                        syslog.info(f"\t\t\tMapping button: ok mapping {input_id} -> {target_input_id}")
+                    
             case InputType.JoystickHat:
                 if target_device.hat_count == 0:
-                    target_device_guid, input_id = self._default_info_map[input_type]
+                    target_device_guid, target_input_id = self._default_info_map[input_type]
+                    if verbose:
+                        syslog.info(f"\t\t\tMapping hat: target has no hats found - cannot map axis {input_id} - {target_input_id}")
                 if input_id > target_device.hat_count:
                     target_input_id = 1
+                    
                 else:
                     target_input_id = input_id
+                    if verbose:
+                        syslog.info(f"\t\t\tMapping hat: ok mapping {input_id} -> {target_input_id}")
             case _:
                 # all others
                 target_input_id = input_id
@@ -1265,8 +1289,12 @@ class ImportProfileDialog(QtWidgets.QDialog):
                 if has_mapping:
                     default_target_device_guid, default_target_input_id = self._default_info_map[input_item.input_type ]
 
+                   
+
                     # derive the target input
                     target_device_guid, target_input_id = self._find_target(source_device_guid, default_target_device_guid, input_item.input_type, input_item.input_id)
+                    if verbose:
+                        syslog.info(f"\t\t{input_item.input_name} {input_item.input_id} -> {target_input_id}")
                     if target_device_guid is None:
                         target_device_guid = default_target_device_guid
                     if target_input_id is None:
@@ -1417,6 +1445,8 @@ class ImportProfileDialog(QtWidgets.QDialog):
                     container_layout.addStretch()
 
                     map_to_widget, target_widget = self._create_target_selection_widget(import_item.device_type)
+
+
                     
                     target_widget.data = import_item  # indicate which import_item holds this device mapping
                     import_item.map_to_widget = target_widget
@@ -1426,17 +1456,20 @@ class ImportProfileDialog(QtWidgets.QDialog):
                     remap_widget.clicked.connect(self._re_import_device)
                     remap_widget.data = (import_item, device_node)
 
-                    detail_widget = ui_common.QDataPushButton("...")
-                    detail_widget.setToolTip("Details")
-                    detail_widget.clicked.connect(self._view_details)
-                    detail_widget.data = (import_item, device_node)
+                    detail_widget = None
+                    if import_item.device_type in (DeviceType.Joystick, DeviceType.VJoy):
+                        detail_widget = ui_common.QDataPushButton("...")
+                        detail_widget.setToolTip("Details")
+                        detail_widget.clicked.connect(self._view_details)
+                        detail_widget.data = (import_item, device_node)
 
                     container_options_widget = QtWidgets.QWidget()
                     container_options_widget.setContentsMargins(0,0,0,0)
                     container_options_layout = QtWidgets.QHBoxLayout(container_options_widget)
                     container_options_layout.setContentsMargins(0,0,0,0)
                     container_options_layout.addWidget(remap_widget)
-                    container_options_layout.addWidget(detail_widget)
+                    if detail_widget:
+                        container_options_layout.addWidget(detail_widget)
 
 
                     self._map[import_item] = target_widget
@@ -1510,6 +1543,7 @@ class ImportProfileDialog(QtWidgets.QDialog):
     def _create_target_input_widget(self, source_import_item : ImportItem, source_input_item : ImportInputItem, target_device_guid : dinput.GUID, target_input_id : int):
         ''' create a combo box for the mode mapping '''
 
+        verbose = gremlin.config.Configuration().verbose
         syslog = logging.getLogger("system")
 
         source_input_type = source_input_item.input_type
@@ -1559,6 +1593,8 @@ class ImportProfileDialog(QtWidgets.QDialog):
                     info : gremlin.joystick_handling.DeviceSummary = gremlin.joystick_handling.device_info_from_guid(target_device_guid)
                     if info is not None:
                         # only create axis outputs that exist on the device
+                        if verbose:
+                            syslog.info(f"\t\t\tDevice {info.name} -> axis count: {info.axis_count}")
                         for index in range(info.axis_count):
                             item = ImportInputItem()
                             item.input_name = source_input_item.input_name
@@ -1570,12 +1606,15 @@ class ImportProfileDialog(QtWidgets.QDialog):
                             item.input_name = self._get_input_name(item.input_type, item.input_id)
                             item.device_guid = target_device_guid
                             items[input_type].append(item)
+                            if verbose:
+                                syslog.info(f"\t\t\tAxis {source_input_item.input_id} -> {item.input_id}")
                         
                 elif input_type == InputType.JoystickButton:                        
                     info : gremlin.joystick_handling.DeviceSummary = gremlin.joystick_handling.device_info_from_guid(target_device_guid)
                     # only create button outputs that exist on the device
                     if info is not None:
-                        
+                        if verbose:
+                            syslog.info(f"\t\t\tDevice {info.name} -> button count: {info.button_count}")
                         for index in range(info.button_count):
                             item = ImportInputItem()
                             item.input_name = source_input_item.input_name
@@ -1587,10 +1626,13 @@ class ImportProfileDialog(QtWidgets.QDialog):
                             item.input_name = self._get_input_name(item.input_type, item.input_id)
                             item.device_guid = target_device_guid
                             items[input_type].append(item)
+             
                 elif input_type == InputType.JoystickHat:                        
                     info : gremlin.joystick_handling.DeviceSummary = gremlin.joystick_handling.device_info_from_guid(target_device_guid)
                     # only create hat outputs that exist on the device
                     if info is not None:
+                        if verbose:
+                            syslog.info(f"\t\t\tDevice {info.name} -> hat count: {info.hat_count}")
                         for index in range(info.hat_count):
                             item = ImportInputItem()
                             item.input_name = source_input_item.input_name

@@ -115,7 +115,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.16ex (m14)"
+APPLICATION_VERSION = "13.40.16ex (m15)"
 
 # the main ui
 ui = None
@@ -242,9 +242,13 @@ class GremlinUi(QtWidgets.QMainWindow):
         # hook input selection 
         el.select_input.connect(self._select_input_handler)
 
+        # hook config changes
+        el.config_changed.connect(self._config_changed_cb)
+
         # hook changes
         eh = gremlin.event_handler.EventHandler()
         eh.profile_changed.connect(self._profile_changed_cb)
+        
 
         self._context_menu_tab_index = None
 
@@ -285,6 +289,9 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         # update status nar
         self._update_mode_status_bar()
+
+        
+
 
 
 
@@ -629,6 +636,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         dialog.closed.connect(
             lambda: self._remove_modal_window("options")
         )
+        dialog.closed.connect(lambda: self.refresh())
         dialog.show()
        
 
@@ -1543,6 +1551,10 @@ class GremlinUi(QtWidgets.QMainWindow):
         eh.select_input.emit(device_guid, input_type, input_id)
 
        
+    def _config_changed_cb(self):
+        ''' called when configuraition has changed '''
+        self.refresh()
+
     def _select_input_handler(self, device_guid : dinput.GUID, input_type : gremlin.input_types.InputType = None, input_id = None, force : bool = False):
         ''' Selects a specific input on the given tab 
         The tab is changed if different from the current tab.
@@ -1699,12 +1711,14 @@ class GremlinUi(QtWidgets.QMainWindow):
         joystick_devices.sort(key=lambda x: x[1].casefold())
         guid_list.extend(joystick_devices)
 
-
+        config = gremlin.config.Configuration()
 
         # add the Keyboard, OSC and MIDI
         guid_list.append(self._find_tab_data_guid(self._keyboard_device_guid))
-        guid_list.append(self._find_tab_data_guid(self._midi_device_guid))
-        guid_list.append(self._find_tab_data_guid(self._osc_device_guid))
+        if config.midi_enabled:
+            guid_list.append(self._find_tab_data_guid(self._midi_device_guid))
+        if config.osc_enabled:
+            guid_list.append(self._find_tab_data_guid(self._osc_device_guid))
 
         # add the input vjoy
         for device_guid in self._vjoy_input_device_guids:

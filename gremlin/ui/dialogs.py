@@ -188,6 +188,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         super().__init__(parent)
 
         # Actual configuration object being managed
+        self._reload_needed = False # true if UI reload is needed on option changes
         self.config = gremlin.config.Configuration()
         self.setMinimumWidth(400)
 
@@ -251,14 +252,12 @@ class OptionsUi(ui_common.BaseDialogUi):
             else:
                 event.ignore()
 
-        
-            
+           
 
     def _save_on_close_cb(self):
         ''' occurs when the dialog is closed - autosave '''
         self._save_map_cb()
-        eh = gremlin.event_handler.EventListener()
-        eh.config_changed.emit()
+
 
 
     def _tab_changed_cb(self, new_index):
@@ -1011,11 +1010,13 @@ This setting is also available on a profile by profile basis on the profile tab,
     @QtCore.Slot(bool)
     def _midi_enabled(self, checked):
         self.config.midi_enabled = checked
+        self._reload_needed = True
 
     @QtCore.Slot(bool)
     def _osc_enabled(self, checked):
         self.config.osc_enabled = checked
         self.osc_port.setEnabled(checked)
+        self._reload_needed = True
 
 
     def _osc_port(self):

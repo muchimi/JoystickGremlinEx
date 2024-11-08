@@ -186,6 +186,9 @@ Joystick Gremlin EX
 
 
 ## 13.40.16ex (pre-release)
+### (m15)
+- Fix: enabled/disabled state of MIDI and OSC inputs did not impact UI such as sort and device visibility.  They now do.
+
 ### (m14)
 - Fix: Gated Axis delete gate does not update range data.
 - Fix: Gated Axis add/remove container or actions in range or gate action could disable input tracking and cause the Gated Axis action to become unresponsive.
