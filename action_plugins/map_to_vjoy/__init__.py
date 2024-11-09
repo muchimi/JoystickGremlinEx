@@ -1103,8 +1103,8 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         # always read the current input as the value could be from another device for merged inputs
         if self.input_type == InputType.JoystickAxis:
             self._axis_repeater_widget.setVisible(True)
+            raw_value = self.action_data.get_raw_axis_value()
             if value is None:
-                raw_value = self.action_data.get_raw_axis_value()
                 # filter and merge the data
                 filtered_value = self.action_data.get_filtered_axis_value(raw_value)
                 value = filtered_value
