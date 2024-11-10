@@ -429,6 +429,7 @@ def joystick_devices_initialization():
     # device: dinput.DILL.DeviceSummary
     for device in devices:
         _joystick_device_guid_map[device.device_guid] = device
+        syslog.info(f"Device: {str(device.device_guid)} {device.name} Axis count: {device.axis_count} Button count: {device.button_count} Hat count: {device.hat_count}")
 
     _joystick_init_lock.release()
 

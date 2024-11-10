@@ -38,19 +38,17 @@ def input_to_ui_string(input_type, input_id):
     """
     
     from gremlin.keyboard import key_from_code
-    
 
     if hasattr(input_id, "display_name"):
         # use the built-in function
         return input_id.display_name
-
 
     if input_type == InputType.JoystickAxis:
         try:
             return gremlin.types.AxisNames.to_string(gremlin.types.AxisNames(input_id))
         except gremlin.error.GremlinError:
             return f"Axis {input_id:d}"
-    elif input_type == InputType.KeyboardLatched:
+    if input_type == InputType.KeyboardLatched:
         # input ID contains a Key object
         return input_id.name
     elif input_type in (InputType.Keyboard, InputType.KeyboardLatched):

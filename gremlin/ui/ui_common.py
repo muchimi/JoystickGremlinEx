@@ -597,12 +597,15 @@ class AbstractInputSelector(QtWidgets.QWidget):
                     input_index)
             else:
                 input_value = self.input_item_dropdowns[device_index].currentText()
-            input_type = self._input_type_registry[device_index][input_index]
 
-            if input_type == InputType.JoystickAxis:
-                input_id = gremlin.types.AxisNames.to_enum(input_value).value
-            else:
-                input_id = int(input_value.split()[-1])
+            input_type, input_id = self.input_item_dropdowns[device_index].itemData(input_index)
+
+            # input_type = self._input_type_registry[device_index][input_index]
+
+            # if input_type == InputType.JoystickAxis:
+            #     input_id = gremlin.types.AxisNames.to_enum(input_value).value
+            # else:
+            #     input_id = int(input_value.split()[-1])
 
         return {
             "device_id": device_id,
@@ -618,8 +621,19 @@ class AbstractInputSelector(QtWidgets.QWidget):
         dev_id = self._device_id_registry.index(device_id)
 
         # Retrieve the index of the correct entry in the combobox
-        input_name = gremlin.common.input_to_ui_string(input_type, input_id)
-        entry_id = self.input_item_dropdowns[dev_id].findText(input_name)
+        data = (input_type, input_id)
+
+        # input_name = gremlin.common.input_to_ui_string(input_type, input_id)
+        # entry_id = self.input_item_dropdowns[dev_id].findText(input_name)
+        entry_id = -1
+        # for some reason, findData doesn't work so we iterate manually
+        for index in range(len(self.input_item_dropdowns)):
+            item_data = self.input_item_dropdowns[dev_id].itemData(index)
+            if item_data == data:
+                entry_id = index
+                break
+                    
+            
 
         # Select and display correct combo boxes and entries within
         with QtCore.QSignalBlocker(self.device_dropdown):
@@ -706,12 +720,13 @@ class AbstractInputSelector(QtWidgets.QWidget):
                     input_id = i+1
                     if input_type == InputType.JoystickAxis:
                         input_id = device.axis_map[i].axis_index
-
-                    s_ui = gremlin.common.input_to_ui_string(
-                        input_type,
-                        input_id
-                    )
-                    selection.addItem(s_ui)
+                        s_ui = f"Axis {device.axis_names[i]}"
+                    else:
+                        s_ui = gremlin.common.input_to_ui_string(
+                            input_type,
+                            input_id
+                        )
+                    selection.addItem(s_ui, (input_type, input_id))
                     
                     self._input_type_registry[-1].append(input_type)
 

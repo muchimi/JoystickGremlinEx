@@ -121,7 +121,9 @@ class _DeviceSummary(ctypes.Structure):
         ("axis_count", ctwt.DWORD),
         ("button_count", ctwt.DWORD),
         ("hat_count", ctwt.DWORD),
-        ("axis_map", _AxisMap * 8)
+        ("axis_map", _AxisMap * 8),
+        ("usage_page", ctwt.WORD),
+        ("usage", ctwt.WORD)
     ]
 
 
@@ -362,6 +364,33 @@ class AxisMap:
         self.linear_index = data.linear_index
         self.axis_index = data.axis_index
 
+    
+    def getName(self) -> str:
+        ''' gets the name of the axis based on its axis index '''
+        axis_index = self.axis_index
+        match axis_index:
+            case 0:
+                return ""
+            case 1:
+                return "(1) X"
+            case 2: 
+                return "(2) Y"
+            case 3:
+                return "(3) Z"
+            case 4:
+                return "(4) RX"
+            case 5:
+                return "(5) RY"
+            case 6:
+                return "(6) RZ"
+            case 7:
+                return "(7) S1"
+            case 8:
+                return "(8) S2"
+            
+        return f"Invalid: {self.axis_index}"
+            
+
 
 class DeviceSummary:
 
@@ -389,8 +418,21 @@ class DeviceSummary:
         self.button_count = data.button_count
         self.hat_count = data.hat_count
         self.axis_map = []
+        self.usage_page = data.usage_page
+        self.usage = data.usage
+        self.axis_names = []
+        logical_count = 0
         for i in range(8):
-            self.axis_map.append(AxisMap(data.axis_map[i]))
+            axis_map = AxisMap(data.axis_map[i])
+            self.axis_map.append(axis_map)
+            axis_name = axis_map.getName()
+            if not axis_name:
+                # axis name is not reporting in via directinput
+                axis_name = f"({i+1})"
+                #axis_name = f"({logical_count}/{i}/{axis_map.linear_index}/{axis_map.axis_index})"
+            else:
+                logical_count += 1
+            self.axis_names.append(axis_name)
         self.vjoy_id = -1
         
     @property

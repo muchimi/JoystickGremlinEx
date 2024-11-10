@@ -53,7 +53,7 @@ class InputIdentifier:
 
     """Represents the identifier of a single input item."""
 
-    def __init__(self, input_type, device_guid, input_id, device_type):
+    def __init__(self, input_type, device_guid, input_id, device_type, input_name):
         """Creates a new instance.
 
         :param input_type the type of input
@@ -65,6 +65,7 @@ class InputIdentifier:
         self._input_id = input_id
         self._device_type = device_type
         self._input_guid = get_guid() # unique internal GUID for this entry
+        self._input_name = input_name
 
 
     @property
@@ -86,6 +87,14 @@ class InputIdentifier:
     @input_id.setter
     def input_id(self, value):
         self._input_id = value
+
+    @property
+    def input_name(self) -> str:
+        return self._input_name
+    @input_name.setter
+    def input_name(self, value : str):
+        self._input_name = value
+
 
     @property
     def guid(self):
@@ -465,6 +474,7 @@ class InputItemListView(ui_common.AbstractView):
                     data.device_guid,
                     data.input_id,
                     data.device_type,
+                    data.input_name
                 )
 
                 if self.custom_widget_handler:
@@ -1341,7 +1351,8 @@ class InputItemWidget(QtWidgets.QFrame):
             return
         
         if not self._config_external:
-            display_text = self.populate_name(self, self.identifier) if self.populate_name else gremlin.common.input_to_ui_string( self.identifier.input_type,self.identifier.input_id)
+            #display_text = self.populate_name(self, self.identifier) if self.populate_name else gremlin.common.input_to_ui_string( self.identifier.input_type,self.identifier.input_id)
+            display_text = self.populate_name(self, self.identifier) if self.populate_name else self.identifier.input_name
             self._title_widget.setText(display_text)
 
         curve_visible = self.data.input_type == InputType.JoystickAxis
@@ -1424,12 +1435,13 @@ class InputItemWidget(QtWidgets.QFrame):
 
     def findAction(self, action):
         ''' true if the action is found in our containers '''
-        for container in self.data.containers:
-            action_sets = container.get_action_sets()
-            if action_sets:
-                for action_set in action_sets:
-                    if action in action_set:
-                        return True
+        if self.data and self.data.containers:
+            for container in self.data.containers:
+                action_sets = container.get_action_sets()
+                if action_sets:
+                    for action_set in action_sets:
+                        if action in action_set:
+                            return True
         return False
 
 

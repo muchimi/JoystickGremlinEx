@@ -1520,6 +1520,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _update_vjoy_device_input_list(self):
         ''' loads a list of valid outputs for the current vjoy device based on the mode '''
         with QtCore.QSignalBlocker(self.cb_vjoy_input_selector):
+
             self.cb_vjoy_input_selector.clear()
             input_type = self._get_selector_input_type()
             action_mode = self._get_action_mode()
@@ -1528,7 +1529,9 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             if action_mode in (VjoyAction.VJoySetAxis, VjoyAction.VJoyRangeAxis, VjoyAction.VJoyAxis, VjoyAction.VJoyInvertAxis, VjoyAction.VjoyMergeAxis):
                 count = dev.axis_count
                 for id in range(1, count+1):
-                    self.cb_vjoy_input_selector.addItem(f"Axis {id} ({self.get_axis_name(id)})",id)
+                    axis_name = dev.axis_names[id-1]
+                    self.cb_vjoy_input_selector.addItem(f"Axis {axis_name}",id)
+                    #self.cb_vjoy_input_selector.addItem(f"Axis {id} ({self.get_axis_name(id)})",id)
             elif input_type in (VJoyWidget.input_type_buttons) or action_mode == VjoyAction.VJoyAxisToButton:
                 count = dev.button_count
                 for id in range(1, count+1):
@@ -2457,7 +2460,8 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         self.vjoy_axis_id = 1
         self.vjoy_button_id = 1
         self.vjoy_hat_id = 1
-     
+        self.vjoy_device_guid = None 
+
         self._reverse : bool = False
         self.axis_mode = "absolute"
         self.axis_scaling : float  = 1.0

@@ -186,6 +186,11 @@ Joystick Gremlin EX
 
 
 ## 13.40.16ex (pre-release)
+### (m18)
+- Improved: GremlinEx will attempt to derive the axis usage name (X, Y, Z, RX, RY, RZ, SL1, SL2) as reported by DirectInput. While many device report as expected, some do not report necessarily report a usage via DirectInput, in which case the derived name of the axis will be its axis sequence number (1 to 8).  Names are informational only.  GremlinEx will always use the hardware input IDs for mapping.
+- Improved: GremlinEx considers axis names when a VJOY definition has skipped axes
+- API: VJOYSelector is now based on data instead of naming conventions  
+
 ### (m17)
 - Fix: action icon not always updating when adding, changing or removing an action/container.
 - Fix: usage icons on map to vjoy button grid update on profile load

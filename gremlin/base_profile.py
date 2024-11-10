@@ -727,6 +727,7 @@ class InputItem():
         self._device_guid = None # hardware input ID
         self._name = None # device name
         self._input_id = None # input Id on the hardware
+        self._input_name = None # input name of the hardware (axis name if an axis)
         self.always_execute = False
         self._description = ""
         #self._containers = base_classes.TraceableList(callback = self._container_change_cb) # container
@@ -778,6 +779,10 @@ class InputItem():
     def description(self, value):
         self._description = value
         
+    @property
+    def input_name(self) -> str:
+        ''' input name as computed based on device, type and input id'''
+        return self._input_name
 
     @property
     def selected(self) -> bool:
@@ -822,7 +827,7 @@ class InputItem():
     @input_type.setter
     def input_type(self, value):
         self._input_type = value
-        self._register_axis()
+        self._update_input()
 
 
     @property
@@ -831,7 +836,9 @@ class InputItem():
     @input_id.setter
     def input_id(self, value):
         self._input_id = value
-        self._register_axis()
+        self._update_input()
+
+            
 
     @property
     def device_guid(self):
@@ -839,7 +846,7 @@ class InputItem():
     @device_guid.setter
     def device_guid(self, value):
         self._device_guid = value
-        self._register_axis()
+        self._update_input()
 
     @property
     def profile_mode(self):
@@ -879,7 +886,7 @@ class InputItem():
     def curve_data(self, value : gremlin.curve_handler.AxisCurveData):
         ''' axis curve data'''
         self._curve_data = value
-        self._register_axis()
+        self._update_input()
 
     @property
     def is_curve(self) -> bool:
@@ -902,10 +909,33 @@ class InputItem():
 
     
 
-    def _register_axis(self):
-        if self._input_type == InputType.JoystickAxis and self._input_id is not None and self._device_guid is not None:
-            eh = gremlin.event_handler.EventListener()
-            eh.registerInput(self)
+    def _update_input(self):
+        ''' updates input name and registers an axis input if needed '''
+        from gremlin.keyboard import key_from_code
+        self._input_name = None
+        input_id = self._input_id
+        if input_id is not None and self._device_guid is not None:
+            if self._input_type == InputType.JoystickAxis:
+                eh = gremlin.event_handler.EventListener()
+                eh.registerInput(self)
+                info = gremlin.joystick_handling.device_info_from_guid(self._device_guid)
+                if info:
+                    self._input_name = f"Axis {info.axis_names[input_id-1]}"
+                else:
+                    self._input_name = f"Axis {input_id}"
+            elif self._input_type == InputType.JoystickButton:
+                self._input_name = f"Button {input_id}"
+            elif self._input_type == InputType.JoystickHat:
+                self._input_name = f"Hat {input_id}"
+
+            elif self._input_type in (InputType.Keyboard, InputType.KeyboardLatched):
+                if isinstance(input_id, gremlin.keyboard.Key):
+                    self._input_name = key_from_code(input_id.scan_code, input_id.is_extended).name
+                
+                self._input_name =  key_from_code(input_id[0],input_id[1]).name
+            else:
+                self._input_name = f"{InputType.to_string(self._input_type).capitalize()} {input_id}"
+            
     
 
     def from_xml(self, node):
