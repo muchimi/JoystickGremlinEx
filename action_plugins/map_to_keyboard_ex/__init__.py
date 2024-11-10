@@ -358,16 +358,25 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
     def process_event(self, event, value):
         if event.event_type == InputType.JoystickAxis or value.current:
             # joystick values or virtual button
+            verbose = gremlin.config.Configuration().verbose
+            
             if self.mode == KeyboardOutputMode.Release:
+                if verbose:
+                    logging.getLogger("system").info(f"MapToKeyboardEx: release")
+                self.is_pressed = False
                 gremlin.macro.MacroManager().queue_macro(self.release)
-            elif self.mode == KeyboardOutputMode.Press and not self.is_pressed:
+            elif self.mode == KeyboardOutputMode.Press:
                 # press mode and not already triggered
                 self.is_pressed = True
+                if verbose:
+                    logging.getLogger("system").info(f"MapToKeyboardEx: press")
                 gremlin.macro.MacroManager().queue_macro(self.press)
 
             elif self.mode == KeyboardOutputMode.Both:
                 # make and break with delay
                 if not self.is_pressed:
+                    if verbose:
+                        logging.getLogger("system").info(f"MapToKeyboardEx: both")
                     gremlin.macro.MacroManager().queue_macro(self.delay_press_release)
                     self.is_pressed = True
 

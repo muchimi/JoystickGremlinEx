@@ -22,6 +22,7 @@ import time
 from lxml import etree as ElementTree
 
 import gremlin
+import gremlin.config
 import gremlin.ui.ui_common
 import gremlin.ui.input_item
 from gremlin.ui.input_item import AbstractContainerWidget, AbstractActionWidget
@@ -186,6 +187,9 @@ class ChainContainerFunctor(gremlin.base_classes.AbstractFunctor):
                 self.index = 0
             self.last_execution = time.time()
 
+        verbose = gremlin.config.Configuration().verbose
+        if verbose:
+            logging.getLogger("system").info(f"Chain: index {self.index}")
         result = self.action_sets[self.index].process_event(event, value)
 
         if (self.switch_on_press and value.current) or not value.current:
