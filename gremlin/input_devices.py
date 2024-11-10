@@ -30,6 +30,7 @@ from PySide6 import QtCore
 
 import gremlin.config
 import gremlin.gamepad_handling
+import gremlin.joystick_handling
 from gremlin.types import GamePadOutput
 
 import gremlin.keyboard
@@ -41,7 +42,6 @@ from gremlin.util import get_guid
 import gremlin.input_types
 
 from . import error
-import gremlin.joystick_handling
 
 import win32api
 import gremlin.sendinput, gremlin.tts
@@ -1703,8 +1703,9 @@ class VJoyPlugin:
     For a function to use this plugin it requires one of its parameters
     to be named "vjoy".
     """
-    
 
+
+    
     vjoy = gremlin.joystick_handling.VJoyProxy()
 
     def __init__(self):

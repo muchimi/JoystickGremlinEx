@@ -24,9 +24,6 @@ from threading import Thread, Timer
 from typing import Callable
 
 
-
-
-import gremlin.joystick_handling
 import gremlin.threading
 
 from PySide6 import QtCore, QtWidgets
@@ -1540,3 +1537,6 @@ class EventHandler(QtCore.QObject):
 		return callback
 
 
+@gremlin.singleton_decorator.SingletonDecorator
+class VjoyRemapEventHandler(QtCore.QObject):
+    grid_changed = QtCore.Signal() # occurs when a grid was updated

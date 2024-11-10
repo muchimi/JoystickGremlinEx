@@ -21,6 +21,7 @@ import threading
 import time
 from lxml import etree as ElementTree
 
+import gremlin.joystick_handling
 from gremlin.util import load_icon
 from PySide6 import QtWidgets
 
@@ -34,6 +35,7 @@ from gremlin.ui import ui_common
 import gremlin.ui.input_item
 import os
 from gremlin.util import *
+import gremlin.event_handler
 
 class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
@@ -212,6 +214,9 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             vjoy_data = self.vjoy_selector.get_selection()
             # input_type_changed = \
             #     self.action_data.input_type != vjoy_data["input_type"]
+
+            current_id = self.action_data.vjoy_input_id
+
             self.action_data.vjoy_device_id = vjoy_data["device_id"]
             self.action_data.vjoy_input_id = vjoy_data["input_id"]
             self.action_data.input_type = vjoy_data["input_type"]
@@ -224,9 +229,45 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
             # Signal changes
             #if input_type_changed:
+
+            usage_data = gremlin.joystick_handling.VJoyUsageState()
+            if current_id is not None and current_id != -1:
+                usage_data.set_state(self.action_data.vjoy_device_id, 
+                                 self.action_data.input_type,
+                                 current_id,
+                                 False
+                                 )
+
+
+            usage_data.set_state(self.action_data.vjoy_device_id, 
+                                 self.action_data.input_type,
+                                 self.action_data.vjoy_input_id,
+                                 True
+                                 )
+
+            eh = gremlin.event_handler.VjoyRemapEventHandler()
+            eh.grid_changed.emit()
+
             self.action_modified.emit()
+            self.notify_device_changed()
+
         except gremlin.error.GremlinError as e:
             log_sys_error(e)
+
+
+    def notify_device_changed(self):
+        state = gremlin.joystick_handling.VJoyUsageState()
+        el = gremlin.event_handler.EventListener()
+        event = gremlin.event_handler.DeviceChangeEvent()
+        event.device_guid = state._active_device_guid
+        event.device_name = state._active_device_name
+        event.device_input_type = self.action_data.input_type
+        event.device_input_id = state._active_device_input_id
+        event.vjoy_device_id = self.action_data.vjoy_device_id
+        event.vjoy_input_id = self.action_data.vjoy_input_id
+        event.source = self.action_data
+        el.profile_device_changed.emit(event)
+        el.icon_changed.emit(event)            
 
 
 class RemapFunctor(gremlin.base_classes.AbstractFunctor):

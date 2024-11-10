@@ -37,7 +37,6 @@ from gremlin.util import safe_format, safe_read
 import gremlin.ui.ui_common
 import gremlin.ui.input_item
 import os
-import action_plugins
 import enum
 from gremlin.input_devices import VjoyAction, remote_state
 from gremlin.util import *
@@ -162,7 +161,7 @@ class GridPopupWindow(QtWidgets.QDialog):
 
         self.setWindowTitle("Mapping Details")
 
-        usage_data = VJoyUsageState()
+        usage_data = gremlin.joystick_handling.VJoyUsageState()
         action_map = usage_data.get_action_map(vjoy_device_id, input_type, vjoy_input_id)
         if not action_map:
             self.close()
@@ -191,368 +190,6 @@ class GridPopupWindow(QtWidgets.QDialog):
 
 
         self.setLayout(box)
-
-from gremlin.singleton_decorator import SingletonDecorator
-
-@SingletonDecorator
-class VJoyUsageState():
-
-
-  
-    class MappingData:
-        vjoy_device_id = None
-        vjoy_input_type = None
-        vjoy_input_id = None
-        device_input_type = None
-        device_guid = None
-        device_name = None
-        device_input_id = None
-
-        def __init__(self, vjoy_device_id, input_type, vjoy_input_id, action_data):
-            self.vjoy_device_id = vjoy_device_id
-            self.vjoy_input_type = input_type
-            self.vjoy_input_id = vjoy_input_id
-            
-            device_guid, device_name, dev_input_type, dev_input_id = action_data
-            self.device_guid = device_guid
-            self.device_name = device_name
-            self.device_input_type = dev_input_type
-            self.device_input_id = dev_input_id
-            
-    
-
-    def __init__(self, profile = None):
-
-        el = gremlin.event_handler.EventListener()
-        el.profile_loaded.connect(self.ensure_profile)
-
-        ''' tracks assigned VJOY functions '''
-        self._free_inputs = None
-        self._device_list = None
-        self._profile = None
-        self._load_list = []
-
-        # holds the mapping by vjoy device, input and ID to a list of raw hardware defining the mapping
-        self._action_map = None
-
-        # list of users buttons by vjoy device ID
-        self._used_map = {}
-        # list of unused buttons by vjoy device ID
-        self._unused_map = {}
-
-        self._active_device_guid = None # guid of the hardware device
-        self._active_device_name = None # name of the hardware device
-        self._active_device_input_type = 0 # type of selected hardware input (axis, button or hat)
-        self._active_device_input_id = 0 # id of the function on the hardware device (button #, hat # or axis #)
-    
-        self._axis_invert_map = {} # holds map of inverted axes for output
-        self._axis_range_map = {} # holds active axis range maps        
-
-        if profile:
-            profile = gremlin.shared_state.current_profile
-            self.set_profile(profile)
-        
-        if not self._device_list:
-            self._device_list = gremlin.joystick_handling.vjoy_devices()
-
-        # listen for active device changes
-        el = gremlin.event_handler.EventListener()
-        el.profile_device_changed.connect(self._profile_device_changed)
-        self.ensure_vjoy()
-
-
-    def _profile_device_changed(self, event):
-        self._active_device_guid = event.device_guid
-        self._active_device_name = event.device_name
-        self._active_device_input_type = event.device_input_type
-        self._active_device_input_id = event.device_input_id
-        
-
-    def push_load_list(self, device_id, input_type, input_id):
-        ''' ensure data loaded by this profile is updated the first time through '''
-        self._load_list.append((device_id, input_type, input_id))
-
-    def ensure_profile(self):
-        if not self._profile or gremlin.shared_state.current_profile != self._profile:
-            self.set_profile(gremlin.shared_state.current_profile)
-
-            for device_id, input_type, input_id in self._load_list:
-                self.set_state(device_id, input_type, input_id, True)
-            self._load_list.clear()
-
-    def ensure_vjoy(self):
-        ''' ensures the inversion map is loaded '''
-        if not self._axis_invert_map:
-            joystick_handling.joystick_devices_initialization()
-            devices = joystick_handling.vjoy_devices()
-            if devices:
-                for dev in devices:
-                    dev_id = dev.vjoy_id
-                    self._axis_invert_map[dev_id] = {}
-                    self._axis_range_map[dev_id] = {}
-                    for axis_id in range(1, dev.axis_count+1):
-                        self._axis_invert_map[dev_id][axis_id] = False
-                        self._axis_range_map[dev_id][axis_id] = [-1.0, 1.0]
-
-    def set_inverted(self, device_id, input_id, inverted):
-        ''' sets the inversion flag for a given vjoy device '''
-        if device_id in self._axis_invert_map:
-            vjoy = self._axis_invert_map[device_id]
-            if input_id in vjoy:
-                vjoy[input_id] = inverted
-        
-    def is_inverted(self, device_id, input_id):
-        ''' returns true if the specified device/axis is inverted '''
-        return self._axis_invert_map[device_id][input_id]
-    
-    def toggle_inverted(self, device_id, input_id):
-        ''' toggles inversion state of specified device/axis is inverted '''
-        if input_id in self._axis_invert_map[device_id]:
-            self._axis_invert_map[device_id][input_id] = not self._axis_invert_map[device_id][input_id]
-            log_sys(f"Vjoy Axis {device_id} {input_id} inverted state: {self._axis_invert_map[device_id][input_id]}")
-        else:
-            logging.getLogger("system").error(f"Vjoy Axis invert: {device_id} - axis {input_id} is not a valid output axis.")
-
-    def set_range(self, device_id, input_id, min_range = -1.0, max_range = 1.0):
-        ''' sets the axis min/max range for the active range computation '''
-        if min_range > max_range:
-            r = min_range
-            min_range = max_range
-            max_range = r
-        if input_id in self._axis_invert_map[device_id]:
-            self._axis_range_map[device_id][input_id] = [min_range, max_range]
-
-    def get_range(self, device_id, input_id):
-        ''' gets the current range for an axis (min,max)'''
-        return self._axis_range_map[device_id][input_id]
-    
-
-
-
-
-    def set_profile(self, profile):
-        ''' loads profile data and free input lists'''
-        if profile != self._profile:
-            self._profile = profile
-            self._load_inputs()
-            # self._free_inputs = self._profile.list_unused_vjoy_inputs()
-
-            for device_id in self._free_inputs.keys():
-                used = []
-
-
-
-
-    def map_input_type(self, input_type) -> str:
-        if isinstance(input_type, InputType):
-            if input_type in VJoyWidget.input_type_buttons:
-                name = "button"
-            elif input_type == InputType.JoystickAxis:
-                name = "axis"
-            elif input_type == InputType.JoystickHat:
-                name = "hat"
-        else:
-            name = input_type
-        return name
-    
-    def get_count(self, device_id, input_type):
-        self.ensure_profile()
-        name = self.map_input_type(input_type)
-        dev = next((d for d in self._device_list if d.vjoy_id == device_id), None)
-        if dev:
-            if name == "axis":
-                return dev.axis_count
-            elif name == "button":
-                return dev.button_count
-            elif name == "hat":
-                return dev.hat_count
-        return 0
-
-    def set_state(self, device_id, input_type, input_id, state):
-        ''' sets the state of the device '''
-        self.ensure_profile()
-        name = self.map_input_type(input_type)
-        unused_list = self._free_inputs[device_id][name]
-        if state:
-            if input_id in unused_list:
-                unused_list.remove(input_id)
-                #print(f"Set state: device: {device_id} type: {name} id: {input_id}")
-        else:
-            # clear state
-            if not input_id in unused_list:
-                unused_list.append(input_id)
-                unused_list.sort()
-                #print(f"Clear state: device: {device_id} type: {name} id: {input_id}")
-
-                
-
-    def get_state(self, device_id, input_type, input_id):
-        ''' returns the current usage state of the input '''
-        self.ensure_profile()
-        unused_list = self._free_inputs[device_id][input_type]
-        if input_id in unused_list:
-            return False
-        return True
-    
-    
-    
-
-    def used_list(self, device_id, input_type):
-        ''' returns a list of used joystick IDs for the specified vjoy'''
-        self.ensure_profile()
-        name = self.map_input_type(input_type)
-        unused_list = self._free_inputs[device_id][name]
-        count = self.get_count(device_id, input_type)
-        if count > 0:
-            return [id for id in range(1, count+1) if not id in unused_list]
-        return []
-    
-    def unused_list(self, device_id, input_type):
-        ''' returns a list of unused input IDs for the specified vjoy'''
-        self.ensure_profile()
-        name = self.map_input_type(input_type)
-        unused_list = self._free_inputs[device_id][name]
-        return unused_list
-
-    @property
-    def free_inputs(self):
-        return self._free_inputs
-    
-    @property
-    def device_list(self):
-        return self._device_list
-    
-    @property
-    def input_count(self, device_id, input_type):
-        ''' returns the number of input counts for a given vjoy ID and type (axis, button or hat)
-        
-        :device_id:
-            device ID, first VJOY is index 1
-
-        :input_type: InputType enum
-            
-        
-        '''
-        return self.get_count(device_id,input_type)
-    
-
-
-    def _load_inputs(self):
-        """Returns a list of unused vjoy inputs for the given profile.
-
-        :return dictionary of unused inputs for each input type
-        """
-
-
-
-
-        vjoy_devices = joystick_handling.vjoy_devices()
-        devices = self._profile.devices
-        # action_plugins = gremlin.plugin_manager.ActionPlugins()
-
-        def extract_remap_actions(action_sets):
-            """Returns a list of remap actions from a list of actions.
-
-            :param action_sets set of actions from which to extract Remap actions
-            :return list of Remap actions contained in the provided list of actions
-            """
-            remap_actions = []
-            for actions in [a for a in action_sets if a is not None]:
-                for action in actions:
-                    if isinstance(action, action_plugins.remap.Remap) or isinstance(action, VjoyRemap):
-                        remap_actions.append(action)
-            return remap_actions
-
-        # List all input types
-        all_input_types = InputType.to_list()
-
-        # Create list of all inputs provided by the vjoy devices
-        vjoy = {}
-        for entry in vjoy_devices:
-            vjoy[entry.vjoy_id] = {}
-            for input_type in all_input_types:
-                vjoy[entry.vjoy_id][InputType.to_string(input_type)] = []
-            for i in range(entry.axis_count):
-                vjoy[entry.vjoy_id]["axis"].append(
-                    entry.axis_map[i].axis_index
-                )
-            for i in range(entry.button_count):
-                vjoy[entry.vjoy_id]["button"].append(i+1)
-            for i in range(entry.hat_count):
-                vjoy[entry.vjoy_id]["hat"].append(i+1)
-
-
-
-        # Create a list of all used remap actions
-        remap_actions = []
-        for dev in devices.values():
-            for mode in dev.modes.values():
-                for input_type in all_input_types:
-                    for item in mode.config[input_type].values():
-                        for container in item.containers:
-                            action_list = extract_remap_actions(container.action_sets)
-                            remap_actions.append([dev, input_type, item.input_id, action_list])
-        
-        action_map = {}
-        # Remove all remap actions from the list of available inputs
-        for dev, input_type, input_id, actions in remap_actions:
-            # Skip remap actions that have invalid configuration
-            if not actions:
-                # no actions found
-                continue
-            
-            for action in actions:
-                type_name = InputType.to_string(action.input_type)
-                if action.vjoy_input_id in [0, None] \
-                        or action.vjoy_device_id in [0, None] \
-                        or action.vjoy_input_id not in vjoy[action.vjoy_device_id][type_name]:
-                    continue
-
-                vjoy_device_id = action.vjoy_device_id
-                vjoy_input_id = action.vjoy_input_id
-
-                if not vjoy_device_id in action_map.keys():
-                    action_map[vjoy_device_id] = {}
-                if not input_type in action_map[vjoy_device_id].keys():
-                    action_map[vjoy_device_id][input_type] = {}
-
-                if not vjoy_input_id in action_map[vjoy_device_id][input_type].keys():
-                    action_map[vjoy_device_id][input_type][vjoy_input_id] = []
-
-                action_map[vjoy_device_id][input_type][vjoy_input_id].append([dev.device_guid, dev.name, input_type, input_id])
-
-                idx = vjoy[action.vjoy_device_id][type_name].index(action.vjoy_input_id)
-                del vjoy[action.vjoy_device_id][type_name][idx]
-
-        self._free_inputs = vjoy
-        self._action_map = action_map
-
-    def get_action_map(self, vjoy_device_id, input_type, input_id):
-        ''' gets what's mapped to a vjoy device by input type and input id '''
-        if not self._action_map:
-            self._load_inputs()
-
-        if not vjoy_device_id in self._action_map.keys():
-            # no mappings for this vjoy device
-            return []
-        if not input_type in self._action_map[vjoy_device_id].keys():
-            # no mappings for this type of input
-            return []
-        if not input_id in self._action_map[vjoy_device_id][input_type]:
-            # no mapping for this specific id
-            return []
-        
-        action_map = []
-        for action_data in self._action_map[vjoy_device_id][input_type][input_id]:
-            data = self.MappingData(vjoy_device_id, input_type, input_id, action_data)
-            action_map.append(data)
-
-        return action_map
-
-usage_data = VJoyUsageState()
-
-
-
 
 
 
@@ -601,7 +238,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
             self.grid_visible_widget = None
 
-            self.usage_state = VJoyUsageState()
+            self.usage_state = gremlin.joystick_handling.VJoyUsageState()
 
             self.main_layout.setSpacing(0)
 
@@ -644,6 +281,11 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             self._update_ui_action_mode(self.action_data)
 
             self.main_layout.setContentsMargins(0, 0, 0, 0)
+
+
+            eh = gremlin.event_handler.VjoyRemapEventHandler()
+            eh.grid_changed.connect(self.refresh_grid)
+
         finally:
             VJoyWidget.locked = False
 
@@ -1196,7 +838,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _create_info(self):
         ''' shows what device is currently selected '''
-        state = VJoyUsageState()
+        state = gremlin.joystick_handling.VJoyUsageState()
         header  =  QtWidgets.QWidget()
         box = QtWidgets.QVBoxLayout(header)
         box.addWidget(QtWidgets.QLabel(state._active_device_name))
@@ -1498,12 +1140,17 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             input_id = self.cb_vjoy_input_selector.itemData(index)
             self.action_data.set_input_id(input_id)
             #self._update_ui_action_mode(self.action_data.action_mode)
-            self._populate_grid(self.action_data.vjoy_device_id, input_id)
+            eh = gremlin.event_handler.VjoyRemapEventHandler()
+            eh.grid_changed.emit()
+            #self._populate_grid(self.action_data.vjoy_device_id, input_id)
             self.notify_device_changed()
 
+    def refresh_grid(self):
+        ''' refreshes the grid '''
+        self._populate_grid(self.action_data.vjoy_device_id, self.action_data.vjoy_input_id )
 
     def notify_device_changed(self):
-        state = VJoyUsageState()
+        state = gremlin.joystick_handling.VJoyUsageState()
         el = gremlin.event_handler.EventListener()
         event = gremlin.event_handler.DeviceChangeEvent()
         event.device_guid = state._active_device_guid
@@ -1816,20 +1463,12 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.cb_vjoy_input_selector.setCurrentIndex(id-1)
 
         # update the grid icons
-        self._populate_grid(self.action_data.vjoy_device_id,id)
+        #self._populate_grid(self.action_data.vjoy_device_id,id)
+        eh = gremlin.event_handler.VjoyRemapEventHandler()
+        eh.grid_changed.emit()
         
         # update the UI when a state change occurs
-        el = gremlin.event_handler.EventListener()
-        event = gremlin.event_handler.DeviceChangeEvent()
-
-        state = VJoyUsageState()
-        event.device_guid = state._active_device_guid
-        event.device_name = state._active_device_name
-        event.device_input_type = state._active_device_input_type
-        event.device_input_id = state._active_device_input_id
-        event.input_type = self.action_data.input_type
-        event.input_id = id
-        el.profile_device_mapping_changed.emit(event)
+        self.notify_device_changed()
 
 
     def _populate_ui(self):
@@ -2112,10 +1751,12 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
     @property
     def reverse(self):
         # axis reversed state
+        usage_data = gremlin.joystick_handling.VJoyUsageState()
         return usage_data.is_inverted(self.vjoy_device_id, self.vjoy_input_id)
         
     def toggle_reverse(self):
         # toggles reverse mode for the axis
+        usage_data = gremlin.joystick_handling.VJoyUsageState()
         value = usage_data.is_inverted(self.vjoy_device_id, self.vjoy_input_id)
         usage_data.set_inverted(self.vjoy_device_id, self.vjoy_input_id, not value)
         log_sys(f"toggle reverse: {self.vjoy_device_id} {self.vjoy_input_id} new state: {self.reverse}")
@@ -2134,6 +1775,7 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
             joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = self.start_pressed
         if self.input_type == InputType.JoystickAxis:
             # set start axis range
+            usage_data = gremlin.joystick_handling.VJoyUsageState()
             usage_data.set_range(self.vjoy_device_id, self.vjoy_input_id, self.range_low, self.range_high)
             # print(f"Axis start value: vjoy: {self.vjoy_device_id} axis: {self.vjoy_input_id}  value: {self.axis_start_value}")
             match self.action_mode:
@@ -2215,6 +1857,7 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
     def _process_event(self, event, value):
         ''' runs when a joystick even occurs like a button press or axis movement when a profile is running '''
         (is_local, is_remote) = input_devices.remote_state.state
+        usage_data = gremlin.joystick_handling.VJoyUsageState()
         if event.force_remote:
             # force remote mode on if specified in the event
             is_remote = True
@@ -2648,10 +2291,12 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
     @property
     def reverse(self):
         # axis reversed state
+        usage_data = gremlin.joystick_handling.VJoyUsageState()
         return usage_data.is_inverted(self.vjoy_device_id, self.vjoy_axis_id) or self._reverse
         
     @reverse.setter
     def reverse(self,value):
+        usage_data = gremlin.joystick_handling.VJoyUsageState()
         usage_data.set_inverted(self.vjoy_device_id, self.vjoy_axis_id, value)
         self._reverse = value
 
@@ -2778,7 +2423,7 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
 
 
             # hack to sync all loaded profile setups with the status grid
-            usage_data = VJoyUsageState()
+            usage_data = gremlin.joystick_handling.VJoyUsageState()
             usage_data.push_load_list(self.vjoy_device_id,self.input_type,self.vjoy_input_id)
             
             
