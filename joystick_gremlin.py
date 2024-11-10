@@ -115,7 +115,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.16ex (m16)"
+APPLICATION_VERSION = "13.40.16ex (m17)"
 
 # the main ui
 ui = None
@@ -939,6 +939,8 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         # Update everything to the new mode
         #self._mode_configuration_changed()
+
+
 
         popCursor()
 
@@ -2507,6 +2509,10 @@ class GremlinUi(QtWidgets.QMainWindow):
             gremlin.util.display_error(f"Failed to load the profile {fname} due to:\n\n{error}")
 
         finally:
+
+            eh = gremlin.event_handler.EventListener()
+            eh.profile_loaded.emit()
+
             # update the status bar
             self._update_mode_status_bar()
             self._update_window_title()

@@ -20,7 +20,6 @@ from PySide6 import QtWidgets, QtCore, QtGui
 import lxml.etree
 
 import gremlin
-import gremlin.base_profile
 import gremlin.config
 
 import gremlin.event_handler
@@ -525,7 +524,7 @@ class InputItemListView(ui_common.AbstractView):
         data = self.model.data(index)
         item = self.scroll_layout.itemAt(index)
         if item is not None:
-            widget = self.scroll_layout.itemAt(index).widget()
+            widget = item.widget()
             if self.custom_widget_handler:
                 widget.update_display()
             elif widget is not None:
@@ -1040,6 +1039,7 @@ class InputItemWidget(QtWidgets.QFrame):
         self._title_container_layout.setVerticalSpacing(0)
 
         self.identifier = identifier
+        self.data = data
         self._selected = False
         self._index = None # assigned widget index
 
@@ -1186,6 +1186,60 @@ class InputItemWidget(QtWidgets.QFrame):
         self.main_layout.addWidget(self._container_widget)
         self.update_display()
 
+
+        el = gremlin.event_handler.EventListener()
+        el.action_created.connect(self._action_changed_cb)
+        el.action_delete.connect(self._action_deleted_cb)
+        el.icon_changed.connect(self._icon_changed_cb)
+        el.mapping_changed.connect(self._mapping_changed_cb)
+
+
+    @QtCore.Slot(object)
+    def _icon_changed_cb(self, event : gremlin.event_handler.DeviceChangeEvent):
+        action = event.source
+        if isinstance(action, gremlin.base_profile.AbstractAction):
+            if self.findAction(action):
+                # update the action
+                self.create_action_icons(self.data)
+
+
+    
+    @QtCore.Slot(object)
+    def _action_changed_cb(self, event):
+        ''' occurs when an action is added or changed '''
+        if isinstance(event,gremlin.base_profile.AbstractAction):
+            action = event
+        elif isinstance(event,gremlin.event_handler.DeviceChangeEvent):
+            action = event.source
+        else:
+            return
+        if isinstance(action, gremlin.base_profile.AbstractAction):
+            if self.findAction(action):
+                # update the action
+                self.create_action_icons(self.data)
+
+    @QtCore.Slot(object, object, object)
+    def _action_deleted_cb(self, item_dat, container, action):
+        ''' occurs when an action is deleted '''
+        if self.findAction(action):
+            # find the widget corresponding to this action
+            self.create_action_icons(self.data)
+            # for i in range(self._icon_layout.count()):
+            #     item = self._icon_layout.itemAt(i)
+            #     if item:
+            #         widget = item.widget()
+            #         if widget:
+            #             if isinstance(widget, ui_common.ActionLabel):
+            #                 if widget.action_entry == action:
+            #                     self._icon_layout.removeWidget(widget)
+            #                     self._icon_layout.update()
+            #                     return
+    @QtCore.Slot(object)
+    def _mapping_changed_cb(self, item_data):
+        if item_data == self.data:
+            self.create_action_icons(self.data)
+        
+                
 
     def update_curve_icon(self, enabled : bool):
         ''' enables or disables curve buttons '''
@@ -1364,7 +1418,19 @@ class InputItemWidget(QtWidgets.QFrame):
                     for action in actions:
                         if action is not None:
                             self._icon_layout.addWidget(ui_common.ActionLabel(action))
+
+                    
             
+
+    def findAction(self, action):
+        ''' true if the action is found in our containers '''
+        for container in self.data.containers:
+            action_sets = container.get_action_sets()
+            if action_sets:
+                for action_set in action_sets:
+                    if action in action_set:
+                        return True
+        return False
 
 
     def mousePressEvent(self, event):

@@ -186,6 +186,14 @@ Joystick Gremlin EX
 
 
 ## 13.40.16ex (pre-release)
+### (m17)
+- Fix: action icon not always updating when adding, changing or removing an action/container.
+- Fix: usage icons on map to vjoy button grid update on profile load
+- Fix: usage icons on map to vjoy button grid show other mappings when clicked
+
+### (m16)
+- Fix: missing raw value in curve  
+
 ### (m15)
 - Fix: enabled/disabled state of MIDI and OSC inputs did not impact UI such as sort and device visibility.  They now do.
 

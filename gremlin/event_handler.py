@@ -195,6 +195,7 @@ class DeviceChangeEvent:
 		self.input_type = 0
 		self.vjoy_device_id = 0
 		self.vjoy_input_id = 0
+		self.source = None # object source responsible for the change, for example, the action
 
 class StateChangeEvent:
 	''' sent when the state changes '''
@@ -247,6 +248,9 @@ class EventListener(QtCore.QObject):
 
 	# Signal emitted when a profile is changed (to refresh UI)
 	profile_changed = QtCore.Signal()
+
+	# profile loaded event
+	profile_loaded =  QtCore.Signal()
 	
 	# signal emitted when the selected hardware device changes
 	profile_device_changed = QtCore.Signal(DeviceChangeEvent)
