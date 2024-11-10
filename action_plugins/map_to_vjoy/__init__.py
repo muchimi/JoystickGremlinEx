@@ -286,6 +286,8 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             eh = gremlin.event_handler.VjoyRemapEventHandler()
             eh.grid_changed.connect(self.refresh_grid)
 
+            self.notify_device_changed()
+
         finally:
             VJoyWidget.locked = False
 

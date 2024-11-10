@@ -323,6 +323,8 @@ class TempoExContainerWidget(AbstractContainerWidget):
                 return (action_sets,i)
         
         return (None, -1)
+    
+
 
     def _handle_interaction(self, widget, action):
         """Handles interaction icons being pressed on the individual actions.
@@ -627,6 +629,10 @@ class TempoExContainer(AbstractContainer):
             node.append(as_node)
 
         return node
+    
+    def is_valid_for_save(self):
+        # indicate always valid for saving
+        return True
 
     def _is_container_valid(self):
         """Returns whether or not this container is configured properly.
