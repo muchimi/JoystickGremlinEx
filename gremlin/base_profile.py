@@ -34,6 +34,7 @@ import gremlin.execution_graph
 import gremlin.keyboard
 import gremlin.profile
 import gremlin.shared_state
+import gremlin.ui.keyboard_device
 from gremlin.util import *
 from gremlin.input_types import InputType
 from gremlin.types import *
@@ -931,8 +932,13 @@ class InputItem():
             elif self._input_type in (InputType.Keyboard, InputType.KeyboardLatched):
                 if isinstance(input_id, gremlin.keyboard.Key):
                     self._input_name = key_from_code(input_id.scan_code, input_id.is_extended).name
-                
-                self._input_name =  key_from_code(input_id[0],input_id[1]).name
+                elif isinstance(input_id, gremlin.ui.keyboard_device.KeyboardInputItem):
+                    self._input_name = input_id.display_name
+                else:
+                    try:
+                        self._input_name =  key_from_code(input_id[0],input_id[1]).name
+                    except:
+                        self._input_name(f"Unable to parse type: {type(input_id).__name__}")
             else:
                 self._input_name = f"{InputType.to_string(self._input_type).capitalize()} {input_id}"
             

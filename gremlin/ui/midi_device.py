@@ -1564,9 +1564,9 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         widget = gremlin.ui.input_item.InputItemWidget(identifier = identifier, populate_ui_callback = self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True, parent = parent)
         input_id : MidiInputItem = identifier.input_id
         widget.create_action_icons(data)
-        widget.setTitle(input_id.title_name)
+        #widget.setTitle(input_id.title_name)
         widget.setInputDescription(input_id.display_name)
-        widget.setDescription(data.description)
+        #widget.setDescription(data.description)
         # widget.setIcon("mdi.midi")
         widget.enable_close()
         widget.enable_edit()
@@ -1609,8 +1609,11 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self._item_data.is_axis = is_axis
         self._item_data.item_data.is_axis = is_axis
 
+        self.input_item_list_view.update_item(index)
+
         #self.input_item_list_view.update_item(index)
         self._select_item_cb(self._index) # forces update and redraw if mode changed
+
 
     def _close_item_cb(self, widget, index, data):
         ''' called when the close button is clicked '''

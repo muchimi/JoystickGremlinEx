@@ -60,7 +60,19 @@ class ContainerCallback:
         execution graph until every entry has run or it is aborted.
         """
         if event.is_axis:
-            value = gremlin.actions.Value(event.curve_value)
+            input_type = event.event_type
+            match input_type:
+                case InputType.JoystickAxis:
+                    value = gremlin.actions.Value(event.curve_value)
+                case InputType.Midi:
+                    value = gremlin.actions.Value(event.value)
+                case InputType.OpenSoundControl:
+                    value = gremlin.actions.Value(event.value)
+                case _:
+                    # nothing to do
+                    return 
+
+
         elif event.event_type == InputType.JoystickHat:
             value = gremlin.actions.Value(event.value)
         elif event.event_type in [
