@@ -195,30 +195,34 @@ class TempoExContainerWidget(AbstractContainerWidget):
 
     def _create_condition_ui(self):
         if self.profile_data.activation_condition_type == "action":
-            if self.profile_data.action_sets[0] is not None:
-                self._create_action_widget(
-                    0,
-                    "Short Press",
-                    self.activation_condition_layout,
-                    gremlin.ui.ui_common.ContainerViewTypes.Condition
-                )
+            if self.profile_data.short_action_sets:
+                action_set = self.profile_data.short_action_sets[0]
+                if action_set is not None:
+                    self._create_action_widget(
+                        action_set,
+                        "Short Press",
+                        self.activation_condition_layout,
+                        gremlin.ui.ui_common.ContainerViewTypes.Condition
+                    )
 
-            if self.profile_data.action_sets[1] is not None:
-                self._create_action_widget(
-                    1,
-                    "Long Press",
-                    self.activation_condition_layout,
-                    gremlin.ui.ui_common.ContainerViewTypes.Condition
-                )
+            if self.profile_data.long_action_sets:
+                action_set = self.profile_data.long_action_sets[0]
+                if action_set is not None:
+                    self._create_action_widget(
+                        action_set,
+                        "Long Press",
+                        self.activation_condition_layout,
+                        gremlin.ui.ui_common.ContainerViewTypes.Condition
+                    )
 
-    def _create_action_widget(self, index, label, layout, view_type):
+    def _create_action_widget(self, action_set, label, layout, view_type):
         """Creates a new action widget.
 
         :param index the index at which to store the created action
         :param label the name of the action to create
         """
         widget = self._create_action_set_widget(
-            self.profile_data.action_sets[index],
+            action_set,
             label,
             view_type
         )
@@ -550,12 +554,12 @@ class TempoExContainer(AbstractContainer):
     #     InputType.JoystickHat,
     #     InputType.Keyboard
     # ]
-    interaction_types = [
-        gremlin.ui.input_item.ActionSetView.Interactions.Up,
-        gremlin.ui.input_item.ActionSetView.Interactions.Down,
-        gremlin.ui.input_item.ActionSetView.Interactions.Edit,
+    interaction_types = []
+    #     gremlin.ui.input_item.ActionSetView.Interactions.Up,
+    #     gremlin.ui.input_item.ActionSetView.Interactions.Down,
+    #     gremlin.ui.input_item.ActionSetView.Interactions.Edit,
         
-    ]
+    # ]
 
     def __init__(self, parent=None):
         """Creates a new instance.

@@ -248,6 +248,9 @@ class EventListener(QtCore.QObject):
 
 	# profile loaded event
 	profile_loaded =  QtCore.Signal()
+
+	# profile unloaded - trigger when a profile is being unloaded
+	profile_unloaded = QtCore.Signal()
 	
 	# signal emitted when the selected hardware device changes
 	profile_device_changed = QtCore.Signal(DeviceChangeEvent)
@@ -287,6 +290,9 @@ class EventListener(QtCore.QObject):
 	
 	# suspend keyboard input
 	suspend_keyboard_input = QtCore.Signal(bool) # arg = state, true = suspend, false = resume
+
+	# called when vjoy button usage has changed in the profile so displays can update themselves
+	button_usage_changed = QtCore.Signal(int)  # (vjoy_device_id) the vjoy device that changed
 
 	
 
@@ -1537,6 +1543,6 @@ class EventHandler(QtCore.QObject):
 		return callback
 
 
-@gremlin.singleton_decorator.SingletonDecorator
-class VjoyRemapEventHandler(QtCore.QObject):
-    grid_changed = QtCore.Signal() # occurs when a grid was updated
+# @gremlin.singleton_decorator.SingletonDecorator
+# class VjoyRemapEventHandler(QtCore.QObject):
+#     grid_changed = QtCore.Signal() # occurs when a grid was updated

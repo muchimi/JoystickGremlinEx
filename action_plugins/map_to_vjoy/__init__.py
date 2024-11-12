@@ -237,6 +237,8 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
                 ]
 
             self.grid_visible_widget = None
+            self.is_button_mode = False  # true if the action is mapping to a button
+            self._grid_widgets = {} # list of checkboxes in the button grid indexed by button id (1...max_button)
 
             self.usage_state = gremlin.joystick_handling.VJoyUsageState()
 
@@ -283,13 +285,21 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.main_layout.setContentsMargins(0, 0, 0, 0)
 
 
-            eh = gremlin.event_handler.VjoyRemapEventHandler()
-            eh.grid_changed.connect(self.refresh_grid)
+            eh = gremlin.event_handler.EventListener()
+            eh.button_usage_changed.connect(self._button_usage_changed)
 
             self.notify_device_changed()
 
         finally:
             VJoyWidget.locked = False
+        
+    @QtCore.Slot(int)
+    def _button_usage_changed(self, vjoy_id):
+        ''' button state changed somewhere '''
+        if vjoy_id == self.action_data.vjoy_device_id:
+            # update if it's our device
+            self.refresh_grid()
+
 
     def _get_selector_input_type(self):
         ''' gets a modified input type based on the current mode '''
@@ -479,8 +489,8 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         device_layout.setColumnStretch(2,2)
         self.container_merge_layout.addLayout(device_layout)
 
-        self.merge_selector_device_widget.currentIndexChanged.connect(self._device_changed_cb)
-        self.merge_selector_input_widget.currentIndexChanged.connect(self._input_changed_cb)
+        self.merge_selector_device_widget.currentIndexChanged.connect(self._merged_device_changed_cb)
+        self.merge_selector_input_widget.currentIndexChanged.connect(self._merged_input_changed_cb)
 
         # populate the selector with hardware inputs
         self.merge_device_map = {} # holds the device information keyed by device_id (str)
@@ -672,7 +682,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._update_axis_widget()                
 
     @QtCore.Slot()
-    def _device_changed_cb(self):
+    def _merged_device_changed_cb(self):
         ''' merge device changed '''
         index = self.merge_selector_device_widget.currentIndex()
         device_id = self.merge_selector_device_widget.itemData(index)
@@ -690,12 +700,14 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         
         
     @QtCore.Slot()
-    def _input_changed_cb(self):
+    def _merged_input_changed_cb(self):
         ''' merge input changed '''
         index = self.merge_selector_input_widget.currentIndex()
         input_id = self.merge_selector_input_widget.itemData(index)
         self.action_data.merge_input_id = input_id
         self.action_modified.emit()
+
+
 
 
     def _profile_start(self):
@@ -1141,9 +1153,10 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         with QtCore.QSignalBlocker(self.cb_vjoy_input_selector):
             input_id = self.cb_vjoy_input_selector.itemData(index)
             self.action_data.set_input_id(input_id)
-            #self._update_ui_action_mode(self.action_data.action_mode)
-            eh = gremlin.event_handler.VjoyRemapEventHandler()
-            eh.grid_changed.emit()
+
+            if self.is_button_mode:
+                self.select_button(self.action_data.vjoy_device_id, input_id)
+            
             #self._populate_grid(self.action_data.vjoy_device_id, input_id)
             self.notify_device_changed()
 
@@ -1290,6 +1303,8 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.cb_vjoy_input_selector.setVisible(selector_visible)
         self.lbl_vjoy_input_selector.setVisible(selector_visible)
 
+        self.is_button_mode = grid_visible
+
         self.action_label.setText(VjoyAction.to_description(action))
 
         
@@ -1378,10 +1393,11 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             h_box = QtWidgets.QHBoxLayout(h_cont)
             h_box.setContentsMargins(0,0,0,0)
             h_box.setAlignment(QtCore.Qt.AlignCenter)
-            cb = QtWidgets.QRadioButton()
+            cb = gremlin.ui.ui_common.QDataRadioButton()
 
             self.button_group.addButton(cb)
             self.button_group.setId(cb, id)
+            cb.data = id # data has the button id
  
             name = str(id)
             h_box.addWidget(cb)
@@ -1435,42 +1451,43 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         popup.exec()
 
 
-    def _select_changed(self, rb):
-        # called when a button is toggled
-        id = self.button_group.checkedId()
-        #id = int(cb.objectName())
-        if self.active_id == id:
-            return
+    def select_button(self, vjoy_id, button_id):
+        ''' selects a button '''
+        
 
         if self.active_id != -1:
-            # clear the old
-            self.usage_state.set_state(self.action_data.vjoy_device_id,
-                                    self.action_data.input_type,
-                                    self.active_id,
-                                    False)
+            # clear the old button if it was previously selected
+            self.usage_state.set_usage_state(vjoy_id, self.active_id, state = False, action = self.action_data, emit = False)
+
+        if self.active_id == button_id:
+            # already selected
+            return
         
-
-        self.usage_state.set_state(self.action_data.vjoy_device_id,
-                                   self.action_data.input_type,
-                                   id,
-                                   True )
-
-
         # set the new
-        self.active_id = id
-        self.action_data.set_input_id(id)
-
+        self.active_id = button_id
+        self.action_data.set_input_id(button_id)
+        
         # update the selector
         with QtCore.QSignalBlocker(self.cb_vjoy_input_selector):
-            self.cb_vjoy_input_selector.setCurrentIndex(id-1)
+            self.cb_vjoy_input_selector.setCurrentIndex(button_id-1)
 
-        # update the grid icons
-        #self._populate_grid(self.action_data.vjoy_device_id,id)
-        eh = gremlin.event_handler.VjoyRemapEventHandler()
-        eh.grid_changed.emit()
-        
+        # update the grid
+        cb = self._grid_widgets[button_id]
+        with QtCore.QSignalBlocker(cb):
+            cb.setChecked(True)
+
+        self.usage_state.set_usage_state(vjoy_id, self.active_id, state = True, action = self.action_data, emit=True)
+
         # update the UI when a state change occurs
         self.notify_device_changed()
+
+
+    def _select_changed(self, rb):
+        # called when a button is toggled
+        vjoy_id = self.action_data.vjoy_device_id
+        button_id = self.button_group.checkedId()
+        self.select_button(vjoy_id, button_id)
+       
 
 
     def _populate_ui(self):
@@ -1527,6 +1544,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
                 index = self.cb_vjoy_input_selector.findData(vjoy_input_id)
                 if index != -1:
                     self.cb_vjoy_input_selector.setCurrentIndex(index)
+            
 
             # set the action type from the input type
             self.load_actions_from_input_type()
@@ -1597,6 +1615,10 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
                 with QtCore.QSignalBlocker(self.chkb_paired):
                     self.chkb_paired.setChecked(self.action_data.paired)
 
+
+                
+
+
             # # populate hardware devices if in merge mode
             # self._populate_hardware()
             # self._populate_hardware_axis()
@@ -1606,6 +1628,9 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             self._populate_grid(vjoy_dev_id, button_id)
             self._update_vjoy_device_input_list()
             self._update_ui_action_mode(self.action_data)
+
+            if is_button_mode:
+                self.select_button(vjoy_dev_id, vjoy_input_id)
 
         except gremlin.error.GremlinError as e:
             util.display_error(
@@ -1687,16 +1712,17 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         ''' updates the usage grid based on current VJOY mappings '''
         used_pixmap = load_pixmap("used.png")
         unused_pixmap = load_pixmap("unused.png")
+        self._grid_widgets = {}
 
         for cb in self.button_group.buttons():
             id = self.button_group.id(cb)
+            self._grid_widgets[id] = cb
+
+            used = self.usage_state.get_usage_state(device_id,id)
 
             if id == button_id:
                 with QtCore.QSignalBlocker(cb):
                     cb.setChecked(True)
-                self.usage_state.set_state(device_id,'button',id,True)
-            
-            used = self.usage_state.get_state(device_id,'button',id)
 
             lbl = self.icon_map[id]
             lbl.setPixmap(used_pixmap if used else unused_pixmap)
@@ -2425,8 +2451,10 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
 
 
             # hack to sync all loaded profile setups with the status grid
-            usage_data = gremlin.joystick_handling.VJoyUsageState()
-            usage_data.push_load_list(self.vjoy_device_id,self.input_type,self.vjoy_input_id)
+            if self.input_type == InputType.JoystickButton:
+                usage_data = gremlin.joystick_handling.VJoyUsageState()
+                usage_data.set_usage_state(self.vjoy_device_id, self.vjoy_input_id, state = True, action = self, emit = False)
+                #usage_data.push_load_list(self.vjoy_device_id,self.input_type,self.vjoy_input_id)
             
             
             self.pulse_delay = 250

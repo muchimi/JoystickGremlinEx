@@ -115,7 +115,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.16ex (m20)"
+APPLICATION_VERSION = "13.40.16ex (m21)"
 
 # the main ui
 ui = None
@@ -897,7 +897,10 @@ class GremlinUi(QtWidgets.QMainWindow):
         """Creates a new empty profile."""
         # Disable Gremlin if active before opening a new profile
 
-        waitCursor()
+        pushCursor()
+
+        
+        
 
         self.ui.actionActivate.setChecked(False)
         self.activate(False)
@@ -908,6 +911,9 @@ class GremlinUi(QtWidgets.QMainWindow):
         gremlin.shared_state.resetState()
         eh = gremlin.event_handler.EventHandler()
         eh.reset()
+
+        el = gremlin.event_handler.EventListener()
+        el.profile_unloaded.emit() # tell the UI we're about to load a new profile
         
         new_profile =  gremlin.base_profile.Profile()
         self.profile = new_profile
@@ -2430,10 +2436,14 @@ class GremlinUi(QtWidgets.QMainWindow):
         # Disable the program if it is running when we're loading a
         # new profile
 
+        pushCursor()
+
         self.ui.actionActivate.setChecked(False)
         self.activate(False)
 
-        pushCursor()
+        el = gremlin.event_handler.EventListener()
+        el.profile_unloaded.emit() # tell the UI we're about to load a new profile
+        
 
         # Attempt to load the new profile
         try:
@@ -2510,8 +2520,8 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         finally:
 
-            eh = gremlin.event_handler.EventListener()
-            eh.profile_loaded.emit()
+
+            el.profile_loaded.emit()
 
             # update the status bar
             self._update_mode_status_bar()

@@ -619,18 +619,19 @@ class AbstractInputSelector(QtWidgets.QWidget):
 
         # Get the index of the combo box associated with this device
         dev_id = self._device_id_registry.index(device_id)
-
-        # Retrieve the index of the correct entry in the combobox
-        data = (input_type, input_id)
-
+        
         # input_name = gremlin.common.input_to_ui_string(input_type, input_id)
         # entry_id = self.input_item_dropdowns[dev_id].findText(input_name)
         entry_id = -1
         # for some reason, findData doesn't work so we iterate manually
-        for index in range(len(self.input_item_dropdowns)):
-            item_data = self.input_item_dropdowns[dev_id].itemData(index)
-            if item_data == data:
+        item_count = self.input_item_dropdowns[dev_id].count()
+        # print (f"looking for: {input_type} {input_id}   count of items: {item_count}")
+        for index in range(item_count):
+            match_input_type, match_input_id = self.input_item_dropdowns[dev_id].itemData(index)
+            # print (f"match: type {match_input_type} id {match_input_id} ")
+            if match_input_type == input_type and match_input_id == input_id:
                 entry_id = index
+                # print ("found!")
                 break
                     
             
@@ -716,7 +717,8 @@ class AbstractInputSelector(QtWidgets.QWidget):
             max_col = 32
          
             for input_type in self.valid_types:
-                for i in range(count_map[input_type](device)):
+                item_count = count_map[input_type](device)
+                for i in range(item_count):
                     input_id = i+1
                     if input_type == InputType.JoystickAxis:
                         input_id = device.axis_map[i].axis_index
@@ -3727,6 +3729,9 @@ class ActionLabel(QtWidgets.QLabel):
         """
         QtWidgets.QLabel.__init__(self, parent)
         icon = action_entry.icon()
+        if icon is None:
+            icon = gremlin.util.load_icon("fa.question-circle-o")
+    
         self._width = 20
         if isinstance(icon, str):
             # convert to icon if a path is given
@@ -3746,6 +3751,8 @@ class ActionLabel(QtWidgets.QLabel):
 
     def _icon_change(self, event):
         icon = self.action_entry.icon()
+        if icon is None:
+            icon = gremlin.util.load_icon("fa.question-circle-o")
         if isinstance(icon, QtGui.QIcon):
             self.setPixmap(QtGui.QPixmap(icon.pixmap(self._width)))
         else:

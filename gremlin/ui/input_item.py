@@ -787,9 +787,15 @@ class ActionSetModel(ui_common.AbstractModel):
 
     def remove_action(self, action):
         if action in self._action_set:
+            el = gremlin.event_handler.EventListener()
+            input_item = action.get_input_item()
+            container = action.get_container()
+            el.action_delete.emit(input_item, container, action)
             if hasattr(action,"_cleanup"):
                 action._cleanup()
             del self._action_set[self._action_set.index(action)]
+            
+            
         self.data_changed.emit()
 
 

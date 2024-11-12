@@ -186,10 +186,16 @@ Joystick Gremlin EX
 
 
 ## 13.40.16ex (pre-release)
+### (m21)
+- Fix: Legacy remap displays blank (or incorrect) value on reload for certain input choices
+- Fix: TempoEx container condition UI invalid index exception when setting conditions based on actions
+- Improved: Refactored button usage tracking
+
 ### (m20)
 - Fix: display details in MIDI inputs would hide details on other entries
 - Fix: MIDI configuration update was not not updating input description consistently
-- Fix: input display fails to update for keyboard entries in m19
+- Fix: input display fails to update for keyboard entries in m19  
+
 
 ### (m19)
 - Improved: legacy remap and map to vjoy actions now synchronize the used data.

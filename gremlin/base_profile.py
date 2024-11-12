@@ -1242,6 +1242,13 @@ class AbstractAction(ProfileData):
         eh.action_delete.disconnect(self._action_delete)
 
 
+    def get_input_item(self):
+        ''' gets the input item owning this action '''
+        input_item = _get_input_item(self.parent_container)
+        return input_item
+    
+    def get_container(self):
+        return self.parent_container
         
 
     def setEnabled(self, value):
