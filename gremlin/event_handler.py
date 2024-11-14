@@ -283,7 +283,7 @@ class EventListener(QtCore.QObject):
 	action_delete = QtCore.Signal(object, object, object) # fires when an action is about to be deleted, passes the inputItem, container, action as a parameters
 
 	# selection event - tells the UI to show a different input
-	select_input = QtCore.Signal(object, object, object) # selects a particular input (device_guid, input_type, input_id)
+	select_input = QtCore.Signal(object, object, object, bool) # selects a particular input (device_guid, input_type, input_id, force_update)
 
 	# mapping changed - either container or action added -
 	mapping_changed = QtCore.Signal(object) # fires when a container or action changes on an InputItem - passes the InputItem as the parameter
@@ -1542,7 +1542,3 @@ class EventHandler(QtCore.QObject):
 				callback = plugin.install(callback, functools.partial)
 		return callback
 
-
-# @gremlin.singleton_decorator.SingletonDecorator
-# class VjoyRemapEventHandler(QtCore.QObject):
-#     grid_changed = QtCore.Signal() # occurs when a grid was updated

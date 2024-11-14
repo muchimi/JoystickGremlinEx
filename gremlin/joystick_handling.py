@@ -22,6 +22,7 @@ import threading
 
 import dinput
 
+import gremlin.base_classes
 import gremlin.event_handler
 import gremlin.shared_state
 
@@ -437,9 +438,13 @@ def joystick_devices_initialization():
     _joystick_init_lock.release()
 
 
+MAX_VJOY_DEVICE = 16 # number of devices 1..16 supported by VJOY - this includes devices that may not be configured
+MAX_VJOY_BUTTON = 128 # max number of buttons per VJOY device
 
 @gremlin.singleton_decorator.SingletonDecorator
 class VJoyUsageState():
+
+
   
     class MappingData:
         vjoy_device_id = None
@@ -450,16 +455,16 @@ class VJoyUsageState():
         device_name = None
         device_input_id = None
 
-        def __init__(self, vjoy_device_id, input_type, vjoy_input_id, action_data):
+        def __init__(self, vjoy_device_id, input_type, vjoy_input_id, action):
             self.vjoy_device_id = vjoy_device_id
             self.vjoy_input_type = input_type
             self.vjoy_input_id = vjoy_input_id
-            
-            device_guid, device_name, dev_input_type, dev_input_id = action_data
-            self.device_guid = device_guid
-            self.device_name = device_name
-            self.device_input_type = dev_input_type
-            self.device_input_id = dev_input_id
+            input_item = action.get_input_item()
+
+            self.device_guid = input_item.device_guid
+            self.device_name = input_item.device_name
+            self.device_input_type = input_item.device_type
+            self.device_input_id = input_item.input_id
             
     
 
@@ -544,6 +549,19 @@ class VJoyUsageState():
 
             self._load_list.clear()
 
+
+    def ensure_valid(self, vjoy_id : int, input_id : int):
+        ''' checks vjoy button mapping exists '''
+        if not vjoy_id in  self._button_usage:
+            # create it
+            self._button_usage[vjoy_id] = {}
+            self._button_usage_map[vjoy_id] = {}
+        if not input_id in self._button_usage[vjoy_id]:
+            self._button_usage[vjoy_id][input_id] = False
+            self._button_usage_map[vjoy_id][input_id] = []
+
+
+
     def ensure_vjoy(self, force_update = False):
         ''' ensures the inversion map is loaded '''
         devices = vjoy_devices()
@@ -552,6 +570,7 @@ class VJoyUsageState():
         if not self._axis_invert_map or force_update:
             self._axis_invert_map = {}
             self._axis_range_map = {}
+            
             for dev in devices:
                 dev_id = dev.vjoy_id
                 self._axis_invert_map[dev_id] = {}
@@ -559,7 +578,8 @@ class VJoyUsageState():
                 for axis_id in range(1, dev.axis_count+1):
                     self._axis_invert_map[dev_id][axis_id] = False
                     self._axis_range_map[dev_id][axis_id] = [-1.0, 1.0]
-        # ensure the button maps are setup for each vjoy
+        
+        # ensure the button maps are setup for each defined vjoy
         if not self._button_usage or force_update:
             self._button_usage = {}
             self._button_usage_map = {}
@@ -567,8 +587,9 @@ class VJoyUsageState():
                 dev_id = dev.vjoy_id
                 self._button_usage[dev_id] = {}
                 self._button_usage_map[dev_id] = {}
+
                 info = device_info_from_guid(dev.device_guid)
-                for button in range(info.button_count):
+                for button in range(1, info.button_count+1):
                     self._button_usage[dev_id][button] = False
                     self._button_usage_map[dev_id][button] = []
 
@@ -675,6 +696,9 @@ class VJoyUsageState():
 
 
     def set_usage_state(self, vjoy_id : int, button_id : int, action, state : bool, emit = True):
+        ''' sets the usage state for a vjoy button '''
+        self.ensure_vjoy()
+        self.ensure_valid(vjoy_id, button_id) # create entry if needed
         if state:
             if not action in self._button_usage_map[vjoy_id][button_id]:
                 self._button_usage_map[vjoy_id][button_id].append(action)
@@ -696,7 +720,9 @@ class VJoyUsageState():
 
 
     def get_usage_state(self, vjoy_id : int, button_id : int) -> bool:
+        ''' gets the usage state for a vjoy button '''
         self.ensure_vjoy()
+        self.ensure_valid(vjoy_id, button_id) # create entry if needed - this can happen if the input vjoy device doesn't exist
         if vjoy_id in self._button_usage.keys() and button_id in self._button_usage[vjoy_id].keys():
             return self._button_usage[vjoy_id][button_id]
         return False
@@ -865,20 +891,20 @@ class VJoyUsageState():
     def get_action_map(self, vjoy_device_id, input_type, input_id):
         ''' gets what's mapped to a vjoy device by input type and input id '''
         #if not self._action_map:
-        self._load_inputs() # update the action map
+        #self._load_inputs() # update the action map
 
-        if not vjoy_device_id in self._action_map.keys():
-            # no mappings for this vjoy device
-            return []
-        if not input_type in self._action_map[vjoy_device_id].keys():
-            # no mappings for this type of input
-            return []
-        if not input_id in self._action_map[vjoy_device_id][input_type]:
-            # no mapping for this specific id
-            return []
+        # if not vjoy_device_id in self._action_map.keys():
+        #     # no mappings for this vjoy device
+        #     return []
+        # if not input_type in self._action_map[vjoy_device_id].keys():
+        #     # no mappings for this type of input
+        #     return []
+        # if not input_id in self._button_usage_map[vjoy_device_id][input_type]:
+        #     # no mapping for this specific id
+        #     return []
         
         action_map = []
-        for action_data in self._action_map[vjoy_device_id][input_type][input_id]:
+        for action_data in self._button_usage_map[vjoy_device_id][input_id]:
             data = self.MappingData(vjoy_device_id, input_type, input_id, action_data)
             action_map.append(data)
 

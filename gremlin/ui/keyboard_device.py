@@ -496,7 +496,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
 
         # select the item
-        self.input_item_list_view.select_item(index, force = True)
+        self.input_item_list_view.select_item(index, force_update = True)
 
         verbose = gremlin.config.Configuration().verbose
         if verbose:

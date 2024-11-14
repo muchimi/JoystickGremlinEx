@@ -186,6 +186,17 @@ Joystick Gremlin EX
 
 
 ## 13.40.16ex (pre-release)
+### (m22)
+- Improved: axis repeater bar no longer causes a small window to flash temporarily on the UI
+- Improved: vjoy remap show/hide button grid checkbox can now change the state for all vjoy remap actions in the profile if the state is changed while a control key is held
+- Improved: 1:1 mapping uses Vjoy Remap as the default mapper instead of the legacy remap (1:1 mapper may need some more work)
+- Improved: vjoy remap button grid color icon click shows where that button mapping is used across entire profile including those of legacy remap action
+- Fix: 1:1 mapper displays an hourglass while processing
+- Fix: right mapping panel was not always updating on input selection or state changes
+- Fix: left input panel icons were not always updating on global profile actions
+- Fix: switch container caused an exception when adding a new switch position
+
+
 ### (m21)
 - Fix: Legacy remap displays blank (or incorrect) value on reload for certain input choices
 - Fix: TempoEx container condition UI invalid index exception when setting conditions based on actions

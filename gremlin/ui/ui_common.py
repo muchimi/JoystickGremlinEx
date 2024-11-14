@@ -125,7 +125,7 @@ class AbstractView(QtWidgets.QWidget):
     """Base class for MVC views."""
 
     # Signal emitted when a entry is selected
-    item_selected = QtCore.Signal(int) # index of the item being selected
+    item_selected = QtCore.Signal(int, bool) # index of the item being selected
     item_edit = QtCore.Signal(object, int, object)  # widget, index, model data object 
     item_edit_curve = QtCore.Signal(object, int, object) # widget, index , model data object
     item_delete_curve = QtCore.Signal(object, int, object) # widget, index , model data object
@@ -2047,7 +2047,7 @@ class AxisStateWidget(QtWidgets.QWidget):
         else:
             self.main_layout = QtWidgets.QHBoxLayout(self)
 
-        self._progress_widget = QtWidgets.QProgressBar()
+        self._progress_widget = QtWidgets.QProgressBar(parent = self)
         self._progress_widget.setOrientation(orientation)
         self._progress_widget.setTextVisible(False)
 
@@ -2060,7 +2060,7 @@ class AxisStateWidget(QtWidgets.QWidget):
         self._readout_curved_widget = QtWidgets.QLabel()
 
         self._label_widget = QtWidgets.QLabel()
-        self._label_widget.setVisible(show_label)
+        
         if axis_id:
             self.setLabel(f"Axis {axis_id}")
 
@@ -2084,6 +2084,8 @@ class AxisStateWidget(QtWidgets.QWidget):
         self._width = 10
         self._update_css()
         self._update_range()
+
+      
 
     
     @property

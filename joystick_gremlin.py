@@ -48,6 +48,7 @@ import gremlin.util
 import gremlin.curve_handler
 import gremlin.gated_handler
 import gremlin.input_types
+import gremlin.mapper
 
 from gremlin.util import InvokeUiMethod, assert_ui_thread
 
@@ -115,7 +116,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.16ex (m21)"
+APPLICATION_VERSION = "13.40.16ex (m22)"
 
 # the main ui
 ui = None
@@ -406,7 +407,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
     def _tab_clear_map_cb(self):
         ''' clears the mappings from the current tab '''
-        tab_guid = gremlin.util.parse_guid(gremlin.shared_state.ui._active_tab_guid())
+        tab_guid = gremlin.util.parse_guid(self._active_tab_guid())
         device : gremlin.base_profile.Device = gremlin.shared_state.current_profile.devices[tab_guid]
         current_mode = gremlin.shared_state.current_mode
         msgbox = gremlin.ui.ui_common.ConfirmBox(f"Remove all mappings from {device.name}, mode [{current_mode}]?")
@@ -487,10 +488,13 @@ class GremlinUi(QtWidgets.QMainWindow):
         ''' gets the curernt active profile '''
         return self.profile
 
-    def refresh(self):
-        ''' forces a refreshes the UI by processing events '''
-        app = QtWidgets.QApplication.instance()
-        app.processEvents(QtCore.QEventLoop.ProcessEventsFlag.AllEvents, 1)
+    # def refresh(self):
+    #     ''' forces a refreshes the UI by processing events '''
+
+    #     self._create_tabs()
+
+    #     app = QtWidgets.QApplication.instance()
+    #     app.processEvents(QtCore.QEventLoop.ProcessEventsFlag.AllEvents, 1)
 
 
 
@@ -773,73 +777,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             self.activate_locked = False
             
 
-    def create_1to1_mapping(self):
-        """Creates a 1 to 1 mapping of the given device to the first
-        vJoy device.
-        """
-        # Don't attempt to create the mapping for the "Getting Started"
-        # widget
-        tab_device_type : TabDeviceType
-        tab_device_type, _ = self.ui.devices.currentWidget().data
-        if not tab_device_type in (TabDeviceType.Joystick, TabDeviceType.VjoyInput):
-            gremlin.ui.ui_common.MessageBox("Information","1:1 mapping is only available on input joysticks")
-            return
-
-        device_profile = self.ui.devices.currentWidget().device_profile
-        # Don't create mappings for non joystick devices
-        if device_profile.type != DeviceType.Joystick:
-            return
-
-        container_plugins = gremlin.plugin_manager.ContainerPlugins()
-        action_plugins = gremlin.plugin_manager.ActionPlugins()
-        current_mode = gremlin.shared_state.current_mode
-        # mode = device_profile.modes[current_mode]
-        input_types = [
-            InputType.JoystickAxis,
-            InputType.JoystickButton,
-            InputType.JoystickHat
-        ]
-        type_name = {
-            InputType.JoystickAxis: "axis",
-            InputType.JoystickButton: "button",
-            InputType.JoystickHat: "hat",
-        }
-        main_profile = device_profile.parent
-        tab_guid = gremlin.util.parse_guid(gremlin.shared_state.ui._active_tab_guid())
-        device : gremlin.base_profile.Device = main_profile.devices[tab_guid]
-        if device.type != DeviceType.Joystick:
-            ''' selected tab is not a joystick - pick the first joystick tab as ordered by the user '''
-            tab_map = gremlin.shared_state.ui._get_tab_map()
-            tab_ids = [device_id for device_id, _, tab_type, _ in tab_map.values() if tab_type == TabDeviceType.Joystick]
-            if not tab_ids:
-                syslog.warning("No joystick available to map to")
-                mb = gremlin.ui.ui_common.MessageBox("Unable to create mapping, no suitable input hardware found.")
-                mb.exec()
-                return
-            
-            tab_guid = gremlin.util.parse_guid(tab_ids[0])
-            device = main_profile.devices[tab_guid]
-
-        mode = device.modes[current_mode]
-        item_list = main_profile.list_unused_vjoy_inputs()
-        for input_type in input_types:
-            for entry in mode.config[input_type].values():
-                input_list  = item_list[1][type_name[input_type]]
-                if len(input_list) > 0:
-                    vjoy_input_id = input_list.pop(0)
-                    
-
-                    container = container_plugins.repository["basic"](entry)
-                    action = action_plugins.repository["remap"](container)
-                    action.input_type = input_type
-                    action.vjoy_input_id = vjoy_input_id
-                    action.vjoy_device_id = 1 # first vjoy
-                
-
-                    container.add_action(action)
-                    entry.containers.append(container)
-
-        self._create_tabs()
+    
 
     def input_repeater(self):
         """Enables or disables the forwarding of events to the repeater."""
@@ -1014,7 +952,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.ui.actionExit.triggered.connect(self._force_close)
         # Actions
         self.ui.actionCreate1to1Mapping.triggered.connect(
-            self.create_1to1_mapping
+            self._create_1to1_mapping
         )
         self.ui.actionMergeAxis.triggered.connect(self.merge_axis)
         self.ui.actionSwapDevices.triggered.connect(self.swap_devices)
@@ -1045,6 +983,12 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         # Tray icon
         self.ui.tray_icon.activated.connect(self._tray_icon_activated_cb)
+
+    def _create_1to1_mapping(self):
+        ''' maps one to one '''
+        mapper = gremlin.mapper.Mapper()
+        mapper.create_1to1_mapping()
+
 
     def _create_recent_profiles(self):
         """Populates the Recent submenu entry with the most recent profiles."""
@@ -1554,16 +1498,16 @@ class GremlinUi(QtWidgets.QMainWindow):
             return None
         return widget.input_item_list_model.data(index)
     
-    def _select_input(self, device_guid, input_type : InputType = None, input_id = None):
+    def _select_input(self, device_guid, input_type : InputType = None, input_id = None, force_update = False):
         eh = gremlin.event_handler.EventListener()
-        eh.select_input.emit(device_guid, input_type, input_id)
+        eh.select_input.emit(device_guid, input_type, input_id, force_update)
 
        
     def _config_changed_cb(self):
         ''' called when configuraition has changed '''
         self.refresh()
 
-    def _select_input_handler(self, device_guid : dinput.GUID, input_type : gremlin.input_types.InputType = None, input_id = None, force : bool = False):
+    def _select_input_handler(self, device_guid : dinput.GUID, input_type : gremlin.input_types.InputType = None, input_id = None, force_update : bool = False):
         ''' Selects a specific input on the given tab 
         The tab is changed if different from the current tab.
 
@@ -1594,10 +1538,10 @@ class GremlinUi(QtWidgets.QMainWindow):
             if input_type is None and input_id is None:
                 input_type = last_input_type
                 input_id = last_input_id
-                force = True # force the selection when setting defaults
+                force_update = True # force the selection when setting defaults
 
             # avoid spamming
-            if not force and self._last_input_change_timestamp + self._input_delay > time.time():
+            if not force_update and self._last_input_change_timestamp + self._input_delay > time.time():
                     # delay not occured yet
                     return
             self._last_input_change_timestamp = time.time()
@@ -1629,14 +1573,12 @@ class GremlinUi(QtWidgets.QMainWindow):
                 #syslog.info("ID change started")
                 widget = self.ui.devices.currentWidget()
                 if widget:
-                    widget.input_item_list_view.select_input(input_type, input_id)
+                    widget.input_item_list_view.select_input(input_type, input_id, force_update = force_update)
                     index = widget.input_item_list_view.current_index
                     widget.input_item_list_view.redraw_index(index)
                     
                     
-
-                #QtWidgets.QApplication.processEvents()
-                #syslog.info("ID change complete")
+                    
 
             # save settings as the last input
             gremlin.shared_state.set_last_input_id(device_guid, input_type, input_id)
@@ -1646,8 +1588,6 @@ class GremlinUi(QtWidgets.QMainWindow):
             self._selection_locked = False
             self.pop_highlighting()
             el.pop_joystick() # restore joystick input while changing UI
-            #time.sleep(0.05) # let things settle
-
 
         
     
@@ -1664,6 +1604,10 @@ class GremlinUi(QtWidgets.QMainWindow):
     def _active_tab_guid(self):
         ''' gets the GUID of the device for the active tab '''
         return self._get_tab_guid(self.ui.devices.currentIndex())
+    
+    def _active_tab_index(self):
+        ''' gets the index of the current tab '''
+        return self.ui.devices.currentIndex()
                 
     
     def _get_tab_guid(self, index : int) -> str:
@@ -1704,6 +1648,13 @@ class GremlinUi(QtWidgets.QMainWindow):
         log = logging.getLogger("system")
         for index, (device_guid, device_name, device_class, tab_index) in tab_map.items():
             log.info(f"[{index}] Tab index: [{tab_index}] {device_name} {device_class} {device_guid}")
+
+    def _refresh_tab(self):
+        ''' refreshes the current device tab '''
+        current_widget = self.ui.devices.currentWidget()
+        if hasattr(current_widget,"refresh"):
+            current_widget.refresh()
+
 
 
     def _sort_tabs(self):
@@ -2538,9 +2489,16 @@ class GremlinUi(QtWidgets.QMainWindow):
         current_profile =gremlin.shared_state.current_profile
         current_mode = gremlin.shared_state.current_mode
 
+        
+
         # Make the first root node the default active mode
         self.mode_selector.populate_selector(current_profile, current_mode, emit = False)
         self._update_mode_status_bar()
+
+
+        # refresh current device tab
+        self._refresh_tab()
+
 
     def _force_close(self):
         """Forces the closure of the program."""

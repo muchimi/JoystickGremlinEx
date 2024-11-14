@@ -438,86 +438,90 @@ class InputItemListView(ui_common.AbstractView):
 
         """
 
+        self.setUpdatesEnabled(False)
+        try:
 
-        verbose = gremlin.config.Configuration().verbose_mode_inputs
-        self.widget_map.clear()
+            verbose = gremlin.config.Configuration().verbose_mode_inputs
+            self.widget_map.clear()
 
-        if self.model is None:
-            return
-        
-
-        with QtCore.QSignalBlocker(self):
-
-            row_count = self.model.rows()
-            device_name = self.current_device.name
+            if self.model is None:
+                return
             
-            selected_index = - 1 # nothing selected
 
-            # remember the index of the item that was previously selected
-            selected_input_id = None
-            if self._current_index != -1 and self._current_index < self.model.rows():
-                selected_input_id = self.model.data(self._current_index).input_id
+            with QtCore.QSignalBlocker(self):
 
-
-            # clear the widgets
-            ui_common.clear_layout(self.scroll_layout)
-
-
-            for index in range(row_count):
-                data = self.model.data(index)
-
-                # true if this index should be selected because it was selected in the old list
-                selected = selected_input_id and selected_input_id == data.input_id
-
-                identifier = InputIdentifier(
-                    data.input_type,
-                    data.device_guid,
-                    data.input_id,
-                    data.device_type,
-                    data.input_name
-                )
-
-                if self.custom_widget_handler:
-                    # custom widget creation handling
-                    widget = self.custom_widget_handler(self, index, identifier, data, parent = self.scroll_layout)
-                    assert widget is not None, "Custom widget handler didn't return a widget"
-                else:
-                    widget = InputItemWidget(identifier)
-                    if data.input_type == InputType.JoystickAxis:
-                        widget.setIcon("joystick_no_frame.png",use_qta=False)
-                    elif data.input_type == InputType.JoystickButton:
-                        widget.setIcon("mdi.gesture-tap-button")
-                    elif data.input_type == InputType.JoystickHat:
-                        widget.setIcon("ei.fullscreen")
-                    widget.create_action_icons(data)
-                    widget.setDescription(data.description)
-
-                self.scroll_layout.addWidget(widget)    
+                row_count = self.model.rows()
+                device_name = self.current_device.name
                 
+                selected_index = - 1 # nothing selected
 
-                # hook the widget
-                widget.selected_changed.connect(self._widget_selection_change_cb)
-                widget.index = index # assigned index
-                if selected:
-                    # remember which item to select
-                    selected_index = index
-
-                widget.edit.connect(self._create_edit_callback(index))
-                widget.edit_curve.connect(self._create_edit_curve_callback(index))
-                widget.delete_curve.connect(self._create_delete_curve_callback(index))
-                widget.closed.connect(self._create_closed_callback(index))
-
-                self.widget_map[index] = widget
-                
-
-                
-                if verbose:
-                    logging.getLogger("system").info(f"LV: {device_name} [{index:02d}] type: {InputType.to_string(data.input_type)} name: {data.input_id}")
+                # remember the index of the item that was previously selected
+                selected_input_id = None
+                if self._current_index != -1 and self._current_index < self.model.rows():
+                    selected_input_id = self.model.data(self._current_index).input_id
 
 
-            self.scroll_layout.addStretch()
+                # clear the widgets
+                ui_common.clear_layout(self.scroll_layout)
 
-        self.updated.emit()
+
+                for index in range(row_count):
+                    data = self.model.data(index)
+
+                    # true if this index should be selected because it was selected in the old list
+                    selected = selected_input_id and selected_input_id == data.input_id
+
+                    identifier = InputIdentifier(
+                        data.input_type,
+                        data.device_guid,
+                        data.input_id,
+                        data.device_type,
+                        data.input_name
+                    )
+
+                    if self.custom_widget_handler:
+                        # custom widget creation handling
+                        widget = self.custom_widget_handler(self, index, identifier, data, parent = self.scroll_layout)
+                        assert widget is not None, "Custom widget handler didn't return a widget"
+                    else:
+                        widget = InputItemWidget(identifier)
+                        if data.input_type == InputType.JoystickAxis:
+                            widget.setIcon("joystick_no_frame.png",use_qta=False)
+                        elif data.input_type == InputType.JoystickButton:
+                            widget.setIcon("mdi.gesture-tap-button")
+                        elif data.input_type == InputType.JoystickHat:
+                            widget.setIcon("ei.fullscreen")
+                        widget.create_action_icons(data)
+                        widget.setDescription(data.description)
+
+                    self.scroll_layout.addWidget(widget)    
+                    
+
+                    # hook the widget
+                    widget.selected_changed.connect(self._widget_selection_change_cb)
+                    widget.index = index # assigned index
+                    if selected:
+                        # remember which item to select
+                        selected_index = index
+
+                    widget.edit.connect(self._create_edit_callback(index))
+                    widget.edit_curve.connect(self._create_edit_curve_callback(index))
+                    widget.delete_curve.connect(self._create_delete_curve_callback(index))
+                    widget.closed.connect(self._create_closed_callback(index))
+
+                    self.widget_map[index] = widget
+                    
+
+                    
+                    if verbose:
+                        logging.getLogger("system").info(f"LV: {device_name} [{index:02d}] type: {InputType.to_string(data.input_type)} name: {data.input_id}")
+
+
+                self.scroll_layout.addStretch()
+        finally:
+            self.setUpdatesEnabled(True)
+            self.update()
+            self.updated.emit()
 
 
     def redraw_index(self, index : int):
@@ -594,14 +598,14 @@ class InputItemListView(ui_common.AbstractView):
 
 
 
-    def select_input(self, input_type, identifier, emit = True):
+    def select_input(self, input_type, identifier, emit = True, force_update = False):
         ''' selects an entry based on input type and ID'''
         for index in range(self.model.rows()):
             data = self.model.data(index)
             if input_type is not None and data.input_type != input_type:
                 continue
             if data.input_id == identifier:
-                self.select_item(index, emit)
+                self.select_item(index, emit, force_update)
                 return
 
     def selected_item(self):
@@ -680,7 +684,7 @@ class InputItemListView(ui_common.AbstractView):
             widget.update_display()
         
 
-    def select_item(self, index, emit=True, force = True, user_selected = False):
+    def select_item(self, index, emit=True, force_update = True, user_selected = False):
         """Handles selecting a specific item.  this is called whenever an input item is selected
 
         :param index the index of the item being selected
@@ -691,9 +695,9 @@ class InputItemListView(ui_common.AbstractView):
         
         if index == -1:
             # always reset things if the index is the clear value of -1
-            force = True
+            force_update = True
 
-        if not force and self._current_index == index:
+        if not force_update and self._current_index == index:
             return # nothing to do if the current index is the same as the new index
         
         # If the index is actually an event we have to correctly translate the
@@ -724,17 +728,6 @@ class InputItemListView(ui_common.AbstractView):
 
         self._current_index = index
 
-        data = self.model.data(index)
-        # device_guid = self.model._device_data.device_guid
-        # device_name = self.model._device_data.name
-        # device_input_type = data.input_type if data else None
-        # device_input_id = data.input_id if data else None
-        
-        # if user_selected:
-        #     # save what was last selected
-            
-        #     gremlin.shared_state.set_last_input_id(device_guid, device_input_type, device_input_id)
-
         widget = self.itemAt(index)
         if widget:
             # if the list is long - bring the selected widget into view
@@ -743,23 +736,8 @@ class InputItemListView(ui_common.AbstractView):
             with (QtCore.QSignalBlocker(widget)):
                 widget.selected = True
 
-        # if emit:
-
-            # eh = gremlin.event_handler.EventListener()
-            # eh.select_input.emit(device_guid, device_input_type, device_input_id)                
-
-
         if emit and index != -1:
-            self.item_selected.emit(index) # load the mapped content for the given index
-
-        #     el = gremlin.event_handler.EventListener()
-        #     event = gremlin.event_handler.DeviceChangeEvent()
-        #     data = self.model.data(index)
-        #     event.device_guid = device_guid
-        #     event.device_name = device_name
-        #     event.device_input_type = device_input_type
-        #     event.device_input_id = device_input_id
-        #     el.profile_device_changed.emit(event)
+            self.item_selected.emit(index, force_update) # load the mapped content for the given index
 
         # return the currently selected widget
         return widget
@@ -838,15 +816,16 @@ class ActionSetView(ui_common.AbstractView):
 
         # Create group box contents
         self.group_layout = QtWidgets.QGridLayout(self.group_widget)
-        self.action_layout = QtWidgets.QVBoxLayout()
+        self.action_widget = QtWidgets.QWidget()
+        self.action_layout = QtWidgets.QVBoxLayout(self.action_widget)
 
         # Only show edit controls in the basic tab
         if self.view_type == ui_common.ContainerViewTypes.Action:
             self._create_edit_controls()
-            self.group_layout.addLayout(self.action_layout, 0, 0)
-            self.group_layout.addLayout(self.controls_layout, 0, 1)
+            self.group_layout.addWidget(self.action_widget, 0, 0)
+            self.group_layout.addWidget(self.controls_widget, 0, 1)
         else:
-            self.group_layout.addLayout(self.action_layout, 0, 0)
+            self.group_layout.addWidget(self.action_widget, 0, 0)
         self.group_layout.setColumnStretch(0, 2)
 
         # Only permit adding actions from the basic tab and if the tab is
@@ -948,7 +927,8 @@ class ActionSetView(ui_common.AbstractView):
         palette = QtGui.QPalette()
         palette.setColor(QtGui.QPalette.ColorRole.Window, QtGui.QColorConstants.Red)
 
-        self.controls_layout = QtWidgets.QVBoxLayout()
+        self.controls_widget = QtWidgets.QWidget()
+        self.controls_layout = QtWidgets.QVBoxLayout(self.controls_widget)
         if ActionSetView.Interactions.Up in self.allowed_interactions:
             self.control_move_up = QtWidgets.QPushButton(
                 load_icon("gfx/button_up.png"), ""
@@ -1195,12 +1175,11 @@ class InputItemWidget(QtWidgets.QFrame):
         
        
         curve_visible = self.identifier.input_type == InputType.JoystickAxis
-        self._curve_container_widget.setVisible(curve_visible)
+
 
 
         self.setMinimumWidth(200)
         self.main_layout.addWidget(self._container_widget)
-        self.update_display()
 
 
         el = gremlin.event_handler.EventListener()
@@ -1208,6 +1187,9 @@ class InputItemWidget(QtWidgets.QFrame):
         el.action_delete.connect(self._action_deleted_cb)
         el.icon_changed.connect(self._icon_changed_cb)
         el.mapping_changed.connect(self._mapping_changed_cb)
+
+        self._curve_container_widget.setVisible(curve_visible) 
+        self.update_display()
 
 
     @QtCore.Slot(object)
@@ -1240,16 +1222,7 @@ class InputItemWidget(QtWidgets.QFrame):
         if self.findAction(action):
             # find the widget corresponding to this action
             self.create_action_icons(self.data)
-            # for i in range(self._icon_layout.count()):
-            #     item = self._icon_layout.itemAt(i)
-            #     if item:
-            #         widget = item.widget()
-            #         if widget:
-            #             if isinstance(widget, ui_common.ActionLabel):
-            #                 if widget.action_entry == action:
-            #                     self._icon_layout.removeWidget(widget)
-            #                     self._icon_layout.update()
-            #                     return
+
     @QtCore.Slot(object)
     def _mapping_changed_cb(self, item_data):
         if item_data == self.data:
@@ -1362,7 +1335,7 @@ class InputItemWidget(QtWidgets.QFrame):
             self._title_widget.setText(display_text)
 
         curve_visible = self.data.input_type == InputType.JoystickAxis
-        self._curve_container_widget.setVisible(curve_visible)
+        
         if self.data.is_curve is None:
             self.curve_button_widget.setIcon(self.curve_icon_active)
             self.clear_curve_widget.setEnabled(True)
@@ -1370,7 +1343,7 @@ class InputItemWidget(QtWidgets.QFrame):
             self.curve_button_widget.setIcon(self.curve_icon_inactive)
             self.clear_curve_widget.setEnabled(False)
 
-        
+        self._curve_container_widget.setVisible(curve_visible)
         
 
     @property
@@ -1851,6 +1824,7 @@ class AbstractActionWidget(QtWidgets.QFrame):
 
         self._create_ui()
         self._populate_ui()
+        
 
     @QtCore.Slot(object)
     def _action_delete(self, input_item, container, action):

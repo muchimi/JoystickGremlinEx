@@ -412,7 +412,6 @@ class SwitchContainerWidget(AbstractContainerWidget):
                 break
 
         self.profile_data.position_data[index] = SwitchData(index,self.profile_data.hardware_device_guid, input_id, SwitchModeType.OnChange)
-        self.profile_data.position_count = len(self.profile_data.position_data)
 
         self._update_ui()
 
@@ -590,8 +589,8 @@ class SwitchContainer(AbstractContainer):
     ]
 
     interaction_types = [
-        gremlin.ui.input_item.ActionSetView.Interactions.Up,
-        gremlin.ui.input_item.ActionSetView.Interactions.Down,
+        # gremlin.ui.input_item.ActionSetView.Interactions.Up,
+        # gremlin.ui.input_item.ActionSetView.Interactions.Down,
         gremlin.ui.input_item.ActionSetView.Interactions.Delete,
     ]
 

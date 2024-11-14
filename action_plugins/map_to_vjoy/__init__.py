@@ -49,6 +49,10 @@ import gremlin.shared_state
 import gremlin.curve_handler
 
 
+@gremlin.singleton_decorator.SingletonDecorator
+class VjoyRemapEventHandler(QtCore.QObject):
+	grid_visible_changed = QtCore.Signal(bool) # occurs when a grid was updated
+
 
 class MergeOperationType (enum.IntEnum):
     ''' merge operation method'''
@@ -167,10 +171,14 @@ class GridPopupWindow(QtWidgets.QDialog):
             self.close()
         
         box = QtWidgets.QVBoxLayout()
+        box.setContentsMargins(0,0,0,0)
         self.layout = box
         
+
         source =  QtWidgets.QWidget()
+        source.setContentsMargins(0,0,0,0)
         source_box = QtWidgets.QHBoxLayout(source)
+        source_box.setContentsMargins(0,0,0,0)
         source_box.addWidget(QtWidgets.QLabel(f"Vjoy {vjoy_device_id} Button {vjoy_input_id} mapped by:"))
         box.addWidget(source)
 
@@ -225,6 +233,10 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         if VJoyWidget.locked:
             return
         
+
+        veh = VjoyRemapEventHandler()
+        veh.grid_visible_changed.connect(self.grid_visible_changed)
+
         try:
             VJoyWidget.locked = True
 
@@ -273,14 +285,14 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             # self.main_layout.addWidget(type_label)
 
             # create UI components
+            
             self._create_selector()
             self._create_input_axis()
             self._create_merge_ui()
             self._create_input_grid()
             self._create_info()
 
-            # update UI visibility
-            self._update_ui_action_mode(self.action_data)
+
 
             self.main_layout.setContentsMargins(0, 0, 0, 0)
 
@@ -288,7 +300,17 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             eh = gremlin.event_handler.EventListener()
             eh.button_usage_changed.connect(self._button_usage_changed)
 
-            self.notify_device_changed()
+            
+            # set the action type from the input type
+            self.load_actions_from_input_type()
+
+
+            # self.notify_device_changed()
+
+            
+
+            # update UI visibility
+            #self._update_ui_action_mode(self.action_data)
 
         finally:
             VJoyWidget.locked = False
@@ -329,15 +351,9 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.absolute_checkbox = QtWidgets.QRadioButton("Absolute")
         self.absolute_checkbox.setChecked(True)
         self.relative_checkbox = QtWidgets.QRadioButton("Relative")
-        self.relative_scaling = gremlin.ui.ui_common.DynamicDoubleSpinBox()
+        
 
 
-        self.sb_start_value = gremlin.ui.ui_common.DynamicDoubleSpinBox()
-        # w = 100
-        # self.set_width(self.sb_start_value,w)
-        self.sb_start_value.setMinimum(-1.0)
-        self.sb_start_value.setMaximum(1.0)
-        self.sb_start_value.setDecimals(3)
 
 
         self.b_min_value = QtWidgets.QPushButton("-1")
@@ -349,19 +365,11 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.b_max_value = QtWidgets.QPushButton("+1")
         self.set_width(self.b_max_value,w)
 
-        self.sb_axis_range_low = gremlin.ui.ui_common.DynamicDoubleSpinBox()
-        self.sb_axis_range_low.setMinimum(-1.0)
-        self.sb_axis_range_low.setMaximum(1.0)
-        self.sb_axis_range_low.setDecimals(3)
-        self.sb_axis_range_high = gremlin.ui.ui_common.DynamicDoubleSpinBox()
-        self.sb_axis_range_high.setMinimum(-1.0)
-        self.sb_axis_range_high.setMaximum(1.0)
-        self.sb_axis_range_high.setDecimals(3)
 
         # output axis repeater
         self.container_repeater_widget = QtWidgets.QWidget()
         self.container_repeater_layout = QtWidgets.QHBoxLayout(self.container_repeater_widget)
-        self._axis_repeater_widget = gremlin.ui.ui_common.AxisStateWidget(show_percentage=False,orientation=QtCore.Qt.Orientation.Horizontal)
+        self._axis_repeater_widget = gremlin.ui.ui_common.AxisStateWidget(show_percentage=False,orientation=QtCore.Qt.Orientation.Horizontal, parent= self.container_repeater_widget)
         self.curve_button_widget = QtWidgets.QPushButton("Output Curve")
         
         
@@ -404,6 +412,15 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.container_axis_layout.addWidget(QtWidgets.QLabel("Start Value:"),row,col,1,3)
 
         row+=1
+
+
+        self.sb_start_value = gremlin.ui.ui_common.DynamicDoubleSpinBox(parent = self.container_axis_widget)
+        # w = 100
+        # self.set_width(self.sb_start_value,w)
+        self.sb_start_value.setMinimum(-1.0)
+        self.sb_start_value.setMaximum(1.0)
+        self.sb_start_value.setDecimals(3)
+
         self.container_axis_layout.addWidget(self.sb_start_value,row,col,1,3)
 
         row+=1
@@ -419,6 +436,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         row+=1
         self.container_axis_layout.addWidget(QtWidgets.QLabel("Scale:"),row,col)
         row+=1
+        self.relative_scaling = gremlin.ui.ui_common.DynamicDoubleSpinBox(parent = self.container_axis_widget)
         self.container_axis_layout.addWidget(self.relative_scaling,row,col)
 
         row = 0
@@ -427,12 +445,23 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         row+=1
         self.container_axis_layout.addWidget(QtWidgets.QLabel("Min:"),row,col)
         row+=1
+        self.sb_axis_range_low = gremlin.ui.ui_common.DynamicDoubleSpinBox(parent = self.container_axis_widget)
+        self.sb_axis_range_low.setMinimum(-1.0)
+        self.sb_axis_range_low.setMaximum(1.0)
+        self.sb_axis_range_low.setDecimals(3)
         self.container_axis_layout.addWidget(self.sb_axis_range_low,row,col)
 
         col+=1
         row=1
         self.container_axis_layout.addWidget(QtWidgets.QLabel("Max:"),row,col)
         row+=1
+
+        
+        self.sb_axis_range_high = gremlin.ui.ui_common.DynamicDoubleSpinBox(parent = self.container_axis_widget)
+        self.sb_axis_range_high.setMinimum(-1.0)
+        self.sb_axis_range_high.setMaximum(1.0)
+        self.sb_axis_range_high.setDecimals(3)
+
         self.container_axis_layout.addWidget(self.sb_axis_range_high,row,col)
 
         
@@ -480,14 +509,15 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.merge_selector_device_widget = gremlin.ui.ui_common.NoWheelComboBox()
         self.merge_selector_input_widget = gremlin.ui.ui_common.NoWheelComboBox()
 
-        device_layout = QtWidgets.QGridLayout()
+        device_widget = QtWidgets.QWidget()
+        device_layout = QtWidgets.QGridLayout(device_widget)
         device_layout.addWidget(QtWidgets.QLabel("Merge Device:"),0,0)
         device_layout.addWidget(self.merge_selector_device_widget,0,1)
         device_layout.addWidget(QtWidgets.QLabel(" "),0,2)
         device_layout.addWidget(QtWidgets.QLabel("Merge Axis:"),1,0)
         device_layout.addWidget(self.merge_selector_input_widget,1,1)
         device_layout.setColumnStretch(2,2)
-        self.container_merge_layout.addLayout(device_layout)
+        self.container_merge_layout.addWidget(device_widget)
 
         self.merge_selector_device_widget.currentIndexChanged.connect(self._merged_device_changed_cb)
         self.merge_selector_input_widget.currentIndexChanged.connect(self._merged_input_changed_cb)
@@ -775,7 +805,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         '''
         # always read the current input as the value could be from another device for merged inputs
         if self.input_type == InputType.JoystickAxis:
-            self._axis_repeater_widget.setVisible(True)
+            
             raw_value = self.action_data.get_raw_axis_value()
             if value is None:
                 # filter and merge the data
@@ -789,15 +819,10 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             else:
                 self._axis_repeater_widget.show_curved = False
                 self._axis_repeater_widget.setValue(value)
-                
-                
 
             # update the curved window if displayed
             if self.curve_update_handler is not None:
                 self.curve_update_handler(raw_value)
-        else:
-            self._axis_repeater_widget.setVisible(False)
-
         
 
 
@@ -1224,8 +1249,11 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
     
 
 
-    def _update_ui_action_mode(self, action_data):
-        ''' updates ui based on the current action requested to show/hide needed components '''
+    def _update_ui(self):
+        ''' updates ui based on the current action requested to show/hide needed components '''        
+
+        action_data = self.action_data
+
         action = action_data.action_mode
         input_type = action_data.input_type
 
@@ -1240,7 +1268,9 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         paired_visible = False
         merge_visible =  False
         repeater_visible = False
-        
+    
+        axis_repeater_visible = self.input_type == InputType.JoystickAxis
+
         
         
 
@@ -1259,6 +1289,8 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             exec_on_release_visible =  action_data.input_type in VJoyWidget.input_type_buttons
         elif input_type == InputType.JoystickHat:
             pass
+
+        
 
         match action:
             case VjoyAction.VJoyRangeAxis:
@@ -1295,7 +1327,6 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.axis_range_container_widget.setVisible(range_visible)
         self.chkb_exec_on_release.setVisible(exec_on_release_visible)
         self.chkb_paired.setVisible(paired_visible)
-        # self.target_value_widget.setVisible(target_value_visible)
         self.target_value_container_widget.setVisible(button_to_axis_visible)
 
         self.lbl_vjoy_device_selector.setVisible(selector_visible)
@@ -1307,7 +1338,10 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self.action_label.setText(VjoyAction.to_description(action))
 
+        self._axis_repeater_widget.setVisible(axis_repeater_visible)
         
+        self.button_grid_widget.setVisible(self.action_data.grid_visible)
+        self.button_grid_widget.setVisible(grid_visible)
 
     def _action_mode_changed(self, index):
         ''' called when the drop down value changes '''
@@ -1315,7 +1349,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             action : VjoyAction = self.cb_action_list.itemData(index)
             self.action_data.action_mode = action
             self.action_data.input_id = self.action_data.get_input_id()
-            self._update_ui_action_mode(self.action_data)
+            self._update_ui()
             self._update_vjoy_device_input_list()
             self.notify_device_changed()
 
@@ -1345,6 +1379,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         grid_visible = self.action_data.grid_visible   
         if self.grid_visible_widget is None:
             self.grid_visible_widget = QtWidgets.QCheckBox("Show button grid")
+            self.grid_visible_widget.setToolTip("Sets the button grid visibility, use ctrl+ to enable/disable globally")
             self.grid_visible_widget.clicked.connect(self._grid_visible_cb)
             self.grid_visible_container_layout.addWidget(self.grid_visible_widget)
 
@@ -1364,7 +1399,6 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         
         vjoy_device_id = self.action_data.vjoy_device_id
         input_type = self._get_selector_input_type()
-
         dev = self.vjoy_map[vjoy_device_id]
         count = dev.button_count
         grid = QtWidgets.QGridLayout(self.button_grid_widget)
@@ -1433,12 +1467,24 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
                 col=0
 
         self.main_layout.addWidget(self.button_grid_widget)
-        self.button_grid_widget.setVisible(grid_visible)
+
    
     @QtCore.Slot(bool)
     def _grid_visible_cb(self, checked):
         self.action_data.grid_visible = checked
-        self.button_grid_widget.setVisible(checked)
+        self._update_ui()
+        
+        el = gremlin.event_handler.EventListener()
+        if el.get_control_state():
+            veh = VjoyRemapEventHandler()
+            veh.grid_visible_changed.emit(checked)
+            
+    @QtCore.Slot(bool)
+    def grid_visible_changed(self, visible):
+        ''' global grid visible change event '''
+        self.action_data.grid_visible = visible
+        self._update_ui()
+
 
     @QtCore.Slot()            
     def _grid_button_clicked(self):
@@ -1451,7 +1497,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         popup.exec()
 
 
-    def select_button(self, vjoy_id, button_id):
+    def select_button(self, vjoy_id, button_id, emit = False):
         ''' selects a button '''
         
 
@@ -1479,7 +1525,8 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.usage_state.set_usage_state(vjoy_id, self.active_id, state = True, action = self.action_data, emit=True)
 
         # update the UI when a state change occurs
-        self.notify_device_changed()
+        if emit:
+            self.notify_device_changed()
 
 
     def _select_changed(self, rb):
@@ -1545,9 +1592,6 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
                 if index != -1:
                     self.cb_vjoy_input_selector.setCurrentIndex(index)
             
-
-            # set the action type from the input type
-            self.load_actions_from_input_type()
 
             index = self.cb_action_list.findData(self.action_data.action_mode)
             if index == -1:
@@ -1627,10 +1671,12 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
             self._populate_grid(vjoy_dev_id, button_id)
             self._update_vjoy_device_input_list()
-            self._update_ui_action_mode(self.action_data)
+            
 
             if is_button_mode:
-                self.select_button(vjoy_dev_id, vjoy_input_id)
+                self.select_button(vjoy_dev_id, vjoy_input_id, emit = False)
+
+            self._update_ui()
 
         except gremlin.error.GremlinError as e:
             util.display_error(
@@ -1710,6 +1756,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
     
     def _populate_grid(self, device_id, button_id):
         ''' updates the usage grid based on current VJOY mappings '''
+
         used_pixmap = load_pixmap("used.png")
         unused_pixmap = load_pixmap("unused.png")
         self._grid_widgets = {}
