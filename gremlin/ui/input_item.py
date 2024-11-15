@@ -550,9 +550,6 @@ class InputItemListView(ui_common.AbstractView):
 
     def _widget_selection_change_cb(self, widget):
         ''' called when a widget selection changes '''
-        # data : gremlin.base_profile.InputItem = widget.data
-        # eh = gremlin.event_handler.EventListener()
-        # eh.select_input.emit(data.device_guid, data.input_type, data.input_id)
         self.select_item(widget.index, user_selected=True)
 
 

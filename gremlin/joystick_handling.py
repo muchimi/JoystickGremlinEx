@@ -242,6 +242,12 @@ def device_info_from_guid(guid : str | dinput.GUID) -> DeviceSummary:
         return _joystick_device_guid_map[guid]
     return None
 
+def vjoy_info_from_vjoy_id(id : int ) -> DeviceSummary:
+    ''' gets physical device info for a vjoy device '''
+    for dev in vjoy_devices():
+        if dev.vjoy_id == id:
+            return dev
+    return None
 
 def is_device_connected(guid : str | dinput.GUID) -> bool:
     ''' true if the device is connected (reported in) '''

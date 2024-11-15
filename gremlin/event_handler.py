@@ -1269,7 +1269,7 @@ class EventHandler(QtCore.QObject):
 		device_guid, input_type, input_id = gremlin.config.Configuration().get_last_input()
 		if input_type and input_id:
 			eh = gremlin.event_handler.EventListener()
-			eh.select_input.emit(device_guid, input_type, input_id)
+			eh.select_input.emit(device_guid, input_type, input_id, False)
 		
 
 

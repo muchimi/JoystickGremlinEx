@@ -186,6 +186,11 @@ Joystick Gremlin EX
 
 
 ## 13.40.16ex (pre-release)
+### (m23)
+- Improved: 1:1 mapping now has a configuration dialog box to select target and mapping mode.
+- Fix: 1:1 usable mode accounts for vjoy mappings by both vjoy mappers
+- Fix: Input selection can throw a missing argument exception in m22 patch
+
 ### (m22)
 - Improved: axis repeater bar no longer causes a small window to flash temporarily on the UI
 - Improved: vjoy remap show/hide button grid checkbox can now change the state for all vjoy remap actions in the profile if the state is changed while a control key is held

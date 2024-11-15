@@ -1309,21 +1309,6 @@ class Configuration:
                 logging.getLogger("system").info(f"Saving last input selection: {device_guid} {device_name} {input_type} {input_id}")
                 pass
 
-    # @property
-    # def last_tab_guid(self):
-    #     ''' last selected tab device guid '''
-    #     tab_guid = self._profile_data.get("last_tab_guid",None)
-    #     if not tab_guid:
-    #         tab_guid = self._data.get("last_tab_guid",None)
-    #     return tab_guid
-    
-    # @last_tab_guid.setter
-    # def last_tab_guid(self, value):
-    #     tab_guid = str(value)
-    #     self._data["last_tab_guid"] = tab_guid
-    #     self._profile_data["last_tab_guid"] = tab_guid
-    #     self.save()
-    #     self.save_profile()        
 
 
     def get_last_device_guid(self):
@@ -1557,3 +1542,21 @@ class Configuration:
     # @splitter_pos.setter
     # def splitter_pos(self, data : int):
     #     self._data["splitter_config"] = data
+
+    @property 
+    def mapping_rollover_mode(self):
+        return self._data.get("mapping_rollover_mode",1)
+    
+    @mapping_rollover_mode.setter
+    def mapping_rollover_mode(self, mode : int):
+        self._data["mapping_rollover_mode"] = mode
+        self.save()
+
+    @property 
+    def mapping_vjoy_id(self):
+        return self._data.get("mapping_vjoy_id",1)
+
+    @mapping_vjoy_id.setter
+    def mapping_vjoy_id(self, id : int):
+        self._data["mapping_vjoy_id"] = id
+        self.save()        

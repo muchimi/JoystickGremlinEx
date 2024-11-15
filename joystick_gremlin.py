@@ -116,7 +116,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.16ex (m22)"
+APPLICATION_VERSION = "13.40.16ex (m23)"
 
 # the main ui
 ui = None
@@ -1446,7 +1446,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         # print (f"select last tab: {self.config.last_tab_guid}")
         device_guid, input_type, input_id = self.config.get_last_input()
         eh = gremlin.event_handler.EventListener()
-        eh.select_input.emit(device_guid, input_type, input_id)
+        eh.select_input.emit(device_guid, input_type, input_id, False)
 
 
     def _select_last_input(self):
@@ -1456,7 +1456,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         device_guid, input_type, input_id = self.config.get_last_input()
         if input_type and input_id:
             eh = gremlin.event_handler.EventListener()
-            eh.select_input.emit(device_guid, input_type, input_id)
+            eh.select_input.emit(device_guid, input_type, input_id, False)
 
     def _get_device_name(self, device_guid):
         ''' gets the name of the specified device '''
@@ -1608,6 +1608,19 @@ class GremlinUi(QtWidgets.QMainWindow):
     def _active_tab_index(self):
         ''' gets the index of the current tab '''
         return self.ui.devices.currentIndex()
+    
+    def _active_input_item(self) -> gremlin.base_profile.InputItem:
+        ''' gets the current selected input item '''
+        index = self.ui.devices.currentIndex()
+        widget = self.ui.devices.widget(index)
+        if hasattr(widget, "input_item_list_view"):
+            item_index = widget.input_item_list_view.current_index
+            data = widget.input_item_list_view.model.data(item_index)
+            return data
+        
+        return None
+
+
                 
     
     def _get_tab_guid(self, index : int) -> str:
@@ -2020,10 +2033,10 @@ class GremlinUi(QtWidgets.QMainWindow):
                 # change tabs and select
                 if verbose:
                     logging.getLogger("system").info(f"Event: execute tab switch begin")
-                eh.select_input.emit(event.device_guid, event.event_type, event.identifier)
+                eh.select_input.emit(event.device_guid, event.event_type, event.identifier, False)
             else:
                 # highlight the specififed item in the current device
-                eh.select_input.emit(event.device_guid, event.event_type, event.identifier)
+                eh.select_input.emit(event.device_guid, event.event_type, event.identifier, False)
 
 
 
@@ -3058,11 +3071,7 @@ if __name__ == "__main__":
         ui.activate(True)
     if args.start_minimized:
         ui.setHidden(True)
-    
-    # # restore last input
-    # event_listener = gremlin.event_handler.EventListener()
-    # device_guid, input_type, input_id = ui.config.get_last_input()
-    # event_listener.select_input.emit(device_guid, input_type, input_id)
+
 
     # Run UI
     syslog.info("GremlinEx UI launching")

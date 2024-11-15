@@ -1601,7 +1601,7 @@ def extract_remap_actions(action_sets):
     remap_actions = []
     for actions in [a for a in action_sets if a is not None]:
         for action in actions:
-            if hasattr(action,"name") and action.name == "remap":
+            if hasattr(action,"name") and action.name in ("Remap", "Vjoy Remap"):
                 remap_actions.append(action)
             # if isinstance(action, gremlin.action_plugins.remap.Remap):
             #     remap_actions.append(action)
@@ -2005,8 +2005,6 @@ class Profile():
                 vjoy[entry.vjoy_id]["button"].append(i+1)
             for i in range(entry.hat_count):
                 vjoy[entry.vjoy_id]["hat"].append(i+1)
-
-        
 
         # Create a list of all used remap actions
         remap_actions = self.list_actions()
