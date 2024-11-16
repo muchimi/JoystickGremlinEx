@@ -25,6 +25,8 @@ Adds the ability to import a mapping from an existing device.
 
 
 from __future__ import annotations
+
+
 from collections import namedtuple
 import os
 import copy
@@ -44,8 +46,9 @@ import gremlin.shared_state
 import PySide6
 from PySide6 import QtCore, QtGui, QtWidgets, QtMultimedia
 # from gremlin.util import *
-from gremlin.types import DeviceType
+from gremlin.types import DeviceType, TabDeviceType
 from gremlin.input_types import InputType
+import gremlin.util
 from gremlin.util import safe_read
 from gremlin.ui import ui_common,midi_device,osc_device, keyboard_device
 from gremlin.clipboard import Clipboard
@@ -53,6 +56,29 @@ from gremlin.clipboard import Clipboard
 import dinput 
 import uuid
 import copy
+
+import dinput
+from dinput import DeviceSummary
+import gremlin.base_classes
+import gremlin.base_profile
+import gremlin.event_handler
+import gremlin.shared_state
+from vjoy import vjoy
+
+
+
+
+import gremlin.config
+from gremlin.ui import ui_common
+
+
+import gremlin.joystick_handling
+import gremlin.ui.ui_common
+import dinput
+import enum
+import vjoy
+
+
 
 #from xml.dom import minidom
 from lxml import etree as ElementTree
@@ -62,6 +88,140 @@ NodeItem = namedtuple("NodeItem","device_name device_guid device_type node")
 #_ContainerItem= namedtuple("ContainerItem","device_name device_guid device_type mode input_type input_id input_description container_nodes data")
 
 
+    
+class MapperMode(enum.IntEnum):
+    ''' automatic mapping modes '''
+    Stop = 1 # stop if the vjoy target has fewer axes/buttons/hats
+    RoundRobin = 2 # restart at 1 if the vjoy target has fewer axes/buttons/hats
+    Unused = 3 # only map unused 
+
+
+class MapperModeWidget(QtWidgets.QWidget):
+    ''' mapper mode widget - lets the user pick a rollover mapping mode '''
+
+    mode_changed = QtCore.Signal(MapperMode) # fires when the mode is changed
+    def __init__(self, parent = None):
+
+        super().__init__(parent)
+
+
+        self._mode : MapperMode = None
+
+
+        self.rollover_stop_widget = QtWidgets.QRadioButton("Stop")
+        self.rollover_stop_widget.setToolTip("In this mode, the assignments will stop if the target VJOY device has insufficient axis, button or hat counts to do the mapping")
+        self.rollover_roundrobin_widget = QtWidgets.QRadioButton("Round-robin")
+        self.rollover_roundrobin_widget.setToolTip("In this mode, the assignments will restart at 1 if the target VJOY device has insufficient axis, button or hat counts to do the mapping")
+        self.rollover_unused_widget = QtWidgets.QRadioButton("Unused")
+        self.rollover_unused_widget.setToolTip("In this mode, the assignment uses the first unused VJOY output and stops if it runs out of available mappings.")
+
+        self.container_rollover_widget = QtWidgets.QWidget()
+        self.container_rollover_widget.setContentsMargins(0,0,0,0)
+        self.container_rollover_layout = QtWidgets.QHBoxLayout(self.container_rollover_widget)
+        self.container_rollover_layout.setContentsMargins(0,0,0,0)
+
+
+        self.container_rollover_layout.addWidget(QtWidgets.QLabel("Mapping Rollover behavior:"))
+        self.container_rollover_layout.addWidget(self.rollover_unused_widget)
+        self.container_rollover_layout.addWidget(self.rollover_stop_widget)
+        self.container_rollover_layout.addWidget(self.rollover_roundrobin_widget)
+        self.container_rollover_layout.addStretch()
+
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+        self.main_layout.addWidget(self.container_rollover_widget)
+
+        self.update_mode(emit=False)
+
+        self.rollover_stop_widget.clicked.connect(self.update_mode)
+
+    def setUnusedEnabled(self, value : bool):
+        self._unused_enabled = value
+        self.rollover_roundrobin_widget.setVisible(value)
+        if not value and self.mode == MapperMode.Unused:
+            self.mode = MapperMode.RoundRobin
+
+    @property
+    def mode(self) -> MapperMode:
+        if self._mode is None:
+            self._mode = gremlin.config.Configuration().mapping_rollover_mode
+        return self._mode
+    @mode.setter
+    def mode(self, value : MapperMode):
+        if value != self._mode:
+            self._mode = value
+            gremlin.config.Configuration().mapping_rollover_mode = value
+            self.update_mode(emit = False)
+
+
+    def update_mode(self, emit = True):
+        ''' mode setup '''
+        mode = self.mode
+        match mode:
+            case MapperMode.RoundRobin:
+                rb = self.rollover_roundrobin_widget
+            case MapperMode.Stop:
+                rb = self.rollover_stop_widget
+            case _:
+                rb = self.rollover_unused_widget
+
+        with QtCore.QSignalBlocker(rb):
+            rb.setChecked(True)
+
+        if emit:
+            self.mode_changed.emit(mode)        
+
+
+class DeviceInfoWidget(QtWidgets.QWidget):
+    ''' display device information as a widget '''
+    def __init__(self, device_info: DeviceSummary = None, parent = None):
+
+        super().__init__(parent)
+
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+        self._device_info = None
+        if device_info is not None:
+            self.device_info = device_info
+
+    @property
+    def device_info(self) -> DeviceSummary:
+        return self._device_info
+    
+    @device_info.setter
+    def device_info(self, value : DeviceSummary):
+        if self._device_info != value:
+            self._device_info = value
+            self.update()
+
+    def update(self):
+        ''' updates the display '''
+
+        gremlin.util.clear_layout(self.main_layout)
+
+        info = self.device_info
+        self.device_widget = QtWidgets.QWidget()
+        self.device_layout = QtWidgets.QFormLayout(self.device_widget)
+
+        self.device_layout.addRow("Source:", self.getStrWidget(info.name))
+        self.device_layout.addRow("Profile Mode:", self.getStrWidget(gremlin.shared_state.edit_mode))
+        self.device_layout.addRow("Axis count:", self.getIntWidget(info.axis_count))
+        self.device_layout.addRow("Button count:", self.getIntWidget(info.button_count))
+        self.device_layout.addRow("Hat count:", self.getIntWidget(info.hat_count))
+
+        self.main_layout.addWidget(self.device_widget)
+
+
+    def getIntWidget(self, value : int) -> ui_common.QIntLineEdit:
+        widget = ui_common.QIntLineEdit()
+        widget.setReadOnly(True)
+        widget.setValue(value)
+        return widget
+    
+    def getStrWidget(self, value : int) -> ui_common.QDataLineEdit:
+        widget = ui_common.QDataLineEdit()
+        widget.setReadOnly(True)
+        widget.setText(value)
+        return widget
+    
 
 class ContainerItem():
     ''' holds source profile input staging container data '''
@@ -420,6 +580,13 @@ class ImportProfileDialog(QtWidgets.QDialog):
         self.import_single_mode_widget.clicked.connect(self._update_mode_options)
         self._update_mode_options()
 
+        # rollover behavior
+        self.rollover_widget = MapperModeWidget()
+        
+
+        self.rollover_widget.mode_changed.connect(self._rollover_mode_changed)
+        self.mode : MapperMode = self.rollover_widget.mode
+
         # mapping container
 
         self.import_input_tree_widget = QtWidgets.QTreeWidget()
@@ -519,12 +686,20 @@ class ImportProfileDialog(QtWidgets.QDialog):
         self.container_mode_layout.addWidget(self.import_mode_selector)
         # self.container_mode_layout.addWidget(self.import_mode_list_widget)
 
-
+        warning_widget = gremlin.ui.ui_common.QIconLabel("fa.warning",use_qta=True,icon_color=QtGui.QColor("orange"),text="This function is experimental and still in development, and not necessary feature complete", use_wrap=False)
+        self.main_layout.addWidget(warning_widget)
         self.main_layout.addWidget(self.container_path_widget)
         self.main_layout.addWidget(self.container_command_header_widget)
+        self.main_layout.addWidget(self.rollover_widget)
         self.main_layout.addWidget(self.container_mappings_widget)
         self.main_layout.addWidget(self.container_buttons_widget)
 
+
+
+    @QtCore.Slot(MapperMode)
+    def _rollover_mode_changed(self, mode : MapperMode):
+        self.mode = mode
+                      
 
     def _create_nodata_input_item(self):
         ''' creates a no data node for the input list '''
@@ -609,9 +784,8 @@ class ImportProfileDialog(QtWidgets.QDialog):
         '''
         while selector.count() > 0:
             selector.removeItem(0)
-
         mode_list = profile.get_modes()
-        self.mode_list = [x[1] for x in mode_list]
+        self.mode_list = mode_list # [x[1] for x in mode_list]
         # Create mode name labels visualizing the tree structure
         inheritance_tree = profile.build_inheritance_tree()
         labels = []
@@ -654,6 +828,8 @@ class ImportProfileDialog(QtWidgets.QDialog):
             self._inheritance_tree_to_labels(labels, children, level+1)
 
     def _get_input_name(self, input_type: InputType, input_id):
+        if input_id == 0:
+            return "No Map"
         if input_type == InputType.JoystickAxis:
             return f"Axis {input_id}"
         elif input_type == InputType.JoystickButton:
@@ -704,9 +880,11 @@ class ImportProfileDialog(QtWidgets.QDialog):
     @QtCore.Slot()
     def _re_import_device(self):
         ''' re-imports a device '''
+        gremlin.util.pushCursor()
         widget = self.sender()
         import_item, device_node = widget.data
         self._update_import_item(import_item, device_node)
+        gremlin.util.popCursor()
 
 
     @QtCore.Slot()
@@ -1146,27 +1324,63 @@ class ImportProfileDialog(QtWidgets.QDialog):
         header.setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
 
+    def _clear_all_inputs(self):
+        ''' clears all used inputs '''
+        self.used_target_inputs = {}
 
-    def _find_target(self, source_device_guid : dinput.GUID,  device_guid : dinput.GUID, input_type : InputType, input_id) -> tuple:
+    def _register_used_input(self, device_guid, input_type, input_id):
+        ''' registers a device input as used '''
+        if input_id is None: 
+            return # nothing to register
+        if not device_guid in self.used_target_inputs:
+            self.used_target_inputs[device_guid] = {}
+        if not input_type in self.used_target_inputs[device_guid]:
+            self.used_target_inputs[device_guid][input_type] = []
+        if not input_id in self.used_target_inputs[device_guid][input_type]:
+            self.used_target_inputs[device_guid][input_type].append(input_id)
+
+
+    def _get_used_input(self, device_guid, input_type):
+        ''' gets a list of registered inputs '''
+        if device_guid in self.used_target_inputs:
+            if input_type in self.used_target_inputs[device_guid]:
+                return self.used_target_inputs[device_guid][input_type]
+            
+        return []
+    
+    def _clear_used_input(self, device_guid, input_type):
+        ''' clears the registered inputs '''
+        if not device_guid in self.used_target_inputs:
+            self.used_target_inputs[device_guid] = {}
+        self.used_target_inputs[device_guid][input_type] = []
+        
+
+    
+
+
+
+    def _find_target(self, source_device_guid : dinput.GUID,  target_device_guid : dinput.GUID, input_type : InputType, input_id) -> tuple:
         '''' gets at target guid and target input id for the requested input type
         : returns : (target_device_guid, target_input_id) 
           
             '''
         
 
-        verbose = gremlin.config.Configuration().verbose
+        verbose = gremlin.config.Configuration().verbose_mode_inputs
         syslog = logging.getLogger("system")
-        if device_guid in self.target_devices_map:
-            target_device_guid = device_guid
-            target_device = self.target_devices_map[device_guid]
+        if target_device_guid in self.target_devices_map:
+            target_device_guid = target_device_guid
+            target_device = self.target_devices_map[target_device_guid]
         else:
             target_device_guid, input_id = self._default_info_map[input_type]
-            target_device = self.target_devices_map[device_guid]
+            target_device = self.target_devices_map[target_device_guid]
 
 
         if source_device_guid in self._input_device_guid_to_target_device_guid:
             target_device_guid = self._input_device_guid_to_target_device_guid[source_device_guid]
 
+        rollover = self.mode
+        target_input_id = 0 # not set
         match input_type:
             case InputType.JoystickAxis:
                 if target_device.axis_count == 0:
@@ -1174,14 +1388,28 @@ class ImportProfileDialog(QtWidgets.QDialog):
                     target_device_guid, target_input_id = self._default_info_map[input_type]
                     if verbose:
                         syslog.info(f"\t\t\tMapping axis: target has no axes found - using default mapping {input_id} -> {target_input_id}")
-                
-                if input_id > target_device.axis_count:
-                    target_input_id = 1
-                    if verbose:
-                        syslog.info(f"\t\t\tMapping axis: target has too few axes {target_device.axis_count} found - mapping {input_id} -> axis {target_input_id}")
                     
                 else:
+
+                    match rollover:
+                        case MapperMode.Stop:
+                            if input_id > target_device.axis_count:
+                                if verbose:
+                                    syslog.info(f"\t\t\tMapping axis: target has too few axes {target_device.axis_count} found - mapping {input_id} -> axis {target_input_id}")
+                            else:
+                                target_input_id = input_id
+                        case MapperMode.RoundRobin:
+                            if input_id > target_device.axis_count:
+                                target_input_id = 1
+                        case MapperMode.Unused:
+                            used_inputs = self._get_used_input(target_device_guid, input_type)
+                            used_inputs.sort()
+                            for id in range(1,target_device.axis_count+1):
+                                if not id in used_inputs:
+                                    target_input_id = id
+                                    break
                     target_input_id = input_id
+                    self._register_used_input(target_device_guid, input_type, target_input_id)
                     if verbose:
                         syslog.info(f"\t\t\tMapping axis: ok - mapping {input_id} -> {target_input_id}")
                     
@@ -1190,27 +1418,49 @@ class ImportProfileDialog(QtWidgets.QDialog):
                     target_device_guid, target_input_id = self._default_info_map[input_type]
                     if verbose:
                         syslog.info(f"\t\t\tMapping axis: target has no buttons found - map {input_id} to default {target_input_id}")
-                if input_id > target_device.button_count:
-                    target_input_id = 1
-                    if verbose:
-                        syslog.info(f"\t\t\tMapping button: target has too few buttons {target_device.button_count} found - mapping {input_id} -> axis {target_input_id}")
                 else:
+                    match rollover:
+                        case MapperMode.Stop:
+                            if input_id <= target_device.button_count:
+                                target_input_id = input_id
+                        case MapperMode.RoundRobin:
+                            if input_id > target_device.button_count:
+                                target_input_id = 1
+                        case MapperMode.Unused:
+                            used_inputs = self._get_used_input(target_device_guid, input_type)
+                            used_inputs.sort()
+                            for id in range(1,target_device.button_count+1):
+                                if not id in used_inputs:
+                                    target_input_id = id
+                                    break
                     target_input_id = input_id
-                    if verbose:
-                        syslog.info(f"\t\t\tMapping button: ok mapping {input_id} -> {target_input_id}")
+                    self._register_used_input(target_device_guid, input_type, target_input_id)
                     
             case InputType.JoystickHat:
                 if target_device.hat_count == 0:
                     target_device_guid, target_input_id = self._default_info_map[input_type]
                     if verbose:
-                        syslog.info(f"\t\t\tMapping hat: target has no hats found - cannot map axis {input_id} - {target_input_id}")
-                if input_id > target_device.hat_count:
-                    target_input_id = 1
-                    
+                        syslog.info(f"\t\t\tMapping hat: target has no hats found - cannot map hat {input_id} - {target_input_id}")
                 else:
+                    match rollover:
+                        case MapperMode.Stop:
+                            if input_id > target_device.hat_count:
+                                if verbose:
+                                    syslog.info(f"\t\t\tMapping axis: target has too few hats {target_device.hat_count} found - mapping {input_id} -> hat {target_input_id}")
+                            else:
+                                target_input_id = input_id
+                        case MapperMode.RoundRobin:
+                            if input_id > target_device.hat_count:
+                                target_input_id = 1
+                        case MapperMode.Unused:
+                            used_inputs = self._get_used_input(target_device_guid, input_type)
+                            used_inputs.sort()
+                            for id in range(1,target_device.hat_count+1):
+                                if not id in used_inputs:
+                                    target_input_id = id
+                                    break
                     target_input_id = input_id
-                    if verbose:
-                        syslog.info(f"\t\t\tMapping hat: ok mapping {input_id} -> {target_input_id}")
+                    self._register_used_input(target_device_guid, input_type, target_input_id)
             case _:
                 # all others
                 target_input_id = input_id
@@ -1218,15 +1468,19 @@ class ImportProfileDialog(QtWidgets.QDialog):
         return target_device_guid, target_input_id
     
     def _update_import_item(self, import_item : ImportItem, device_node : QtWidgets.QTreeWidgetItem):
-        ''' updates an import item '''
+        ''' updates an import item mapping '''
 
-        verbose = gremlin.config.Configuration()
+        verbose = gremlin.config.Configuration().verbose_mode_inputs
         syslog = logging.getLogger("system")
         tree = self.import_input_tree_widget
         syslog = logging.getLogger("system")
         mode_item: ImportModeItem
         target_widget = self._map[import_item]
         source_device_guid = import_item.device_guid
+
+        self._clear_all_inputs()
+        
+        
         
         # clear the node from children
         for _ in range(device_node.childCount()): 
@@ -1344,6 +1598,8 @@ class ImportProfileDialog(QtWidgets.QDialog):
                 input_item.map_to_widget = widget
                 self._map[input_item] = widget
 
+                # target_device = gremlin.joystick_handling.device_info_from_guid(target_device_guid)
+
                 for container_item in input_item.containers:
 
                     container_node = QtWidgets.QTreeWidgetItem()
@@ -1400,7 +1656,7 @@ class ImportProfileDialog(QtWidgets.QDialog):
             with QtCore.QSignalBlocker(tree):
                 tree.clear()
                 tree.setColumnCount(5)
-                tree.setHeaderLabels(["Device","Actions","Map To","",""])
+                tree.setHeaderLabels(["Device","Actions","Map To Input","",""])
                 
                 
                 syslog = logging.getLogger("system")
@@ -1416,6 +1672,12 @@ class ImportProfileDialog(QtWidgets.QDialog):
                 tree.addTopLevelItem(root_node)
 
                 import_item : ImportItem
+
+                # get mapping output options
+                rollover = self.mode
+
+
+
 
                 for import_item in self._import_map.values():
 
@@ -1457,11 +1719,13 @@ class ImportProfileDialog(QtWidgets.QDialog):
                     remap_widget.data = (import_item, device_node)
 
                     detail_widget = None
+                    width = gremlin.ui.ui_common.get_text_width("MMM")
                     if import_item.device_type in (DeviceType.Joystick, DeviceType.VJoy):
                         detail_widget = ui_common.QDataPushButton("...")
                         detail_widget.setToolTip("Details")
                         detail_widget.clicked.connect(self._view_details)
                         detail_widget.data = (import_item, device_node)
+                        detail_widget.setMaximumWidth(width)
 
                     container_options_widget = QtWidgets.QWidget()
                     container_options_widget.setContentsMargins(0,0,0,0)
@@ -1470,6 +1734,7 @@ class ImportProfileDialog(QtWidgets.QDialog):
                     container_options_layout.addWidget(remap_widget)
                     if detail_widget:
                         container_options_layout.addWidget(detail_widget)
+                    container_options_layout.addStretch()
 
 
                     self._map[import_item] = target_widget
@@ -1539,11 +1804,14 @@ class ImportProfileDialog(QtWidgets.QDialog):
         self.populate_mode_selector(widget, self.source_profile)
 
         return container_widget, widget
+    
+       
+
 
     def _create_target_input_widget(self, source_import_item : ImportItem, source_input_item : ImportInputItem, target_device_guid : dinput.GUID, target_input_id : int):
-        ''' create a combo box for the mode mapping '''
+        ''' creates a listing of all possible output types for the given input type  '''
 
-        verbose = gremlin.config.Configuration().verbose
+        verbose = gremlin.config.Configuration().verbose_mode_inputs
         syslog = logging.getLogger("system")
 
         source_input_type = source_input_item.input_type
@@ -1555,7 +1823,6 @@ class ImportProfileDialog(QtWidgets.QDialog):
             items = {} # map of possible target input items keyed by input type
             for _, input_type in enumerate(InputType):
                 items[input_type] = []
-
 
                 # build the list of target inputs
                 if input_type == InputType.KeyboardLatched:
@@ -1595,37 +1862,48 @@ class ImportProfileDialog(QtWidgets.QDialog):
                         # only create axis outputs that exist on the device
                         if verbose:
                             syslog.info(f"\t\t\tDevice {info.name} -> axis count: {info.axis_count}")
-                        for index in range(info.axis_count):
-                            item = ImportInputItem()
-                            item.input_name = source_input_item.input_name
-                            item.input_description = source_input_item.input_description
-                            item.description = source_input_item.description
-                            item.input_type = input_type
-                            item.input_id = index + 1
-                            item.input_type = input_type
-                            item.input_name = self._get_input_name(item.input_type, item.input_id)
-                            item.device_guid = target_device_guid
-                            items[input_type].append(item)
-                            if verbose:
-                                syslog.info(f"\t\t\tAxis {source_input_item.input_id} -> {item.input_id}")
-                        
+                        if info.axis_count:
+                            for input_id in range(0, info.axis_count+1):
+                                item = ImportInputItem()
+                                if input_id == 0:
+                                    item.input_name = "No Map"              
+                                    item.description = "Do not map this entry"
+                                else:
+                                    item.input_name = source_input_item.input_name
+                                    item.description = source_input_item.description
+                                item.input_description = source_input_item.input_description
+                                item.input_type = input_type
+                                item.input_id = input_id
+                                item.input_type = input_type
+                                item.input_name = self._get_input_name(item.input_type, item.input_id)
+                                item.device_guid = target_device_guid
+                                items[input_type].append(item)
+                                if verbose:
+                                    syslog.info(f"\t\t\tAxis {source_input_item.input_id} -> {item.input_id}")
+                            
                 elif input_type == InputType.JoystickButton:                        
                     info : gremlin.joystick_handling.DeviceSummary = gremlin.joystick_handling.device_info_from_guid(target_device_guid)
                     # only create button outputs that exist on the device
                     if info is not None:
                         if verbose:
                             syslog.info(f"\t\t\tDevice {info.name} -> button count: {info.button_count}")
-                        for index in range(info.button_count):
-                            item = ImportInputItem()
-                            item.input_name = source_input_item.input_name
-                            item.input_description = source_input_item.input_description
-                            item.description = source_input_item.description
-                            item.input_type = input_type
-                            item.input_id = index + 1
-                            item.input_type = input_type
-                            item.input_name = self._get_input_name(item.input_type, item.input_id)
-                            item.device_guid = target_device_guid
-                            items[input_type].append(item)
+                        if info.button_count:
+                            
+                            for input_id in range(0,info.button_count+1):
+                                item = ImportInputItem()
+                                if input_id == 0:
+                                    item.input_name = "No Map"              
+                                    item.description = "Do not map this entry"
+                                else:
+                                    item.input_name = source_input_item.input_name
+                                    item.description = source_input_item.description
+                                item.input_description = source_input_item.input_description
+                                item.input_type = input_type
+                                item.input_id = input_id
+                                item.input_type = input_type
+                                item.input_name = self._get_input_name(item.input_type, item.input_id)
+                                item.device_guid = target_device_guid
+                                items[input_type].append(item)
              
                 elif input_type == InputType.JoystickHat:                        
                     info : gremlin.joystick_handling.DeviceSummary = gremlin.joystick_handling.device_info_from_guid(target_device_guid)
@@ -1633,17 +1911,23 @@ class ImportProfileDialog(QtWidgets.QDialog):
                     if info is not None:
                         if verbose:
                             syslog.info(f"\t\t\tDevice {info.name} -> hat count: {info.hat_count}")
-                        for index in range(info.hat_count):
-                            item = ImportInputItem()
-                            item.input_name = source_input_item.input_name
-                            item.input_description = source_input_item.input_description
-                            item.description = source_input_item.description
-                            item.input_type = input_type
-                            item.input_id = index + 1
-                            item.input_type = input_type
-                            item.input_name = self._get_input_name(item.input_type, item.input_id)
-                            item.device_guid = target_device_guid
-                            items[item.input_type].append(item)
+                        if info.hat_count:
+                            items[input_type].append(self._no_map_item())
+                            for input_id in range(0,info.hat_count+1):
+                                item = ImportInputItem()
+                                if input_id == 0:
+                                    item.input_name = "No Map"              
+                                    item.description = "Do not map this entry"
+                                else:
+                                    item.input_name = source_input_item.input_name
+                                    item.description = source_input_item.description
+                                item.input_description = source_input_item.input_description
+                                item.input_type = input_type
+                                item.input_id = input_id
+                                item.input_type = input_type
+                                item.input_name = self._get_input_name(item.input_type, item.input_id)
+                                item.device_guid = target_device_guid
+                                items[input_type].append(item)
 
             # remember the list for next time - the map contains all possible mappings keyed by input type
             self._target_input_item_map[target_device_guid] = items
@@ -1889,9 +2173,12 @@ class ImportProfileDialog(QtWidgets.QDialog):
                             widget = input_item.map_to_widget
                             if widget:
 
-
+                                
                                 input_input_id = input_item.input_id
                                 input_input_type = input_item.input_type
+                                if input_input_id == 0:
+                                    # no map entry - skip
+                                    continue
 
                                 # get the target input on that device
                                 target_input_item : ImportInputItem = widget.currentData()
@@ -2024,53 +2311,18 @@ class ImportDetailDialog(QtWidgets.QDialog):
         self.setWindowModality(QtCore.Qt.ApplicationModal)
         syslog = logging.getLogger("system")
 
-        target_info : gremlin.joystick_handling.DeviceSummary = gremlin.joystick_handling.device_info_from_guid(target_device_guid)
+        target_info : DeviceSummary = gremlin.joystick_handling.device_info_from_guid(target_device_guid)
         self.main_layout = QtWidgets.QHBoxLayout(self)
 
-        source_widget = QtWidgets.QWidget()
-        source_layout = QtWidgets.QFormLayout(source_widget)
+        source_info : DeviceSummary = gremlin.joystick_handling.device_info_from_guid(import_item.device_guid)
 
-        target_widget = QtWidgets.QWidget()
-        target_layout = QtWidgets.QFormLayout(target_widget)
-
-
-
-        
-        source_layout.addRow("Source:", self.getStrWidget(import_item.device_name))
-        source_layout.addRow("Axis count:", self.getIntWidget(import_item.getAxisCount()))
-        source_layout.addRow("Button count:", self.getIntWidget(import_item.getButtonCount()))
-        source_layout.addRow("Hat count:", self.getIntWidget(import_item.getHatCount()))
-
-        target_layout.addRow("Target:", self.getStrWidget(target_info.name))
-        target_layout.addRow("Axis count:", self.getIntWidget(target_info.axis_count))
-        target_layout.addRow("Button count:", self.getIntWidget(target_info.button_count))
-        target_layout.addRow("Hat count:", self.getIntWidget(target_info.hat_count))
+        source_widget = DeviceInfoWidget(source_info)
+        target_widget = DeviceInfoWidget(target_info)
 
         self.main_layout.addWidget(source_widget)
         self.main_layout.addWidget(target_widget)
 
         self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
-        
-
-
-    def getIntWidget(self, value : int) -> ui_common.QIntLineEdit:
-        widget = ui_common.QIntLineEdit()
-        widget.setReadOnly(True)
-        widget.setValue(value)
-        return widget
-    
-    def getStrWidget(self, value : int) -> ui_common.QDataLineEdit:
-        widget = ui_common.QDataLineEdit()
-        widget.setReadOnly(True)
-        widget.setText(value)
-        return widget
-    
-    
-
-
-
-
-
 
 
 
@@ -2089,3 +2341,378 @@ def import_profile():
     dialog.exec()
 
     gremlin.shared_state.ui.refresh()
+
+
+
+
+class Mapper():
+    ''' mapping helper class'''
+
+
+    class MapperDialog(QtWidgets.QDialog):
+        ''' dialog for mapping options '''
+
+
+        def __init__(self, device_info : dinput.DeviceSummary, parent=None):
+
+            super().__init__(parent)
+
+            # make modal
+            self.setWindowModality(QtCore.Qt.ApplicationModal)
+            syslog = logging.getLogger("system")
+
+            self.setMinimumWidth(400)
+
+            self.main_layout = QtWidgets.QVBoxLayout(self)
+
+            self.button_mapper = "Vjoy Remap"
+
+            devices = sorted(gremlin.joystick_handling.vjoy_devices(),key=lambda x: x.vjoy_id)
+            if not devices:
+                # no vjoy devices to map
+                ui_common.MessageBox(prompt="No VJOY devices found to map to")
+                self.close()
+            
+
+            # info
+            self.container_info_widget = QtWidgets.QWidget()
+            self.container_info_widget.setContentsMargins(0,0,0,0)
+            self.container_info_layout = QtWidgets.QVBoxLayout(self.container_info_widget)
+            self.container_info_layout.setContentsMargins(0,0,0,0)
+
+            self.device_widget = QtWidgets.QWidget()
+            self.device_layout = QtWidgets.QFormLayout(self.device_widget)
+
+
+
+            self.device_layout.addRow("Source:", self.getStrWidget(device_info.name))
+            self.device_layout.addRow("Profile Mode:", self.getStrWidget(gremlin.shared_state.edit_mode))
+            self.device_layout.addRow("Axis count:", self.getIntWidget(device_info.axis_count))
+            self.device_layout.addRow("Button count:", self.getIntWidget(device_info.button_count))
+            self.device_layout.addRow("Hat count:", self.getIntWidget(device_info.hat_count))
+
+            self.container_info_layout.addWidget(QtWidgets.QLabel("<b>1:1 Mapping Options</b>"))
+            self.container_info_layout.addWidget(self.device_widget)
+
+        
+
+            # import options
+            self.container_options_widget = QtWidgets.QWidget()
+            self.container_options_widget.setContentsMargins(0,0,0,0)
+            self.container_options_layout = QtWidgets.QHBoxLayout(self.container_options_widget)
+            self.container_options_layout.setContentsMargins(0,0,0,0)
+
+
+            self.container_button_widget = QtWidgets.QWidget()
+            self.container_button_widget.setContentsMargins(0,0,0,0)
+            self.container_button_layout = QtWidgets.QHBoxLayout(self.container_button_widget)
+            self.container_button_layout.setContentsMargins(0,0,0,0)
+            
+
+            self.lbl_vjoy_device_selector = QtWidgets.QLabel("Target VJoy Device:")
+            self.cb_vjoy_device_selector = gremlin.ui.ui_common.NoWheelComboBox()
+
+            
+            self.container_selector_widget = QtWidgets.QWidget()
+            self.container_selector_widget.setContentsMargins(0,0,0,0)
+            self.container_selector_layout = QtWidgets.QHBoxLayout(self.container_selector_widget)
+            self.container_selector_layout.setContentsMargins(0,0,0,0)
+            self.container_selector_layout.addWidget(self.lbl_vjoy_device_selector)
+            self.container_selector_layout.addWidget(self.cb_vjoy_device_selector)
+            self.container_selector_layout.addStretch()
+
+            self.vjoy_map = {}
+
+            config = gremlin.config.Configuration()
+            
+            self._vjoy_id = config.mapping_vjoy_id
+
+            selected_index = None
+            index = 0
+            for dev in devices:
+                self.cb_vjoy_device_selector.addItem(dev.name, dev.vjoy_id)
+                self.vjoy_map[dev.vjoy_id] = dev
+                if dev.vjoy_id == self.vjoy_id:
+                    selected_index = index
+                index+=1
+
+            if selected_index is not None:
+                self.cb_vjoy_device_selector.setCurrentIndex(selected_index)
+
+            if not self.vjoy_id in self.vjoy_map:
+                self.vjoy_id = self.cb_vjoy_device_selector.itemData(0)
+                
+
+            self.cb_vjoy_device_selector.currentIndexChanged.connect(self._select_vjoy)
+
+
+            self.mapper_vjoy_remap_widget = QtWidgets.QRadioButton("Vjoy Remap")
+            self.mapper_vjoy_remap_widget.setChecked(True)
+            self.mapper_remap_widget = QtWidgets.QRadioButton("Legacy Remap")
+
+            self.mapper_vjoy_remap_widget.clicked.connect(self._select_vjoy_remap)
+            self.mapper_remap_widget.clicked.connect(self._select_remap)
+
+
+            self.container_options_layout.addWidget(QtWidgets.QLabel("Target Vjoy Mapper:"))
+            self.container_options_layout.addWidget(self.mapper_vjoy_remap_widget)
+            self.container_options_layout.addWidget(self.mapper_remap_widget)
+            self.container_options_layout.addStretch()
+
+            self.rollover_widget = MapperModeWidget()
+            self.rollover_widget.mode_changed.connect(self._rollover_mode_changed)
+            self.mode : MapperMode = self.rollover_widget.mode
+
+            self.execute_button = QtWidgets.QPushButton("Map 1:1")
+            self.execute_button.clicked.connect(self._execute_mapping)
+            self.cancel_button = QtWidgets.QPushButton("Cancel")
+            self.cancel_button.clicked.connect(self.close)
+
+            self.container_button_layout.addStretch()
+            self.container_button_layout.addWidget(self.execute_button)
+            self.container_button_layout.addWidget(self.cancel_button)
+
+
+            self.main_layout.addWidget(self.container_info_widget)
+            self.main_layout.addWidget(self.container_selector_widget)
+            self.main_layout.addWidget(self.container_options_widget)
+            #self.main_layout.addWidget(self.container_rollover_widget)
+            self.main_layout.addWidget(self.rollover_widget)
+            self.main_layout.addStretch()
+            self.main_layout.addWidget(self.container_button_widget)
+
+        def getIntWidget(self, value : int) -> ui_common.QIntLineEdit:
+            widget = ui_common.QIntLineEdit()
+            widget.setReadOnly(True)
+            widget.setValue(value)
+            return widget
+        
+        def getStrWidget(self, value : int) -> ui_common.QDataLineEdit:
+            widget = ui_common.QDataLineEdit()
+            widget.setReadOnly(True)
+            widget.setText(value)
+            return widget            
+
+
+        @property
+        def vjoy_id(self) -> int:
+            return self._vjoy_id
+        @vjoy_id.setter
+        def vjoy_id(self, value: int):
+            self._vjoy_id = value
+            gremlin.config.Configuration().mapping_vjoy_id = value
+            
+        @QtCore.Slot(bool)
+        def _select_vjoy_remap(self, checked):
+            if checked:
+                self.button_mapper = "Vjoy Remap"
+
+        @QtCore.Slot(bool)
+        def _select_remap(self, checked):
+            if checked:
+                self.button_mapper = "Remap"
+
+        @QtCore.Slot()
+        def _select_vjoy(self):
+            self.vjoy_id = self.cb_vjoy_device_selector.currentData()
+            
+        
+        @QtCore.Slot(MapperMode)
+        def _rollover_mode_changed(self, mode : MapperMode):
+            self.mode = mode
+                      
+
+        @QtCore.Slot()
+        def _execute_mapping(self):
+            ''' executes the mapping '''
+            self.create_1to1_mapping(self.vjoy_id, self.button_mapper, self.mode)
+            self.close()
+
+
+
+
+
+        def create_1to1_mapping(self, vjoy_id : int = 1, vjoy_mapper : str = "Vjoy Remap", rollover : MapperMode = MapperMode.Unused):
+            """Creates a 1 to 1 mapping of the given device to the first
+            vJoy device.
+            """
+            # Don't attempt to create the mapping for the "Getting Started"
+            # widget
+
+            gremlin.util.pushCursor()
+            try:
+                syslog = logging.getLogger("system")
+                tab_device_type : TabDeviceType
+                gremlin_ui = gremlin.shared_state.ui
+                ui = gremlin_ui.ui
+                tab_device_type, _ = ui.devices.currentWidget().data
+                if not tab_device_type in (TabDeviceType.Joystick, TabDeviceType.VjoyInput):
+                    gremlin.ui.ui_common.MessageBox("Information","1:1 mapping is only available on input joysticks")
+                    return
+
+                device_profile = ui.devices.currentWidget().device_profile
+                # Don't create mappings for non joystick devices
+                if device_profile.type != DeviceType.Joystick:
+                    return
+
+                container_plugins = gremlin.plugin_manager.ContainerPlugins()
+                action_plugins = gremlin.plugin_manager.ActionPlugins()
+                current_mode = gremlin.shared_state.current_mode
+                # mode = device_profile.modes[current_mode]
+                input_types = [
+                    InputType.JoystickAxis,
+                    InputType.JoystickButton,
+                    InputType.JoystickHat
+                ]
+                type_name = {
+                    InputType.JoystickAxis: "axis",
+                    InputType.JoystickButton: "button",
+                    InputType.JoystickHat: "hat",
+                }
+                #current_profile = device_profile.parent
+
+                current_profile = gremlin.shared_state.current_profile
+                tab_guid = gremlin.util.parse_guid(gremlin_ui._active_tab_guid())
+                device : gremlin.base_profile.Device = current_profile.devices[tab_guid]
+
+                tab_map = gremlin_ui._get_tab_map()
+                if device.type != DeviceType.Joystick:
+                    ''' selected tab is not a joystick - pick the first joystick tab as ordered by the user '''
+                    
+                    tab_ids = [device_id for device_id, _, tab_type, _ in tab_map.values() if tab_type == TabDeviceType.Joystick]
+
+                    if not tab_ids:
+                        syslog.warning("No joystick available to map to")
+                        mb =ui_common.MessageBox("Unable to create mapping, no suitable input hardware found.")
+                        mb.exec()
+                        return
+                    
+                    tab_guid = gremlin.util.parse_guid(tab_ids[0])
+                    device = current_profile.devices[tab_guid]
+
+                mode = device.modes[current_mode]
+                if rollover == MapperMode.Unused:
+                    item_list = current_profile.list_unused_vjoy_inputs()
+                    for input_type in input_types:
+                        for entry in mode.config[input_type].values():
+                            input_list  = item_list[vjoy_id][type_name[input_type]]
+                            if len(input_list) > 0:
+                                vjoy_input_id = input_list.pop(0)
+                                container = container_plugins.repository["basic"](entry)
+                                action = action_plugins.repository[vjoy_mapper](container)
+                                action.input_type = input_type
+                                action.vjoy_input_id = vjoy_input_id
+                                action.vjoy_device_id = vjoy_id
+
+                                container.add_action(action)
+                                entry.containers.append(container)
+
+                elif rollover == MapperMode.Stop:
+                    info : dinput.DeviceSummary = gremlin.joystick_handling.vjoy_info_from_vjoy_id(vjoy_id)
+                    axis_list = [i for i in range(1, info.axis_count+1)]
+                    hat_list = [i for i in range(1, info.hat_count+1)]
+                    button_list = [i for i in range(1, info.button_count+1)]
+
+                    for input_type in input_types:
+                        for entry in mode.config[input_type].values():
+                            if input_type == InputType.JoystickAxis:
+                                if not axis_list:
+                                    continue
+                                input_list = axis_list
+                            elif input_type == InputType.JoystickHat:
+                                if not hat_list:
+                                    continue
+                                input_list = hat_list
+                            elif input_type == InputType.JoystickButton:
+                                if not button_list:
+                                    continue
+                                input_list = button_list
+                            else:
+                                continue
+
+                            if len(input_list) > 0:
+                                vjoy_input_id = input_list.pop(0)
+                                container = container_plugins.repository["basic"](entry)
+                                action = action_plugins.repository[vjoy_mapper](container)
+                                action.input_type = input_type
+                                action.vjoy_input_id = vjoy_input_id
+                                action.vjoy_device_id = vjoy_id
+
+                                container.add_action(action)
+                                entry.containers.append(container)
+
+                elif rollover == MapperMode.RoundRobin:
+                    info = gremlin.joystick_handling.vjoy_info_from_vjoy_id(vjoy_id)
+                    axis_list = [i for i in range(1, info.axis_count+1)]
+                    hat_list = [i for i in range(1, info.hat_count+1)]
+                    button_list = [i for i in range(1, info.button_count+1)]
+                    axis_index = 0
+                    hat_index = 0
+                    button_index = 0
+
+                    for input_type in input_types:
+                        for entry in mode.config[input_type].values():
+                            if input_type == InputType.JoystickAxis:
+                                if not axis_list:
+                                    continue
+                                vjoy_input_id = axis_list[axis_index]
+                                axis_index +=1
+                                if axis_index >= len(axis_list):
+                                    axis_index = 0
+                            elif input_type == InputType.JoystickHat:
+                                if not hat_list:
+                                    continue
+                                vjoy_input_id = hat_list[hat_index]
+                                hat_index +=1
+                                if hat_index >= len(hat_list):
+                                    hat_index = 0
+
+                            elif input_type == InputType.JoystickButton:
+                                if not button_list:
+                                    continue
+                                vjoy_input_id = button_list[button_index]
+                                button_index +=1
+                                if button_index >= len(button_list):
+                                    button_index = 0
+                            else:
+                                continue
+
+                            container = container_plugins.repository["basic"](entry)
+                            action = action_plugins.repository[vjoy_mapper](container)
+                            action.input_type = input_type
+                            action.vjoy_input_id = vjoy_input_id
+                            action.vjoy_device_id = vjoy_id
+
+                            container.add_action(action)
+                            entry.containers.append(container)
+
+                            
+
+                            
+
+                # refresh the input tabs
+
+                devices : QtWidgets.QTabWidget = ui.devices
+                tab_index = gremlin_ui._active_tab_index()
+                tab_widget =  devices.widget(tab_index)
+                tab_widget.refresh()
+
+                # update the selection
+                eh = gremlin.event_handler.EventListener()
+                device_guid, input_type, input_id = gremlin.config.Configuration().get_last_input()
+                if input_type and input_id:
+                    eh = gremlin.event_handler.EventListener()
+                    eh.select_input.emit(device_guid, input_type, input_id, True)
+            finally:
+                gremlin.util.popCursor()
+
+            
+    def create_1to1_mapping(self):           
+        ''' shows the dialog '''
+        #input_item = gremlin.shared_state.ui._active_input_item()
+        device_guid = gremlin.shared_state.ui._active_tab_guid()
+        device_info = gremlin.joystick_handling.device_info_from_guid(device_guid)
+        if device_info is not None:
+            dialog = Mapper.MapperDialog(device_info)
+            gremlin.util.centerDialog(dialog, width = dialog.width(), height=dialog.height())
+            dialog.exec()

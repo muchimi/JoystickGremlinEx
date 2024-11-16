@@ -30,7 +30,7 @@ import dinput
 import qtawesome as qta
 from lxml import etree as ElementTree
 from typing import Callable
-
+from types import FunctionType, MethodType
 
 from PySide6 import QtCore, QtWidgets, QtGui
 from win32api import GetFileVersionInfo, LOWORD, HIWORD
@@ -38,6 +38,7 @@ from PySide6.QtGui import QColor
 
 from . import error
 
+from gremlin.singleton_decorator import SingletonDecorator
 
 # Table storing which modules have been imported already
 g_loaded_modules = {}
@@ -564,9 +565,30 @@ def find_files(root_folder, source_pattern = "*") -> list:
 
     return []
 
-                    
+
+@SingletonDecorator
+class SearchCache():
+    ''' file search cache service '''
+    def __init__(self):
+        self.cache = {}
+
+    def find_file(self, file_path, root_folder = None):
+        if not file_path in self.cache:
+            item = _find_file(file_path, root_folder)
+            if item is not None:
+                self.cache[file_path] = item
+            return item
+        return self.cache[file_path]
+            
 def find_file(file_path, root_folder = None):
+    cache = SearchCache()
+    return cache.find_file(file_path, root_folder)
+
+
+def _find_file(file_path, root_folder = None):
     ''' finds a file '''
+
+    
 
 
     from pathlib import Path
@@ -600,6 +622,10 @@ def find_file(file_path, root_folder = None):
             extensions = [".svg",".png"]
         circuit_breaker = 1000
         for dirpath, _, filenames in os.walk(root_folder):
+            last = os.path.basename(dirpath)
+            if last.startswith("."):
+                # ignore hidden folders
+                continue
             circuit_breaker-=1
             if circuit_breaker == 0:
                 break
@@ -694,6 +720,8 @@ def load_pixmap(*paths):
     
     logging.getLogger("system").error(f"load_pixmap(): invalid path")
     return None
+
+   
 
 def load_icon(*paths, use_qta = False, qta_color = None):
     ''' gets an icon (returns a QIcon) - uses the qtawesome library or does a raw file search '''
@@ -1033,10 +1061,6 @@ def csv_to_list(value) -> list:
     return []
 
 
-def isSignalConnected(q_object, signature):
-    ''' returns the connection status of a QObject to a signature signal on it'''
-    meta = q_object.metaObject()
-    return q_object.isSignalConnected(meta.method(meta.indexOfSignal(signature)))
 
 def waitCursor():
     ''' sets the app to a wait cursor '''
@@ -1102,6 +1126,9 @@ def isSignalConnected(oObject : QtCore.QObject, signal_name : str):
     ''' true if a signal is connected '''
     mm = getSignal(oObject, signal_name)
     return mm is not None and oObject.isSignalConnected(mm)
+
+
+
 
 def centerDialog(dialog, width = 300, height = 150):
     ''' centers the dialog on top of the UI '''

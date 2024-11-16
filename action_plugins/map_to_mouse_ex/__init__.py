@@ -2,7 +2,7 @@
 
 # MaptoMouseEx - enhanced version of MapToMouse
 
-
+from __future__ import annotations
 import logging
 import math
 import os
@@ -85,18 +85,23 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         
         self.mode_group = QtWidgets.QButtonGroup()
         self.mode_normal = QtWidgets.QRadioButton("Click")
+        self.mode_double_click = QtWidgets.QRadioButton("Double-Click")
         self.mode_press = QtWidgets.QRadioButton("Press Only")
         self.mode_release = QtWidgets.QRadioButton("Release Only")
 
         self.mode_normal.clicked.connect(self._click_change_mode)
+        self.mode_double_click.clicked.connect(self._click_change_mode)
         self.mode_press.clicked.connect(self._click_change_mode)
         self.mode_release.clicked.connect(self._click_change_mode)
 
         self.mode_group.addButton(self.mode_normal)
+        self.mode_group.addButton(self.mode_double_click)
         self.mode_group.addButton(self.mode_press)
         self.mode_group.addButton(self.mode_release)
 
+
         self.click_options_layout.addWidget(self.mode_normal)
+        self.click_options_layout.addWidget(self.mode_double_click)
         self.click_options_layout.addWidget(self.mode_press)
         self.click_options_layout.addWidget(self.mode_release)
         self.click_options_layout.addStretch()
@@ -155,6 +160,8 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.action_data.click_mode = MouseClickMode.Press
         elif self.mode_release.isChecked():
             self.action_data.click_mode = MouseClickMode.Release
+        elif self.mode_double_click.isChecked():
+            self.action_data.click_mode = MouseClickMode.DoubleClick
 
     def _create_axis_ui(self):
         """Creates the UI for axis setups."""
@@ -282,8 +289,6 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
             with QtCore.QSignalBlocker(self.mode_widget):
                 self.mode_widget.setCurrentIndex(index)
 
-        # self.motion_radio.setChecked(action_mode == MouseAction.MouseMotion)
-        # self.button_radio.setChecked(action_mode == MouseAction.MouseButton)
         
         self.mode_label.setText(MouseAction.to_description(action_mode))
 
@@ -297,6 +302,9 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         elif click_mode == MouseClickMode.Release:
             with QtCore.QSignalBlocker(self.mode_release):
                 self.mode_release.setChecked(True)
+        elif click_mode == MouseClickMode.DoubleClick:
+            with QtCore.QSignalBlocker(self.mode_double_click):
+                self.mode_double_click.setChecked(True)
 
         self._change_mode()
 
@@ -518,20 +526,21 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
     _mouse_controller = None
 
 
-    def __init__(self, action):
+    def __init__(self, action : MapToMouseEx):
         """Creates a new functor with the provided data.
 
         :param action contains parameters to use with the functor
         """
         super().__init__(action)
 
-        self.action = action
+        self.action : MapToMouseEx = action
         if not MapToMouseExFunctor._mouse_controller:
             MapToMouseExFunctor._mouse_controller = gremlin.sendinput.MouseController()
         
         self.input_type = action.input_type
         self.exec_on_release = action.exec_on_release
         self.action_mode = action.action_mode
+        self.click_mode = action.click_mode
     
 
     def process_event(self, event, value):
@@ -577,6 +586,8 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
                     self._perform_mouse_button(event, value)
                 elif not self.exec_on_release and event.is_pressed:
                     self._perform_mouse_button(event, value)
+            
+
         return True
     
     def get_state(self):
@@ -622,6 +633,17 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
                         gremlin.sendinput.mouse_release(self.action.button_id)
                     if is_remote:
                         input_devices.remote_client.send_mouse_button(self.action.button_id.value, False)
+            elif self.action.click_mode == MouseClickMode.DoubleClick:
+                if value.current:
+                    if is_local:
+                        gremlin.sendinput.mouse_press_double_click(self.action.button_id)    
+                    if is_remote:
+                        input_devices.remote_client.send_mouse_button_double_click(self.action.button_id.value, True)
+                else:
+                    if is_local:
+                        gremlin.sendinput.mouse_release(self.action.button_id)
+                    if is_remote:
+                        input_devices.remote_client.send_mouse_button(self.action.button_id.value, False)                        
             elif self.action.click_mode == MouseClickMode.Press:
                 if is_local:
                     gremlin.sendinput.mouse_press(self.action.button_id)

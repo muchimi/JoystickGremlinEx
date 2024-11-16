@@ -384,6 +384,7 @@ def mouse_relative_motion(dx, dy):
 
 
 def mouse_press(button):
+    ''' sends a single click'''
     from gremlin.types import MouseButton
     if button == MouseButton.Left:
         _send_input(_mouse_input(MOUSEEVENTF_LEFTDOWN))
@@ -395,6 +396,52 @@ def mouse_press(button):
         _send_input(_mouse_input(MOUSEEVENTF_XDOWN, data=XBUTTON1))
     elif button == MouseButton.Forward:
         _send_input(_mouse_input(MOUSEEVENTF_XDOWN, data=XBUTTON2))
+
+def mouse_press_double_click(button, delay = 0.05):
+    ''' sends a double click (also releases the mouse) '''
+    from gremlin.types import MouseButton
+    if button == MouseButton.Left:
+        _send_input(_mouse_input(MOUSEEVENTF_LEFTDOWN))
+        time.sleep(delay)
+        _send_input(_mouse_input(MOUSEEVENTF_LEFTUP))
+        time.sleep(delay)
+        _send_input(_mouse_input(MOUSEEVENTF_LEFTDOWN))
+        time.sleep(delay)
+        _send_input(_mouse_input(MOUSEEVENTF_LEFTUP))
+    elif button == MouseButton.Right:
+        _send_input(_mouse_input(MOUSEEVENTF_RIGHTDOWN))
+        time.sleep(delay)
+        _send_input(_mouse_input(MOUSEEVENTF_RIGHTUP))
+        time.sleep(delay)
+        _send_input(_mouse_input(MOUSEEVENTF_RIGHTDOWN))
+        time.sleep(delay)
+        _send_input(_mouse_input(MOUSEEVENTF_RIGHTUP))
+    elif button == MouseButton.Middle:
+        _send_input(_mouse_input(MOUSEEVENTF_MIDDLEDOWN))
+        time.sleep(delay)
+        _send_input(_mouse_input(MOUSEEVENTF_MIDDLEUP))
+        time.sleep(delay)
+        _send_input(_mouse_input(MOUSEEVENTF_MIDDLEDOWN))
+        time.sleep(delay)
+        _send_input(_mouse_input(MOUSEEVENTF_MIDDLEUP))
+    elif button == MouseButton.Back:
+        _send_input(_mouse_input(MOUSEEVENTF_XDOWN, data=XBUTTON1))
+        time.sleep(delay)
+        _send_input(_mouse_input(MOUSEEVENTF_XUP, data=XBUTTON1))
+        time.sleep(delay)
+        _send_input(_mouse_input(MOUSEEVENTF_XDOWN, data=XBUTTON1))
+        time.sleep(delay)
+        _send_input(_mouse_input(MOUSEEVENTF_XUP, data=XBUTTON1))
+        
+    elif button == MouseButton.Forward:
+        _send_input(_mouse_input(MOUSEEVENTF_XDOWN, data=XBUTTON2))
+        time.sleep(delay)
+        _send_input(_mouse_input(MOUSEEVENTF_XUP, data=XBUTTON2))
+        time.sleep(delay)
+        _send_input(_mouse_input(MOUSEEVENTF_XDOWN, data=XBUTTON2))
+        time.sleep(delay)
+        _send_input(_mouse_input(MOUSEEVENTF_XUP, data=XBUTTON2))
+
 
 
 def mouse_release(button):

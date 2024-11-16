@@ -745,6 +745,12 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
                     gremlin.sendinput.mouse_press(button)
                 else:
                     gremlin.sendinput.mouse_release(button)
+            elif subtype == "button_double":
+                button_id = data["button"]
+                button = gremlin.sendinput.MouseButton.to_enum(button_id)
+                is_pressed = data["value"]
+                if is_pressed:
+                    gremlin.sendinput.mouse_press_double_click(button)
             elif subtype == "axis":
                 dx = data["dx"]
                 dy = data["dy"]
@@ -1130,6 +1136,20 @@ class RemoteClient(QtCore.QObject):
             raw_data = msgpack.packb(data)
             self._send(raw_data)
             #syslog.debug(f"remote gremlin event set mouse: button: {button_id} pressed: {is_pressed}")
+
+
+    def send_mouse_button_double_click(self, button_id, is_pressed, force_remote = False):
+        ''' sends a mouse button press or release '''
+        if self.enabled or force_remote:
+            data = {}
+            data["sender"] = self._id
+            data["action"] = "mouse"
+            data["subtype"] = "button_double"
+            data["button"] = button_id
+            data["value"] = is_pressed
+            raw_data = msgpack.packb(data)
+            self._send(raw_data)
+            #syslog.debug(f"remote gremlin event set mouse: button: {button_id} pressed: {is_pressed}")            
 
     def send_mouse_wheel(self, direction, force_remote = False):
         ''' sends mousewheel data  '''

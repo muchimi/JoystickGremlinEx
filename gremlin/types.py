@@ -651,6 +651,7 @@ class MouseClickMode(Enum):
     Normal = 0 # click on/off
     Press = 1 # press only
     Release = 2 # release only
+    DoubleClick = 3 # double click
 
     @staticmethod
     def to_string(mode):
@@ -669,12 +670,12 @@ class MouseClickMode(Enum):
     @staticmethod
     def from_string(str):
         ''' converts from a string representation (text or numeric) to the enum, not case sensitive'''
-        str = str.lower().strip()
+        str = str.casefold().strip()
         if str.isnumeric():
             mode = int(str)
             return MouseClickMode(mode)
         for item in MouseClickMode:
-            if item.name.lower() == str:
+            if item.name.casefold() == str:
                 return item
 
         return None
@@ -688,7 +689,10 @@ class MouseClickMode(Enum):
             return "Mouse button press"
         elif action == MouseClickMode.Release:
             return "Mouse button release"
+        elif action == MouseClickMode.DoubleClick:
+            return "Double Click"
         return f"Unknown {action}"
+    
     
     @staticmethod
     def to_name(action):
@@ -699,6 +703,8 @@ class MouseClickMode(Enum):
             return "Mouse button press"
         elif action == MouseClickMode.Release:
             return "Mouse button release"
+        elif action == MouseClickMode.DoubleClick:
+            return "Double click"
         return f"Unknown {action}"
     
 class MouseAction(Enum):
@@ -708,7 +714,6 @@ class MouseAction(Enum):
     MouseWiggleOffLocal = 3 # disable mouse wiggle - locla machine only
     MouseWiggleOnRemote = 4 # enable mouse wiggle - remote machines only
     MouseWiggleOffRemote = 5 # disable mouse wiggle - remote machines only
-
 
     @staticmethod
     def to_string(mode):
@@ -748,12 +753,11 @@ class MouseAction(Enum):
             return "Turns wiggle mode off (local only)"
         elif action == MouseAction.MouseWiggleOnLocal:
             return "Turns wiggle mode on (local only)"
-        
         elif action == MouseAction.MouseWiggleOffRemote:
             return "Turns wiggle mode off (remote only)"
         elif action == MouseAction.MouseWiggleOnRemote:
             return "Turns wiggle mode on (remote only)"
-        
+
         return f"Unknown {action}"
     
     @staticmethod
@@ -771,6 +775,7 @@ class MouseAction(Enum):
             return "Wiggle Disable (remote)"
         elif action == MouseAction.MouseWiggleOnRemote:
             return "Wiggle Enable (remote)"
+
                 
         return f"Unknown {action}"
     

@@ -48,7 +48,7 @@ import gremlin.util
 import gremlin.curve_handler
 import gremlin.gated_handler
 import gremlin.input_types
-import gremlin.mapper
+
 
 from gremlin.util import InvokeUiMethod, assert_ui_thread
 
@@ -116,7 +116,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.16ex (m23)"
+APPLICATION_VERSION = "13.40.16ex (m24)"
 
 # the main ui
 ui = None
@@ -986,7 +986,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
     def _create_1to1_mapping(self):
         ''' maps one to one '''
-        mapper = gremlin.mapper.Mapper()
+        mapper = gremlin.import_profile.Mapper()
         mapper.create_1to1_mapping()
 
 

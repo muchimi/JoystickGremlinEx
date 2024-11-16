@@ -186,6 +186,16 @@ Joystick Gremlin EX
 
 
 ## 13.40.16ex (pre-release)
+### (m24)
+- Improved: The range container now supports directional triggers based on a relative input axis position change. The container can now trigger its actions based on an input increase or decrease, or both, provided that the input change (delta) exceeds the percentage or range set (default 10% deviation).  The use case for this is to trigger a button or key based on a slider input going up or down.  Note: if mapping a button or key, use the pulse feature as the container is only an "on" container - in trigger on change mode, it does not issue a release so the action must self release if that is the desired behavior.
+- Improved: Import profile function UI improvements
+- Improved: Import profile "no map" option for mappings
+- Improved: Import profile automated mapping behavior (unused, stop, round-robin) added
+- Improved: file search will skip folders marked hidden (starting with a ".")
+- Improved: file search will cache previously found items to improves UI responsiveness associated with locating icons in particular
+- Improved: Map to Mouse Ex can now send double-clicks
+- Fix: Input load skips loading vjoy inputs that do not exist anymore whatever the reason and will output a warning log entry if it cannot find something 
+
 ### (m23)
 - Improved: 1:1 mapping now has a configuration dialog box to select target and mapping mode.
 - Fix: 1:1 usable mode accounts for vjoy mappings by both vjoy mappers

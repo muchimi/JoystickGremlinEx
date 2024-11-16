@@ -810,7 +810,7 @@ class VJoyUsageState():
         """
 
 
-
+        verbose = gremlin.config.Configuration().verbose
 
         vjoy_devices = gremlin.joystick_handling.vjoy_devices()
         devices = self._profile.devices
@@ -872,7 +872,16 @@ class VJoyUsageState():
                 type_name = InputType.to_string(action.input_type)
                 if action.vjoy_input_id in [0, None] \
                         or action.vjoy_device_id in [0, None] \
+                        or action.vjoy_device_id not in vjoy \
+                        or type_name not in vjoy[action.vjoy_device_id] \
                         or action.vjoy_input_id not in vjoy[action.vjoy_device_id][type_name]:
+                    if verbose:
+                        syslog = logging.getLogger("system")
+                        if action.vjoy_device_id not in vjoy:
+                            syslog.warning(f"Skipping vjoy device ID: vjoy id {action.vjoy_device_id} not found")
+                        elif type_name not in vjoy[action.vjoy_device_id]:
+                            syslog.warning(f"Skipping vjoy device ID: vjoy id {action.vjoy_device_id} type {type_name} not found")
+                    
                     continue
 
                 vjoy_device_id = action.vjoy_device_id

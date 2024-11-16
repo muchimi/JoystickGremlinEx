@@ -19,8 +19,10 @@
 import logging
 from lxml import etree as ElementTree
 import gremlin.actions
+import gremlin.config
 import gremlin.event_handler
 from gremlin.input_types import InputType
+import gremlin.joystick_handling
 from gremlin.util import rad2deg, get_guid
 from gremlin.profile import safe_format, safe_read
 import gremlin.ui.ui_common
@@ -31,6 +33,7 @@ from gremlin.base_profile import AbstractContainer
 
 from action_plugins.map_to_keyboard import *
 from action_plugins.map_to_mouse import *
+import gremlin.config
 
 
 syslog = logging.getLogger("system")
@@ -46,6 +49,7 @@ class RangeContainerWidget(AbstractContainerWidget):
         :param parent the parent of this widget
         """
         super().__init__(profile_data, parent)
+        
 
 
     def _create_action_ui(self):
@@ -77,18 +81,18 @@ class RangeContainerWidget(AbstractContainerWidget):
             self.profile_data.get_input_type()
         )
 
-        profile: RangeContainer
-        profile = self.profile_data
+        action_data: RangeContainer
+        action_data = self.profile_data
 
         # attach this UI widget to the container data
-        profile._widget = self
+        action_data._widget = self
 
         # min range box
         min_box = gremlin.ui.ui_common.DynamicDoubleSpinBox()
         min_box.setMinimum(-1.0)
         min_box.setMaximum(1.0)
         min_box.setDecimals(3)
-        min_box.setValue(profile.range_min)
+        min_box.setValue(action_data.range_min)
         min_box.setToolTip("Lower range of the bracket")
 
         # holds the mode change data when in trigger by value change mode
@@ -106,23 +110,47 @@ class RangeContainerWidget(AbstractContainerWidget):
 
         any_change_mode =  QtWidgets.QCheckBox("Any Change") # trigger on any change mode
         self.ui_any_change_mode = any_change_mode
-        any_change_mode.setChecked(profile.any_change_mode)
+        any_change_mode.setChecked(action_data.any_change_mode)
         any_change_mode.clicked.connect(self._any_change_mode_changed)
         any_change_mode.setToolTip("When set, the action will be triggered on any axis value change.")
 
         any_change_label = QtWidgets.QLabel("Delta %")
-        any_change_delta = QtWidgets.QSpinBox()
+        any_change_delta = gremlin.ui.ui_common.QIntLineEdit(min_range=0) # QtWidgets.QSpinBox()
         self.ui_any_change_delta = any_change_delta
         any_change_delta.setRange(0,100) 
-        any_change_delta.setValue(profile.any_change_delta)
+        any_change_delta.setValue(action_data.any_change_delta)
         any_change_delta.setToolTip("In any change mode, determines how much the axis should deviate from the old value before triggering the action")
         
+        container_mode_widget = QtWidgets.QWidget()
+        container_mode_widget.setContentsMargins(0,0,0,0)
+        container_mode_layout = QtWidgets.QHBoxLayout(container_mode_widget)
+        container_mode_layout.setContentsMargins(0,0,0,0)
+        rb_change_both = gremlin.ui.ui_common.QDataRadioButton("Both", 0)
+        rb_change_up = gremlin.ui.ui_common.QDataRadioButton("Up", 1)
+        rb_change_down = gremlin.ui.ui_common.QDataRadioButton("Down", -1)
+        if action_data.any_change_direction == 0:
+            rb_change_both.setChecked(True)
+        elif action_data.any_change_direction == 1:
+            rb_change_up.setChecked(True)
+        elif action_data.any_change_direction == -1:
+            rb_change_down.setChecked(True)
+
+        rb_change_both.clicked.connect(self._change_direction)
+        rb_change_up.clicked.connect(self._change_direction)
+        rb_change_down.clicked.connect(self._change_direction)
+
+        container_mode_layout.addWidget(rb_change_both)
+        container_mode_layout.addWidget(rb_change_up)
+        container_mode_layout.addWidget(rb_change_down)
+        container_mode_layout.addStretch()
+
+        
         min_box_included = QtWidgets.QCheckBox("[")
-        min_box_included.setChecked(profile.range_min_included)
+        min_box_included.setChecked(action_data.range_min_included)
         min_box_included.setToolTip("Include/Exclude flag: When set, the range includes the specified min value.<br>When not set, the value is excluded from the max range")
 
         max_box_included = QtWidgets.QCheckBox("]")
-        max_box_included.setChecked(profile.range_max_included)
+        max_box_included.setChecked(action_data.range_max_included)
         max_box_included.setToolTip("Include/Exclude flag: When set, the range includes the specified max value<br>When not set, the value is excluded from the max range")
 
         add_button_top_90 = QtWidgets.QPushButton("Top 90%")
@@ -166,17 +194,19 @@ class RangeContainerWidget(AbstractContainerWidget):
         max_box.setMinimum(-1.0)
         max_box.setMaximum(1.0)
         max_box.setDecimals(3)
-        max_box.setValue(profile.range_max)
+        max_box.setValue(action_data.range_max)
         max_box.setToolTip("Upper range of the bracket")
 
 
 
         symmetrical_box = QtWidgets.QCheckBox("Symmetrical")
-        symmetrical_box.setChecked(profile.symmetrical)
+        symmetrical_box.setChecked(action_data.symmetrical)
         symmetrical_box.setToolTip("When enabled, the range given will be automatically mirrored about the center of the range, causing an action trigger when the range on either side of the center value is entered.")
 
         mode_container.addWidget(any_change_label)
         mode_container.addWidget(any_change_delta)
+        mode_container.addWidget(container_mode_widget)
+        mode_container.addStretch()
         
 
         range_container.addWidget(QtWidgets.QLabel("Start:"))
@@ -186,13 +216,14 @@ class RangeContainerWidget(AbstractContainerWidget):
         range_container.addWidget(max_box)
         range_container.addWidget(max_box_included)
         range_container.addWidget(symmetrical_box)
+        range_container.addStretch()
 
 
 
         toolbar1.addWidget(any_change_mode)
         toolbar1.addWidget(mode_widget)
         toolbar1.addWidget(range_widget)
-        range_container.addStretch(1)
+        toolbar1.addStretch()
 
         toolbar2.addWidget(add_button_top_90)
         toolbar2.addWidget(action_label)
@@ -201,7 +232,7 @@ class RangeContainerWidget(AbstractContainerWidget):
         toolbar2.addWidget(self.ui_range_count)
         toolbar2.addWidget(add_range)
         toolbar2.addWidget(replace_range)
-        toolbar2.addStretch(1)
+        toolbar2.addStretch()
 
 
         
@@ -244,7 +275,12 @@ class RangeContainerWidget(AbstractContainerWidget):
             widget.model.data_changed.connect(self.container_modified.emit)
 
 
-
+    @QtCore.Slot(bool)
+    def _change_direction(self, checked):
+        if checked:
+            rb = self.sender()
+            delta = rb.data
+            self.profile_data.any_change_direction = delta
 
     def _create_condition_ui(self):
         if self.profile_data.activation_condition_type == "action":
@@ -426,6 +462,7 @@ class RangeContainerFunctor(gremlin.base_classes.AbstractFunctor):
 
         self.action_data = action_data
         self.any_change_mode = action_data.any_change_mode
+        self.any_change_direction = action_data.any_change_direction
         self.reset_range()
 
         self.any_change_delta =  action_data.any_change_delta / 200 # 2 * 100 because the range is -1 to +1, so 2 total, to actual range value
@@ -441,6 +478,10 @@ class RangeContainerFunctor(gremlin.base_classes.AbstractFunctor):
         self.latched_functors = []
         self.latched_loaded = False
         self.last_target = -2.0
+
+    def profile_start(self):
+        ''' called on profile start - get the start position of the axis'''
+        self.last_target = gremlin.joystick_handling.get_axis(self.action_data.hardware_device_guid, self.action_data.hardware_input_id)
 
 
     def reset_range(self):
@@ -458,6 +499,9 @@ class RangeContainerFunctor(gremlin.base_classes.AbstractFunctor):
 
         if not event.is_axis: 
             return
+        
+        verbose = gremlin.config.Configuration().verbose
+        syslog = logging.getLogger("system")
         
         # process release triggers
         releases = set()
@@ -503,9 +547,36 @@ class RangeContainerFunctor(gremlin.base_classes.AbstractFunctor):
         target = value.current
         in_range = False
 
+
+
+
+        is_change_mode = False
+
         if self.any_change_mode:
             # trigger if change meets the deflection delta
             trigger = abs(target - self.last_target) >= self.any_change_delta
+            #syslog.info(f"Target {target:0.3f} last: {self.last_target:0.3f}  dir flag: {target > self.last_target}  delta: {abs(target - self.last_target):0.3f} threshold: {self.any_change_delta:0.3f}")
+
+            if trigger:
+
+                
+             
+                # apply direction filter if any
+                if self.any_change_direction == 1:
+                    trigger = target > self.last_target
+                    if trigger and verbose:
+                        syslog.info("Trigger up")
+                elif self.any_change_direction == -1:
+                    trigger = target < self.last_target
+                    if trigger and verbose:
+                        syslog.info("Trigger down")
+                else:
+                    if verbose:
+                        syslog.info("Trigger change")
+
+                is_change_mode = trigger        
+                self.last_target = target
+
         else:
 
             # verify the event is in the correct range
@@ -514,9 +585,6 @@ class RangeContainerFunctor(gremlin.base_classes.AbstractFunctor):
 
             range_min = self.range_min
             range_max = self.range_max
-
-
-            #print (f"Add range: {range_min:0.4f} {range_max:0.4f}")
             ranges = [(range_min, range_max)]
 
             if container.symmetrical:
@@ -562,8 +630,9 @@ class RangeContainerFunctor(gremlin.base_classes.AbstractFunctor):
                                 continue
                         trigger = False
                         break
-            # else:
-            #     print (f"{target:0.4f} not in range")
+            
+            if trigger:
+                self.last_target = target
 
         if trigger:
             #syslog.info("trigger!")
@@ -577,9 +646,10 @@ class RangeContainerFunctor(gremlin.base_classes.AbstractFunctor):
             for action in self.action_sets:
                 # execute the action
                 action.process_event(event_clone, value_clone)
-                # register a range exit trigger
-                exit_trigger = RangeReleaseTrigger(ranges, event_clone, action)
-                self.action_data.exit_range_triggers.append(exit_trigger)
+                if not is_change_mode:
+                    # register a range exit trigger on non change triggers
+                    exit_trigger = RangeReleaseTrigger(ranges, event_clone, action)
+                    self.action_data.exit_range_triggers.append(exit_trigger)
                 #print (f"process press event: {exit_trigger.id}")
             if in_range:
                 self.last_range_min = range_min
@@ -590,7 +660,8 @@ class RangeContainerFunctor(gremlin.base_classes.AbstractFunctor):
                 for functor in self.latched_functors:
                     functor.reset_range()
 
-            self.last_target = target
+            
+            
 
             
             
@@ -638,6 +709,7 @@ class RangeContainer(AbstractContainer):
         self._functor = None # will be populated when the functor is created for this container
         self.any_change_mode = False # trigger on any change mode
         self.any_change_delta = 10 # percentage move that must be detected before the action is triggered 0 to 100
+        self.any_change_direction = 0 # direction of change 0 = both, 1 = up, -1 = down
         self.condition_enabled = False
         self.virtual_button_enabled = False
         self.exit_range_triggers = [] # triggers to execute when the range is exited
@@ -672,6 +744,8 @@ class RangeContainer(AbstractContainer):
                 self.range_min_included = safe_read(node, "max_inc", bool)
             if "sym" in node.attrib:
                 self.symmetrical = safe_read(node, "sym",bool)
+            if "direction" in node.attrib:
+                self.any_change_direction = safe_read(node,"direction",int)
             
         except:
             pass
@@ -689,6 +763,7 @@ class RangeContainer(AbstractContainer):
         node.set("min_inc", safe_format(self.range_min_included, bool))
         node.set("max_inc", safe_format(self.range_max_included, bool))
         node.set("sym", safe_format(self.symmetrical, bool))
+        node.set("direction", safe_format(self.any_change_direction, int))
 
         # write children out
         as_node = ElementTree.Element("action-set")
@@ -704,7 +779,7 @@ class RangeContainer(AbstractContainer):
 
         :return True if the container is configured properly, False otherwise
         """
-        return len(self.action_sets) > 0
+        return True # len(self.action_sets) > 0
 
 
 
