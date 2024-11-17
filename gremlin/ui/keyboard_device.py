@@ -596,6 +596,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         '''
 
         widget = InputItemWidget(identifier = identifier, populate_ui_callback=self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True, parent=parent, data=data)
+        widget.data = data
         widget.create_action_icons(data)
         widget.setDescription(data.description)
 

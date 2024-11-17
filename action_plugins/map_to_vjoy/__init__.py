@@ -940,10 +940,12 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
     def set_width(self, widget, width, height = 22):
         widget.setFixedSize(width, height)
 
-
-
+    
+        
     def _create_selector(self):
         ''' creates the button option panel '''
+
+
         self.selector_widget =  QtWidgets.QWidget()
         grid = QtWidgets.QGridLayout(self.selector_widget)
         grid.setColumnStretch(3,1)
@@ -963,20 +965,16 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 
         # vjoy device selection - display vjoy target ID and vjoy target input - the input changes based on the behavior
+        
 
         row = 2
         self.lbl_vjoy_device_selector = QtWidgets.QLabel("Device:")
         grid.addWidget(self.lbl_vjoy_device_selector,row,0)
         self.cb_vjoy_device_selector = gremlin.ui.ui_common.NoWheelComboBox()
         grid.addWidget(self.cb_vjoy_device_selector,row,1)
-        
-                             
-        self.vjoy_map = {} # holds the count of axes for
-        devices = sorted(joystick_handling.vjoy_devices(),key=lambda x: x.vjoy_id)
-        for dev in devices:
-            #self.cb_vjoy_device_selector.addItem(f"VJoy device {dev.vjoy_id}", dev.vjoy_id)
+        for dev in self.action_data.vjoy_map.values():
             self.cb_vjoy_device_selector.addItem(dev.name, dev.vjoy_id)
-            self.vjoy_map[dev.vjoy_id] = dev
+                             
         
 
         row = 3
@@ -1202,7 +1200,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         event.source = self.action_data
         el.profile_device_changed.emit(event)
         el.icon_changed.emit(event)
-        
+
 
     def _update_vjoy_device_input_list(self):
         ''' loads a list of valid outputs for the current vjoy device based on the mode '''
@@ -1212,7 +1210,14 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             input_type = self._get_selector_input_type()
             action_mode = self._get_action_mode()
 
-            dev = self.vjoy_map[self.action_data.vjoy_device_id]
+            if not self.action_data.vjoy_device_id in self.action_data.vjoy_map:
+                self.action_data.refresh_vjoy()
+                if not self.action_data.vjoy_device_id in self.action_data.vjoy_map:
+                    gremlin.ui.ui_common.MessageBox(prompt=f"VJOY configuration has changed and GremlinEx is unable to find the requested Vjoy device # {self.action_data.vjoy_device_id}")
+                    return
+
+
+            dev = self.action_data.vjoy_map[self.action_data.vjoy_device_id]
             if action_mode in (VjoyAction.VJoySetAxis, VjoyAction.VJoyRangeAxis, VjoyAction.VJoyAxis, VjoyAction.VJoyInvertAxis, VjoyAction.VjoyMergeAxis):
                 count = dev.axis_count
                 for id in range(1, count+1):
@@ -1376,6 +1381,12 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _create_input_grid(self):
         ''' create a grid of buttons for easy selection'''
 
+        if not self.action_data.vjoy_device_id in self.action_data.vjoy_map:
+                self._refresh_vjoy()
+                if not self.action_data.vjoy_device_id in self.action_data.vjoy_map:
+                    gremlin.ui.ui_common.MessageBox(prompt=f"VJOY configuration has changed and GremlinEx is unable to find the requested Vjoy device # {self.action_data.vjoy_device_id}")
+                    return
+
         grid_visible = self.action_data.grid_visible   
         if self.grid_visible_widget is None:
             self.grid_visible_widget = QtWidgets.QCheckBox("Show button grid")
@@ -1399,7 +1410,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         
         vjoy_device_id = self.action_data.vjoy_device_id
         input_type = self._get_selector_input_type()
-        dev = self.vjoy_map[vjoy_device_id]
+        dev = self.action_data.vjoy_map[vjoy_device_id]
         count = dev.button_count
         grid = QtWidgets.QGridLayout(self.button_grid_widget)
         grid.setSpacing(2)
@@ -2224,6 +2235,16 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         self.target_value = 0.0
         self.target_value_valid = True
 
+        self.vjoy_map = {}  # list of vjoy devices by their vjoy index ID
+        self.refresh_vjoy()
+
+    def refresh_vjoy(self):
+        ''' updates vjoy devices device map  '''
+        self.vjoy_map = {} # holds the map of devices keyed by VJOYID
+        devices = sorted(joystick_handling.vjoy_devices(),key=lambda x: x.vjoy_id)
+        for dev in devices:
+            self.vjoy_map[dev.vjoy_id] = dev        
+
 
     def get_raw_axis_value(self):
         return gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, self.hardware_input_id)
@@ -2476,6 +2497,30 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         """
 
         try:
+
+            syslog = logging.getLogger("system")
+
+         
+
+            vjoy_id = safe_read(node, "vjoy", int)
+            if not vjoy_id in self.vjoy_map:
+                self.refresh_vjoy() # ensure we have the latest device list
+
+            if not vjoy_id in self.vjoy_map:
+                syslog.error(f"Profile load: vjoy device {vjoy_id} was not found in the list of valid VJOY devices")
+                self.vjoy_axis_id = 1
+                self.vjoy_button_id = 1
+                self.vjoy_hat_id = 1
+                return
+
+
+            self.vjoy_device_id = vjoy_id
+
+            if "input" in node.attrib:
+                index = safe_read(node,"input", int, 1)
+                self.set_input_id(index)
+
+
             valid = False
             for input_type in InputType.to_list():
                 attrib_name = InputType.to_string(input_type)
@@ -2490,11 +2535,6 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
             if not valid:
                 raise gremlin.error.GremlinError(f"VJOYREMAP: Invalid remap type provided: {node.attrib}")
 
-            self.vjoy_device_id = safe_read(node, "vjoy", int)
-
-            if "input" in node.attrib:
-                index = safe_read(node,"input", int, 1)
-                self.set_input_id(index)
 
 
             # hack to sync all loaded profile setups with the status grid

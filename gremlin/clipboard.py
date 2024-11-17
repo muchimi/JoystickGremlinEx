@@ -17,8 +17,9 @@ import gremlin.base_profile
 from gremlin.singleton_decorator import SingletonDecorator
 
 class EncoderType(IntEnum):
-    Action = 1
-    Container = 2
+    Action = 1 # single action
+    Container = 2 # single container
+    MultiContainer = 3 # data holds multiple containers
 
 class ObjectEncoder():
     ''' helper class to encode objects '''
@@ -224,7 +225,7 @@ class Clipboard(QtCore.QObject):
         from gremlin.base_profile import AbstractContainer
         data = self.data
         if isinstance(data, ObjectEncoder):
-            return data.encoder_type == EncoderType.Container
+            return data.encoder_type in (EncoderType.Container, EncoderType.MultiContainer)
         return self.data is not None and isinstance(self.data, AbstractContainer)
     
     @property

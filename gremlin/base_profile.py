@@ -324,14 +324,19 @@ class AbstractContainer(ProfileData):
     # default allowed input types = all
     input_types = InputType.to_list()
 
+    # by default the container works with either axis or momentary inputs
+    axis_only = False
+
     def __init__(self, parent):
         """Creates a new instance.
 
         :parent the InputItem which is the parent to this action
         """
         super().__init__(parent)
+
         self.parent = parent
         self.action_sets = []
+        self.action_model = None # set at creation by the parent of this container
         self.custom_action_sets = False # true if the container uses custom action sets (need a converter to product action_sets)
         self._condition_enabled = True
         self._virtual_button_enabled = True # determines if the callbacks can be virtualized or not - if not - the callback is "raw" to the functor
@@ -357,6 +362,8 @@ class AbstractContainer(ProfileData):
             self.device_input_id = None
             self.device_input_type = None
             self.device = None
+
+        
 
 
     @property
@@ -391,8 +398,6 @@ class AbstractContainer(ProfileData):
     def input_display_name(self):
         return f"{gremlin.shared_state.get_device_name(self.device_guid)} {InputType.to_display_name(self.device_input_type)} {self.device_input_id}"
     
-
-
     def add_action(self, action, index=-1):
         """Adds an action to this container.
 
@@ -908,15 +913,28 @@ class InputItem():
                             return True
         return False
 
-    
+    def get_valid_container_list(self):
+        """Returns a list of valid containers for this input  """
+        container_list = []
+        for entry in gremlin.plugin_manager.ContainerPlugins().repository.values():
+            if not entry.input_types or self.input_type in entry.input_types:
+                # if no input types provided, all are ok
+                if entry.axis_only:
+                    # container requires an axis
+                    if not self.is_axis:
+                        continue
+                container_list.append(entry.name)
+        return sorted(container_list)
 
     def _update_input(self):
         ''' updates input name and registers an axis input if needed '''
         from gremlin.keyboard import key_from_code
         self._input_name = None
         input_id = self._input_id
+        self.is_axis = False
         if input_id is not None and self._device_guid is not None:
             if self._input_type == InputType.JoystickAxis:
+                self.is_axis = True # indicate we are an axis
                 eh = gremlin.event_handler.EventListener()
                 eh.registerInput(self)
                 info = gremlin.joystick_handling.device_info_from_guid(self._device_guid)
@@ -928,6 +946,7 @@ class InputItem():
                 self._input_name = f"Button {input_id}"
             elif self._input_type == InputType.JoystickHat:
                 self._input_name = f"Hat {input_id}"
+                
 
             elif self._input_type in (InputType.Keyboard, InputType.KeyboardLatched):
                 if isinstance(input_id, gremlin.keyboard.Key):
@@ -941,6 +960,8 @@ class InputItem():
                         self._input_name(f"Unable to parse type: {type(input_id).__name__}")
             else:
                 self._input_name = f"{InputType.to_string(self._input_type).capitalize()} {input_id}"
+
+            
             
     
 
@@ -1017,6 +1038,7 @@ class InputItem():
                     self.curve_data = gremlin.curve_handler.AxisCurveData()
                     self.curve_data._parse_xml(child)
                     break
+            self.is_axis = True
 
         assert self.input_id is not None,"Error processing input - check types"
             
@@ -1158,6 +1180,8 @@ class InputItem():
         elif self._input_type == InputType.Midi:
             return f"Midi {self._input_id}"
         return f"Unknown input: {self._input_type}"
+    
+
     
 
     @property

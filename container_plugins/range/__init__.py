@@ -676,7 +676,7 @@ class RangeContainer(AbstractContainer):
     tag = "range"
 
     # this container only works with axis inputs
-    input_types = [InputType.JoystickAxis]
+    input_types = [InputType.JoystickAxis, InputType.OpenSoundControl, InputType.Midi]
 
     # allowed interactions with this container
     interaction_types = [
@@ -685,6 +685,7 @@ class RangeContainer(AbstractContainer):
         gremlin.ui.input_item.ActionSetView.Interactions.Delete,
     ]
 
+    axis_only = True
 
     functor = RangeContainerFunctor
     widget = RangeContainerWidget
@@ -704,7 +705,6 @@ class RangeContainer(AbstractContainer):
         self.symmetrical = False # true if the range is symmetrical about the center of the axis 
         self.range_min_included = True # true if the boundary is included in the range
         self.range_max_included = True # true if the boundery is included in the range
-        self.action_model = None # set at creation by the parent of this container
         self._widget = None # will be populated by the widget attached to this container
         self._functor = None # will be populated when the functor is created for this container
         self.any_change_mode = False # trigger on any change mode
@@ -714,9 +714,11 @@ class RangeContainer(AbstractContainer):
         self.virtual_button_enabled = False
         self.exit_range_triggers = [] # triggers to execute when the range is exited
         
+        
         # make actions think we're attached to a button
         self.override_input_id = 1
         self.override_input_type = InputType.JoystickButton
+
 
 
     def icon(self):

@@ -1563,6 +1563,7 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         widget = gremlin.ui.input_item.InputItemWidget(identifier = identifier, populate_ui_callback = self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True, parent = parent)
         input_id : MidiInputItem = identifier.input_id
+        widget.data = data
         widget.create_action_icons(data)
         #widget.setTitle(input_id.title_name)
         widget.setInputDescription(input_id.display_name)

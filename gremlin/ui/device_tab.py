@@ -19,9 +19,12 @@
 import logging
 
 from PySide6 import QtWidgets, QtCore
+import lxml.etree
 
 
 import gremlin
+import gremlin.base_buttons
+import gremlin.base_profile
 import gremlin.base_profile
 import gremlin.config
 import gremlin.config
@@ -162,19 +165,61 @@ class InputItemConfiguration(QtWidgets.QFrame):
 
         el = gremlin.event_handler.EventListener()
         el.mapping_changed.emit(self.item_data)
+        self.notify_changed()
         
 
-    def _paste_action(self, action):
+    def notify_changed(self):
+        ''' notifies the item has changed'''
+        
+        el = gremlin.event_handler.EventListener()
+        event = gremlin.event_handler.DeviceChangeEvent()
+        event.device_guid = self.item_data.device_guid
+        event.device_name = self.item_data.device_name
+        event.device_input_type = self.item_data.input_type
+        event.device_input_id = self.item_data.input_id
+        event.vjoy_device_id = 0
+        event.vjoy_input_id = 0
+        event.source = self.item_data
+        el.profile_device_changed.emit(event)
+        el.icon_changed.emit(event)
+
+
+    def _paste_action(self, data_or_action):
         """ paste action to the input item """
         import container_plugins.basic
         import gremlin.plugin_manager
+        import gremlin.base_profile
+
+
         if self.item_data.get_device_type() == DeviceType.VJoy:
             if len(self.item_data.containers) > 0:
                 return
-
+            
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        container = container_plugins.basic.BasicContainer(self.item_data)
-        action_item = plugin_manager.duplicate(action, container )
+        action_tag_map = plugin_manager.tag_map
+
+            
+        if isinstance(data_or_action, ObjectEncoder):
+            oc = data_or_action
+            if oc.encoder_type == EncoderType.Action:
+                xml = oc.data
+                node = lxml.etree.fromstring(xml)
+                action_tag = node.tag
+                if action_tag in action_tag_map:
+                    action_name = action_tag_map[action_tag]
+                    container = container_plugins.basic.BasicContainer(self.item_data)
+                    action_item = action_name(container)
+            else:
+                # not an action type, ignore
+                return
+
+        elif isinstance(data_or_action, gremlin.base_profile.AbstractAction):
+            action = data_or_action
+            container = container_plugins.basic.BasicContainer(self.item_data)
+            action_item = plugin_manager.duplicate(action, container )
+        else:
+            # nothing to do
+            return
         
         # remap inputs
         action_item.update_inputs(self.item_data)
@@ -186,6 +231,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
 
         eh = gremlin.event_handler.EventListener()
         eh.mapping_changed.emit(self.item_data)
+        self.notify_changed()
 
     def _add_container(self, container_name):
         """Adds a new container to the input item.
@@ -204,6 +250,21 @@ class InputItemConfiguration(QtWidgets.QFrame):
 
         return container
     
+    def _copy_container(self):
+        ''' copies all containers to the clipboard '''
+        if len(self.item_data.containers) > 0:
+            clipboard = Clipboard()
+            
+            root = lxml.etree.Element("multi_containers")
+            for container in self.item_data.containers:
+                 node = container.to_xml()
+                 root.append(node)
+            xml = lxml.etree.tostring(root)
+            oc = ObjectEncoder(self.item_data.containers, xml, "multi", EncoderType.MultiContainer)
+            clipboard.data = oc
+            logging.getLogger("system").info(f"multi container copied to clipboard")
+    
+
 
     def _paste_container(self, container):
         """Adds a new container to the input item.
@@ -211,36 +272,94 @@ class InputItemConfiguration(QtWidgets.QFrame):
         :param container container to be added
         """
         plugin_manager = gremlin.plugin_manager.ContainerPlugins()
+        container_list = []
 
         if isinstance(container, ObjectEncoder):
             oc = container
+            valid_containers_names = self.item_data.get_valid_container_list()
+            container_tag_map = plugin_manager.tag_map
             if oc.encoder_type == EncoderType.Container:
                 xml = oc.data
                 node = lxml.etree.fromstring(xml)
                 container_type = node.get("type")
-                container_tag_map = plugin_manager.tag_map
-                new_container = container_tag_map[container_type](self.item_data)
-                new_container.from_xml(node)
 
-                #new_container = copy.deepcopy(container)
+                # verify the container is valid for the input
+                if container_type in container_tag_map:
+                    container_name = container_tag_map[container_type].name
+                    if container_name in valid_containers_names:
 
-                for action_set in new_container.get_action_sets():
-                    for action in action_set:
-                        action.action_id = gremlin.util.get_guid()
+                        
+                        new_container = container_tag_map[container_type](self.item_data)
+                        new_container.from_xml(node)
+
+
+
+                        #new_container = copy.deepcopy(container)
+
+                        for action_set in new_container.get_action_sets():
+                            for action in action_set:
+                                action.action_id = gremlin.util.get_guid()
+
+                        container_list.append(new_container)
+
+            elif oc.encoder_type == EncoderType.MultiContainer:
+                xml = oc.data
+                root = lxml.etree.fromstring(xml)
+                for node in root:
+                    container_type = node.get("type")
+                    if container_type in container_tag_map:
+                        container_name = container_tag_map[container_type].name
+                        if container_name in valid_containers_names:
+                            
+                            new_container = container_tag_map[container_type](self.item_data)
+                            new_container.from_xml(node)
+
+                            for action_set in new_container.get_action_sets():
+                                for action in action_set:
+                                    action.action_id = gremlin.util.get_guid()
+
+                            container_list.append(new_container)
+
+
         else:
             new_container = plugin_manager.duplicate(container, self.item_data)
+            container_list.append(new_container)
 
-        if hasattr(new_container, "action_model"):
-            new_container.action_model = self.action_model
+        if container_list:
+            for new_container in container_list:
+                if hasattr(new_container, "action_model"):
+                    new_container.action_model = self.action_model
+                
+                    self.action_model.add_container(new_container)
+                    plugin_manager.set_container_data(self.item_data, new_container)
 
+            eh = gremlin.event_handler.EventListener()
+            eh.mapping_changed.emit(self.item_data)
+            self.notify_changed()
+
+        return container_list
+    
+    def _delete_container(self):
+        ''' call to delete all containers '''
+        if not self.item_data.containers:
+            # nothing to do
+            return 
+        # do a confirmation box just in case
+        message_box = QtWidgets.QMessageBox()
+        message_box.setIcon(QtWidgets.QMessageBox.Icon.Warning)
+        message_box.setText("This will remove the current container set and any actions.")
+        message_box.setInformativeText("Are you sure?")
+        message_box.setStandardButtons(
+            QtWidgets.QMessageBox.StandardButton.Cancel | 
+            QtWidgets.QMessageBox.StandardButton.Ok 
+        )
+        gremlin.util.centerDialog(message_box)
+        result = message_box.exec()
+        if result == QtWidgets.QMessageBox.StandardButton.Cancel:
+            return
         
-        self.action_model.add_container(new_container)
-        plugin_manager.set_container_data(self.item_data, new_container)
-
-        eh = gremlin.event_handler.EventListener()
-        eh.mapping_changed.emit(self.item_data)
-
-        return new_container
+        self.action_model.remove_all_containers()
+            
 
     def _remove_container(self, container):
         """Removes an existing container from the InputItem.
@@ -250,8 +369,6 @@ class InputItemConfiguration(QtWidgets.QFrame):
 
         self.action_model.remove_container(container)
 
-        eh = gremlin.event_handler.EventListener()
-        eh.mapping_changed.emit(self.item_data)
 
                 
 
@@ -291,11 +408,11 @@ class InputItemConfiguration(QtWidgets.QFrame):
         self.action_selector.action_added.connect(self._add_action)
         self.action_selector.action_paste.connect(self._paste_action)
 
-        self.container_selector = input_item.ContainerSelector(
-            self._input_type
-        )
+        self.container_selector = input_item.ContainerSelector(self._input_type, self.item_data.is_axis)
         self.container_selector.container_added.connect(self._add_container)
+        self.container_selector.container_copy.connect(self._copy_container)
         self.container_selector.container_paste.connect(self._paste_container)
+        self.container_selector.container_delete.connect(self._delete_container)
         self.always_execute = QtWidgets.QCheckBox("Always execute")
         self.always_execute.setChecked(self.item_data.always_execute)
         self.always_execute.stateChanged.connect(self._always_execute_cb)
@@ -423,7 +540,7 @@ class ActionContainerModel(gremlin.ui.ui_common.AbstractModel):
 
         :param container the container instance to remove
         """
-        eh = gremlin.event_handler.EventListener()
+        el = gremlin.event_handler.EventListener()
 
         if container in self._containers:
             # notify actions that the container is closing
@@ -431,15 +548,33 @@ class ActionContainerModel(gremlin.ui.ui_common.AbstractModel):
                 for action in action_set:
                     # if hasattr(action, "_cleanup"):
                     #     action._cleanup()
-                    eh.action_delete.emit(self._item_data, container, action)
+                    el.action_delete.emit(self._item_data, container, action)
+
+            del self._containers[self._containers.index(container)]
+        self.data_changed.emit()
+        el.mapping_changed.emit(self.item_data)
+        
+
+    def remove_all_containers(self):
+        """Removes an existing container from the model.
+
+        :param container the container instance to remove
+        """
+        el = gremlin.event_handler.EventListener()
+        container_list = [container for container in self._containers]
+        for container in container_list:
+            # notify actions that the container is closing
+            for action_set in container.action_sets:
+                for action in action_set:
+                    # if hasattr(action, "_cleanup"):
+                    #     action._cleanup()
+                    el.action_delete.emit(self._item_data, container, action)
 
             del self._containers[self._containers.index(container)]
         self.data_changed.emit()
 
-        el = gremlin.event_handler.EventListener()
-        el.mapping_changed.emit(self.item_data)
         
-
+        el.mapping_changed.emit(self.item_data)
         
 
 

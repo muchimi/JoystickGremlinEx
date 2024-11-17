@@ -1315,7 +1315,11 @@ class OscClient(QtCore.QObject):
                 elif input_item.mode == OscInputItem.InputMode.Axis:
                     is_pressed = False
                     # map to -1 +1 range for vjoy output
-                    value = gremlin.util.scale_to_range(raw_value, input_item.min_range, input_item.max_range)
+                    if input_item.min_range != input_item.max_range:
+                        value = gremlin.util.scale_to_range(raw_value, input_item.min_range, input_item.max_range)
+                    else:
+                        logging.getLogger("system").error(f"OSC: send event: invalid scale range: {input_item.min_range} {input_item.max_range}")    
+                        value = gremlin.util.scale_to_range(raw_value, 0, 1, -1, 1)
                     is_axis = True
                 elif input_item.mode == OscInputItem.InputMode.OnChange:
                     is_pressed = True

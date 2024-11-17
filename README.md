@@ -186,6 +186,15 @@ Joystick Gremlin EX
 
 
 ## 13.40.16ex (pre-release)
+### (m26)
+- Improved: Complete input mappings for an input (all containers) can now be copied and pasted all at once from the clipboard as a set.  This makes is easier to copy/paste multiple container mappings between inputs. Note: when pasting multiple containers, only valid containers in the clipboard will be pasted so if you are missing a container, it's because it wasn't valid for the input.  This comes into play when copying containers for an axis and pasting it to a button input, and vice versa.  (new container toolbar button).
+- Improved: It is now possible to clear all mappings from an input.  A confirmation box will be presented (new container toolbar button).
+- API: added axis flag to containers if the container is only for axis inputs as the type of the input can change so containers need to know if the current input is configured as an axis - previously was relying on input type alone
+- Fix: Input axis flag was not always set correctly in input items in the API
+- Fix: OSC range min value for axis not updating correct property
+- Fix: Paste action didn't recognize XML ObjectEncoder data
+- Improved: Vjoy Remap will validate the VJOY device ID and gracefully provide an error message with the offending ID rather than causing an exception if it cannot be found in the active VJOY device list.  The action will also check at profile load if an ID is not valid, for example an older profile referencing an ID that no longer exists.  IDs are assigned by the VJOY Configurator.
+
 ### (m25)
 - Fix: Curve controller now checks for duplicated points when fitting a curve
 

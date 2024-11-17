@@ -1191,12 +1191,14 @@ class InputItemWidget(QtWidgets.QFrame):
 
     @QtCore.Slot(object)
     def _icon_changed_cb(self, event : gremlin.event_handler.DeviceChangeEvent):
-        action = event.source
-        if isinstance(action, gremlin.base_profile.AbstractAction):
+        if isinstance(event.source, gremlin.base_profile.AbstractAction):
+            action = event.source
             if self.findAction(action):
                 # update the action
                 self.create_action_icons(self.data)
-
+        elif isinstance(event.source, gremlin.base_profile.InputItem):
+            if self.data and self.data == event.source:
+                self.create_action_icons(self.data)
 
     
     @QtCore.Slot(object)
@@ -1455,16 +1457,20 @@ class ContainerSelector(QtWidgets.QWidget):
     """Allows the selection of a container type."""
 
     # Signal emitted when a container type is selected
-    container_added = QtCore.Signal(str)
-    container_paste = QtCore.Signal(object)
+    container_added = QtCore.Signal(str) # fires when a container is added (name of the container)
+    container_copy =  QtCore.Signal() # copy all containers
+    container_paste = QtCore.Signal(object) # paste containers
+    container_delete = QtCore.Signal() # delete all containers
 
-    def __init__(self, input_type, parent=None):
+    def __init__(self, input_type, is_axis = False, parent=None):
         """Creates a new selector instance.
 
         :param parent the parent of this widget
         """
         super().__init__(parent)
         self.input_type = input_type
+        self.is_axis = is_axis
+
 
         self.main_layout = QtWidgets.QHBoxLayout(self)
         self.main_layout.addWidget(QtWidgets.QLabel("Container"))
@@ -1480,16 +1486,33 @@ class ContainerSelector(QtWidgets.QWidget):
 
 
         # clipboard
+        self.copy_button =  QtWidgets.QPushButton()
+        icon = gremlin.util.load_icon("button_copy.svg")
+        self.copy_button.setIcon(icon)
+        self.copy_button.clicked.connect(self._copy_container)
+        self.copy_button.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Minimum)
+        self.copy_button.setToolTip("Copy container(s)")
+
         self.paste_button = QtWidgets.QPushButton()
         icon = gremlin.util.load_icon("button_paste.svg")
         self.paste_button.setIcon(icon)
         self.paste_button.clicked.connect(self._paste_container)
         self.paste_button.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Minimum)
-        self.paste_button.setToolTip("Paste container")
+        self.paste_button.setToolTip("Paste container(s)")
+
+        # delete all containers
+        self.delete_button =  QtWidgets.QPushButton()
+        icon = gremlin.util.load_icon("fa.trash-o")
+        self.delete_button.setIcon(icon)
+        self.delete_button.clicked.connect(self._delete_container)
+        self.delete_button.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Minimum)
+        self.delete_button.setToolTip("Delete container(s)")
 
         self.main_layout.addWidget(self.container_dropdown)
         self.main_layout.addWidget(self.add_button)
+        self.main_layout.addWidget(self.copy_button)
         self.main_layout.addWidget(self.paste_button)
+        self.main_layout.addWidget(self.delete_button)
 
         eh = gremlin.event_handler.EventHandler()
         eh.last_container_changed.connect(self._last_container_changed)
@@ -1517,9 +1540,14 @@ class ContainerSelector(QtWidgets.QWidget):
         container_list = []
         for entry in gremlin.plugin_manager.ContainerPlugins().repository.values():
             if self.input_type in entry.input_types:
+                if entry.axis_only:
+                    # container requires an axis
+                    if not self.is_axis:
+                        continue
                 container_list.append(entry.name)
         return sorted(container_list)
 
+    @QtCore.Slot()
     def _add_container(self, clicked=False):
         """Handles add button events.
 
@@ -1537,23 +1565,23 @@ class ContainerSelector(QtWidgets.QWidget):
         else:
             self.paste_button.setToolTip(f"Paste container (not available)")
 
+    @QtCore.Slot()
     def _paste_container(self):
         ''' handle paste containern '''
         clipboard = Clipboard()
         # validate the clipboard data is an action and is of the correct type for the input/container
         if clipboard.is_container:
-            container_name = clipboard.data.name
-            if container_name in self._valid_container_list():
-                # valid container - and add it
-                # logging.getLogger("system").info("Clipboard paste action trigger...")
-                self.container_paste.emit(clipboard.data)
-            else:
-                # dish out a message
-                message_box = QtWidgets.QMessageBox(
-                    QtWidgets.QSystemTrayIcon.MessageIcon.Warning,
-                    f"Invalid container type ({container_name})",
-                    "Unable to paste container because it is not valid for the current input")
-                message_box.showNormal()
+            self.container_paste.emit(clipboard.data)
+    
+    @QtCore.Slot()
+    def _copy_container(self):
+        ''' fires the copy container '''
+        self.container_copy.emit()
+
+    @QtCore.Slot()
+    def _delete_container(self):
+        ''' delete container '''
+        self.container_delete.emit()
 
 
 class AbstractContainerWidget(QtWidgets.QDockWidget):

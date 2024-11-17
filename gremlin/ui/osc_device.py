@@ -23,6 +23,8 @@ import logging
 from PySide6 import QtWidgets, QtCore, QtGui
 import threading
 import gremlin.config
+import gremlin.event_handler
+import gremlin.event_handler
 from gremlin.types import DeviceType
 from gremlin.input_types import InputType
 import gremlin.shared_state
@@ -2371,7 +2373,7 @@ class OscInputConfigDialog(QtWidgets.QDialog):
         self._validate()
 
     def _max_range_cb(self):
-        self._min_range = self._max_range_widget.value()  
+        self._max_range = self._max_range_widget.value()  
         self._validate()     
 
     @property
@@ -2614,6 +2616,8 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         if selected_index is not None:
             self._select_item_cb(selected_index)
 
+
+
     def itemAt(self, index):
         ''' returns the input widget at the given index '''
         return self.input_item_list_view.itemAt(index)
@@ -2721,17 +2725,18 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         import gremlin.ui.input_item
 
         widget = gremlin.ui.input_item.InputItemWidget(identifier = identifier, populate_ui_callback = self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True, parent = parent)
-        #identifier = identifier.input_id
+        widget.data = data
         widget.create_action_icons(data)
         widget.setInputDescription(data.input_id.display_name)
         widget.enable_close()
         widget.enable_edit()
         widget.setIcon("mdi.surround-sound")
+
+
+
         # remember what widget is at what index
         widget.index = index
         return widget
-    
-
 
     def _update_conflicts(self):
          # check for conflicts with other entries
