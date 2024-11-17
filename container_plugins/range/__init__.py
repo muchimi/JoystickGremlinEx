@@ -115,7 +115,7 @@ class RangeContainerWidget(AbstractContainerWidget):
         any_change_mode.setToolTip("When set, the action will be triggered on any axis value change.")
 
         any_change_label = QtWidgets.QLabel("Delta %")
-        any_change_delta = gremlin.ui.ui_common.QIntLineEdit(min_range=0) # QtWidgets.QSpinBox()
+        any_change_delta = gremlin.ui.ui_common.QIntLineEdit(min_range=0,max_range=100) # QtWidgets.QSpinBox()
         self.ui_any_change_delta = any_change_delta
         any_change_delta.setRange(0,100) 
         any_change_delta.setValue(action_data.any_change_delta)

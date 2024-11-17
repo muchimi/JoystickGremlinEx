@@ -34,6 +34,7 @@ import gremlin.ui.input_item
 import gremlin.ui.ui_common
 import gremlin.util
 import gremlin.shared_state
+from gremlin.curve_handler import Point2D
 
 
 g_scene_size = 250.0
@@ -65,27 +66,6 @@ _symmetry_mode_to_enum = {
 }
 
 
-class Point2D:
-
-    """Represents a 2D point with support for addition and subtraction."""
-
-    def __init__(self, x=0.0, y=0.0):
-        """Creates a new instance.
-
-        :param x the x coordinate
-        :param y the y coordinate
-        """
-        self.x = x
-        self.y = y
-
-    def __add__(self, other):
-        return Point2D(self.x + other.x, self.y + other.y)
-
-    def __sub__(self, other):
-        return Point2D(self.x - other.x, self.y - other.y)
-
-    def __str__(self):
-        return f"[{self.x:.2f}, {self.y:.2f}]"
 
 
 class ControlPoint:
@@ -255,7 +235,14 @@ class AbstractCurveModel(QtCore.QObject):
         :param handles list of potential handles
         :return the newly created control point
         """
-        self._control_points.append(self._create_control_point(point, handles))
+
+        # don't add to an existing point
+        new_point = self._create_control_point(point, handles)
+        if new_point in self._control_points:
+            # point already exists, ignore
+            return
+        
+        self._control_points.append(new_point)
 
         if self.symmetry_mode == SymmetryMode.Diagonal:
             self._control_points.append(self._create_control_point(
@@ -363,7 +350,7 @@ class CubicSplineModel(AbstractCurveModel):
         """
         points = []
         for cp in sorted(self._control_points, key=lambda e: e.center.x):
-            points.append((cp.center.x, cp.center.y))
+            points.append(Point2D(cp.center.x, cp.center.y))
         if len(points) < 2:
             return None
         else:

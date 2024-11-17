@@ -21,7 +21,7 @@ import gremlin.util
 
 
 # Named tuple to facilitate working with 2D coordinates
-Point2D = collections.namedtuple("Point2D", ["x", "y"])
+TPoint2D = collections.namedtuple("TPoint2D", ["x", "y"])
 
 
 class CubicSpline:
@@ -39,7 +39,11 @@ class CubicSpline:
         """
         # Order the points by increasing x coordinate to guarantee proper
         # functioning of the spline code
-        ordered_points = sorted(points, key=lambda x: x[0])
+
+        
+
+
+        ordered_points = sorted(list(set(points)), key=lambda x: x[0])
 
         self.x = [v[0] for v in ordered_points]
         self.y = [v[1] for v in ordered_points]
@@ -125,10 +129,10 @@ class CubicBezierSpline:
         for i in range(int((len(self.x) - 4) / 3) + 1):
             offset = i * 3
             points = [
-                Point2D(self.x[offset], self.y[offset]),
-                Point2D(self.x[offset + 1], self.y[offset + 1]),
-                Point2D(self.x[offset + 2], self.y[offset + 2]),
-                Point2D(self.x[offset + 3], self.y[offset + 3])
+                TPoint2D(self.x[offset], self.y[offset]),
+                TPoint2D(self.x[offset + 1], self.y[offset + 1]),
+                TPoint2D(self.x[offset + 2], self.y[offset + 2]),
+                TPoint2D(self.x[offset + 3], self.y[offset + 3])
             ]
 
             # Get t -> coordinate mappings
@@ -151,7 +155,7 @@ class CubicBezierSpline:
         mt2 = mt * mt
         mt3 = mt2 * mt
 
-        return Point2D(
+        return TPoint2D(
             points[0].x * mt3
                 + 3 * points[1].x * mt2 * t
                 + 3 * points[2].x * mt * t2

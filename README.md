@@ -186,6 +186,9 @@ Joystick Gremlin EX
 
 
 ## 13.40.16ex (pre-release)
+### (m25)
+- Fix: Curve controller now checks for duplicated points when fitting a curve
+
 ### (m24)
 - Improved: The range container now supports directional triggers based on a relative input axis position change. The container can now trigger its actions based on an input increase or decrease, or both, provided that the input change (delta) exceeds the percentage or range set (default 10% deviation).  The use case for this is to trigger a button or key based on a slider input going up or down.  Note: if mapping a button or key, use the pulse feature as the container is only an "on" container - in trigger on change mode, it does not issue a release so the action must self release if that is the desired behavior.
 - Improved: Import profile function UI improvements
