@@ -23,6 +23,7 @@ import gremlin
 import gremlin.config
 
 import gremlin.event_handler
+import gremlin.event_handler
 import gremlin.shared_state
 import gremlin.ui.midi_device
 from gremlin.util import load_icon, load_pixmap
@@ -1584,6 +1585,64 @@ class ContainerSelector(QtWidgets.QWidget):
         self.container_delete.emit()
 
 
+class ConditionTrackerInfo:
+    def __init__(self, input_item, device_guid, input_id, dock_tabs):
+        self.device_guid = device_guid
+        self.input_id = input_id
+        self.dock_tabs = dock_tabs
+        self.input_item = input_item
+        
+    
+
+@SingletonDecorator
+class ConditionStateTracker():
+    def __init__(self):
+        self.tracker = {} # maps input to condition tab
+        el = gremlin.event_handler.EventListener()
+        el.condition_state_changed.connect(self._condition_state_changed)
+        self._icon_enabled = gremlin.util.load_icon("mdi.record", qta_color="green")
+        self._icon_disabled = gremlin.util.load_icon("mdi.record", qta_color="lightgray")
+
+    def register(self, input_item, dock_tab : QtWidgets.QTabWidget):
+        
+        device_guid = input_item.device_guid
+        input_id = input_item.input_id
+        if not device_guid in self.tracker:
+            self.tracker[device_guid] = {}
+        
+        info = ConditionTrackerInfo(input_item, device_guid, input_id, dock_tab)
+        self.tracker[device_guid][input_id] = info
+        enabled = info.input_item.hasConditions()
+        self.set_condition_tab_state(dock_tab, enabled)
+
+    @QtCore.Slot(object)
+    def _condition_state_changed(self, action_data):
+        device_guid = action_data.hardware_device_guid
+        input_id = action_data.hardware_input_id
+        if device_guid in self.tracker:
+            if input_id in self.tracker[device_guid]:
+                info = self.tracker[device_guid][input_id]
+                enabled = info.input_item.hasConditions()
+                dock_tabs = info.dock_tabs
+                self.set_condition_tab_state(dock_tabs, enabled)
+        
+
+     
+    def set_condition_tab_state(self, dock_tabs : QtWidgets.QTabWidget, enabled : bool):
+        ''' marks the condition tab used or not '''
+        try:
+            for i in range(dock_tabs.count()):
+                if dock_tabs.tabText(i) == "Condition":
+                    tb = dock_tabs.tabBar()
+                    icon = self._icon_enabled if enabled else self._icon_disabled
+                    tb.setTabIcon(i, icon)
+                    break
+        except:
+            pass
+
+        
+
+
 class AbstractContainerWidget(QtWidgets.QDockWidget):
 
     """Base class for container widgets."""
@@ -1616,8 +1675,10 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         """
 
         import gremlin.hints
+        import gremlin.event_handler
         assert isinstance(profile_data, gremlin.base_profile.AbstractContainer)
         super().__init__(parent)
+
         self.profile_data = profile_data
         self.action_widgets = []
 
@@ -1633,6 +1694,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         self.dock_tabs.setTabPosition(QtWidgets.QTabWidget.East)
         self.setWidget(self.dock_tabs)
 
+        
         # Create the individual tabs
         self._create_action_tab()
         if self.profile_data.get_device_type() != DeviceType.VJoy:
@@ -1645,6 +1707,13 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
         # Select appropriate tab
         self._select_tab(self.profile_data.current_view_type)
+
+        tracker = ConditionStateTracker()
+        tracker.register(self.profile_data.input_item, self.dock_tabs)
+
+
+ 
+
 
     def _create_action_tab(self):
         # Create root widget of the dock element
@@ -1677,13 +1746,16 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         self.activation_condition_layout.addWidget(
             self.activation_condition_widget
         )
-        self.dock_tabs.addTab(
+        self.condition_tab_index = self.dock_tabs.addTab(
             self.activation_condition_tab_widget,
             "Condition"
         )
 
         self._create_condition_ui()
         self.activation_condition_layout.addStretch(10)
+
+        
+
 
     def _create_virtual_button_tab(self):
         # Return if nothing is to be done
@@ -2192,6 +2264,7 @@ class ConditionActionWrapper(AbstractActionWrapper):
                     )
 
             self.condition_model = ui_activation_condition.ConditionModel(
+                action_data,
                 action_data.activation_condition
             )
             self.condition_view = ui_activation_condition.ConditionView()

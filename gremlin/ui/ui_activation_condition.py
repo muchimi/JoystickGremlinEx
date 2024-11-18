@@ -778,7 +778,7 @@ class ConditionModel(ui_common.AbstractModel):
 
     """Stores and represents condition data."""
 
-    def __init__(self, condition_data, parent=None):
+    def __init__(self, action_data, condition_data, parent=None):
         """Creates a new model to store condition data.
 
         :param condition_data the condition data to represent
@@ -786,6 +786,7 @@ class ConditionModel(ui_common.AbstractModel):
         """
         super().__init__(parent)
         self.condition_data = condition_data
+        self.action_data = action_data
 
     def rows(self):
         """Returns the number of rows in the model.
@@ -924,12 +925,16 @@ class ConditionView(ui_common.AbstractView):
             )
             self.conditions_layout.addWidget(condition_widget)
 
+        eh = gremlin.event_handler.EventListener()
+        eh.condition_state_changed.emit(self.model.action_data)
+
     def _add_condition(self):
         """Adds a condition to the view's model."""
         data_type = ConditionView.condition_map[
             self.condition_selector.currentText().split()[0]
         ][0]
         self.model.add_condition(data_type())
+        
 
     def _rule_changed_cb(self, text):
         """Updates the rule of the model.
@@ -943,6 +948,9 @@ class ConditionView(ui_common.AbstractView):
         self.rule_selector.setCurrentText(
             ConditionView.rules_map[self.model.rule]
         )
+
+        
+
 
     def _show_hint(self, state):
         """Shows a help message regarding the condition types.

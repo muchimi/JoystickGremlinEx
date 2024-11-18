@@ -1744,6 +1744,23 @@ class DeadzoneWidget(QtWidgets.QWidget):
                 widget.setValueIndex(index,value)
                 print (f"index {index} set value {value} new values: {widget.value()}")
 
+    def _update_deadzone(self, data : list):
+        ''' updates the deadzone data '''
+        for index, value in enumerate(data):
+            match index:
+                case 0:
+                    self.left_lower.setValue(value)
+                case 1:
+                    self.left_upper.setValue(value)
+                case 2:
+                    self.right_lower.setValue(value)
+                case 3:
+                    self.right_upper.setValue(value)
+
+            self.profile_data.deadzone[index] = value
+        self.changed.emit()
+
+        
 
 
 
@@ -2312,8 +2329,9 @@ class AxisCurveWidget(QtWidgets.QWidget):
 
             
         
-        
-        dd.set_values([d_start, d_left, d_right, d_end])
+        dd._update_deadzone([d_start, d_left, d_right, d_end])
+        #dd.set_values([d_start, d_left, d_right, d_end])
+
 
     @QtCore.Slot() 
     def _deadzone_modified_cb(self):

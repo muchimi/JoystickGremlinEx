@@ -294,7 +294,8 @@ class EventListener(QtCore.QObject):
 	# called when vjoy button usage has changed in the profile so displays can update themselves
 	button_usage_changed = QtCore.Signal(int)  # (vjoy_device_id) the vjoy device that changed
 
-	
+	# called when a condition state changes - used to update the UI
+	condition_state_changed = QtCore.Signal(object) # passes along the action data
 
 	def __init__(self):
 		"""Creates a new instance."""

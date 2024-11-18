@@ -1382,7 +1382,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         ''' create a grid of buttons for easy selection'''
 
         if not self.action_data.vjoy_device_id in self.action_data.vjoy_map:
-                self._refresh_vjoy()
+                self.action_data.refresh_vjoy()
                 if not self.action_data.vjoy_device_id in self.action_data.vjoy_map:
                     gremlin.ui.ui_common.MessageBox(prompt=f"VJOY configuration has changed and GremlinEx is unable to find the requested Vjoy device # {self.action_data.vjoy_device_id}")
                     return
@@ -2537,11 +2537,7 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
 
 
 
-            # hack to sync all loaded profile setups with the status grid
-            if self.input_type == InputType.JoystickButton:
-                usage_data = gremlin.joystick_handling.VJoyUsageState()
-                usage_data.set_usage_state(self.vjoy_device_id, self.vjoy_input_id, state = True, action = self, emit = False)
-                #usage_data.push_load_list(self.vjoy_device_id,self.input_type,self.vjoy_input_id)
+
             
             
             self.pulse_delay = 250
@@ -2559,6 +2555,18 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
                 elif self.input_type == InputType.JoystickAxis:
                     default_action_mode = VjoyAction.VJoyAxis
                 self.action_mode = default_action_mode
+
+
+            # hack to sync all loaded profile setups with the status grid
+            usage_data = gremlin.joystick_handling.VJoyUsageState()
+            if self.input_type == InputType.JoystickButton:
+                usage_data.set_usage_state(self.vjoy_device_id, self.vjoy_input_id, state = True, action = self, emit = False)
+                #usage_data.push_load_list(self.vjoy_device_id,self.input_type,self.vjoy_input_id)
+            elif self.input_type == InputType.JoystickAxis:
+                # check action mode for special case axis to button
+                if self.action_mode == VjoyAction.VJoyAxisToButton:
+                    usage_data.set_usage_state(self.vjoy_device_id, self.vjoy_input_id, state = True, action = self, emit = False)
+                                
 
             if "reverse" in node.attrib:
                 self.reverse = safe_read(node,"reverse",bool,False)

@@ -732,35 +732,6 @@ class VJoyUsageState():
         if vjoy_id in self._button_usage.keys() and button_id in self._button_usage[vjoy_id].keys():
             return self._button_usage[vjoy_id][button_id]
         return False
-
-    # def set_state(self, vjoy_device_id, input_type, input_id, state):
-    #     ''' sets the state of the device '''
-    #     self.ensure_profile()
-    #     name = self.map_input_type(input_type)
-
-    #     unused_list = self._free_inputs[vjoy_device_id][name]
-    #     if state:
-    #         if input_id in unused_list:
-    #             unused_list.remove(input_id)
-    #             #print(f"Set state: device: {device_id} type: {name} id: {input_id}")
-    #     else:
-    #         # clear state
-    #         if not input_id in unused_list:
-    #             unused_list.append(input_id)
-    #             unused_list.sort()
-    #             #print(f"Clear state: device: {device_id} type: {name} id: {input_id}")
-
-                
-
-    # def get_state(self, device_id, input_type, input_id):
-    #     ''' returns the current usage state of the input '''
-    #     self.ensure_profile()
-    #     unused_list = self._free_inputs[device_id][input_type]
-    #     if input_id in unused_list:
-    #         return False
-    #     return True
-    
-    
     
 
     def used_list(self, device_id, input_type):
@@ -808,8 +779,6 @@ class VJoyUsageState():
 
         :return dictionary of unused inputs for each input type
         """
-
-
         verbose = gremlin.config.Configuration().verbose
 
         vjoy_devices = gremlin.joystick_handling.vjoy_devices()
@@ -867,9 +836,13 @@ class VJoyUsageState():
             if not actions:
                 # no actions found
                 continue
+
+
             
             for action in actions:
                 type_name = InputType.to_string(action.input_type)
+        
+                    
                 if action.vjoy_input_id in [0, None] \
                         or action.vjoy_device_id in [0, None] \
                         or action.vjoy_device_id not in vjoy \

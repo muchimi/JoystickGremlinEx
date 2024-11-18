@@ -186,6 +186,12 @@ Joystick Gremlin EX
 
 
 ## 13.40.16ex (pre-release)
+### (m27)
+- Fix: Input or output axis curves: setting deadzone via buttons not saving values. 
+- Improved: [experimental] Condition tab will show a marker when one or more conditions are defined (I've set it up to pickup any condition however I am not a heavy user of conditions so it's completely possible this will trip up somewhere)
+- Fix: VJOY used button state now takes into account axis to button mappings.
+- Fix: VJoy Remap typo in diagnostics code to handle invalid VJOY IDs
+
 ### (m26)
 - Improved: Complete input mappings for an input (all containers) can now be copied and pasted all at once from the clipboard as a set.  This makes is easier to copy/paste multiple container mappings between inputs. Note: when pasting multiple containers, only valid containers in the clipboard will be pasted so if you are missing a container, it's because it wasn't valid for the input.  This comes into play when copying containers for an axis and pasting it to a button input, and vice versa.  (new container toolbar button).
 - Improved: It is now possible to clear all mappings from an input.  A confirmation box will be presented (new container toolbar button).
