@@ -261,7 +261,8 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
                     v -= self._step * factor
                 v = gremlin.util.clamp(v, self._min_range, self._max_range)
                 self.setValue(v)
-                self.valueChanged.emit(v)
+                
+            return True # filter the wheel event
         elif t == QtCore.QEvent.Type.FocusAboutToChange:
             if not self.hasAcceptableInput():
                 return True # skip the event
@@ -281,7 +282,6 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
             s_value = f"{value:0.{self._decimals}f}"
             if s_value != self.text():
                 self.setText(s_value)
-            
             self.valueChanged.emit(value)
 
 
@@ -290,7 +290,8 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
     def _validate(self):
         ''' called whenever the text changes '''
         if self.hasAcceptableInput():
-            self.valueChanged.emit(self.value())
+            value = self.value()
+            self.valueChanged.emit(value)
 
     def setValue(self, value : float):
         ''' sets the value '''
@@ -399,7 +400,8 @@ class QIntLineEdit(QtWidgets.QLineEdit):
                     v -= self._step
                 v = gremlin.util.clamp(v, self._min_range, self._max_range)
                 self.setValue(v)
-                self.valueChanged.emit(v)
+            
+            return True # filter the wheel event
         elif t == QtCore.QEvent.Type.FocusAboutToChange:
             if not self.hasAcceptableInput():
                 return True # skip the event
@@ -876,8 +878,8 @@ class ActionSelector(QtWidgets.QWidget):
             #     self.action_dropdown.addItem(warning_icon, name)
             # else:
                 self.action_dropdown.addItem(name)
-        cfg = gremlin.config.Configuration()
-        self.action_dropdown.setCurrentText(cfg.last_action)
+        config = gremlin.config.Configuration()
+        self.action_dropdown.setCurrentText(config.last_action)
         self.action_dropdown.currentIndexChanged.connect(self._action_changed)
         self.add_button = QtWidgets.QPushButton("Add")
         self.add_button.clicked.connect(self._add_action)
@@ -922,8 +924,17 @@ class ActionSelector(QtWidgets.QWidget):
         # if self.input_type == InputType.JoystickAxis:
         #     action_list.append("Response Curve")
         # else:
+
+        config = gremlin.config.Configuration()
+        convert_vjoy = config.convert_vjoy_remap
+        convert_curve = config.convert_response_curve
+        #all_entries = [entry.name for entry in gremlin.plugin_manager.ActionPlugins().repository.values()]
         for entry in gremlin.plugin_manager.ActionPlugins().repository.values():
             if self.input_type in entry.input_types:
+                if convert_vjoy and entry.name == "Remap":
+                    continue
+                elif convert_curve and entry.name == "Response Curve":
+                    continue
                 action_list.append(entry.name)
         return sorted(action_list)
     

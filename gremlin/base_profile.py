@@ -530,19 +530,30 @@ class AbstractContainer(ProfileData):
         :param action_set storage for the processed action nodes
         """
         action_name_map = ActionPlugins().tag_map
+        config = gremlin.config.Configuration()
         for child in node:
-            # if child.tag == "remap":
-            #     child.tag = "vjoyremap"
-
+            
             if child.tag not in action_name_map:
                 logging.getLogger("system").warning(
                     f"Unknown node present: {child.tag}"
                 )
                 continue
 
-            
+            # apply any conversions
+            tag = child.tag
+            if config.convert_response_curve and tag == "response-curve":
+                tag = "response-curve-ex"
+                if not tag in action_name_map:
+                    # new mapper not found
+                    tag = child.tag
+            elif config.convert_vjoy_remap and tag == "remap":
+                tag = "vjoyremap"
+                if not tag in action_name_map:
+                    # new mapper not found
+                    tag = child.tag
 
-            entry = action_name_map[child.tag](self)
+
+            entry = action_name_map[tag](self)
             entry.from_xml(child)
             action_set.append(entry)
 
@@ -1046,7 +1057,7 @@ class InputItem():
         elif self.input_type == InputType.JoystickAxis:
             # check for curve data
             for child in node:
-                if child.tag == "response-curve":
+                if child.tag == "response-curve-ex":
                     self.curve_data = gremlin.curve_handler.AxisCurveData()
                     self.curve_data._parse_xml(child)
                     break

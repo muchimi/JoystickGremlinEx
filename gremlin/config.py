@@ -1560,3 +1560,21 @@ class Configuration:
     def mapping_vjoy_id(self, id : int):
         self._data["mapping_vjoy_id"] = id
         self.save()        
+
+    @property 
+    def convert_response_curve(self):
+        return self._data.get("convert_response_curve", True)
+
+    @convert_response_curve.setter
+    def convert_response_curve(self, value : bool):
+        self._data["convert_response_curve"] = value
+        self.save()   
+
+    @property 
+    def convert_vjoy_remap(self):
+        return self._data.get("convert_vjoy_remap", False)
+
+    @convert_vjoy_remap.setter
+    def convert_vjoy_remap(self, value: bool):
+        self._data["convert_vjoy_remap"] = value
+        self.save()   

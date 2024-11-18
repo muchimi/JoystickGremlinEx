@@ -469,7 +469,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
         action_names = []
         if self.item_data.input_type == gremlin.types.DeviceType.VJoy:
             entry = gremlin.plugin_manager.ActionPlugins().repository.get(
-                "response-curve",
+                "response-curve-ex",
                 None
             )
             if entry is not None:

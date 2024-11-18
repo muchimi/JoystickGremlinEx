@@ -177,7 +177,9 @@ class ResponseCurveEx(gremlin.base_profile.AbstractAction):
         :return XML node representing the object's data
         """
 
+        
         node = self.curve_data._generate_xml()
+        node.tag = "response-curve-ex"
         return node
 
     def _is_valid(self):

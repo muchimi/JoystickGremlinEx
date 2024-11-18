@@ -186,6 +186,15 @@ Joystick Gremlin EX
 
 
 ## 13.40.16ex (pre-release)
+### (m28)
+- Improved: GremlinEx can automatically convert legacy Remap and Response Curve to their GremlinEx version provided that options are enabled from the Profile page in the options.  Converting is recommended and will occur when a profile is loaded.  When the convert option is selected, the legacy mappers will no longer be visible from the action drop down either to encourage the use of the new actions.
+- Improved: Added option to toggle the display of button grids in the GremlinEx options panel.  This is the same as holding the control key down when toggling the "show button grid" in the Map to Vjoy mapper.
+- Fix: Missing button options panel when in Axis to Button mapping mode of Map to Vjoy
+- Fix: Response curve Ex saving to profile as a legacy response curve action.
+- Fix: Response curve text inputs not always updating the UI correctly
+- Fix: Floating point and integer text input wheel events are no longer propagated (that could cause random unexpected scrolling of a parent containers)
+
+
 ### (m27)
 - Fix: Input or output axis curves: setting deadzone via buttons not saving values. 
 - Improved: [experimental] Condition tab will show a marker when one or more conditions are defined (I've set it up to pickup any condition however I am not a heavy user of conditions so it's completely possible this will trip up somewhere)

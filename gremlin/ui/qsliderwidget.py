@@ -644,10 +644,10 @@ class QSliderWidget(QtWidgets.QWidget):
         if x >= self._usable_left and x <= self._usable_right:
             # x is in the "value" zone
             value = gremlin.util.scale_to_range(x, self._usable_left, self._usable_right, self._minimum, self._maximum)
-            print (f"click value: {x} -> {value}")
+            #print (f"click value: {x} -> {value}")
             return value
         # not in range
-        print (f"not in range click value: {x} -> N/A")
+        #print (f"not in range click value: {x} -> N/A")
         return None
     
     def _get_min_max_handles(self):
@@ -883,7 +883,7 @@ class QSliderWidget(QtWidgets.QWidget):
 
                     # get the index of the value relative to the other gates
                     old_value = self._values[self._drag_handle_index] 
-                    print (f"Current x: {old_x} -> {current_x}  offset: {x_offset}  old value: {old_value}  new value: {value}")
+                    #print (f"Current x: {old_x} -> {current_x}  offset: {x_offset}  old value: {old_value}  new value: {value}")
                     if old_value != value:
                         self._values[self._drag_handle_index] = value
                         values = [(value, index) for index, value in enumerate(self._values)]

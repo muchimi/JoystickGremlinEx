@@ -370,6 +370,13 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.show_joystick_input_widget.setChecked(self.config.show_input_axis)
         self.show_joystick_input_widget.clicked.connect(self._show_joystick_input_cb)
 
+        # show button grid
+        self.show_button_grid_widget = QtWidgets.QCheckBox("Show button grid")
+        self.show_button_grid_widget.setToolTip("When enabled, Map to Vjoy remapper will display a button grid")
+        self.show_button_grid_widget.setChecked(self.config.button_grid_visible)
+        self.show_button_grid_widget.clicked.connect(self._show_button_grid_cb)
+        
+
         # allow partial plugin configurations
         self.partial_plugin_save = QtWidgets.QCheckBox("Save partial user plugin data")
         self.partial_plugin_save.setToolTip("When enabled, user-plugin configuration will be saved even if one or more input variable reports not-configured.<br>This feature allows saving of the configuration to date.<br>Incomplete configurations will not be activated at runtime even if this feature is used.")
@@ -601,6 +608,8 @@ class OptionsUi(ui_common.BaseDialogUi):
         row+=1
         self.column_layout.addWidget(self.show_joystick_input_widget, row, col)
         row+=1
+        self.column_layout.addWidget(self.show_button_grid_widget, row, col)
+        row+=1
         self.column_layout.addWidget(self.runtime_ui_update, row, col)
         row+=1
         self.column_layout.addWidget(self.midi_enabled, row, col)
@@ -696,6 +705,18 @@ This setting is also available on a profile by profile basis on the profile tab,
         self.reset_mode_on_process_activate.clicked.connect(self._reset_mode_on_process_activate)
         self.reset_mode_on_process_activate.setToolTip("If set, the profile mode will be reset to the startup mode whenever the application has the focus")
 
+        # convert remap
+        self.convert_vjoy_remap = QtWidgets.QCheckBox("Convert legacy Remap")
+        self.convert_vjoy_remap.clicked.connect(self._convert_vjoy_remap)
+        self.convert_vjoy_remap.setChecked(self.config.convert_vjoy_remap)
+        self.convert_vjoy_remap.setToolTip("When set, Remap actions will convert to Map To Vjoy when GremlinEx starts.")        
+
+        # Activate profile on launch
+        self.convert_response_curve = QtWidgets.QCheckBox("Convert legacy Response Curve")
+        self.convert_response_curve.clicked.connect(self._convert_response_curve)
+        self.convert_response_curve.setChecked(self.config.convert_response_curve)
+        self.convert_response_curve.setToolTip("When set, Response Curve actions will conver to the EX version when GremlinEx starts.")
+
         row = 0
         self.profile_page_layout.addWidget(self.autoload_checkbox,row,0)
         row+=1
@@ -710,6 +731,10 @@ This setting is also available on a profile by profile basis on the profile tab,
         self.profile_page_layout.addWidget(self.initial_load_mode_tts,row,0)
         row+=1
         self.profile_page_layout.addWidget(self.reset_mode_on_process_activate, row, 0)
+        row+=1
+        self.profile_page_layout.addWidget(self.convert_vjoy_remap, row, 0)
+        row+=1
+        self.profile_page_layout.addWidget(self.convert_response_curve, row, 0)
         row+=1
 
 
@@ -932,6 +957,16 @@ This setting is also available on a profile by profile basis on the profile tab,
         self.config.restore_profile_mode_on_start = checked
 
     @QtCore.Slot(bool)
+    def _convert_vjoy_remap(self, checked):
+        self.config.convert_vjoy_remap = checked
+
+    @QtCore.Slot(bool)
+    def _convert_response_curve(self, checked):
+        self.config.convert_response_curve = checked        
+
+    
+
+    @QtCore.Slot(bool)
     def _initial_load_mode_tts(self, checked):
         self.config.initial_load_mode_tts = checked
 
@@ -987,6 +1022,10 @@ This setting is also available on a profile by profile basis on the profile tab,
     @QtCore.Slot(bool)
     def _show_joystick_input_cb(self, checked):
         self.config.show_input_axis = checked
+
+    @QtCore.Slot(bool)
+    def _show_button_grid_cb(self, checked):
+        self.config.button_grid_visible = checked
 
     @QtCore.Slot(bool)
     def _partial_plugin_save(self, checked):
@@ -1229,6 +1268,11 @@ This setting is also available on a profile by profile basis on the profile tab,
         pushCursor()
         for item in self._profile_mapper.items():
             item.save()
+
+        # reflect any changes to the grid button
+        eh = gremlin.event_handler.VjoyRemapEventHandler()
+        eh.grid_visible_changed.emit(self.config.button_grid_visible)
+
 
         self._profile_mapper.save_profile_map()
         popCursor()

@@ -1543,3 +1543,7 @@ class EventHandler(QtCore.QObject):
 				callback = plugin.install(callback, functools.partial)
 		return callback
 
+
+@gremlin.singleton_decorator.SingletonDecorator
+class VjoyRemapEventHandler(QtCore.QObject):
+	grid_visible_changed = QtCore.Signal(bool) # occurs when a grid was updated

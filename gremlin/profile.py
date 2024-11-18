@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations
 from abc import abstractmethod, ABCMeta
 import codecs
 import collections
@@ -31,6 +32,7 @@ import gremlin.base_profile
 from PySide6 import QtCore
 
 import dinput
+import gremlin.config
 import gremlin.shared_state
 import gremlin.actions
 from gremlin.util import *
@@ -72,7 +74,21 @@ class ProfileConverter:
         root = tree.getroot()
 
         version = self._determine_version(root)
-        return version == ProfileConverter.current_version or version == 9
+        return version == ProfileConverter.current_version # or version == 9
+    
+    def convert_to_ex(self, fname):
+        ''' applies the options and converts the profile '''
+        import gremlin.util
+
+        try:
+            tree = ElementTree.parse(fname)
+            root = tree.getroot()
+
+            new_root = self._convert_to_ex(root, fname)
+            tree = ElementTree.tostring(new_root)
+            tree.write(fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
+        except:
+            gremlin.util.m
 
     def convert_profile(self, fname):
         """Converts the provided profile to the current version.
@@ -451,6 +467,33 @@ class ProfileConverter:
             node.set("motion_input", "True")
 
         return root
+    
+    def _convert_to_ex(self, root, fname = None):
+        ''' converts to the EX version '''
+
+        root.attrib["version"] = "100"
+        syslog = logging.getLogger("system")
+
+        config = gremlin.config.Configuration()
+        convert_response_curve = config.convert_response_curve
+        convert_vjoy_remap = config.convert_vjoy_remap
+
+
+        # convert all response-curve to response-curve EX
+        if convert_response_curve:        
+            nodes = root.xpath("//response-curve")
+            for node in nodes:
+                node.tag = "response-curve-ex"
+
+        # convert all remap to vjoy remap if configured in options
+        
+        if convert_vjoy_remap:
+            nodes = root.xpath("//remap")
+            for node in nodes:
+                node.tag = "vjoyremap"
+
+        return root
+
 
     def _convert_from_v8(self, root, fname=None):
         """Convert from a V8 profile to V9.

@@ -1561,6 +1561,7 @@ class DeadzoneWidget(QtWidgets.QWidget):
         :param parent the parent widget
         """
         super().__init__(parent)
+        self._values = None
 
         self.profile_data = profile_data
         self.main_layout = QtWidgets.QGridLayout(self)
@@ -1568,12 +1569,13 @@ class DeadzoneWidget(QtWidgets.QWidget):
 
         # Create the two sliders
         self.left_slider = QSliderWidget()
+
         self.left_slider.setMarkerVisible(False)
         self.left_slider.desired_height = 24
-        self.left_slider.setRange(-1, 0)
+        self.left_slider.setRange(-1.0, 0.0)
         self.right_slider = QSliderWidget()
         self.right_slider.setMarkerVisible(False)
-        self.right_slider.setRange(0, 1)
+        self.right_slider.setRange(0.0, 1.0)
         self.right_slider.desired_height = 24
 
         # Create spin boxes for the left slider
@@ -1609,33 +1611,18 @@ class DeadzoneWidget(QtWidgets.QWidget):
         # Hook up all the required callbacks
         self.left_slider.valueChanged.connect(self._update_left)
         self.right_slider.valueChanged.connect(self._update_right)
+
         self.left_lower.valueChanged.connect(
-            lambda value: self._update_from_spinner(
-                value,
-                0,
-                self.left_slider
-            )
+            lambda value: self._update_from_spinner(value,0)
         )
         self.left_upper.valueChanged.connect(
-            lambda value: self._update_from_spinner(
-                value,
-                1,
-                self.left_slider
-            )
+            lambda value: self._update_from_spinner(value,1)
         )
         self.right_lower.valueChanged.connect(
-            lambda value: self._update_from_spinner(
-                value,
-                0,
-                self.right_slider
-            )
+            lambda value: self._update_from_spinner(value,2)
         )
         self.right_upper.valueChanged.connect(
-            lambda value: self._update_from_spinner(
-                value,
-                1,
-                self.right_slider
-            )
+            lambda value: self._update_from_spinner(value,3)
         )
 
         # Set deadzone positions
@@ -1681,17 +1668,26 @@ class DeadzoneWidget(QtWidgets.QWidget):
             self.right_upper.setValue(v2)
 
 
+        self._values = values
+        for index, value in enumerate(values):
+            self.profile_data.deadzone[index] = value
+
+
     def get_values(self):
         """Returns the current deadzone values.
 
         :return current deadzone values
         """
-        return [
+
+        if self._values is None:
+            self._values = [
             self.left_lower.value(),
             self.left_upper.value(),
             self.right_lower.value(),
             self.right_upper.value()
         ]
+            
+        return self._values
 
     def _update_left(self, handle, value):
         """Updates the left spin boxes.
@@ -1731,21 +1727,27 @@ class DeadzoneWidget(QtWidgets.QWidget):
 
         
 
-    def _update_from_spinner(self, value, index, widget):
+    def _update_from_spinner(self, value, index):
         """Updates the slider position.
 
         :param value the new value
         :param handle the handle to move
         :param widget which slider widget to update
         """
-        with QtCore.QSignalBlocker(widget):
-            values = widget.value()
-            if values[index] != value:
-                widget.setValueIndex(index,value)
-                print (f"index {index} set value {value} new values: {widget.value()}")
+
+        values = self.get_values()
+
+        current = values[index]
+        if current != value:
+            values[index] = value
+            self.set_values(values)
+
+        
+
+            
 
     def _update_deadzone(self, data : list):
-        ''' updates the deadzone data '''
+        ''' updates the deadzone text values '''
         for index, value in enumerate(data):
             match index:
                 case 0:
@@ -1758,9 +1760,7 @@ class DeadzoneWidget(QtWidgets.QWidget):
                     self.right_upper.setValue(value)
 
             self.profile_data.deadzone[index] = value
-        self.changed.emit()
 
-        
 
 
 
@@ -2040,8 +2040,8 @@ class AxisCurveWidget(QtWidgets.QWidget):
         
         self.curve_scene.redraw_scene()
 
-        # Set deadzone values
-        self.deadzone_widget.set_values(self.action_data.deadzone)
+        # # Set deadzone values
+        # self.deadzone_widget.set_values(self.action_data.deadzone)
 
     @QtCore.Slot()
     def _show_help(self):

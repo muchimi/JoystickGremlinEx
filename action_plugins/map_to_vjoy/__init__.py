@@ -49,10 +49,6 @@ import gremlin.shared_state
 import gremlin.curve_handler
 
 
-@gremlin.singleton_decorator.SingletonDecorator
-class VjoyRemapEventHandler(QtCore.QObject):
-	grid_visible_changed = QtCore.Signal(bool) # occurs when a grid was updated
-
 
 class MergeOperationType (enum.IntEnum):
     ''' merge operation method'''
@@ -234,7 +230,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             return
         
 
-        veh = VjoyRemapEventHandler()
+        veh = gremlin.event_handler.VjoyRemapEventHandler()
         veh.grid_visible_changed.connect(self.grid_visible_changed)
 
         try:
@@ -1305,6 +1301,8 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
                 range_visible = False
             case VjoyAction.VJoyAxisToButton:
                 repeater_visible = False
+                start_visible = True
+                grid_visible = True
 
 
         self.container_repeater_widget.setVisible(repeater_visible)
@@ -1487,7 +1485,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         
         el = gremlin.event_handler.EventListener()
         if el.get_control_state():
-            veh = VjoyRemapEventHandler()
+            veh = gremlin.event_handler.VjoyRemapEventHandler()
             veh.grid_visible_changed.emit(checked)
             
     @QtCore.Slot(bool)
@@ -2630,7 +2628,7 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
                 self.grid_visible = safe_read(node,"grid_visible", bool, True)
 
             # curve data
-            curve_node = util.get_xml_child(node,"response-curve")
+            curve_node = util.get_xml_child(node,"response-curve-ex")
             if curve_node is not None:
                 self.curve_data = gremlin.curve_handler.AxisCurveData()
                 self.curve_data._parse_xml(curve_node)
