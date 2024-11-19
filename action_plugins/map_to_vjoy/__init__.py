@@ -1285,7 +1285,9 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         elif input_type in VJoyWidget.input_type_buttons:
             pulse_visible = action == VjoyAction.VJoyPulse
             start_visible = action in (VjoyAction.VJoyButton, VjoyAction.VjoyButtonRelease)
-            grid_visible = action in (VjoyAction.VJoyPulse, VjoyAction.VJoyButton, VjoyAction.VJoyToggle, VjoyAction.VjoyButtonRelease)
+            if action in (VjoyAction.VJoyPulse, VjoyAction.VJoyButton, VjoyAction.VJoyToggle, VjoyAction.VjoyButtonRelease):
+                grid_visible = True
+                start_visible = True
             paired_visible = action == VjoyAction.VJoyButton
             exec_on_release_visible =  action_data.input_type in VJoyWidget.input_type_buttons
         elif input_type == InputType.JoystickHat:
