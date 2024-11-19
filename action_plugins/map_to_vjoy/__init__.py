@@ -2701,6 +2701,7 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
 
         if self.curve_data is not None:
             curve_node =  self.curve_data._generate_xml()
+            curve_node.tag = "response-curve-ex"
             node.append(curve_node)
 
         if VjoyAction.is_command(self.action_mode) or self.action_mode:
