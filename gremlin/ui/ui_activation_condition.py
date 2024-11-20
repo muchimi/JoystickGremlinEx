@@ -88,9 +88,7 @@ class ActivationConditionWidget(QtWidgets.QWidget):
 
             self.main_layout.addLayout(self.controls_layout)
             if self.profile_data.activation_condition_type == "container":
-                self.condition_model = ConditionModel(
-                    self.profile_data.activation_condition
-                )
+                self.condition_model = ConditionModel(self.profile_data, self.profile_data.activation_condition)
                 self.condition_view = ConditionView()
                 self.condition_view.set_model(self.condition_model)
                 self.condition_view.redraw()
