@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-
+from __future__ import annotations
 import os
 
 from PySide6 import QtWidgets, QtCore, QtGui
@@ -43,7 +43,9 @@ from lxml import etree as ElementTree
 from gremlin.gated_handler import *
 from gremlin.ui.qdatawidget import QDataWidget
 import gremlin.config
-
+import gremlin.joystick_handling
+import gremlin.actions
+import gremlin.curve_handler
 
 class QHLine(QtWidgets.QFrame):
     def __init__(self, parent = None):
@@ -117,7 +119,7 @@ class SimconnectOptions(QtCore.QObject):
 
 
     ''' holds simconnect mapper options for all actions '''
-    def __init__(self):
+    def __init__(self, simconnect : SimConnect):
         super().__init__()
         self._profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
         self._mode_list = self._profile.get_modes()
@@ -125,20 +127,26 @@ class SimconnectOptions(QtCore.QObject):
         self._auto_mode_select = True # if set, autoloads the mode associated with the aircraft if such a mode exists
         self._aircraft_definitions = [] # holds aicraft entries
         self._titles = []
-        self._community_folder = r"C:\Microsoft Flight Simulator\Community"
+        # Steam version
+        #self._community_folder = r"C:\Microsoft Flight Simulator\Community"
+        # Microsoft store version MSFS 2024: %appdata%\Local\Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache\Packages\Community
+        app_data = os.getenv("appdata")
+        self._community_folder = os.path.join(app_data, "Local","Packages","Microsoft.Limitless_8wekyb3d8bbwe","LocalCache","Packages","Community")
+
         self._sort_mode = SimconnectSortMode.NotSet
         self.parse_xml()
+        self._simconnect = simconnect
 
 
     @property
     def current_aircraft_folder(self):
-        if self._sm.ok:
+        if self._simconnect.ok:
             return self._aircraft_folder
         return None
     
     @property
     def current_aircraft_title(self):
-        if self._sm.ok:
+        if self._simconnect.ok:
             return self._aircraft_title
         return None
     
@@ -364,7 +372,7 @@ class SimconnectOptions(QtCore.QObject):
             return value.strip()
 
 
-        options = SimconnectOptions()
+        #options = SimconnectOptions()
 
         from gremlin.ui import ui_common
         if not self._community_folder or not os.path.isdir(self._community_folder):
@@ -497,7 +505,7 @@ class SimconnectOptions(QtCore.QObject):
 class SimconnectOptionsUi(QtWidgets.QDialog):
     """UI to set individual simconnect  settings """
 
-    def __init__(self, parent=None):
+    def __init__(self, simconnect : SimConnect, parent=None):
         from gremlin.ui import ui_common
         super().__init__(parent)
 
@@ -526,7 +534,7 @@ class SimconnectOptionsUi(QtWidgets.QDialog):
         # display name to mode pair list
         self.mode_pair_list = gremlin.ui.ui_common.get_mode_list(self.profile)
 
-        self.options = SimconnectOptions()
+        self.options = SimconnectOptions(simconnect)
 
         self.setWindowTitle("Simconnect Options")
 
@@ -994,14 +1002,33 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         :param action_data the data managed by this widget
         :param parent the parent of this widget
         """
-        
-        self.action_data : MapToSimConnect = action_data
-        self.options = SimconnectOptions()
 
         # call super last because it will call create_ui and populate_ui so the vars must exist
         super().__init__(action_data, parent=parent)
 
+
+
+    def _create(self, action_data):
+        '''' initialize before createUI() '''
+        
+        self.action_data : MapToSimConnect = action_data
+        
+
+        handler = SimConnectEventHandler()
+        self._simconnect = handler.simconnect
+
+        # handler to update curve widget if displayed
+        self.curve_update_handler = None
+        self.input_type = self.action_data.hardware_input_type 
+        self._is_axis = self.action_data.input_is_axis()
+
+
+
     
+
+
+
+
 
     def _create_ui(self):
         """Creates the UI components."""
@@ -1011,6 +1038,10 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         if verbose:
             log_info(f"Simconnect UI for: {self.action_data.hardware_input_type_name}  {self.action_data.hardware_device_name} input: {self.action_data.hardware_input_id}")
 
+
+
+        # if the input is chained 
+        self.chained_input = self.action_data.input_item.is_action
 
         # mode from aircraft button - grabs the aicraft name as a mode
         self._options_button_widget = QtWidgets.QPushButton("Simconnect Options")
@@ -1032,7 +1063,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         # list of possible events to trigger
         self._command_selector_widget = ui_common.QComboBox()
-        self._command_list = self.action_data.sm.get_command_name_list()
+        self._command_list = self.action_data.smd.get_command_name_list()
         self._command_selector_widget.setEditable(True)
         self._command_selector_widget.addItems(self._command_list)
         self._command_selector_widget.currentIndexChanged.connect(self._command_changed_cb)
@@ -1146,10 +1177,36 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._output_max_range_widget.setRange(-16383,16383)
         self._output_max_range_widget.valueChanged.connect(self._max_range_changed_cb)
 
-        
-        self._output_axis_widget = ui_common.AxisStateWidget(show_percentage=False,orientation=QtCore.Qt.Orientation.Horizontal)
+
+        # output axis repeater
+        self.container_repeater_widget = QtWidgets.QWidget()
+        self.container_repeater_layout = QtWidgets.QHBoxLayout(self.container_repeater_widget)
+
+         
+        self.curve_button_widget = QtWidgets.QPushButton("Output Curve")
+        self.curve_icon_inactive = gremlin.util.load_icon("mdi.chart-bell-curve",qta_color="gray")
+        self.curve_icon_active = gremlin.util.load_icon("mdi.chart-bell-curve",qta_color="blue")
+        self.curve_button_widget.setToolTip("Curve output")
+        self.curve_button_widget.clicked.connect(self._curve_button_cb)
+
+        self.curve_clear_widget = QtWidgets.QPushButton("Clear curve")
+        delete_icon = load_icon("mdi.delete")
+        self.curve_clear_widget.setIcon(delete_icon)
+        self.curve_clear_widget.setToolTip("Removes the curve output")
+        self.curve_clear_widget.clicked.connect(self._curve_delete_button_cb)
+
+        self._axis_repeater_widget = ui_common.AxisStateWidget(show_percentage=False,orientation=QtCore.Qt.Orientation.Horizontal)
+
+
+        self.container_repeater_layout.addWidget(self.curve_button_widget)
+        self.container_repeater_layout.addWidget(self.curve_clear_widget)
+        self.container_repeater_layout.addWidget(self._axis_repeater_widget)
+        self.container_repeater_layout.addStretch()
+        self._update_curve_icon()
+
+
         if self.action_data.input_type == InputType.JoystickAxis:
-            self._output_axis_widget.hookDevice(self.action_data.hardware_device_guid, self.action_data.hardware_input_id)
+            self._update_axis_widget()
 
 
         output_row_layout.addWidget(self._output_invert_axis_widget)
@@ -1157,7 +1214,6 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         output_row_layout.addWidget(self._output_min_range_widget)
         output_row_layout.addWidget(QtWidgets.QLabel("Range max:"))
         output_row_layout.addWidget(self._output_max_range_widget)
-        output_row_layout.addWidget(self._output_axis_widget)
         output_row_layout.addStretch(1)
         
 
@@ -1237,9 +1293,6 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
             self._gates_container_widget.setStyleSheet('.QFrame{background-color: lightgray;}')
             self._gates_container_layout = QtWidgets.QVBoxLayout(self._gates_container_widget)
             self._gated_axis_widget = None # added later if needed
-            
-            
-
             self._output_gated_container_layout.addWidget(self._gates_container_widget)
         else:
             self._gates_container_widget = None
@@ -1270,15 +1323,159 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._output_container_layout.addStretch()
 
 
+
         #self.main_layout.addWidget(self._toolbar_container_widget)
+
+        warning_widget = gremlin.ui.ui_common.QIconLabel("fa.warning",use_qta=True,icon_color=QtGui.QColor("orange"),text="This function is experimental and still in development, and not necessary feature complete", use_wrap=False)
+        self.main_layout.addWidget(warning_widget)
+
         self.main_layout.addWidget(self._command_container_widget)
         self.main_layout.addWidget(self._output_container_widget)
+        self.main_layout.addWidget(self.container_repeater_widget)
+
+
+            
+
+        # hook the inputs and profile
+        el = gremlin.event_handler.EventListener()
+        el.custom_joystick_event.connect(self._joystick_event_handler)
+        if not self.chained_input:
+            el.joystick_event.connect(self._joystick_event_handler)
+        el.profile_start.connect(self._profile_start)
+        el.profile_stop.connect(self._profile_stop)
+
 
         # update from ui
         self._ensure_gated()
         self._update_block_ui()
         self._update_axis_range()
         self._update_ui_container_visibility()
+
+
+
+
+    def _update_curve_icon(self):
+        if self.action_data.curve_data:
+            self.curve_button_widget.setIcon(self.curve_icon_active)
+            self.curve_clear_widget.setEnabled(True)
+        else:
+            self.curve_button_widget.setIcon(self.curve_icon_inactive)
+            self.curve_clear_widget.setEnabled(False)
+
+    QtCore.Slot()
+    def _curve_button_cb(self):
+        if not self.action_data.curve_data:
+            curve_data = gremlin.curve_handler.AxisCurveData()
+            curve_data.curve_update()
+            self.action_data.curve_data = curve_data
+            
+        dialog = gremlin.curve_handler.AxisCurveDialog(self.action_data.curve_data)
+        gremlin.util.centerDialog(dialog, dialog.width(), dialog.height())
+        self.curve_update_handler = dialog.curve_update_handler
+        self._update_axis_widget(self._current_input_axis())
+
+        # disable highlighting
+        gremlin.shared_state.push_suspend_highlighting()
+        dialog.exec()
+        gremlin.shared_state.pop_suspend_highlighting()
+        self.curve_update_handler = None
+
+        self._update_curve_icon()
+
+
+
+    QtCore.Slot()
+    def _curve_delete_button_cb(self):
+        ''' removes the curve data '''
+        message_box = QtWidgets.QMessageBox()
+        message_box.setText("Confirmation")
+        message_box.setInformativeText("Delete curve data for this output?")
+        message_box.setStandardButtons(
+            QtWidgets.QMessageBox.StandardButton.Ok |
+            QtWidgets.QMessageBox.StandardButton.Cancel
+        )
+        message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
+        gremlin.util.centerDialog(message_box)
+        is_cursor = isCursorActive()
+        if is_cursor:
+            popCursor()
+        response = message_box.exec()
+        if is_cursor:
+            pushCursor()
+        if response == QtWidgets.QMessageBox.StandardButton.Ok:
+            self.action_data.curve_data = None
+            self._update_curve_icon()        
+
+
+    def _profile_start(self):
+        ''' called when the profile starts '''
+        el = gremlin.event_handler.EventListener()
+        el.custom_joystick_event.disconnect(self._joystick_event_handler)
+        if not self.chained_input:
+            el.joystick_event.disconnect(self._joystick_event_handler)
+        
+    def _profile_stop(self):
+        ''' called when the profile stops'''
+        self._update_axis_widget()
+        el = gremlin.event_handler.EventListener()
+        el.custom_joystick_event.connect(self._joystick_event_handler)
+        if not self.chained_input:
+            el.joystick_event.connect(self._joystick_event_handler)
+
+
+    def _joystick_event_handler(self, event):
+        ''' handles joystick events in the UI (functor handles the output when profile is running) so we see the output at design time '''
+        if gremlin.shared_state.is_running:
+            return 
+
+        if not event.is_axis:
+            return 
+        
+        value = None
+        
+        if event.device_guid != self.action_data.hardware_device_guid:
+            return
+        if event.identifier != self.action_data.hardware_input_id:
+            return
+        if event.is_custom:
+            value = event.value
+        
+        self._update_axis_widget(value)            
+
+
+
+    def _current_input_axis(self):
+        ''' gets the current input axis value '''
+        return gremlin.joystick_handling.get_curved_axis(self.action_data.hardware_device_guid, 
+                                                  self.action_data.hardware_input_id) 
+        
+    def _update_axis_widget(self, value : float = None):
+        ''' updates the axis output repeater with the value 
+        
+        :param value: the floating point input value, if None uses the cached value
+        
+        '''
+        # always read the current input as the value could be from another device for merged inputs
+        if self.input_type == InputType.JoystickAxis:
+            
+            raw_value = self.action_data.get_raw_axis_value()
+            if value is None:
+                # filter and merge the data
+                filtered_value = self.action_data.get_filtered_axis_value(raw_value)
+                value = filtered_value
+            if self.action_data.curve_data is not None:
+                # curve the data 
+                curved_value = self.action_data.curve_data.curve_value(value)
+                self._axis_repeater_widget.show_curved = True
+                self._axis_repeater_widget.setValue(value, curved_value)
+            else:
+                self._axis_repeater_widget.show_curved = False
+                self._axis_repeater_widget.setValue(value)
+
+            # update the curved window if displayed
+            if self.curve_update_handler is not None:
+                self.curve_update_handler(raw_value)
+                    
 
     def _ensure_gated(self):
         ''' adds a gated axis widget if the mode requires it - this is to only setup a gated axis if needed '''
@@ -1296,7 +1493,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _show_options_dialog_cb(self):
         ''' displays the simconnect options dialog'''
-        dialog = SimconnectOptionsUi()
+        dialog = SimconnectOptionsUi(self._simconnect)
         dialog.exec()
 
     def _update_validator(self):
@@ -1369,7 +1566,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
             block.enable_notifications()
             # store to profile
             self.action_data.min_range = value
-            self._output_axis_widget.setMinimum(value)
+            self._axis_repeater_widget.setMinimum(value)
 
     def _max_range_changed_cb(self):
         value = self._output_max_range_widget.value()
@@ -1381,12 +1578,12 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
             block.enable_notifications()
             # store to profile
             self.action_data.max_range = value
-            self._output_axis_widget.setMaximum(value)
+            self._axis_repeater_widget.setMaximum(value)
 
     @QtCore.Slot(bool)
     def _output_invert_axis_cb(self, checked):
-        self.action_data.block.invert = checked
-        self._output_axis_widget.setReverse(checked)
+        self.action_data.block.invert_axis = checked
+        self._axis_repeater_widget.setReverse(checked)
         # update the repeater
   
 
@@ -1601,12 +1798,13 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         ''' updates the UI based on the output mode selected '''
         input_type = self.action_data.input_type
         block : SimConnectBlock = self.action_data.block
-
+        repeater_visible = False
         setvalue_visible = block.output_mode == SimConnectActionMode.SetValue
         trigger_visible = block.output_mode == SimConnectActionMode.Trigger
         if input_type == InputType.JoystickAxis:
             range_visible = block.output_mode == SimConnectActionMode.Ranged
             gated_visible = block.output_mode == SimConnectActionMode.Gated
+            repeater_visible = True
             
         else:
             # momentary
@@ -1617,6 +1815,8 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._output_trigger_bool_container_widget.setVisible(trigger_visible)
         self._output_value_container_widget.setVisible(setvalue_visible)
         self._output_gated_container_widget.setVisible(gated_visible)
+
+        self.container_repeater_widget.setVisible(repeater_visible)
 
 
 
@@ -1716,37 +1916,42 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         self.action_data : MapToSimConnect = action
         self.command = action.command # the command to execute
         self.value = action.value # the value to send (None if no data to send)
-        self.sm = None
+        eh = SimConnectEventHandler()
+        self.smd  = eh.smd
+
 
     
     def profile_start(self):
         ''' occurs when the profile starts '''
-        if self.action_data.enabled:
-            if self.sm is None:
-                self.sm = SimConnectData()
-                self.block = self.sm.block(self.command)
 
-            self.sm.sim_connect()
-            self.action_data.gate_data.process_callback = self.process_gated_event
+
+        eh = SimConnectEventHandler()
+        eh.request_connect.emit()
+        self.reconnect_timeout = 5
+        self.last_reconnect_time = None
         
+        self.block = self.smd.block(self.command)
+        self.action_data.gate_data.process_callback = self.process_gated_event
+
+
 
     def profile_stop(self):
         ''' occurs wen the profile stops'''
-        if self.action_data.enabled:
-            if not self.sm is None:
-                self.sm.sim_disconnect()
-    
+        eh = SimConnectEventHandler()
+        eh.request_disconnect.emit()
+        
+        
 
     def scale_output(self, value):
         ''' scales an output value for the output range '''
-        return gremlin.util.scale_to_range(value, target_min = self.action_data.block.min_range, target_max = self.action_data.block.max_range, invert=self.action_data.block.invert)
+        return gremlin.util.scale_to_range(value, target_min = self.action_data.block.min_range, target_max = self.action_data.block.max_range, invert=self.action_data.block.invert_axis)
     
-    def process_gated_event(self, event, value):
+    def process_gated_event(self, event, value : gremlin.actions.Value):
         ''' handles gated input data '''
 
         logging.getLogger("system").info(f"SC FUNCTOR: {event}  {value}")
         
-        if not self.sm.ok:
+        if not self.smd.is_running:
             return True
 
         if not self.block or not self.block.valid:
@@ -1755,10 +1960,16 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
    
         if event.is_axis and self.block.is_axis:
             # axis event to axis block mapping
-            
+
+
             if self.action_data.mode == SimConnectActionMode.Ranged:
                 # come up with a default mode for the selected command if not set
                 target = value.current
+
+                if self.action_data.curve_data is not None:
+                    # curve the output 
+                    target = self.action_data.curve_data.curve_value(target)
+            
                 output_value = gremlin.util.scale_to_range(target, target_min = self.action_data.min_range, target_max = self.action_data.max_range, invert=self.action_data.invert_axis)
                 return self.block.execute(output_value)
                 
@@ -1772,23 +1983,49 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         elif value.is_pressed:
             # momentary trigger - trigger on press - such as from gate crossings
             return self.block.execute(value.is_pressed)
-                    
 
-    def process_event(self, event, value):
+
+    def process_event(self, event, action_value : gremlin.actions.Value):
+        ''' runs when a joystick event occurs like a button press or axis movement when a profile is running '''
+
+        if not self.smd.is_running:
+            # sim is not running - attempt to reconnect every few seconds
+            if self.last_reconnect_time is None or self.last_reconnect_time + self.reconnect_timeout > time.time():
+                self.last_reconnect_time = time.time()
+                eh = SimConnectEventHandler()
+                eh.request_connect.emit()
+            return True
+
+        if event.is_axis:
+            # process input options and any merge and curve operation
+            value = self.action_data.get_filtered_axis_value(action_value.current)
+
+            if self.action_data.curve_data is not None:
+                # curve the output 
+                value = self.action_data.curve_data.curve_value(value)
+
+            action_value = gremlin.actions.Value(value)
+        
+        return self._process_event(event, action_value)                    
+
+    def _process_event(self, event, action_value):
         ''' handles default input data '''
 
         # execute the nested functors for this action
-        super().process_event(event, value)
+        super().process_event(event, action_value)
 
-        if not self.sm.ok:
-            return True
-
+        if not self.smd.is_running:
+            # sim is not running
+            return
+        
         if not self.block or not self.block.valid:
             # invalid command
             return True
         
         if event.is_axis and self.action_data.block.output_mode in (SimConnectActionMode.Ranged, SimConnectActionMode.Gated):
-            block_value = gremlin.util.scale_to_range(value.current, target_min = self.block.min_range, target_max = self.block.max_range)
+            value = self.action_data.get_filtered_axis_value(action_value.current)
+            action_value = gremlin.actions.Value(value)
+            block_value = gremlin.util.scale_to_range(action_value.current, target_min = self.block.min_range, target_max = self.block.max_range, invert= self.block.invert_axis)
             self.block.execute(block_value)
         elif self.action_data.block.output_mode == SimConnectActionMode.Trigger:
             if not event.is_axis and value.is_pressed:
@@ -1835,8 +2072,11 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         import gremlin.shared_state
 
         super().__init__(parent)
-        self.sm = SimConnectData()
         self.parent = parent
+
+        eh = SimConnectEventHandler()
+        self.smd  = eh.smd
+
 
         self.input_type = self.get_input_type()
 
@@ -1852,7 +2092,9 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         gate_data = GateData(profile_mode = gremlin.shared_state.current_mode, action_data=self)
         self.gates = [gate_data] # list of GateData objects
         self.gate_data = gate_data
-    
+
+        # curve data applied to a simconnect axis output
+        self.curve_data = None # present if curve data is needed
 
         self._block = None
 
@@ -1862,6 +2104,18 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
 
         # readonly mode
         self.is_readonly = False
+
+    def get_filtered_axis_value(self, value : float = None) -> float:
+        ''' computes the output value for the current configuration  '''
+
+        if value is None:
+            value = gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, 
+                                                        self.hardware_input_id)
+        return value
+
+
+    def get_raw_axis_value(self):
+        return gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, self.hardware_input_id)        
 
 
     def display_name(self):
@@ -1892,7 +2146,7 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         ''' updates the data block with the current command '''
         if self._command is None:
             self._command = self._default_command()
-        self._block =self.sm.block(self._command)
+        self._block =self.smd.block(self._command)
     
     
     @property
@@ -1943,6 +2197,14 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
             self.gates = gates
             self.gate_data = gates[0]
 
+        # curve data
+        curve_node = gremlin.util.get_xml_child(node,"response-curve-ex")
+        if curve_node is not None:
+            self.curve_data = gremlin.curve_handler.AxisCurveData()
+            self.curve_data._parse_xml(curve_node)
+            self.curve_data.curve_update()
+
+
     def _default_command(self):
         ''' default command'''
         return "AXIS_THROTTLE_SET" if self.hardware_input_type == InputType.JoystickAxis else "LIGHT_BEACON"
@@ -1968,6 +2230,11 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
                 child = gate_data.to_xml()
                 node_gate.append(child)
 
+        if self.curve_data is not None:
+            curve_node =  self.curve_data._generate_xml()
+            curve_node.tag = "response-curve-ex"
+            node.append(curve_node)                
+
 
         return node
 
@@ -1983,14 +2250,15 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         ''' serialization override '''
         state = self.__dict__.copy()
         # sm is not serialized, remove it
-        del state["sm"]
+        del state["smd"]
         return state
 
     def __setstate__(self, state):
         ''' serialization override '''
         self.__dict__.update(state)
         # sm is not serialized, add it
-        self.sm = SimConnectData()
+        eh = SimConnectEventHandler()
+        self.smd = eh.smd
 
 version = 1
 name = "map-to-simconnect"

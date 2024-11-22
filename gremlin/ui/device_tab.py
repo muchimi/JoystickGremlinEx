@@ -553,6 +553,11 @@ class ActionContainerModel(gremlin.ui.ui_common.AbstractModel):
             del self._containers[self._containers.index(container)]
         self.data_changed.emit()
         el.mapping_changed.emit(self.item_data)
+        # event = gremlin.event_handler.DeviceChangeEvent()
+        # event.source = self.item_data
+        # el = gremlin.event_handler.EventListener()
+        # el.icon_changed.emit(event)
+
         
 
     def remove_all_containers(self):

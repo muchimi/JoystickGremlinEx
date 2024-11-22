@@ -415,6 +415,8 @@ class GateInfo():
                 eh.gate_configuration_changed.emit(self)
                 break
 
+        
+
     def hasContainers(self, condition : GateCondition) -> bool:
         ''' true if the range has any mappings in any mode '''
         if condition in self.item_data_map:
@@ -2471,6 +2473,7 @@ class GateData():
             return
     
         self.use_default_range = safe_read(node, "use_default_range", bool, True)
+        verbose = gremlin.config.Configuration().verbose_mode_details
 
         assert self.isGateRegistered(self.default_min_gate)
         assert self.isGateRegistered(self.default_max_gate)
@@ -2582,12 +2585,14 @@ class GateData():
                 g1 = self.findGate(min_gate.value)
                 g2 = self.findGate(max_gate.value)
                 if g1 is not None and g2 is not None:
-                    syslog.info(f"Read range: (by value) gate {g1.index} {g2.index} {g1.value} {g2.value}")
+                    if verbose:
+                        syslog.info(f"Read range: (by value) gate {g1.index} {g2.index} {g1.value} {g2.value}")
                 else:
                     # bad data
                     continue
             else:
-                syslog.info (f"Read range: (by id) gate {g1.index} {g2.index} {g1.value} {g2.value}")
+                if verbose:
+                    syslog.info (f"Read range: (by id) gate {g1.index} {g2.index} {g1.value} {g2.value}")
 
             key = (g1, g2)
             if key in range_pairs:
@@ -2650,7 +2655,8 @@ class GateData():
                 
             
         
-        all_ranges = self.getUsedRanges()
+        # repopulate data
+        self.getUsedRanges()
         # for rng in all_ranges:
         #     print (f"\t{str(rng)}")
             
@@ -2658,8 +2664,10 @@ class GateData():
         # update the ranges based on the new gates
         self._update_ranges()
 
+        # repopulate data
+        self.getUsedRanges()
 
-        all_ranges = self.getUsedRanges()
+
         # for rng in all_ranges:
         #     print (f"\t{str(rng)}")
 

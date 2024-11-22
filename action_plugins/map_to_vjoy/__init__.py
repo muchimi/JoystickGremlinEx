@@ -2341,14 +2341,7 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
             return f"VJoy #{self._vjoy_device_id} Mode: {self.action_mode}"
         
         
-    def input_is_axis(self):
-        ''' true if the input is an axis type input '''
 
-        is_axis = hasattr(self.hardware_input_id, "is_axis") and self.hardware_input_id.is_axis
-        if hasattr(self.input_item,"is_axis"):
-            is_axis = is_axis or self.input_item.is_axis
-        is_axis = is_axis or self.input_type == InputType.JoystickAxis 
-        return is_axis
 
     @property
     def exec_on_release(self):

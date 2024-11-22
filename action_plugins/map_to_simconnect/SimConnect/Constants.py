@@ -2,7 +2,7 @@ import logging
 from ctypes.wintypes import *
 from ctypes import *
 
-LOGGER = logging.getLogger(__name__)
+syslog = logging.getLogger(__name__)
 
 
 # //----------------------------------------------------------------------------

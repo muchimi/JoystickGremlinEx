@@ -5,7 +5,7 @@ from .Constants import *
 
 import logging
 
-LOGGER = logging.getLogger(__name__)
+syslog = logging.getLogger(__name__)
 
 # ----------------------------------------------------------------------------
 #        Enum definitions

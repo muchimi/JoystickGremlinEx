@@ -1221,12 +1221,13 @@ class InputItemWidget(QtWidgets.QFrame):
         ''' occurs when an action is deleted '''
         if self.findAction(action):
             # find the widget corresponding to this action
-            self.create_action_icons(self.data)
+            self.clear_action_icon(self.data, action)
 
     @QtCore.Slot(object)
     def _mapping_changed_cb(self, item_data):
-        if item_data == self.data:
-            self.create_action_icons(self.data)
+        pass
+        # # if item_data == self.data:
+        #     self.create_action_icons(self.data)
         
                 
 
@@ -1391,10 +1392,13 @@ class InputItemWidget(QtWidgets.QFrame):
         :param profile_data the profile.InputItem object associated
             with this instance
         """
+
+        if self.data.id != profile_data.id:
+            return
+
         ui_common.clear_layout(self._icon_layout)
 
         # Create the actual icons
-        # FIXME: this currently ignores the containers themselves
         self._icon_layout.addStretch(1)
         for container in profile_data.containers:
             action_sets = container.get_action_sets()
@@ -1409,7 +1413,24 @@ class InputItemWidget(QtWidgets.QFrame):
                         if action is not None:
                             self._icon_layout.addWidget(ui_common.ActionLabel(action))
 
-                    
+    def clear_action_icon(self, profile_data, action_to_remove):
+        ''' delete an action icon '''
+        ui_common.clear_layout(self._icon_layout)
+        self._icon_layout.addStretch(1)
+        for container in profile_data.containers:
+            action_sets = container.get_action_sets()
+            if action_sets:
+                for actions in [a for a in action_sets if a is not None]:
+                    for action in actions:
+                        if action is not None and action != action_to_remove:
+                            self._icon_layout.addWidget(ui_common.ActionLabel(action))
+            else:
+                for actions in [a for a in container.action_sets if a is not None]:
+                    for action in actions:
+                        if action is not None and action != action_to_remove:
+                            self._icon_layout.addWidget(ui_common.ActionLabel(action))
+
+
             
 
     def findAction(self, action):
@@ -1919,6 +1940,8 @@ class AbstractActionWidget(QtWidgets.QFrame):
         eh.profile_unload.connect(self._cleanup_ui)
         eh.action_delete.connect(self._action_delete)
 
+
+        self._create(action_data)
         self._create_ui()
         self._populate_ui()
         
@@ -1928,6 +1951,10 @@ class AbstractActionWidget(QtWidgets.QFrame):
         if self.action_data._id is not None and self.action_data._id == action._id:
             self._cleanup_ui()
             
+    def _create(action_data = None):
+        ''' called before create_UI if present '''
+        pass
+
 
     def _cleanup_ui(self):
         ''' called when a container is closing '''

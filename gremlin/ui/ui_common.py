@@ -3759,8 +3759,8 @@ class ActionLabel(QtWidgets.QLabel):
 
         self.action_entry = action_entry
 
-        el = gremlin.event_handler.EventListener()
-        el.icon_changed.connect(self._icon_change)
+        # el = gremlin.event_handler.EventListener()
+        # el.icon_changed.connect(self._icon_change)
 
     def _icon_change(self, event):
         icon = self.action_entry.icon()

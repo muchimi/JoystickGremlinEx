@@ -188,7 +188,6 @@ def userprofile_path():
 
     return os.path.normcase(path)
 
-    
 
 
 def resource_path(relative_path):

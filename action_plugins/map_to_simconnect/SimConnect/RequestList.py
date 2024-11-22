@@ -112,7 +112,7 @@ class Request(object):
 			self.LastID = temp.value
 			return True
 		else:
-			LOGGER.error("SIM def" + str(self.definitions[0]))
+			syslog.error("SIM def" + str(self.definitions[0]))
 			return False
 
 

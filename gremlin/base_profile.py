@@ -1315,7 +1315,14 @@ class AbstractAction(ProfileData):
         if verbose and value:
             logging.getLogger("system").info(f"Functor: {self.name} {type(self).__name__} enabled")
 
-        
+    def input_is_axis(self):
+        ''' true if the input is an axis type input '''
+
+        is_axis = hasattr(self.hardware_input_id, "is_axis") and self.hardware_input_id.is_axis
+        if hasattr(self.input_item,"is_axis"):
+            is_axis = is_axis or self.input_item.is_axis
+        is_axis = is_axis or self.input_type == InputType.JoystickAxis 
+        return is_axis        
 
     @property
     def enabled(self):
