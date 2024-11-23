@@ -46,6 +46,7 @@ import gremlin.config
 import gremlin.joystick_handling
 import gremlin.actions
 import gremlin.curve_handler
+from gremlin.input_types import InputType
 
 class QHLine(QtWidgets.QFrame):
     def __init__(self, parent = None):

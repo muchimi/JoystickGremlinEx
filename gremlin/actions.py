@@ -252,8 +252,10 @@ class JoystickCondition(AbstractCondition):
             else:
                 return not joy.button(self.input_id).is_pressed
         elif self.input_type == InputType.JoystickHat:
-            return joy.hat(self.input_id).direction == \
+            match = joy.hat(self.input_id).direction == \
                    gremlin.util.hat_direction_to_tuple(self.comparison)
+            print (f"match: {match}")
+            return match
         else:
             logging.getLogger("system").warning(
                 f"Invalid input_type {self.input_type} received"

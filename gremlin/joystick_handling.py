@@ -156,6 +156,10 @@ def get_curved_axis(guid, index):
     value = dinput.DILL.get_axis(guid, index)
     return eh.apply_transforms(guid, index, value)
 
+def get_hat(guid, index):
+    ''' gets the current hat value '''
+    return dinput.DILL.get_hat(guid, index)
+
     
 
 

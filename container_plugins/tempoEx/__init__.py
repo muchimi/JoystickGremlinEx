@@ -35,7 +35,7 @@ from gremlin.profile import safe_format, safe_read
 from gremlin.ui.input_item import AbstractContainerWidget, AbstractActionWidget
 from gremlin.base_profile import AbstractContainer
 import gremlin.execution_graph
-
+from gremlin.input_types import InputType
 
 
 class TempoExContainerWidget(AbstractContainerWidget):
@@ -357,11 +357,12 @@ class TempoExContainerWidget(AbstractContainerWidget):
 
         :return title to use for the container
         """
-        if self.profile_data.is_valid():
-            return f"TempoEx: {len(self.profile_data.short_action_sets)} short actions,{len(self.profile_data.long_action_sets)} long actions"
+        if self.profile_data.is_valid() \
+            and len(self.profile_data.action_sets) == 2 \
+                and None not in self.profile_data.action_sets:
+            return f"TempoEx: ({", ".join([a.name for a in self.profile_data.action_sets[0]])}) / ({", ".join([a.name for a in self.profile_data.action_sets[1]])})"
         else:
             return "TempoEx"
-
 
 class TempoExContainerFunctor(gremlin.base_classes.AbstractFunctor):
 
@@ -465,19 +466,23 @@ class TempoExContainerFunctor(gremlin.base_classes.AbstractFunctor):
     def process_event(self, event, value):
         # TODO: Currently this does not handle hat or axis events, however
         #       virtual buttons created on those inputs is supported
-        if not isinstance(value.current, bool):
+        if event.event_type == InputType.JoystickHat:
+            is_pressed = value.current != (0,0)
+        elif not isinstance(value.current, bool):
             logging.getLogger("system").warning(
                 f"Invalid data type received in TempoEx container: {type(event.value)}"
             )
             return False
+        else:
+            is_pressed = value.currnet
 
         # Copy state when input is pressed
-        if value.current:
+        if is_pressed:
             self.value_press = copy.deepcopy(value)
             self.event_press = event.clone()
 
         # Execute tempoEx logic
-        if value.current:
+        if is_pressed:
             # raw button was pressed - start timer for long/short press
             self.start_time = time.time()
             self.timer = threading.Timer(self.delay, self._long_press)
@@ -643,7 +648,8 @@ class TempoExContainer(AbstractContainer):
 
         :return True if the container is configured properly, False otherwise
         """
-        return len(self.short_action_sets) > 0 or len(self.long_action_sets) > 0
+        valid =  len(self.short_action_sets) > 0 or len(self.long_action_sets) > 0
+        return valid
     
     def get_action_sets(self):
         """ override method: returns action sets - override because we have custom sets """

@@ -919,9 +919,10 @@ class InputItem():
             for container in self._containers:
                 for action_set in container.action_sets:
                     action : AbstractAction
-                    for action in action_set:
-                        if type(action) == action_type:
-                            return True
+                    if action_set:
+                        for action in action_set:
+                            if type(action) == action_type:
+                                return True
         return False
     
     def hasConditions(self):
@@ -931,9 +932,10 @@ class InputItem():
                 return True
             for action_set in container.action_sets:
                 action : AbstractAction
-                for action in action_set:
-                    if action.activation_condition and len(action.activation_condition.conditions) > 0:
-                        return True
+                if action_set:
+                    for action in action_set:
+                        if action.activation_condition and len(action.activation_condition.conditions) > 0:
+                            return True
         return False
 
     def get_valid_container_list(self):

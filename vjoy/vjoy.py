@@ -358,6 +358,62 @@ class Hat:
         (-1, 1): 31500
     }
 
+    to_continuous_position = {
+        -1 : (0, 0),
+        0: (0, 1),
+        4500: (1, 1),
+        9000: (1, 0),
+        13500 : (1, -1),
+        18000 : (0, -1),
+        22500: (-1, -1),
+        27000: (-1, 0),
+        31500: (-1, 1), 
+    }
+
+
+    # Mapping from event directions to names
+    direction_to_name = {
+        ( 0,  0): "Center",
+        ( 0,  1): "North",
+        ( 1,  1): "North-east",
+        ( 1,  0): "East",
+        ( 1, -1): "South-east",
+        ( 0, -1): "South",
+        (-1, -1): "South-west",
+        (-1,  0): "West",
+        (-1,  1): "North-west"
+    }
+
+    # Mapping from names to event directions
+    name_to_direction = {
+        "Center": (0, 0),
+        "North": (0, 1),
+        "North-east": (1, 1),
+        "East": (1, 0),
+        "South-east": (1, -1),
+        "South": (0, -1),
+        "South-west": (-1, -1),
+        "West": (-1, 0),
+        "North-west": (-1, 1)
+    }
+
+    direction_to_icon = {
+        ( 0,  0): "mdi.image-filter-center-focus-strong", #"Center",
+        ( 0,  1): "mdi.arrow-up-thin-circle-outline", #"North",
+        ( 1,  1): "mdi.arrow-top-right-thin-circle-outline", #"North-east",
+        ( 1,  0): "mdi.arrow-right-thin-circle-outline", #"East",
+        ( 1, -1): "mdi.arrow-bottom-right-thin-circle-outline", #"South-east",
+        ( 0, -1): "mdi.arrow-down-thin-circle-outline", #"South",
+        (-1, -1): "mdi.arrow-bottom-left-thin-circle-outline", #"South-west",
+        (-1,  0): "mdi.arrow-left-thin-circle-outline", # "West", 
+        (-1,  1): "mdi.arrow-top-left-thin-circle-outline", #"North-west"
+    }
+
+    
+    
+
+
+
     def __init__(self, vjoy_dev, hat_id, hat_type):
         """Creates a new object.
 

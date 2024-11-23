@@ -264,6 +264,7 @@ class InputActionCondition(AbstractCondition):
         :param node the XML node to parse for data
         """
         self.comparison = safe_read(node, "comparison")
+        
 
     def to_xml(self):
         """Returns an XML node containing the objects data.

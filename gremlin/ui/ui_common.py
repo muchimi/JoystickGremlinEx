@@ -1665,18 +1665,16 @@ class QWrapableLabel(QtWidgets.QLabel):
 class QIconLabel(QtWidgets.QWidget):
     ''' label with an icon using the QAWESEOME lib '''
 
-    IconSize = QtCore.QSize(16, 16)
     HorizontalSpacing = 2
 
-    def __init__(self, icon_path = None, text = None, stretch=True, use_qta = False, icon_color = None, use_wrap = True, parent = None):
+    def __init__(self, icon_path = None, text = None, stretch=True, use_qta = False, icon_color = None, use_wrap = True, icon_size = 16, parent = None):
         super().__init__(parent)
 
         container_widget = QtWidgets.QWidget()
         container_widget.setContentsMargins(0, 0, 0, 0)
         container_layout = QtWidgets.QHBoxLayout(container_widget)
         container_layout.setContentsMargins(0, 0, 0, 0)
-        
-
+        self._icon_size = QtCore.QSize(icon_size, icon_size)
         self._icon_widget = QtWidgets.QLabel()
         if icon_path:
             self.setIcon(icon_path, use_qta, color = icon_color)
@@ -1700,15 +1698,15 @@ class QIconLabel(QtWidgets.QWidget):
         if icon_path:
             if use_qta:
                 if color:
-                    pixmap = qta.icon(icon_path, color=color).pixmap(self.IconSize)
+                    pixmap = qta.icon(icon_path, color=color).pixmap(self._icon_size)
                 else:
-                    pixmap = qta.icon(icon_path).pixmap(self.IconSize)
+                    pixmap = qta.icon(icon_path).pixmap(self._icon_size)
             else:
                 pixmap = load_pixmap(icon_path) if icon_path else None
         else:
             pixmap = None
         if pixmap:
-            pixmap = pixmap.scaled(QIconLabel.IconSize, QtCore.Qt.AspectRatioMode.KeepAspectRatio)
+            pixmap = pixmap.scaled(self._icon_size, QtCore.Qt.AspectRatioMode.KeepAspectRatio)
             self._icon_widget.setPixmap(pixmap)
         else:
             # clear the pixmap

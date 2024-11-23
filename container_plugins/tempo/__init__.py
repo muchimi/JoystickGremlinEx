@@ -27,6 +27,8 @@ import gremlin
 import gremlin.ui.ui_common
 from gremlin.ui.input_item import AbstractContainerWidget
 from gremlin.base_profile import AbstractContainer
+from gremlin.input_types import InputType
+
 
 class TempoContainerWidget(AbstractContainerWidget):
 
@@ -196,25 +198,28 @@ class TempoContainerWidget(AbstractContainerWidget):
         else:
             self.profile_data.activate_on = "release"
 
-    def _handle_interaction(self, widget, action):
+    def _handle_interaction(self, widget, action : gremlin.ui.input_item.ActionSetView.Interactions):
         """Handles interaction icons being pressed on the individual actions.
 
         :param widget the action widget on which an action was invoked
         :param action the type of action being invoked
         """
-        index = self._get_widget_index(widget)
-        if index != -1:
-            if index == 0 and self.profile_data.action_sets[0] is None:
-                index = 1
-            self.profile_data.action_sets[index] = None
-            self.container_modified.emit()
+        if action == gremlin.ui.input_item.ActionSetView.Interactions.Delete:
+            index = self._get_widget_index(widget)
+            if index != -1:
+                if index == 0 and self.profile_data.action_sets[0] is None:
+                    index = 1
+                self.profile_data.action_sets[index] = None
+                self.container_modified.emit()
 
     def _get_window_title(self):
         """Returns the title to use for this container.
 
         :return title to use for the container
         """
-        if self.profile_data.is_valid():
+        if self.profile_data.is_valid() \
+            and len(self.profile_data.action_sets) == 2 \
+                and None not in self.profile_data.action_sets:
             return f"Tempo: ({", ".join([a.name for a in self.profile_data.action_sets[0]])}) / ({", ".join([a.name for a in self.profile_data.action_sets[1]])})"
         else:
             return "Tempo"
@@ -250,21 +255,23 @@ class TempoContainerFunctor(gremlin.base_classes.AbstractFunctor):
 
 
     def process_event(self, event, value):
-        # TODO: Currently this does not handle hat or axis events, however
-        #       virtual buttons created on those inputs is supported
-        if not isinstance(value.current, bool):
+        if event.event_type == InputType.JoystickHat:
+            is_pressed = value.current != (0,0)
+        elif not isinstance(value.current, bool):
             logging.getLogger("system").warning(
-                f"Invalid data type received in Tempo container: {type(event.value)}"
+                f"Invalid data type received in TempoEx container: {type(event.value)}"
             )
             return False
+        else:
+            is_pressed = value.currnet
 
         # Copy state when input is pressed
-        if value.current:
+        if is_pressed:
             self.value_press = copy.deepcopy(value)
             self.event_press = event.clone()
 
         # Execute tempo logic
-        if value.current:
+        if is_pressed:
             self.start_time = time.time()
             self.timer = threading.Timer(self.delay, self._long_press)
             self.timer.start()
@@ -340,7 +347,7 @@ class TempoContainer(AbstractContainer):
     #     InputType.Keyboard
     # ]
     interaction_types = [
-        gremlin.ui.input_item.ActionSetView.Interactions.Edit,
+        gremlin.ui.input_item.ActionSetView.Interactions.Delete,
     ]
 
     def __init__(self, parent=None):
@@ -385,6 +392,8 @@ class TempoContainer(AbstractContainer):
         :return True if the container is configured properly, False otherwise
         """
         return True # len(self.action_sets) == 2 and None not in self.action_sets
+    
+
 
 
 # Plugin definitions

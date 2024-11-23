@@ -196,13 +196,20 @@ class AbstractExecutionGraph(metaclass=ABCMeta):
 
         while self.current_index is not None and len(self.functors) > 0:
             functor = self.functors[self.current_index]
-        
-            result = functor.process_event(event, value)
-            if result is None or not result and not isinstance(functor, gremlin.actions.ActivationCondition):
-                logging.getLogger("system").warning(f"Process event returned no data or FALSE - functor: {type(functor).__name__}")
+            if isinstance(functor, gremlin.actions.ActivationCondition):
+                result = functor.process_event(event, value)    
+                #print (f"condition test: {result}")
+                if not result:
+                    # condition is not met
+                    # print ("Condition failed")
+                    return True
+            else:
+                result = functor.process_event(event, value)
+                if result is None or not result:
+                    logging.getLogger("system").warning(f"Process event returned no data or FALSE - functor: {type(functor).__name__}")
 
-            if isinstance(functor, gremlin.actions.AxisButton):
-                process_again = functor.forced_activation
+                if isinstance(functor, gremlin.actions.AxisButton):
+                    process_again = functor.forced_activation
 
             self.current_index = self.transitions.get((self.current_index, result),None)
         self.current_index = 0

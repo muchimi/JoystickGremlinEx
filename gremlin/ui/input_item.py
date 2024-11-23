@@ -1440,8 +1440,9 @@ class InputItemWidget(QtWidgets.QFrame):
                 action_sets = container.get_action_sets()
                 if action_sets:
                     for action_set in action_sets:
-                        if action in action_set:
-                            return True
+                        if action_set:
+                            if action in action_set:
+                                return True
         return False
 
 
@@ -1951,7 +1952,7 @@ class AbstractActionWidget(QtWidgets.QFrame):
         if self.action_data._id is not None and self.action_data._id == action._id:
             self._cleanup_ui()
             
-    def _create(action_data = None):
+    def _create(self, action_data = None):
         ''' called before create_UI if present '''
         pass
 

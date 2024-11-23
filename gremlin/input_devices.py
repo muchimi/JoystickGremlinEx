@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-
+from __future__ import annotations
 import collections
 import functools
 import heapq
@@ -40,6 +40,7 @@ from dinput import DILL, GUID, GUID_Invalid
 import gremlin.util
 from gremlin.util import get_guid
 import gremlin.input_types
+import vjoy.vjoy
 
 from . import error
 
@@ -77,8 +78,9 @@ class VjoyAction(enum.Enum):
     VJoyEnableLocalAndRemote = 16 # enables concurrent local/remote control
     VJoyEnablePairedRemote = 17 # enables primary fire one and two on remote client
     VJoyDisablePairedRemote = 18 # disable primary fire one and two on remote client
-    VjoyButtonRelease = 19 # action button release (clear a button if set)
-    VjoyMergeAxis = 20 # action to merge another axis
+    VJoyButtonRelease = 19 # action button release (clear a button if set)
+    VJoyMergeAxis = 20 # action to merge another axis
+    VJoyHatToButton = 21 # action to map a hat to a button
 
   
 
@@ -119,6 +121,8 @@ class VjoyAction(enum.Enum):
             return "Press a vjoy button"
         elif action == VjoyAction.VJoyHat:
             return "Maps to a vjoy hat"
+        elif action == VjoyAction.VJoyHatToButton:
+            return "Maps a hat position to a vjoy button"
         elif action == VjoyAction.VJoyInvertAxis:
             return "Inverts all output to the specififed axis"
         elif action == VjoyAction.VJoyPulse:
@@ -153,9 +157,9 @@ class VjoyAction(enum.Enum):
             return "Disables local control mode (local input will be disabled)"
         elif action == VjoyAction.VJoyDisableRemote:
             return "Disables remote control mode (remote clients will not get inputs except for paired commands)"
-        elif action == VjoyAction.VjoyButtonRelease:
+        elif action == VjoyAction.VJoyButtonRelease:
             return "Releases a button"
-        elif action == VjoyAction.VjoyMergeAxis:
+        elif action == VjoyAction.VJoyMergeAxis:
             return "Merges two axes into one"
         
         msg  = f"Unknown [{action}]"
@@ -171,6 +175,8 @@ class VjoyAction(enum.Enum):
             return "Button Press"
         elif action == VjoyAction.VJoyHat:
             return "Hat"
+        elif action == VjoyAction.VJoyHatToButton:
+            return "Hat to Button"
         elif action == VjoyAction.VJoyInvertAxis:
             return "Invert Axis"
         elif action == VjoyAction.VJoyPulse:
@@ -205,9 +211,9 @@ class VjoyAction(enum.Enum):
             return "Disable local control"
         elif action == VjoyAction.VJoyDisableRemote:
             return "Disable remote control"
-        elif action == VjoyAction.VjoyButtonRelease:
+        elif action == VjoyAction.VJoyButtonRelease:
             return "Button release"
-        elif action == VjoyAction.VjoyMergeAxis:
+        elif action == VjoyAction.VJoyMergeAxis:
             return "Merge Axis"
         
         msg  = f"Unknown [{action}]"
@@ -1548,7 +1554,14 @@ class JoystickWrapper:
 
         @property
         def direction(self):
-            return gremlin.util.dill_hat_lookup(DILL.get_hat(self._joystick_guid, self._index))
+            import vjoy
+            value = gremlin.joystick_handling.get_hat(self._joystick_guid, self._index)
+            if value in vjoy.vjoy.Hat.to_continuous_position: 
+                position = vjoy.vjoy.Hat.to_continuous_position[value]
+            else:
+                position = (0,0)
+            return position
+            #return gremlin.util.dill_hat_lookup(DILL.get_hat(self._joystick_guid, self._index))
 
     def __init__(self, device_guid):
         """Creates a new wrapper object for the given object id.
