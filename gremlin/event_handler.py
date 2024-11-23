@@ -24,6 +24,7 @@ from threading import Thread, Timer
 from typing import Callable
 
 
+import gremlin.joystick_handling
 import gremlin.threading
 
 from PySide6 import QtCore, QtWidgets
@@ -521,6 +522,10 @@ class EventListener(QtCore.QObject):
 		:param data the joystick event
 		"""
 
+		if not gremlin.joystick_handling._joystick_initialized:
+			# not initialized yet
+			return 
+
 		if self._joystick_suspend_count > 0:
 			# ignore if joystick input is suspended
 			return
@@ -532,6 +537,9 @@ class EventListener(QtCore.QObject):
 		
 		#breakpoint()
 		device = gremlin.joystick_handling.device_info_from_guid(event.device_guid)
+		if device is None:
+			# device not initialized/not found = ignore
+			return 
 		
 		is_virtual = device.is_virtual if device is not None else False
 		if event.input_type == dinput.InputType.Axis:

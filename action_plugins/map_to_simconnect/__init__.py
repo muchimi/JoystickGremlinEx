@@ -124,7 +124,10 @@ class SimconnectOptions(QtCore.QObject):
         super().__init__()
         self._profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
         self._mode_list = self._profile.get_modes()
-        self._xml_source = os.path.join(gremlin.util.userprofile_path(),"simconnect_config.xml")
+        base_file = "simconnect_config.xml"
+        user_source = os.path.join(gremlin.util.userprofile_path(),base_file)
+        self._xml_source = user_source
+        
         self._auto_mode_select = True # if set, autoloads the mode associated with the aircraft if such a mode exists
         self._aircraft_definitions = [] # holds aicraft entries
         self._titles = []

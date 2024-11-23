@@ -35,7 +35,7 @@ import gremlin.config
 from PySide6 import QtWidgets, QtCore, QtGui
 
 # List of all joystick devices
-_joystick_devices = []
+_joystick_devices = [] # all devices
 
 # map of physical devices by their GUID
 _joystick_device_guid_map = {}
@@ -43,6 +43,8 @@ _joystick_device_guid_map = {}
 # Joystick initialization lock
 _joystick_init_lock = threading.Lock()
 
+# initialized flag
+_joystick_initialized = False
 
 class VJoyProxy:
 
@@ -56,6 +58,7 @@ class VJoyProxy:
         :param key id of the vjoy device
         :return the corresponding vjoy device
         """
+        assert key is not None and key > 0 and key < 17,"Invalid VJOY device ID provided"
         if key in VJoyProxy.vjoy_devices:
             return VJoyProxy.vjoy_devices[key]
         else:
@@ -107,7 +110,10 @@ def vjoy_devices() -> list[DeviceSummary]:
 
     :return list of vJoy devices
     """
-    return [dev for dev in _joystick_devices if dev.is_virtual]
+    device_list = [dev for dev in _joystick_devices if dev.vjoy_id != -1 and dev.is_virtual]
+    if not device_list:
+        pass
+    return device_list
 
 def scale_to_range(value, source_min = -1.0, source_max = 1.0, target_min = -1.0, target_max = 1.0, invert = False):
     ''' scales a value on one range to the new range
@@ -232,6 +238,7 @@ def vjoy_id_from_guid(guid : str | dinput.GUID):
 
 def device_name_from_guid(guid : str | dinput.GUID) -> str:
     ''' gets device name from GUID '''
+    assert (_joystick_initialized)
     if isinstance(guid, str):
         guid = util.parse_guid(guid) # convert to dinput GUID 
     if guid in _joystick_device_guid_map.keys():
@@ -240,6 +247,7 @@ def device_name_from_guid(guid : str | dinput.GUID) -> str:
     
 def device_info_from_guid(guid : str | dinput.GUID) -> DeviceSummary:
     ''' gets physical device information '''
+    assert (_joystick_initialized)
     if isinstance(guid, str):
         guid = util.parse_guid(guid) # convert to dinput GUID 
     if guid in _joystick_device_guid_map.keys():
@@ -248,6 +256,7 @@ def device_info_from_guid(guid : str | dinput.GUID) -> DeviceSummary:
 
 def vjoy_info_from_vjoy_id(id : int ) -> DeviceSummary:
     ''' gets physical device info for a vjoy device '''
+    assert (_joystick_initialized)
     for dev in vjoy_devices():
         if dev.vjoy_id == id:
             return dev
@@ -255,6 +264,7 @@ def vjoy_info_from_vjoy_id(id : int ) -> DeviceSummary:
 
 def is_device_connected(guid : str | dinput.GUID) -> bool:
     ''' true if the device is connected (reported in) '''
+    assert (_joystick_initialized)
     if isinstance(guid, str):
         guid = util.parse_guid(guid) # convert to dinput GUID 
     return guid in _joystick_device_guid_map.keys()
@@ -300,7 +310,11 @@ def joystick_devices_initialization():
     Amongst other things this also ensures that each vJoy device has a correct
     windows id assigned to it.
     """
-    global _joystick_devices, _joystick_init_lock
+
+    import gremlin.util
+    global _joystick_devices, _joystick_init_lock, _joystick_initialized, _joystick_device_guid_map
+
+    _joystick_initialized = False
     
     verbose = gremlin.config.Configuration().verbose_mode_inputs
 
@@ -315,15 +329,21 @@ def joystick_devices_initialization():
     # Process all connected devices in order to properly initialize the
     # device registry
     devices = []
+    _joystick_devices = []
+    _joystick_device_guid_map = {}
     device_count = dinput.DILL.get_device_count()
     virtual_count = 0
     real_count = 0
-    for i in range(device_count):
-        info = dinput.DILL.get_device_information_by_index(i)
-        devices.append(info)
-        syslog.info(f"\t[{i}] {info.device_id} {info.name}")
-        if info.is_virtual: 
+    virtual_devices = {}
+    for device_index in range(device_count):
+        dev = dinput.DILL.get_device_information_by_index(device_index)
+        devices.append(dev)
+        syslog.info(f"\tindex: [{device_index}] {str(dev)}")
+        _joystick_devices.append(dev)
+        _joystick_device_guid_map[dev.device_guid] = dev
+        if dev.is_virtual: 
             virtual_count += 1
+            virtual_devices[dev.hashkey] = dev
         else:
             real_count += 1
 
@@ -335,24 +355,24 @@ def joystick_devices_initialization():
 
     # Compare existing versus observed devices and only proceed if there
     # is a change to avoid unnecessary work.
-    device_added = False
-    device_removed = False
-    for new_dev in devices:
-        if new_dev not in _joystick_devices:
-            device_added = True
-            if verbose:
-                syslog.debug(f"Added: name={new_dev.name} guid={new_dev.device_guid}")
+    # device_added = False
+    # device_removed = False
+    # for new_dev in devices:
+    #     if new_dev not in _joystick_devices:
+    #         device_added = True
+    #         if verbose:
+    #             syslog.debug(f"Added: name={new_dev.name} guid={new_dev.device_guid}")
                 
-    for old_dev in _joystick_devices:
-        if old_dev not in devices:
-            device_removed = True
-            if verbose:
-                syslog.debug(f"Removed: name={old_dev.name} guid={old_dev.device_guid}")
+    # for old_dev in _joystick_devices:
+    #     if old_dev not in devices:
+    #         device_removed = True
+    #         if verbose:
+    #             syslog.debug(f"Removed: name={old_dev.name} guid={old_dev.device_guid}")
 
-    # Terminate if no change occurred
-    if not device_added and not device_removed:
-        _joystick_init_lock.release()
-        return
+    # # Terminate if no change occurred
+    # if not force_refresh and not device_added and not device_removed:
+    #     _joystick_init_lock.release()
+    #     return
 
     # In order to associate vJoy devices and their ids correctly with SDL
     # device ids a hash is constructed from the number of axes, buttons, and
@@ -362,90 +382,151 @@ def joystick_devices_initialization():
 
     vjoy_lookup = {}
     vjoy_wheel_lookup = {}
-    for dev in [dev for dev in devices if dev.is_virtual]:
-        hash_value = (dev.axis_count, dev.button_count, dev.hat_count)
-        hash_value_wheel = (dev.axis_count+1, dev.button_count, dev.hat_count)
-        if verbose:
-            syslog.debug(f"vJoy guid={dev.device_guid}: {hash_value}")
+    
+    should_terminate = False
 
-        # Only unique combinations of axes, buttons, and hats are allowed
-        # for vJoy devices
-        if hash_value in vjoy_lookup:
-            raise error.GremlinError(
-                "Indistinguishable vJoy devices present.\n\n"
-                "vJoy devices have to differ in the number of "
-                "(at least one of) axes, buttons, or hats in order to work "
-                "properly with Joystick Gremlin."
-            )
+    # get the vjoy device list from direct input
+    # for dev in [dev for dev in devices if dev.is_virtual]:
+    #     hash_value = (dev.axis_count, dev.button_count, dev.hat_count)
+    #     hash_value_wheel = (dev.axis_count+1, dev.button_count, dev.hat_count)
+    #     syslog.info("Virtual VJOY device summary:")
+    #     syslog.debug(f"\tHash: {hash_value} {str(dev)}")
 
-        vjoy_lookup[hash_value] = dev
-        vjoy_wheel_lookup[hash_value_wheel] = dev
+    #     # Only unique combinations of axes, buttons, and hats are allowed
+    #     # for vJoy devices
+    #     if hash_value in vjoy_lookup:
+    #         syslog.error("\tFATAL: A VJOY device with the same axis, button and hat count was already found. ")
+    #         should_terminate = True
+    #         continue
+
+    #     vjoy_lookup[hash_value] = dev
+    #     vjoy_wheel_lookup[hash_value_wheel] = dev
+        
 
 
     # Query all vJoy devices in sequence until all have been processed and
     # their matching SDL counterparts have been found.
+    vjoy_hash_list = []
     vjoy_proxy = VJoyProxy()
-    should_terminate = False
-    for i in range(1, 17):
-        # Only process devices that actually exist
-        if not vjoy.device_exists(i):
+    for vjoy_index in range(1,17):  # index 1 up to 16
+        # Only process devices that actually exist 
+        
+        if not vjoy.device_exists(vjoy_index):
+            syslog.info(f"Vjoy Interface: device {vjoy_index} not found")
             continue
 
         # Compute a hash for the vJoy device and match it against the SDL
         # device hashes
-        hash_value = (
-            vjoy.axis_count(i),
-            vjoy.button_count(i),
-            vjoy.hat_count(i)
-        )
 
-        if not vjoy.hat_configuration_valid(i):
-            error_string = f"vJoy id {i:d}: Hats are set to discrete but have to be set as continuous."
+        axis_count = vjoy.axis_count(vjoy_index)
+        button_count = vjoy.button_count(vjoy_index)
+        hat_count = vjoy.hat_count(vjoy_index)
+        
+        hash_value = (axis_count,button_count,hat_count)
+        hash_wheel_value = (axis_count+1,button_count,hat_count)
+
+        syslog.info(f"Vjoy Interface: device index [{vjoy_index}] Hash: {hash_value} Hash wheel: {hash_wheel_value} Axis Count: {axis_count} Button count: {button_count} Hat count: {hat_count}")
+
+        if hash_value in vjoy_hash_list:
+            syslog.error("Fatal error: This device is not unique in terms of axis/button/hat counts.")
+            should_terminate = True
+            
+        
+
+        if hat_count > 0 and not vjoy.hat_configuration_valid(vjoy_index):
+            error_string = f"VJoy id {vjoy_index:d}: Hats are set to discrete but have to be set as continuous."
             syslog.debug(error_string)
             util.display_error(error_string)
 
         # As we are ensured that no duplicate vJoy devices exist from
         # the previous step we can directly link the SDL and vJoy device
         if hash_value in vjoy_lookup:
-            vjoy_lookup[hash_value].set_vjoy_id(i)
-            if verbose:
-                syslog.debug(f"vjoy id {i:d}: {hash_value} - MATCH")
-        elif hash_value in vjoy_wheel_lookup:
-            vjoy_wheel_lookup[hash_value].set_vjoy_id(i)
+            # found the vjoy interface index
+            vjoy_lookup[hash_value].set_vjoy_id(vjoy_index)
+            syslog.info(f"\tVjoy id {vjoy_index}: found in vjoy interface")
+        elif hash_wheel_value in vjoy_wheel_lookup:
             vjoy_lookup[hash_value] = vjoy_wheel_lookup[hash_value]
-            if verbose:
-                syslog.debug(f"vjoy id {i:d}: {hash_value} - WHEEL MATCH")
-
+            vjoy_lookup[hash_value].set_vjoy_id(vjoy_index)
+            syslog.info(f"\tVjoy id {vjoy_index}: found in vjoy interface (as a wheel)")
+        elif hash_value in virtual_devices:
+            dev = virtual_devices[hash_value]
+            vjoy_lookup[hash_value] = dev
+            vjoy_lookup[hash_value].set_vjoy_id(vjoy_index)
         else:
-            # should_terminate = True
-            syslog.debug(f"vjoy id {i:d}: {hash_value} - ERROR - vJoy device exists but DILL does not see it - check HIDHide config if enabled and process is whitelisted")
+            # not found
+            syslog.warning(f"vjoy id {vjoy_index:d}: {hash_value} vJoy device exists but DILL does not see it - check HIDHide config if enabled and process is whitelisted.  This device cannot be used as input.")
+            dev = DeviceSummary()
+            dev.device_guid = gremlin.util.get_dinput_guid() # bogus ID
+            dev.device_id = str(dev.device_guid)
+            dev.vendor_id = 0x1234 # vjoy vendor
+            dev.product_id = 0xBEAD # vjoy product ID
+            dev.joystick_id = vjoy_index
+            dev.name = f"VJOY {axis_count}/{button_count}/{hat_count} [{vjoy_index}]"
+            dev.axis_count = axis_count
+            dev.button_count = button_count
+            dev.hat_count = hat_count
+            dev.axis_map = []
+            dev.usage_page = None
+            dev.usage = None
+            dev.axis_names = []
+            dev.set_vjoy_id(vjoy_index)
+            logical_count = 0
+            for i in range(8):
+                axis_map = dinput.AxisMap()
+                axis_map.axis_index = i
+                dev.axis_map.append(axis_map)
+                axis_name = axis_map.getName()
+                if not axis_name:
+                    axis_name = f"({i+1})"
+                else:
+                    logical_count += 1
+                dev.axis_names.append(axis_name)
+
+            
+            vjoy_lookup[hash_value] = dev
+            _joystick_devices.append(dev)
+            _joystick_device_guid_map[dev.device_guid] = dev
+            syslog.info(f"Adding undetected VJOY device: [{vjoy_index}] {str(dev)}")
+            
+
+        if dev.is_virtual and dev.vjoy_id == -1:
+            syslog.error(f"vJoy id {vjoy_index:} - VJOY device detected with an invalid ID")
+            should_terminate = True
 
         # If the device can be acquired, configure the mapping from
         # vJoy axis id, which may not be sequential, to the
         # sequential SDL axis id
         if hash_value in vjoy_lookup:
             try:
-                vjoy_dev = vjoy_proxy[i]
+                # register the vjoy device with the proxy
+                vjoy_dev = vjoy_proxy[vjoy_index]
             except error.VJoyError as e:
-                syslog.debug(f"vJoy id {i:} can't be acquired")
+                syslog.debug(f"vJoy id {vjoy_index:} can't be acquired")
+
+    if not should_terminate:
+        if len(_joystick_device_guid_map) == 0:
+            syslog.error(f"Error (fatal): no usable VJOY devices found.")
+            should_terminate = True
 
     if should_terminate:
-        raise error.GremlinError(
-            "Unable to match vJoy devices to windows devices."
-        )
-
+        # exit gracefully
+        syslog.error("A fatal error was encountered during the detection and mapping of input devices - see the log for errors.")
+        app = QtWidgets.QApplication.instance()
+        app.exit()
+        return
+        
     # Reset all devices so we don't hog the ones we aren't actually using
     vjoy_proxy.reset()
 
-    # Update device list which will be used when queries for joystick devices
-    # are made
-    _joystick_devices = devices
     # device: dinput.DILL.DeviceSummary
-    for device in devices:
-        _joystick_device_guid_map[device.device_guid] = device
-        syslog.info(f"Device: {str(device.device_guid)} {device.name} Axis count: {device.axis_count} Button count: {device.button_count} Hat count: {device.hat_count}")
+    syslog.info("Input device summary:")
+    for dev in _joystick_devices:
+        syslog.info(f"\tDevice: {str(dev)}")
 
     _joystick_init_lock.release()
+    _joystick_initialized = True
+
+    syslog.info("Joystick input initialized")
 
 
 MAX_VJOY_DEVICE = 16 # number of devices 1..16 supported by VJOY - this includes devices that may not be configured
@@ -513,7 +594,7 @@ class VJoyUsageState():
             self.set_profile(profile)
         
         if not self._device_list:
-            self._device_list = gremlin.joystick_handling.vjoy_devices()
+            self._device_list = vjoy_devices()
 
         # listen for active device changes
         el = gremlin.event_handler.EventListener()

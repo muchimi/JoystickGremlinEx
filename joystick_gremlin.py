@@ -116,7 +116,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.16ex (m31)"
+APPLICATION_VERSION = "13.40.16ex (m32)"
 
 # the main ui
 ui = None
@@ -164,6 +164,8 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         # list of detected devices
         self._active_devices = []
+
+        
 
 
         # highlighing options

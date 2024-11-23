@@ -2582,8 +2582,6 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         return self._vjoy_input_id
     @vjoy_input_id.setter
     def vjoy_input_id(self, value):
-        if value == 10:
-            pass
         self._vjoy_input_id = value
     
     @property

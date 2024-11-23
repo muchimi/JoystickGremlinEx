@@ -151,6 +151,7 @@ class VJoyInterface:
             "arguments": [ctypes.c_ulong, ctypes.c_uint, ctypes.c_ubyte],
             "returns": ctypes.c_bool
         },
+
     }
 
     @classmethod

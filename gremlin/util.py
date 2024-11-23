@@ -531,7 +531,11 @@ def grouped(iterable, n):
     ''' returns n items for a given iterable item '''
     return zip(*[iter(iterable)]*n)
 
-def get_guid(strip=True,no_brackets = False):
+def get_dinput_guid() -> dinput.GUID:
+    ''' gets a DirectInput compatible GUID'''
+    return parse_guid(get_guid(strip=False,no_brackets=True))
+
+def get_guid(strip=True,no_brackets = False) -> str:
     ''' generates a reasonably lowercase unique guid string '''
     import uuid
     guid = f"{uuid.uuid4()}"
@@ -582,6 +586,22 @@ class SearchCache():
 def find_file(file_path, root_folder = None):
     cache = SearchCache()
     return cache.find_file(file_path, root_folder)
+
+
+def find_package_file(file_path):
+    ''' find a package file '''
+    syslog = logging.getLogger("system")
+    # get the execution folder
+    root_folder = None
+    if getattr(sys, 'frozen', False):
+        app = QtWidgets.QApplication.instance()
+        root_folder = app.applicationDirPath()
+    elif __file__:
+        root_folder = os.path.dirname(__file__)
+    
+    syslog.info(f"Application Execution folder: {root_folder}")
+    return find_file(file_path, root_folder)
+
 
 
 def _find_file(file_path, root_folder = None):

@@ -353,7 +353,7 @@ class AxisMap:
     descriptive DirectInput axis index.
     """
 
-    def __init__(self, data):
+    def __init__(self, data = None):
         """Creates a new instance.
 
         Parameters
@@ -361,8 +361,13 @@ class AxisMap:
         data : _AxisMap
             The data received from DILL and to be held by this instance
         """
-        self.linear_index = data.linear_index
-        self.axis_index = data.axis_index
+
+        self.linear_index = 0
+        self.axis_index = 0
+        if data is not None:
+            self.linear_index = data.linear_index
+            self.axis_index = data.axis_index
+        
 
     
     def getName(self) -> str:
@@ -399,7 +404,7 @@ class DeviceSummary:
     This summary holds static information about a single device's layout.
     """
 
-    def __init__(self, data):
+    def __init__(self, data = None):
         """Creates a new instance.
 
         Parameters
@@ -407,44 +412,62 @@ class DeviceSummary:
         data : _DeviceSummary
             The data received from DILL and to be held by this instance
         """
-        
-        self.device_guid = GUID(data.device_guid)
-        self.device_id = str(self.device_guid)
-        self.vendor_id = data.vendor_id
-        self.product_id = data.product_id
-        self.joystick_id = data.joystick_id
-        self.name = data.name.decode("utf-8")
-        self.axis_count = data.axis_count
-        self.button_count = data.button_count
-        self.hat_count = data.hat_count
-        self.axis_map = []
-        self.usage_page = data.usage_page
-        self.usage = data.usage
-        self.axis_names = []
-        logical_count = 0
-        for i in range(8):
-            axis_map = AxisMap(data.axis_map[i])
-            self.axis_map.append(axis_map)
-            axis_name = axis_map.getName()
-            if not axis_name:
-                # axis name is not reporting in via directinput
-                axis_name = f"({i+1})"
-                #axis_name = f"({logical_count}/{i}/{axis_map.linear_index}/{axis_map.axis_index})"
-            else:
-                logical_count += 1
-            self.axis_names.append(axis_name)
-        self.vjoy_id = -1
+        if data is not None:    
+            self.device_guid = GUID(data.device_guid)
+            self.device_id = str(self.device_guid)
+            self.vendor_id = data.vendor_id
+            self.product_id = data.product_id
+            self.joystick_id = data.joystick_id
+            self.name = data.name.decode("utf-8")
+            self.axis_count = data.axis_count
+            self.button_count = data.button_count
+            self.hat_count = data.hat_count
+            self.axis_map = []
+            self.usage_page = data.usage_page
+            self.usage = data.usage
+            self.axis_names = []
+            logical_count = 0
+            self.is_input_enabled = True # allow usage as an input device
+            for i in range(8):
+                axis_map = AxisMap(data.axis_map[i])
+                self.axis_map.append(axis_map)
+                axis_name = axis_map.getName()
+                if not axis_name:
+                    # axis name is not reporting in via directinput
+                    axis_name = f"({i+1})"
+                    #axis_name = f"({logical_count}/{i}/{axis_map.linear_index}/{axis_map.axis_index})"
+                else:
+                    logical_count += 1
+                self.axis_names.append(axis_name)
+            self.vjoy_id = -1
+        else:
+            self.device_guid = None
+            self.device_id = None
+            self.vendor_id = None
+            self.product_id = None
+            self.joystick_id = None
+            self.name = None
+            self.axis_count = 0
+            self.button_count = 0
+            self.hat_count = 0
+            self.axis_map = []
+            self.usage_page = None
+            self.usage = None
+            self.axis_names = []
+            logical_count = 0
+            self.is_input_enabled = False # do not allow usage as an input device
+            self.vjoy_id = -1
         
     @property
     def is_virtual(self):
-        """Returns if a device is virtual.
+        """ determins if a device is virtual.
 
         Returns
         =======
         bool
             True if the device is a virtual vJoy device, False otherwise
         """
-        if self.vendor_id == 0x1234 and self.product_id == 0xBEAD:
+        if self.vendor_id == 0x1234: # and self.product_id == 0xBEAD
             return True
         #if self.vendor_id == 0x
         return False
@@ -464,6 +487,14 @@ class DeviceSummary:
         assert self.is_virtual is True
         self.vjoy_id = vjoy_id
         self.name = f"VJoy {self.axis_count}/{self.button_count}/{self.hat_count} ({vjoy_id:d})"
+
+    @property
+    def hashkey(self):
+        ''' gets the hash key for virtual devices '''
+        return (self.axis_count,self.button_count,self.hat_count)
+
+    def __str__(self):
+        return f"Device: {self.name} {self.device_id} Axis: {self.axis_count} Buttons: {self.button_count} Hats: {self.hat_count} Vendor: 0x{self.vendor_id:X} Product: 0x{self.product_id:X} Virtual: {self.is_virtual} VjoyID: {self.vjoy_id}"
 
 
 C_EVENT_CALLBACK = ctypes.CFUNCTYPE(None, _JoystickInputData)

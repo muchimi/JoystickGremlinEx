@@ -1925,7 +1925,7 @@ class QPathLineItem(QtWidgets.QWidget):
         else:
             pixmap = None
         if pixmap:
-            pixmap = pixmap.scaled(QIconLabel.IconSize, QtCore.Qt.AspectRatioMode.KeepAspectRatio)
+            pixmap = pixmap.scaled(QPathLineItem.IconSize, QtCore.Qt.AspectRatioMode.KeepAspectRatio)
             self._icon_widget.setPixmap(pixmap)
         else:
             # clear the pixmap

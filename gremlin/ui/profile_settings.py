@@ -209,7 +209,7 @@ class VJoyAxisDefaultsWidget(QtWidgets.QWidget):
 
     """UI widget allowing modification of axis initialization values."""
 
-    def __init__(self, joy_data, profile_data, parent=None):
+    def __init__(self, device, profile_data, parent=None):
         """Creates a new UI widget.
 
         :param joy_data JoystickDeviceData object containing device information
@@ -218,7 +218,9 @@ class VJoyAxisDefaultsWidget(QtWidgets.QWidget):
         """
         super().__init__(parent)
 
-        self.joy_data = joy_data
+        assert device.is_virtual and device.vjoy_id > 0,"Device provided is not a VJOY device"
+        self.device = device
+        
         self.profile_data = profile_data
         self.main_layout = QtWidgets.QGridLayout(self)
         self.main_layout.setColumnMinimumWidth(0, 100)
@@ -230,13 +232,13 @@ class VJoyAxisDefaultsWidget(QtWidgets.QWidget):
     def _create_ui(self):
         """Creates the UI elements."""
         vjoy_proxy = gremlin.joystick_handling.VJoyProxy()
-        for i in range(self.joy_data.axis_count):
+        for i in range(self.device.axis_count):
             # FIXME: This is a workaround to not being able to read a vJoy
             #   device's axes names when it is grabbed by another process
             #   and the inability of SDL to provide canonical axis names
             axis_name = f"Axis {i+1:d}"
             try:
-                axis_name = vjoy_proxy[self.joy_data.vjoy_id]\
+                axis_name = vjoy_proxy[self.device.vjoy_id]\
                     .axis_name(linear_index=i+1)
             except gremlin.error.VJoyError:
                 pass
@@ -250,7 +252,7 @@ class VJoyAxisDefaultsWidget(QtWidgets.QWidget):
             box.setRange(-1, 1)
             box.setSingleStep(0.05)
             box.setValue(self.profile_data.get_initial_vjoy_axis_value(
-                self.joy_data.vjoy_id,
+                self.device.vjoy_id,
                 i+1
             ))
             box.valueChanged.connect(self._create_value_cb(i+1))
@@ -273,7 +275,7 @@ class VJoyAxisDefaultsWidget(QtWidgets.QWidget):
         :param value the value to update the axis to
         """
         self.profile_data.set_initial_vjoy_axis_value(
-            self.joy_data.vjoy_id,
+            self.device.vjoy_id,
             axis_id,
             value
         )
