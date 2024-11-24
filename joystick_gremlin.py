@@ -116,7 +116,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.16ex (m32_2)"
+APPLICATION_VERSION = "13.40.16ex (m33)"
 
 # the main ui
 ui = None
@@ -517,7 +517,9 @@ class GremlinUi(QtWidgets.QMainWindow):
 
             self.process_monitor.running = False
             try:
-                self.ui.tray_icon.delete_later()
+                if self.ui.tray_icon:
+                    del self.ui.tray_icon
+                    self.ui_tray_icon = None
             except:
                 pass
             QtCore.QCoreApplication.quit()

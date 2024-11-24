@@ -545,18 +545,13 @@ class ActionContainerModel(gremlin.ui.ui_common.AbstractModel):
         if container in self._containers:
             # notify actions that the container is closing
             for action_set in container.action_sets:
-                for action in action_set:
-                    # if hasattr(action, "_cleanup"):
-                    #     action._cleanup()
-                    el.action_delete.emit(self._item_data, container, action)
+                if action_set:
+                    for action in action_set:
+                        el.action_delete.emit(self._item_data, container, action)
 
             del self._containers[self._containers.index(container)]
         self.data_changed.emit()
         el.mapping_changed.emit(self.item_data)
-        # event = gremlin.event_handler.DeviceChangeEvent()
-        # event.source = self.item_data
-        # el = gremlin.event_handler.EventListener()
-        # el.icon_changed.emit(event)
 
         
 
@@ -1172,7 +1167,7 @@ def input_item_index_lookup(index, input_items):
     if key_count > 0:
         if not input_items.has_data(InputType.Keyboard, index):
             logging.getLogger("system").error(
-                "Attempting to retrieve non existent input, "
+                "Attempting to retrieve non existent key input, "
                 f"type={InputType.to_string(InputType.Keyboard)} index={index}"
             )
         return input_items.get_data(InputType.Keyboard, index)
@@ -1182,7 +1177,7 @@ def input_item_index_lookup(index, input_items):
             axis_keys = sorted(input_items.config[InputType.JoystickAxis].keys())
             if not input_items.has_data(InputType.JoystickAxis, axis_keys[index]):
                 logging.getLogger("system").error(
-                    "Attempting to retrieve non existent input, "
+                    "Attempting to retrieve non existent axis input, "
                     f"type={InputType.to_string(InputType.JoystickAxis)} index={axis_keys[index]}"
                 )
 
@@ -1196,7 +1191,7 @@ def input_item_index_lookup(index, input_items):
                     index - axis_count + 1
             ):
                 logging.getLogger("system").error(
-                    "Attempting to retrieve non existent input, "
+                    "Attempting to retrieve non existent button input, "
                     f"type={InputType.to_string(InputType.JoystickButton)} index={index - axis_count + 1}"
                 )
 
@@ -1207,10 +1202,10 @@ def input_item_index_lookup(index, input_items):
         elif index < axis_count + button_count + hat_count:
             if not input_items.has_data(
                     InputType.JoystickHat,
-                    axis_count + button_count + hat_count
+                    index - axis_count - button_count + 1
             ):
                 logging.getLogger("system").error(
-                    "Attempting to retrieve non existent input, "
+                    "Attempting to retrieve non existent hat input, "
                     f"type={ InputType.to_string(InputType.JoystickHat)} index={index - axis_count - button_count + 1}"
                 )
 

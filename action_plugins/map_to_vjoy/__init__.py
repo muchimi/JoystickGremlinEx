@@ -40,6 +40,7 @@ import os
 import enum
 from gremlin.input_devices import VjoyAction, remote_state
 from gremlin.util import *
+import gremlin.util
 import vjoy.vjoy
 
 
@@ -345,15 +346,58 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.container_hat_widget = QtWidgets.QWidget()
         self.container_hat_widget.setVisible(False)
         self.container_hat_widget.setContentsMargins(0,0,0,0)
+
+        self.container_hat_layout = QtWidgets.QVBoxLayout(self.container_hat_widget)
+        self.container_hat_layout.setContentsMargins(0,0,0,0)
+
+        self.container_hat_grid_widget = QtWidgets.QWidget()
+        self.container_hat_grid_layout = QtWidgets.QGridLayout(self.container_hat_grid_widget)
+
+        self.container_hat_options_widget = QtWidgets.QWidget()
+        self.container_hat_options_widget.setContentsMargins(0,0,0,0)
+        self.container_hat_options_layout = QtWidgets.QHBoxLayout(self.container_hat_options_widget)
+        
         self.main_layout.addWidget(self.container_hat_widget)
         
-        self.container_hat_layout = QtWidgets.QGridLayout(self.container_hat_widget)
-        self.container_hat_layout.setContentsMargins(0,0,0,0)
+        
         
         self.cb_hat_list = []
         self.rb_hat_hold_list = []
         self.rb_hat_pulse_list = []
+
+        self.hat_pulse_widget = QtWidgets.QPushButton("All Pulse")
+        self.hat_pulse_widget.setToolTip("Sets all mappings to pulse mode")
+        self.hat_hold_widget = QtWidgets.QPushButton("All Hold")
+        self.hat_hold_widget.setToolTip("Sets all mappings to hold mode")
+        self.hat_unmap_widget =  QtWidgets.QPushButton("Clear Buttons")
+        self.hat_unmap_widget.setToolTip("Clears all mappings")
+        self.hat_map_widget =  QtWidgets.QPushButton("Map Buttons")
+        self.hat_map_widget.setToolTip("Maps all positions sequentially using the first button as the reference if set.")
+
+        self.hat_hold_widget.clicked.connect(self._set_all_hold)
+        self.hat_pulse_widget.clicked.connect(self._set_all_pulse)
+        self.hat_unmap_widget.clicked.connect(self._clear_map)
+        self.hat_map_widget.clicked.connect(self._auto_map)
+
+        self.hat_stick_widget = QtWidgets.QCheckBox("Sticky mode")
+        self.hat_stick_widget.setToolTip("When enabled, all pressed hat positions will stick until the hat returns to the center position")
+        self.hat_stick_widget.setChecked(self.action_data.hat_sticky)
+        self.hat_stick_widget.clicked.connect(self._hat_sticky_changed)
+
+        self.container_hat_options_layout.addWidget(self.hat_pulse_widget)
+        self.container_hat_options_layout.addWidget(self.hat_hold_widget)
+        self.container_hat_options_layout.addWidget(self.hat_unmap_widget)
+        self.container_hat_options_layout.addWidget(self.hat_map_widget)
+        self.container_hat_options_layout.addWidget(self.hat_stick_widget)
+        self.container_hat_options_layout.addStretch()
+        
+
         positions = self.action_data.hat_positions
+
+
+        self.container_hat_layout.addWidget(self.container_hat_options_widget)
+        self.container_hat_layout.addWidget(self.container_hat_grid_widget)
+        
         row = 0
         for position in positions: # 9 positions - 8 cardinal and center push
             cb = gremlin.ui.ui_common.NoWheelComboBox()
@@ -363,8 +407,8 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             lbl = gremlin.ui.ui_common.QIconLabel(icon_path=icon, text = f"{name}:", use_wrap= False, icon_color=QtGui.QColor("green"),icon_size=32, use_qta=True)
             
             lbl.setIcon(icon)
-            self.container_hat_layout.addWidget(lbl, row, 0)
-            self.container_hat_layout.addWidget(cb, row,1)
+            self.container_hat_grid_layout.addWidget(lbl, row, 0)
+            self.container_hat_grid_layout.addWidget(cb, row,1)
             self.cb_hat_list.append(cb)
             cb.currentIndexChanged.connect(self._hat_mapping_changed)
 
@@ -382,7 +426,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             mode_container_layout.addWidget(rb_hold)
             mode_container_layout.addWidget(rb_pulse)
 
-            self.container_hat_layout.addWidget(mode_container_widget, row, 2)
+            self.container_hat_grid_layout.addWidget(mode_container_widget, row, 2)
             
             self.rb_hat_hold_list.append(rb_hold)
             self.rb_hat_pulse_list.append(rb_pulse)
@@ -390,9 +434,66 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             row += 1
             
 
-        self.container_hat_layout.addWidget(QtWidgets.QLabel(), 0, 4)
-        self.container_hat_layout.setColumnStretch(4,3)
+        self.container_hat_grid_layout.addWidget(QtWidgets.QLabel(), 0, 4)
+        self.container_hat_grid_layout.setColumnStretch(4,3)
         self._update_hat_mapping()
+
+
+    @QtCore.Slot(bool)
+    def _hat_sticky_changed(self, checked : bool):
+        self.action_data.hat_sticky = checked
+
+    @QtCore.Slot()
+    def _set_all_hold(self):
+        ''' sets all mappings to hold mode '''
+        positions = self.action_data.hat_positions
+        for position in positions:
+            self.action_data.hat_pulse_map[position] = False
+        self._update_hat_mapping()
+
+    @QtCore.Slot()
+    def _set_all_pulse(self):
+        ''' sets all mappings to pulse mode '''
+        positions = self.action_data.hat_positions
+        for position in positions:
+            self.action_data.hat_pulse_map[position] = True
+        self._update_hat_mapping()
+
+    @QtCore.Slot()
+    def _clear_map(self):
+        ''' sets all mappings to pulse mode '''
+        msgbox = gremlin.ui.ui_common.ConfirmBox(prompt = "Clear all hat button mappings?")
+        result = msgbox.show()
+        if result == QtWidgets.QMessageBox.StandardButton.Ok:
+            positions = self.action_data.hat_positions
+            for position in positions:
+                self.action_data.hat_map[position] = 0
+            self._update_hat_mapping()
+
+    @QtCore.Slot()
+    def _auto_map(self):
+        ''' sets all mappings to pulse mode '''
+        msgbox = gremlin.ui.ui_common.ConfirmBox(prompt = "Remap all hat button mappings?")
+        result = msgbox.show()
+        if result == QtWidgets.QMessageBox.StandardButton.Ok:
+            positions = self.action_data.hat_positions
+            dev = self.action_data.vjoy_map[self.action_data.vjoy_device_id]
+            button_count = dev.button_count
+            for index, position in enumerate(positions):
+                if index == 0:
+                    button_id = self.action_data.hat_map[position]
+                    if button_id == 0:
+                        # default if first button is not set
+                        button_id = 1
+                
+                self.action_data.hat_map[position] = button_id
+
+                button_id += 1
+                if button_id > button_count:
+                    # wrap around
+                    button_id = 1
+
+            self._update_hat_mapping()
 
 
     @QtCore.Slot()
@@ -1981,6 +2082,7 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
 
         self.remote_client = input_devices.remote_client
         self.hat_position = (0,0)
+        self.in_range = False # true when in axis to button mode and the axis was in range
 
         self.lock = threading.Lock()
 
@@ -2121,18 +2223,23 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
                     r_min = self.range_low
                     r_max = self.range_high
                     if value.current >= r_min and value.current <= r_max:
-                        # axis in range
-                        # print (f"In range {value.current}")
-                        if event.is_pressed:
+                        if not self.in_range:
+                            # axis in range
+                            self.in_range = True
+                            # print (f"In range {value.current:0.3f} range: {r_min:0.3f} {r_max:0.3f}")
                             if is_local:
                                 joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = True
                             if is_remote:
                                 self.remote_client.send_button(self.vjoy_device_id, self.vjoy_input_id, True)
+                        
                     else:
-                        if is_local:
-                            joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = False
-                        if is_remote:
-                            self.remote_client.send_button(self.vjoy_device_id, self.vjoy_input_id, False)
+                        if self.in_range:
+                            # print (f"out of range {value.current:0.3f} range: {r_min:0.3f} {r_max:0.3f}")
+                            if is_local:
+                                joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = False
+                            if is_remote:
+                                self.remote_client.send_button(self.vjoy_device_id, self.vjoy_input_id, False)
+                            self.in_range = False
 
 
                 case _:
@@ -2168,17 +2275,34 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
             if is_pressed:
                 is_pulse = self.action_data.hat_pulse_map[position]
                 input_id = self.action_data.hat_map[position]
+                sticky = self.action_data.hat_sticky
                 if input_id > 0:
 
                     if is_pulse:
                         if not self.lock.locked():
                             threading.Timer(0.01, self._fire_pulse, [self.vjoy_device_id, input_id, self.pulse_delay/1000]).start()
                     else:
+                        if not sticky:
+                            # release the prior buttons
+                            for pressed_position in pressed_positions:
+                                if position == pressed_position:
+                                    continue
+                                release_input_id = self.pressed_hat_buttons[pressed_position]
+                                if release_input_id > 0:
+                                    if is_local:
+                                        joystick_handling.VJoyProxy()[self.vjoy_device_id].button(release_input_id).is_pressed = False
+                                    if is_remote:
+                                        self.remote_client.send_button(self.vjoy_device_id, release_input_id, False)
+
+                                del self.pressed_hat_buttons[pressed_position]        
+                        # press the new button    
                         self.pressed_hat_buttons[position] = input_id
                         if is_local:
                             joystick_handling.VJoyProxy()[self.vjoy_device_id].button(input_id).is_pressed = True
                         if is_remote:
                             self.remote_client.send_button(self.vjoy_device_id, input_id, True)
+                        
+                        
             else:
                 for pressed_position in pressed_positions:
                     input_id = self.pressed_hat_buttons[pressed_position]
@@ -2389,6 +2513,7 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         self.hat_positions = list(vjoy.vjoy.Hat.to_continuous_direction.keys())
         self.hat_positions.remove((0,0)) # remove center position
         self.hat_pulse_map = {} # bool table keyed by hat position
+        self.hat_sticky = False # determines if hats are sticky or not - sticky means all positions are active until all returns to the center position
         button_id = 1
         for position in self.hat_positions:
             self.hat_map[position] = button_id
@@ -2855,6 +2980,9 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
                         self.hat_map[position] = button_id
                         is_pulse = safe_read(node_hat,"pulse",bool, False)
                         self.hat_pulse_map[position] = is_pulse
+                if "hat_sticky" in node.attrib:
+                    self.hat_sticky = safe_read(node,"hat_sticky",bool, False)
+
 
 
 
@@ -2936,6 +3064,8 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
                     node_hat.set("pulse", safe_format(is_pulse, bool))
                     node.append(node_hat)
                     write_node_input = False
+
+                node.set("hat_sticky", safe_format(self.hat_sticky, bool))
 
         if self.curve_data is not None:
             curve_node =  self.curve_data._generate_xml()

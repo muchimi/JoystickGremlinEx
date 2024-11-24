@@ -238,11 +238,16 @@ class ControlPoint:
         self._handles = [hdl for hdl in handles]
         self._identifier = ControlPoint.next_id
         self._last_modified = time.time()
+        self._last_modified_handle_index = 0 # index of the last modified handle
         ControlPoint.next_id += 1
 
     @property
     def last_modified(self):
         return self._last_modified
+
+    @property
+    def last_modified_handle_index(self):
+        return self._last_modified_handle_index
 
     @property
     def model(self):
@@ -318,6 +323,7 @@ class ControlPoint:
             self._model.model_updated()
 
             self._last_modified = time.time()
+            self._last_modified_handle_index = index
             self._model.model_updated()
 
     def __eq__(self, other):
@@ -470,9 +476,14 @@ class AbstractCurveModel(QtCore.QObject):
         )
 
     def _enforce_symmetry(self):
+        ''' enforces symmetry of all points '''
         count = len(self._control_points)
 
         ordered_cp = sorted(self._control_points, key=lambda x: x.center.x)
+
+        # for index, cp in enumerate(ordered_cp):
+        #     print (f"cp[{index}]: {cp.x} {cp.y} handles: {len(cp.handles)}")
+
         for i in range(int(count / 2.0)):
             cp1 = ordered_cp[i]
             cp2 = ordered_cp[-i - 1]
@@ -493,6 +504,20 @@ class AbstractCurveModel(QtCore.QObject):
         if count % 2 != 0:
             ordered_cp[int(count / 2)].set_center(Point2D(0, 0), False)
 
+        # handle the special case of the bezier center point
+        ordered_cp = sorted(self._control_points, key=lambda x: x.center.x)
+        cp = next((p for p in ordered_cp if p.x == 0.0 and p.y == 0.0), None)
+        if cp and len(cp.handles) == 2:
+            # which handle is selected
+            index = cp.last_modified_handle_index
+            h1 = 0
+            h2 = 1
+            if index == 0:
+                h1, h2 = h2, h1
+            cp.handles[h1] = cp.center - cp.handles[h2] 
+            
+        
+
     def set_symmetry_mode(self, mode):
         """Sets the symmetry mode of the curve model.
 
@@ -501,6 +526,7 @@ class AbstractCurveModel(QtCore.QObject):
         self.symmetry_mode = mode
         if mode == SymmetryMode.Diagonal:
             if len(self._control_points) == 2:
+                # if only two points (the ends) - add a center point '''
                 self.add_control_point(Point2D(0.0, 0.0))
                 self.content_added.emit()
                 self._enforce_symmetry()
@@ -1405,6 +1431,7 @@ class ControlPointEditorWidget(QtWidgets.QWidget):
         self.y_input.setValue(0)
 
         self.active_point = None
+        self.active_handle = None
 
         self.next_control_point = QtWidgets.QPushButton()
         self.next_control_point.setIcon(gremlin.util.load_icon("fa.caret-up"))
@@ -1464,16 +1491,19 @@ class ControlPointEditorWidget(QtWidgets.QWidget):
         msg = ""
         handle_visible = False
         point = None
+        self.active_handle = None
         if item is None:
             pass
         elif isinstance(item, CurveHandleGraphicsItem):
             self.point_label.setText("Handle")
             handle_visible = True
             point = item.parent.control_point.handles[item.index]
+            self.selected_handle = item
         elif isinstance(item, ControlPointGraphicsItem):
             self.point_label.setText("Control Point")
             msg = f"{[index+1]}"
             point = item.control_point.center
+            
 
         else:
             self.point_label.setText("???")

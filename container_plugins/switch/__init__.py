@@ -507,8 +507,20 @@ class SwitchContainerFunctor(gremlin.base_classes.AbstractFunctor):
     def process_event(self, event : gremlin.event_handler.Event, value : gremlin.actions.Value):
         if event.is_axis:
             return True
+        if event.event_type == InputType.JoystickHat:
+            is_hat = True
+            is_pressed = value.current != (0,0)
+        elif not isinstance(value.current, bool):
+            logging.getLogger("system").warning(
+                f"Invalid data type received in Switch container: {type(event.value)}"
+            )
+            return False
+        else:
+            is_hat = False
+            is_pressed = value.current
+        
         data : SwitchData
-        print (str(event))
+        
         for data in self.profile_data.position_data.values():
             if data.device_guid != event.device_guid:
                 continue
@@ -518,16 +530,16 @@ class SwitchContainerFunctor(gremlin.base_classes.AbstractFunctor):
                 case SwitchModeType.OnChange:
                     pass
                 case SwitchModeType.OnPress:
-                    if not event.is_pressed:
+                    if not is_pressed:
                         continue
                 case SwitchModeType.OnRelease:
-                    if event.is_pressed:
+                    if is_pressed:
                         continue
 
             if value.current is None:
-                value.current = event.is_pressed
+                value.current = (0,0) if is_hat else is_pressed
 
-            print ("activate")
+            
 
             self.action_sets[data.index].process_event(event, value)
 

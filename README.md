@@ -186,7 +186,18 @@ Joystick Gremlin EX
 
 
 ## 13.40.16ex (pre-release)  
+### (m33)
+- New: Map to vjoy, hat to button mode has a new sticky option.  When enabled and the position mapping is in the hold mode, any pressed hat positions will "stick" until the hat is returned to center, and when disabled, only the current hat position is pressed.   This mode is only relevant when in hold mode, it has no meaning in the pulse mode for obvious reasons.
+- Fix: Tempo/TempoEx/Chain/Switch/Button did not support hats as input
+- Fix: When in symmetry mode, curve editor did not mirror the center point bezier handle
+- Fix: Map to Vjoy in axis to button mode, change in triggering logic.
 
+
+
+### (m32)
+- Improved: cross-reference data returned by Vjoy API with data returned by DirectInput and more detailed log data for what was detected.  This can help with troubleshooting.
+- Fix: typo in tempo/tempoEx in variable name
+- Fix: possible tray icon exception when the application exits and the tray icon has already been discarded.
 ### (m31)
 - Improved: support for Simconnect for MSFS2024.  This is a work in progress and does not include all planned features, such as, a facility to add custom simvars from add-on products.  The barebones module is functional with MSFS 2024 released Tuesday, November 10th, 2024.
 - Improved: Map to vjoy adds a new hat to button mode to map up to 8 hat positions directly to buttons.  The buttons can be pulsed or held.

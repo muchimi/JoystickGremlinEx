@@ -28,6 +28,7 @@ import gremlin.ui.ui_common
 import gremlin.ui.input_item
 from gremlin.ui.input_item import AbstractContainerWidget
 from gremlin.base_profile import AbstractContainer
+from gremlin.input_types import InputType
 
 
 class DoubleTapContainerWidget(AbstractContainerWidget):
@@ -246,23 +247,26 @@ class DoubleTapContainerFunctor(gremlin.base_classes.AbstractFunctor):
         self.processed_single_tap = True
 
     def process_event(self, event, value):
-        # TODO: Currently this does not handle hat or axis events, however
-        #       virtual buttons created on those inputs is supported
-        if not isinstance(value.current, bool):
+        if event.event_type == InputType.JoystickHat:
+            is_pressed = value.current != (0,0)
+        elif not isinstance(value.current, bool):
             logging.getLogger("system").warning(
                 f"Invalid data type received in DoubleTap container: {type(event.value)}"
             )
             return False
+        else:
+            is_pressed = value.current
 
         if self.processed_single_tap:
                 
                 # Copy state when input is pressed
-                if value.current:
+                if is_pressed:
                     self.value_press = copy.deepcopy(value)
                     self.event_press = event.clone()
 
                 # Execute double tap logic
-                if value.current:
+                if is_pressed:
+                    
                     # Second activation within the delay, i.e. second tap
                     if (self.start_time + self.delay) > time.time():
                         # Prevent repeated double taps from repeated button presses
@@ -270,9 +274,10 @@ class DoubleTapContainerFunctor(gremlin.base_classes.AbstractFunctor):
                         self.tap_type = "double"
                         if self.activate_on == "exclusive":
                             self.double_action_timer.cancel()
-                    # First acitvation within the delay, i.e. first tap
+                    # First activation within the delay, i.e. first tap
                     else:
                         self.start_time = time.time()
+                        #print ("first activation")
                         self.tap_type = "single"
                         if self.activate_on == "exclusive":
                             self.double_action_timer = \
@@ -291,15 +296,23 @@ class DoubleTapContainerFunctor(gremlin.base_classes.AbstractFunctor):
                     self.double_action_timer.start()
 
                 if self.tap_type == "double":
+                    #print ("double tap")
                     self.double_tap.process_event(event, value)
                     if self.activate_on == "combined":
                         self.single_tap.process_event(event, value)
                 elif self.activate_on != "exclusive":
+                    #print ("single tap exclusive")
                     self.single_tap.process_event(event, value)
         
         else:
+            #print ("first tap")
+            self.start_time = time.time()
             self.single_tap.process_event(event, value)
             self.processed_single_tap = True
+            
+            
+
+        return True
 
     def _single_tap(self, event_release=None, value_release=None):
         """Callback executed, when the delay expires."""

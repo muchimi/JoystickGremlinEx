@@ -27,7 +27,7 @@ import gremlin.ui.ui_common
 import gremlin.ui.input_item
 from gremlin.ui.input_item import AbstractContainerWidget, AbstractActionWidget
 from gremlin.base_profile import AbstractContainer
-
+from gremlin.input_types import InputType
 
 class ChainContainerWidget(AbstractContainerWidget):
 
@@ -182,6 +182,17 @@ class ChainContainerFunctor(gremlin.base_classes.AbstractFunctor):
                         self.switch_on_press = True
 
     def process_event(self, event, value):
+        if event.event_type == InputType.JoystickHat:
+            is_pressed = value.current != (0,0)
+        elif not isinstance(value.current, bool):
+            logging.getLogger("system").warning(
+                f"Invalid data type received in Chain container: {type(event.value)}"
+            )
+            return False
+        else:
+            is_pressed = value.current
+
+
         if self.timeout > 0.0:
             if self.last_execution + self.timeout < time.time():
                 self.index = 0
@@ -192,7 +203,7 @@ class ChainContainerFunctor(gremlin.base_classes.AbstractFunctor):
             logging.getLogger("system").info(f"Chain: index {self.index}")
         result = self.action_sets[self.index].process_event(event, value)
 
-        if (self.switch_on_press and value.current) or not value.current:
+        if (self.switch_on_press and is_pressed) or not is_pressed:
             self.index = (self.index + 1) % len(self.action_sets)
         return result
 

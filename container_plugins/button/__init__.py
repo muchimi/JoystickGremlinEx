@@ -30,7 +30,7 @@ import gremlin.ui.ui_common
 import gremlin.ui.input_item
 from gremlin.ui.input_item import AbstractContainerWidget
 from gremlin.base_profile import AbstractContainer
-
+from gremlin.input_types import InputType
 
 class ButtonContainerWidget(AbstractContainerWidget):
 
@@ -199,19 +199,25 @@ class ButtonContainerFunctor(gremlin.base_classes.AbstractFunctor):
         )
 
     def process_event(self, event, value):
-        if not isinstance(value.current, bool):
+
+        if event.event_type == InputType.JoystickHat:
+            is_hat = True
+            is_pressed = value.current != (0,0)
+        elif not isinstance(value.current, bool):
             logging.getLogger("system").warning(
-                f"Invalid data type received in button container: {type(event.value)}"
+                f"Invalid data type received in Button container: {type(event.value)}"
             )
             return False
+        else:
+            is_hat = False
+            is_pressed = value.current
 
-        if event.is_pressed:
+        if is_pressed:
             # button press
             self.press_set.process_event(event, value)
         else:
             # button release
-            # fake press from the container
-            value.current = True
+            value.current = (0,0) if is_hat else True
             self.release_set.process_event(event, value)
 
         return True
