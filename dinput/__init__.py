@@ -494,7 +494,8 @@ class DeviceSummary:
         return (self.axis_count,self.button_count,self.hat_count)
 
     def __str__(self):
-        return f"Device: {self.name} {self.device_id} Axis: {self.axis_count} Buttons: {self.button_count} Hats: {self.hat_count} Vendor: 0x{self.vendor_id:X} Product: 0x{self.product_id:X} Virtual: {self.is_virtual} VjoyID: {self.vjoy_id}"
+        vjoy_stub = f"VjoyID: {self.vjoy_id}" if self.vjoy_id != -1 else ""
+        return f"Device: {self.name} {self.device_id} Axis: {self.axis_count} Buttons: {self.button_count} Hats: {self.hat_count} Vendor: 0x{self.vendor_id:X} Product: 0x{self.product_id:X} Virtual: {self.is_virtual} {vjoy_stub}"
 
 
 C_EVENT_CALLBACK = ctypes.CFUNCTYPE(None, _JoystickInputData)
@@ -574,6 +575,8 @@ class DILL:
         from pathlib import Path
         from gremlin.util import display_error, get_dll_version
 
+        syslog = logging.getLogger("system")
+
         if DILL._dll is None:
 
             dll_folder = os.path.dirname(__file__)
@@ -611,12 +614,20 @@ class DILL:
             except Exception as error:
                 msg = f"Unable to initialize DirectInput: {_dll_path}\n{error}"
                 display_error(msg)
-                logging.getLogger("system").critical(msg)
+                syslog.critical(msg)
                 os._exit(1)
 
             DILL.initalized = True
 
 
+            # display a list of all ditected devices
+            
+            device_count = DILL.get_device_count()
+            syslog.info("DILL: device detection summary")
+            for index in range(device_count):
+                dev = DILL.get_device_information_by_index(index)
+                syslog.info(f"\tIndex: [{index}] {str(dev)}")
+            syslog.info("DILL: end device detection summary")
 
 
     @staticmethod

@@ -111,8 +111,6 @@ def vjoy_devices() -> list[DeviceSummary]:
     :return list of vJoy devices
     """
     device_list = [dev for dev in _joystick_devices if dev.vjoy_id != -1 and dev.is_virtual]
-    if not device_list:
-        pass
     return device_list
 
 def scale_to_range(value, source_min = -1.0, source_max = 1.0, target_min = -1.0, target_max = 1.0, invert = False):
@@ -520,8 +518,13 @@ def joystick_devices_initialization():
 
     # device: dinput.DILL.DeviceSummary
     syslog.info("Input device summary:")
-    for dev in _joystick_devices:
-        syslog.info(f"\tDevice: {str(dev)}")
+    regular_devices_list = [dev for dev in _joystick_devices if not dev.is_virtual]
+    vjoy_devices_list = [dev for dev in _joystick_devices if dev.is_virtual]
+    vjoy_devices_list.sort(key = lambda x: x.vjoy_id)
+    for dev in regular_devices_list:
+        syslog.info(f"\tDevice: (regular) {str(dev)}")
+    for dev in vjoy_devices_list:
+        syslog.info(f"\tDevice: (vjoy) {str(dev)}")
 
     _joystick_init_lock.release()
     _joystick_initialized = True
