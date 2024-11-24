@@ -116,7 +116,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.16ex (m32)"
+APPLICATION_VERSION = "13.40.16ex (m32_1)"
 
 # the main ui
 ui = None
@@ -517,7 +517,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
             self.process_monitor.running = False
             try:
-                del self.ui.tray_icon
+                self.ui.tray_icon.delete_later()
             except:
                 pass
             QtCore.QCoreApplication.quit()
@@ -769,7 +769,10 @@ class GremlinUi(QtWidgets.QMainWindow):
                 ]:
                     self.ui.devices.currentWidget().refresh()
                 #print ("set icon INACTIVE")
-                self.ui.tray_icon.setIcon(load_icon("gfx/icon.ico"))
+                try:
+                    self.ui.tray_icon.setIcon(load_icon("gfx/icon.ico"))
+                except:
+                    pass
         except Exception as err:
             logging.getLogger("system").error(f"Activate: error: {err}\n{traceback.format_exc()}")
                         
