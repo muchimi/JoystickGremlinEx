@@ -263,7 +263,7 @@ class TempoContainerFunctor(gremlin.base_classes.AbstractFunctor):
             )
             return False
         else:
-            is_pressed = value.currnet
+            is_pressed = value.current
 
         # Copy state when input is pressed
         if is_pressed:
