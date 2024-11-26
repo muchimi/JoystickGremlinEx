@@ -84,14 +84,12 @@ class SmartToggleContainerWidget(AbstractContainerWidget):
             self.action_layout.addWidget(action_selector)
 
     def _create_condition_ui(self):
-        if len(self.profile_data.action_sets) > 0 and \
-                self.profile_data.activation_condition_type == "action":
-            assert len(self.profile_data.action_sets) == 1
+        if self.profile_data.has_action_conditions:
 
             widget = self._create_action_set_widget(
                 self.profile_data.action_sets[0],
                 "Smart Toggle",
-                gremlin.ui.ui_common.ContainerViewTypes.Condition
+                gremlin.ui.ui_common.ContainerViewTypes.Conditions
             )
             self.activation_condition_layout.addWidget(widget)
             widget.redraw()
@@ -159,7 +157,7 @@ class SmartToggleContainerWidget(AbstractContainerWidget):
             return "Smart Toggle"
 
 
-class SmartToggleContainerFunctor(gremlin.base_classes.AbstractFunctor):
+class SmartToggleContainerFunctor(gremlin.base_conditions.AbstractFunctor):
 
     """Executes the contents of the associated SmartToggle container."""
 

@@ -162,6 +162,7 @@ class KeyboardInputItem(AbstractInputItem):
                     # if virtual_code > 0:
                     #     key = gremlin.keyboard.KeyMap.find_virtual(virtual_code)
                     # else:
+                    
                     (scan_code, is_extended), _= gremlin.keyboard.KeyMap.translate((scan_code, is_extended))
                     key = gremlin.keyboard.KeyMap.find(scan_code, is_extended)
                     
@@ -225,15 +226,13 @@ class KeyboardInputItem(AbstractInputItem):
             self._display_tooltip = ""
             return
         
-    
-        message_key = f"{self._key._scan_code:x}{1 if self.key._is_extended else 0}"
+        extended_key = '0x0E ' if self._key._is_extended else ''
+        message_key = f"| {extended_key}0x{self._key._scan_code:02X}"
         
         key : Key
         for key in self._key._latched_keys:
-            # if key._virtual_code > 0:
-            #     message_key += f"|{key._virtual_code:x}"
-            # else:
-            message_key += f"|{key._scan_code:x}{1 if key._is_extended else 0}"
+            extended_key = '0x0E ' if key._is_extended else ''
+            message_key += f"|{extended_key}0x{key._scan_code:02X}"
         
         self._message_key = message_key
     
@@ -254,6 +253,10 @@ class KeyboardInputItem(AbstractInputItem):
     def name(self):
         ''' display name - can be a compound key '''
         return self._display_name
+    
+    @property
+    def display_name_scan(self) -> str:
+        return f"{self._display_name} {self.message_key}"
     
     def duplicate(self) -> KeyboardInputItem:
         ''' duplicates this object '''
@@ -610,11 +613,11 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     
 
     def _update_input_widget(self, input_widget, container_widget):
-        ''' called when the widget has to update itself on a data change '''
+        ''' called when the keyboard input widget has to update itself on a data change '''
         data = input_widget.identifier.input_id
         input_widget.setTitle(data.title_name)
-        input_widget.setInputDescription(data.display_name)
-        input_widget.display_name = data.display_name
+        input_widget.setInputDescription(data.display_name_scan)
+        input_widget.display_name = data.display_name_scan
         
         input_widget.setToolTip(data.display_tooltip)
         if data.has_mouse:

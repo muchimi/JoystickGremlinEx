@@ -79,8 +79,8 @@ class ProfileOptionsUi(QtWidgets.QDialog):
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
 
-        self.numlock_widget = QtWidgets.QCheckBox("Force numlock off on profile start")
-        self.numlock_widget.setToolTip("When enabled, the numlock key will be turned off when the profile (re)activates - this avoids issue with keylatching for the numeric keypad")
+        self.numlock_widget = QtWidgets.QCheckBox("Force numlock off on profile start (Profile)")
+        self.numlock_widget.setToolTip("When enabled, the numlock key will be turned off when the profile (re)activates - this avoids issue with keylatching for the numeric keypad.<br>This setting can be overriden by the global numlock configuration on the main options page.")
         self.numlock_widget.setChecked(self.profile.get_force_numlock())
         self.numlock_widget.clicked.connect(self._numlock_force_cb)
 
@@ -337,6 +337,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.runtime_ignore_device_change.clicked.connect(self._runtime_ignore_device_change)
 
 
+
         # Start minimized option
         self.start_minimized = QtWidgets.QCheckBox(
             "Start Joystick Gremlin Ex minimized"
@@ -414,6 +415,12 @@ class OptionsUi(ui_common.BaseDialogUi):
                 row +=1
             self._verbose_mode_widgets[mode] = widget
 
+
+        # global numlock
+        self.numlock_enabled = QtWidgets.QCheckBox("Force Numlock Off (global)")
+        self.numlock_enabled.clicked.connect(self._numlock_off)
+        self.numlock_enabled.setChecked(self.config.numlock_off)
+        self.numlock_enabled.setToolTip("When set, numlock will be turned off whenever a profile starts unless that profile has its own setting")
 
 
         # midi enabled
@@ -595,6 +602,9 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.column_layout.addWidget(self.start_minimized, row, col)
         row+=1
         self.column_layout.addWidget(self.start_with_windows, row, col)
+        row+=1
+        self.column_layout.addWidget(self.numlock_enabled, row, col)
+        
 
 
         # column 2
@@ -1047,6 +1057,10 @@ This setting is also available on a profile by profile basis on the profile tab,
         self.config.verbose_set_mode(mode, is_checked)
 
     @QtCore.Slot(bool)
+    def _numlock_off(self, checked):
+        self.config.numlock_off = checked
+
+    @QtCore.Slot(bool)
     def _midi_enabled(self, checked):
         self.config.midi_enabled = checked
         self._reload_needed = True
@@ -1056,6 +1070,7 @@ This setting is also available on a profile by profile basis on the profile tab,
         self.config.osc_enabled = checked
         self.osc_port.setEnabled(checked)
         self._reload_needed = True
+
 
 
     def _osc_port(self):

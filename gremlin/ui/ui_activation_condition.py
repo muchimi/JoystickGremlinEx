@@ -19,6 +19,7 @@
 from PySide6 import QtCore, QtGui, QtWidgets
 
 import logging
+import gremlin.config
 from gremlin.input_types import InputType
 from gremlin import hints, input_devices, macro, util
 from gremlin.util import load_icon
@@ -53,6 +54,7 @@ class ActivationConditionWidget(QtWidgets.QWidget):
         super().__init__(parent)
         self.profile_data = profile_data
         self.main_layout = QtWidgets.QVBoxLayout(self)
+        self.main_layout.setContentsMargins(0,0,0,0)
         self._create_ui()
 
     def _create_ui(self):
@@ -63,65 +65,43 @@ class ActivationConditionWidget(QtWidgets.QWidget):
 
         try:
             ActivationConditionWidget.locked = True
-            self.granularity_selector = ui_common.QComboBox()
-            self.granularity_selector.addItem("None")
-            self.granularity_selector.addItem("Action")
-            self.granularity_selector.addItem("Container")
-            self.granularity_selector.setCurrentIndex(
-                ActivationConditionWidget.activation_type_to_index[
-                    self.profile_data.activation_condition_type
-                ]
-            )
-            self.granularity_selector.currentIndexChanged.connect(
-                self._granularity_changed_cb
-            )
 
             self.help_button = QtWidgets.QPushButton(load_icon("gfx/help.png"), "")
             self.help_button.clicked.connect(self._show_hint)
 
             self.controls_layout = QtWidgets.QHBoxLayout()
-            self.controls_layout.addWidget(QtWidgets.QLabel("Apply conditions to"))
-            self.controls_layout.addWidget(self.granularity_selector)
+            self.controls_layout.setContentsMargins(0,0,0,0)
+            self.controls_layout.addWidget(QtWidgets.QLabel("Conditions Definitions:"))
             self.controls_layout.addWidget(self.help_button)
 
             self.controls_layout.addStretch()
 
             self.main_layout.addLayout(self.controls_layout)
-            if self.profile_data.activation_condition_type == "container":
-                self.condition_model = ConditionModel(self.profile_data, self.profile_data.activation_condition)
-                self.condition_view = ConditionView()
-                self.condition_view.set_model(self.condition_model)
-                self.condition_view.redraw()
 
-                self.main_layout.addWidget(self.condition_view)
+            # conditions for the container
 
-            self.main_layout.addStretch()
+            
+            self.container_condition_frame_widget = QtWidgets.QFrame()
+            self.container_condition_frame_widget.setContentsMargins(0,0,0,0)
+            self.container_condition_frame_layout = QtWidgets.QVBoxLayout(self.container_condition_frame_widget)
+            self.container_condition_frame_widget.setFrameShape(QtWidgets.QFrame.Shape.Box)
+            self.container_condition_frame_layout.addWidget(QtWidgets.QLabel(f"Container conditions ({self.profile_data.condition_count} found):"))
+            self.container_condition_model = ConditionModel(self.profile_data, self.profile_data.activation_container_condition)
+            self.container_condition_view = ConditionView()
+            self.container_condition_view.set_model(self.container_condition_model)
+            
+            self.container_condition_frame_layout.addWidget(self.container_condition_view)
+            self.container_condition_frame_layout.addStretch()
+
+           
+            self.main_layout.addWidget(self.container_condition_frame_widget)
+
+            self.container_condition_view.redraw()
+  
+
+            
         finally:
             ActivationConditionWidget.locked = False
-
-    def _granularity_changed_cb(self, index):
-        """Updates whether conditions are on actions or containers.
-
-        :param index the entry of the selection box
-        """
-        from gremlin.base_classes import ActivationCondition, ActivationRule
-        index_to_type = {
-            0: None,
-            1: "action",
-            2: "container"
-        }
-        self.profile_data.activation_condition_type = index_to_type[index]
-
-        if self.profile_data.activation_condition_type == "container":
-            self.profile_data.activation_condition = \
-                ActivationCondition(
-                    [],
-                    ActivationRule.All
-                )
-        else:
-            self.profile_data.activation_condition = None
-
-        self.activation_condition_modified.emit()
 
     def _show_hint(self, state):
         """Shows a help message.
@@ -898,6 +878,12 @@ class ConditionView(ui_common.AbstractView):
         self.condition_selector.addItem("Joystick Condition")
         self.condition_selector.addItem("vJoy Condition")
         self.condition_selector.addItem("Action Condition")
+        config = gremlin.config.Configuration()
+        last_selector = config.condition_selector
+        index = self.condition_selector.findText(last_selector)
+        if index != -1:
+            self.condition_selector.setCurrentIndex(index)
+        self.condition_selector.currentIndexChanged.connect(self._change_condition_selector)
         self.condition_add_button = QtWidgets.QPushButton("Add")
         self.condition_add_button.clicked.connect(self._add_condition)
         self.controls_layout.addWidget(self.condition_selector)
@@ -906,6 +892,11 @@ class ConditionView(ui_common.AbstractView):
         self.help_button = QtWidgets.QPushButton(load_icon("gfx/help.png"), "")
         self.help_button.clicked.connect(self._show_hint)
         self.controls_layout.addWidget(self.help_button)
+
+    @QtCore.Slot()
+    def _change_condition_selector(self):
+        config = gremlin.config.Configuration().config
+        config.condition_selector = self.condition_selector.currentText()
 
     def redraw(self):
         """Redraws the entire view."""

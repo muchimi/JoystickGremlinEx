@@ -131,7 +131,7 @@ class HatButtonsContainerWidget(AbstractContainerWidget):
         self.action_layout.addStretch()
 
     def _create_condition_ui(self):
-        if self.profile_data.activation_condition_type != "action":
+        if not self.profile_data.has_action_conditions:
             return
 
         lookup = _four_lookup
@@ -148,7 +148,7 @@ class HatButtonsContainerWidget(AbstractContainerWidget):
             widget = self._create_action_set_widget(
                 action_set,
                 names[i],
-                gremlin.ui.ui_common.ContainerViewTypes.Condition
+                gremlin.ui.ui_common.ContainerViewTypes.Conditions
             )
             self.activation_condition_layout.addWidget(widget)
             widget.redraw()
@@ -220,7 +220,7 @@ class HatButtonsContainerWidget(AbstractContainerWidget):
             self._create_action_ui()
 
 
-class HatButtonsContainerFunctor(gremlin.base_classes.AbstractFunctor):
+class HatButtonsContainerFunctor(gremlin.base_conditions.AbstractFunctor):
 
     """Executes the contents of the associated basic container.
 
@@ -297,8 +297,8 @@ class HatButtonsContainer(AbstractContainer):
             basic_container = BasicContainer(self)
             basic_container.action_sets = [action_set]
             basic_container.activation_condition = self.activation_condition
-            basic_container.activation_condition_type = \
-                self.activation_condition_type
+            basic_container.activation_container_condition = self.activation_container_condition
+            
 
             # Callback reacting to virtual button events
             callbacks.append(gremlin.base_profile.CallbackData(

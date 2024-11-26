@@ -1578,3 +1578,24 @@ class Configuration:
     def convert_vjoy_remap(self, value: bool):
         self._data["convert_vjoy_remap"] = value
         self.save()   
+
+
+    @property
+    def numlock_off(self) -> bool:
+        ''' force numlock off - global setting '''
+        return self._data.get("numlock_off", True)
+    
+    @numlock_off.setter
+    def numlock_off(self, value: bool):
+        self._data["numlock_off"] = value
+        self.save()
+
+    @property
+    def condition_selector(self) -> str:
+        ''' last selected condition selector '''
+        return self._data.get("condition_selector","Joystick Condition")
+    
+    @condition_selector.setter
+    def condition_selector(self, value: str):
+        self._data["condition_selector"] = value
+        self.save()

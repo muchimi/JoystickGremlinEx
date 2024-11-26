@@ -185,7 +185,17 @@ Joystick Gremlin EX
 <!-- TOC --><a name="134015ex-pre-release"></a>
 
 
-## 13.40.16ex (pre-release)  
+## 13.40.16ex (pre-release)
+### (m35)
+- Improved: Condition processing for containers and actions are now cumulative, meaning that each container has a set of conditions for the whole container, and another concurrent set for each action in the container to toggle each one individually.  If a condition on a container fails, the whole container is disabled, regardless of the individual conditions on actions.
+- Improved: Condition logic
+- New: Global numlock off startup state option.  This option, when set, overrides the per profile numlock setting.  In most cases, this option should be on to avoid problems with keyboard output using numlock. 
+- Fix: Keyboard input: Arrows keys no longer get translated to Numpad arrow keys
+- API: reworked the container and actions conditions API.
+
+### (m34)
+- Unreleased test version
+
 ### (m33)
 - New: Map to vjoy, hat to button mode has a new sticky option.  When enabled and the position mapping is in the hold mode, any pressed hat positions will "stick" until the hat is returned to center, and when disabled, only the current hat position is pressed.   This mode is only relevant when in hold mode, it has no meaning in the pulse mode for obvious reasons.
 - Fix: Tempo/TempoEx/Chain/Switch/Button did not support hats as input

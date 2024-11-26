@@ -177,7 +177,6 @@ class AbstractExecutionGraph(metaclass=ABCMeta):
         self.functors = []
         self.transitions = {}
         self.current_index = 0
-
         self._build_graph(instance)
 
     def process_event(self, event, value):
@@ -194,24 +193,54 @@ class AbstractExecutionGraph(metaclass=ABCMeta):
         # a "release" event is sent.
         process_again = False
 
-        while self.current_index is not None and len(self.functors) > 0:
-            functor = self.functors[self.current_index]
-            if isinstance(functor, gremlin.actions.ActivationCondition):
-                result = functor.process_event(event, value)    
-                #print (f"condition test: {result}")
-                if not result:
-                    # condition is not met
-                    # print ("Condition failed")
-                    return True
+        
+        verbose = gremlin.config.Configuration().verbose_mode_inputs
+        #verbose = True
+        syslog = logging.getLogger("system")
+        
+        if verbose: syslog.info (f"Execution plan:")
+        functor_names = []
+        for index, functor in enumerate(self.functors):
+            functor_names.append(type(functor).__name__)
+            if hasattr(functor, "condition_name"):
+                condition_name = functor.condition_name()
             else:
+                condition_name = ""
+            if verbose: syslog.info(f"\t{index} -> {functor_names[index]} {condition_name}")
+        
+        if verbose:
+            # output the transition plan
+            syslog.info("Transition plan:")
+            for key, next_index in self.transitions.items():
+                syslog.info(f"\t{key} -> {next_index}")
+        
+
+        if verbose: syslog.info (f"Execution start:")
+        while self.current_index is not None and len(self.functors) > 0:
+            index = self.current_index
+            functor = self.functors[index]
+            if isinstance(functor, gremlin.actions.ActivationCondition):
+                if verbose: syslog.info(f"\t\tIndex {index} -> executing condition {functor_names[index]} {functor.condition_name()}")
                 result = functor.process_event(event, value)
+                if verbose: syslog.info (f"\t\t\t{index} -> condition result: {result}")
                 if result is None or not result:
-                    logging.getLogger("system").warning(f"Process event returned no data or FALSE - functor: {type(functor).__name__}")
+                    # condition is not met
+                    if verbose: syslog.info (f"\t\t\t{index} -> condition failed")
+                    # get the next item
+            else:
+                if verbose: syslog.info(f"\t\t{index} -> executing action {functor_names[index]}")
+                result = functor.process_event(event, value)
+                if verbose: syslog.info (f"\t\t\t{index} -> action result: {result}")
+                if result is None or not result:
+                    return False
+                #     logging.getLogger("system").warning(f"Process event returned no data or FALSE - functor: {type(functor).__name__}")
 
                 if isinstance(functor, gremlin.actions.AxisButton):
                     process_again = functor.forced_activation
 
-            self.current_index = self.transitions.get((self.current_index, result),None)
+            self.current_index = self.transitions.get((index, result),None)
+            if verbose: syslog.info (f"\t\tNext step: {(index, result)} -> {self.current_index}")
+
         self.current_index = 0
 
         if process_again:
@@ -227,7 +256,28 @@ class AbstractExecutionGraph(metaclass=ABCMeta):
         """
         pass
 
-    def _create_activation_condition(self, activation_condition):
+    def _convert_condition(self, condition):
+        ''' converts a base condition to an action condition '''
+        if isinstance(condition, gremlin.base_conditions.KeyboardCondition):
+                return gremlin.actions.KeyboardCondition(
+                        condition.scan_code,
+                        condition.is_extended,
+                        condition.comparison
+                    )
+                
+        elif isinstance(condition, gremlin.base_conditions.JoystickCondition):
+            return gremlin.actions.JoystickCondition(condition)
+            
+        elif isinstance(condition, gremlin.base_conditions.VJoyCondition):
+            return gremlin.actions.VJoyCondition(condition)
+            
+        elif isinstance(condition, gremlin.base_conditions.InputActionCondition):
+            return gremlin.actions.InputActionCondition(condition.comparison)
+        
+        assert False, f"Invalid base condition to convert: {type(condition).__name__}"
+        
+
+    def _create_activation_condition(self, activation_condition, target):
         """Creates activation condition objects base on the given data.
 
         :param activation_condition data about activation condition to be
@@ -235,32 +285,16 @@ class AbstractExecutionGraph(metaclass=ABCMeta):
         """
         conditions = []
         for condition in activation_condition.conditions:
-            if isinstance(condition, gremlin.base_conditions.KeyboardCondition):
-                conditions.append(
-                    gremlin.actions.KeyboardCondition(
-                        condition.scan_code,
-                        condition.is_extended,
-                        condition.comparison
-                    )
-                )
-            elif isinstance(condition, gremlin.base_conditions.JoystickCondition):
-                conditions.append(
-                    gremlin.actions.JoystickCondition(condition)
-                )
-            elif isinstance(condition, gremlin.base_conditions.VJoyCondition):
-                conditions.append(
-                    gremlin.actions.VJoyCondition(condition)
-                )
-            elif isinstance(condition, gremlin.base_conditions.InputActionCondition):
-                conditions.append(
-                    gremlin.actions.InputActionCondition(condition.comparison)
-                )
+            if isinstance(condition, gremlin.base_conditions.ActivationCondition):
+                for sub_condition in condition.conditions:
+                    conditions.append(self._convert_condition(sub_condition))
             else:
-                raise gremlin.error.GremlinError("Invalid condition provided")
+                conditions.append(self._convert_condition(condition))
 
         return gremlin.actions.ActivationCondition(
             conditions,
-            activation_condition.rule
+            activation_condition.rule,
+            target
         )
 
     def _contains_input_action_condition(self, activation_condition):
@@ -286,9 +320,9 @@ class AbstractExecutionGraph(metaclass=ABCMeta):
         seq_count = len(sequence)
         self.transitions = {}
         for i, seq in enumerate(sequence):
-            if seq == "Condition":
+            if seq != "Action":
                 # On success, transition to the next node of any type in line
-                self.transitions[(i, True)] = i+1
+                self.transitions[(i, True)] = i+1 if i+1 < seq_count else None
                 offset = i + 1
                 # On failure, transition to the condition node after the
                 # next action node
@@ -301,8 +335,9 @@ class AbstractExecutionGraph(metaclass=ABCMeta):
             elif seq == "Action" and i+1 < seq_count:
                 # Transition to the next node irrespective of failure or success
                 self.transitions[(i, True)] = i+1
-                self.transitions[(i, False)] = i + 1
+                self.transitions[(i, False)] = i+1
 
+        
 
 class ContainerExecutionGraph(AbstractExecutionGraph):
 
@@ -322,7 +357,12 @@ class ContainerExecutionGraph(AbstractExecutionGraph):
 
         :param container data to use in order to generate the graph
         """
+
+
+        verbose = gremlin.config.Configuration().verbose_mode_details
+
         sequence = []
+
 
         # Add virtual button transform as the first functor if present
         # if container.virtual_button:
@@ -330,14 +370,16 @@ class ContainerExecutionGraph(AbstractExecutionGraph):
         #     sequence.append("Condition")
 
         # If container based conditions exist add them before any actions
-        if container.activation_condition_type == "container":
-            self.functors.append(
-                self._create_activation_condition(container.activation_condition)
-            )
-            sequence.append("Condition")
+        if container.has_conditions: 
+            self.functors.append(self._create_activation_condition(container.activation_container_condition, container))
+            sequence.append("ContainerCondition")
+
+        # if container.has_action_conditions:
+        #     self.functors.append(self._create_activation_condition(container.activation_condition, container))
+        #     sequence.append("ActionCondition")
 
         functor = container.functor(container)
-        verbose = gremlin.config.Configuration().verbose_mode_details
+        
         if verbose:
             logging.getLogger("system").info(f"Enable container functor: {type(functor).__name__}")
 
@@ -355,8 +397,6 @@ class ContainerExecutionGraph(AbstractExecutionGraph):
                 )
                 eh.add_latched_functor(device_guid, mode, event, functor)
                 
-        
-
         container_plugins = gremlin.plugin_manager.ContainerPlugins()
         container_plugins.register_functor(functor)
         self.functors.append(functor)
@@ -364,7 +404,7 @@ class ContainerExecutionGraph(AbstractExecutionGraph):
         sequence.append("Action")
 
         self._create_transitions(sequence)
-
+        
 
 class ActionSetExecutionGraph(AbstractExecutionGraph):
 
@@ -398,14 +438,7 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
 
         sequence = []
 
-        condition_type = action_set[0].parent.activation_condition_type
         add_default_activation = True
-        if condition_type is None:
-            add_default_activation = True
-        elif condition_type == "container":
-            add_default_activation = not self._contains_input_action_condition(
-                action_set[0].parent.activation_condition
-            )
 
         # Reorder action set entries such that if any remap action is
         # present it is executed last (after a curving action for example) (unless it's a mode switch action - mode switching must happen last because it changes the action list)
@@ -439,15 +472,14 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
         # Create functors
         for action in ordered_action_set:
             # Create conditions for each action if needed
-            if action.activation_condition is not None:
-                # Only add a condition if we truly have conditions
-                if len(action.activation_condition.conditions) > 0:
-                    self.functors.append(
-                        self._create_activation_condition(
-                            action.activation_condition
-                        )
+            if action.has_conditions:
+                self.functors.append(
+                    self._create_activation_condition(
+                        action.activation_condition,
+                        action
                     )
-                    sequence.append("Condition")
+                )
+                sequence.append("Condition")
 
             # Create default activation condition if needed
             has_input_action = self._contains_input_action_condition(
@@ -464,12 +496,12 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
                     gremlin.base_conditions.ActivationRule.All
                 )
                 self.functors.append(
-                    self._create_activation_condition(activation_condition)
+                    self._create_activation_condition(activation_condition, action)
                 )
                 sequence.append("Condition")
 
             # Create action functor
-            functor : gremlin.base_classes.AbstractFunctor = action.functor(action)
+            functor : gremlin.base_conditions.AbstractFunctor = action.functor(action)
             extra_inputs = functor.latch_extra_inputs()
             if extra_inputs:
                 # register the extra inputs for this functor

@@ -642,6 +642,7 @@ class ActionContainerView(gremlin.ui.ui_common.AbstractView):
                         widget.container_modified.connect(self.model.data_changed.emit)
                         self.scroll_layout.addWidget(widget)
                         self._widgets.append(widget)
+                        
                 else:
                     input_type = self.model.input_type # InputType.JoystickAxis
                     label = QtWidgets.QLabel(f"Please add an action or container for {self.model.item_data.display_name} ({InputType.to_display_name(input_type)})")
@@ -650,6 +651,7 @@ class ActionContainerView(gremlin.ui.ui_common.AbstractView):
                 self.scroll_layout.addStretch(1)
             finally:
                 self.redraw_lock = False
+               
         else:
             logging.getLogger("system").error("re-entry code detected")
 

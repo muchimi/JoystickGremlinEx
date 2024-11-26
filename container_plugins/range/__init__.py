@@ -283,12 +283,12 @@ class RangeContainerWidget(AbstractContainerWidget):
             self.profile_data.any_change_direction = delta
 
     def _create_condition_ui(self):
-        if self.profile_data.activation_condition_type == "action":
+        if self.profile_data.has_action_conditions:
             for i, action in enumerate(self.profile_data.action_sets):
                 widget = self._create_action_set_widget(
                     self.profile_data.action_sets[i],
                     f"Action {i:d}",
-                    gremlin.ui.ui_common.ContainerViewTypes.Condition
+                    gremlin.ui.ui_common.ContainerViewTypes.Conditions
                 )
                 self.activation_condition_layout.addWidget(widget)
                 widget.redraw()
@@ -445,7 +445,7 @@ class RangeReleaseTrigger():
     def __hash__(self):
         return hash(self.id)
 
-class RangeContainerFunctor(gremlin.base_classes.AbstractFunctor):
+class RangeContainerFunctor(gremlin.base_conditions.AbstractFunctor):
 
     """Executes the contents of the associated range container."""
 

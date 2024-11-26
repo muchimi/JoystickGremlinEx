@@ -23,6 +23,7 @@ from lxml import etree as ElementTree
 
 from PySide6 import QtWidgets, QtCore, QtGui
 import gremlin.actions
+import gremlin.base_conditions
 import gremlin.config
 import gremlin.event_handler
 import gremlin.input_types
@@ -2040,7 +2041,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 
 
-class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
+class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
     """Executes a remap action when called."""
 
@@ -2460,25 +2461,7 @@ class VJoyRemapFunctor(gremlin.base_classes.AbstractFunctor):
             except gremlin.error.VJoyError:
                 self.thread_running = False
 
-    def _check_for_auto_release(self, action):
-        activation_condition = None
-        if action.parent.activation_condition:
-            activation_condition = action.parent.activation_condition
-        elif action.activation_condition:
-            activation_condition = action.activation_condition
 
-        # If an input action activation condition is present the auto release
-        # may have to be disabled
-        needs_auto_release = True
-        if activation_condition:
-            for condition in activation_condition.conditions:
-                if isinstance(condition, InputActionCondition):
-                    # Remap like actions typically have an always activation
-                    # condition associated with them
-                    if condition.comparison != "always":
-                        needs_auto_release = False
-
-        return needs_auto_release
 
 
 

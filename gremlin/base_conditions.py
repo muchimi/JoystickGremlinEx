@@ -124,6 +124,9 @@ class KeyboardCondition(AbstractCondition):
         return super().is_valid() and \
             self.scan_code is not None and \
             self.is_extended is not None
+    
+
+
 
 
 class JoystickCondition(AbstractCondition):
@@ -182,6 +185,8 @@ class JoystickCondition(AbstractCondition):
         :return True if the condition is properly specified, False otherwise
         """
         return super().is_valid() and self.input_type is not None
+    
+  
 
 
 class VJoyCondition(AbstractCondition):
@@ -244,6 +249,7 @@ class VJoyCondition(AbstractCondition):
         """
         return super().is_valid() and self.input_type is not None
 
+ 
 
 
 class InputActionCondition(AbstractCondition):
@@ -276,10 +282,8 @@ class InputActionCondition(AbstractCondition):
         node.set("input", "action")
         node.set("comparison", str(self.comparison))
         return node
-    
 
-    
-
+   
 class AbstractFunctor(metaclass=ABCMeta):
 
     """Abstract base class defining the interface for functor like classes.
@@ -328,6 +332,27 @@ class AbstractFunctor(metaclass=ABCMeta):
         ''' returns any extra inputs as a list of (device_guid, input_id) to latch to this action (trigger on change) '''
         return []
 
+
+    def _check_for_auto_release(self, action):
+        ''' auto release check for functors '''
+        activation_condition = None
+        if action.parent.activation_condition:
+            activation_condition = action.parent.activation_condition
+        elif action.activation_condition:
+            activation_condition = action.activation_condition
+
+        # If an input action activation condition is present the auto release
+        # may have to be disabled
+        needs_auto_release = True
+        if activation_condition:
+            for condition in activation_condition.conditions:
+                if isinstance(condition, InputActionCondition):
+                    # Remap like actions typically have an always activation
+                    # condition associated with them
+                    if condition.comparison != "always":
+                        needs_auto_release = False
+
+        return needs_auto_release
 
 
 class AbstractContainerActionFunctor(AbstractFunctor):

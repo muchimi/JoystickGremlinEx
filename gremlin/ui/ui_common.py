@@ -55,7 +55,7 @@ class ContainerViewTypes(enum.Enum):
     """Enumeration of view types used by containers."""
 
     Action = 1
-    Condition = 2
+    Conditions = 2
     VirtualButton = 3
 
     @staticmethod
@@ -79,14 +79,14 @@ class ContainerViewTypes(enum.Enum):
 
 _ContainerView_to_enum_lookup = {
     "action": ContainerViewTypes.Action,
-    "condition": ContainerViewTypes.Condition,
+    "conditions": ContainerViewTypes.Conditions,
     "virtual button": ContainerViewTypes.VirtualButton
 }
 
 
 _ContainerView_to_string_lookup = {
     ContainerViewTypes.Action: "Action",
-    ContainerViewTypes.Condition: "Condition",
+    ContainerViewTypes.Conditions: "Conditions",
     ContainerViewTypes.VirtualButton: "Virtual Button"
 }
 
@@ -1497,6 +1497,8 @@ def clear_layout(layout):
             clear_layout(child.layout())
         elif child.widget():
             widget = child.widget()
+            if hasattr(widget,"_cleanup_ui"):
+                widget._cleanup_ui()
             widget.hide()
             widget.deleteLater()
         layout.removeItem(child)

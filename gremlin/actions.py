@@ -21,9 +21,11 @@ import logging
 
 import dinput
 
+import gremlin.base_profile
 from gremlin.input_types import InputType
 #from . import base_classes, event_handler, fsm, input_devices, joystick_handling, macro, util
 from gremlin.base_conditions import ActivationRule
+import gremlin.input_types
 import gremlin.joystick_handling
 
 import gremlin.event_handler
@@ -120,10 +122,17 @@ class ActivationCondition:
         ActivationRule.Any: smart_any
     }
 
-    def __init__(self, conditions, rule):
+    def __init__(self, conditions, rule, target):
         self._conditions = conditions
         self._rule = rule
         self.enabled = True # always enabled
+        self.target = target # the target this condition applies to (container or action)
+        
+    @property
+    def is_container(self) -> bool:
+        if self.target:
+            return isinstance(self.target, gremlin.base_profile.AbstractContainer)
+        return False
 
     def process_event(self, event, value):
         """Returns whether or not a condition is satisfied, i.e. true.
@@ -136,6 +145,14 @@ class ActivationCondition:
             [partial(c, event, value) for c in self._conditions]
         )
 
+
+    def condition_name(self)->str:
+        ''' returns a condition name for diagnostics purposes '''
+        rule_name = "all" if self._rule == ActivationRule.All else "any"
+        condition_name = ""
+        for index, c in enumerate(self._conditions):
+            condition_name += f"[C{index}] {c.condition_name()} "
+        return f"Rule: {rule_name} Is container: {self.is_container} Conditions: {condition_name} "
 
 class AbstractCondition(metaclass=ABCMeta):
 
@@ -162,6 +179,9 @@ class AbstractCondition(metaclass=ABCMeta):
         """
         pass
 
+    def condition_name(self)->str:
+        return "Condition not set"
+    
 
 class KeyboardCondition(AbstractCondition):
 
@@ -202,6 +222,10 @@ class KeyboardCondition(AbstractCondition):
             return key_pressed
         else:
             return not key_pressed
+        
+        
+    def condition_name(self)->str:
+        return f"KeyboardCondition {self.input_item.display_name}"
 
 
 class JoystickCondition(AbstractCondition):
@@ -261,6 +285,19 @@ class JoystickCondition(AbstractCondition):
                 f"Invalid input_type {self.input_type} received"
             )
             return False
+        
+    def condition_name(self)->str:
+        info = gremlin.joystick_handling.device_info_from_guid(self.device_guid)
+        match self.input_type:
+            case InputType.JoystickButton:
+                state = gremlin.joystick_handling.get_button(self.device_guid, self.input_id)
+            case InputType.JoystickHat:
+                state = gremlin.joystick_handling.get_hat(self.device_guid, self.input_id)
+            case InputType.JoystickAxis:
+                state = f"{gremlin.joystick_handling.get_axis(self.device_guid, self.input_id):0.3f}"
+            case _:
+                state = "N/A"
+        return f"JoystickCondition: mode: {self.comparison} type: {gremlin.input_types.InputType.to_display_name(self.input_type)} input: {self.input_id} device: {info.name} state: {state} "
 
 
 class VJoyCondition(AbstractCondition):
@@ -329,6 +366,9 @@ class VJoyCondition(AbstractCondition):
             )
             return False
 
+    def condition_name(self)->str:
+        info = gremlin.joystick_handling.device_info_from_guid(self.device_guid)
+        return f"VJoyCondition: mode: {self.comparison} type: {gremlin.input_types.InputType.to_display_name(self.input_type)} input: {self.input_id} device: {info.name} "
 
 class InputActionCondition(AbstractCondition):
 
@@ -361,6 +401,8 @@ class InputActionCondition(AbstractCondition):
         else:
             return False
 
+    def condition_name(self)->str:
+        return f"InputActionCondition: condition: {self.comparison}"
 
 class VirtualButton(metaclass=ABCMeta):
 

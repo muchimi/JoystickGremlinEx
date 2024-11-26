@@ -644,17 +644,21 @@ class EventListener(QtCore.QObject):
 		:param event the keyboard event
 		"""
 		verbose = gremlin.config.Configuration().verbose_mode_keyboard
+		syslog = logging.getLogger("system")
 
 		# verbose = True
 		virtual_code = event.virtual_code
 		key_id = (event.scan_code, event.is_extended)
-		#print (f"recorded key: {key_id} sc: {event.scan_code:X} vk: {virtual_code} (0x{virtual_code:X})")
+		is_pressed = event.is_pressed
+		if verbose:
+			syslog.info(f"Recorded key: {key_id:} sc: {event.scan_code:X} ex: {event.is_extended} vk: {virtual_code} (0x{virtual_code:X}) pressed: {is_pressed}")
 
 		# deal with any code translations needed
 		key_id, virtual_code = gremlin.keyboard.KeyMap.translate(key_id) # modify scan codes if needed
-		#print (f"translated key: {key_id} sc: {event.scan_code:X} vk: {virtual_code} (0x{virtual_code:X})")
+		if verbose:
+			syslog.info(f"Translated key: {key_id:} sc: {event.scan_code:X} ex: {event.is_extended} vk: {virtual_code} (0x{virtual_code:X}) pressed: {is_pressed}")
 
-		is_pressed = event.is_pressed
+		
 		is_repeat = self._keyboard_state.get(key_id) and is_pressed
 
 		if is_repeat:

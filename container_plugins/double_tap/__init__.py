@@ -106,13 +106,13 @@ class DoubleTapContainerWidget(AbstractContainerWidget):
             )
 
     def _create_condition_ui(self):
-        if self.profile_data.activation_condition_type == "action":
+        if self.profile_data.has_action_conditions:
             if self.profile_data.action_sets[0] is not None:
                 self._create_action_widget(
                     0,
                     "Single Tap",
                     self.activation_condition_layout,
-                    gremlin.ui.ui_common.ContainerViewTypes.Condition
+                    gremlin.ui.ui_common.ContainerViewTypes.Conditions
                 )
 
             if self.profile_data.action_sets[1] is not None:
@@ -120,7 +120,7 @@ class DoubleTapContainerWidget(AbstractContainerWidget):
                     1,
                     "Double Tap",
                     self.activation_condition_layout,
-                    gremlin.ui.ui_common.ContainerViewTypes.Condition
+                    gremlin.ui.ui_common.ContainerViewTypes.Conditions
                 )
 
     def _add_action_selector(self, add_action_cb, label, paste_action_cb):
@@ -224,7 +224,7 @@ class DoubleTapContainerWidget(AbstractContainerWidget):
             return "DoubleTap"
 
 
-class DoubleTapContainerFunctor(gremlin.base_classes.AbstractFunctor):
+class DoubleTapContainerFunctor(gremlin.base_conditions.AbstractFunctor):
 
     """Executes the contents of the associated DoubleTap container."""
 

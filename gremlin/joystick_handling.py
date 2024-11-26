@@ -153,7 +153,6 @@ def get_axis(guid, index, normalized = True):
     if normalized:
         return gremlin.util.scale_to_range(value, source_min = -32767, source_max = 32767, target_min = -1, target_max = 1)
 
-
 def get_curved_axis(guid, index):
     ''' returns curved data same as the event handler '''
     eh = gremlin.event_handler.EventListener()
@@ -163,6 +162,10 @@ def get_curved_axis(guid, index):
 def get_hat(guid, index):
     ''' gets the current hat value '''
     return dinput.DILL.get_hat(guid, index)
+
+def get_button(guid, index) -> bool:
+    ''' gets the button pressed state '''
+    return dinput.DILL.get_button(guid, index)
 
     
 

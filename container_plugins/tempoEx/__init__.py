@@ -194,7 +194,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
     
 
     def _create_condition_ui(self):
-        if self.profile_data.activation_condition_type == "action":
+        if self.profile_data.has_action_conditions:
             if self.profile_data.short_action_sets:
                 action_set = self.profile_data.short_action_sets[0]
                 if action_set is not None:
@@ -202,7 +202,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
                         action_set,
                         "Short Press",
                         self.activation_condition_layout,
-                        gremlin.ui.ui_common.ContainerViewTypes.Condition
+                        gremlin.ui.ui_common.ContainerViewTypes.Conditions
                     )
 
             if self.profile_data.long_action_sets:
@@ -212,7 +212,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
                         action_set,
                         "Long Press",
                         self.activation_condition_layout,
-                        gremlin.ui.ui_common.ContainerViewTypes.Condition
+                        gremlin.ui.ui_common.ContainerViewTypes.Conditions
                     )
 
     def _create_action_widget(self, action_set, label, layout, view_type):
@@ -364,7 +364,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
         else:
             return "TempoEx"
 
-class TempoExContainerFunctor(gremlin.base_classes.AbstractFunctor):
+class TempoExContainerFunctor(gremlin.base_conditions.AbstractFunctor):
 
     def __init__(self, container):
         super().__init__(container)
@@ -401,7 +401,7 @@ class TempoExContainerFunctor(gremlin.base_classes.AbstractFunctor):
         # release event. Only for container conditions this is necessary to
         # ensure proper cycling.
         self.switch_on_press = False
-        if container.activation_condition_type == "container":
+        if container.has_conditions:
             for cond in container.activation_condition.conditions:
                 if isinstance(cond, gremlin.base_conditions.InputActionCondition):
                     if cond.comparison == "press":

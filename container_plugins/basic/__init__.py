@@ -69,18 +69,17 @@ class BasicContainerWidget(AbstractContainerWidget):
             self.action_layout.addWidget(action_selector)
 
     def _create_condition_ui(self):
-        if len(self.profile_data.action_sets) > 0 and \
-                self.profile_data.activation_condition_type == "action":
-            assert len(self.profile_data.action_sets) == 1
-
+        if self.profile_data.action_sets:
             widget = self._create_action_set_widget(
                 self.profile_data.action_sets[0],
                 "Basic",
-                gremlin.ui.ui_common.ContainerViewTypes.Condition
+                gremlin.ui.ui_common.ContainerViewTypes.Conditions
             )
             self.activation_condition_layout.addWidget(widget)
             widget.redraw()
             widget.model.data_changed.connect(self.container_modified.emit)
+
+            return widget
 
     def _add_action(self, action_data):
         """Adds a new action to the container.
@@ -208,6 +207,8 @@ class BasicContainer(AbstractContainer):
                 self.action_sets.append([])
                 index = len(self.action_sets) - 1
             self.action_sets[index].append(action)
+
+        self.refresh_conditions()
 
         self.create_or_delete_virtual_button()
 

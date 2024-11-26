@@ -859,7 +859,7 @@ class ActionSetView(ui_common.AbstractView):
                 wrapped_widget.closed.connect(self._create_closed_cb(widget))
                 self.action_layout.addWidget(wrapped_widget)
                 self._widgets.append(widget)
-        elif self.view_type == ui_common.ContainerViewTypes.Condition:
+        elif self.view_type == ui_common.ContainerViewTypes.Conditions:
             for index in range(self.model.rows()):
                 data = self.model.data(index)
                 widget = data.widget(data)
@@ -1626,7 +1626,7 @@ class ConditionStateTracker():
         self._icon_disabled = gremlin.util.load_icon("mdi.record", qta_color="lightgray")
 
     def register(self, input_item, dock_tab : QtWidgets.QTabWidget):
-        
+        ''' registers a condition tracker '''
         device_guid = input_item.device_guid
         input_id = input_item.input_id
         if not device_guid in self.tracker:
@@ -1636,6 +1636,16 @@ class ConditionStateTracker():
         self.tracker[device_guid][input_id] = info
         enabled = info.input_item.hasConditions()
         self.set_condition_tab_state(dock_tab, enabled)
+
+    def unregister(self, input_item):
+        ''' unregisters a condition tracker '''
+        device_guid = input_item.device_guid
+        input_id = input_item.input_id
+        if device_guid in self.tracker:
+            if input_id in self.tracker[device_guid]:
+                del self.tracker[device_guid][input_id]
+
+
 
     @QtCore.Slot(object)
     def _condition_state_changed(self, action_data):
@@ -1654,7 +1664,7 @@ class ConditionStateTracker():
         ''' marks the condition tab used or not '''
         try:
             for i in range(dock_tabs.count()):
-                if dock_tabs.tabText(i) == "Condition":
+                if dock_tabs.tabText(i) == "Conditions":
                     tb = dock_tabs.tabBar()
                     icon = self._icon_enabled if enabled else self._icon_disabled
                     tb.setTabIcon(i, icon)
@@ -1733,8 +1743,10 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         tracker = ConditionStateTracker()
         tracker.register(self.profile_data.input_item, self.dock_tabs)
 
-
- 
+    def _cleanup_ui(self):
+        tracker = ConditionStateTracker()
+        tracker.unregister(self.profile_data.input_item)
+        
 
 
     def _create_action_tab(self):
@@ -1752,29 +1764,36 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
     def _create_activation_condition_tab(self):
         # Create widget to place inside the tab
         import gremlin.ui.ui_activation_condition
-        self.activation_condition_tab_widget = QtWidgets.QWidget()
-        self.activation_condition_layout = QtWidgets.QVBoxLayout(
-            self.activation_condition_tab_widget
-        )
 
-        # Create activation condition UI widget
-        self.activation_condition_widget = \
-            gremlin.ui.ui_activation_condition.ActivationConditionWidget(self.profile_data)
-        self.activation_condition_widget.activation_condition_modified.connect(
-            self.container_modified.emit
-        )
+
+        self.activation_condition_tab_widget = QtWidgets.QWidget()
+        self.activation_condition_tab_layout = QtWidgets.QVBoxLayout(self.activation_condition_tab_widget)
+        #self.activation_condition_tab_widget.setContentsMargins(0,0,0,0)
+        #self.activation_condition_tab_layout.setContentsMargins(0,0,0,0)
+
+        # Create container condition widget
+        self.activation_condition_widget = gremlin.ui.ui_activation_condition.ActivationConditionWidget(self.profile_data)
+        self.activation_condition_widget.activation_condition_modified.connect(self.container_modified.emit)
 
         # Put everything together
-        self.activation_condition_layout.addWidget(
-            self.activation_condition_widget
-        )
-        self.condition_tab_index = self.dock_tabs.addTab(
-            self.activation_condition_tab_widget,
-            "Condition"
-        )
+        self.activation_condition_tab_layout.addWidget(self.activation_condition_widget)
+        self.condition_tab_index = self.dock_tabs.addTab(self.activation_condition_tab_widget,"Conditions")
 
+
+        # conditions for the actions in the container
+        self.action_condition_frame_widget = QtWidgets.QFrame()
+
+        self.action_condition_frame_widget.setFrameShape(QtWidgets.QFrame.Shape.Box)
+        self.activation_condition_layout = QtWidgets.QVBoxLayout(self.action_condition_frame_widget)
+        self.activation_condition_layout.addWidget(QtWidgets.QLabel(f"Action conditions ({self.profile_data.action_condition_count} found):"))
+
+        self.activation_condition_tab_layout.addWidget(self.action_condition_frame_widget)
+        
+        # create the action container widget
+        # widgets are placed in activation_condition_layout
         self._create_condition_ui()
-        self.activation_condition_layout.addStretch(10)
+        self.activation_condition_layout.addStretch()
+        self.activation_condition_tab_layout.addStretch()
 
         
 
@@ -1810,6 +1829,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
             for i in range(self.dock_tabs.count()):
                 if self.dock_tabs.tabText(i) == tab_title:
                     self.dock_tabs.setCurrentIndex(i)
+
         except gremlin.error.GremlinError:
             return
 
@@ -1821,6 +1841,9 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
                    logging.getLogger("system").info(f"Device change begin")
             tab_text = self.dock_tabs.tabText(index)
             self.profile_data.current_view_type = ui_common.ContainerViewTypes.to_enum(tab_text.lower())
+            
+
+
         except gremlin.error.GremlinError:
             return
         finally:
@@ -2283,24 +2306,24 @@ class ConditionActionWrapper(AbstractActionWrapper):
 
         # Setup activation condition UI
         action_data = self.action_widget.action_data
-        if action_data.parent.activation_condition_type == "action":
-            if action_data.activation_condition is None:
-                action_data.activation_condition = \
-                    gremlin.base_classes.ActivationCondition(
-                        [],
-                        gremlin.base_classes.ActivationRule.All
-                    )
+        # if action_data.parent.has_action_conditions:
+        if action_data.activation_condition is None:
+            action_data.activation_condition = \
+                gremlin.base_classes.ActivationCondition(
+                    [],
+                    gremlin.base_classes.ActivationRule.All
+                )
 
-            self.condition_model = ui_activation_condition.ConditionModel(
-                action_data,
-                action_data.activation_condition
-            )
-            self.condition_view = ui_activation_condition.ConditionView()
-            self.condition_view.set_model(self.condition_model)
-            self.condition_view.redraw()
-            self.main_layout.addWidget(self.condition_view)
-        else:
-            action_data.activation_condition = None
+        self.condition_model = ui_activation_condition.ConditionModel(
+            action_data,
+            action_data.activation_condition
+        )
+        self.condition_view = ui_activation_condition.ConditionView()
+        self.condition_view.set_model(self.condition_model)
+        self.condition_view.redraw()
+        self.main_layout.addWidget(self.condition_view)
+        # else:
+        #     action_data.activation_condition = None
 
 
 

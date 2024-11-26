@@ -272,7 +272,7 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             el.icon_changed.emit(event)            
 
 
-class RemapFunctor(gremlin.base_classes.AbstractFunctor):
+class RemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
     """Executes a remap action when called."""
 
@@ -367,25 +367,7 @@ class RemapFunctor(gremlin.base_classes.AbstractFunctor):
             except gremlin.error.VJoyError:
                 self.thread_running = False
 
-    def _check_for_auto_release(self, action):
-        activation_condition = None
-        if action.parent.activation_condition:
-            activation_condition = action.parent.activation_condition
-        elif action.activation_condition:
-            activation_condition = action.activation_condition
-
-        # If an input action activation condition is present the auto release
-        # may have to be disabled
-        needs_auto_release = True
-        if activation_condition:
-            for condition in activation_condition.conditions:
-                if isinstance(condition, InputActionCondition):
-                    # Remap like actions typically have an always activation
-                    # condition associated with them
-                    if condition.comparison != "always":
-                        needs_auto_release = False
-
-        return needs_auto_release
+  
 
 
 class Remap(gremlin.base_profile.AbstractAction):

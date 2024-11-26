@@ -1076,13 +1076,13 @@ class KeyMap:
     _g_translate_map = {
         (0x52,True): ((0x52, False), win32con.VK_NUMPAD0), # make all numpad keys report as numpad
         (0x4F,True): ((0x4F, False), win32con.VK_NUMPAD1),
-        (0x50,True): ((0x50, False), win32con.VK_NUMPAD2),
+        (0x50,True): ((0x50, True), win32con.VK_DOWN),  # down arrow
         (0x51,True): ((0x51, False), win32con.VK_NUMPAD3),
-        (0x4B,True): ((0x4B, False), win32con.VK_NUMPAD4),
+        (0x4B,True): ((0x4B, True), win32con.VK_LEFT), # left arrow
         (0x4C,True): ((0x4C, False), win32con.VK_NUMPAD5),
-        (0x4D,True): ((0x4D, False), win32con.VK_NUMPAD6),
+        (0x4D,True): ((0x4D, True), win32con.VK_RIGHT), # right arrow
         (0x47,True): ((0x47, False), win32con.VK_NUMPAD7),
-        (0x48,True): ((0x48, False), win32con.VK_NUMPAD8),
+        (0x48,True): ((0x48, True), win32con.VK_UP), # up arrow
         (0x49,True): ((0x49, False), win32con.VK_NUMPAD9),
 
         (0x52,False): ((0x52, False), win32con.VK_NUMPAD0), 

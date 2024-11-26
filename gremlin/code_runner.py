@@ -126,11 +126,18 @@ class CodeRunner:
 
         el = gremlin.event_handler.EventListener()
 
-        self.disableUi()
+        config = gremlin.config.Configuration()
 
+        syslog = logging.getLogger("system")
+
+        self.disableUi()
 
         # indicate we're in run mode
         gremlin.shared_state.is_running = True
+
+        # determine numlock state
+        numlock_off = config.numlock_off
+      
 
         # Reset states to their default values
         self._inheritance_tree = inheritance_tree
@@ -394,12 +401,15 @@ class CodeRunner:
                 self.event_handler.process_event
             )
 
-            # set keyboard startup state for numlock
-            if profile.get_force_numlock():
+            # set keyboard startup state for numlock - use global numlock or profile numlock
+            numlock_off = numlock_off or profile.get_force_numlock()
+            
+            if numlock_off:
                 state = gremlin.keyboard.KeyMap.numlock_state()
-                logging.getLogger("system").info(f"Numlock state: {state}")
+                syslog.info(f"Numlock state: {state}")
                 if state:
-                    # toggle the mode off
+                    # toggle numlock off
+                    syslog.info(f"Numlock state: Forcing Off")
                     gremlin.keyboard.KeyMap.toggle_numlock()
                 
             

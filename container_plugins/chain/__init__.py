@@ -79,12 +79,12 @@ class ChainContainerWidget(AbstractContainerWidget):
             widget.model.data_changed.connect(self.container_modified.emit)
 
     def _create_condition_ui(self):
-        if self.profile_data.activation_condition_type == "action":
+        if self.profile_data.has_action_conditions:
             for i, action in enumerate(self.profile_data.action_sets):
                 widget = self._create_action_set_widget(
                     self.profile_data.action_sets[i],
                     f"Action {i:d}",
-                    gremlin.ui.ui_common.ContainerViewTypes.Condition
+                    gremlin.ui.ui_common.ContainerViewTypes.Conditions
                 )
                 self.activation_condition_layout.addWidget(widget)
                 widget.redraw()
@@ -156,7 +156,7 @@ class ChainContainerWidget(AbstractContainerWidget):
         return f"Chain: {" -> ".join([", ".join([a.name for a in actions]) for actions in self.profile_data.action_sets])}"
 
 
-class ChainContainerFunctor(gremlin.base_classes.AbstractFunctor):
+class ChainContainerFunctor(gremlin.base_conditions.AbstractFunctor):
 
     def __init__(self, container):
         super().__init__(container)
@@ -175,11 +175,10 @@ class ChainContainerFunctor(gremlin.base_classes.AbstractFunctor):
         # release event. Only for container conditions this is necessary to
         # ensure proper cycling.
         self.switch_on_press = False
-        if container.activation_condition_type == "container":
-            for cond in container.activation_condition.conditions:
-                if isinstance(cond, gremlin.base_classes.InputActionCondition):
-                    if cond.comparison == "press":
-                        self.switch_on_press = True
+        for cond in container.activation_condition.conditions:
+            if isinstance(cond, gremlin.base_classes.InputActionCondition):
+                if cond.comparison == "press":
+                    self.switch_on_press = True
 
     def process_event(self, event, value):
         if event.event_type == InputType.JoystickHat:

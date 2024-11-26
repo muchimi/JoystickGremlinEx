@@ -340,12 +340,9 @@ class AbstractContainer(ProfileData):
         self.custom_action_sets = False # true if the container uses custom action sets (need a converter to product action_sets)
         self._condition_enabled = True
         self._virtual_button_enabled = True # determines if the callbacks can be virtualized or not - if not - the callback is "raw" to the functor
-        self.activation_condition_type = None
-        self.activation_condition = None
+        self.activation_container_condition = ActivationCondition([],ActivationRule.All) # activation condition that applies to the container
+        self.activation_condition = ActivationCondition([],ActivationRule.All) # activation condition that applies to the actions
         self.virtual_button = None
-        # Storage for the currently active view in the UI
-        # FIXME: This is ugly and shouldn't be done but for now the least
-        #   terrible option
         self.current_view_type = None
 
         # attached hardware device to this container
@@ -364,7 +361,59 @@ class AbstractContainer(ProfileData):
             self.device = None
 
         
+    @property
+    def has_conditions(self):
+        ''' true if the container has conditions defined '''
+        return self.activation_container_condition is not None and len(self.activation_container_condition.conditions) > 0
 
+    @property
+    def has_action_conditions(self):
+        ''' true if the container has action conditions defined '''
+        
+        if self.activation_condition is not None:
+            if len(self.activation_condition.conditions) == 0:
+                self.refresh_conditions()
+            return len(self.activation_condition.conditions) > 0
+        return False
+    
+    def refresh_conditions(self):
+        ''' updates action conditions '''
+        if self.activation_condition is not None:
+            self.activation_condition.conditions = []    
+            for action_set in self.action_sets:
+                action : AbstractAction
+                if action_set:
+                    for action in action_set:
+                        condition = action.activation_condition
+                        if condition:
+                            if not condition in self.activation_condition.conditions:
+                                self.activation_condition.conditions.append(condition)
+
+
+
+                            
+    
+
+    @property
+    def condition_count(self)->int:
+        ''' gets the count of container conditions currently defined '''
+        if self.activation_container_condition is not None:
+            return len(self.activation_container_condition.conditions)
+        return 0
+    
+    @property
+    def action_condition_count(self) -> int:
+        ''' gets the count of action conditions currently defined '''
+        count = 0
+        if self.activation_condition is not None:
+            # check each action set for conditions
+            for action_set in self.action_sets:
+                action : AbstractAction
+                if action_set:
+                    for action in action_set:
+                        if action.activation_condition:
+                            count += len(action.activation_condition.conditions)
+        return count                            
 
     @property
     def id(self):
@@ -498,10 +547,17 @@ class AbstractContainer(ProfileData):
         # Add activation condition if needed
         if self.virtual_button:
             node.append(self.virtual_button.to_xml())
-        if self.activation_condition:
-            condition_node = self.activation_condition.to_xml()
+        
+        # if self.activation_condition:
+        #     condition_node = self.activation_condition.to_xml()
+        #     if condition_node is not None:
+        #         node.append(condition_node)
+
+        if self.activation_container_condition:
+            condition_node = self.activation_container_condition.to_xml()
             if condition_node is not None:
                 node.append(condition_node)
+
         return node
 
     def _parse_action_set_xml(self, node):
@@ -572,13 +628,12 @@ class AbstractContainer(ProfileData):
                 self.virtual_button.from_xml(vb_node)
 
     def _parse_activation_condition_xml(self, node):
-        for child in node.findall("activation-condition"):
-            self.activation_condition_type = "container"
-            self.activation_condition = \
-                ActivationCondition([], ActivationRule.All)
-            cond_node = node.find("activation-condition")
-            if cond_node is not None:
-                self.activation_condition.from_xml(cond_node)
+        ''' load the container condition '''
+        self.activation_container_condition = ActivationCondition([], ActivationRule.All)
+        for _ in node.findall("activation-condition"):
+            condition_node = node.find("activation-condition")
+            if condition_node is not None:
+                self.activation_container_condition.from_xml(condition_node)
 
     def _is_valid(self):
         """Returns whether or not this container is configured properly.
@@ -928,14 +983,8 @@ class InputItem():
     def hasConditions(self):
         ''' true if the input item has conditions defined '''
         for container in self._containers:
-            if container.activation_condition and len(container.activation_condition.conditions) > 0:
+            if container.condition_count or container.action_condition_count:
                 return True
-            for action_set in container.action_sets:
-                action : AbstractAction
-                if action_set:
-                    for action in action_set:
-                        if action.activation_condition and len(action.activation_condition.conditions) > 0:
-                            return True
         return False
 
     def get_valid_container_list(self):
@@ -1278,6 +1327,11 @@ class AbstractAction(ProfileData):
         eh.action_created.emit(self)
         eh.profile_unload.connect(self._cleanup)
         eh.action_delete.connect(self._action_delete)
+
+    @property
+    def has_conditions(self):
+        ''' true if the action has conditions defined '''
+        return self.activation_condition is not None and len(self.activation_condition.conditions) > 0
         
     def _action_delete(self, input_item, container, action):
         if self._id == action._id:
@@ -1369,14 +1423,8 @@ class AbstractAction(ProfileData):
         super().from_xml(node)
 
 
-
-        for child in node.findall("activation-condition"):
-            self.parent.activation_condition_type = "action"
-            self.activation_condition = \
-                ActivationCondition(
-                    [],
-                    ActivationRule.All
-                )
+        self.activation_condition = ActivationCondition([],ActivationRule.All)
+        for _ in node.findall("activation-condition"):
             cond_node = node.find("activation-condition")
             if cond_node is not None:
                 self.activation_condition.from_xml(cond_node)
@@ -1390,7 +1438,8 @@ class AbstractAction(ProfileData):
         :return XML node representing the state of this instance
         """
         node = super().to_xml()
-        if self.activation_condition:
+        if self.has_conditions:
+            # output the conditions
             node.append(self.activation_condition.to_xml())
 
         # output the ID

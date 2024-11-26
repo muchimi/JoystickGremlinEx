@@ -362,6 +362,8 @@ def clear_layout(layout):
         if child.layout():
             clear_layout(child.layout())
         elif child.widget():
+            if hasattr(child,"_cleanup_ui"):
+                child._cleanup_ui()
             child.widget().hide()
             child.widget().deleteLater()
         layout.removeItem(child)
