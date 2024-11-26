@@ -186,6 +186,11 @@ Joystick Gremlin EX
 
 
 ## 13.40.16ex (pre-release)
+### (m36)
+- Improved: Added OSC send capability
+- Improved: Added VJOY output events  
+- New: GremlinEx to OSC vjoy output script user plugin demo
+
 ### (m35)
 - Improved: Condition processing for containers and actions are now cumulative, meaning that each container has a set of conditions for the whole container, and another concurrent set for each action in the container to toggle each one individually.  If a condition on a container fails, the whole container is disabled, regardless of the individual conditions on actions.
 - Improved: Condition logic

@@ -202,6 +202,12 @@ class StateChangeEvent:
 		self.is_remote = is_remote
 		self.is_broadcast_enabled = is_broadcast_enabled
 
+class VjoyEvent:
+	def __init__(self, vjoy_id, input_type : InputType, input_id : int, value):
+		self.vjoy_id = vjoy_id
+		self.input_type = input_type
+		self.input_id = input_id
+		self.value = value
 
 
 
@@ -215,6 +221,8 @@ class EventListener(QtCore.QObject):
 
 	# Signal emitted when joystick events are received
 	joystick_event = QtCore.Signal(Event)
+
+	vjoy_event = QtCore.Signal(VjoyEvent)
 
 	# custom joystick event - this is a code based joystick event 
 	custom_joystick_event = QtCore.Signal(Event)

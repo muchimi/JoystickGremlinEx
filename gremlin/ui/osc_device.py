@@ -57,6 +57,9 @@ from lxml import etree as ElementTree
 
 import enum
 from gremlin.base_classes import AbstractInputItem
+import gremlin.util
+import vjoy
+import vjoy.vjoy
 
   
 
@@ -1546,6 +1549,90 @@ class SimpleUDPClient(UDPClient):
         self.send(msg)
 
 
+class OscClient():
+    def __init__(self):
+        #logging.getLogger("system").info("OSC: server init")
+        self._server = None
+        self._output_port = None
+        self._client = None
+        self._started = False
+
+    def setPort(self, port):
+        self._output_port = port
+
+    def setHost(self, host : str):
+        self._server = host
+
+    
+    def start(self, host_ip = "127.0.0.1", output_port = 8001):
+        '''
+        starts the OSC client to send OSC commands
+        :param host_ip = ip address of server in format xxx.xxx.xxx.xxx
+        :param input_port = input port, numeric, default 8000
+        '''
+        if host_ip:
+            self._server = host_ip
+        if output_port is not None:
+            self._output_port = output_port
+        syslog = logging.getLogger("system")
+        if self._server is not None and self._output_port is not None:
+            self._client = UDPClient(self._server, self._output_port)
+            self._started = True
+            syslog.info("OSC client start")
+        else:
+            syslog.error("Invalid OSC configuration, provide server IP and port #")
+
+    def stop(self):
+        if self._started:
+            self._client = None
+            self._started = False
+            syslog = logging.getLogger("system")
+            syslog.info("OSC client stop")
+        
+
+    def add_arg(self, builder, value):
+        if value is not None:
+            if isinstance(value, float):
+                builder.add_arg(value, OscMessageBuilder.ARG_TYPE_FLOAT)
+            elif isinstance(value, str):
+                builder.add_arg(value, OscMessageBuilder.ARG_TYPE_STRING)
+            elif isinstance(value, int):
+                builder.add_arg(value, OscMessageBuilder.ARG_TYPE_INT)
+            elif isinstance(value, bool):
+                if value:
+                    builder.add_arg(value, OscMessageBuilder.ARG_TYPE_TRUE)
+                else:
+                    builder.add_arg(value, OscMessageBuilder.ARG_TYPE_FALSE)
+            else:
+                syslog = logging.getLogger("system")
+                syslog.warning(f"OSC Argument: don't know how to handle {value} {type(value).__name__}")
+
+
+    def send(self, command : str, v1 = None, v2 = None):
+        ''' sends an osc command
+        
+        :param command : the OSC command to send (string)
+        :param v1 : optional value 1 (type determines what is sent)
+        :param v2 : optional value 2 (type determines what is sent)
+        
+        
+        '''
+        if not self._started:
+            self.start()
+
+        builder = OscMessageBuilder(command)
+        self.add_arg(builder, v1)
+        self.add_arg(builder, v2)
+
+        osc = builder.build()
+        self._send(osc)
+
+    
+    def _send(self, content):
+        self._client.send(content)
+
+
+
 class OscServer():
 
     def thread_loop(self):
@@ -1594,7 +1681,7 @@ class OscServer():
         ''' starts the server on IP and port 
         
         :param host_ip = ip address of server in format xxx.xxx.xxx.xxx
-        :param input_port = input port
+        :param input_port = input port, numeric, default 8000
         :param callback = the callback to call when a message arrives
         
         '''
@@ -1656,6 +1743,7 @@ class OscInterface(QtCore.QObject):
         self._input_port = gremlin.config.Configuration().osc_port
         self._output_port = self._input_port + 1
         self._osc_server = OscServer() # the OSC server
+        self._osc_client = OscClient() # the OSC client
         self.osc_enabled = True # always able to listen to ports
 
         # find our current IP address
@@ -1710,16 +1798,22 @@ class OscInterface(QtCore.QObject):
         # logging.getLogger("system").info(f"OSC: {address}: {args}")
         address = address.lower()
         self.osc_message.emit(address, args)
-     
 
     def start(self):
         ''' starts listening to OSC messages '''
-        logging.getLogger("system").info(f"OSC: starting server with IP: {self._host_ip} port: {self._input_port} output: {self._output_port}")
+        logging.getLogger("system").info(f"OSC: starting with IP: {self._host_ip} port: {self._input_port} output: {self._output_port}")
         self._osc_server.start(self._host_ip, self._input_port, self._osc_message_handler)
+        self._osc_client.start(self._host_ip, self._output_port)
+
 
     def stop(self):
         ''' stops listencing to OSC messages '''
         self._osc_server.stop()
+        self._osc_client.stop()
+
+    def send(self, command : str, v1 = None, v2 = None):
+        ''' send data '''
+        self._osc_client.send(command, v1, v2)
 
 
 

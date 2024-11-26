@@ -440,7 +440,7 @@ class MidiListener(AbortableThread):
         self.callback = callback
 
     def run(self):
-        verbose = gremlin.config.Configuration().verbose
+        verbose = gremlin.config.Configuration().verbose_mode_inputs
         
         try:
             with mido.open_input(self.port_name) as inport:

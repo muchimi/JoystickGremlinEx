@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations
 
 import ctypes
 import enum
@@ -228,6 +229,12 @@ class Axis:
         :param value the position of the axis in the range [-1, 1]
         """
         
+        import gremlin.event_handler
+        from gremlin.input_types import InputType
+
+        eh = gremlin.event_handler.EventListener()
+        event = gremlin.event_handler.VjoyEvent(self.vjoy_id, InputType.JoystickAxis, self.axis_id - 0x30 + 1, value)
+        eh.vjoy_event.emit(event)
 
         self.vjoy_dev.ensure_ownership()
 
@@ -318,6 +325,17 @@ class Button:
         :param is_pressed True if the button is pressed, False otherwise
         """
         assert(isinstance(is_pressed, bool))
+
+        import gremlin.event_handler
+        from gremlin.input_types import InputType
+
+        eh = gremlin.event_handler.EventListener()
+        event = gremlin.event_handler.VjoyEvent(self.vjoy_id, InputType.JoystickButton, self.button_id, is_pressed)
+        eh.vjoy_event.emit(event)
+
+
+
+
         self.vjoy_dev.ensure_ownership()
         self._is_pressed = is_pressed
         if not VJoyInterface.SetBtn(
@@ -442,6 +460,16 @@ class Hat:
 
         :param direction the new direction of the hat
         """
+
+        import gremlin.event_handler
+        from gremlin.input_types import InputType
+
+        eh = gremlin.event_handler.EventListener()
+        event = gremlin.event_handler.VjoyEvent(self.vjoy_id, InputType.JoystickHat, self.hat_id, direction)
+        eh.vjoy_event.emit(event)
+
+
+
         self.vjoy_dev.ensure_ownership()
 
         if self.hat_type == HatType.Discrete:
