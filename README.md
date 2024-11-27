@@ -186,6 +186,9 @@ Joystick Gremlin EX
 
 
 ## 13.40.16ex (pre-release)
+### (m39)
+- Improved: OSC output can send to any IP address (set IP and port in options).  The prior implementation was sending to the local server only.
+
 ### (m38)
 - Fix: removed redundant "force numlock off" check box in profile to process mapping as that option is superfluous.  Each profile can set its own option in the profile config window, or it can be set globally in options.  Those two methods are sufficient to achieve the desired behavior.  
 - Fix: Curves applied to input axes not always loaded post converting to the new curve editor.

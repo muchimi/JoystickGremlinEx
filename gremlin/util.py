@@ -1402,3 +1402,19 @@ def is_binary_string(data):
   if data is None:
       return False
   return isinstance(data, bytes)
+
+
+def getHostIp():
+    ''' gets the current machine's IP address '''
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.settimeout(0)
+    try:
+        s.connect(('10.254.254.254', 1)) # dummy address
+        host_ip = s.getsockname()[0]
+    except Exception:
+        host_ip= '127.0.0.1'
+    finally:
+        s.close()
+
+    return host_ip

@@ -1087,6 +1087,30 @@ class Configuration:
         self._data["osc_port"] = value
         self.save()
 
+    @property
+    def osc_output_port(self):
+        ''' OSC listen port '''
+        port = self._data.get("osc_output_port", 8001)
+        return port
+    @osc_output_port.setter
+    def osc_output_port(self, value):
+        self._data["osc_output_port"] = value
+        self.save()
+    
+
+    @property
+    def osc_host(self):
+        ''' OSC client host (this is the IP the client sends OSC data to)'''
+        host = self._data.get("osc_host", "127.0.0.1")
+        return host
+    
+    @osc_host.setter
+    def osc_host(self, value : str):
+        self._data["osc_host"] = value
+        self.save()
+
+
+
 
     @property
     def show_scancodes(self):

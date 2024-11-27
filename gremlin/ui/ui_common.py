@@ -1815,7 +1815,7 @@ class QDataLineEdit(QtWidgets.QLineEdit):
     def __init__(self, text = None, data = None, parent = None):
         super().__init__(text, parent)
         self._data = data
-        self.setStyleSheet("QLineEdit{border: #8FBC8F;}")
+        #self.setStyleSheet("QLineEdit{border: #8FBC8F;}")
 
     @property
     def data(self):
@@ -1824,6 +1824,15 @@ class QDataLineEdit(QtWidgets.QLineEdit):
     @data.setter
     def data(self, value):
         self._data = value
+
+class QDataIPLineEdit(QDataLineEdit):
+    ''' IP input text box '''
+    def __init__(self, text = None, data = None, parent = None):
+        super().__init__(text, data, parent)
+        regex = r'^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5]).){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$'
+        validator = QtGui.QRegularExpressionValidator(regex)
+        self.setValidator(validator)
+
 
 
 class QDataComboBox(QComboBox):

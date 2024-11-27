@@ -1550,10 +1550,10 @@ class SimpleUDPClient(UDPClient):
 
 
 class OscClient():
-    def __init__(self):
+    def __init__(self, host_ip = "127.0.0.1", output_port = 8001):
         #logging.getLogger("system").info("OSC: server init")
-        self._server = None
-        self._output_port = None
+        self._server = host_ip
+        self._output_port = output_port
         self._client = None
         self._started = False
 
@@ -1564,21 +1564,17 @@ class OscClient():
         self._server = host
 
     
-    def start(self, host_ip = "127.0.0.1", output_port = 8001):
+    def start(self):
         '''
         starts the OSC client to send OSC commands
         :param host_ip = ip address of server in format xxx.xxx.xxx.xxx
         :param input_port = input port, numeric, default 8000
         '''
-        if host_ip:
-            self._server = host_ip
-        if output_port is not None:
-            self._output_port = output_port
+        
         syslog = logging.getLogger("system")
         if self._server is not None and self._output_port is not None:
             self._client = UDPClient(self._server, self._output_port)
             self._started = True
-            syslog.info("OSC client start")
         else:
             syslog.error("Invalid OSC configuration, provide server IP and port #")
 
@@ -1740,10 +1736,13 @@ class OscInterface(QtCore.QObject):
 
         #self._host_ip = "192.168.1.59"
         # host OSC listen port (UDP) - make sure the host's firewall allows that port in
-        self._input_port = gremlin.config.Configuration().osc_port
-        self._output_port = self._input_port + 1
+        config = gremlin.config.Configuration()
+        self._input_port = config.osc_port
+        self._output_port = config.osc_output_port # self._input_port + 1
+        self._target_ip = config.osc_host # the OSC target IP
         self._osc_server = OscServer() # the OSC server
-        self._osc_client = OscClient() # the OSC client
+        self._osc_client = OscClient(self._target_ip, self.output_port) # the OSC client
+
         self.osc_enabled = True # always able to listen to ports
 
         # find our current IP address
@@ -1801,9 +1800,9 @@ class OscInterface(QtCore.QObject):
 
     def start(self):
         ''' starts listening to OSC messages '''
-        logging.getLogger("system").info(f"OSC: starting with IP: {self._host_ip} port: {self._input_port} output: {self._output_port}")
+        logging.getLogger("system").info(f"OSC: starting with IP: {self._host_ip} port: {self._input_port} send host: {self._target_ip} port: {self._output_port}")
         self._osc_server.start(self._host_ip, self._input_port, self._osc_message_handler)
-        self._osc_client.start(self._host_ip, self._output_port)
+        self._osc_client.start()
 
 
     def stop(self):

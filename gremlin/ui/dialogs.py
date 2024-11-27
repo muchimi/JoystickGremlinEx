@@ -436,6 +436,19 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.osc_port.setValue(port)
         self.osc_port.valueChanged.connect(self._osc_port)
 
+        self.osc_ouput_port = QtWidgets.QSpinBox()
+        self.osc_ouput_port.setRange(4096,65535)
+        self.osc_ouput_port.setEnabled(self.config.osc_enabled)
+        port = self.config.osc_output_port
+        self.osc_ouput_port.setValue(port)
+        self.osc_ouput_port.valueChanged.connect(self._osc_output_port)
+
+        self.osc_host = ui_common.QDataIPLineEdit()
+        self.osc_host.setText(self.config.osc_host)
+        self.osc_host.setEnabled(self.config.osc_enabled)
+        self.osc_host.textChanged.connect(self._osc_host)
+
+
 
         # midi enabled
         self.midi_enabled = QtWidgets.QCheckBox("Enable MIDI input")
@@ -637,10 +650,33 @@ class OptionsUi(ui_common.BaseDialogUi):
 
         
         container = QtWidgets.QWidget()
+        container.setContentsMargins(0,0,0,0)
         layout = QtWidgets.QHBoxLayout(container)
+        layout.setContentsMargins(0,0,0,0)
         layout.addWidget(self.osc_enabled)
-        layout.addWidget(QtWidgets.QLabel("Listen port number (outbound is +1)"))
+        host_ip = gremlin.util.getHostIp()
+        server_widget = ui_common.QDataIPLineEdit()
+        server_widget.setText(host_ip)
+        server_widget.setReadOnly(True)
+        w = ui_common.get_text_width("MMM.MMM.MMM.MMM MM")
+        server_widget.setMaximumWidth(w)
+        layout.addWidget(QtWidgets.QLabel(f"OSC Server:"))
+        layout.addWidget(server_widget)
+        layout.addStretch()
+        self.general_layout.addWidget(container)
+
+        container = QtWidgets.QWidget()
+        container.setContentsMargins(0,0,0,0)
+        layout = QtWidgets.QHBoxLayout(container)
+        layout.setContentsMargins(0,0,0,0)
+
+        layout.addWidget(QtWidgets.QLabel("OSC Input port:"))
         layout.addWidget(self.osc_port)
+        layout.addWidget(QtWidgets.QLabel("Output port:"))
+        layout.addWidget(self.osc_ouput_port)
+        layout.addWidget(QtWidgets.QLabel("Output host IP:"))
+        layout.addWidget(self.osc_host)
+        self.osc_host.setMaximumWidth(w)
         layout.addStretch()
         layout.setContentsMargins(0,0,0,0)
         
@@ -1072,9 +1108,17 @@ This setting is also available on a profile by profile basis on the profile tab,
         self._reload_needed = True
 
 
-
+    @QtCore.Slot()
     def _osc_port(self):
         self.config.osc_port = self.osc_port.value()
+
+    @QtCore.Slot()
+    def _osc_output_port(self):
+        self.config.osc_output_port = self.osc_port.value()
+
+    @QtCore.Slot()
+    def _osc_host(self):
+        self.config.osc_host = self.osc_host.text()
 
 
     @QtCore.Slot(bool)
