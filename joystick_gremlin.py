@@ -116,7 +116,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.16ex (m36)"
+APPLICATION_VERSION = "13.40.16ex (m38)"
 
 # the main ui
 ui = None
@@ -2472,6 +2472,11 @@ class GremlinUi(QtWidgets.QMainWindow):
             # trip over insignificant input item additions.
             if profile_updated:
                 new_profile.to_xml(fname)
+
+
+            # ask the UI to update input curve icons
+            el = gremlin.event_handler.EventListener()
+            el.update_input_icons.emit()
 
 
 

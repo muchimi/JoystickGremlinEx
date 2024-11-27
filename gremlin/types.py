@@ -895,7 +895,8 @@ class VerboseMode(IntFlag):
     Mouse = auto() # mouse input
     SimConnect = auto() # simconnect interface
     Details = auto() # user interface details
-    All = Keyboard | Joystick | Inputs | Mouse | Details | SimConnect
+    Condition = auto() # conditions diagnostics
+    All = Keyboard | Joystick | Inputs | Mouse | Details | SimConnect | Condition
 
     def __contains__(self, item):
         return  (self.value & item.value) == item.value

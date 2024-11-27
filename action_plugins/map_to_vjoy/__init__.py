@@ -2321,8 +2321,6 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
             self.hat_position = position
 
         elif self.input_type in VJoyWidget.input_type_buttons:
-
-   
             is_paired = remote_state.paired
             force_remote = event.force_remote or is_paired
             

@@ -284,7 +284,6 @@ class EventListener(QtCore.QObject):
 	# occurs on mode edit/update/delete
 	modes_changed = QtCore.Signal()
 
-
 	# functor enable flag changed
 	action_created = QtCore.Signal(object) # runs when an action is created - object = the object that triggered the event 
 
@@ -305,6 +304,13 @@ class EventListener(QtCore.QObject):
 
 	# called when a condition state changes - used to update the UI
 	condition_state_changed = QtCore.Signal(object) # passes along the action data
+
+	# container deleted 
+	container_delete = QtCore.Signal(object, object) # fires when a container is about to be deleted, passes the input item, container as parameters
+
+	# update input curve icons
+	update_input_icons = QtCore.Signal() # fires when the input curve icons need to be updated
+
 
 	def __init__(self):
 		"""Creates a new instance."""

@@ -895,7 +895,7 @@ class ConditionView(ui_common.AbstractView):
 
     @QtCore.Slot()
     def _change_condition_selector(self):
-        config = gremlin.config.Configuration().config
+        config = gremlin.config.Configuration()
         config.condition_selector = self.condition_selector.currentText()
 
     def redraw(self):

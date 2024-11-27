@@ -1185,9 +1185,29 @@ class InputItemWidget(QtWidgets.QFrame):
         el.action_delete.connect(self._action_deleted_cb)
         el.icon_changed.connect(self._icon_changed_cb)
         el.mapping_changed.connect(self._mapping_changed_cb)
+        el.update_input_icons.connect(self._update_icons)
 
         self._curve_container_widget.setVisible(curve_visible) 
         self.update_display()
+
+
+
+    @QtCore.Slot()
+    def _update_icons(self):
+        ''' update icons'''
+
+        curve_visible = self.data.input_type == InputType.JoystickAxis
+        
+        if self.data.is_curve:
+            self.curve_button_widget.setIcon(self.curve_icon_active)
+            self.clear_curve_widget.setEnabled(True)
+        else:
+            self.curve_button_widget.setIcon(self.curve_icon_inactive)
+            self.clear_curve_widget.setEnabled(False)
+
+        self._curve_container_widget.setVisible(curve_visible)
+
+
 
 
     @QtCore.Slot(object)
@@ -1335,16 +1355,7 @@ class InputItemWidget(QtWidgets.QFrame):
             display_text = self.populate_name(self, self.identifier) if self.populate_name else self.identifier.input_name
             self._title_widget.setText(display_text)
 
-        curve_visible = self.data.input_type == InputType.JoystickAxis
-        
-        if self.data.is_curve is None:
-            self.curve_button_widget.setIcon(self.curve_icon_active)
-            self.clear_curve_widget.setEnabled(True)
-        else:
-            self.curve_button_widget.setIcon(self.curve_icon_inactive)
-            self.clear_curve_widget.setEnabled(False)
-
-        self._curve_container_widget.setVisible(curve_visible)
+        self._update_icons()
         
 
     @property
@@ -1608,11 +1619,12 @@ class ContainerSelector(QtWidgets.QWidget):
 
 
 class ConditionTrackerInfo:
-    def __init__(self, input_item, device_guid, input_id, dock_tabs):
+    def __init__(self, input_item, device_guid, input_id, container, dock_tabs):
         self.device_guid = device_guid
         self.input_id = input_id
         self.dock_tabs = dock_tabs
         self.input_item = input_item
+        self.container = container
         
     
 
@@ -1622,41 +1634,52 @@ class ConditionStateTracker():
         self.tracker = {} # maps input to condition tab
         el = gremlin.event_handler.EventListener()
         el.condition_state_changed.connect(self._condition_state_changed)
+        el.container_delete.connect(self._container_delete)
         self._icon_enabled = gremlin.util.load_icon("mdi.record", qta_color="green")
         self._icon_disabled = gremlin.util.load_icon("mdi.record", qta_color="lightgray")
 
-    def register(self, input_item, dock_tab : QtWidgets.QTabWidget):
+    def register(self, input_item, container, dock_tab : QtWidgets.QTabWidget):
         ''' registers a condition tracker '''
         device_guid = input_item.device_guid
         input_id = input_item.input_id
         if not device_guid in self.tracker:
             self.tracker[device_guid] = {}
+        if not input_id in self.tracker[device_guid]:
+            self.tracker[device_guid][input_id] = {}
         
-        info = ConditionTrackerInfo(input_item, device_guid, input_id, dock_tab)
-        self.tracker[device_guid][input_id] = info
+        info = ConditionTrackerInfo(input_item, device_guid, input_id, container, dock_tab)
+        self.tracker[device_guid][input_id][container] = info
         enabled = info.input_item.hasConditions()
         self.set_condition_tab_state(dock_tab, enabled)
 
-    def unregister(self, input_item):
+    def unregister(self, input_item, container):
         ''' unregisters a condition tracker '''
         device_guid = input_item.device_guid
         input_id = input_item.input_id
         if device_guid in self.tracker:
             if input_id in self.tracker[device_guid]:
-                del self.tracker[device_guid][input_id]
+                if container in self.tracker[device_guid][input_id]:
+                        del self.tracker[device_guid][input_id][container]
 
 
 
     @QtCore.Slot(object)
-    def _condition_state_changed(self, action_data):
-        device_guid = action_data.hardware_device_guid
-        input_id = action_data.hardware_input_id
+    def _condition_state_changed(self, container):
+        device_guid = container.hardware_device_guid
+        input_id = container.hardware_input_id
         if device_guid in self.tracker:
             if input_id in self.tracker[device_guid]:
-                info = self.tracker[device_guid][input_id]
-                enabled = info.input_item.hasConditions()
-                dock_tabs = info.dock_tabs
-                self.set_condition_tab_state(dock_tabs, enabled)
+                if container in self.tracker[device_guid][input_id]:
+                    info = self.tracker[device_guid][input_id][container]
+                    enabled = info.input_item.hasConditions()
+                    dock_tabs = info.dock_tabs
+                    self.set_condition_tab_state(dock_tabs, enabled)
+
+    @QtCore.Slot(object, object)
+    def _container_delete(self, input_item, container):
+        self.unregister(input_item, container)
+                    
+        
         
 
      
@@ -1741,11 +1764,11 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         self._select_tab(self.profile_data.current_view_type)
 
         tracker = ConditionStateTracker()
-        tracker.register(self.profile_data.input_item, self.dock_tabs)
+        tracker.register(self.profile_data.input_item, self.profile_data, self.dock_tabs)
 
     def _cleanup_ui(self):
         tracker = ConditionStateTracker()
-        tracker.unregister(self.profile_data.input_item)
+        tracker.unregister(self.profile_data.input_item, self.profile_data)
         
 
 

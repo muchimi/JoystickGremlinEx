@@ -186,6 +186,15 @@ Joystick Gremlin EX
 
 
 ## 13.40.16ex (pre-release)
+### (m38)
+- Fix: removed redundant "force numlock off" check box in profile to process mapping as that option is superfluous.  Each profile can set its own option in the profile config window, or it can be set globally in options.  Those two methods are sufficient to achieve the desired behavior.  
+- Fix: Curves applied to input axes not always loaded post converting to the new curve editor.
+- New: Conditions have their own verbose mode for log output for troubleshooting conditions in the log.  When this is enabled, the execution plan and the outcome of tested conditions will be output to the log to help diagnose issues around conditions.  Conditions and execution plans are very complicated (warning, when enabled, as with most verbose modes, this can generate a lot of log data and consequently slows GremlinEx down significantly).
+- Fix: Docktab for mappings generating an internal Python exception because the C++ reference was garbage collected before the Python reference.
+
+### (m37)
+- Fix: exception on mode change with certain curve setups  
+
 ### (m36)
 - Improved: Added OSC send capability
 - Improved: Added VJOY output events  

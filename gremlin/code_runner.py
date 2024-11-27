@@ -64,7 +64,7 @@ class CodeRunner:
         
 
         self._inheritance_tree = None
-        self._vjoy_curves = VJoyCurves()
+        #self._vjoy_curves = VJoyCurves()
         self._merge_axes = []
         self._startup_profile = None
         self._startup_mode = None
@@ -342,10 +342,10 @@ class CodeRunner:
                 )
 
             # Create vJoy response curve setups
-            self._vjoy_curves.profile_data = profile.vjoy_devices
-            self.event_handler.runtime_mode_changed.connect(
-                self._vjoy_curves.mode_changed
-            )
+            # self._vjoy_curves.profile_data = profile.vjoy_devices
+            # self.event_handler.runtime_mode_changed.connect(
+            #     self._vjoy_curves.mode_changed
+            # )
 
             # Use inheritance to build input action lookup table
             self.event_handler.build_event_lookup(inheritance_tree)
@@ -549,9 +549,9 @@ class CodeRunner:
 
         el.keyboard_event.disconnect(kb.keyboard_event)
         el.gremlin_active = False
-        self.event_handler.runtime_mode_changed.disconnect(
-            self._vjoy_curves.mode_changed
-        )
+        # self.event_handler.runtime_mode_changed.disconnect(
+        #     self._vjoy_curves.mode_changed
+        # )
         
 
         # Empty callback registry
@@ -618,17 +618,15 @@ class VJoyCurves:
         vjoy = gremlin.joystick_handling.VJoyProxy()
         for guid, device in self.profile_data.items():
             if mode_name in device.modes:
-                for aid, data in device.modes[mode_name].config[
-                        InputType.JoystickAxis
-                ].items():
+                for aid, data in device.modes[mode_name].config[InputType.JoystickAxis].items():
                     # Get integer axis id in case an axis enum was used
                     axis_id = vjoy_module.vjoy.VJoy.axis_equivalence.get(aid, aid)
                     vjoy_id = gremlin.joystick_handling.vjoy_id_from_guid(guid)
 
-                    if len(data.containers) > 0 and \
-                            vjoy[vjoy_id].is_axis_valid(axis_id):
+                    if len(data.containers) > 0 and vjoy[vjoy_id].is_axis_valid(axis_id):
                         action = data.containers[0].action_sets[0][0]
-                        vjoy[vjoy_id].axis(aid).set_deadzone(*action.deadzone)
+                        if hasattr(action,"deadzone"):
+                            vjoy[vjoy_id].axis(aid).set_deadzone(*action.deadzone)
                         vjoy[vjoy_id].axis(aid).set_response_curve(
                             action.mapping_type,
                             action.control_points

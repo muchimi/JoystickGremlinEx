@@ -1270,14 +1270,14 @@ class ResponseCurveWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         # Deadzone configuration
         self.deadzone_label = QtWidgets.QLabel("Deadzone")
-        self.deadzone = DeadzoneWidget(self.action_data)
+        self.deadzone_widget = DeadzoneWidget(self.action_data)
 
         # Add all widgets to the layout
         self.main_layout.addWidget(self.container_options_widget)
         self.main_layout.addLayout(self.curve_view_layout)
         self.main_layout.addWidget(self.control_point_editor)
         self.main_layout.addWidget(self.deadzone_label)
-        self.main_layout.addWidget(self.deadzone)
+        self.main_layout.addWidget(self.deadzone_widget)
 
         
 
@@ -1299,7 +1299,7 @@ class ResponseCurveWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.curve_scene.redraw_scene()
 
         # Set deadzone values
-        self.deadzone.set_values(self.action_data.deadzone)
+        self.deadzone_widget.set_values(self.action_data.deadzone)
 
         self.curve_type_selection.currentTextChanged.connect(
             self._change_curve_type

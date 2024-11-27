@@ -194,8 +194,7 @@ class AbstractExecutionGraph(metaclass=ABCMeta):
         process_again = False
 
         
-        verbose = gremlin.config.Configuration().verbose_mode_inputs
-        #verbose = True
+        verbose = gremlin.config.Configuration().verbose_mode_condition
         syslog = logging.getLogger("system")
         
         if verbose: syslog.info (f"Execution plan:")

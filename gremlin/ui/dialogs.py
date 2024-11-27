@@ -1367,10 +1367,10 @@ This setting is also available on a profile by profile basis on the profile tab,
                 restore_widget.clicked.connect(self._restore_changed)
                 restore_widget.setToolTip("When set, restores the last used mode if the profile has been automatically loaded on process change")
 
-                force_numlock_widget = ui_common.QDataCheckbox("Force numlock off", item)
-                force_numlock_widget.setToolTip("When set, GremlinEx will force the keyboard numlock state to Off to prevent issues with numpad keymapping")
-                force_numlock_widget.setChecked(pd.force_numlock_off)
-                force_numlock_widget.clicked.connect(self._force_numlock_cb)
+                # force_numlock_widget = ui_common.QDataCheckbox("Force numlock off", item)
+                # force_numlock_widget.setToolTip("When set, GremlinEx will force the keyboard numlock state to Off to prevent issues with numpad keymapping")
+                # force_numlock_widget.setChecked(pd.force_numlock_off)
+                # force_numlock_widget.clicked.connect(self._force_numlock_cb)
                 
 
                 mode_widget = ui_common.QDataComboBox(item)
@@ -1391,7 +1391,7 @@ This setting is also available on a profile by profile basis on the profile tab,
                 mode_widget.setToolTip("Default startup mode for this profile")
 
 
-                options_layout.addWidget(force_numlock_widget,0,0,1,-1)
+                #options_layout.addWidget(force_numlock_widget,0,0,1,-1)
                 options_layout.addWidget(restore_widget,1,0)
                 options_layout.addWidget(QtWidgets.QLabel("Default start mode:"),1,1)
                 options_layout.addWidget(mode_widget,1,2)

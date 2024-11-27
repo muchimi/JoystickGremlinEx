@@ -22,6 +22,7 @@ import logging
 import dinput
 
 import gremlin.base_profile
+import gremlin.config
 from gremlin.input_types import InputType
 #from . import base_classes, event_handler, fsm, input_devices, joystick_handling, macro, util
 from gremlin.base_conditions import ActivationRule
@@ -256,30 +257,42 @@ class JoystickCondition(AbstractCondition):
         :param value the possibly modified value
         :return True if the condition is satisfied, False otherwise
         """
+
+        verbose = gremlin.config.Configuration().verbose_mode_condition
+        syslog = logging.getLogger("system")
+
         joy = gremlin.input_devices.JoystickProxy()[self.device_guid]
         if joy is None:
             # device not found - ignore
             return False
+        
+        if verbose:
+            info = gremlin.joystick_handling.device_info_from_guid(self.device_guid)
 
         if self.input_type == InputType.JoystickAxis:
+            retval = False
             in_range = self.condition.range[0] <= \
                        joy.axis(self.input_id).value <= \
                        self.condition.range[1]
 
             if self.comparison in ["inside", "outside"]:
-                return in_range if self.comparison == "inside" else not in_range
-            else:
-                return False
+                retval = in_range if self.comparison == "inside" else not in_range
+            if verbose: syslog.info(f"JoystickCondition: Axis {self.comparison}: device {info.name} input: {self.input_id} range: {self.condition.range[0]:0.3f} to {self.condition.range[1]:0.3f} value: {joy.axis(self.input_id).value:0.3f} return: {"OK" if retval else "FAILED"}")
+            return retval
+        
         elif self.input_type == InputType.JoystickButton:
+            retval = False
             if self.comparison == "pressed":
-                return joy.button(self.input_id).is_pressed
-            else:
-                return not joy.button(self.input_id).is_pressed
+                retval = joy.button(self.input_id).is_pressed
+            else: # released
+                retval = not joy.button(self.input_id).is_pressed
+            if verbose: syslog.info(f"JoystickCondition: Button {self.comparison}: device {info.name} input: {self.input_id} return: {"OK" if retval else "FAILED"}")
+            return retval
+            
         elif self.input_type == InputType.JoystickHat:
-            match = joy.hat(self.input_id).direction == \
-                   gremlin.util.hat_direction_to_tuple(self.comparison)
-            print (f"match: {match}")
-            return match
+            retval = joy.hat(self.input_id).direction == gremlin.util.hat_direction_to_tuple(self.comparison)
+            if verbose: syslog.info(f"VjoyCondition: Hat Device {info.name} input: {self.input_id} comparison: {self.comparison} return: {"OK" if retval else "FAILED"}")
+            return retval
         else:
             logging.getLogger("system").warning(
                 f"Invalid input_type {self.input_type} received"
@@ -342,24 +355,37 @@ class VJoyCondition(AbstractCondition):
         if joy is None:
             # device not found - ignore
             return False
+        
+        verbose = gremlin.config.Configuration().verbose_mode_condition
+        syslog = logging.getLogger("system")
+        if verbose:
+            info = gremlin.joystick_handling.device_info_from_guid(self.device_guid)
+
 
         if self.input_type == InputType.JoystickAxis:
+            retval = False
             in_range = self.condition.range[0] <= \
                        joy.axis(self.input_id).value <= \
                        self.condition.range[1]
 
             if self.comparison in ["inside", "outside"]:
-                return in_range if self.comparison == "inside" else not in_range
-            else:
-                return False
+                retval =  in_range if self.comparison == "inside" else not in_range
+            if verbose: syslog.info(f"VjoyCondition: Axis {self.comparison}: device {info.name} input: {self.input_id} range: {self.condition.range[0]:0.3f} to {self.condition.range[1]:0.3f} value: {joy.axis(self.input_id).value:0.3f} return: {"OK" if retval else "FAILED"}")
+            return retval
+
+            
         elif self.input_type == InputType.JoystickButton:
+            retval = False
             if self.comparison == "pressed":
-                return joy.button(self.input_id).is_pressed
+                retval =  joy.button(self.input_id).is_pressed
             else:
-                return not joy.button(self.input_id).is_pressed
+                retval = not joy.button(self.input_id).is_pressed
+            if verbose: syslog.info(f"VjoyCondition: Button {self.comparison}: device {info.name} input: {self.input_id} return: {"OK" if retval else "FAILED"}")
+            return retval
+            
         elif self.input_type == InputType.JoystickHat:
-            return joy.hat(self.input_id).direction == \
-                   gremlin.util.hat_direction_to_tuple(self.comparison)
+            retval =  joy.hat(self.input_id).direction == gremlin.util.hat_direction_to_tuple(self.comparison)
+            if verbose: syslog.info(f"VjoyCondition: Hat Device {info.name} input: {self.input_id} comparison: {self.comparison} return: {"OK" if retval else "FAILED"}")
         else:
             logging.getLogger("system").warning(
                 f"Invalid input_type {self.input_type} received"
@@ -372,7 +398,7 @@ class VJoyCondition(AbstractCondition):
 
 class InputActionCondition(AbstractCondition):
 
-    """Condition verifying the state of the triggering input itself.
+    """Condition verifying the state of the triggering input itself. (ActionActivationCondition)
 
     This checks the state of the input that triggered the event in the first
     place.
@@ -392,14 +418,21 @@ class InputActionCondition(AbstractCondition):
         :param value the possibly modified value
         :return True if the condition is satisfied, False otherwise
         """
+
+
+        verbose = gremlin.config.Configuration().verbose_mode_condition
+
+        syslog = logging.getLogger("system")
+        retval = False
         if self.comparison == "pressed":
-            return value.current
+            retval = value.current
         elif self.comparison == "released":
-            return not value.current
+            retval = not value.current
         elif self.comparison == "always":
-            return True
-        else:
-            return False
+            retval = True
+        
+        if verbose: syslog.info(f"InputActionCondition: comparison {self.comparison}: return: {retval}")
+        return retval
 
     def condition_name(self)->str:
         return f"InputActionCondition: condition: {self.comparison}"

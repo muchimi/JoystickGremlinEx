@@ -2474,7 +2474,7 @@ class AxisCurveData():
 
         :return XML node representing the object's data
         """
-        node = ElementTree.Element("response-curve")
+        node = ElementTree.Element("response-curve-ex")
         node.set("mode", SymmetryMode.to_string(self.symmetry_mode))
 
         # Response curve mapping

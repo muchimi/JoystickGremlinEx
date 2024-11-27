@@ -551,7 +551,9 @@ class ActionContainerModel(gremlin.ui.ui_common.AbstractModel):
 
             del self._containers[self._containers.index(container)]
         self.data_changed.emit()
+        el.container_delete.emit(self.item_data, container)
         el.mapping_changed.emit(self.item_data)
+        
 
         
 
@@ -570,6 +572,7 @@ class ActionContainerModel(gremlin.ui.ui_common.AbstractModel):
                     #     action._cleanup()
                     el.action_delete.emit(self._item_data, container, action)
 
+            el.container_delete.emit(self.item_data, container)
             del self._containers[self._containers.index(container)]
         self.data_changed.emit()
 

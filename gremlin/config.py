@@ -1050,6 +1050,12 @@ class Configuration:
     def verbose_mode_simconnect(self):
         ''' true if verbose mode is in simconnect mode '''
         return self.verbose and VerboseMode.SimConnect in self.verbose_mode
+    
+    @property
+    def verbose_mode_condition(self):
+        ''' true if verbose mode is in simconnect mode '''
+        return self.verbose and VerboseMode.Condition in self.verbose_mode
+    
 
     @property
     def midi_enabled(self):

@@ -1009,13 +1009,14 @@ class InputItem():
         if input_id is not None and self._device_guid is not None:
             if self._input_type == InputType.JoystickAxis:
                 self.is_axis = True # indicate we are an axis
-                eh = gremlin.event_handler.EventListener()
-                eh.registerInput(self)
+                el = gremlin.event_handler.EventListener()
+                el.registerInput(self)
                 info = gremlin.joystick_handling.device_info_from_guid(self._device_guid)
                 if info:
                     self._input_name = f"Axis {info.axis_names[input_id-1]}"
                 else:
                     self._input_name = f"Axis {input_id}"
+                el.update_input_icons.emit()
             elif self._input_type == InputType.JoystickButton:
                 self._input_name = f"Button {input_id}"
             elif self._input_type == InputType.JoystickHat:
@@ -1035,7 +1036,7 @@ class InputItem():
             else:
                 self._input_name = f"{InputType.to_string(self._input_type).capitalize()} {input_id}"
 
-            
+    
             
     
 
@@ -1119,7 +1120,7 @@ class InputItem():
 
         
         for child in container_node:
-            if child.tag in ("latched", "input", "keylatched","response-curve"):
+            if child.tag in ("latched", "input", "keylatched","response-curve-ex"):
                 # ignore extra data
                 continue
             container_type = child.attrib["type"]
@@ -1739,6 +1740,7 @@ class Profile():
         self._last_edit_mode = "Default"
         self._restore_last_mode = False # True if the profile should start with the last active mode (profile specific)
         self._dirty = False # dirty flag - indicates the profile data was changed but not saved yet
+        self._profile_data : Profile
         self._force_numlock_off = True # if set, forces numlock to be off if it isn't so numpad keys report the correct scan codes
 
         el = gremlin.event_handler.EventListener()
@@ -1930,7 +1932,7 @@ class Profile():
     
     def set_force_numlock(self, value):
         self._force_numlock_off = value
-        self.save()
+    
 
     def mode_list(self):
         """Returns a list of all modes based on the given node.
@@ -2898,7 +2900,7 @@ class ProfileMapItem():
         self._index = -1
         self._warning = None
         self._valid = True # assume valid
-        self._force_numlock_off = True
+        #self._force_numlock_off = True
         
         self._update()
 
@@ -2912,14 +2914,14 @@ class ProfileMapItem():
             value = value.replace("\\","/").lower().strip()
         self._profile = value
 
-    @property
-    def numlock_force(self):
-        return self._force_numlock_off
+    # @property
+    # def numlock_force(self):
+    #     return self._force_numlock_off
     
-    @numlock_force.setter
-    def numlock_force(self, value):
-        self._force_numlock_off = value
-        self._update()
+    # @numlock_force.setter
+    # def numlock_force(self, value):
+    #     self._force_numlock_off = value
+    #     self._update()
 
 
     @property
@@ -3049,7 +3051,7 @@ class ProfileMapItem():
             current_profile.set_restore_mode(self._restore_mode)
             if self._default_mode:
                 current_profile.set_start_mode(self._default_mode)
-            current_profile.set_force_numlock(self._force_numlock_off)
+            #current_profile.set_force_numlock(self._force_numlock_off)
             current_profile.save()
             
             return
@@ -3065,7 +3067,7 @@ class ProfileMapItem():
                     if self._default_mode:
                         element.set("default_mode", self._default_mode)
                     element.set("start_mode", self.last_mode)
-                    element.set("force_numlock", str(self._force_numlock_off))
+                    #element.set("force_numlock", str(self._force_numlock_off))
                     profile_node = element
                     break
 
@@ -3100,7 +3102,7 @@ class ProfileMapItem():
         self._default_mode = pd.default_mode
         self._last_mode = pd.start_mode
         self._restore_mode = pd.restore_last
-        self._force_numlock_off = pd.force_numlock_off
+        #self._force_numlock_off = pd.force_numlock_off
 
     @property
     def valid(self):
@@ -3254,7 +3256,7 @@ class ProfileMap():
 
             pd = item.get_profile_data()
             if pd.mode_list:
-                if not item.default_mode in pd.mode_list:
+                if item.default_mode is not None and not item.default_mode in pd.mode_list:
                     valid = False
                     warning = f"Startup mode '{item.default_mode}' does not exist for this profile"
                     self._valid = False

@@ -112,6 +112,7 @@ class ProfileConverter:
             6: self._convert_from_v6,
             7: self._convert_from_v7,
             8: self._convert_from_v8,
+            9: None
         }
 
         # Create a backup of the outdated profile
@@ -120,26 +121,29 @@ class ProfileConverter:
 
         # Convert the profile
         new_root = None
+        converted = False
         while old_version < ProfileConverter.current_version:
-            if new_root is None:
-                new_root = conversion_map[old_version](root, fname=fname)
+            if old_version in conversion_map:
+                convert = conversion_map[old_version]
+                if convert:                
+                    if new_root is None:
+                        new_root = convert(root, fname=fname)
+                    else:
+                        new_root = convert(new_root, fname=fname)
+                    converted = True
+                old_version += 1
+                    
             else:
-                new_root = conversion_map[old_version](new_root, fname=fname)
-            old_version += 1
+                syslog = logging.getLogger("system")
+                syslog.warning(f"Unexpected version: {old_version} found in profile.  Some unsupported features may not have loaded correctly.")
 
-        if new_root is not None:
-            # Save converted version
-            
-            # ugly_xml = ElementTree.tostring(new_root, encoding="unicode")
-            # ugly_xml = "".join([line.strip() for line in ugly_xml.split("\n")])
-            # dom_xml = minidom.parseString(ugly_xml)
-            # with open(fname, "w") as out:
-            #     out.write(dom_xml.toprettyxml(indent="    ", newl="\n"))
-
-            tree = ElementTree.tostring(new_root)
-            tree.write(fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
-        else:
-            raise error.ProfileError("Failed to convert profile")
+        if converted:
+            if new_root is not None:
+                # Save converted version
+                tree = ElementTree.tostring(new_root)
+                tree.write(fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
+            else:
+                raise error.ProfileError("Failed to convert profile")
 
     def _determine_version(self, root):
         """Returns the version of the provided profile.
@@ -494,6 +498,9 @@ class ProfileConverter:
 
         return root
 
+    def _convert_from_noop(self, root, fname = None):
+        ''' no op conversion '''
+        pass
 
     def _convert_from_v8(self, root, fname=None):
         """Convert from a V8 profile to V9.
