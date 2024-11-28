@@ -582,11 +582,13 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
                 else:
                     self._perform_button_motion(event, value)
             elif self.action_mode == MouseAction.MouseButton:
-                if self.exec_on_release and not event.is_pressed:
+                if self.exec_on_release:
+                    if not event.is_pressed:
+                        self._perform_mouse_button(event, value)
+                    elif  event.is_pressed:
+                        self._perform_mouse_button(event, value)
+                else:
                     self._perform_mouse_button(event, value)
-                elif not self.exec_on_release and event.is_pressed:
-                    self._perform_mouse_button(event, value)
-            
 
         return True
     
