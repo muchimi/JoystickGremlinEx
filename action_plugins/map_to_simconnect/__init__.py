@@ -68,9 +68,13 @@ class CommandValidator(QtGui.QValidator):
             # blank is ok
             return QtGui.QValidator.State.Acceptable
         # match all values starting with the text given
-        r = re.compile(clean_value + "*")
-        for _ in filter(r.match, self.commands):
-            return QtGui.QValidator.State.Intermediate
+        try:
+            r = re.compile(clean_value + "*")
+            for _ in filter(r.match, self.commands):
+                return QtGui.QValidator.State.Intermediate
+        except:
+            # invalid regex - probably a special char
+            pass
         return QtGui.QValidator.State.Invalid
     
 class SimconnectAicraftDefinition():
@@ -1012,6 +1016,8 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 
 
+
+
     def _create(self, action_data):
         '''' initialize before createUI() '''
         
@@ -1025,13 +1031,6 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.curve_update_handler = None
         self.input_type = self.action_data.hardware_input_type 
         self._is_axis = self.action_data.input_is_axis()
-
-
-
-    
-
-
-
 
 
     def _create_ui(self):
@@ -1905,9 +1904,6 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
                 index = self._command_selector_widget.findText(self.action_data.command)
                 self._command_selector_widget.setCurrentIndex(index)
         
-        # self._update_block_ui()
-        # self._update_ui_container_visibility()
-
 
 class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor):
 
@@ -2101,7 +2097,7 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         # curve data applied to a simconnect axis output
         self.curve_data = None # present if curve data is needed
 
-        self._block = None
+        self._block = SimConnectBlock()
 
 
         # output mode
@@ -2152,7 +2148,9 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         ''' updates the data block with the current command '''
         if self._command is None:
             self._command = self._default_command()
-        self._block =self.smd.block(self._command)
+        block = self.smd.block(self._command)
+        if block:
+            self._block = block
     
     
     @property

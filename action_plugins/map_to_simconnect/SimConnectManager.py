@@ -721,8 +721,9 @@ class SimConnectManager(QtCore.QObject):
         ''' gets the command block for a given Simconnect command '''
         s_command, b_command = gremlin.util.to_byte_string(command)
         key = s_command.casefold()
-        if key in self._commands:
-            return self._block_map[key]
+        for cmd in self._commands:
+            if key in cmd.casefold():
+                return self._block_map[key]
         return None
 
     def get_aircraft_data(self):
