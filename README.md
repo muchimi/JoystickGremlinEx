@@ -186,6 +186,15 @@ Joystick Gremlin EX
 
 
 ## 13.40.16ex (pre-release)
+### (m41)
+- Improved: Keyboard mapper Ex enhanced display of selected keys.
+- Improved: Simconnect (MSFS) supports two-way communication via OSC (see osc_msfs.py as the demo of the parking brakes).  The demo OSC/Pilot and user plugin module to support two way comms is in the demo msfs zip file.  Note: this is not OSC/Pilot specific - just provided as a demo here.  The concept is similar with other OSC surface control software  although it may have to be tweaked based on that software's capabilities.
+- Improved: Added autorelease option for OSC commands that do not issue a release (example, StreamDeck OSC plugin). This enables a release to be issued on an OSC message receipt to trigger the missing release after a user selectable delay (default 250ms)
+- Fix: Containers not always telling actions what container type they are when the container type overrides the input type.
+- Fix: Gated Axis triggers on a single condition gate crossings ignoring the others  
+- Fix: C++ reference error on gated axis after stopping a profile and moving the associated input device
+### (m40)
+- Fix: small update for mouse ex not releasing mouse button (thanks for reporting!)
 ### (m39)
 - Improved: OSC output can send to any IP address (set IP and port in options).  The prior implementation was sending to the local server only.
 

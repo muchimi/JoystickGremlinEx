@@ -116,7 +116,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.16ex (m40)"
+APPLICATION_VERSION = "13.40.16ex (m41)"
 
 # the main ui
 ui = None

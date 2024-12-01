@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations
 import os
 import lxml
 from lxml import etree
@@ -33,6 +34,16 @@ from .SimConnect.Enum import *
 from gremlin.singleton_decorator import SingletonDecorator
 import enum
 import time
+import threading
+
+
+syslog = logging.getLogger("system")
+
+class DataThreadingEvent(threading.Event):
+    ''' a threading event that can support a data value'''
+    def __init__(self):
+        super().__init__()
+        self.data = None
 
 
 ''' full axis range commands -16883 to + 16383 '''
@@ -113,6 +124,7 @@ class SimConnectActionMode(enum.Enum):
     Trigger = 2, # output is a trigger (no value sent)
     SetValue = 3, # output sets a number value
     Gated = 4, # output of axis is gated - the position of the axis is not linear
+    GetValue = 4, # gets a value from simconnect
 
     @staticmethod
     def to_string(value):
@@ -138,7 +150,8 @@ _simconnect_action_mode_to_display_lookup = {
     SimConnectActionMode.Gated: "Gated",
     SimConnectActionMode.Ranged: "Ranged",
     SimConnectActionMode.Trigger: "Trigger",
-    SimConnectActionMode.SetValue: "Value"
+    SimConnectActionMode.SetValue: "SetValue",
+    SimConnectActionMode.GetValue: "GetValue"
 }
 
 class SimConnectTriggerMode(enum.Enum):
@@ -214,11 +227,11 @@ class OutputType(enum.Enum):
 
 class SimConnectCommandType(enum.Enum):
     NotSet = 0
-    Event = 1
-    Request = 2
-    LVar = 3
-    AVar = 4
-    SimVar = 5
+    Event = 1 # request event
+    Request = 2 # request data
+    LVar = 3 # set lvar
+    AVar = 4 # set avar
+    SimVar = 5 # set simvar
 
     @staticmethod
     def from_string(value):
@@ -366,23 +379,29 @@ _simconnect_event_category_to_enum_lookup = {
 
 
 @SingletonDecorator
-class SimConnectData(QtCore.QObject):
-    ''' holds simconnect data '''
+class SimConnectManager(QtCore.QObject):
+    ''' holds simconnect data and manages simconnect '''
 
     aircraft_loaded = QtCore.Signal(str, str) # fires when aircraft title changes (param folder, title)
     _aircraft_loaded_internal = QtCore.Signal(str) # fires when aircraft title changes
 
     def __init__(self, handler) -> None:
+        ''' manages simconnect connections and interactions 
+        
+        :param handler: handler that responds to simconnect events
+        :param force_update: flag to update the default data if it has been modified
+        
+        '''
         QtCore.QObject.__init__(self)
 
-        self.verbose = gremlin.config.Configuration().verbose
+        self.verbose = gremlin.config.Configuration().verbose_mode_simconnect
 
         sm = SimConnect(handler, auto_connect = False,
                         verbose = gremlin.config.Configuration().verbose_mode_simconnect,
                         sim_paused_callback=self._sim_paused_cb,
                         sim_running_callback = self._sim_running_cb,
                         aircraft_loaded_callback= self._aicraft_loaded_cb)
-        self._sm = sm
+        self._sm : SimConnect = sm
 
         handler.simconnect_connected.connect(self._connected)
         handler.simconnect_disconnected.connect(self._disconnected)
@@ -403,11 +422,6 @@ class SimConnectData(QtCore.QObject):
 
         self._connect_attempts = 3 # number of connection attempts before giving up
 
-        # list of all commands
-        self._commands = []
-
-        # list of command blocks
-        self._block_map = {}
 
         self._is_started = False
         self._is_paused = False
@@ -415,7 +429,30 @@ class SimConnectData(QtCore.QObject):
         self._is_running = False
         self._aircraft_folder = None
 
-        # if the data file doesn't exist, create it in the user's profile folder from the built-in data
+        self._registered_feed_blocks = {}
+        self._registered_requests = {}
+        self._registered_events = {}
+
+
+        self.reload()
+
+    def reload(self, force_update = False):
+                # if the data file doesn't exist, create it in the user's profile folder from the built-in data
+
+        # list of all commands
+        self._commands = []
+
+        # list of command blocks
+        self._block_map = {}
+
+        
+
+
+
+                
+        if force_update and os.path.isfile(self._simvars_xml):
+            os.unlink(self._simvars_xml)
+
         if not os.path.isfile(self._simvars_xml):
             self._write_default_xml(self._simvars_xml)
 
@@ -424,57 +461,133 @@ class SimConnectData(QtCore.QObject):
         if os.path.isfile(self._simvars_xml):
             self._load_xml(self._simvars_xml)
 
-
         if len(self._block_map) > 0:
             # process lists
-            self._commands = list(self._block_map.keys())
+            b = SimConnectBlock()
+            
+            self._commands = [b.command for b in self._block_map.values()]
             self._commands.sort()
+
+
+
+    def _register_feed(self, command):
+        if not command in self._registered_feed_blocks:
+            block = SimConnectBlock()
+            block.command = command
+            block.command_type = SimConnectCommandType.Request
+            block.is_periodic = True
+            self._registered_feed_blocks[command] = block
+            
+    def _enable_feed(self):
+        ''' enables the data feed '''
+        block : SimConnectBlock
+        for block in self._registered_feed_blocks.values():
+            block.execute()
+
+    def _disable_feed(self):
+        ''' disable the data feed '''
+        block : SimConnectBlock
+        for block in self._registered_feed_blocks.values():
+            block.stop()
+        self._registered_feed_blocks = {}
+
+    def RegisterFeed(self, command):
+        ''' registers a data feed '''
+        self._register_feed(command)
+
+    def _init_feed(self):
+        ''' setup the default data feed events, if any '''
+        pass
+        # self._register_feed("AIRSPEED_INDICATED")
+        # self._register_feed("PLANE_ALT_ABOVE_GROUND")
+        # self._register_feed("BRAKE_PARKING_INDICATOR")
+
+    def setFeedEnabled(self, enabled):
+        ''' enables or disables data feed '''
+        if enabled:
+            self._init_feed()
+            self._enable_feed()
+        else:
+            self._disable_feed()
+
+    def registerRequest(self, command, datatype, settable : bool = False) -> Request:
+        ''' registers a request '''
+
+        # see if the request is already registered
+        block = self.block(command)
+        if block:
+            # found it, use that one
+            return block.request
+
+        s_command, b_command = gremlin.util.to_byte_string(command)
+        key = s_command.casefold()
+        s_datatype, b_datatype = gremlin.util.to_byte_string(datatype)
+        if not key in self._registered_requests:
+            request = Request((b_command, b_datatype), self.sm, settable)
+            request._ensure_def()
+            self._registered_requests[key] = request
+        
+        return self._registered_requests[key]
+            
+
+    def setSimvar(self, command, datatype, value):
+        ''' sets a simvar without using a data block '''
+        request = self.registerRequest(command, datatype, True)
+        request.value = value
+        request.transmit()
+
+    def sendEvent(self, command):
+        ''' sends an event to Simconnect '''
+        if command in self._block_map:
+            block = self._block_map[command]
+            syslog.info(f"Simconnect: send Event {command}")
+            return block.execute(1)
+        syslog.error(f"Simconnect: event not found: {command}")
+        
+
 
     @QtCore.Slot()
     def _connected(self):
         self._is_connected = True
         if self.verbose:
-            syslog = logging.getLogger("system")
             syslog.info(f"Simconnect Event: connected")
+
+        self.setFeedEnabled(True)
 
     @QtCore.Slot()
     def _disconnected(self):
         self._is_connected = False
         if self.verbose:
-            syslog = logging.getLogger("system")
             syslog.info(f"Simconnect Event: disconnected")
+
+        self.setFeedEnabled(False)
 
     @QtCore.Slot()
     def _paused(self):
         self._is_paused = True
         if self.verbose:
-            syslog = logging.getLogger("system")
             syslog.info(f"Simconnect Event: paused")
 
     @QtCore.Slot()
     def _unpaused(self):
-        syslog = logging.getLogger("system")
         if self.verbose:
             self._is_paused = False
             syslog.info(f"Simconnect Event: unpaused")
 
     @QtCore.Slot()
     def _start(self):
-        syslog = logging.getLogger("system")
         if self.verbose:
             syslog.info(f"Simconnect Event: started")
             self._is_started = True
 
     @QtCore.Slot()
     def _stop(self):
-        syslog = logging.getLogger("system")
         if self.verbose:
             syslog.info(f"Simconnect Event: stopped")
             self._is_started = False
 
     @QtCore.Slot()
     def _running(self):
-        syslog = logging.getLogger("system")
         if self.verbose:
             syslog.info(f"Simconnect Event: running")
             self._is_running = True
@@ -569,7 +682,7 @@ class SimConnectData(QtCore.QObject):
                         self._connect_attempts -= 1
                     self._sm.connect()
                     
-                logging.getLogger("system").info("Simconnect: connected to simulator")
+                syslog.info("Simconnect: connected to simulator")
             except:
                 pass
         else:
@@ -578,7 +691,7 @@ class SimConnectData(QtCore.QObject):
 
         if not self._sm.ok:
             if self._connect_attempts == 0:
-                logging.getLogger("system").warning("Simconnect: failed to connect to simulator")
+                syslog.warning("Simconnect: failed to connect to simulator")
             return False
 
         # on connection - grab the current aircraft da
@@ -604,10 +717,12 @@ class SimConnectData(QtCore.QObject):
         ''' true if block maps are valid '''
         return len(self._block_map) > 0
 
-    def block(self, command):
+    def block(self, command) -> SimConnectBlock:
         ''' gets the command block for a given Simconnect command '''
-        if command in self._commands:
-            return self._block_map[command]
+        s_command, b_command = gremlin.util.to_byte_string(command)
+        key = s_command.casefold()
+        if key in self._commands:
+            return self._block_map[key]
         return None
 
     def get_aircraft_data(self):
@@ -774,8 +889,10 @@ class SimConnectData(QtCore.QObject):
                 units = data[1][2].decode('ascii')
                 settable = data[1][3] == 'Y'
 
-
-            category =  SimConnectEventCategory.to_string(self.get_command_category(command))
+            command_category =self.get_command_category(command)
+            if command_category is None:
+                command_category = SimConnectEventCategory.NotSet
+            category =  SimConnectEventCategory.to_string(command_category)
             is_axis = "AXIS_" in command
             if is_axis:
                 min_range = -16383
@@ -804,7 +921,7 @@ class SimConnectData(QtCore.QObject):
             tree = etree.ElementTree(root)
             tree.write(xml_file, pretty_print=True,xml_declaration=True,encoding="utf-8")
         except Exception as err:
-            logging.getLogger("system").error(f"SimconnectData: unable to create XML simvars: {xml_file}: {err}")
+            syslog.error(f"SimconnectData: unable to create XML simvars: {xml_file}: {err}")
 
     def _load_xml(self, xml_source):
         ''' loads blocks from the XML file '''
@@ -851,7 +968,7 @@ class SimConnectData(QtCore.QObject):
 
         self._block_map = {}
         if not xml_source or not os.path.isfile(xml_source):
-            logging.getLogger("system").error(f"SimconnectData: unable to load XML simvars: {xml_source}")
+            syslog.error(f"SimconnectData: unable to load XML simvars: {xml_source}")
             return False
 
         try:
@@ -891,6 +1008,8 @@ class SimConnectData(QtCore.QObject):
                         max_range = get_int_attribute(child,"max",throw_on_missing=True)
 
                 block = SimConnectBlock()
+                s_simvar, b_simvar = gremlin.util.to_byte_string(simvar)
+
                 block.command = simvar
                 block.command_type = simvar_type
                 block.output_data_type = data_type
@@ -907,17 +1026,18 @@ class SimConnectData(QtCore.QObject):
                 block._command_min_range = min_range # original range - cannot be modified
                 block._command_max_range = max_range # original range - cannot be modified
                 block.is_toggle = is_toggle
-
-                if simvar in self._block_map.keys():
-                    logging.getLogger("system").error(f"SimconnectData: duplicate definition found: {simvar} in  {xml_source}")
+                key = s_simvar.casefold()
+                if key in self._block_map.keys():
+                    syslog.error(f"SimconnectData: duplicate definition found: {s_simvar} in  {xml_source}")
                     self._block_map = {}
                     return False
-                self._block_map[simvar] = block
+                self._block_map[key] = block
 
-            logging.getLogger("system").info(f"SimconnectData: loaded {len(self._block_map):,} simvars")
+            if self.verbose:
+                syslog.info(f"SimconnectData: loaded {len(self._block_map):,} simvars")
 
         except Exception as err:
-            logging.getLogger("system").error(f"SimconnectData: XML simvars read error: {xml_source}: {err}")
+            syslog.error(f"SimconnectData: XML simvars read error: {xml_source}: {err}")
             return False
 
 
@@ -981,6 +1101,77 @@ class SimConnectData(QtCore.QObject):
             block = self._block_map[command]
             return block.category
         return SimConnectEventCategory.NotSet
+    
+
+    def sendReadbackEvent(self, command, value, readback_command, readback_value, timeout = 4):
+        ''' sends an event and waits for a return value to match the readback value, or timeout '''
+        
+        # simconnect events have to be in byte strings
+        s_command, b_command = gremlin.util.to_byte_string(command)
+        _, b_readback = gremlin.util.to_byte_string(readback_command)
+        
+        key = s_command.casefold()
+        if not key in self._registered_events:
+            self._registered_events[key] = self._sm.map_to_sim_event(b_command)
+        
+        if key in self._registered_events:
+            event_id = self._registered_events[key]
+            if event_id == 0:
+                syslog.error(f"Simconnect: unable to register event for {s_command}")
+                return False # bad event
+
+        # send event and wait for readback value or a timeout
+        event = DataThreadingEvent()
+        thread = threading.Thread(target=self._send_readback_event_worker(event, event_id, value, b_readback, readback_value, timeout))
+        thread.start()
+        event.wait()
+
+        if event.data and self.verbose: syslog.info(f"SimConnect: event readback completed OK {command} value: {value}")
+        return event.data # data contains the return code
+        
+
+    def _send_readback_event_worker(self, event, event_id, value, readback, readback_value, timeout):
+        ''' readback worker to send the event, then compare the expected value to the return value within the timeout period '''
+        
+        
+        # send the event
+        retval = self._sm.send_event(event_id, value)
+
+        # read the data back to confirm it was processed
+        retval = False
+        
+        block = self.block(readback)
+        if block:
+       
+
+            value = block.read()
+            if value == readback_value:
+                retval = True
+            else:
+                max_time = time.time() + timeout
+                # wait for the value to show up on readback or a timeout
+                while time.time() < max_time:
+                    if value == readback_value:
+                        # found the data we're looking for
+                        retval = True
+                        break
+                    time.sleep(0.250)
+                    value = block.read()
+        else:
+            syslog.error(f"Simconnect: event readback FAILED: readback command {readback} not found")
+    
+        # done    
+        event.data = retval
+        event.set()
+
+    
+class SimConnectEvent:
+    ''' holds event data for the simconnect_event signal '''
+    def __init__(self, command: str = None, value = None):
+        self.command = command
+        self.value = value
+
+
 
 @gremlin.singleton_decorator.SingletonDecorator
 class SimConnectEventHandler(QtCore.QObject):
@@ -997,20 +1188,21 @@ class SimConnectEventHandler(QtCore.QObject):
     simconnect_sim_unpaused = QtCore.Signal() # sim unpaused
     simconnect_sim_running = QtCore.Signal() # sim running
     simconnect_aircraft_loaded = QtCore.Signal(str) # sim aircraft loaded (sends what was loaded)
+    simconnect_event = QtCore.Signal(SimConnectEvent) # fires when we get a Simconnect data value notice
 
     def __init__(self):
         super().__init__()
-        self._smd = SimConnectData(self)
-        
+        self._manager = SimConnectManager(self)
 
     @property
-    def smd(self) -> SimConnectData:
+    def manager(self) -> SimConnectManager:
         ''' gets the simconnect data object '''        
-        return self._smd
+        return self._manager
 
     @property
     def simconnect(self):
-        return self._smd.simconnect
+        return self._manager.simconnect
+    
 
 class SimConnectBlock():
     ''' holds simconnect block information '''
@@ -1050,11 +1242,25 @@ class SimConnectBlock():
         self._command = None
         self._units = ""
         self._is_axis = False # true if the block is axis output enabled
+        self._is_periodic = False # true if we're requesting period data from the sim when the data changes
+        self._request : Request = None # holds any current aircraft request (request commands only )
+        config = gremlin.config.Configuration()
+        self.verbose = config.verbose_mode_simconnect
+        self.verbose_detailed = config.verbose_mode_detailed
 
     @property
-    def sm(self):
+    def sm(self) -> SimConnect:
         ''' simconnect object '''
-        return SimConnectData().sm
+        return SimConnectManager().sm
+    
+    @property
+    def request(self):
+        ''' gets any active aicraft request '''
+        if not self._request:
+            # create a request for this block
+            self.register()
+
+        return self._request
 
     def enable_notifications(self, force = False):
         ''' enables data notifications from this block '''
@@ -1071,6 +1277,15 @@ class SimConnectBlock():
     def notifications_enabled(self):
         ''' true if notifications are enabled'''
         return self._notify_enabled_count == 0
+    
+    @property
+    def is_periodic(self) -> bool:
+        ''' determines if the data should be sent when it changes (true) or just one time (false)'''
+        return self._is_periodic
+    
+    @is_periodic.setter
+    def is_periodic(self, value: bool):
+        self._is_periodic = value
 
     @property
     def command(self):
@@ -1126,12 +1341,12 @@ class SimConnectBlock():
         return F"Unknown command type: {self._command_type}"
 
     @property
-    def output_mode(self):
+    def output_mode(self) -> SimConnectActionMode:
         ''' output mode '''
         return self._output_mode
 
     @output_mode.setter
-    def output_mode(self, value):
+    def output_mode(self, value : SimConnectActionMode):
         self._output_mode = value
 
     @property
@@ -1369,18 +1584,62 @@ class SimConnectBlock():
         ''' '''
         block = SimConnectBlock(command)
         return block
+    
 
+    def register(self):
+        ''' registers a block command '''
+        if not self.sm.is_connected():
+            # not connected
+            return False
 
-    def execute(self, value = None):
+        if self._command:
+            
+            if self._command_type ==  SimConnectCommandType.Event:
+                ae = AircraftEvents(self.sm)
+                trigger = ae.find(self._command)
+                if trigger:
+                    return True
+                else:
+                    syslog.error(f"Simconnect: event: '{self._command}' not found")
+            elif self._command_type == SimConnectCommandType.SimVar:
+                # set simvar
+                ar = AircraftRequests(self.sm, time=2000)
+                self._request = ar.request(self._command)
+                if self.verbose:
+                    syslog.info(f"Simconnect: register simvar: '{self._command}' mode: {self.output_mode}")
+                return True
+
+            elif self._command_type == SimConnectCommandType.Request and not self._readonly:
+                ar = AircraftRequests(self.sm, time=2000)
+                self._request = ar.request(self._command)
+                if self._request:
+                    self._request._ensure_def()    
+                    self._request.callback = self.request_changed_callback
+                    if self.is_periodic:
+                        self.sm._request_periodic_data(self._request)
+                    else:
+                        self.sm._request_data(self._request)
+                    if self.verbose:
+                        syslog.info(f"Simconnect: get request {self._command}")
+                else:
+                    syslog.error(f"Simmconnect: unknown command '{self._command}'")
+                return True
+
+        return False        
+
+    def read(self):
+        ''' gets a value from simconnect '''
+        if not self.sm.is_connected():
+            # not connected
+            return None
+        return self.execute(mode = SimConnectActionMode.GetValue)
+
+    def execute(self, value = None, mode : SimConnectActionMode = None):
         ''' executes the command '''
 
         if not self.sm.is_connected():
             # not connected
             return False
-
-        verbose = gremlin.config.Configuration().verbose
-        if verbose:
-            logger = logging.getLogger("system")
 
         if self._command:
             if self._command_type ==  SimConnectCommandType.Event:
@@ -1389,20 +1648,24 @@ class SimConnectBlock():
                 if trigger:
                     if self.is_readonly:
                         # no param to set
-                        if verbose:
-                            logger.info(f"Simconnect: trigger Simconnect Event: {self._command}")
+                        if self.verbose_detailed:
+                            syslog.info(f"Simconnect: trigger Simconnect Event: {self._command}")
                         trigger()
                     else:
-                        if verbose:
-                            logger.info(f"Simconnect: trigger event value: {self._command} {value}")
+                        if self.verbose_detailed:
+                            syslog.info(f"Simconnect: trigger event value: {self._command} {value}")
                         trigger(value)
                     return True
+                else:
+                    syslog.error(f"Simconnect: event: '{self._command}' not found")
             elif self._command_type == SimConnectCommandType.SimVar:
                 # set simvar
-                ar = AircraftRequests(self.sm, _time=2000)
-                if verbose:
-                    logger.info(f"Simconnect: set simvar: {self._command} mode: {self.output_mode}")
-                if self.output_mode == SimConnectActionMode.Trigger:
+                ar = AircraftRequests(self.sm, time=2000)
+                if self.verbose:
+                    syslog.info(f"Simconnect: set simvar: '{self._command}' mode: {self.output_mode}")
+                if mode is None:
+                    mode = self.output_mode
+                if mode == SimConnectActionMode.Trigger:
                     mode = self.trigger_mode
 
                     if mode == SimConnectTriggerMode.Toggle:
@@ -1410,24 +1673,29 @@ class SimConnectBlock():
                         state = ar.get(self._command)
                         value = 1 if state == 0 else 0
                         ar.set(self._command, value)
-                        if verbose:
-                            logger.info(f"\tToggle state: {state} -> {value}")
+                        if self.verbose:
+                            syslog.info(f"\tToggle state: {state} -> {value}")
                     elif mode == SimConnectTriggerMode.TurnOff:
                         ar.set(self._command, 0)
-                        if verbose:
-                            logger.info(f"\tTurn off: 0")
+                        if self.verbose:
+                            syslog.info(f"\tTurn off: 0")
                     elif mode == SimConnectTriggerMode.TurnOn:
                         ar.set(self._command, 1)
-                        if verbose:
-                            logger.info(f"\tTurn on: 1")
+                        if self.verbose:
+                            syslog.info(f"\tTurn on: 1")
                     elif mode == SimConnectTriggerMode.NoOp:
-                        if verbose:
-                            logger.info(f"\tNo op:")
+                        if self.verbose:
+                            syslog.info(f"\tNo op:")
                         ar.set(self._command, 1)
-                elif self.output_mode == SimConnectActionMode.SetValue:
+                elif mode == SimConnectActionMode.SetValue:
                     ar.set(self._command, value)
-                    if verbose:
-                        logger.info(f"\tSet value: {value}")
+                    if self.verbose:
+                        syslog.info(f"\tSet value: {value}")
+                elif mode == SimConnectActionMode.GetValue:
+                    value = ar.get(self._command)
+                    if self.verbose:
+                        syslog.info(f"\tGet value: {value}")
+                    return value
 
                 return True
 
@@ -1436,14 +1704,38 @@ class SimConnectBlock():
 
 
             elif self._command_type == SimConnectCommandType.Request and not self._readonly:
-                ar = AircraftRequests(self.sm, _time=2000)
-                ar.set(self._command, value)
-                if verbose:
-                    logger.info(f"Simconnect: set request {self._command} {value}")
+                ar = AircraftRequests(self.sm, time=2000)
+                self._request = ar.request(self._command)
+                if self._request:
+                    self._request._ensure_def()    
+                    self._request.callback = self.request_changed_callback
+                    if self.is_periodic:
+                        self.sm._request_periodic_data(self._request)
+                    else:
+                        self.sm._request_data(self._request)
+                    if self.verbose:
+                        syslog.info(f"Simconnect: set request {self._command} {value}")
+                else:
+                    syslog.error(f"Simmconnect: unknown command '{self._command}'")
                 return True
 
         return False
-
+    
+    def request_changed_callback(self):
+        ''' called when the request receives data '''
+        sh = SimConnectEventHandler()
+        if self.verbose_detailed:
+            syslog.info(f"Simconnect block: {self._command}  Received data: {self._request.buffer}  data type: {type(self._request.buffer).__name__}")
+        event = SimConnectEvent(self._command, self._request.buffer)
+        sh.simconnect_event.emit(event)
+    
+    def stop(self):
+        ''' stops a periodic request '''
+        request = self._request
+        if request is not None: # request was made
+            if self.is_periodic: # request is periodic 
+                self.sm.stop_periodic_data(request) # tell the sim to stop sending data 
+            self.sm.clear(request) # remove the definition
 
     def to_xml(self):
         ''' writes to an xml node block '''
@@ -1464,7 +1756,7 @@ class SimConnectBlock():
         ''' reads from an xml node block '''
         command = gremlin.util.safe_read(node,"command", str)
         if not command:
-            command = SimConnectData().get_default_command()
+            command = SimConnectManager().get_default_command()
         self.command = command
         self.value = gremlin.util.safe_read(node,"value", float, 0)
         mode = gremlin.util.safe_read(node,"mode", str, "none")

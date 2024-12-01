@@ -896,6 +896,7 @@ class VerboseMode(IntFlag):
     SimConnect = auto() # simconnect interface
     Details = auto() # user interface details
     Condition = auto() # conditions diagnostics
+    OSC = auto() # OSC data 
     All = Keyboard | Joystick | Inputs | Mouse | Details | SimConnect | Condition
 
     def __contains__(self, item):

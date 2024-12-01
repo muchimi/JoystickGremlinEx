@@ -3,237 +3,91 @@ from .Enum import *
 from .Constants import *
 
 
-class Request(object):
-
-	def get(self):
-		return self.value
-
-	def set(self, _value):
-		self.value = _value
-
-	@property
-	def value(self):
-		if self._deff_test():
-			# self.sm.run()
-			if (self.LastData + self.time) < millis():
-				if self.sm.get_data(self):
-					self.LastData = millis()
-				else:
-					return None
-			return self.outData
-		else:
-			return None
-
-	@value.setter
-	def value(self, val):
-		if self._deff_test() and self.settable:
-			self.outData = val
-			self.sm.set_data(self)
-			# self.sm.run()
-
-	def __init__(self, _deff, _sm, _time=10, _dec=None, _settable=False, _attemps=10):
-		self.DATA_DEFINITION_ID = None
-		self.definitions = []
-		self.description = _dec
-		self._name = None
-		self.definitions.append(_deff)
-		self.outData = None
-		self.attemps = _attemps
-		self.sm = _sm
-		self.time = _time
-		self.defined = False
-		self.settable = _settable
-		self.LastData = 0
-		self.LastID = 0
-		if ':index' in str(self.definitions[0][0]):
-			self.lastIndex = b':index'
-
-	def setIndex(self, index):
-		if not hasattr(self, "lastIndex"):
-			return False
-		(dec, stype) = self.definitions[0]
-		newindex = str(":" + str(index)).encode()
-		if newindex == self.lastIndex:
-			return
-		dec = dec.replace(self.lastIndex, newindex)
-		self.lastIndex = newindex
-		self.definitions[0] = (dec, stype)
-		self.redefine()
-		return True
-
-	def redefine(self):
-		if self.DATA_DEFINITION_ID is not None:
-			self.sm._dll.ClearDataDefinition(
-				self.sm._hSimConnect,
-				self.DATA_DEFINITION_ID.value,
-			)
-			self.defined = False
-			# self.sm.run()
-		if self._deff_test():
-			# self.sm.run()
-			self.sm.get_data(self)
-
-	def _deff_test(self):
-		if not self.sm.ok:
-			# auto connect
-			self.sm.connect()
-		if not self.sm.ok:
-			return False
-		if ':index' in str(self.definitions[0][0]):
-			self.lastIndex = b':index'
-			return False
-		if self.defined is True:
-			return True
-		if self.DATA_DEFINITION_ID is None:
-			self.DATA_DEFINITION_ID = self.sm.new_def_id()
-			self.DATA_REQUEST_ID = self.sm.new_request_id()
-			self.outData = None
-			self.sm.Requests[self.DATA_REQUEST_ID.value] = self
-
-		rtype = self.definitions[0][1]
-		DATATYPE = SIMCONNECT_DATATYPE.SIMCONNECT_DATATYPE_FLOAT64
-		if 'String' in rtype.decode() or 'string' in rtype.decode():
-			rtype = None
-			DATATYPE = SIMCONNECT_DATATYPE.SIMCONNECT_DATATYPE_STRINGV
-
-		err = self.sm._dll.AddToDataDefinition(
-			self.sm._hSimConnect,
-			self.DATA_DEFINITION_ID.value,
-			self.definitions[0][0],
-			rtype,
-			DATATYPE,
-			0,
-			SIMCONNECT_UNUSED,
-		)
-		if self.sm.IsHR(err, 0):
-			self.defined = True
-			temp = DWORD(0)
-			self.sm._dll.GetLastSentPacketID(self.sm._hSimConnect, temp)
-			self.LastID = temp.value
-			return True
-		else:
-			syslog.error("SIM def" + str(self.definitions[0]))
-			return False
-
-
-class RequestHelper:
-	def __init__(self, _sm, _time=10, _attempts=10):
-		self.sm = _sm
-		self.dic = []
-		self.time = _time
-		self.attempts = _attempts
-
-	# def __getattribute__(self, _name):
-	# 	return super().__getattribute__(_name)
-		
-	def __getattr__(self, _name):
-		if _name in self.list:
-			key = self.list.get(_name)
-			setable = False
-			if key[3] == 'Y':
-				setable = True
-			ne = Request((key[1], key[2]), self.sm, _dec=key[0], _settable=setable, _time=self.time, _attemps=self.attempts)
-			setattr(self, _name, ne)
-			return ne
-		return None
-
-	def get(self, _name):
-		if getattr(self, _name) is None:
-			return None
-		return getattr(self, _name).value
-
-	def set(self, _name, _value=0):
-		temp = getattr(self, _name)
-		if temp is None:
-			return False
-		if not getattr(temp, "settable"):
-			return False
-
-		setattr(temp, "value", _value)
-		return True
-
-	def json(self):
-		map = {}
-		for att in self.list:
-			val = self.get(att)
-			if val is not None:
-				try:
-					map[att] = val.value
-				except AttributeError:
-					map[att] = val
-		return map
-
 
 class AircraftRequests():
 	def find(self, key):
 		index = None
 		if ':' in key:
 			(keyname, index) = key.split(":", 1)
-			key = "%s:index" % (keyname)
+			key = f"{keyname}:index"
 
-		for clas in self.list:
-			if key in clas.list:
-				rqest = getattr(clas, key)
+		for item in self.list:
+			if key in item.list:
+				request = getattr(item, key)
 				if index is not None:
-					rqest.setIndex(index)
-				return rqest
+					request.setIndex(index)
+				return request
+		return None
+	
+	def request(self, key):
+		''' gets the request object for this aircraft request '''
+		_request = self.find(key)
+		if _request is not None:
+			_request._ensure_def()
+			return _request
 		return None
 
+
 	def get(self, key):
-		request = self.find(key)
+		''' gets the value of the current request '''
+		request = self.request(key)
 		if request is None:
 			return None
+		self.sm.get_data(request)
 		return request.value
 
 	def set(self, key, _value):
-		request = self.find(key)
+		''' sets the value of the current request '''
+		request = self.request(key)
 		if request is None:
 			return False
 		request.value = _value
+		self.sm.set_data(request)
+			
 		return True
 
-	def __init__(self, _sm, _time=10, _attemps=10):
-		self.sm = _sm
+	def __init__(self, sm : SimConnect, time=10, attempts=10, on_change = False):
+		self.sm = sm
 		self.list = []
-		self.EngineData = self.__AircraftEngineData(_sm, _time, _attemps)
+		self.EngineData = self.__AircraftEngineData(sm, time, attempts, on_change)
 		self.list.append(self.EngineData)
-		self.FuelTankSelection = self.__FuelTankSelection(_sm, _time, _attemps)
+		self.FuelTankSelection = self.__FuelTankSelection(sm, time, attempts, on_change)
 		self.list.append(self.FuelTankSelection)
-		self.FuelData = self.__AircraftFuelData(_sm, _time, _attemps)
+		self.FuelData = self.__AircraftFuelData(sm, time, attempts, on_change)
 		self.list.append(self.FuelData)
-		self.LightsData = self.__AircraftLightsData(_sm, _time, _attemps)
+		self.LightsData = self.__AircraftLightsData(sm, time, attempts, on_change)
 		self.list.append(self.LightsData)
-		self.PositionandSpeedData = self.__AircraftPositionandSpeedData(_sm, _time, _attemps)
+		self.PositionandSpeedData = self.__AircraftPositionandSpeedData(sm, time, attempts, on_change)
 		self.list.append(self.PositionandSpeedData)
-		self.FlightInstrumentationData = self.__AircraftFlightInstrumentationData(_sm, _time, _attemps)
+		self.FlightInstrumentationData = self.__AircraftFlightInstrumentationData(sm, time, attempts, on_change)
 		self.list.append(self.FlightInstrumentationData)
-		self.AvionicsData = self.__AircraftAvionicsData(_sm, _time, _attemps)
+		self.AvionicsData = self.__AircraftAvionicsData(sm, time, attempts, on_change)
 		self.list.append(self.AvionicsData)
-		self.ControlsData = self.__AircraftControlsData(_sm, _time, _attemps)
+		self.ControlsData = self.__AircraftControlsData(sm, time, attempts, on_change)
 		self.list.append(self.ControlsData)
-		self.AutopilotData = self.__AircraftAutopilotData(_sm, _time, _attemps)
+		self.AutopilotData = self.__AircraftAutopilotData(sm, time, attempts, on_change)
 		self.list.append(self.AutopilotData)
-		self.LandingGearData = self.__AircraftLandingGearData(_sm, _time, _attemps)
+		self.LandingGearData = self.__AircraftLandingGearData(sm, time, attempts, on_change)
 		self.list.append(self.LandingGearData)
-		self.AircraftEnvironmentData = self.__AircraftEnvironmentData(_sm, _time, _attemps)
+		self.AircraftEnvironmentData = self.__AircraftEnvironmentData(sm, time, attempts, on_change)
 		self.list.append(self.AircraftEnvironmentData)
-		self.HelicopterSpecificData = self.__HelicopterSpecificData(_sm, _time, _attemps)
+		self.HelicopterSpecificData = self.__HelicopterSpecificData(sm, time, attempts, on_change)
 		self.list.append(self.HelicopterSpecificData)
-		self.MiscellaneousSystemsData = self.__AircraftMiscellaneousSystemsData(_sm, _time, _attemps)
+		self.MiscellaneousSystemsData = self.__AircraftMiscellaneousSystemsData(sm, time, attempts, on_change)
 		self.list.append(self.MiscellaneousSystemsData)
-		self.MiscellaneousData = self.__AircraftMiscellaneousData(_sm, _time, _attemps)
+		self.MiscellaneousData = self.__AircraftMiscellaneousData(sm, time, attempts, on_change)
 		self.list.append(self.MiscellaneousData)
-		self.StringData = self.__AircraftStringData(_sm, _time, _attemps)
+		self.StringData = self.__AircraftStringData(sm, time, attempts, on_change)
 		self.list.append(self.StringData)
-		self.AIControlledAircraft = self.__AIControlledAircraft(_sm, _time, _attemps)
+		self.AIControlledAircraft = self.__AIControlledAircraft(sm, time, attempts, on_change)
 		self.list.append(self.AIControlledAircraft)
-		self.CarrierOperations = self.__CarrierOperations(_sm, _time, _attemps)
+		self.CarrierOperations = self.__CarrierOperations(sm, time, attempts, on_change)
 		self.list.append(self.CarrierOperations)
-		self.Racing = self.__Racing(_sm, _time, _attemps)
+		self.Racing = self.__Racing(sm, time, attempts, on_change)
 		self.list.append(self.Racing)
-		self.EnvironmentData = self.__EnvironmentData(_sm, _time, _attemps)
+		self.EnvironmentData = self.__EnvironmentData(sm, time, attempts, on_change)
 		self.list.append(self.EnvironmentData)
-		self.SlingsandHoists = self.__SlingsandHoists(_sm, _time, _attemps)
+		self.SlingsandHoists = self.__SlingsandHoists(sm, time, attempts, on_change)
 		self.list.append(self.SlingsandHoists)
 
 	class __AircraftEngineData(RequestHelper):
@@ -714,6 +568,7 @@ class AircraftRequests():
 			"RUDDER_TRIM_PCT": ["The trim position of the rudder. Zero is no trim.", b'RUDDER TRIM PCT', b'Percent over 100', 'Y'],
 			"FOLDING_WING_HANDLE_POSITION": ["True if the folding wing handle is engaged.", b'FOLDING WING HANDLE POSITION', b'Bool', 'N'],
 			"FUEL_DUMP_SWITCH": ["If true the aircraft is dumping fuel at the rate set in the configuration file.", b'FUEL DUMP SWITCH', b'Bool', 'N'],
+			#"PARKING_BRAKE_SET": ["Set the parking brake on/off",b'PARKING BRAKE SET', b'Bool', 'Y'],
 		}
 
 	class __AircraftAutopilotData(RequestHelper):

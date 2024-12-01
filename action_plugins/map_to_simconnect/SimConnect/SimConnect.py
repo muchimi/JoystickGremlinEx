@@ -22,6 +22,8 @@ from ctypes import *
 from ctypes.wintypes import *
 import logging
 import time
+
+import gremlin.util
 from .Enum import *
 from .Constants import *
 from .Attributes import *
@@ -41,6 +43,205 @@ def millis():
 	return int(round(time.time() * 1000))
 
 
+class Request(object):
+
+	
+	def __init__(self, definitions, sm, time=10, dec=None, settable=False, attempts=10, callback = None):
+		''' request 
+		
+		:param deff:  definitions (command, datatype)
+		:callback : callback to call when the value of this request is set by the simulator
+		
+		'''
+		self.DATA_DEFINITION_ID = None
+		self.definitions = []
+		self.description = dec
+		self._name = None
+		if definitions:
+			self.definitions.append(definitions)
+		self.buffer = None
+		self.attempts = attempts
+		self._sm : SimConnect = sm
+		self.time = time
+		self.defined = False
+		self.settable = settable
+		self.LastData = 0
+		self.LastID = 0
+		self._callback = callback # callback to call when data changes
+		if ':index' in str(self.definitions[0][0]):
+			self.lastIndex = b':index'
+
+	@property
+	def addCommand(self, command, datatype):
+		self.definitions.append((command, datatype))
+
+	@property
+	def callback(self):
+		return self._callback
+	
+	@callback.setter
+	def callback(self, value):
+		self._callback = value
+
+	def get(self):
+		return self.value
+
+	def set(self, _value):
+		self.value = _value
+
+	@property
+	def value(self):
+		if self._ensure_def():
+			if (self.LastData + self.time) < millis():
+				if self._sm.get_data(self):
+					self.LastData = millis()
+				else:
+					return None
+			return self.buffer
+		else:
+			return None
+
+	@value.setter
+	def value(self, val):
+		if self._ensure_def():
+			if not self.settable:
+				syslog.warning(f"Value is not settable: {self.definitions} {self.description}")
+				return
+			self.buffer = val
+
+	def transmit(self):
+		''' sends the data to simconnect '''
+		self._sm.set_data(self)
+
+	def setIndex(self, index):
+		if not hasattr(self, "lastIndex"):
+			return False
+		(dec, stype) = self.definitions[0]
+		newindex = str(":" + str(index)).encode()
+		if newindex == self.lastIndex:
+			return
+		dec = dec.replace(self.lastIndex, newindex)
+		self.lastIndex = newindex
+		self.definitions[0] = (dec, stype)
+		self.redefine()
+		return True
+
+	def redefine(self):
+		if self.DATA_DEFINITION_ID is not None:
+			self._sm._dll.ClearDataDefinition(
+				self._sm._hSimConnect,
+				self.DATA_DEFINITION_ID.value,
+			)
+			self.defined = False
+			# self.sm.run()
+		if self._ensure_def():
+			# self.sm.run()
+			self._sm.get_data(self)
+
+	def Register(self):
+		''' ensures the request is registered with SimConnect '''
+		self._ensure_def()
+
+	def _ensure_def(self):
+		if not self._sm.ok:
+			# auto connect
+			self._sm.connect()
+		if not self._sm.ok:
+			return False
+		
+		if self.defined is True:
+			return True
+	
+		DATATYPE = SIMCONNECT_DATATYPE.SIMCONNECT_DATATYPE_FLOAT64
+		if ':index' in str(self.definitions[0][0]):
+			self.lastIndex = b':index'
+			return False
+
+
+		rtype = self.definitions[0][1]
+		s_rtype = rtype.decode()
+		
+		if s_rtype.casefold() == 'string':
+			rtype = None
+			DATATYPE = SIMCONNECT_DATATYPE.SIMCONNECT_DATATYPE_STRINGV
+
+		command = self.definitions[0][0]
+
+		if self.DATA_DEFINITION_ID is None:
+			self.DATA_DEFINITION_ID = self._sm.new_def_id()
+			self.DATA_REQUEST_ID = self._sm.new_request_id()
+			self.buffer = None
+			self._sm.Requests[self.DATA_REQUEST_ID.value] = self
+
+
+		err = self._sm._dll.AddToDataDefinition(
+			self._sm._hSimConnect,
+			self.DATA_DEFINITION_ID.value,
+			command,
+			rtype,
+			DATATYPE,
+			0,
+			SIMCONNECT_UNUSED,
+		)
+		if self._sm.IsHR(err, 0):
+			self.defined = True
+			temp = DWORD(0)
+			self._sm._dll.GetLastSentPacketID(self._sm._hSimConnect, temp)
+			self.LastID = temp.value
+			syslog.info(f"Simconnect: request defintion OK: {command}")
+			return True
+		else:
+			syslog.error(f"Simconnect: request defintion error: {command}")
+			return False
+
+
+class RequestHelper:
+	def __init__(self, sm, time=10, attempts=10, on_change = False):
+		self.sm = sm
+		self.dic = []
+		self.time = time
+		self.attempts = attempts
+		self.on_change = on_change # if set, ask to trigger whenever the data changes
+
+	def __getattr__(self, _name):
+		if _name in self.list:
+			key = self.list.get(_name)
+			setable = False
+			if key[3] == 'Y':
+				setable = True
+			ne = Request((key[1], key[2]), self.sm, dec=key[0], settable=setable, time=self.time, attempts=self.attempts)
+			setattr(self, _name, ne)
+			return ne
+		return None
+
+	def get(self, _name):
+		if getattr(self, _name) is None:
+			return None
+		return getattr(self, _name).value
+
+	def set(self, _name, _value=0):
+		temp = getattr(self, _name)
+		if temp is None:
+			return False
+		if not getattr(temp, "settable"):
+			return False
+
+		setattr(temp, "value", _value)
+		return True
+
+	def json(self):
+		map = {}
+		for att in self.list:
+			val = self.get(att)
+			if val is not None:
+				try:
+					map[att] = val.value
+				except AttributeError:
+					map[att] = val
+		return map
+
+
+
 class SimConnect():
 	''' MSFS simconnect interface '''
 
@@ -48,9 +249,15 @@ class SimConnect():
 	def __init__(self, handler, auto_connect=True, library_path=_library_path, verbose = False, 
 			  	sim_paused_callback = None,
 				sim_running_callback = None,
-				aircraft_loaded_callback = None):
+				aircraft_loaded_callback = None,
+				):
+		''' initializes sim connect 
 		
-		#from action_plugins.map_to_simconnect.SimConnectData import SimConnectEventHandler
+		:param handler: SimConnectEventHandler
+		
+		'''
+		
+		
 		
 		self.Requests = {}
 		self.Facilities = []
@@ -95,7 +302,9 @@ class SimConnect():
 			self.connect()
 
 					
-
+	@property
+	def handle(self):
+		return self._hSimConnect
 		
 				
 	@QtCore.Slot()
@@ -205,11 +414,16 @@ class SimConnect():
 			rtype = _request.definitions[0][1].decode()
 			if 'string' in rtype.lower():
 				pS = cast(ObjData.dwData, c_char_p)
-				_request.outData = pS.value
+				_request.buffer = pS.value
 			else:
-				_request.outData = cast(
+				_request.buffer = cast(
 					ObjData.dwData, POINTER(c_double * len(_request.definitions))
 				).contents[0]
+
+			if _request.callback is not None:
+				''' run the request callback '''
+				_request.callback()
+			
 		else:
 			syslog = logging.getLogger("system")
 			syslog.warning(f"SimConnect: Event ID: {dwRequestID} is not handled")
@@ -239,7 +453,7 @@ class SimConnect():
 		
 
 	# TODO: update callbackfunction to expand functions.
-	def my_dispatch_proc(self, pData, cbData, pContext):
+	def simconnect_dispatch_proc(self, pData, cbData, pContext):
 		# print("my_dispatch_proc")
 		syslog = logging.getLogger("system")
 		dwID = pData.contents.dwID
@@ -295,6 +509,11 @@ class SimConnect():
 			folder = os.path.dirname(file)
 			if self._aircraft_loaded_callback:
 				self._aircraft_loaded_callback(folder)
+		elif dwID == SIMCONNECT_RECV_ID.SIMCONNECT_RECV_ID_SIMOBJECT_DATA:
+			# data
+			pObjData = cast(pData, POINTER(SIMCONNECT_RECV_SIMOBJECT_DATA)).contents
+			self.handle_simobject_event(pObjData)
+
 
 		else:
 			if self.verbose:
@@ -312,7 +531,7 @@ class SimConnect():
 			self._is_loop_running = False
 			self._quit = 0
 			self._dll = SimConnectDll(self._library_path)
-			self._my_dispatch_proc_rd = self._dll.DispatchProc(self.my_dispatch_proc)
+			self._my_dispatch_proc_rd = self._dll.DispatchProc(self.simconnect_dispatch_proc)
 			err = self._dll.Open(
 				byref(self._hSimConnect), LPCSTR(b"Request Data"), None, 0, 0, 0
 			)
@@ -369,12 +588,16 @@ class SimConnect():
 		self._is_loop_running = True
 		syslog = logging.getLogger("system")
 		syslog.info("Simconnect: Open connection")
+		error_count = 10
 		while self._quit == 0:
 			try:
 				self._dll.CallDispatch(self._hSimConnect, self._my_dispatch_proc_rd, None)
 				time.sleep(.002)
+				error_count = 10
 			except:
-				pass
+				error_count -=1
+				if error_count == 0:
+					self._quit = True
 		# close the connection
 		try:
 			self._dll.Close(self._hSimConnect)
@@ -433,36 +656,75 @@ class SimConnect():
 		syslog.error(f"Simconnect: Error: MapToSimEvent: event: {name}")
 		return None
 
-	def add_to_notification_group(self, group, evnt, bMaskable=False):
+	def add_to_notification_group(self, group, event, maskable : bool =False):
 		if self._dll is not None:
 			self._dll.AddClientEventToNotificationGroup(
-				self._hSimConnect, group, evnt, bMaskable
+				self._hSimConnect, group, event, maskable
 			)
 
-	def request_data(self, _Request):
+	def _request_data(self, request : Request):
 		if self._dll is not None:
-			_Request.outData = None
+			request.buffer = None
 			self._dll.RequestDataOnSimObjectType(
 				self._hSimConnect,
-				_Request.DATA_REQUEST_ID.value,
-				_Request.DATA_DEFINITION_ID.value,
+				request.DATA_REQUEST_ID.value,
+				request.DATA_DEFINITION_ID.value,
 				0,
 				SIMCONNECT_SIMOBJECT_TYPE.SIMCONNECT_SIMOBJECT_TYPE_USER,
 			)
 			temp = DWORD(0)
 			self._dll.GetLastSentPacketID(self._hSimConnect, temp)
-			_Request.LastID = temp.value
+			request.LastID = temp.value
 
-	def set_data(self, _Request):
+	def _request_periodic_data(self, request : Request):
+		if self._dll is not None:
+			request.buffer = None
+			self._dll.RequestDataOnSimObject(
+				self._hSimConnect,
+				request.DATA_REQUEST_ID.value,
+				request.DATA_DEFINITION_ID.value,
+				0, # object ID 0 = aircraft
+				SIMCONNECT_PERIOD.SIMCONNECT_PERIOD_VISUAL_FRAME, #  specifies how often the data is to be sent by the server and received by the client
+				SIMCONNECT_DATA_REQUEST_FLAG.SIMCONNECT_DATA_REQUEST_FLAG_CHANGED, # 0 or changed or tagged
+				0, # origin The number of times the data should be transmitted before this communication is ended. The default is zero, which means the data should be transmitted endlessly.
+				0, # interval The number of times the data should be transmitted before this communication is ended. The default is zero, which means the data should be transmitted endlessly.
+				0 # limit The number of times the data should be transmitted before this communication is ended. The default is zero, which means the data should be transmitted endlessly.
+			)
+			temp = DWORD(0)
+			self._dll.GetLastSentPacketID(self._hSimConnect, temp)
+			request.LastID = temp.value			
+
+	def stop_periodic_data(self, request):
+		''' stops a request for periodic data setup with request_periodic_data'''
+		if self._dll is not None:
+			request.buffer = None
+			self._dll.RequestDataOnSimObject(
+				self._hSimConnect,
+				request.DATA_REQUEST_ID.value,
+				request.DATA_DEFINITION_ID.value,
+				0,
+				SIMCONNECT_PERIOD.SIMCONNECT_PERIOD_NEVER,
+			)
+
+	def clear(self, request):
+		''' clears a request '''
+		if self._dll is not None:
+			self._dll.ClearClientDataDefinition(
+				self._hSimConnect,
+				request.DATA_DEFINITION_ID.value
+			)
+
+	def set_data(self, request : Request):
 		if self._dll is None:
 			return False
-		
-		rtype = _Request.definitions[0][1].decode()
+		if request.buffer is None:
+			return False
+		rtype = request.definitions[0][1].decode()
 		if 'string' in rtype.lower():
-			pyarr = bytearray(_Request.outData)
+			pyarr = bytearray(request.buffer)
 			dataarray = (ctypes.c_char * len(pyarr))(*pyarr)
 		else:
-			pyarr = list([_Request.outData])
+			pyarr = list([request.buffer])
 			dataarray = (ctypes.c_double * len(pyarr))(*pyarr)
 
 		pObjData = cast(
@@ -470,11 +732,11 @@ class SimConnect():
 		)
 		err = self._dll.SetDataOnSimObject(
 			self._hSimConnect,
-			_Request.DATA_DEFINITION_ID.value,
+			request.DATA_DEFINITION_ID.value,
 			SIMCONNECT_SIMOBJECT_TYPE.SIMCONNECT_SIMOBJECT_TYPE_USER,
-			0,
-			0,
-			sizeof(ctypes.c_double) * len(pyarr),
+			SIMCONNECT_DATA_SET_FLAG.SIMCONNECT_DATA_SET_FLAG_DEFAULT,
+			0, # one element 
+			sizeof(ctypes.c_double) * len(pyarr), # size of the element in bytes
 			pObjData
 		)
 		if self.IsHR(err, 0):
@@ -482,19 +744,24 @@ class SimConnect():
 			return True
 		else:
 			return False
+	
 
-	def get_data(self, _Request):
-		self.request_data(_Request)
+	def get_data(self, request):
+		self._request_data(request)
 		retries = 0
-		while _Request.outData is None and retries < _Request.attemps:
+		while request.buffer is None and retries < request.attempts:
 			time.sleep(.01)
 			retries += 1
-		if _Request.outData is None:
+		if request.buffer is None:
 			if self.verbose:
-				syslog.warning(f"Simconnect: warning: timeout in request {_Request}")
+				syslog.warning(f"Simconnect: warning: timeout in request {request}")
 			return False
-
 		return True
+	
+	def get_periodic_data(self, request):
+		''' requests periodic data (data will be sent on change via the event system) '''
+		self._request_periodic_data(request)
+	
 
 	def send_event(self, evnt, data=DWORD(0)):
 		if self._dll is None:
@@ -506,7 +773,8 @@ class SimConnect():
 			evnt.value,
 			data,
 			SIMCONNECT_GROUP_PRIORITY_HIGHEST,
-			DWORD(16),
+			SIMCONNECT_EVENT_FLAG_GROUPID_IS_PRIORITY  #DWORD(16),
+			
 		)
 
 		if self.IsHR(err, 0):

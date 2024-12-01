@@ -1312,12 +1312,14 @@ class OscClient(QtCore.QObject):
                 # button press mode - if the value is in the top half of the range, the button is considered pressed
                 is_axis = False
                 raw_value = args[0]
-
+                
+                autorelease = False
                 
                 input_type = InputType.OpenSoundControl
                 if input_item.mode == OscInputItem.InputMode.Button:
                     is_pressed = raw_value != 0.0   #for OSC pressed is any value except 0
                     value = 1 if is_pressed else 0
+                    autorelease = input_item._autorelease
                 elif input_item.mode == OscInputItem.InputMode.Axis:
                     is_pressed = False
                     # map to -1 +1 range for vjoy output
@@ -1334,17 +1336,27 @@ class OscClient(QtCore.QObject):
                 if self._verbose:
                     logging.getLogger("system").info(f"OSC: send event: is_pressed: {is_pressed} value: {value} raw value: {raw_value} is axis: {is_axis}")
 
-                self._event_listener.osc_event.emit(
-                gremlin.event_handler.Event(
+                event = gremlin.event_handler.Event(
                     event_type = input_type,
                     device_guid = OscDeviceTabWidget.device_guid,
                     identifier = input_item,
                     is_pressed = is_pressed,
                     value = value,
                     raw_value = raw_value,
-                    is_axis = is_axis
+                    is_axis = is_axis)
 
-                ))
+                self._event_listener.osc_event.emit(event)
+
+
+                if autorelease:
+                    # schedule an autorelease event
+                    delay = input_item.autorelease_delay/1000 # ms to s
+                    release_event = event.clone()
+                    release_event.is_pressed = False
+                    release_event.value = 0
+                    timer = threading.Timer(delay, lambda: self._event_listener.osc_event.emit(release_event))
+                    timer.start()
+
         # else:
         #     if verbose:
         #         logging.getLogger("system").info(f"OSC: runtime: ignoring {message_key}")

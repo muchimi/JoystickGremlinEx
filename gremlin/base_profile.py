@@ -1374,6 +1374,10 @@ class AbstractAction(ProfileData):
 
     def input_is_axis(self):
         ''' true if the input is an axis type input '''
+        if hasattr(self, "hardware_input_type"):
+            input_type : InputType = self.hardware_input_type
+            return input_type == InputType.JoystickAxis
+                
 
         is_axis = hasattr(self.hardware_input_id, "is_axis") and self.hardware_input_id.is_axis
         if hasattr(self.input_item,"is_axis"):

@@ -36,7 +36,7 @@ import gremlin.gated_handler
 import enum
 from gremlin.profile import safe_format, safe_read
 import gremlin.util
-from .SimConnectData import *
+from .SimConnectManager import *
 import re
 from lxml import etree
 from lxml import etree as ElementTree
@@ -59,7 +59,7 @@ class CommandValidator(QtGui.QValidator):
     ''' validator for command selection '''
     def __init__(self):
         super().__init__()
-        self.commands = SimConnectData().get_command_name_list()
+        self.commands = SimConnectManager().get_command_name_list()
         
         
     def validate(self, value, pos):
@@ -971,7 +971,7 @@ class SimconnectOptionsUi(QtWidgets.QDialog):
     @QtCore.Slot()
     def _active_button_cb(self):
         widget = self.sender()
-        sm = SimConnectData()
+        sm = SimConnectManager()
         
         aircraft = sm.get_aircraft()
         if aircraft:
@@ -1909,8 +1909,6 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         # self._update_ui_container_visibility()
 
 
-
-
 class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor):
 
     manager = gremlin.macro.MacroManager()
@@ -1921,7 +1919,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         self.command = action.command # the command to execute
         self.value = action.value # the value to send (None if no data to send)
         eh = SimConnectEventHandler()
-        self.smd  = eh.smd
+        self.manager : SimConnectManager = eh.manager
 
 
     
@@ -1934,13 +1932,16 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         self.reconnect_timeout = 5
         self.last_reconnect_time = None
         
-        self.block = self.smd.block(self.command)
+        self.block = self.manager.block(self.command)
         self.action_data.gate_data.process_callback = self.process_gated_event
+
+        
 
 
 
     def profile_stop(self):
         ''' occurs wen the profile stops'''
+
         eh = SimConnectEventHandler()
         eh.request_disconnect.emit()
         
@@ -1955,7 +1956,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
 
         logging.getLogger("system").info(f"SC FUNCTOR: {event}  {value}")
         
-        if not self.smd.is_running:
+        if not self.manager.is_running:
             return True
 
         if not self.block or not self.block.valid:
@@ -1992,7 +1993,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
     def process_event(self, event, action_value : gremlin.actions.Value):
         ''' runs when a joystick event occurs like a button press or axis movement when a profile is running '''
 
-        if not self.smd.is_running:
+        if not self.manager.is_running:
             # sim is not running - attempt to reconnect every few seconds
             if self.last_reconnect_time is None or self.last_reconnect_time + self.reconnect_timeout > time.time():
                 self.last_reconnect_time = time.time()
@@ -2018,7 +2019,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         # execute the nested functors for this action
         super().process_event(event, action_value)
 
-        if not self.smd.is_running:
+        if not self.manager.is_running:
             # sim is not running
             return
         
@@ -2079,7 +2080,7 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         self.parent = parent
 
         eh = SimConnectEventHandler()
-        self.smd  = eh.smd
+        self.smd  = eh.manager
 
 
         self.input_type = self.get_input_type()
@@ -2143,6 +2144,7 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
     def command(self, value):
         if value != self._command:
             # update command and associated block
+            
             self._command = value
             self.update_block()
     
@@ -2186,7 +2188,8 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         # self.category = SimConnectEventCategory.to_enum(value, validate=False)
         node_block =gremlin.util.get_xml_child(node,"block")
         if node_block is not None:
-            self.block.from_xml(node_block)
+            self._block = SimConnectBlock()
+            self._block.from_xml(node_block)
 
         # load gate data
         gates = []
@@ -2262,7 +2265,7 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         self.__dict__.update(state)
         # sm is not serialized, add it
         eh = SimConnectEventHandler()
-        self.smd = eh.smd
+        self.smd = eh.manager
 
 version = 1
 name = "map-to-simconnect"

@@ -25,14 +25,15 @@ SIMCONNECT_CLIENTDATA_MAX_SIZE = DWORD(
 
 # Notification Group priority values
 SIMCONNECT_GROUP_PRIORITY_HIGHEST = DWORD(1)  # highest priority
-SIMCONNECT_GROUP_PRIORITY_HIGHEST_MASKABLE = DWORD(
-	10000000
-)  # highest priority that allows events to be masked
+SIMCONNECT_GROUP_PRIORITY_HIGHEST_MASKABLE = DWORD(10000000)  # highest priority that allows events to be masked
 SIMCONNECT_GROUP_PRIORITY_STANDARD = DWORD(1900000000)  # standard priority
 SIMCONNECT_GROUP_PRIORITY_DEFAULT = DWORD(2000000000)  # default priority
-SIMCONNECT_GROUP_PRIORITY_LOWEST = DWORD(
-	4000000000
-)  # priorities lower than this will be ignored
+SIMCONNECT_GROUP_PRIORITY_LOWEST = DWORD(4000000000)  # priorities lower than this will be ignored
+
+SIMCONNECT_EVENT_FLAG_DEFAULT                  = DWORD(0x00000000)
+SIMCONNECT_EVENT_FLAG_FAST_REPEAT_TIMER        = DWORD(0x00000001)  # set event repeat timer to simulate fast repeat
+SIMCONNECT_EVENT_FLAG_SLOW_REPEAT_TIMER        = DWORD(0x00000002)  # set event repeat timer to simulate slow repeat
+SIMCONNECT_EVENT_FLAG_GROUPID_IS_PRIORITY      = DWORD(0x00000010)  # interpret GroupID parameter as priority value
 
 # Weather observations Metar strings
 MAX_METAR_LENGTH = DWORD(2000)

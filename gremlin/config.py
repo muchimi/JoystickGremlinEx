@@ -1045,6 +1045,11 @@ class Configuration:
     def verbose_mode_details(self):
         ''' true if verbose mode is in inputs mode '''
         return self.verbose and VerboseMode.Details in self.verbose_mode
+    
+    @property
+    def verbose_mode_detailed(self):
+        ''' true if verbose mode is in inputs mode '''
+        return self.verbose and VerboseMode.Details in self.verbose_mode
 
     @property
     def verbose_mode_simconnect(self):
@@ -1055,6 +1060,11 @@ class Configuration:
     def verbose_mode_condition(self):
         ''' true if verbose mode is in simconnect mode '''
         return self.verbose and VerboseMode.Condition in self.verbose_mode
+    
+    @property
+    def verbose_mode_osc(self):
+        ''' true if verbose mode is in OSC mode '''
+        return self.verbose and VerboseMode.OSC in self.verbose_mode
     
 
     @property

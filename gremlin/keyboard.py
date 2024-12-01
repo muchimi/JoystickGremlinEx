@@ -1145,7 +1145,7 @@ class KeyMap:
         "right": ("Right", 0x4d, True, win32con.VK_RIGHT),
         # Numpad
         "numlock": ("NumLock", 0x45, True, win32con.VK_NUMLOCK),
-        "npdivide": ("Numpad /", 0x35, True, win32con.VK_DIVIDE),
+        "npdivide": ("Numpad / (FSlash)", 0x35, True, win32con.VK_DIVIDE),
         "npmultiply": ("Numpad *", 0x37, False, win32con.VK_MULTIPLY),
         "npminus": ("Numpad -", 0x4a, False, win32con.VK_SUBTRACT),
         "npplus": ("Numpad +", 0x4e, False, win32con.VK_ADD),

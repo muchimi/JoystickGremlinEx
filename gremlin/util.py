@@ -1418,3 +1418,13 @@ def getHostIp():
         s.close()
 
     return host_ip
+
+
+def to_byte_string(source) -> tuple:
+    ''' converts a byte string or regular string to (string, bytestring) '''
+    if source is None:
+        return (None, None)
+    if isinstance(source, bytes):
+        return (source.decode(), source)
+    return (source, source.encode('utf-8'))
+    

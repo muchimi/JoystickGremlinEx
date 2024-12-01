@@ -63,16 +63,17 @@ class RangeContainerWidget(AbstractContainerWidget):
         toolbar_widget.setLayout(toolbar_container)
 
         toolbar1_widget = QtWidgets.QWidget()
-        toolbar1 = QtWidgets.QHBoxLayout()
-        toolbar1_widget.setLayout(toolbar1)
+        toolbar1_widget.setContentsMargins(0,0,0,0)
+        toolbar1_layout = QtWidgets.QHBoxLayout()
+        toolbar1_widget.setLayout(toolbar1_layout)
 
         toolbar2_widget = QtWidgets.QWidget()
-        toolbar2 = QtWidgets.QHBoxLayout()
-        toolbar2_widget.setLayout(toolbar2)
+        toolbar2_widget.setContentsMargins(0,0,0,0)
+        toolbar2_layout = QtWidgets.QHBoxLayout()
+        toolbar2_widget.setLayout(toolbar2_layout)
 
 
-        toolbar_container.addWidget(toolbar1_widget)
-        toolbar_container.addWidget(toolbar2_widget)
+        
 
         self.widget_layout = QtWidgets.QVBoxLayout()
 
@@ -104,9 +105,13 @@ class RangeContainerWidget(AbstractContainerWidget):
 
         # holds the range data when triggered by range
         range_widget = QtWidgets.QWidget()
-        range_container = QtWidgets.QHBoxLayout() # holds the range data
-        range_widget.setLayout(range_container)
+        range_container = QtWidgets.QHBoxLayout(range_widget) # holds the range data
         self.ui_range_widget = range_widget
+
+        # options_widget = QtWidgets.QWidget()
+        # options_widget.setContentsMargins(0,0,0,0)
+        # options_layout =  QtWidgets.QHBoxLayout(options_widget)
+        # self.ui_options_widget = options_widget
 
         any_change_mode =  QtWidgets.QCheckBox("Any Change") # trigger on any change mode
         self.ui_any_change_mode = any_change_mode
@@ -203,6 +208,13 @@ class RangeContainerWidget(AbstractContainerWidget):
         symmetrical_box.setChecked(action_data.symmetrical)
         symmetrical_box.setToolTip("When enabled, the range given will be automatically mirrored about the center of the range, causing an action trigger when the range on either side of the center value is entered.")
 
+        # release_box =  QtWidgets.QCheckBox("Autorelease")
+        # release_box.setChecked(action_data.autorelease)
+        # release_box.setToolTip("When enabled, a release action will be triggered when the input exits the range")
+
+        # options_layout.addWidget(release_box)
+        
+
         mode_container.addWidget(any_change_label)
         mode_container.addWidget(any_change_delta)
         mode_container.addWidget(container_mode_widget)
@@ -220,19 +232,19 @@ class RangeContainerWidget(AbstractContainerWidget):
 
 
 
-        toolbar1.addWidget(any_change_mode)
-        toolbar1.addWidget(mode_widget)
-        toolbar1.addWidget(range_widget)
-        toolbar1.addStretch()
+        toolbar1_layout.addWidget(any_change_mode)
+        toolbar1_layout.addWidget(mode_widget)
+        toolbar1_layout.addWidget(range_widget)
+        toolbar1_layout.addStretch()
 
-        toolbar2.addWidget(add_button_top_90)
-        toolbar2.addWidget(action_label)
-        toolbar2.addWidget(self.ui_action_dropdown)
-        toolbar2.addWidget(range_count_label)
-        toolbar2.addWidget(self.ui_range_count)
-        toolbar2.addWidget(add_range)
-        toolbar2.addWidget(replace_range)
-        toolbar2.addStretch()
+        toolbar2_layout.addWidget(add_button_top_90)
+        toolbar2_layout.addWidget(action_label)
+        toolbar2_layout.addWidget(self.ui_action_dropdown)
+        toolbar2_layout.addWidget(range_count_label)
+        toolbar2_layout.addWidget(self.ui_range_count)
+        toolbar2_layout.addWidget(add_range)
+        toolbar2_layout.addWidget(replace_range)
+        toolbar2_layout.addStretch()
 
 
         
@@ -245,6 +257,9 @@ class RangeContainerWidget(AbstractContainerWidget):
         self.ui_max_box_included = min_box_included
         self.ui_symmetrical = symmetrical_box
         self.ui_range_options = toolbar2_widget
+        #self.ui_autorelease = release_box
+
+        
 
         self.action_selector.action_added.connect(self._add_action)
         self.action_selector.action_paste.connect(self._paste_action)
@@ -254,6 +269,7 @@ class RangeContainerWidget(AbstractContainerWidget):
         max_box.valueChanged.connect(self._range_max_changed)
         max_box_included.clicked.connect(self._range_max_included_changed)
         symmetrical_box.clicked.connect(self._symmetrical_changed)
+        #release_box.clicked.connect(self._autorelease_changed)        
 
         self.action_layout.addLayout(self.widget_layout)
 
@@ -261,6 +277,11 @@ class RangeContainerWidget(AbstractContainerWidget):
         mode_widget.setEnabled(mode)
         range_widget.setEnabled(not mode)
         toolbar2_widget.setEnabled(not mode)
+
+
+        toolbar_container.addWidget(toolbar1_widget)
+        toolbar_container.addWidget(toolbar2_widget)
+        #toolbar_container.addWidget(options_widget)
                 
 
         # Insert action widgets
@@ -373,8 +394,13 @@ class RangeContainerWidget(AbstractContainerWidget):
     def _range_max_included_changed(self):
         self.profile_data.range_max_included = self.ui_max_box_included.isChecked()
 
+    @QtCore.Slot(bool)
     def _symmetrical_changed(self):
         self.profile_data.symmetrical = self.ui_symmetrical.isChecked()       
+
+    # @QtCore.Slot(bool)
+    # def _autorelease_changed(self):
+    #     self.profile_data.autorelease = self.ui_autorelease.isChecked()
 
     def _add_top_90(self):
         self.ui_min_box.setValue(0.90)
@@ -713,6 +739,7 @@ class RangeContainer(AbstractContainer):
         self.condition_enabled = False
         self.virtual_button_enabled = False
         self.exit_range_triggers = [] # triggers to execute when the range is exited
+        self.autorelease = False # if set, autoreleases when the value is outside the range after being in the range
         
         
         # make actions think we're attached to a button
@@ -748,6 +775,8 @@ class RangeContainer(AbstractContainer):
                 self.symmetrical = safe_read(node, "sym",bool)
             if "direction" in node.attrib:
                 self.any_change_direction = safe_read(node,"direction",int)
+            if "autorelease" in node.attrib:
+                self.autorelease = safe_read(node,"autorelease", bool, False)
             
         except:
             pass
@@ -766,6 +795,7 @@ class RangeContainer(AbstractContainer):
         node.set("max_inc", safe_format(self.range_max_included, bool))
         node.set("sym", safe_format(self.symmetrical, bool))
         node.set("direction", safe_format(self.any_change_direction, int))
+        node.set("autorelease", safe_format(self.autorelease, bool))
 
         # write children out
         as_node = ElementTree.Element("action-set")

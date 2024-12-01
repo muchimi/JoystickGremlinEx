@@ -1616,6 +1616,17 @@ class OscClient():
         if not self._started:
             self.start()
 
+
+        verbose = gremlin.config.Configuration().verbose_mode_osc
+        if verbose:
+            syslog = logging.getLogger("system")
+            msg = f"Send OSC: {command}"
+            if v1 is not None:
+                msg += f" {v1}"
+            if v2 is not None:
+                msg += f" {v2}"
+            syslog.info(msg)
+
         builder = OscMessageBuilder(command)
         self.add_arg(builder, v1)
         self.add_arg(builder, v2)
@@ -1728,7 +1739,7 @@ class OscServer():
 class OscInterface(QtCore.QObject):
     ''' GremlinEX Open Sound Control interface '''
 
-    osc_message = QtCore.Signal(str, object ) # signal on receiving an osc message
+    osc_message = QtCore.Signal(str, object) # signal on receiving an osc message
 
     def __init__(self):
         super().__init__()
@@ -1850,6 +1861,23 @@ class OscInputItem(AbstractInputItem):
         self._message_key = "" # unique key that identifies this input
         self._min_range = 0.0
         self._max_range = 1.0 
+        self._autorelease = False # true if auto-release
+        self._autorelease_delay = 250 # default release delay
+
+    @property
+    def autoRelease(self) -> bool:
+        return self._autorelease
+    @autoRelease.setter
+    def autoRelease(self, value: bool):
+        self._autorelease = value
+        self._update()
+
+    @property
+    def autorelease_delay(self) -> int:
+        return self._autorelease_delay
+    @autorelease_delay.setter
+    def autorelease_delay(self, value: int):
+        self._autorelease_delay = value
 
 
     @property
@@ -1996,7 +2024,7 @@ class OscInputItem(AbstractInputItem):
     def _update(self):
         ''' updates the message key based on the current config '''
         if self._command_mode == OscInputItem.CommandMode.Data:
-            self._message_key = f"{self.message} {self._data_to_string(self._data)}"
+            self._message_key = f"{self.message} {self._data_to_string(self._message_data)}"
         elif self._command_mode == OscInputItem.CommandMode.Message:
             self._message_key = self.message
         else:
@@ -2018,6 +2046,10 @@ class OscInputItem(AbstractInputItem):
             self._command_mode = OscInputItem.command_mode_from_string(safe_read(node,"cmd_mode", str))
             self._min_range = safe_read(node,"min",float, 0.0)
             self._max_range = safe_read(node,"max",float, 1.0)
+            if "autorelease" in node.attrib:
+                self._autorelease = safe_read(node,"autorelease", bool, False)
+            if "autorelease_delay" in node.attrib:
+                self._autorelease_delay = safe_read(node,"autorelease_delay", int, 250)
 
         self._update()
 
@@ -2032,6 +2064,8 @@ class OscInputItem(AbstractInputItem):
         node.set("cmd_mode", self.command_mode_string)
         node.set("min", str(self._min_range))
         node.set("max", str(self._max_range))
+        node.set("autorelease", str(self._autorelease))
+        node.set("autorelease_delay", str(self._autorelease_delay))
         return node
           
    
@@ -2212,6 +2246,8 @@ class OscInputConfigDialog(QtWidgets.QDialog):
         self._mode_locked = False # if set, prevents flipping input modes axis to a button mode
         self._min_range = 0.0 # min value for axis mapping (maps to -1.0 in vjoy)
         self._max_range = 1.0 # max value for axis mapping (maps to 1.0 in vjoy)
+        self._autorelease = data._autorelease
+        self._pulse_delay = data._autorelease_delay
         
 
         # midi message
@@ -2282,6 +2318,27 @@ class OscInputConfigDialog(QtWidgets.QDialog):
         self._mode_on_change_widget.clicked.connect(self._mode_change_cb)
         self._mode_locked_widget = gremlin.ui.ui_common.QIconLabel()
 
+        self._autorelease_widget = QtWidgets.QCheckBox("Autorelease Button")
+        self._autorelease_widget.setToolTip("For OSC inputs that only issue a press, GremlinEx will auto-issue a release trigger")
+        self._autorelease_widget.setChecked(self._autorelease)
+        self._autorelease_widget.clicked.connect(self._autorelease_change_cb)
+
+
+        self._autorelease_container_widget = QtWidgets.QWidget()
+        self._autorelease_container_layout = QtWidgets.QHBoxLayout(self._autorelease_container_widget)
+        self.pulse_spin_widget = QtWidgets.QSpinBox()
+        self.pulse_spin_widget.setMinimum(0)
+        self.pulse_spin_widget.setMaximum(60000)
+        self.pulse_spin_widget.setValue(self._pulse_delay)
+        self.pulse_spin_widget.valueChanged.connect(self._pulse_value_changed)
+
+        self._autorelease_container_layout.addWidget(self._autorelease_widget)
+        self._autorelease_container_layout.addWidget(QtWidgets.QLabel("Pulse duration (ms):"))
+        self._autorelease_container_layout.addWidget(self.pulse_spin_widget)
+        self._autorelease_container_layout.addStretch()
+        
+
+
         self._container_mode_radio_layout.addWidget(QtWidgets.QLabel("Action mode:"))
         self._container_mode_radio_layout.addWidget(self._mode_on_change_widget)
         self._container_mode_radio_layout.addWidget(self._mode_button_widget)
@@ -2300,6 +2357,7 @@ class OscInputConfigDialog(QtWidgets.QDialog):
 
         self._container_option_layout.addWidget(self._container_mode_radio_widget)
         self._container_option_layout.addWidget(self._container_command_mode_radio_widget)
+        
         self._container_option_layout.addStretch()
 
 
@@ -2326,6 +2384,7 @@ class OscInputConfigDialog(QtWidgets.QDialog):
         main_layout.addWidget(self.config_widget)
         main_layout.addWidget(self._container_options_widget)
         main_layout.addWidget(self._container_range_widget)
+        main_layout.addWidget(self._autorelease_container_widget)
         main_layout.addWidget(self._container_mode_description_widget)
         main_layout.addWidget(self._container_command_mode_description_widget)
         main_layout.addWidget(self._validation_message_widget)
@@ -2356,6 +2415,12 @@ class OscInputConfigDialog(QtWidgets.QDialog):
 
         self._validate()
         self._update_display()
+
+
+    def _pulse_value_changed(self, value):
+        ''' called when the pulse value changes '''
+        if value >= 0:
+            self._pulse_delay = value
 
     def _validate(self):
         ''' validates the input to ensure it does not conflict with an existing input '''
@@ -2446,10 +2511,16 @@ class OscInputConfigDialog(QtWidgets.QDialog):
             self._mode = OscInputItem.InputMode.Button
             self._update_display()             
 
+    @QtCore.Slot()
     def _mode_change_cb(self):
         if self._mode_on_change_widget.isChecked():
             self._mode = OscInputItem.InputMode.OnChange
             self._update_display()
+
+    @QtCore.Slot(bool)
+    def _autorelease_change_cb(self, checked):
+        self._autorelease = checked
+
 
     def _command_mode_message_cb(self):
         if self._command_mode_message_widget.isChecked():
@@ -2487,11 +2558,14 @@ class OscInputConfigDialog(QtWidgets.QDialog):
 
     def _update_display(self):
         ''' loads message data into the UI '''
-           # mode radio buttons
+        # mode radio buttons
+        autorelease_visible = False
         if self._mode == OscInputItem.InputMode.Button:
             self._container_mode_description_widget.setText(f"The input will trigger a button press when the value is 1<br>Use this to trigger a button press from a specific OSC message.")
             with QtCore.QSignalBlocker(self._mode_button_widget):
                 self._mode_button_widget.setChecked(True)
+            autorelease_visible = True
+            
         elif self._mode == OscInputItem.InputMode.Axis:
             self._container_mode_description_widget.setText(f"The input act as an axis input using the OSC value.<br>Use this mode if mapping to an axis output (OSC value messages only)")
             self._command_mode = OscInputItem.CommandMode.Message # force message mode in axis as the value will determine the state
@@ -2518,6 +2592,8 @@ class OscInputConfigDialog(QtWidgets.QDialog):
         self._command_widget.setText(self._command)
         csv = list_to_csv(self._command_data)
         self._data_widget.setText(csv)
+
+        self._autorelease_container_widget.setVisible(autorelease_visible)
 
     def _update_message(self):
         ''' updates message data from UI '''
@@ -2931,6 +3007,8 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         command_mode = self._edit_dialog.command_mode
         min_range = self._edit_dialog.min_range
         max_range = self._edit_dialog.max_range
+        autorelease = self._edit_dialog._autorelease
+        autorelease_delay = self._edit_dialog._pulse_delay
         
 
         identifier = self.input_item_list_model.data(index)
@@ -2941,6 +3019,8 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         input_item._command_mode = command_mode
         input_item._min_range = min_range
         input_item._max_range = max_range
+        input_item._autorelease = autorelease
+        input_item._autorelease_delay = autorelease_delay
 
         is_axis = mode == OscInputItem.InputMode.Axis
 

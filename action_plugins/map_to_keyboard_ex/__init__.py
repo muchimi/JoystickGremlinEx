@@ -42,6 +42,7 @@ import logging
 import threading
 import time
 from gremlin.util import log_info
+import gremlin.util
 
 class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
@@ -60,11 +61,13 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
         """Creates the UI components."""
 
 
-        self.key_combination = QtWidgets.QLabel()
+        self.key_combination = QtWidgets.QLabel("<b>Current key combination:</b>")
+        self.key_combination_widget = QtWidgets.QWidget() # holds the keys
+        self.key_combination_layout = QtWidgets.QHBoxLayout(self.key_combination_widget)
 
         self.action_widget = QtWidgets.QWidget()
-        self.action_layout = QtWidgets.QHBoxLayout()
-        self.action_widget.setLayout(self.action_layout)
+        self.action_layout = QtWidgets.QHBoxLayout(self.action_widget)
+        
 
         self.record_button = QtWidgets.QPushButton("Listen")
         self.record_button.clicked.connect(self._record_keys_cb)
@@ -159,13 +162,14 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 
         self.main_layout.addWidget(self.key_combination)
+        self.main_layout.addWidget(self.key_combination_widget)
         self.main_layout.addWidget(self.action_widget)
         self.main_layout.addWidget(self._options_widget)
         self.main_layout.addWidget(self.delay_container_widget)
         self.main_layout.addWidget(self.description_widget)
 
 
-        self.main_layout.addStretch(1)
+        self.main_layout.addStretch()
         self._mode_changed() # update UI based on mode
 
     def _select_keys_cb(self):
@@ -193,9 +197,35 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _populate_ui(self):
         """Populates the UI components."""
-        text = "<b>Current key combination:</b> "
-        text += f" + {self.action_data._get_display_keys()}"
-        self.key_combination.setText(text)
+        #text = "<b>Current key combination:</b>"
+        # text += f"{self.action_data._get_display_keys()}"
+        #self.key_combination.setText(text)
+
+        gremlin.util.clear_layout(self.key_combination_layout)
+        max_width = 32
+        
+        for index, name in enumerate(self.action_data._get_display_keys(as_list=True)):
+            if index:
+                lbl = QtWidgets.QLabel("+")
+                self.key_combination_layout.addWidget(lbl)
+            lbl = QtWidgets.QLabel(name)
+            w = gremlin.ui.ui_common.get_text_width(name)
+            # center text if needed as cscc text align isn't supported by QT labels
+            css_pad = ""
+            if w < max_width:
+                delta = (max_width - w) // 2
+                css_pad = f" padding-left: {delta}px; padding-right:{delta}px;"  
+            
+            lbl.setStyleSheet(f"background-color:white; border: 2px solid black; border-radius: 4px 8px;{css_pad}")
+            lbl.setMinimumHeight(24)
+            lbl.setMinimumWidth(32)
+            self.key_combination_layout.addWidget(lbl)
+
+        self.key_combination_layout.addStretch()
+
+            
+        
+
 
 
 
@@ -492,7 +522,7 @@ class MapToKeyboardEx(gremlin.base_profile.AbstractAction):
         config.last_keyboard_mapper_interval_value =self.autorepeat_delay_box.value()
         
 
-    def _get_display_keys(self):
+    def _get_display_keys(self, as_list = False):
         text = ''
         names = []
 
@@ -508,6 +538,8 @@ class MapToKeyboardEx(gremlin.base_profile.AbstractAction):
                 assert True, f"Don't know how to handle: {code}"
             if key:
                 names.append(key.name)
+        if as_list:
+            return names
         text += " + ".join(names)
         return text
 
