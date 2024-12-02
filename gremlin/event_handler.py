@@ -274,6 +274,7 @@ class EventListener(QtCore.QObject):
 	profile_start = QtCore.Signal() # profile start signal (when a profile starts)
 	profile_stop = QtCore.Signal() # profile stop signal (when a profile stops)
 	profile_unload = QtCore.Signal() # profile unload signal (when a profile is unloaded and a new profile loaded)
+	request_profile_stop = QtCore.Signal(str) # request the profile to stop (reason: str)
 	
 	# occurs on broadcast configuration change
 	config_changed =  QtCore.Signal()
@@ -524,8 +525,11 @@ class EventListener(QtCore.QObject):
 		dinput.DILL.set_input_event_callback(self._joystick_event_handler)
 		while self._running:
 			# Keep this thread alive until we are done
-			time.sleep(0.1)
+			time.sleep(0.05)
 		logging.getLogger("system").info("DILL: input stop listen")
+		dinput.DILL.set_device_change_callback(None)
+		dinput.DILL.set_input_event_callback(None)
+
 
 	def _joystick_event_handler(self, data):
 		"""Callback for joystick events.

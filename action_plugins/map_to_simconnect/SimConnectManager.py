@@ -25,6 +25,7 @@ from PySide6 import QtWidgets, QtCore, QtGui
 import gremlin.base_classes
 import gremlin.base_profile
 import gremlin.config
+import gremlin.event_handler
 import gremlin.macro
 import gremlin.ui.ui_common
 import gremlin.ui.input_item
@@ -435,6 +436,7 @@ class SimConnectManager(QtCore.QObject):
 
 
         self.reload()
+    
 
     def reload(self, force_update = False):
                 # if the data file doesn't exist, create it in the user's profile folder from the built-in data
@@ -691,7 +693,10 @@ class SimConnectManager(QtCore.QObject):
 
         if not self._sm.ok:
             if self._connect_attempts == 0:
-                syslog.warning("Simconnect: failed to connect to simulator")
+                syslog.error("Simconnect: failed to connect to simulator - terminating profile")
+                # request the profile to stop
+                eh = gremlin.event_handler.EventListener()
+                eh.request_profile_stop.emit()
             return False
 
         # on connection - grab the current aircraft da
@@ -1048,6 +1053,15 @@ class SimConnectManager(QtCore.QObject):
         if command in self._aircraft_events_description_map.keys():
             return self._aircraft_events_description_map[command]
         return "Not found"
+    
+    def get_command_type(self, command) -> SimConnectCommandType:
+        ''' maps to the type of command'''
+        if self._aircraft_events.find(command):
+            return SimConnectCommandType.Event
+        if self._aircraft_requests.find(command):
+            return SimConnectCommandType.SimVar
+        return SimConnectCommandType.NotSet
+
 
     @property
     def AircraftEvents(self):
@@ -1649,11 +1663,11 @@ class SimConnectBlock():
                 if trigger:
                     if self.is_readonly:
                         # no param to set
-                        if self.verbose_detailed:
+                        if self.verbose:
                             syslog.info(f"Simconnect: trigger Simconnect Event: {self._command}")
                         trigger()
                     else:
-                        if self.verbose_detailed:
+                        if self.verbose:
                             syslog.info(f"Simconnect: trigger event value: {self._command} {value}")
                         trigger(value)
                     return True
@@ -1775,9 +1789,13 @@ class SimConnectBlock():
 
         self.min_range = gremlin.util.safe_read(node,"min_range", float, -16383)
         self.max_range = gremlin.util.safe_read(node,"max_range", float, 16383)
+        
 
 
-
-
+    def update(self):
+        ''' updates missing values '''
+        if self._command_type == SimConnectCommandType.NotSet:
+            sm = SimConnectManager()
+            self._command_type = sm.get_command_type(self._command)
 
 

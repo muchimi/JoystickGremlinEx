@@ -1884,7 +1884,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _readonly_cb(self):
         block : SimConnectBlock
-        block = self.block
+        block = self.action_data.block
         
         readonly = block is not None and block.is_readonly
         checked = self.output_readonly_status_widget.isChecked()
@@ -1916,7 +1916,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         self.value = action.value # the value to send (None if no data to send)
         eh = SimConnectEventHandler()
         self.manager : SimConnectManager = eh.manager
-
+        self.valid = False
 
     
     def profile_start(self):
@@ -1928,8 +1928,14 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         self.reconnect_timeout = 5
         self.last_reconnect_time = None
         
-        self.block = self.manager.block(self.command)
         self.action_data.gate_data.process_callback = self.process_gated_event
+        if self.action_data.block is None or not self.action_data.block.command_type != SimConnectCommandType.NotSet:
+            syslog.error(f"Simconnect: invalid block: {self.command}")
+            self.valid = False
+            return
+        
+        self.valid = True
+
 
         
 
@@ -1950,44 +1956,48 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
     def process_gated_event(self, event, value : gremlin.actions.Value):
         ''' handles gated input data '''
 
+        if not self.valid:
+            return
+
         logging.getLogger("system").info(f"SC FUNCTOR: {event}  {value}")
-        
+
         if not self.manager.is_running:
             return True
+        
+        block = self.action_data.block
 
-        if not self.block or not self.block.valid:
+        if not block or not block.valid:
             # invalid command
             return True
    
-        if event.is_axis and self.block.is_axis:
-            # axis event to axis block mapping
+        if event.is_axis and block.is_axis:
+            # axis event to axis block mapping/
 
 
             if self.action_data.mode == SimConnectActionMode.Ranged:
                 # come up with a default mode for the selected command if not set
                 target = value.current
-
-                if self.action_data.curve_data is not None:
-                    # curve the output 
-                    target = self.action_data.curve_data.curve_value(target)
             
-                output_value = gremlin.util.scale_to_range(target, target_min = self.action_data.min_range, target_max = self.action_data.max_range, invert=self.action_data.invert_axis)
-                return self.block.execute(output_value)
+                output_value = gremlin.util.scale_to_range(target, target_min = self.action_data.min_range, target_max = self.action_data.max_range, invert= block.invert_axis)
+                return block.execute(output_value)
                 
             if self.action_data.mode == SimConnectActionMode.Trigger:
                 pass
                     
             elif self.action_data.mode == SimConnectActionMode.SetValue:
                 target = self.action_data.value
-                return self.block.execute(target)
+                return block.execute(target)
             
         elif value.is_pressed:
             # momentary trigger - trigger on press - such as from gate crossings
-            return self.block.execute(value.is_pressed)
+            return block.execute(value.is_pressed)
 
 
     def process_event(self, event, action_value : gremlin.actions.Value):
         ''' runs when a joystick event occurs like a button press or axis movement when a profile is running '''
+
+        if not self.valid:
+            return
 
         if not self.manager.is_running:
             # sim is not running - attempt to reconnect every few seconds
@@ -1997,40 +2007,38 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                 eh.request_connect.emit()
             return True
 
-        if event.is_axis:
-            # process input options and any merge and curve operation
-            value = self.action_data.get_filtered_axis_value(action_value.current)
-
-            if self.action_data.curve_data is not None:
-                # curve the output 
-                value = self.action_data.curve_data.curve_value(value)
-
-            action_value = gremlin.actions.Value(value)
-        
         return self._process_event(event, action_value)                    
 
-    def _process_event(self, event, action_value):
+    def _process_event(self, event, action_value : gremlin.actions.Value):
         ''' handles default input data '''
 
         # execute the nested functors for this action
         super().process_event(event, action_value)
 
+        verbose = gremlin.config.Configuration().verbose_mode_inputs
+        #verbose = True
+
         if not self.manager.is_running:
             # sim is not running
             return
         
-        if not self.block or not self.block.valid:
+        block = self.action_data.block
+
+        if not block or not block.valid:
             # invalid command
-            return True
-        
-        if event.is_axis and self.action_data.block.output_mode in (SimConnectActionMode.Ranged, SimConnectActionMode.Gated):
-            value = self.action_data.get_filtered_axis_value(action_value.current)
-            action_value = gremlin.actions.Value(value)
-            block_value = gremlin.util.scale_to_range(action_value.current, target_min = self.block.min_range, target_max = self.block.max_range, invert= self.block.invert_axis)
-            self.block.execute(block_value)
-        elif self.action_data.block.output_mode == SimConnectActionMode.Trigger:
-            if not event.is_axis and value.is_pressed:
-                self.block.execute(value.current)
+            return True        
+        if event.is_axis and block.output_mode in (SimConnectActionMode.Ranged, SimConnectActionMode.Gated):
+            # value = self.action_data.get_filtered_axis_value(action_value.current)
+            # process input options and any merge and curve operation
+            filtered_value = self.action_data.get_filtered_axis_value(action_value.current)
+            action_value = gremlin.actions.Value(filtered_value)
+            
+            block_value = gremlin.util.scale_to_range(filtered_value, target_min = block.min_range, target_max = block.max_range, invert= block.invert_axis)
+            if verbose: syslog.info(f"Send block axis: {block.command}  raw: {action_value.current:3f} filtered: {filtered_value} {block_value:2f} inverted: {block.invert_axis} ")
+            block.execute(block_value)
+        elif block.output_mode == SimConnectActionMode.Trigger:
+            if not event.is_axis and action_value.is_pressed:
+                block.execute(action_value.current)
         return True
     
 
@@ -2096,6 +2104,7 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
 
         # curve data applied to a simconnect axis output
         self.curve_data = None # present if curve data is needed
+        
 
         self._block = SimConnectBlock()
 
@@ -2110,8 +2119,13 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         ''' computes the output value for the current configuration  '''
 
         if value is None:
+            # filter input
             value = gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, 
                                                         self.hardware_input_id)
+            # apply local curve if any
+            if self.curve_data:
+                value = self.curve_data.curve_value(value)
+
         return value
 
 
@@ -2148,9 +2162,12 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         ''' updates the data block with the current command '''
         if self._command is None:
             self._command = self._default_command()
+        inverted = self.block.invert_axis
         block = self.smd.block(self._command)
-        if block:
-            self._block = block
+        assert block is not None,"Returned block should not be null"
+        block.invert_axis = inverted
+        self._block = block
+
     
     
     @property
@@ -2186,8 +2203,9 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         # self.category = SimConnectEventCategory.to_enum(value, validate=False)
         node_block =gremlin.util.get_xml_child(node,"block")
         if node_block is not None:
-            self._block = SimConnectBlock()
+            assert self._block is not None,"Block should not be null"
             self._block.from_xml(node_block)
+            self._block.update()
 
         # load gate data
         gates = []

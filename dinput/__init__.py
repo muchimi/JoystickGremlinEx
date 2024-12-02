@@ -643,10 +643,12 @@ class DILL:
         callback : callable
             Function to execute when an event occurs.
         """
-        DILL.input_event_callback_fn = C_EVENT_CALLBACK(callback)
-        DILL._dll.set_input_event_callback(
-            DILL.input_event_callback_fn
-        )
+        if callback is None:
+            DILL.input_event_callback_fn = None
+            DILL._dll.set_input_event_callback(C_EVENT_CALLBACK())
+        else:
+            DILL.input_event_callback_fn = C_EVENT_CALLBACK(callback)
+            DILL._dll.set_input_event_callback(DILL.input_event_callback_fn)
 
     @staticmethod
     def set_device_change_callback(callback):
@@ -660,11 +662,14 @@ class DILL:
         callback : callable
             Function to execute when an event occurs.
         """
-        DILL.device_change_callback_fn = \
-            C_DEVICE_CHANGE_CALLBACK(callback)
-        DILL._dll.set_device_change_callback(
-            DILL.device_change_callback_fn
-        )
+        if callback is None:
+            DILL.device_change_callback_fn = None
+            DILL._dll.set_device_change_callback(C_DEVICE_CHANGE_CALLBACK())
+        else:
+            DILL.device_change_callback_fn = C_DEVICE_CHANGE_CALLBACK(callback)
+            DILL._dll.set_device_change_callback(DILL.device_change_callback_fn)
+
+        
 
     @staticmethod
     def get_device_count():

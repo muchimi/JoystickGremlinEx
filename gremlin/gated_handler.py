@@ -1125,7 +1125,7 @@ class GateData():
         gates = self.getGates()
         self.updateRanges() # ensure we have the latest ranges
 
-        verbose = gremlin.config.Configuration().verbose
+        verbose = gremlin.config.Configuration().verbose_mode_detailed
         if verbose:
             syslog.info("GateData: Starting profile with ranges:")
             self.dumpActiveRanges()

@@ -571,7 +571,9 @@ class SimConnect():
 
 				
 		except OSError:
-			syslog.info("Simconnect: Did not find Flight Simulator running.")
+			syslog.error("Simconnect: Did not find Flight Simulator running.")
+			eh = gremlin.event_handler.EventListener()
+			#eh.request_profile_stop.emit("Did not find Flight Simulator running.")
 			raise ConnectionError("Did not find Flight Simulator running.")
 		
 	def run(self):

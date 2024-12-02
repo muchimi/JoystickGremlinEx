@@ -6,13 +6,14 @@ class Event(object):
 	def __call__(self, value=0):
 		if self.event is None:
 			self.event = self.sm.map_to_sim_event(self.deff)
+		syslog.info(f"send {self.description} {value}")
 		self.sm.send_event(self.event, DWORD(int(value)))
 
-	def __init__(self, _deff, _sm, _dec=''):
-		self.deff = _deff
+	def __init__(self, definition, sm, description=''):
+		self.deff = definition
 		self.event = None
-		self.description = _dec
-		self.sm = _sm
+		self.description = description
+		self.sm = sm
 
 
 class EventHelper:
@@ -22,7 +23,7 @@ class EventHelper:
 	def __getattr__(self, _name):
 		for key in self.list:
 			if _name == key[0].decode():
-				ne = Event(key[0], self.sm, _dec=key[1])
+				ne = Event(key[0], self.sm, description=key[1])
 				setattr(self, _name, ne)
 				return ne
 		return None

@@ -605,7 +605,7 @@ def get_midi(dgram: bytes, start_index: int) -> Tuple[MidiPacket, int]:
 
 
 
-### OSCE MESSAGE ###
+### OSC MESSAGE ###
 
 """Representation of an OSC message in a pythonesque way."""
 
