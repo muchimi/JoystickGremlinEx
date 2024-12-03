@@ -211,9 +211,12 @@ class Configuration:
         :param profile_path profile path for which to return the mode
         :return name of the mode if present, None otherwise
         """
+        profile_path = os.path.normpath(profile_path).casefold()
         item = self._data.get("last_mode", None)
-        if item:
-            return item.get(profile_path, None)
+        if not item:
+            return None
+        if profile_path in item:
+            return item[profile_path]
         return None
     
 
@@ -239,10 +242,13 @@ class Configuration:
         :param profile_path profile path for which to return the mode
         :return name of the mode if present, None otherwise
         """
-
+        
+        profile_path = os.path.normpath(profile_path).casefold()
         item = self._data.get("last_edit_mode", None)
-        if item:
-            return item.get(profile_path, None)
+        if not item:
+            return None
+        if profile_path in item:
+            return item[profile_path]
         return None
 
     def set_profile_last_runtime_mode(self, mode_name):

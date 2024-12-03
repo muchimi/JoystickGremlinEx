@@ -1394,8 +1394,8 @@ class ResponseCurveWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 class ResponseCurveFunctor(gremlin.base_profile.AbstractFunctor):
 
-    def __init__(self, action):
-        super().__init__(action)
+    def __init__(self, action, parent = None):
+        super().__init__(action, parent)
         self.deadzone_fn = lambda value: gremlin.input_devices.deadzone(
             value,
             action.deadzone[0],

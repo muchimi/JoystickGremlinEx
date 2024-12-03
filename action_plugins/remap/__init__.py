@@ -276,8 +276,8 @@ class RemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
     """Executes a remap action when called."""
 
-    def __init__(self, action):
-        super().__init__(action)
+    def __init__(self, action, parent = None):
+        super().__init__(action, parent)
         self.vjoy_device_id = action.vjoy_device_id
         self.vjoy_input_id = action.vjoy_input_id
         self.input_type = action.input_type

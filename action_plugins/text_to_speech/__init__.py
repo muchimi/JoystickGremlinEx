@@ -145,8 +145,8 @@ class TextToSpeechFunctor(gremlin.base_profile.AbstractFunctor):
     
     tts = gremlin.tts.TextToSpeech()
 
-    def __init__(self, action):
-        super().__init__(action)
+    def __init__(self, action, parent = None):
+        super().__init__(action, parent)
         self.action_data = action
 
     def _speak(self):

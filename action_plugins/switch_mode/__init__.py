@@ -54,8 +54,8 @@ class SwitchModeWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 class SwitchModeFunctor(gremlin.base_profile.AbstractFunctor):
 
-    def __init__(self, action):
-        super().__init__(action)
+    def __init__(self, action, parent = None):
+        super().__init__(action, parent)
         self.mode_name = action.mode_name
 
     def process_event(self, event, value):

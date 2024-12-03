@@ -30,6 +30,7 @@ import gremlin
 #     joystick_handling, macro, sendinput, user_plugin, util
 
 
+import gremlin.base_profile
 from gremlin.input_types import InputType
 import gremlin.keyboard
 import gremlin.shared_state
@@ -44,7 +45,8 @@ import gremlin.macro
 import gremlin.input_devices
 import gremlin.user_plugin
 import gremlin.sendinput as sendinput
-
+import gremlin.execution_graph
+import anytree
 
 syslog = logging.getLogger("system")
 
@@ -114,7 +116,7 @@ class CodeRunner:
         ''' enables UI '''
         self.setUIState(True)
 
-    def start(self, inheritance_tree, settings, start_mode, profile):
+    def start(self, inheritance_tree, settings, start_mode, profile : gremlin.base_profile.Profile):
         """Starts listening to events and loads all existing callbacks.
 
         :param inheritance_tree tree encoding inheritance between the
@@ -165,6 +167,8 @@ class CodeRunner:
 
         # Retrieve list of current paths searched by Python
         system_paths = [os.path.normcase(os.path.abspath(p)) for p in sys.path]
+
+        ec = gremlin.execution_graph.ExecutionContext()
 
         # Load the generated code
         try:
@@ -248,11 +252,18 @@ class CodeRunner:
             mode_source.sort(key = lambda x: x[0]) # sort parent to child
             mode_list = [mode for (_,mode) in mode_source] # parent mode first
 
-
+            mode_nodes = {}
+            for mode in mode_list:
+                mode_node = gremlin.execution_graph.ExecutionGraphNode(gremlin.execution_graph.ExecutionGraphNodeType.Mode)
+                mode_node.parent = ec.root
+                mode_node.mode = mode
+                mode_nodes[mode] = mode_node
 
             # Create input callbacks based on the profile's content
+
             for device in profile.devices.values():
                 for mode in device.modes.values():
+                    mode_node = mode_nodes[mode.name]
                     for input_items in mode.config.values():
                         for input_item in input_items.values():
                             # Only add callbacks for input items that actually
@@ -279,7 +290,7 @@ class CodeRunner:
                                         "Incomplete container ignored"
                                     )
                                     continue
-                                callbacks.extend(container.generate_callbacks())
+                                callbacks.extend(container.generate_callbacks(mode_node))
 
                             for cb_data in callbacks:
                                 if cb_data.event is None:
@@ -356,14 +367,12 @@ class CodeRunner:
                 for aid, value in data.items():
                     vjoy_proxy.axis(linear_index=aid).set_absolute_value(value)
 
-            
 
 
             # for action in self._actions:
             #     logging.getLogger("system").info(f"ACTION DATA: {action.name} {type(action).__name__}  enabled: {action.enabled}")
 
-            # tell callbacks they are starting
-            el.profile_start.emit()
+            
 
 
 
@@ -459,9 +468,10 @@ class CodeRunner:
             mode = start_mode
             if config.restore_profile_mode_on_start or profile.get_restore_mode():
                 # restore the profile mode
+                mode = profile.get_last_runtime_mode()
                 if verbose:
                     logging.getLogger("system").error(f"Restore last active profile mode: '{mode}'")
-                mode = profile.get_last_mode()
+                
 
                 if mode:
                     if not mode in mode_list:
@@ -493,7 +503,7 @@ class CodeRunner:
 
 
         except Exception as e:
-            msg = f"Unable to launch user plugin due to an error: {e}"
+            msg = f"Unable to launch profile due to an error: {e}"
             # re-enable tabs
             self.enableUI()
             syslog.debug(msg)
@@ -511,12 +521,6 @@ class CodeRunner:
 
         el = gremlin.event_handler.EventListener()
         eh = gremlin.event_handler.EventHandler()
-
-        # stop listen
-        el.stop()
-
-
-        el.profile_stop.emit()
 
         # stop midi client
         gremlin.input_devices.midi_client.stop()

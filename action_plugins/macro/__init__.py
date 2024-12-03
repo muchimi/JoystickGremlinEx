@@ -44,8 +44,8 @@ class MacroFunctor(gremlin.base_profile.AbstractFunctor):
 
     manager = gremlin.macro.MacroManager()
 
-    def __init__(self, action):
-        super().__init__(action)
+    def __init__(self, action, parent = None):
+        super().__init__(action, parent)
         self.macro = gremlin.macro.Macro()
         for seq in action.sequence:
             self.macro.add_action(seq)

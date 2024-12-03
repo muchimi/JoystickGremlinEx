@@ -160,12 +160,12 @@ class MapToGamepadFunctor(gremlin.base_profile.AbstractFunctor):
     properly with a single input, at least partially.
     """
 
-    def __init__(self, action_data):
+    def __init__(self, action_data, parent = None):
         """Creates a new functor with the provided data.
 
         :param action contains parameters to use with the functor
         """
-        super().__init__(action_data)
+        super().__init__(action_data, parent)
         self.action_data = action_data
 
     def process_event(self, event, value):

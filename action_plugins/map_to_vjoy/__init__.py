@@ -26,6 +26,7 @@ import gremlin.actions
 import gremlin.base_conditions
 import gremlin.config
 import gremlin.event_handler
+import gremlin.execution_graph
 import gremlin.input_types
 import gremlin.joystick_handling
 from gremlin.util import load_icon
@@ -2053,8 +2054,8 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                 return widget
         return None
     
-    def __init__(self, action_data):
-        super().__init__(action_data)
+    def __init__(self, action_data, parent = None):
+        super().__init__(action_data, parent)
         self.action_data : VjoyRemap = action_data
         self.vjoy_device_id = action_data.vjoy_device_id
         self.vjoy_input_id = action_data.vjoy_input_id
@@ -2068,6 +2069,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         self.target_value_valid = action_data.target_value_valid
         self.range_low = action_data.range_low
         self.range_high = action_data.range_high
+        
 
         self.exec_on_release = action_data.exec_on_release
         self.paired = action_data.paired
@@ -2080,12 +2082,49 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         self.axis_delta_value = 0.0
         self.axis_value = 0.0
         self.axis_start_value = action_data.axis_start_value
+        self.curve_actions = None # list of curve actions that apply to our input
 
         self.remote_client = input_devices.remote_client
         self.hat_position = (0,0)
         self.in_range = False # true when in axis to button mode and the axis was in range
-
         self.lock = threading.Lock()
+
+
+    def getCurveActions(self):
+        ''' finds curve action siblings to this remap action '''
+        actions = []
+        nodes = []
+        for node in self.getSiblings():
+            if node.action.tag in ("response-curve", "response-curve-ex"):
+                nodes.append(node)
+        
+        # sort the list in reverse priority order (highest prority runs first)
+        if nodes:
+            nodes.sort(key = lambda x: x.priority)
+            nodes.reverse()
+            for node in nodes:
+                actions.append(node.action)
+        return actions
+    
+    def getCurveData(self):
+        ''' returns active curve data that applies to the container through included response curve actions '''
+        actions = self.getCurveActions()
+        curves = []
+        if actions:
+            for action in actions:
+                if action.curve_data:
+                    curves.append(action.curve_data)
+
+        return curves
+
+
+    def applyContainerCurves(self, value : float):
+        ''' applies the container curve data to the curve '''
+        for action in self.curve_actions:
+            if action.curve_data:
+                value = action.curve_data.curve_value(value)
+
+        return value
 
         
     @property
@@ -2114,10 +2153,17 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
             # set start button state
             joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = self.start_pressed
         if self.input_type == InputType.JoystickAxis:
-            # set start axis range
+            # send initial axis values to the output
+
+            # get the same level curve actions 
+            self.curves = self.getCurveData()
+
             usage_data = gremlin.joystick_handling.VJoyUsageState()
             usage_data.set_range(self.vjoy_device_id, self.vjoy_input_id, self.range_low, self.range_high)
             # print(f"Axis start value: vjoy: {self.vjoy_device_id} axis: {self.vjoy_input_id}  value: {self.axis_start_value}")
+
+            
+
             match self.action_mode:
                 case VjoyAction.VJoyAxis:
                     joystick_handling.VJoyProxy()[self.vjoy_device_id].axis(self.vjoy_input_id).value = self.axis_start_value
@@ -2193,12 +2239,14 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         #     # merged axis data is handled by the internal hook - ignore
         #     return True
         if event.is_axis:
-            # process input options and any merge and curve operation
-            value = self.action_data.get_filtered_axis_value(action_value.current)
+            # process input options and any merge and curve operation - the current value will already be curved by the input curve if one exists
 
-            if self.action_data.curve_data is not None:
-                # curve the output 
-                value = self.action_data.curve_data.curve_value(value)
+            # raw_value = gremlin.joystick_handling.get_axis(self.action_data.hardware_device_guid, self.action_data.hardware_input_id)
+            # received = action_value.current
+            value = self.action_data.get_filtered_axis_value(curves = self.curves)
+
+            # syslog = logging.getLogger("system")
+            # syslog.info(f"VjoyRemap: raw {raw_value:0.3f} received: {received:0.3f}  computed: {value:0.3f}  ")
 
             action_value = gremlin.actions.Value(value)
         
@@ -2565,12 +2613,16 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
     def get_raw_axis_value(self):
         return gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, self.hardware_input_id)
 
-    def get_filtered_axis_value(self, value : float = None) -> float:
+    def get_filtered_axis_value(self, value : float = None, curves : list = None) -> float:
         ''' computes the output value for the current configuration  '''
 
         if value is None:
             value = gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, 
                                                         self.hardware_input_id)
+            
+            if curves:
+                for curve_data in curves:
+                    value = curve_data.curve_value(value)
 
         if self.merge_mode != MergeOperationType.NotSet:
             if self.merge_device_id and self.merge_input_id:
@@ -2579,6 +2631,14 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
                                                         self.hardware_input_id) 
                 v2 = gremlin.joystick_handling.get_curved_axis(self.merge_device_guid, 
                                                     self.merge_input_id) 
+                
+                # apply any local curves to the values
+                if curves:
+                    for curve_data in curves:
+                        v1 = curve_data.curve_value(v1)
+                        v2 = curve_data.curve_value(v2)
+
+
                 
                 match self.merge_mode:
                     case MergeOperationType.Add:

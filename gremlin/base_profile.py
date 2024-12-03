@@ -54,7 +54,7 @@ from gremlin.singleton_decorator import SingletonDecorator
 import gremlin.util
 import gremlin.ui.ui_common
 
-
+syslog = logging.getLogger("system")
 
 # Data struct representing profile information of a device
 ProfileDeviceInformation = collections.namedtuple(
@@ -327,7 +327,7 @@ class AbstractContainer(ProfileData):
     # by default the container works with either axis or momentary inputs
     axis_only = False
 
-    def __init__(self, parent):
+    def __init__(self, parent, node = None):
         """Creates a new instance.
 
         :parent the InputItem which is the parent to this action
@@ -344,6 +344,7 @@ class AbstractContainer(ProfileData):
         self.activation_condition = ActivationCondition([],ActivationRule.All) # activation condition that applies to the actions
         self.virtual_button = None
         self.current_view_type = None
+        self.parent_node = node
 
         # attached hardware device to this container
 
@@ -490,7 +491,7 @@ class AbstractContainer(ProfileData):
         else:
             self.virtual_button = None
 
-    def generate_callbacks(self):
+    def generate_callbacks(self, parent = None):
         """Returns a list of callback data entries.
 
         :return list of container callback entries
@@ -508,7 +509,7 @@ class AbstractContainer(ProfileData):
                 None
             ))
             callbacks.append(CallbackData(
-                gremlin.execution_graph.VirtualButtonCallback(self),
+                gremlin.execution_graph.VirtualButtonCallback(self, parent),
                 Event(
                     InputType.VirtualButton,
                     callbacks[-1].callback.virtual_button.identifier,
@@ -519,7 +520,7 @@ class AbstractContainer(ProfileData):
             ))
         else:
            
-            callbacks.append(CallbackData(gremlin.execution_graph.ContainerCallback(self),None))
+            callbacks.append(CallbackData(gremlin.execution_graph.ContainerCallback(self, parent),None))
 
 
         return callbacks
@@ -1120,10 +1121,16 @@ class InputItem():
 
         
         for child in container_node:
-            if child.tag in ("latched", "input", "keylatched","response-curve-ex"):
+            if child.tag in ("latched", "input", "keylatched","response-curve","response-curve-ex"):
                 # ignore extra data
                 continue
-            container_type = child.attrib["type"]
+            if not "type" in child.attrib:
+                logging.getLogger("system").error(
+                    f"XML {child.tag} is missing container 'type' attribute"
+                )
+                continue 
+            container_type = child.get("type")
+            
             if container_type not in container_tag_map:
                 logging.getLogger("system").warning(
                     f"Unknown container type used: {container_type}"
@@ -1580,10 +1587,10 @@ class AbstractContainerAction(AbstractAction):
         self._subcontainers.append(container)
         return container
     
-    def _build_graph(self):
+    def _build_graph(self, parent_node = None):
         ''' builds the execution graph for the sub containers '''
         for container in self._subcontainers:
-            eg = gremlin.execution_graph.ContainerExecutionGraph(container)
+            eg = gremlin.execution_graph.ContainerExecutionGraph(container, parent_node)
             self._functors.extend(eg.functors)
 
         
@@ -1902,6 +1909,9 @@ class Profile():
             config = gremlin.config.Configuration()
             self._last_runtime_mode = mode
             config.set_last_runtime_mode(self._profile_fname, mode)
+            verbose = gremlin.config.Configuration().verbose
+            if verbose:
+                syslog.info(f"Profile: {self._profile_name} set last runtime mode: {mode}")
 
     def get_last_runtime_mode(self):
         ''' gets the last used mode '''
@@ -1909,6 +1919,9 @@ class Profile():
             config = gremlin.config.Configuration()
             mode = config.get_profile_last_runtime_mode()
             if mode is not None:
+                verbose = gremlin.config.Configuration().verbose
+                if verbose:
+                    syslog.info(f"Profile: {self._profile_name} get last runtime mode: {mode}")
                 self._last_runtime_mode = mode
         return self._last_runtime_mode
     

@@ -49,8 +49,8 @@ class NoOpActionFunctor(gremlin.base_profile.AbstractFunctor):
 
     """Functor, executing the NoOp action."""
 
-    def __init__(self, action):
-        super().__init__(action)
+    def __init__(self, action, parent = None):
+        super().__init__(action, parent)
 
     def process_event(self, event, value):
         return True

@@ -162,8 +162,8 @@ class PlaySoundFunctor(gremlin.base_profile.AbstractFunctor):
     player = QtMultimedia.QMediaPlayer()
     audio = QtMultimedia.QAudioOutput()
 
-    def __init__(self, action):
-        super().__init__(action)
+    def __init__(self, action, parent = None):
+        super().__init__(action, parent)
         self.sound_file = action.sound_file
         self.volume = action.volume
         PlaySoundFunctor.player.setAudioOutput(PlaySoundFunctor.audio)

@@ -189,13 +189,13 @@ class ButtonContainerWidget(AbstractContainerWidget):
 
 class ButtonContainerFunctor(gremlin.base_conditions.AbstractFunctor):
 
-    def __init__(self, container):
-        super().__init__(container)
+    def __init__(self, container, parent = None):
+        super().__init__(container, parent)
         self.press_set = gremlin.execution_graph.ActionSetExecutionGraph(
-            container.action_sets[0]
+            container.action_sets[0], parent
         )
         self.release_set = gremlin.execution_graph.ActionSetExecutionGraph(
-            container.action_sets[1]
+            container.action_sets[1], parent
         )
 
     def process_event(self, event, value):
@@ -246,12 +246,12 @@ class ButtonContainer(AbstractContainer):
         gremlin.ui.input_item.ActionSetView.Interactions.Edit,
     ]
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, node = None):
         """Creates a new instance.
 
         :param parent the InputItem this container is linked to
         """
-        super().__init__(parent)
+        super().__init__(parent, node)
         self.action_sets = [[], []]
         self.delay = 0.5
         self.activate_on = "release"

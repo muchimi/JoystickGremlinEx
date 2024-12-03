@@ -326,12 +326,12 @@ class MapToMouseFunctor(gremlin.base_profile.AbstractFunctor):
     properly with a single input, at least partially.
     """
 
-    def __init__(self, action):
+    def __init__(self, action, parent = None):
         """Creates a new functor with the provided data.
 
         :param action contains parameters to use with the functor
         """
-        super().__init__(action)
+        super().__init__(action, parent)
 
         self.config = action
         self.mouse_controller = gremlin.sendinput.MouseController()

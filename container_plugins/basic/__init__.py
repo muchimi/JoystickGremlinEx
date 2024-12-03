@@ -133,10 +133,11 @@ class BasicContainerFunctor(gremlin.base_profile.AbstractFunctor):
 
     """Executes the contents of the associated basic container."""
 
-    def __init__(self, container):
-        super().__init__(container)
+    def __init__(self, container, parent = None):
+        super().__init__(container, parent)
         self.action_set = gremlin.execution_graph.ActionSetExecutionGraph(
-            container.action_sets[0]
+            container.action_sets[0],
+            parent
         )
 
     def process_event(self, event, value):
@@ -168,12 +169,12 @@ class BasicContainer(AbstractContainer):
     functor = BasicContainerFunctor
     widget = BasicContainerWidget
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, node = None):
         """Creates a new instance.
 
         :param parent the InputItem this container is linked to
         """
-        super().__init__(parent)
+        super().__init__(parent, node)
     
     def add_action(self, action, index=-1):
         assert isinstance(action, gremlin.base_profile.AbstractAction)

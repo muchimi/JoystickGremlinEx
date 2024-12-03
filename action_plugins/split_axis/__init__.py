@@ -165,8 +165,8 @@ class SplitAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 class SplitAxisFunctor(gremlin.base_profile.AbstractFunctor):
 
-    def __init__(self, action):
-        super().__init__(action)
+    def __init__(self, action, parent = None):
+        super().__init__(action, parent)
         self.action = action
         self.vjoy = gremlin.joystick_handling.VJoyProxy()
 

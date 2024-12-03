@@ -70,8 +70,8 @@ class GatedAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 class GatedAxisFunctor(gremlin.base_profile.AbstractContainerActionFunctor):
 
-    def __init__(self, action):
-        super().__init__(action)
+    def __init__(self, action, parent = None):
+        super().__init__(action, parent)
 
     def process_event(self, event, value):
         # all the work happens in the gate widget - nothing to do

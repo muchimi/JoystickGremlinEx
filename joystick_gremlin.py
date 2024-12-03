@@ -38,6 +38,8 @@ import webbrowser
 import dinput
 from lxml import etree
 
+import gremlin.event_handler
+import gremlin.execution_graph
 import gremlin.gamepad_handling
 import gremlin.import_profile
 import gremlin.joystick_handling
@@ -49,7 +51,7 @@ import gremlin.util
 import gremlin.curve_handler
 import gremlin.gated_handler
 import gremlin.input_types
-
+import anytree
 
 from gremlin.util import InvokeUiMethod, assert_ui_thread
 
@@ -117,7 +119,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.16ex (m41)"
+APPLICATION_VERSION = "13.40.16ex (m42)"
 
 # the main ui
 ui = None
@@ -717,12 +719,12 @@ class GremlinUi(QtWidgets.QMainWindow):
         import gremlin.ui.osc_device
         import gremlin.shared_state
 
-        abort_received = False
-
         if self.activate_locked:
             #logging.getLogger("system").info("Activate: re-entry")
             return
 
+
+        el = gremlin.event_handler.EventListener()
 
         try:
 
@@ -742,6 +744,8 @@ class GremlinUi(QtWidgets.QMainWindow):
                 if verbose:
                     logging.getLogger("system").info(f"Activate: activate profile")
                 self._profile_auto_activated = False
+                ec = gremlin.execution_graph.ExecutionContext()
+                ec.reset()
                 self.runner.start(
                     self.profile.build_inheritance_tree(),
                     self.profile.settings,
@@ -751,6 +755,13 @@ class GremlinUi(QtWidgets.QMainWindow):
                 #print ("set icon ACTIVE")
                 self.ui.tray_icon.setIcon(load_icon("gfx/icon_active.ico"))
 
+                ec.dump()
+
+
+                # tell callbacks they are starting
+                
+                el.profile_start.emit()
+
             else:
                 # Stop running the code
                 if verbose:
@@ -758,6 +769,12 @@ class GremlinUi(QtWidgets.QMainWindow):
                 if is_running:
                     # running - save the last running mode
                     self.profile.set_last_runtime_mode(gremlin.shared_state.current_mode)
+
+                
+                # stop listen
+                el.stop()
+                # tell modules the profile is stopping
+                el.profile_stop.emit()
 
 
                 self.runner.stop()
@@ -2086,7 +2103,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
 
     def _process_changed_cb(self, path):
-        """Handles changes in the active process.
+        """Handles changes in the active windows process focus
 
         If the active process has a known associated profile it is
         loaded and activated. If none exists and the user has not
@@ -2116,9 +2133,9 @@ class GremlinUi(QtWidgets.QMainWindow):
         option_reset_mode_on_process_activate = config.reset_mode_on_process_activate
         eh = gremlin.event_handler.EventHandler()
 
-        verbose = gremlin.config.Configuration().verbose
-        # if verbose:
-        #     logging.getLogger("system").info(f"PROC: Process focus change detected: {os.path.basename(path)}  autoload: {option_auto_load}  keep focus: {option_keep_focus} restore mode: {option_restore_mode}")
+        verbose = gremlin.config.Configuration().verbose_mode_detailed
+        if verbose:
+            logging.getLogger("system").info(f"PROC: Process focus change detected: {os.path.basename(path)}  autoload: {option_auto_load}  keep focus: {option_keep_focus} restore mode: {option_restore_mode}")
 
         # see if we have a mapping entry for this executable
         profile_item = self._profile_map.get_map(path)
@@ -2143,7 +2160,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                 # figure out which mode to restore mode for the new profile
                 if option_restore_mode:
                     # get the mode to restore
-                    mode = self.profile.get_last_mode()
+                    mode = self.profile.get_last_runtime_mode()
                     if verbose:
                         logging.getLogger("system").info(f"PROC: profile: '{os.path.basename(profile_path)}' restore last mode: '{mode}' ")
 
@@ -2156,7 +2173,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
                 if option_restore_mode:
                     # get the mode to restore
-                    mode = self.profile.get_last_mode()
+                    mode = self.profile.get_last_runtime_mode()
                     if verbose:
                         logging.getLogger("system").info(f"PROC: profile: '{os.path.basename(profile_path)}' restore last mode: '{mode}' ")
 

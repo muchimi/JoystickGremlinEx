@@ -74,6 +74,7 @@ class Value:
         self._raw = raw
         self._current = raw
         self._is_pressed = is_pressed
+        
 
     @property
     def raw(self):
@@ -108,7 +109,9 @@ class Value:
     @is_pressed.setter
     def is_pressed(self, value: bool):
         self._is_pressed = value
-        
+
+
+    
 class ActivationCondition:
 
     """Represents a set of conditions dictating the activation of actions.

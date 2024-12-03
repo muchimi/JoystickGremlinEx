@@ -161,7 +161,7 @@ class SmartToggleContainerFunctor(gremlin.base_conditions.AbstractFunctor):
 
     """Executes the contents of the associated SmartToggle container."""
 
-    def __init__(self, container):
+    def __init__(self, container, parent = None):
         """Creates a new functor instance.
 
         Parameters
@@ -169,9 +169,9 @@ class SmartToggleContainerFunctor(gremlin.base_conditions.AbstractFunctor):
         container : SmartToggleContainer
             The instance containing the configuration of the container
         """
-        super().__init__(container)
+        super().__init__(container, parent)
         self.action_set = gremlin.execution_graph.ActionSetExecutionGraph(
-            container.action_sets[0]
+            container.action_sets[0], parent
         )
         self.delay = container.delay
         self.release_value = None
@@ -244,12 +244,12 @@ class SmartToggleContainer(AbstractContainer):
     functor = SmartToggleContainerFunctor
     widget = SmartToggleContainerWidget
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, node = None):
         """Creates a new instance.
 
         :param parent the InputItem this container is linked to
         """
-        super().__init__(parent)
+        super().__init__(parent, node)
         self.action_sets = [[]]
         self.delay = 0.5
 

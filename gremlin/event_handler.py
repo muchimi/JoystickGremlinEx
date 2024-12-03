@@ -792,7 +792,8 @@ class EventListener(QtCore.QObject):
 		else:
 			return axis_calibration(value, -32768, 0, 32767)
 		
-	def _apply_curve_ex(self, device_guid, input_id, value):
+	def _apply_curve_ex(self, device_guid, input_id, value : float):
+		''' applies a curve to the input axis '''
 		key = (device_guid, input_id)
 		if key in self._joystick_input_item_map:
 			item = self._joystick_input_item_map[key]

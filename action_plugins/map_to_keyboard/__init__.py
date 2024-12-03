@@ -108,8 +108,8 @@ class MapToKeyboardWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 class MapToKeyboardFunctor(gremlin.base_profile.AbstractFunctor):
 
-    def __init__(self, action):
-        super().__init__(action)
+    def __init__(self, action, parent = None):
+        super().__init__(action, parent)
         self.press = gremlin.macro.Macro()
         self.needs_auto_release = True
         for key in action.keys:

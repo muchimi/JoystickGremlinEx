@@ -228,13 +228,13 @@ class DoubleTapContainerFunctor(gremlin.base_conditions.AbstractFunctor):
 
     """Executes the contents of the associated DoubleTap container."""
 
-    def __init__(self, container):
-        super().__init__(container)
+    def __init__(self, container, parent = None):
+        super().__init__(container, parent)
         self.single_tap = gremlin.execution_graph.ActionSetExecutionGraph(
-            container.action_sets[0]
+            container.action_sets[0], parent
         )
         self.double_tap = gremlin.execution_graph.ActionSetExecutionGraph(
-            container.action_sets[1]
+            container.action_sets[1], parent
         )
         self.delay = container.delay
         self.activate_on = container.activate_on
@@ -348,12 +348,12 @@ class DoubleTapContainer(AbstractContainer):
         gremlin.ui.input_item.ActionSetView.Interactions.Edit,
     ]
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, node = None):
         """Creates a new instance.
 
         :param parent the InputItem this container is linked to
         """
-        super().__init__(parent)
+        super().__init__(parent, node)
         self.action_sets = [[], []]
         self.delay = 0.5
         self.activate_on = "exclusive"

@@ -1,10 +1,11 @@
-
+from __future__ import annotations
 from abc import abstractmethod, ABCMeta
 import enum
 import logging
 from lxml import etree as ElementTree
 from gremlin.input_types import InputType
 from gremlin.util import *
+
 
 class ActivationRule(enum.Enum):
 
@@ -291,7 +292,7 @@ class AbstractFunctor(metaclass=ABCMeta):
     These classes are used in the internal code execution system.
     """
 
-    def __init__(self, instance):
+    def __init__(self, instance, parent = None):
         """Creates a new instance, extracting needed information.
 
         :param instance the object which contains the information needed to
@@ -300,6 +301,8 @@ class AbstractFunctor(metaclass=ABCMeta):
         import gremlin.event_handler
         self._name = instance.name
         self.enabled = True
+        self.node = parent
+        
 
         el = gremlin.event_handler.EventListener()
         el.profile_start.connect(self.profile_start)
@@ -331,6 +334,28 @@ class AbstractFunctor(metaclass=ABCMeta):
     def latch_extra_inputs(self):
         ''' returns any extra inputs as a list of (device_guid, input_id) to latch to this action (trigger on change) '''
         return []
+    
+    def getContainerNode(self):
+        ''' gets the container node the action belongs to '''
+        import gremlin.execution_graph
+        if self.node:
+            container_node = None
+            for node in self.node.ancestors:
+                if node.nodeType == gremlin.execution_graph.ExecutionGraphNodeType.Container:
+                    return node
+        return None
+    
+    def getSiblings(self) -> list:
+        ''' gets action node siblings'''
+        import gremlin.execution_graph
+        container_node = self.getContainerNode()
+        nodes = []
+        if container_node:
+            # grab all the curve nodes attached to that container
+            for node in container_node.descendants:
+                if node.nodeType == gremlin.execution_graph.ExecutionGraphNodeType.Action:
+                    nodes.append(node)
+        return nodes
 
 
     def _check_for_auto_release(self, action):

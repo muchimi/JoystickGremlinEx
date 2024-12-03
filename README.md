@@ -186,6 +186,12 @@ Joystick Gremlin EX
 
 
 ## 13.40.16ex (pre-release)
+### (m42)
+- API: Refactored the execution graph to also create a new execution tree data structure.  This makes it much easier to navigate the execution graph at runtime from any point of the execution, output diagnostics and derive latched actions.
+- Improved: The API improvement simplifies curve computations and resolves merged axis curve application in map to vjoy.
+- Fix: last runtime profile restore on profile start non longer throws an exception if option is enabled
+- Fix: automatic profile load based on mapped process if option is enabled
+
 ### (m41)
 - Improved: Keyboard mapper Ex enhanced display of selected keys.
 - Improved: Simconnect (MSFS) supports two-way communication via OSC (see osc_msfs.py as the demo of the parking brakes).  The demo OSC/Pilot and user plugin module to support two way comms is in the demo msfs zip file.  Note: this is not OSC/Pilot specific - just provided as a demo here.  The concept is similar with other OSC surface control software  although it may have to be tweaked based on that software's capabilities.

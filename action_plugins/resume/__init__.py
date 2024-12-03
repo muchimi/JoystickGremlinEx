@@ -43,8 +43,8 @@ class ResumeActionWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 class ResumeActionFunctor(gremlin.base_profile.AbstractFunctor):
 
-    def __init__(self, action):
-        super().__init__(action)
+    def __init__(self, action, parent = None):
+        super().__init__(action, parent)
 
     def process_event(self, event, value):
         import gremlin.control_action

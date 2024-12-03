@@ -110,8 +110,8 @@ class ResponseCurveExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 class ResponseCurveExFunctor(gremlin.base_profile.AbstractFunctor):
 
-    def __init__(self, action_data : ResponseCurveEx) :
-        super().__init__(action_data)
+    def __init__(self, action_data : ResponseCurveEx, parent = None) :
+        super().__init__(action_data, parent)
         self.curve_data = action_data.curve_data
         self.curve_data.curve_update()
 

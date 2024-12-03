@@ -476,14 +476,14 @@ class RangeContainerFunctor(gremlin.base_conditions.AbstractFunctor):
     """Executes the contents of the associated range container."""
 
 
-    def __init__(self, action_data):
+    def __init__(self, action_data, parent = None):
         action_data: RangeContainer
-        super().__init__(action_data)
+        super().__init__(action_data, parent)
         
         self.action_sets = []
         for action_set in action_data.action_sets:
             self.action_sets.append(
-                gremlin.execution_graph.ActionSetExecutionGraph(action_set)
+                gremlin.execution_graph.ActionSetExecutionGraph(action_set, parent)
             )
 
         self.action_data = action_data
@@ -716,12 +716,12 @@ class RangeContainer(AbstractContainer):
     functor = RangeContainerFunctor
     widget = RangeContainerWidget
 
-    def __init__(self, parent):
+    def __init__(self, parent, node = None):
         '''' creates a new instance 
         :parent the InputItem which is the parent to this action
         '''
 
-        super().__init__(parent)
+        super().__init__(parent, node)
         self.id = get_guid() # unique id of this item
         self._index = 0 # index # of this item
         self.range_min = -1.0 # lower bound of the range

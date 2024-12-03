@@ -471,13 +471,13 @@ class SwitchContainerWidget(AbstractContainerWidget):
 
 class SwitchContainerFunctor(gremlin.base_conditions.AbstractFunctor):
 
-    def __init__(self, container):
-        super().__init__(container)
+    def __init__(self, container, parent = None):
+        super().__init__(container, parent)
         self.profile_data :  SwitchContainer = container
         self.action_sets = []
         for action_set in container.action_sets:
             self.action_sets.append(
-                gremlin.execution_graph.ActionSetExecutionGraph(action_set)
+                gremlin.execution_graph.ActionSetExecutionGraph(action_set, parent)
             )
         self.timeout = container.timeout
 
@@ -609,12 +609,12 @@ class SwitchContainer(AbstractContainer):
     functor = SwitchContainerFunctor
     widget = SwitchContainerWidget
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, node = None):
         """Creates a new instance.
 
         :param parent the InputItem this container is linked to
         """
-        super().__init__(parent)
+        super().__init__(parent, node)
         self.timeout = 0.0
 
         self.position_data = {}  # data block indexed by position index

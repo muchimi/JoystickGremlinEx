@@ -449,13 +449,6 @@ class MacroManager:
 
         :param macro the macro object to be executed
         """
-        # Handle macros with a repeat mode
-        # if not is_local:
-        #     is_local = macro.is_local
-        # if not is_remote:
-        #     is_remote = macro.is_remote
-
-
         (state_is_local, state_is_remote) = gremlin.input_devices.remote_state.state
         if not is_remote:
             is_remote = state_is_remote

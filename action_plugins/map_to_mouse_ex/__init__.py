@@ -526,12 +526,12 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
     _mouse_controller = None
 
 
-    def __init__(self, action : MapToMouseEx):
+    def __init__(self, action : MapToMouseEx, parent = None):
         """Creates a new functor with the provided data.
 
         :param action contains parameters to use with the functor
         """
-        super().__init__(action)
+        super().__init__(action, parent)
 
         self.action : MapToMouseEx = action
         if not MapToMouseExFunctor._mouse_controller:

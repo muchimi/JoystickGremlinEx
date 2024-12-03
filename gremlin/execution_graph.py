@@ -15,6 +15,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations
+
 from abc import abstractmethod, ABCMeta
 from collections import namedtuple
 import copy
@@ -33,7 +35,82 @@ import gremlin.input_types
 import gremlin.plugin_manager
 import gremlin.base_conditions
 import gremlin.shared_state
+import anytree
+from enum import Enum,auto
 
+from gremlin.singleton_decorator import SingletonDecorator
+
+
+class ExecutionGraphNodeType(Enum):
+    ''' types of tree nodes in an execution graph '''
+    Root = auto()
+    Container = auto()
+    ActionSet = auto()
+    Action = auto()
+    Mode = auto() 
+    
+
+class ExecutionGraphNode(anytree.NodeMixin):
+    ''' tree node '''
+    def __init__(self, node_type : ExecutionGraphNodeType):
+        super().__init__()
+
+        self.action : gremlin.base_profile.AbstractAction = None # holds any action at this node
+        self.functors : list[gremlin.base_profile.AbstractFunctor] = [] # holds the functors to execute in this node
+        self.sequence = [] # list of sequence codes (action, condition) for the functor by index
+        self.container : gremlin.base_profile.AbstractContainer = None  # holds the container object
+        self.priority : int = 0 # execution priority of nodes at the same tree level
+        self.nodeType : ExecutionGraphNodeType = node_type
+        self.mode : str = None
+
+
+    def __str__(self):
+        msg = self.nodeType.name
+        stub = ""
+        match self.nodeType:
+            case ExecutionGraphNodeType.Root:
+                pass
+            case ExecutionGraphNodeType.Container:
+                container = self.container
+                device_name = container.get_device_name()
+                stub = f"{self.container.name} Device: {device_name} input {container.input_display_name}"
+            case ExecutionGraphNodeType.ActionSet:
+                pass
+            case ExecutionGraphNodeType.Action:
+                stub = self.action.name
+            case ExecutionGraphNodeType.Mode:
+                stub = self.mode
+        return f"{msg} {stub}"
+                
+
+
+
+@SingletonDecorator
+class ExecutionContext():
+    ''' holds the current execution context '''
+    def __init__(self):
+        self.root = ExecutionGraphNode(ExecutionGraphNodeType.Root) # root node
+
+    def reset(self):
+        self.root = ExecutionGraphNode(ExecutionGraphNodeType.Root) # root node
+
+    def find(self, item):
+        ''' looks for a container, action or action set in the execution tree node '''
+        for node in anytree.PreOrderIter(self.root):
+            if node.container == item or node.action == item or node.action_set == item or item in node.functors:
+                return node
+            
+        return None
+            
+
+    def dump(self):
+        # dumps the execution tree
+        syslog = logging.getLogger("system")
+        syslog.info(f"Execution Tree:")
+
+        for pre, fill, node in anytree.RenderTree(self.root, style=anytree.AsciiStyle()):
+            syslog.info(f"{pre}{str(node)}")
+        
 
 
 
@@ -45,13 +122,16 @@ class ContainerCallback:
     and chained actions.
     """
 
-    def __init__(self, container):
+    def __init__(self, container, parent):
         """Creates a new instance based according to the given input item.
 
         :param container the container instance for which to build th
             execution graph base callback
         """
-        self.execution_graph = ContainerExecutionGraph(container)
+        if parent is None:
+            ec = ExecutionContext()
+            parent = ec.root
+        self.execution_graph = ContainerExecutionGraph(container, parent)
 
     def __call__(self, event):
         """Executes the callback based on the event's content.
@@ -103,12 +183,12 @@ class VirtualButtonCallback:
 
     """VirtualButton event based callback class."""
 
-    def __init__(self, container):
+    def __init__(self, container, parent = None):
         """Creates a new instance.
 
         :param container the container to execute when called
         """
-        self._execution_graph = ContainerExecutionGraph(container)
+        self._execution_graph = ContainerExecutionGraph(container, parent)
 
     def __call__(self, event, value = None):
         """Executes the container's content when called.
@@ -169,7 +249,7 @@ class AbstractExecutionGraph(metaclass=ABCMeta):
     graph terminates.
     """
 
-    def __init__(self, instance):
+    def __init__(self, instance, parent = None):
         """Creates a new execution graph based on the provided data.
 
         :param instance the object to use in order to generate the graph
@@ -177,7 +257,13 @@ class AbstractExecutionGraph(metaclass=ABCMeta):
         self.functors = []
         self.transitions = {}
         self.current_index = 0
-        self._build_graph(instance)
+        ec = ExecutionContext()
+        if parent is None:
+            parent = ec.root
+        self._build_graph(instance, parent)
+
+                                                      
+    
 
     def process_event(self, event, value):
         """Executes the graph with the provided data.
@@ -248,7 +334,7 @@ class AbstractExecutionGraph(metaclass=ABCMeta):
         return True
 
     @abstractmethod
-    def _build_graph(self, instance):
+    def _build_graph(self, instance, parent_node = None):
         """Builds the graph structure based on the given object's content.
 
         :param instance the object to use in order to generate the graph
@@ -342,16 +428,16 @@ class ContainerExecutionGraph(AbstractExecutionGraph):
 
     """Execution graph for the content of a single container."""
 
-    def __init__(self, container):
+    def __init__(self, container, parent = None):
         """Creates a new instance for a specific container.
 
         :param container the container data from which to generate the
             execution graph
         """
         assert isinstance(container, gremlin.base_profile.AbstractContainer)
-        super().__init__(container)
+        super().__init__(container, parent)
 
-    def _build_graph(self, container):
+    def _build_graph(self, container, parent = None):
         """Builds the graph structure based on the container's content.
 
         :param container data to use in order to generate the graph
@@ -368,16 +454,26 @@ class ContainerExecutionGraph(AbstractExecutionGraph):
         #     self.functors.append(self._create_virtual_button(container))
         #     sequence.append("Condition")
 
+        # tree node for this container
+        node = ExecutionGraphNode(ExecutionGraphNodeType.Container)
+        node.container = container
+        node.parent = parent
+
+
         # If container based conditions exist add them before any actions
         if container.has_conditions: 
-            self.functors.append(self._create_activation_condition(container.activation_container_condition, container))
+            functor = self._create_activation_condition(container.activation_container_condition, container)
+            self.functors.append(functor)
+            node.functors.append(functor)
             sequence.append("ContainerCondition")
+            node.sequence.append("ContainerCondition")
 
         # if container.has_action_conditions:
         #     self.functors.append(self._create_activation_condition(container.activation_condition, container))
         #     sequence.append("ActionCondition")
 
-        functor = container.functor(container)
+        functor = container.functor(container, node)
+        node.functors.append(functor)
         
         if verbose:
             logging.getLogger("system").info(f"Enable container functor: {type(functor).__name__}")
@@ -399,8 +495,10 @@ class ContainerExecutionGraph(AbstractExecutionGraph):
         container_plugins = gremlin.plugin_manager.ContainerPlugins()
         container_plugins.register_functor(functor)
         self.functors.append(functor)
-        
         sequence.append("Action")
+
+        node.functors.append(functor)
+        node.sequence.append("Action")
 
         self._create_transitions(sequence)
         
@@ -415,15 +513,15 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
         (False, True): "released"
     }
 
-    def __init__(self, action_set):
+    def __init__(self, action_set, parent = None):
         """Creates a new instance for a specific set of actions.
 
         :param action_set the set of actions from which to generate the
             execution graph
         """
-        super().__init__(action_set)
+        super().__init__(action_set, parent)
 
-    def _build_graph(self, action_set):
+    def _build_graph(self, action_set, parent = None):
         """Builds the graph structure based on the content of the action set.
 
         :param action_set data to use in order to generate the graph
@@ -439,12 +537,20 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
 
         add_default_activation = True
 
+        nodes = {} # list of tree nodes at this level created for each action in the actions sets
+        
+
         # Reorder action set entries such that if any remap action is
         # present it is executed last (after a curving action for example) (unless it's a mode switch action - mode switching must happen last because it changes the action list)
         ordered_action_set = []
         if verbose:
             logging.getLogger("system").info("Ordering action sets:")
         for action in action_set:
+
+
+            action_set_node = ExecutionGraphNode(ExecutionGraphNodeType.ActionSet)
+            action_set_node.parent = parent
+
             # if not isinstance(action, action_plugins.remap.Remap):
             priority = 0
             if hasattr(action, "priority"):
@@ -452,6 +558,12 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
             ordered_action_set.append((priority, action))
             if verbose:
                 logging.getLogger("system").info(f"\tadding action: {type(action)} priority: {priority} data: {str(action)}" )
+
+            node = ExecutionGraphNode(ExecutionGraphNodeType.Action)
+            node.parent = action_set_node
+            node.action = action
+            node.priority = priority
+            nodes[action] = node
 
 
         if len(ordered_action_set) > 1:
@@ -472,13 +584,13 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
         for action in ordered_action_set:
             # Create conditions for each action if needed
             if action.has_conditions:
-                self.functors.append(
-                    self._create_activation_condition(
+                functor = self._create_activation_condition(
                         action.activation_condition,
                         action
                     )
-                )
+                self.functors.append(functor)
                 sequence.append("Condition")
+                nodes[action].functors.append(functor)
 
             # Create default activation condition if needed
             has_input_action = self._contains_input_action_condition(
@@ -494,13 +606,15 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
                     [condition],
                     gremlin.base_conditions.ActivationRule.All
                 )
-                self.functors.append(
-                    self._create_activation_condition(activation_condition, action)
-                )
+                functor = self._create_activation_condition(activation_condition, action)
+                self.functors.append(functor)
                 sequence.append("Condition")
+                nodes[action].functors.append(functor)
+                nodes[action].sequence.append("Condition")
+                
 
             # Create action functor
-            functor : gremlin.base_conditions.AbstractFunctor = action.functor(action)
+            functor : gremlin.base_conditions.AbstractFunctor = action.functor(action, nodes[action])
             extra_inputs = functor.latch_extra_inputs()
             if extra_inputs:
                 # register the extra inputs for this functor
@@ -520,5 +634,8 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
             action.setEnabled(True)
             self.functors.append(functor)
             sequence.append("Action")
+            nodes[action].functors.append(functor)
+            nodes[action].sequence.append("Action")
+
 
         self._create_transitions(sequence)
