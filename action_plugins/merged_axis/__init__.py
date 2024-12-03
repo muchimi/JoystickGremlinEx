@@ -440,8 +440,8 @@ class MergedAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
  
 class MergedAxisFunctor(gremlin.base_profile.AbstractContainerActionFunctor):
 
-    def __init__(self, action):
-        super().__init__(action)
+    def __init__(self, action, parent = None):
+        super().__init__(action, parent)
         self.action_data = action
         self._joy1_value = 0
         self._joy2_value = 0

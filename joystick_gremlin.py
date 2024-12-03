@@ -119,7 +119,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.16ex (m42)"
+APPLICATION_VERSION = "13.40.16ex (m43)"
 
 # the main ui
 ui = None
@@ -3053,6 +3053,7 @@ if __name__ == "__main__":
     app.setWindowIcon(load_icon("gfx/icon.png"))
     app.setApplicationDisplayName(APPLICATION_NAME + " " + APPLICATION_VERSION)
     app.setApplicationVersion(APPLICATION_VERSION)
+    app.setAttribute(QtCore.Qt.ApplicationAttribute.AA_EnableHighDpiScaling)
 
     # handle windows themes better
     app.setStyle('Fusion')

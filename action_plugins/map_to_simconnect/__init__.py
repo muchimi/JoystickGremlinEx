@@ -1909,8 +1909,8 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
 
     manager = gremlin.macro.MacroManager()
 
-    def __init__(self, action):
-        super().__init__(action)
+    def __init__(self, action, parent = None):
+        super().__init__(action, parent)
         self.action_data : MapToSimConnect = action
         self.command = action.command # the command to execute
         self.value = action.value # the value to send (None if no data to send)

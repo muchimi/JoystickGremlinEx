@@ -186,6 +186,10 @@ Joystick Gremlin EX
 
 
 ## 13.40.16ex (pre-release)
+### (m43)
+- Improved: curve dialog window on input has scrollbars for lower resolution displays.
+- Fix: Simconnect functor exception with new API tree feature
+
 ### (m42)
 - API: Refactored the execution graph to also create a new execution tree data structure.  This makes it much easier to navigate the execution graph at runtime from any point of the execution, output diagnostics and derive latched actions.
 - Improved: The API improvement simplifies curve computations and resolves merged axis curve application in map to vjoy.

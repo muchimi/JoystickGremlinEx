@@ -1601,12 +1601,12 @@ class DeadzoneWidget(QtWidgets.QWidget):
         self.left_slider = QSliderWidget()
 
         self.left_slider.setMarkerVisible(False)
-        self.left_slider.desired_height = 24
+        self.left_slider.desired_height = 20
         self.left_slider.setRange(-1.0, 0.0)
         self.right_slider = QSliderWidget()
         self.right_slider.setMarkerVisible(False)
         self.right_slider.setRange(0.0, 1.0)
-        self.right_slider.desired_height = 24
+        self.right_slider.desired_height = 20
 
         # Create spin boxes for the left slider
         self.left_lower = ui_common.QFloatLineEdit()
@@ -1908,7 +1908,6 @@ class AxisCurveWidget(QtWidgets.QWidget):
             self.handle_symmetry_widget.setVisible(False)
 
         self.container_options_layout.addWidget(self.handle_symmetry_widget)        
-
 
         self.container_options_layout.addStretch()
 
@@ -2541,13 +2540,28 @@ class AxisCurveDialog(QtWidgets.QDialog):
         super().__init__(parent=parent)
 
         self.action_data = curve_data
+
+        self.scroll_area = QtWidgets.QScrollArea()
+        self.scroll_widget = QtWidgets.QWidget()
+        self.scroll_layout = QtWidgets.QVBoxLayout(self.scroll_widget)
+        self.scroll_widget.setSizePolicy(
+            QtWidgets.QSizePolicy.Expanding,
+            QtWidgets.QSizePolicy.Expanding
+        )
+        self.scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+        self.scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setWidget(self.scroll_widget)
+
         self.main_layout = QtWidgets.QVBoxLayout(self)
 
         self.widget = AxisCurveWidget(curve_data, self)
-        self.main_layout.addWidget(self.widget)
+        self.main_layout.addWidget(self.scroll_area)
+        self.scroll_layout.addWidget(self.widget)
 
-        self.minimumWidth = 700
-        self.minimumHeight = 600
+        self.minimumWidth = 400
+        self.minimumHeight = 400
 
     @property
     def curve_update_handler(self):
