@@ -268,11 +268,12 @@ class CodeRunner:
                         for input_item in input_items.values():
                             # Only add callbacks for input items that actually
                             # contain actions
-
                             
                             if len(input_item.containers) == 0:
                                 # no containers = no actions = skip
                                 continue
+
+                            self.event_handler.registerInputItem(mode.name, input_item)
 
                             event = gremlin.event_handler.Event(
                                 event_type=input_item.input_type,

@@ -260,3 +260,4 @@ class AbstractInputItem():
     
     def setInputDescription(self, value : str):
         self._input_description = value
+

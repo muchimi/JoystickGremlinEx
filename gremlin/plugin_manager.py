@@ -133,6 +133,7 @@ class ContainerPlugins:
             raise error(f"Unable to find container plugins: {walk_path}")
         
         for root, dirs, files in os.walk(walk_path):
+
             for fname in [v for v in files if v == "__init__.py"]:
                 try:
                     folder, module = os.path.split(root)

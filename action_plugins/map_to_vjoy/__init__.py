@@ -53,6 +53,7 @@ import gremlin.shared_state
 import gremlin.curve_handler
 
 
+syslog = logging.getLogger("system")
 
 
 
@@ -2302,6 +2303,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                         
                         if is_local:
                             joystick_handling.VJoyProxy()[self.vjoy_device_id].axis(self.vjoy_input_id).value = value
+                            #syslog.info(f"send vjoy {self.vjoy_device_id} axis {self.vjoy_input_id} {value}")
                         if is_remote:
                             self.remote_client.send_axis(self.vjoy_device_id, self.vjoy_input_id, value)
                     else:

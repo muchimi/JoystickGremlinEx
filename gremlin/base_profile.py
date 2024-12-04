@@ -811,6 +811,7 @@ class InputItem():
         self._is_axis = False # true if the item is an axis input
         self._curve_data = None # true if the item has its input curved
         self._profile_mode = None
+        self._enabled = True # enabled flag
         if parent is not None:
             # find the missing properties from the parenting hierarchy
             self._is_action = isinstance(parent, AbstractAction)
@@ -827,6 +828,14 @@ class InputItem():
                 item = item.parent
 
 
+        el = gremlin.event_handler.EventListener()
+        el.profile_start.connect(self._profile_start)
+
+
+    @QtCore.Slot()
+    def _profile_start(self):
+        # enable the input at profile start 
+        self._enabled = True
                 
     @property
     def id(self):
@@ -864,6 +873,18 @@ class InputItem():
     @selected.setter
     def selected(self, value : bool):
         self._selected = value
+
+    @property
+    def enabled(self) -> bool:
+        return self._enabled
+    @enabled.setter
+    def enabled(self, value: bool):
+        if value != self.enabled:
+            self._enabled = value
+            # fire off the change event
+            el = gremlin.event_handler.EventListener()
+            el.input_enabled_changed.emit(self)
+
 
     @property
     def is_action(self) -> bool:
@@ -1149,9 +1170,9 @@ class InputItem():
         ''' true if the item has something to save to a profile '''
         from gremlin.keyboard import Key
         if self.input_type in (InputType.Keyboard, InputType.KeyboardLatched):
-            if isinstance(self.input_id, Key):
-                # has a key definition, save
-                return True
+            # if isinstance(self.input_id, Key):
+            #     # has a key definition, save
+            return True
         elif self.input_type in (InputType.Midi, InputType.OpenSoundControl):
             return True
         elif hasattr(self.input_id,"to_xml"):
@@ -1611,6 +1632,7 @@ class Settings:
         self.startup_mode = None
         self.default_delay = 0.05
 
+
     def to_xml(self):
         """Returns an XML node containing the settings.
 
@@ -1683,6 +1705,8 @@ class Settings:
                 value = safe_read(axis_node, "value", float, 0.0)
                 self.vjoy_initial_values[vid][aid] = value
 
+
+
     def get_initial_vjoy_axis_value(self, vid, aid):
         """Returns the initial value a vJoy axis should use.
 
@@ -1706,7 +1730,6 @@ class Settings:
         if vid not in self.vjoy_initial_values:
             self.vjoy_initial_values[vid] = {}
         self.vjoy_initial_values[vid][aid] = value
-
 
 
 def extract_remap_actions(action_sets):
@@ -1758,6 +1781,8 @@ class Profile():
         el.modes_changed.connect(self._modes_changed_cb)
         
 
+
+
     @QtCore.Slot()        
     def _modes_changed_cb(self):
         ''' available mode list has changed - check data '''
@@ -1796,9 +1821,13 @@ class Profile():
         return self._profile_name
     
 
-    def get_ordered_device_list(self):
+    def get_ordered_device_list(self) -> list[Device]:
         ''' gets the devices ordered by the current UI order '''
-        id_list = gremlin.shared_state.ui.get_ordered_device_guid_list()
+
+        if gremlin.shared_state.ui is not None:
+            id_list = gremlin.shared_state.ui.get_ordered_device_guid_list()
+        else:
+            id_list = [device.device_guid for device in gremlin.shared_state.current_profile.devices.values()]
         device_list = []
         for id in id_list:
             if id in self.devices.keys():

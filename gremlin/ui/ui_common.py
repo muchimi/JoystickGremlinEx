@@ -928,12 +928,16 @@ class ActionSelector(QtWidgets.QWidget):
         config = gremlin.config.Configuration()
         convert_vjoy = config.convert_vjoy_remap
         convert_curve = config.convert_response_curve
+        control_enabled = config.show_input_enable
+
         #all_entries = [entry.name for entry in gremlin.plugin_manager.ActionPlugins().repository.values()]
         for entry in gremlin.plugin_manager.ActionPlugins().repository.values():
             if self.input_type in entry.input_types:
                 if convert_vjoy and entry.name == "Remap":
                     continue
                 elif convert_curve and entry.name == "Response Curve":
+                    continue
+                if entry.name == "Control" and not control_enabled:
                     continue
                 action_list.append(entry.name)
         return sorted(action_list)

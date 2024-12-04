@@ -186,6 +186,12 @@ Joystick Gremlin EX
 
 
 ## 13.40.16ex (pre-release)
+### (m44)  
+
+- Experimental: ability to disable certain inputs and manage input enabled state at profile runtime via the new control action.  The control action can only be mapped to a momentary input and can control the enabled state on any known input.  The idea of this feature is to (1) enable/disable inputs without having to connect/disconnect them which can cause problems or conflicts or re-ordering (2) for advanced setups where multiple inputs may be mapped to the same output and this is not desirable due to conflict in certain scenarios. 
+- Improved: individual input enable button now available on any input to enable or disable it from the profile.  By default, all inputs are enabled when a profile starts.  The buttons can be enabled via an option.
+
+
 ### (m43)
 - Improved: curve dialog window on input has scrollbars for lower resolution displays.
 - Fix: Simconnect functor exception with new API tree feature

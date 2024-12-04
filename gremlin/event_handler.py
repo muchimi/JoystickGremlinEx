@@ -24,6 +24,7 @@ from threading import Thread, Timer
 from typing import Callable
 
 
+
 import gremlin.joystick_handling
 import gremlin.threading
 
@@ -41,6 +42,9 @@ from . import config, joystick_handling, windows_event_hook
 import gremlin.keyboard
 import gremlin.ui
 import gremlin.singleton_decorator
+import json
+
+syslog = logging.getLogger("system")
 
 
 class Event:
@@ -312,6 +316,9 @@ class EventListener(QtCore.QObject):
 	# update input curve icons
 	update_input_icons = QtCore.Signal() # fires when the input curve icons need to be updated
 
+	# occurs when input enabled state changes
+	input_enabled_changed = QtCore.Signal(object) # param - InputItem
+
 
 	def __init__(self):
 		"""Creates a new instance."""
@@ -324,7 +331,7 @@ class EventListener(QtCore.QObject):
 			self.mouse_hook = windows_event_hook.MouseHook()
 			self.mouse_hook.register(self._mouse_handler)
 		else:
-			logging.getLogger("system").warning("************ DEBUG MODE - MOUSE HOOKS ARE DISABLED ")
+			syslog.warning("************ DEBUG MODE - MOUSE HOOKS ARE DISABLED ")
 			self.mouse_hook = None
 
 		# Calibration function for each axis of all devices
@@ -399,7 +406,7 @@ class EventListener(QtCore.QObject):
 		verbose = gremlin.config.Configuration().verbose_mode_keyboard
 		is_error = False
 		if verbose:
-			logging.getLogger("system").info(f"process_queue: found item: {item} is presseD: {is_pressed}")
+			syslog.info(f"process_queue: found item: {item} is presseD: {is_pressed}")
 
 		if isinstance(item, int):
 			virtual_code = item
@@ -413,7 +420,7 @@ class EventListener(QtCore.QObject):
 			scan_code, is_extended = item
 			key = gremlin.keyboard.KeyMap.find(scan_code, is_extended)
 			if key is None:
-				logging.getLogger("system").error(f"DEQUEUE KEY: don't know how to handle scancode: {scan_code:x} extended: {is_extended}")	
+				syslog.error(f"DEQUEUE KEY: don't know how to handle scancode: {scan_code:x} extended: {is_extended}")	
 				is_error = True
 			else:				
 				virtual_code = key.virtual_code
@@ -421,7 +428,7 @@ class EventListener(QtCore.QObject):
 
 		if not is_error:
 			if verbose:
-				logging.getLogger("system").info(f"DEQUEUE KEY {gremlin.keyboard.KeyMap.keyid_tostring(key_id)} vk: {virtual_code} (0x{virtual_code:X}) name: {key.name} pressed: {is_pressed}")
+				syslog.info(f"DEQUEUE KEY {gremlin.keyboard.KeyMap.keyid_tostring(key_id)} vk: {virtual_code} (0x{virtual_code:X}) name: {key.name} pressed: {is_pressed}")
 			
 
 			self.keyboard_event.emit(Event(
@@ -441,7 +448,7 @@ class EventListener(QtCore.QObject):
 	def _keyboard_processor(self):
 		''' runs as a thread to process inbound keyboard events using a queue '''
 
-		logging.getLogger("system").info("KBD: processing start")
+		syslog.info("KBD: processing start")
 		self._keyboard_buffer = {}
 		self._key_listener_started = True
 		while not self._keyboard_thread.stopped():
@@ -456,7 +463,7 @@ class EventListener(QtCore.QObject):
 		while not self._keyboard_queue.empty():
 			self._process_queue()
 		
-		logging.getLogger("system").info("KBD: processing stop")
+		syslog.info("KBD: processing stop")
 	
 
 	def start_key_listener(self):
@@ -520,13 +527,13 @@ class EventListener(QtCore.QObject):
 		
 		if not dinput.DILL.initalized:
 			dinput.DILL.init()
-		logging.getLogger("system").info("DILL: input start listen")
+		syslog.info("DILL: input start listen")
 		dinput.DILL.set_device_change_callback(self._joystick_device_handler)
 		dinput.DILL.set_input_event_callback(self._joystick_event_handler)
 		while self._running:
 			# Keep this thread alive until we are done
 			time.sleep(0.05)
-		logging.getLogger("system").info("DILL: input stop listen")
+		syslog.info("DILL: input stop listen")
 		dinput.DILL.set_device_change_callback(None)
 		dinput.DILL.set_input_event_callback(None)
 
@@ -562,7 +569,7 @@ class EventListener(QtCore.QObject):
 		is_virtual = device.is_virtual if device is not None else False
 		if event.input_type == dinput.InputType.Axis:
 			if verbose:
-				logging.getLogger("system").info(event)
+				syslog.info(event)
 
 			# get the curved input if the input is curved
 			raw_value = event.value
@@ -631,7 +638,7 @@ class EventListener(QtCore.QObject):
 		self._process_device_change_lock = True
 
 		try:
-			syslog = logging.getLogger("system")
+			syslog = syslog
 			
 			is_running = gremlin.shared_state.is_running
 			gremlin.shared_state.has_device_changes = True
@@ -662,7 +669,6 @@ class EventListener(QtCore.QObject):
 		:param event the keyboard event
 		"""
 		verbose = gremlin.config.Configuration().verbose_mode_keyboard
-		syslog = logging.getLogger("system")
 
 		# verbose = True
 		virtual_code = event.virtual_code
@@ -700,7 +706,7 @@ class EventListener(QtCore.QObject):
 			# add to the processing queue
 			if verbose:
 				# key = gremlin.keyboard.KeyMap.find_virtual(virtual_code) if virtual_code > 0 else gremlin.keyboard.KeyMap.find(key_id[0],key_id[1])
-				logging.getLogger("system").info(f"QUEUE KEY {gremlin.keyboard.KeyMap.keyid_tostring(key_id)} vk 0x{virtual_code:X} pressed {is_pressed}")
+				syslog.info(f"QUEUE KEY {gremlin.keyboard.KeyMap.keyid_tostring(key_id)} vk 0x{virtual_code:X} pressed {is_pressed}")
 
 		else:
 			# DESIGN mode - straight
@@ -856,25 +862,30 @@ class EventHandler(QtCore.QObject):
 
 	
 
+
 	def __init__(self):
 		"""Initializes the EventHandler instance."""
 		QtCore.QObject.__init__(self)
 		self.plugins = {}
 		self.reset()
 
+
 	def reset(self):
-		verbose = gremlin.config.Configuration().verbose
+		config =  gremlin.config.Configuration()
+		verbose = config.verbose
 		if verbose:
-			logging.getLogger("system").info("EventHandler: reset()")
+			syslog.info("EventHandler: reset()")
 			
 		self.process_callbacks = True
 		self.callbacks = {}
+		self.input_item_map = {} # map of input items keyed by device_guid, mode, input_type, input_id
 		self.latched_events = {}
 		self.latched_callbacks = {}
 		self.midi_callbacks = {}
 		self.osc_callbacks = {}
 		self._event_lookup = {}
 		self.latched_functors = {}
+		self.experimental = config.experimental
 		
 
 	@property
@@ -930,29 +941,29 @@ class EventHandler(QtCore.QObject):
 			return
 		
 		get_device_name = gremlin.shared_state.get_device_name
-		logger = logging.getLogger("system")
+		
 		for callbacks in self.callbacks[device_guid][mode][event]:
 			for callback in callbacks:
 				if not hasattr(callback,"execution_graph"):
-					logger.debug(f"\tDevice ID: {device_guid} ({get_device_name(device_guid)}) mode: {mode} event: {event} - skip callback - missing execution graph - don't know how to handle {type(callback)} *********")
+					syslog.debug(f"\tDevice ID: {device_guid} ({get_device_name(device_guid)}) mode: {mode} event: {event} - skip callback - missing execution graph - don't know how to handle {type(callback)} *********")
 					continue
 				
 				for callback_functor in callback.execution_graph.functors:
 					if hasattr(callback_functor,"action_set"):
 						for functor in callback_functor.action_set.functors:
 							action_data = functor.action_data if hasattr(functor, "action_data") else None
-							logger.debug(f"\tDevice ID: {device_guid} ({get_device_name(device_guid)}) mode: {mode} event: {event} hash: {hash(event):X} type: {type(functor)}")
+							syslog.debug(f"\tDevice ID: {device_guid} ({get_device_name(device_guid)}) mode: {mode} event: {event} hash: {hash(event):X} type: {type(functor)}")
 							if action_data:
 								# dump member variables only
-								logger.debug("\t\tData block:")
+								syslog.debug("\t\tData block:")
 								for attr in dir(action_data):
 									if not attr.startswith("_"):
 										item = getattr(action_data,attr)
 										
 										if not (isinstance(item, FunctionType) or isinstance(item, MethodType) or inspect.isabstract(item) or inspect.isclass(item)):
-											logger.debug(f"\t\t\t{attr}: {item}")
+											syslog.debug(f"\t\t\t{attr}: {item}")
 					else:
-						logger.debug(f"\tFunctor '{type(callback_functor).__name__} does not define an action set")
+						syslog.debug(f"\tFunctor '{type(callback_functor).__name__} does not define an action set")
 					
 								
 
@@ -966,8 +977,8 @@ class EventHandler(QtCore.QObject):
 
 		
 		get_device_name = gremlin.shared_state.get_device_name
-		logger = logging.getLogger("system")
-		logger.debug("------------ Latched Events ----------------")
+		
+		syslog.debug("------------ Latched Events ----------------")
 		for device_guid in self.latched_events.keys():
 			for mode in self.latched_events[device_guid].keys():
 				for key_pair in self.latched_events[device_guid][mode]:
@@ -978,9 +989,9 @@ class EventHandler(QtCore.QObject):
 							key_data = f"scan code: 0x{scan_code:X}  extended: {is_extended}"
 						else:
 							key_data = str(key_pair)
-						logger.debug(f"\tDevice ID: {device_guid} ({get_device_name(device_guid)}) mode: {mode} pair: {key_data} data: {identifier.to_string()}")
+						syslog.debug(f"\tDevice ID: {device_guid} ({get_device_name(device_guid)}) mode: {mode} pair: {key_data} data: {identifier.to_string()}")
 
-		logger.debug("------------ Execution callbacks ----------------")
+		syslog.debug("------------ Execution callbacks ----------------")
 		for device_guid in self.callbacks.keys():
 			for mode in self.callbacks[device_guid].keys():
 				for event in self.callbacks[device_guid][mode]:
@@ -997,8 +1008,60 @@ class EventHandler(QtCore.QObject):
 		if event not in self.latched_functors[device_guid][mode]:
 			self.latched_functors[device_guid][mode][event] = []
 		self.latched_functors[device_guid][mode][event].append(functor)
+
+	def _matching_input_item(self, mode, event):
+		''' gets the matching input item from the event '''
 		
-				
+		device_guid = event.device_guid
+		input_type = event.event_type
+		if input_type == InputType.Keyboard:
+			input_type = InputType.KeyboardLatched
+		if input_type == InputType.KeyboardLatched:
+			magic = json.dumps(event.identifier)
+		else:
+			magic = event.identifier
+		
+		if not device_guid in self.input_item_map:
+			return None
+		if not mode in self.input_item_map[device_guid]:
+			return None
+		if not input_type in self.input_item_map[device_guid][mode]:
+			return None
+		if  magic in self.input_item_map[device_guid][mode][input_type]:
+			return self.input_item_map[device_guid][mode][input_type][magic]
+		
+		# syslog.info(f"No match: {input_type} {magic}")
+		# for key in self.input_item_map[device_guid][mode][input_type].keys():
+		# 	syslog.info(f"\t{key}")
+		return None
+
+		
+	def registerInputItem(self, mode : str, input_item):
+		''' registers an input item with the event handler '''
+		item: gremlin.base_profile.InputItem = input_item
+		device_guid = item.device_guid
+		input_type = item.input_type
+		if input_type == InputType.Keyboard:
+			input_type = InputType.KeyboardLatched
+
+		if input_type == InputType.KeyboardLatched:
+			# use the key sequence as the magic key
+			magic = json.dumps(input_item.input_id.key_tuple)
+		else:
+			magic = item.input_id
+		
+		if not device_guid in self.input_item_map:
+			self.input_item_map[device_guid] = {}
+		if not mode in self.input_item_map[device_guid]:
+			self.input_item_map[device_guid][mode] = {}
+		if not input_type in self.input_item_map[device_guid][mode]:
+			self.input_item_map[device_guid][mode][input_type] = {}
+		self.input_item_map[device_guid][mode][input_type][magic] = input_item
+
+		verbose = gremlin.config.Configuration().verbose
+		if verbose:
+			syslog.info(f"Register InputItem: {input_item.display_name} mode {mode} {input_type} magic: {magic}")
+			pass
 
 	def add_callback(self, device_guid, mode, event, callback, permanent=False):
 		"""Installs the provided callback for the given event.
@@ -1052,7 +1115,7 @@ class EventHandler(QtCore.QObject):
 						self.latched_events[device_guid][mode][keyid] = []
 					self.latched_events[device_guid][mode][keyid].append(identifier)
 					if verbose:
-						logging.getLogger("system").info(f"Key latch registered by guid {device_guid}  mode: {mode} vk: {virtual_code} (0x{virtual_code:X}) source keyid: {gremlin.keyboard.KeyMap.keyid_tostring(keyid_source)} -> translated keyId: {gremlin.keyboard.KeyMap.keyid_tostring(keyid)} name: {key.name} -> {identifier.display_name}")
+						syslog.info(f"Key latch registered by guid {device_guid}  mode: {mode} vk: {virtual_code} (0x{virtual_code:X}) source keyid: {gremlin.keyboard.KeyMap.keyid_tostring(keyid_source)} -> translated keyId: {gremlin.keyboard.KeyMap.keyid_tostring(keyid)} name: {key.name} -> {identifier.display_name}")
 					
 
 				if device_guid not in self.latched_callbacks.keys():
@@ -1124,7 +1187,7 @@ class EventHandler(QtCore.QObject):
 			index = (mouse_button.value + 0x1000, False)
 			verbose = gremlin.config.Configuration().verbose_mode_mouse
 			if verbose:
-				logging.getLogger("system").info(f"matching mouse event {event.identifier} to {gremlin.keyboard.KeyMap.keyid_tostring(index)}")
+				syslog.info(f"matching mouse event {event.identifier} to {gremlin.keyboard.KeyMap.keyid_tostring(index)}")
 		else:
 			verbose = gremlin.config.Configuration().verbose_mode_keyboard
 			device_guid = event.device_guid
@@ -1132,7 +1195,7 @@ class EventHandler(QtCore.QObject):
 			index, _ = gremlin.keyboard.KeyMap.translate(event.identifier)
 			verbose = gremlin.config.Configuration().verbose_mode_keyboard
 			if verbose:
-				logging.getLogger("system").info(f"matching key event {event.identifier} to {gremlin.keyboard.KeyMap.keyid_tostring(index)}")
+				syslog.info(f"matching key event {event.identifier} to {gremlin.keyboard.KeyMap.keyid_tostring(index)}")
 
 		#event_key = Key(scan_code = identifier[0], is_extended = identifier[1], is_mouse = is_mouse, virtual_code= virtual_code)
 		input_items = []
@@ -1229,7 +1292,7 @@ class EventHandler(QtCore.QObject):
 		
 
 		if verbose:
-			logging.getLogger("system").debug(f"EVENT: change mode to [{new_mode}] requested - active mode: [{gremlin.shared_state.runtime_mode}]  current mode: [{gremlin.shared_state.current_mode}] profile '{current_profile.name}'")
+			syslog.debug(f"EVENT: change mode to [{new_mode}] requested - active mode: [{gremlin.shared_state.runtime_mode}]  current mode: [{gremlin.shared_state.current_mode}] profile '{current_profile.name}'")
 
 
 		if new_mode == self.current_mode and not force_update:
@@ -1263,7 +1326,7 @@ class EventHandler(QtCore.QObject):
 			# import gremlin.config
 			# verbose = gremlin.config.Configuration().verbose
 			# if verbose:
-			logging.getLogger("system").warning(
+			syslog.warning(
 				f"Mode Change Error: The mode \"{new_mode}\" does not exist or has no associated callbacks - profile '{current_profile.name}'"
 			)
 			return
@@ -1277,7 +1340,7 @@ class EventHandler(QtCore.QObject):
 				current_profile.set_last_runtime_mode(self.runtime_mode)
 				self.previous_runtime_mode = self.runtime_mode
 				self.runtime_mode = new_mode
-				logging.getLogger("system").debug(f"Profile: {current_profile.name} - Runtime Mode switch to: {new_mode}")
+				syslog.debug(f"Profile: {current_profile.name} - Runtime Mode switch to: {new_mode}")
 				if emit:
 					self.runtime_mode_changed.emit(self.runtime_mode)
 		else:
@@ -1287,7 +1350,7 @@ class EventHandler(QtCore.QObject):
 				gremlin.config.Configuration().set_profile_last_edit_mode(new_mode)
 				gremlin.shared_state.edit_mode = new_mode
 				self.edit_mode = new_mode
-				logging.getLogger("system").debug(f"Profile: {current_profile.name} - Design time Mode switch to: {new_mode}")
+				syslog.debug(f"Profile: {current_profile.name} - Design time Mode switch to: {new_mode}")
 				if emit:
 					self.mode_changed.emit(self.edit_mode)
 					
@@ -1346,7 +1409,14 @@ class EventHandler(QtCore.QObject):
 		
 		verbose = gremlin.config.Configuration().verbose_mode_inputs
 		if verbose and event.event_type != InputType.JoystickAxis:
-			logging.getLogger("system").info(f"process event - mode [{self.runtime_mode}] event: {str(event)}")
+			syslog.info(f"process event - mode [{self.runtime_mode}] event: {str(event)}")
+
+
+		input_item = self._matching_input_item(self.runtime_mode, event)
+		if input_item is not None and not input_item.enabled:
+			# input item registered but not enabled - ignore inputs that aren't registered or could not be found (latched keys for example)
+			if verbose: syslog.info(f"Event: input disabled {str(event)}")
+			return
 
 		# filter latched keyboard or mouse events
 		if event.event_type in (InputType.Keyboard, InputType.KeyboardLatched, InputType.Mouse):
@@ -1355,42 +1425,40 @@ class EventHandler(QtCore.QObject):
 			if event.event_type == InputType.Mouse:
 				verbose = gremlin.config.Configuration().verbose_mode_mouse
 			if verbose:
-				logging.getLogger("system").info(f"process keyboard event: {event}")
-				logging.getLogger("system").info(f"\tKeyboard state data:")
+				syslog.info(f"process keyboard event: {event}")
+				syslog.info(f"\tKeyboard state data:")
 				for key in data.keys():
-					logging.getLogger("system").info(f"\t\t{gremlin.keyboard.KeyMap.keyid_tostring(key)} {data[key]}")
+					syslog.info(f"\t\t{gremlin.keyboard.KeyMap.keyid_tostring(key)} {data[key]}")
 
 			items = self._matching_event_keys(event)  # returns list of primary keys
 			if items:
 				if verbose:
-					logging.getLogger("system").info(f"Matched keys for mode: [{self.runtime_mode}]  event {event} pressed: {event.is_pressed} keys: {len(items)} ")
+					syslog.info(f"Matched keys for mode: [{self.runtime_mode}]  event {event} pressed: {event.is_pressed} keys: {len(items)} ")
 					for index, input_item in enumerate(items):
-						logging.getLogger("system").info(f"\t[{index}]: {input_item.name}")
-				
-				
+						syslog.info(f"\t[{index}]: {input_item.name}")
 				
 				for input_item in items:
 					if verbose:
-						logging.getLogger("system").info("-"*50)
+						syslog.info("-"*50)
 					is_latched = True
 					latch_key = None
 					# print (data)
 					latched_keys = [input_item.key]
 					latched_keys.extend(input_item.latched_keys)
 					if verbose:
-						logging.getLogger("system").info(f"Checking latching: {len(latched_keys)} key(s)")
+						syslog.info(f"Checking latching: {len(latched_keys)} key(s)")
 					for k in latched_keys:
 						index = k.index_tuple()
 						found = index in data.keys()
 						state = data[index] if found else False
 						if verbose:
-							logging.getLogger("system").info(f"\tcheck latched key: {gremlin.keyboard.KeyMap.keyid_tostring(index)} {k.name} found: {found} state: {state} {'*****' if state else ''}")
+							syslog.info(f"\tcheck latched key: {gremlin.keyboard.KeyMap.keyid_tostring(index)} {k.name} found: {found} state: {state} {'*****' if state else ''}")
 							if not found:
-								logging.getLogger("system").info(f"\t\t* Key not found *")
+								syslog.info(f"\t\t* Key not found *")
 						is_latched = is_latched and state
 
 					if verbose:
-						logging.getLogger("system").info(f"\tLatched state: {is_latched}")
+						syslog.info(f"\tLatched state: {is_latched}")
 					
 					if is_latched:
 						latch_key = input_item.key
@@ -1401,9 +1469,9 @@ class EventHandler(QtCore.QObject):
 						if m_list:
 							if verbose:
 								trigger_line = "***** TRIGGER " + "*"*30
-								logging.getLogger("system").info(trigger_line)
-								logging.getLogger("system").info(f"\tmode: [{self.runtime_mode}] Found latched key: Check key {latch_key.name} callbacks: {len(m_list)} event: {event}")
-								logging.getLogger("system").info(trigger_line)
+								syslog.info(trigger_line)
+								syslog.info(f"\tmode: [{self.runtime_mode}] Found latched key: Check key {latch_key.name} callbacks: {len(m_list)} event: {event}")
+								syslog.info(trigger_line)
 							self._trigger_callbacks(m_list, event)
 							return
 						# else:
@@ -1411,13 +1479,14 @@ class EventHandler(QtCore.QObject):
 
 			else:
 				if verbose:
-					logging.getLogger("system").info("No matching events")
+					syslog.info("No matching events")
 			return
 						
 		elif event.event_type ==InputType.Midi:
 			verbose = gremlin.config.Configuration().verbose_mode_details
-			m_list = self._matching_midi_callbacks(event)
+					
 		elif event.event_type == InputType.OpenSoundControl:
+			m_list = self._matching_midi_callbacks(event)
 			verbose = gremlin.config.Configuration().verbose_mode_details
 			m_list = self._matching_osc_callbacks(event)
 		elif event.event_type in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat):
@@ -1433,12 +1502,12 @@ class EventHandler(QtCore.QObject):
 		
 		if m_list:
 			if verbose:
-				logging.getLogger("system").info(f"TRIGGER: mode: [{self.runtime_mode}] callbacks: {len(m_list)} event: {event}")
+				syslog.info(f"TRIGGER: mode: [{self.runtime_mode}] callbacks: {len(m_list)} event: {event}")
 			self._trigger_callbacks(m_list, event)
 
 		if f_list:
 			if verbose:
-				logging.getLogger("system").info(f"TRIGGER: mode: [{self.runtime_mode}] functors: {len(f_list)} event: {event}")
+				syslog.info(f"TRIGGER: mode: [{self.runtime_mode}] functors: {len(f_list)} event: {event}")
 			self._trigger_functor_callbacks(f_list, event)
 
 
@@ -1447,12 +1516,12 @@ class EventHandler(QtCore.QObject):
 		for cb in callbacks:
 			try:
 				# if verbose:
-				# 	logging.getLogger("system").info(f"CALLBACK: execute start")
+				# 	syslog.info(f"CALLBACK: execute start")
 				cb(event)
 				# if verbose:
-				# 	logging.getLogger("system").info(f"CALLBACK: execute done")
+				# 	syslog.info(f"CALLBACK: execute done")
 			except Exception as ex:
-				logging.getLogger("system").error(f"CALLBACK: error {ex}")
+				syslog.error(f"CALLBACK: error {ex}")
 
 	def _trigger_functor_callbacks(self, functors, event : Event):
 		#verbose = gremlin.config.Configuration().verbose'
@@ -1461,7 +1530,9 @@ class EventHandler(QtCore.QObject):
 			try:
 				functor.process_event(event, gremlin.actions.Value(event.value))
 			except Exception as ex:
-				logging.getLogger("system").error(f"FUNCTOR CALLBACK: error {ex}")				
+				syslog.error(f"FUNCTOR CALLBACK: error {ex}")				
+
+
 
 
 	def _matching_midi_callbacks(self, event):
@@ -1537,7 +1608,7 @@ class EventHandler(QtCore.QObject):
 						self.dump_exectree(device_guid, mode, event)
 
 		if verbose:
-			logging.getLogger("system").debug(f"device: {gremlin.shared_state.get_device_name(event.device_guid)} mode: {self.runtime_mode} found: {len(callback_list)}")
+			syslog.debug(f"device: {gremlin.shared_state.get_device_name(event.device_guid)} mode: {self.runtime_mode} found: {len(callback_list)}")
 			if callback_list:
 				pass
 

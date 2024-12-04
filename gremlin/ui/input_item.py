@@ -42,7 +42,6 @@ import logging
 syslog = logging.getLogger("system")
 import qtawesome as qta
 import gremlin.ui.input_item
-import gremlin.base_profile
 import lxml
 
 
@@ -975,9 +974,11 @@ class ActionSetView(ui_common.AbstractView):
 
 class InputItemWidget(QtWidgets.QFrame):
 
-    """Creates a button like widget which emits an event when pressed.
+    """ holds the input widget (left side of the interface) for available inputs that get mapped.
+    
+    this widget is used to represent an input mapping.  There are multiple variants of this for joysticks, vjoy (as input), keyboard, OSC and MIDI.
 
-    this widget is used to represent an input mapping
+    Some of those use custom widget rendering based on their types.
 
     This event can be used to display input item specific customization
     widgets. This button also shows icons of the associated actions.
@@ -1035,6 +1036,7 @@ class InputItemWidget(QtWidgets.QFrame):
         self.identifier = identifier
         self.data = data
         self._selected = False
+        self._enabled = True # this determines if the input is active 
         self._index = None # assigned widget index
 
         self.populate_name = populate_name_callback # callback to populate the name
@@ -1061,6 +1063,12 @@ class InputItemWidget(QtWidgets.QFrame):
 
         self.setFrameShape(QtWidgets.QFrame.Box)
 
+        # icons
+        self._curve_icon_inactive = load_icon("mdi.chart-bell-curve",qta_color="gray")
+        self._curve_icon_active = load_icon("mdi.chart-bell-curve",qta_color="blue")
+        self._input_icon_inactive = load_icon("fa.power-off",qta_color="gray")
+        self._input_icon_active = load_icon("fa.power-off",qta_color="blue")
+
 
         # title row
 
@@ -1075,20 +1083,30 @@ class InputItemWidget(QtWidgets.QFrame):
         self._edit_button_widget.setFixedSize(24,16)
         self._edit_button_widget.clicked.connect(self._edit_button_cb)
 
-        self._title_container_layout.addWidget(self._edit_button_widget, data_row, 2)
+        # input button on/off
+        self._input_button_widget = QtWidgets.QPushButton() 
+        self._input_button_widget.setIcon(self._input_icon_active)
+        self._input_button_widget.setToolTip("Enables or disables this input.  If disabled, input from this specific input will be ignored.<br>The state can be changed by the control action as well.")
+        self._input_button_widget.setFixedSize(24,16)
+        self._input_button_widget.clicked.connect(self._input_button_cb)
+        
+
+        self._title_container_layout.addWidget(self._input_button_widget, data_row, 2)
+        self._title_container_layout.addWidget(self._edit_button_widget, data_row, 3)
 
         self._close_button_widget = QtWidgets.QPushButton(qta.icon("mdi.delete"),"")
         
         self._close_button_widget.setFixedSize(16,16)
         self._close_button_widget.clicked.connect(self._close_button_cb)
-        self.curve_icon_inactive = load_icon("mdi.chart-bell-curve",qta_color="gray")
-        self.curve_icon_active = load_icon("mdi.chart-bell-curve",qta_color="blue")
         
-        self.curve_button_widget = QtWidgets.QPushButton() 
-        self.curve_button_widget.setIcon(self.curve_icon_active)
-        self.curve_button_widget.setToolTip("Input Curve")
-        self.curve_button_widget.setFixedSize(24,16)
-        self.curve_button_widget.clicked.connect(self._curve_button_cb)
+        
+        self._curve_button_widget = QtWidgets.QPushButton() 
+        self._curve_button_widget.setIcon(self._curve_icon_active)
+        self._curve_button_widget.setToolTip("Input Curve")
+        self._curve_button_widget.setFixedSize(24,16)
+        self._curve_button_widget.clicked.connect(self._curve_button_cb)
+
+
 
         self.clear_curve_widget = QtWidgets.QPushButton()
         self.clear_curve_widget.setToolTip("Clear Curve")
@@ -1102,12 +1120,12 @@ class InputItemWidget(QtWidgets.QFrame):
         self._curve_container_layout.setContentsMargins(0,0,0,0)
 
         self._curve_container_layout.addStretch()
-        self._curve_container_layout.addWidget(self.curve_button_widget)
+        self._curve_container_layout.addWidget(self._curve_button_widget)
         self._curve_container_layout.addWidget(self.clear_curve_widget)
 
 
-        self._title_container_layout.addWidget(self._close_button_widget, data_row, 3)
-        self._title_container_layout.addWidget(QtWidgets.QLabel(" "), data_row, 4)        
+        self._title_container_layout.addWidget(self._close_button_widget, data_row, 4)
+        self._title_container_layout.addWidget(QtWidgets.QLabel(" "), data_row, 5)        
         self._title_container_widget.setMinimumHeight(20)
 
         
@@ -1186,10 +1204,21 @@ class InputItemWidget(QtWidgets.QFrame):
         el.icon_changed.connect(self._icon_changed_cb)
         el.mapping_changed.connect(self._mapping_changed_cb)
         el.update_input_icons.connect(self._update_icons)
+        el.input_enabled_changed.connect(self._update_enabled_state)
 
         self._curve_container_widget.setVisible(curve_visible) 
         self.update_display()
 
+
+    @QtCore.Slot(object)
+    def _update_enabled_state(self, input_item ): # : gremlin.base_profile.InputItem
+        ''' updates the enabled state '''
+        if self.data == input_item:
+            # ours
+            if input_item.enabled:
+                self._input_button_widget.setIcon(self._input_icon_active)
+            else:
+                self._input_button_widget.setIcon(self._input_icon_inactive)
 
 
     @QtCore.Slot()
@@ -1199,10 +1228,10 @@ class InputItemWidget(QtWidgets.QFrame):
         curve_visible = self.data.input_type == InputType.JoystickAxis
         
         if self.data.is_curve:
-            self.curve_button_widget.setIcon(self.curve_icon_active)
+            self._curve_button_widget.setIcon(self._curve_icon_active)
             self.clear_curve_widget.setEnabled(True)
         else:
-            self.curve_button_widget.setIcon(self.curve_icon_inactive)
+            self._curve_button_widget.setIcon(self._curve_icon_inactive)
             self.clear_curve_widget.setEnabled(False)
 
         self._curve_container_widget.setVisible(curve_visible)
@@ -1254,9 +1283,9 @@ class InputItemWidget(QtWidgets.QFrame):
     def update_curve_icon(self, enabled : bool):
         ''' enables or disables curve buttons '''
         if enabled:
-            self.curve_button_widget.setIcon(self.curve_icon_active)
+            self._curve_button_widget.setIcon(self._curve_icon_active)
         else:
-            self.curve_button_widget.setIcon(self.curve_icon_inactive)
+            self._curve_button_widget.setIcon(self._curve_icon_inactive)
         self.clear_curve_widget.setEnabled(enabled)
         if self.identifier.input_type == InputType.JoystickAxis:
             self.axis_widget.show_curved = enabled
@@ -1266,6 +1295,7 @@ class InputItemWidget(QtWidgets.QFrame):
     def _input_value_changed(self, value):
         ''' called when the input changes '''
         self.input_value_changed.emit(self, value)
+
         
     @property
     def data(self):
@@ -1346,6 +1376,11 @@ class InputItemWidget(QtWidgets.QFrame):
 
     def update_display(self):
         ''' updates the display text for the button '''
+        config = gremlin.config.Configuration()
+        power_visible = config.show_input_enable
+
+        self._input_button_widget.setVisible(power_visible)
+
         if self._update_callback:
             self._update_callback(self, self.custom_container_widget)
             return
@@ -1479,6 +1514,11 @@ class InputItemWidget(QtWidgets.QFrame):
     QtCore.Slot()
     def _curve_button_cb(self):
         self.edit_curve.emit(self)
+
+    QtCore.Slot()
+    def _input_button_cb(self):
+        # toggle input state
+        self.data.enabled = not self.data.enabled
 
     QtCore.Slot()
     def _clear_curve_cb(self):

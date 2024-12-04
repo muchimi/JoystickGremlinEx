@@ -1645,3 +1645,22 @@ class Configuration:
     def condition_selector(self, value: str):
         self._data["condition_selector"] = value
         self.save()
+
+
+    @property
+    def experimental(self) -> bool:
+        ''' true if internal dev mode '''
+        return self._data.get("experimental",False)
+    
+    @experimental.setter
+    def experimental(self, value: bool):
+        self._data["experimental"] = value
+        self.save()
+
+    @property
+    def show_input_enable(self) -> bool:
+        return self._data.get("show_input_enable",False)
+    @show_input_enable.setter
+    def show_input_enable(self, value: bool):
+        self._data["show_input_enable"] = value
+        self.save()

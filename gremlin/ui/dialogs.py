@@ -337,6 +337,11 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.runtime_ignore_device_change.clicked.connect(self._runtime_ignore_device_change)
 
 
+        self.show_input_enable = QtWidgets.QCheckBox("Show input enable buttons")
+        self.show_input_enable.setToolTip("When enabled, displays a toggle button for each input to enable or disable it in the profile")
+        self.show_input_enable.setChecked(self.config.show_input_enable)
+        self.show_input_enable.clicked.connect(self._show_input_enable)
+
 
         # Start minimized option
         self.start_minimized = QtWidgets.QCheckBox(
@@ -642,6 +647,9 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.column_layout.addWidget(self.runtime_ignore_device_change, row, col)
         row+=1
         self.column_layout.addWidget(self.debug_ui, row, col)
+        row+=1
+        self.column_layout.addWidget(self.show_input_enable, row, col)
+        
 
         self.general_layout.addWidget(self.column_widget)
 
@@ -1043,6 +1051,10 @@ This setting is also available on a profile by profile basis on the profile tab,
     @QtCore.Slot(bool)
     def _runtime_ignore_device_change(self, checked):
         self.config.runtime_ignore_device_change = checked
+
+    @QtCore.Slot(bool)
+    def _show_input_enable(self, checked):
+        self.config.show_input_enable = checked
 
 
     @QtCore.Slot(bool)

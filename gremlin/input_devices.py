@@ -57,8 +57,32 @@ import gremlin.event_handler
 syslog = logging.getLogger("system")
 
 
+class ControlAction(enum.Enum):
+    ''' defines the available control actions for the control plugin'''
+    EnableInput = 0 # enables an input
+    DisableInput = 1 # disable an input
+    ToggleInput = 2 # toggle the input
+
+    @staticmethod
+    def to_string(action):
+        return action.name
+    
+    @staticmethod
+    def to_display_name(action):
+        return _control_action_display[action]
+        
+        
+_control_action_display = {
+    ControlAction.EnableInput: "Enable Input",
+    ControlAction.DisableInput: "Disable Input",
+    ControlAction.ToggleInput: "Toggle Input",
+}
+
+
+
+
 class VjoyAction(enum.Enum):
-    ''' defines available vjoy actions supported by this plugin'''
+    ''' defines available vjoy actions supported by the vjoy mapper plugins'''
     VJoyButton = 0 # action on button press
     VJoyToggle = 1 # toggle function on/off
     VJoyPulse = 2 # pulse function (pulses a button),
