@@ -345,6 +345,14 @@ class Configuration:
 
         return self._data["calibration"][identifier][axis_name]
     
+    # @property
+    # def legacy_calibration_imported(self)->bool:
+    #     return self._data.get("legacy_calibration_imported",False)
+    
+    # @legacy_calibration_imported.setter
+    # def legacy_calibration_imported(self, value : bool):
+    #     self._data["legacy_calibration_imported"] = value
+    
 
     @property
     def last_options_tab(self):

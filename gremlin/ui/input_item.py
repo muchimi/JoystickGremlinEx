@@ -25,6 +25,7 @@ import gremlin.config
 import gremlin.event_handler
 import gremlin.event_handler
 import gremlin.shared_state
+import gremlin.ui.axis_calibration
 import gremlin.ui.midi_device
 from gremlin.util import load_icon, load_pixmap
 from gremlin.input_types import InputType
@@ -1068,6 +1069,7 @@ class InputItemWidget(QtWidgets.QFrame):
         self._curve_icon_active = load_icon("mdi.chart-bell-curve",qta_color="blue")
         self._input_icon_inactive = load_icon("fa.power-off",qta_color="gray")
         self._input_icon_active = load_icon("fa.power-off",qta_color="blue")
+        self._calibration_icon = load_icon("mdi.arrow-expand-horizontal")
 
 
         # title row
@@ -1089,10 +1091,17 @@ class InputItemWidget(QtWidgets.QFrame):
         self._input_button_widget.setToolTip("Enables or disables this input.  If disabled, input from this specific input will be ignored.<br>The state can be changed by the control action as well.")
         self._input_button_widget.setFixedSize(24,16)
         self._input_button_widget.clicked.connect(self._input_button_cb)
+
+        # calibration button
+        self._calibration_button_widget = QtWidgets.QPushButton() 
+        self._calibration_button_widget.setIcon(self._calibration_icon)
+        self._calibration_button_widget.setToolTip("Device calibration options")
+        self._calibration_button_widget.setFixedSize(24,16)
+        self._calibration_button_widget.clicked.connect(self._calibration_button_cb)
         
 
-        self._title_container_layout.addWidget(self._input_button_widget, data_row, 2)
-        self._title_container_layout.addWidget(self._edit_button_widget, data_row, 3)
+        self._title_container_layout.addWidget(self._input_button_widget, data_row, 1)
+        self._title_container_layout.addWidget(self._edit_button_widget, data_row, 2)
 
         self._close_button_widget = QtWidgets.QPushButton(qta.icon("mdi.delete"),"")
         
@@ -1100,6 +1109,9 @@ class InputItemWidget(QtWidgets.QFrame):
         self._close_button_widget.clicked.connect(self._close_button_cb)
         
         
+
+
+
         self._curve_button_widget = QtWidgets.QPushButton() 
         self._curve_button_widget.setIcon(self._curve_icon_active)
         self._curve_button_widget.setToolTip("Input Curve")
@@ -1120,6 +1132,7 @@ class InputItemWidget(QtWidgets.QFrame):
         self._curve_container_layout.setContentsMargins(0,0,0,0)
 
         self._curve_container_layout.addStretch()
+        self._curve_container_layout.addWidget(self._calibration_button_widget)
         self._curve_container_layout.addWidget(self._curve_button_widget)
         self._curve_container_layout.addWidget(self.clear_curve_widget)
 
@@ -1519,6 +1532,12 @@ class InputItemWidget(QtWidgets.QFrame):
     def _input_button_cb(self):
         # toggle input state
         self.data.enabled = not self.data.enabled
+
+    @QtCore.Slot()
+    def _calibration_button_cb(self):
+        # open the calibration button for this input
+        dialog = gremlin.ui.axis_calibration.CalibrationDialogEx(self.data.device_guid, self.data.input_id)
+        dialog.exec()
 
     QtCore.Slot()
     def _clear_curve_cb(self):

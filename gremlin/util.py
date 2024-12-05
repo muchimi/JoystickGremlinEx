@@ -95,18 +95,27 @@ def is_user_admin():
 def axis_calibration(value, minimum, center, maximum):
     """Returns the calibrated value for a normal style axis.
 
-    :param value the raw value to process
+    :param value the raw value to process range -1 to +1
     :param minimum the minimum value of the axis
     :param center the center value of the axis
     :param maximum the maximum value of the axis
     :return the calibrated value in [-1, 1] corresponding to the
         provided raw value
     """
-    value = clamp(value, minimum, maximum)
+
+    value = clamp(value, -1.0, 1.0)
+
+    if center is None:
+        # if no center provided, use the slider function with no center
+        return slider_calibration(value, minimum, maximum)
+    
+    
+
+    
     if value < center:
-        return (value - center) / float(center - minimum)
+        return (value - center) / float(center - minimum) + 0.0
     else:
-        return (value - center) / float(maximum - center)
+        return (value - center) / float(maximum - center) + 0.0
 
 
 def slider_calibration(value, minimum, maximum):
@@ -119,7 +128,7 @@ def slider_calibration(value, minimum, maximum):
         provided raw value
     """
     value = clamp(value, minimum, maximum)
-    return (value - minimum) / float(maximum - minimum) * 2.0 - 1.0
+    return (value - minimum) / float(maximum - minimum) * 2.0 - 1.0 + 0.0
 
 
 def create_calibration_function(minimum, center, maximum):
@@ -131,7 +140,7 @@ def create_calibration_function(minimum, center, maximum):
     :return function which returns a value in [-1, 1] corresponding
         to the provided raw input value
     """
-    if minimum == center or maximum == center:
+    if center is None or  minimum == center or maximum == center:
         return lambda x: slider_calibration(x, minimum, maximum)
     else:
         return lambda x: axis_calibration(x, minimum, center, maximum)

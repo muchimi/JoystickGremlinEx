@@ -363,6 +363,10 @@ class EventListener(QtCore.QObject):
 		# internal event on process change
 		self._process_device_change.connect(self._process_device_change_cb)
 
+		# calibration data access
+		from gremlin.ui.axis_calibration import CalibrationManager
+		self.calibrationManager = CalibrationManager()
+
 		Thread(target=self._run).start()
 
 	def registerInput(self, item):
@@ -542,7 +546,7 @@ class EventListener(QtCore.QObject):
 		"""Callback for joystick events.
 
 		The handler converts the event data into a signal which is then
-		emitted.
+		emitted.  IMPORTANT: Applies any calibration and curvature to the data before firing other events.
 
 		:param data the joystick event
 		"""
@@ -791,12 +795,17 @@ class EventListener(QtCore.QObject):
 		return self._apply_curve_ex(event.device_guid, event.input_index, event.value)
 		
 	def _apply_calibration_ex(self, device_guid, input_id, value):
-		from gremlin.util import axis_calibration
-		key = (device_guid, input_id)
-		if key in self._calibrations:
-			return self._calibrations[key](value)
-		else:
-			return axis_calibration(value, -32768, 0, 32767)
+		''' applies calibration and deadzone data to the raw input - value -32768 to 32767, returns -1, +1 and optionally inverts the input '''
+		calibration = self.calibrationManager.getCalibration(device_guid, input_id)
+		calibrated_value = calibration.getValue(value)
+		return calibrated_value
+
+		# from gremlin.util import axis_calibration
+		# key = (device_guid, input_id)
+		# if key in self._calibrations:
+		# 	return self._calibrations[key](value)
+		# else:
+		# 	return axis_calibration(value, -32768, 0, 32767)
 		
 	def _apply_curve_ex(self, device_guid, input_id, value : float):
 		''' applies a curve to the input axis '''
@@ -826,6 +835,7 @@ class EventListener(QtCore.QObject):
 
 		:param device_info information about the device
 		"""
+
 		from gremlin.util import create_calibration_function
 		cfg = config.Configuration()
 		for entry in device_info.axis_map:

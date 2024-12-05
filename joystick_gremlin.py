@@ -575,16 +575,19 @@ class GremlinUi(QtWidgets.QMainWindow):
 
     def calibration(self):
         """Opens the calibration window."""
-        self.modal_windows["calibration"] = \
-            gremlin.ui.axis_calibration.CalibrationUi()
-        self.modal_windows["calibration"].show()
-        gremlin.shared_state.push_suspend_highlighting()
-        self.modal_windows["calibration"].closed.connect(
-            lambda: gremlin.shared_state.pop_suspend_highlighting()
-        )
-        self.modal_windows["calibration"].closed.connect(
-            lambda: self._remove_modal_window("calibration")
-        )
+        # indicate the feature has been deprecated
+        return
+    
+        # self.modal_windows["calibration"] = \
+        #     gremlin.ui.axis_calibration.CalibrationUi()
+        # self.modal_windows["calibration"].show()
+        # gremlin.shared_state.push_suspend_highlighting()
+        # self.modal_windows["calibration"].closed.connect(
+        #     lambda: gremlin.shared_state.pop_suspend_highlighting()
+        # )
+        # self.modal_windows["calibration"].closed.connect(
+        #     lambda: self._remove_modal_window("calibration")
+        # )
 
     def device_information(self):
         """Opens the device information window."""
@@ -1001,7 +1004,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         )
         self.ui.actionManageModes.triggered.connect(self.manage_modes)
         self.ui.actionInputRepeater.triggered.connect(self.input_repeater)
-        self.ui.actionCalibration.triggered.connect(self.calibration)
+        #self.ui.actionCalibration.triggered.connect(self.calibration)
         self.ui.actionInputViewer.triggered.connect(self.input_viewer)
         self.ui.actionPDFCheatsheet.triggered.connect(
             lambda: self._create_cheatsheet()
@@ -1800,8 +1803,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         icon = load_icon("gfx/input_repeater.svg")
         self.ui.actionInputRepeater.setIcon(icon)
 
-        icon = load_icon("gfx/calibration.svg")
-        self.ui.actionCalibration.setIcon(icon)
+        # icon = load_icon("gfx/calibration.svg")
+        # self.ui.actionCalibration.setIcon(icon)
 
         icon = load_icon("gfx/input_viewer.svg")
         self.ui.actionInputViewer.setIcon(icon)

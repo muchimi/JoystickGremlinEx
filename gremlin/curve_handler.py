@@ -87,9 +87,9 @@ class DeadzonePreset(enum.IntEnum):
 
     @staticmethod
     def to_display(value : DeadzonePreset) -> str:
-        return _deadzon_preset_string_lookup[value]
+        return _deadzone_preset_string_lookup[value]
 
-_deadzon_preset_string_lookup = {    
+_deadzone_preset_string_lookup = {    
     DeadzonePreset.center_two : "Center 2%",
     DeadzonePreset.center_five : "Center 5%",
     DeadzonePreset.center_ten : "Center 10%",
@@ -1596,13 +1596,21 @@ class DeadzoneWidget(QtWidgets.QWidget):
         self.profile_data = profile_data
         self.main_layout = QtWidgets.QGridLayout(self)
         self.event_lock = False
+        self._centered = False
 
         # Create the two sliders
         self.left_slider = QSliderWidget()
 
+        # single slider for non-centered axes
+        self.slider = QSliderWidget()
+        self.slider.desired_height = 20
+        self.slider.setRange(-1.0, 1.0)
+
+        # double slider for centered axes
         self.left_slider.setMarkerVisible(False)
         self.left_slider.desired_height = 20
         self.left_slider.setRange(-1.0, 0.0)
+
         self.right_slider = QSliderWidget()
         self.right_slider.setMarkerVisible(False)
         self.right_slider.setRange(0.0, 1.0)
@@ -1639,6 +1647,7 @@ class DeadzoneWidget(QtWidgets.QWidget):
         self.right_upper.setValue(1)
 
         # Hook up all the required callbacks
+        self.slider.valueChanged.connect(self._update_center)
         self.left_slider.valueChanged.connect(self._update_left)
         self.right_slider.valueChanged.connect(self._update_right)
 
@@ -1659,6 +1668,7 @@ class DeadzoneWidget(QtWidgets.QWidget):
         self.set_values(self.profile_data.deadzone)
 
         # Put everything into the layout
+        self.main_layout.addWidget(self.slider,0,0,1,4)
         self.main_layout.addWidget(self.left_slider, 0, 0, 1, 2)
         self.main_layout.addWidget(self.right_slider, 0, 2, 1, 2)
         self.main_layout.addWidget(self.left_lower, 1, 0)
@@ -1666,17 +1676,29 @@ class DeadzoneWidget(QtWidgets.QWidget):
         self.main_layout.addWidget(self.right_lower, 1, 2)
         self.main_layout.addWidget(self.right_upper, 1, 3)
 
+        self.update()
+
+
+    @property
+    def isCentered(self) -> bool:
+        return self._centered
+    @isCentered.setter
+    def isCentered(self, value: bool):
+        if value != self._centered:
+            self._centered = value
+            self._update()
 
     def set_values(self, values):
         """Sets the deadzone values.
 
-        :param values the new deadzone values
+        :param values the new deadzone values [min, min center, max center, max]
         """
         v1, v2 = values[0], values[1]
         if v1 is None:
             v1 = -1
         if v2 is None:
             v2 = 0
+        v3, v4 = values[2], values[3]
 
         with QtCore.QSignalBlocker(self.left_slider):
             self.left_slider.setValue((v1,v2))
@@ -1685,7 +1707,10 @@ class DeadzoneWidget(QtWidgets.QWidget):
         with QtCore.QSignalBlocker(self.left_upper):            
             self.left_upper.setValue(v2)
 
-        v1, v2 = values[2], values[3]
+        with QtCore.QSignalBlocker(self.slider):
+            self.slider.setValue((v1,v4))
+
+        v1, v2 = v3, v4
         if v1 is None:
             v1 = 0
         if v2 is None:
@@ -1718,6 +1743,30 @@ class DeadzoneWidget(QtWidgets.QWidget):
         ]
             
         return self._values
+    
+    def get_min(self) -> float:
+        return self.left_lower.value()
+    def get_max(self) -> float:
+        return self.right_upper.value()
+    
+    def get_center_left(self) -> float:
+        return self.left_upper.value()
+    def get_center_right(self) -> float:
+        return self.right_lower.value()
+    
+    def _update_center(self, handle, value):
+        ''' updates the main slider when in non centered mode'''
+        if not self.event_lock:
+            self.event_lock = True
+            if handle == 0:
+                self.left_lower.setValue(value)
+                self.profile_data.deadzone[0] = value
+            elif handle == 1:
+                self.right_upper.setValue(value)
+                self.profile_data.deadzone[3] = value
+
+            self.changed.emit()
+            self.event_lock = False
 
     def _update_left(self, handle, value):
         """Updates the left spin boxes.
@@ -1790,7 +1839,25 @@ class DeadzoneWidget(QtWidgets.QWidget):
                     self.right_upper.setValue(value)
 
             self.profile_data.deadzone[index] = value
+        self.changed.emit() # notify we changed
+            
 
+
+    def _update(self):
+        is_centered = self._centered
+        if is_centered:
+            self.slider.setVisible(False)
+            self.left_slider.setVisible(True)
+            self.right_slider.setVisible(True)
+            self.left_upper.setVisible(True)
+            self.right_lower.setVisible(True)
+        else:
+            self.slider.setVisible(True)
+            self.left_slider.setVisible(False)
+            self.right_slider.setVisible(False)
+            self.left_upper.setVisible(False)
+            self.right_lower.setVisible(False)
+        
 
 
 

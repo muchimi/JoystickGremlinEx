@@ -246,6 +246,7 @@ class QSliderWidget(QtWidgets.QWidget):
             values = value
         elif isinstance(value, tuple):
             values = list(value)
+        values = [v for v in values if v is not None]
         if values:
             values.sort() # sort by value so the values are always in smallest to greatest
             self._values = values # [max(min(1.0, n), -1.0) for n in values]
