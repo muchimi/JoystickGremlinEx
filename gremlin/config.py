@@ -1672,3 +1672,43 @@ class Configuration:
     def show_input_enable(self, value: bool):
         self._data["show_input_enable"] = value
         self.save()
+
+
+
+    def getWindowSize(self, key : str):
+        ''' gets window geometry size'''
+        data = self._data.get("window_geo_size",{})
+        if key in data:
+            return data[key]
+        return None 
+
+    def setWindowSize(self, key : str, width : int, height : int):
+        ''' sets window geometry size '''
+        data = self._data.get("window_geo_size",{})
+        data[key] = [width, height]
+        self._data["window_geo_size"] = data
+        self.save()
+
+
+    def getWindowLocation(self, key : str):
+        ''' gets window geometry location '''
+        data = self._data.get("window_geo_loc",{})
+        if key in data:
+            return data[key]
+        return None 
+
+    def setWindowLocation(self, key : str, x : int, y : int):
+        ''' sets window geometry location '''
+        data = self._data.get("window_geo_loc",{})
+        data[key] = [x, y]
+        self._data["window_geo_loc"] = data
+        self.save()
+
+
+    def clearWindowData(self):
+        ''' resets saved window data '''
+        self._data["window_geo_loc"] = {}
+        self._data["window_geo_size"] = {}
+        self.save()
+
+    

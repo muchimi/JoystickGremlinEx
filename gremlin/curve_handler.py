@@ -52,6 +52,7 @@ from itertools import pairwise
 from gremlin.ui.ui_common import DynamicDoubleSpinBox, DualSlider, get_text_width
 import enum
 from lxml import etree
+from gremlin.ui.deadzone import DeadzonePreset, DeadzoneWidget
 
 
 g_scene_size = 250.0
@@ -76,28 +77,6 @@ _curve_preset_string_lookup = {
     CurvePreset.Reset : "Reset",
 }
 
-class DeadzonePreset(enum.IntEnum):
-    center_two = 1
-    center_five = 2
-    center_ten = 3
-    end_two = 4
-    end_five = 5
-    end_ten = 6
-    reset = 7
-
-    @staticmethod
-    def to_display(value : DeadzonePreset) -> str:
-        return _deadzone_preset_string_lookup[value]
-
-_deadzone_preset_string_lookup = {    
-    DeadzonePreset.center_two : "Center 2%",
-    DeadzonePreset.center_five : "Center 5%",
-    DeadzonePreset.center_ten : "Center 10%",
-    DeadzonePreset.end_two : "End 2%",
-    DeadzonePreset.end_five : "End 5%",
-    DeadzonePreset.end_ten : "End 10%",
-    DeadzonePreset.reset : "Reset"
-}
 
 class Point2D:
 
@@ -1577,310 +1556,6 @@ class ControlPointEditorWidget(QtWidgets.QWidget):
             self.y_input.setValue(point.y)
         self.active_point = point
 
-
-class DeadzoneWidget(QtWidgets.QWidget):
-    ''' deadzone widget '''
-
-    changed = QtCore.Signal() # indicates the data has changed
-    
-
-    def __init__(self, profile_data, parent=None):
-        """Creates a new instance.
-
-        :param profile_data the data of this response curve
-        :param parent the parent widget
-        """
-        super().__init__(parent)
-        self._values = None
-
-        self.profile_data = profile_data
-        self.main_layout = QtWidgets.QGridLayout(self)
-        self.event_lock = False
-        self._centered = False
-
-        # Create the two sliders
-        self.left_slider = QSliderWidget()
-
-        # single slider for non-centered axes
-        self.slider = QSliderWidget()
-        self.slider.desired_height = 20
-        self.slider.setRange(-1.0, 1.0)
-        self.slider.setMarkerVisible(False)
-
-        # double slider for centered axes
-        self.left_slider.setMarkerVisible(False)
-        self.left_slider.desired_height = 20
-        self.left_slider.setRange(-1.0, 0.0)
-
-        self.right_slider = QSliderWidget()
-        self.right_slider.setMarkerVisible(False)
-        self.right_slider.setRange(0.0, 1.0)
-        self.right_slider.desired_height = 20
-
-        # Create spin boxes for the left slider
-        self.left_lower = ui_common.QFloatLineEdit()
-        self.left_lower.setMinimum(-1.0)
-        self.left_lower.setMaximum(0.0)
-        self.left_lower.setSingleStep(0.05)
-        self.left_lower.setValue(-1)
-        self.left_lower.setToolTip("Low (-1.0) deadzone")
-
-        self.left_upper = ui_common.QFloatLineEdit()
-        self.left_upper.setMinimum(-1.0)
-        self.left_upper.setMaximum(0.0)
-        self.left_upper.setSingleStep(0.05)
-        self.left_upper.setValue(0)
-        self.left_upper.setToolTip("Center left deadzone")
-
-        # Create spin boxes for the right slider
-        self.right_lower = ui_common.QFloatLineEdit()
-        self.right_lower.setSingleStep(0.05)
-        self.right_lower.setMinimum(0.0)
-        self.right_lower.setMaximum(1.0)
-        self.right_lower.setValue(0)
-        self.right_lower.setToolTip("Center right deadzone")
-
-        self.right_upper = ui_common.QFloatLineEdit()
-        self.right_lower.setToolTip("High (+1.0) deadzone")
-        self.right_upper.setSingleStep(0.05)
-        self.right_upper.setMinimum(0.0)
-        self.right_upper.setMaximum(1.0)
-        self.right_upper.setValue(1)
-
-        # Hook up all the required callbacks
-        self.slider.valueChanged.connect(self._update_center)
-        self.left_slider.valueChanged.connect(self._update_left)
-        self.right_slider.valueChanged.connect(self._update_right)
-
-        self.left_lower.valueChanged.connect(
-            lambda value: self._update_from_spinner(value,0)
-        )
-        self.left_upper.valueChanged.connect(
-            lambda value: self._update_from_spinner(value,1)
-        )
-        self.right_lower.valueChanged.connect(
-            lambda value: self._update_from_spinner(value,2)
-        )
-        self.right_upper.valueChanged.connect(
-            lambda value: self._update_from_spinner(value,3)
-        )
-
-        
-        # Put everything into the layout
-        self.main_layout.addWidget(self.slider,0,0,1,4)
-        self.main_layout.addWidget(self.left_slider, 0, 0, 1, 2)
-        self.main_layout.addWidget(self.right_slider, 0, 2, 1, 2)
-        self.main_layout.addWidget(self.left_lower, 1, 0)
-        self.main_layout.addWidget(self.left_upper, 1, 1)
-        self.main_layout.addWidget(self.right_lower, 1, 2)
-        self.main_layout.addWidget(self.right_upper, 1, 3)
-
-        self.update()
-
-
-    @property
-    def isCentered(self) -> bool:
-        return self._centered
-    @isCentered.setter
-    def isCentered(self, value: bool):
-        if value != self._centered:
-            self._centered = value
-            self._update()
-
-    def set_values(self, values):
-        """Sets the deadzone values.
-
-        :param values the new deadzone values [min, min center, max center, max]
-        """
-
-        if self._centered:
-            v1, v2 = values[0], values[1]
-            if v1 is None:
-                v1 = -1
-            if v2 is None:
-                v2 = 0
-            v3, v4 = values[2], values[3]
-
-            with QtCore.QSignalBlocker(self.left_slider):
-                self.left_slider.setValue((v1,v2))
-            with QtCore.QSignalBlocker(self.left_lower):
-                self.left_lower.setValue(v1)
-            with QtCore.QSignalBlocker(self.left_upper):            
-                self.left_upper.setValue(v2)
-
- 
-            v1, v2 = v3, v4
-            if v1 is None:
-                v1 = 0
-            if v2 is None:
-                v2 = 1
-            with QtCore.QSignalBlocker(self.right_slider):
-                self.right_slider.setValue((v1,v2))
-            with QtCore.QSignalBlocker(self.right_lower):
-                self.right_lower.setValue(v1)
-            with QtCore.QSignalBlocker(self.right_upper):
-                self.right_upper.setValue(v2)
-        else:
-            v1, v2 = values[0], values[1]
-            if v1 is None:
-                v1 = -1
-            if v2 is None:
-                v2 = 1
-
-            with QtCore.QSignalBlocker(self.slider):
-                self.slider.setValue((v1,v2))
-
-        self._update()
-
-
-
-        self._values = values
-        for index, value in enumerate(values):
-            self.profile_data.deadzone[index] = value
-
-
-    def get_values(self):
-        """Returns the current deadzone values.
-
-        :return current deadzone values
-        """
-
-        if self._centered:
-            if self._values is None:
-                self._values = [
-                self.left_lower.value(),
-                self.left_upper.value(),
-                self.right_lower.value(),
-                self.right_upper.value()
-            ]
-        else:
-            if self._values is None:
-                self._values = [
-                self.left_lower.value(),
-                self.right_upper.value()
-                ]   
-                
-        return self._values
-        
-
-    
-    def get_min(self) -> float:
-        return self.left_lower.value()
-    def get_max(self) -> float:
-        return self.right_upper.value()
-    
-    def get_center_left(self) -> float:
-        return self.left_upper.value()
-    def get_center_right(self) -> float:
-        return self.right_lower.value()
-    
-    def _update_center(self, handle, value):
-        ''' updates the main slider when in non centered mode'''
-        if not self.event_lock:
-            self.event_lock = True
-            if handle == 0:
-                self.left_lower.setValue(value)
-                self.profile_data.deadzone[0] = value
-            elif handle == 1:
-                self.right_upper.setValue(value)
-                self.profile_data.deadzone[3] = value
-
-            self.changed.emit()
-            self.event_lock = False
-
-    def _update_left(self, handle, value):
-        """Updates the left spin boxes.
-
-        :param handle the handle which was moved
-        :param value the new value
-        """
-        if not self.event_lock:
-            self.event_lock = True
-            if handle == 0:
-                self.left_lower.setValue(value)
-                self.profile_data.deadzone[0] = value
-            elif handle == 1:
-                self.left_upper.setValue(value)
-                self.profile_data.deadzone[1] = value
-
-            self.changed.emit()
-            self.event_lock = False
-
-    def _update_right(self, handle, value):
-        """Updates the right spin boxes.
-
-        :param handle the handle which was moved
-        :param value the new value
-        """
-        if not self.event_lock:
-            self.event_lock = True
-            if handle == 0:
-                self.right_lower.setValue(value)
-                self.profile_data.deadzone[2] = value
-            elif handle == 1:
-                self.right_upper.setValue(value)
-                self.profile_data.deadzone[3] = value
-
-            self.changed.emit()
-            self.event_lock = False
-
-        
-
-    def _update_from_spinner(self, value, index):
-        """Updates the slider position.
-
-        :param value the new value
-        :param handle the handle to move
-        :param widget which slider widget to update
-        """
-
-        values = self.get_values()
-
-        current = values[index]
-        if current != value:
-            values[index] = value
-            self.set_values(values)
-
-        
-
-            
-
-    def _update_deadzone(self, data : list):
-        ''' updates the deadzone text values '''
-        for index, value in enumerate(data):
-            match index:
-                case 0:
-                    self.left_lower.setValue(value)
-                case 1:
-                    self.left_upper.setValue(value)
-                case 2:
-                    self.right_lower.setValue(value)
-                case 3:
-                    self.right_upper.setValue(value)
-
-            self.profile_data.deadzone[index] = value
-        self.changed.emit() # notify we changed
-            
-
-
-    def _update(self):
-        is_centered = self._centered
-        if is_centered:
-            self.slider.setVisible(False)
-            self.left_slider.setVisible(True)
-            self.right_slider.setVisible(True)
-            self.left_upper.setVisible(True)
-            self.right_lower.setVisible(True)
-        else:
-            self.slider.setVisible(True)
-            self.left_slider.setVisible(False)
-            self.right_slider.setVisible(False)
-            self.left_upper.setVisible(False)
-            self.right_lower.setVisible(False)
-        
-
-
-
 class AxisCurveWidget(QtWidgets.QWidget):
     ''' response curve standalone widget '''
 
@@ -2615,7 +2290,7 @@ class AxisCurveData():
         
 
 
-class AxisCurveDialog(QtWidgets.QDialog):
+class AxisCurveDialog(gremlin.ui.ui_common.QRememberDialog):
     ''' dialog box for curve configuration '''
 
     def __init__(self, curve_data, parent=None):
@@ -2624,7 +2299,7 @@ class AxisCurveDialog(QtWidgets.QDialog):
         :param curve_data: the curve configuration data 
         :param parent: the parent widget
         """
-        super().__init__(parent=parent)
+        super().__init__(self.__class__.__name__, parent=parent)
 
         self.action_data = curve_data
 

@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations
 import enum
 import time
 import threading
@@ -248,6 +249,8 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
         t = event.type()
         if t == QtCore.QEvent.Type.Wheel:
             # handle wheel up/down change
+            if self.isReadOnly():
+                return True # cannot change the value if readonly
             v = self.value()
             if v is not None:
                 eh = gremlin.event_handler.EventListener()
@@ -977,37 +980,7 @@ class ActionSelector(QtWidgets.QWidget):
         else:
             self.paste_button.setToolTip(f"Paste action (not available)")
     
-        
-
-class BaseDialogUi(QtWidgets.QWidget):
-
-    """Base class for all UI dialogs.
-
-    The main purpose of this class is to provide the closed signal to dialogs
-    so that the main application can react to the dialog being closed if
-    desired.
-    """
-
-    # Signal emitted when the dialog is being closed
-    closed = QtCore.Signal()
-
-    def __init__(self, parent=None):
-        """Creates a new options UI instance.
-
-        :param parent the parent of this widget
-        """
-        super().__init__(parent)
-
-    def closeEvent(self, event):
-        """Closes the calibration window.
-
-        :param event the close event
-        """
-        if hasattr(self, "confirmClose"):
-            self.confirmClose(event)
-        if event.isAccepted():
-            self.closed.emit()
-
+     
 
 def _inheritance_tree_to_labels(labels, tree, level):
     """Generates labels to use in the dropdown menu indicating inheritance.
@@ -3786,36 +3759,6 @@ class ActionLabel(QtWidgets.QLabel):
 
 
 
-class MarkdownDialog(QtWidgets.QDialog):
-    '''
-    Dialog box for instructions in markdown format
-    '''
-    def __init__(self, title = "Markdown Instructions", source = None, parent = None):
-        super().__init__(parent)
-        self.setWindowTitle(title)
-        self.setWindowModality(QtCore.Qt.ApplicationModal)
-        self._view = QtWidgets.QTextEdit()
-        layout = QtWidgets.QVBoxLayout(self)
-        layout.addWidget(self._view)
-        if source is not None:
-            self.load(source)
-
-
-    def load(self, source : str):
-        ''' loads a source '''
-        if source is not None and os.path.isfile(source):
-            location = source
-        else:
-            location = gremlin.util.find_file(source, gremlin.shared_state.root_path)
-        if location is not None and os.path.isfile(location):
-            logging.getLogger("system").info(f"dialog: found file : {location}")
-            self._source = location
-            with open(location,"+rt") as f:
-                md = f.read()
-            self._view.setMarkdown(md)
-            return True
-        return False
-
 class QContentWidget(QtWidgets.QWidget):
     ''' a widget that fires a resize event when its size changes '''
 
@@ -3827,25 +3770,6 @@ class QContentWidget(QtWidgets.QWidget):
         self.resized.emit(event.size)
         return super().resizeEvent(event)
         
-# @SingletonDecorator
-# class TabSplitterData():
-#     ''' helper class to sync positions for all splitters on all tabs '''
-#     def __init__(self):
-#         self.pos = gremlin.config.Configuration().splitter_pos
-#         self._splitters = []
-
-#     def register(self, splitter):
-#         if not splitter in self._splitters:
-#             self._splitters.append(splitter)
-
-#     def setPos(self, value):
-#         ''' sets the position on all registered splitters '''
-#         self.pos = value
-#         if value is not None:
-#             for splitter in self._splitters:
-#                 with QtCore.QSignalBlocker(splitter):
-#                     splitter.moveSplitter(value, 0)
-
 
 class QSplitTabWidget(QDataWidget):
     ''' tab content widgeth split '''
@@ -3961,3 +3885,123 @@ class QSplitTabWidget(QDataWidget):
         ''' removes all widgets from the right panel '''
         gremlin.util.clear_layout(self._right_container_layout)
         
+
+
+class QRememberDialog(QtWidgets.QDialog):
+    ''' a dialog window that remembers its size and location '''
+
+    def __init__(self, key: str, parent = None):
+        super().__init__(parent)
+
+        self._resize_count = 0
+        assert key,"unique key must be provided"
+        self.window_key = key
+        self.apply_window_settings()
+        
+
+    def getResizable(self) -> bool:
+        return self._resizable
+    def setResizable(self, value: bool):
+        self._resizable = value
+        if value:
+            self.layout().setSizeConstraint(QtWidgets.QLayout.SizeConstraint.SetNoConstraint)    
+        else:
+            self.layout().setSizeConstraint(QtWidgets.QLayout.SizeConstraint.SetFixedSize)
+
+
+    def apply_window_settings(self):
+        """Restores the stored window geometry settings."""
+        config = gremlin.config.Configuration()
+        window_size = config.getWindowSize(self.window_key)
+        window_location = config.getWindowLocation(self.window_key)
+        if window_size:
+            self.resize(window_size[0], window_size[1])
+        if window_location:
+            self.move(window_location[0], window_location[1])
+
+    def moveEvent(self, evt):
+        """Handle changing the position of the window.
+
+        :param evt event information
+        """
+        config = gremlin.config.Configuration()
+        config.setWindowLocation(self.window_key, evt.pos().x(), evt.pos().y())
+        super().moveEvent(evt)
+
+    def resizeEvent(self, evt):
+        """Handling changing the size of the window.
+
+        :param evt event information
+        """
+        if self._resize_count > 1:
+            config = gremlin.config.Configuration()
+            config.setWindowSize(self.window_key, evt.size().width(), evt.size().height())
+
+        self._resize_count += 1
+        super().resizeEvent(evt)
+
+
+
+
+
+class MarkdownDialog(QRememberDialog):
+    '''
+    Dialog box for instructions in markdown format
+    '''
+    def __init__(self, title = "Markdown Instructions", source = None, parent = None):
+        super().__init__(self.__class__.__name__, parent)
+        self.setWindowTitle(title)
+        self.setWindowModality(QtCore.Qt.ApplicationModal)
+        self._view = QtWidgets.QTextEdit()
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.addWidget(self._view)
+        if source is not None:
+            self.load(source)
+
+
+    def load(self, source : str):
+        ''' loads a source '''
+        if source is not None and os.path.isfile(source):
+            location = source
+        else:
+            location = gremlin.util.find_file(source, gremlin.shared_state.root_path)
+        if location is not None and os.path.isfile(location):
+            logging.getLogger("system").info(f"dialog: found file : {location}")
+            self._source = location
+            with open(location,"+rt") as f:
+                md = f.read()
+            self._view.setMarkdown(md)
+            return True
+        return False        
+    
+
+   
+
+class BaseDialogUi(QRememberDialog):
+
+    """Base class for all UI dialogs.
+
+    The main purpose of this class is to provide the closed signal to dialogs
+    so that the main application can react to the dialog being closed if
+    desired.
+    """
+
+    # Signal emitted when the dialog is being closed
+    closed = QtCore.Signal()
+
+    def __init__(self, key, parent=None):
+        """Creates a new options UI instance.
+
+        :param parent the parent of this widget
+        """
+        super().__init__(key, parent)
+
+    def closeEvent(self, event):
+        """Closes the calibration window.
+
+        :param event the close event
+        """
+        if hasattr(self, "confirmClose"):
+            self.confirmClose(event)
+        if event.isAccepted():
+            self.closed.emit()

@@ -29,6 +29,7 @@ import gremlin.config
 import gremlin.event_handler
 from gremlin.input_types import InputType
 import gremlin.joystick_handling
+import gremlin.ui.axis_calibration
 from gremlin.ui.ui_common import DynamicDoubleSpinBox, DualSlider, get_text_width
 import gremlin.ui.input_item
 import gremlin.ui.ui_common
@@ -146,6 +147,7 @@ class ResponseCurveEx(gremlin.base_profile.AbstractAction):
         super().__init__(parent)
         self.parent = parent
         self.curve_data = gremlin.curve_handler.AxisCurveData()
+        self.curve_data.calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(self.hardware_device_guid, self.hardware_input_id)
         self.curve_data.curve_update()
         self.show_input_axis = gremlin.config.Configuration().show_input_axis
         

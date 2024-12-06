@@ -822,6 +822,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         curve_data : gremlin.curve_handler.AxisCurveData = data.curve_data
         if not curve_data:
             curve_data = gremlin.curve_handler.AxisCurveData()
+            curve_data.calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(data.device_guid, data.input_id)
             curve_data.curve_update()
             data.curve_data = curve_data
             

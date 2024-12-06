@@ -49,12 +49,12 @@ from lxml import etree
 import dinput
 import gremlin.util
 
-class ProfileOptionsUi(QtWidgets.QDialog):
+class ProfileOptionsUi(gremlin.ui.ui_common.QRememberDialog):
     """UI to set individual profile settings """
     start_mode_changed = QtCore.Signal(str)  # when the start mode changes
 
     def __init__(self, parent=None):
-        super().__init__(parent)
+        super().__init__(self.__class__.__name__, parent)
 
         # make modal
         self.setWindowModality(QtCore.Qt.ApplicationModal)
@@ -185,7 +185,7 @@ class OptionsUi(ui_common.BaseDialogUi):
 
         :param parent the parent of this widget
         """
-        super().__init__(parent)
+        super().__init__(self.__class__.__name__, parent)
 
         # Actual configuration object being managed
         self._reload_needed = False # true if UI reload is needed on option changes
@@ -209,7 +209,21 @@ class OptionsUi(ui_common.BaseDialogUi):
         # closing bar
         close_button = QtWidgets.QPushButton("Close")
         close_button.clicked.connect(self.close)
-        self.main_layout.addWidget(close_button,1,0)
+        close_button.setToolTip("Save options and close")
+
+        clear_windows  = QtWidgets.QPushButton("Clear Window Data")
+        clear_windows.clicked.connect(self.config.clearWindowData)
+        clear_windows.setToolTip("Clear dialog position and size data")
+
+        options_container = QtWidgets.QWidget()
+        options_layout = QtWidgets.QHBoxLayout(options_container)
+
+        
+        options_layout.addWidget(clear_windows)
+        options_layout.addStretch()
+        options_layout.addWidget(close_button)
+
+        self.main_layout.addWidget(options_container,1,0)
 
         # select the last used tab
         index = self.config.last_options_tab
@@ -1620,7 +1634,7 @@ class ProcessWindow(ui_common.BaseDialogUi):
         :param text: the process exe to select by default (if one is provided, and the item is not in the list, the file open will executed at that folder location)
         :param parent the parent of the widget
         """
-        super().__init__(parent)
+        super().__init__(self.__class__.__name__, parent)
 
         self.setWindowTitle("Process List")
         self.setMinimumWidth(400)
@@ -1734,7 +1748,7 @@ class LogWindowUi(ui_common.BaseDialogUi):
 
         :param parent the parent of this widget
         """
-        super().__init__(parent)
+        super().__init__(self.__class__.__name__, parent)
 
         self.setWindowTitle("Log Viewer")
         self.setMinimumWidth(600)
@@ -1824,7 +1838,7 @@ class AboutUi(ui_common.BaseDialogUi):
 
         :param parent parent of this widget
         """
-        super().__init__(parent)
+        super().__init__(self.__class__.__name__, parent)
         self.ui = ui_about.Ui_About()
         self.ui.setupUi(self)
 
@@ -1863,7 +1877,7 @@ class ModeManagerUi(ui_common.BaseDialogUi):
             configured
         :param parent the parent of this widget
         """
-        super().__init__(parent)
+        super().__init__(self.__class__.__name__, parent)
         self._profile = profile_data
         self.setWindowTitle("Mode Manager")
 
@@ -2304,7 +2318,7 @@ class DeviceInformationUi(ui_common.BaseDialogUi):
 
         :param parent the parent widget
         """
-        super().__init__(parent)
+        super().__init__(self.__class__.__name__, parent)
 
         self.profile = profile_data
 
@@ -2503,7 +2517,7 @@ class SwapDevicesUi(ui_common.BaseDialogUi):
         :param profile the current profile
         :param parent the parent of this widget
         """
-        super().__init__(parent)
+        super().__init__(self.__class__.__name__, parent)
 
         self.profile = profile
 
@@ -2613,11 +2627,11 @@ class SwapDevicesUi(ui_common.BaseDialogUi):
 
 
 
-class SubstituteDialog(QtWidgets.QDialog):
+class SubstituteDialog(gremlin.ui.ui_common.QRememberDialog):
     ''' device substitution - allows the swap of one device_guid for another '''
 
     def __init__(self, device_guid, device_name, parent = None):
-        super().__init__(parent)
+        super().__init__(self.__class__.__name__, parent)
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self._device_guid = device_guid # current device GUID

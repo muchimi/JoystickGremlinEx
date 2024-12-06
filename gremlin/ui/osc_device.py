@@ -2216,7 +2216,7 @@ class OscInputListenerWidget(QtWidgets.QFrame):
 
 
 
-class OscInputConfigDialog(QtWidgets.QDialog):
+class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
     ''' dialog showing the OSC input configuration options '''
 
     def __init__(self, current_mode, index, data, parent):
@@ -2225,7 +2225,7 @@ class OscInputConfigDialog(QtWidgets.QDialog):
         :param identifier - the input item identifier 
         '''
         
-        super().__init__(parent)
+        super().__init__(self.__class__.__name__,parent)
         # self._sequence = InputKeyboardModel(sequence=sequence)
         main_layout = QtWidgets.QVBoxLayout()
         self.setWindowTitle("OSC Input Mapper")

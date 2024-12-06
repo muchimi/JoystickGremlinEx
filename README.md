@@ -8,7 +8,54 @@ Joystick Gremlin EX
 <!-- TOC start (generated with https://github.com/derlin/bitdowntoc) -->
 
 - [Changelog](#changelog)
-   * [13.40.15ex (pre-release)](#134015ex-pre-release)
+   * [13.40.16ex (pre-release)](#134016ex-pre-release)
+      + [(m44)  ](#m44)
+      + [(m43)](#m43)
+      + [(m42)](#m42)
+      + [(m41)](#m41)
+      + [(m40)](#m40)
+      + [(m39)](#m39)
+      + [(m38)](#m38)
+      + [(m37)](#m37)
+      + [(m36)](#m36)
+      + [(m35)](#m35)
+      + [(m34)](#m34)
+      + [(m33)](#m33)
+      + [(m32)](#m32)
+      + [(m31)](#m31)
+      + [(m30)](#m30)
+      + [(m29)](#m29)
+      + [(m28)](#m28)
+      + [(m27)](#m27)
+      + [(m26)](#m26)
+      + [(m25)](#m25)
+      + [(m24)](#m24)
+      + [(m23)](#m23)
+      + [(m22)](#m22)
+      + [(m21)](#m21)
+      + [(m20)](#m20)
+      + [(m19)](#m19)
+      + [(m18)](#m18)
+      + [(m17)](#m17)
+      + [(m16)](#m16)
+      + [(m15)](#m15)
+      + [(m14)](#m14)
+      + [(m13)](#m13)
+      + [(m12)](#m12)
+      + [(m11)](#m11)
+      + [(m10)](#m10)
+      + [(m9)](#m9)
+      + [(m7/8)](#m78)
+      + [(m6)](#m6)
+      + [(m6)](#m6-1)
+      + [(m4)](#m4)
+      + [(m3)](#m3)
+      + [(m2)](#m2)
+      + [(m1)](#m1)
+   * [13.40.15ex ](#134015ex)
+      + [(m5.4) hotfix](#m54-hotfix)
+      + [(m5.3) hotfix](#m53-hotfix)
+      + [(m5.2) hotfix](#m52-hotfix)
       + [(m5)](#m5)
       + [(m4.10) hotfix](#m410-hotfix)
       + [(m4.8) hotfix](#m48-hotfix)
@@ -16,10 +63,10 @@ Joystick Gremlin EX
       + [(m4.5) hotfix](#m45-hotfix)
       + [(m4.2) hotfix](#m42-hotfix)
       + [(m4.1) hotfix](#m41-hotfix)
-      + [(m4)](#m4)
-      + [(m3)](#m3)
-      + [(m2)](#m2)
-      + [(m1)](#m1)
+      + [(m4)](#m4-1)
+      + [(m3)](#m3-1)
+      + [(m2)](#m2-1)
+      + [(m1)](#m1-1)
    * [13.40.14ex (m22)](#134014ex-m22)
 - [Virus false-positives](#virus-false-positives)
 - [Releases](#releases)
@@ -56,6 +103,17 @@ Joystick Gremlin EX
          - [Undetected devices may not be available after startup](#undetected-devices-may-not-be-available-after-startup)
          - [Runtime device changes create a dragon rich environment](#runtime-device-changes-create-a-dragon-rich-environment)
    * [Joystick (axis) device](#joystick-axis-device)
+      + [Calibration](#calibration)
+         - [Global scope](#global-scope)
+         - [Range and accuracy](#range-and-accuracy)
+         - [Live feedback](#live-feedback)
+         - [Centering](#centering)
+         - [Inversion](#inversion)
+         - [Calibration limits](#calibration-limits)
+         - [Calibration center](#calibration-center)
+         - [Reset](#reset)
+         - [Deadzones](#deadzones)
+      + [Calibration Tips](#calibration-tips)
       + [Curve Editor](#curve-editor)
       + [Curve types](#curve-types)
          - [Coordinate system](#coordinate-system)
@@ -64,8 +122,8 @@ Joystick Gremlin EX
          - [Curve presets](#curve-presets)
          - [Curve copy/paste](#curve-copypaste)
          - [Symmetry mode](#symmetry-mode)
-         - [Inversion](#inversion)
-         - [Deadzones](#deadzones)
+         - [Inversion](#inversion-1)
+         - [Deadzones](#deadzones-1)
          - [Curve processing order](#curve-processing-order)
    * [Keyboard (+Mouse) device](#keyboard-mouse-device)
          - [Keyboard inputs](#keyboard-inputs)
@@ -182,26 +240,33 @@ Joystick Gremlin EX
 <!-- TOC --><a name="changelog"></a>
 # Changelog
 
-<!-- TOC --><a name="134015ex-pre-release"></a>
 
 
+<!-- TOC --><a name="134016ex-pre-release"></a>
 ## 13.40.16ex (pre-release)
+<!-- TOC --><a name="m44"></a>
 ### (m44)  
 - Improved: The legacy calibration method has been deprecated. Legacy data will be loaded if it exists the first time GremlinEx runs from an older version. The calibration tool is removed, and calibration options are moved to individual input via a configuration button for each that brings up a dialog specific to that input. The new features include new visualization of live data, inversion, and deadzone settings applied at the input level without needing a curve. The calibration applies to the input before further processing by GremlinEx, including before any curve is applied.  By default all axes are setup as "centered" and no calibration is applied so no changes are needed unless calibration should be applied.  Calibration data is now saved to a separate XML datafile in the user profile folder where profiles are kept and includes the new flags/options in it.
 - Experimental: ability to disable certain inputs and manage input enabled state at profile runtime via the new control action.  The control action can only be mapped to a momentary input and can control the enabled state on any known input.  The idea of this feature is to (1) enable/disable inputs without having to connect/disconnect them which can cause problems or conflicts or re-ordering (2) for advanced setups where multiple inputs may be mapped to the same output and this is not desirable due to conflict in certain scenarios. 
 - Improved: individual input enable button now available on any input to enable or disable it from the profile.  By default, all inputs are enabled when a profile starts.  The buttons can be enabled via an option.
+- Improved: Most dialogs will remember position and size.
+- Fix: Invalid input type in legacy remap
+- New: documentation on calibration
 
 
+<!-- TOC --><a name="m43"></a>
 ### (m43)
 - Improved: curve dialog window on input has scrollbars for lower resolution displays.
 - Fix: Simconnect functor exception with new API tree feature
 
+<!-- TOC --><a name="m42"></a>
 ### (m42)
 - API: Refactored the execution graph to also create a new execution tree data structure.  This makes it much easier to navigate the execution graph at runtime from any point of the execution, output diagnostics and derive latched actions.
 - Improved: The API improvement simplifies curve computations and resolves merged axis curve application in map to vjoy.
 - Fix: last runtime profile restore on profile start non longer throws an exception if option is enabled
 - Fix: automatic profile load based on mapped process if option is enabled
 
+<!-- TOC --><a name="m41"></a>
 ### (m41)
 - Improved: Keyboard mapper Ex enhanced display of selected keys.
 - Improved: Simconnect (MSFS) supports two-way communication via OSC (see osc_msfs.py as the demo of the parking brakes).  The demo OSC/Pilot and user plugin module to support two way comms is in the demo msfs zip file.  Note: this is not OSC/Pilot specific - just provided as a demo here.  The concept is similar with other OSC surface control software  although it may have to be tweaked based on that software's capabilities.
@@ -209,25 +274,31 @@ Joystick Gremlin EX
 - Fix: Containers not always telling actions what container type they are when the container type overrides the input type.
 - Fix: Gated Axis triggers on a single condition gate crossings ignoring the others  
 - Fix: C++ reference error on gated axis after stopping a profile and moving the associated input device
+<!-- TOC --><a name="m40"></a>
 ### (m40)
 - Fix: small update for mouse ex not releasing mouse button (thanks for reporting!)
+<!-- TOC --><a name="m39"></a>
 ### (m39)
 - Improved: OSC output can send to any IP address (set IP and port in options).  The prior implementation was sending to the local server only.
 
+<!-- TOC --><a name="m38"></a>
 ### (m38)
 - Fix: removed redundant "force numlock off" check box in profile to process mapping as that option is superfluous.  Each profile can set its own option in the profile config window, or it can be set globally in options.  Those two methods are sufficient to achieve the desired behavior.  
 - Fix: Curves applied to input axes not always loaded post converting to the new curve editor.
 - New: Conditions have their own verbose mode for log output for troubleshooting conditions in the log.  When this is enabled, the execution plan and the outcome of tested conditions will be output to the log to help diagnose issues around conditions.  Conditions and execution plans are very complicated (warning, when enabled, as with most verbose modes, this can generate a lot of log data and consequently slows GremlinEx down significantly).
 - Fix: Docktab for mappings generating an internal Python exception because the C++ reference was garbage collected before the Python reference.
 
+<!-- TOC --><a name="m37"></a>
 ### (m37)
 - Fix: exception on mode change with certain curve setups  
 
+<!-- TOC --><a name="m36"></a>
 ### (m36)
 - Improved: Added OSC send capability
 - Improved: Added VJOY output events  
 - New: GremlinEx to OSC vjoy output script user plugin demo
 
+<!-- TOC --><a name="m35"></a>
 ### (m35)
 - Improved: Condition processing for containers and actions are now cumulative, meaning that each container has a set of conditions for the whole container, and another concurrent set for each action in the container to toggle each one individually.  If a condition on a container fails, the whole container is disabled, regardless of the individual conditions on actions.
 - Improved: Condition logic
@@ -235,9 +306,11 @@ Joystick Gremlin EX
 - Fix: Keyboard input: Arrows keys no longer get translated to Numpad arrow keys
 - API: reworked the container and actions conditions API.
 
+<!-- TOC --><a name="m34"></a>
 ### (m34)
 - Unreleased test version
 
+<!-- TOC --><a name="m33"></a>
 ### (m33)
 - New: Map to vjoy, hat to button mode has a new sticky option.  When enabled and the position mapping is in the hold mode, any pressed hat positions will "stick" until the hat is returned to center, and when disabled, only the current hat position is pressed.   This mode is only relevant when in hold mode, it has no meaning in the pulse mode for obvious reasons.
 - Fix: Tempo/TempoEx/Chain/Switch/Button did not support hats as input
@@ -246,10 +319,12 @@ Joystick Gremlin EX
 
 
 
+<!-- TOC --><a name="m32"></a>
 ### (m32)
 - Improved: cross-reference data returned by Vjoy API with data returned by DirectInput and more detailed log data for what was detected.  This can help with troubleshooting.
 - Fix: typo in tempo/tempoEx in variable name
 - Fix: possible tray icon exception when the application exits and the tray icon has already been discarded.
+<!-- TOC --><a name="m31"></a>
 ### (m31)
 - Improved: support for Simconnect for MSFS2024.  This is a work in progress and does not include all planned features, such as, a facility to add custom simvars from add-on products.  The barebones module is functional with MSFS 2024 released Tuesday, November 10th, 2024.
 - Improved: Map to vjoy adds a new hat to button mode to map up to 8 hat positions directly to buttons.  The buttons can be pulsed or held.
@@ -259,13 +334,16 @@ Joystick Gremlin EX
 - Known issue: condition marker does not always update in all use cases (this does not impact functionality)
 - Known issue: conditions if also mapped for their own actions may cause some conflicts because they fire at the same time.
 
+<!-- TOC --><a name="m30"></a>
 ### (m30)
 - Fix for condition tab error when adding a condition that applies to the container - related to the addition of the status flag in m27 
 
+<!-- TOC --><a name="m29"></a>
 ### (m29)
 - Fix for m28 vjoy mapper ignoring curve data on load due to a tag change in m28
 - Fix for missing panel in vjoy mapper for some other button modes (m28 fixed the axis to button but missed a few others that had the same issue when mapping to a button input)
 
+<!-- TOC --><a name="m28"></a>
 ### (m28)
 - Improved: GremlinEx can automatically convert legacy Remap and Response Curve to their GremlinEx version provided that options are enabled from the Profile page in the options.  Converting is recommended and will occur when a profile is loaded.  When the convert option is selected, the legacy mappers will no longer be visible from the action drop down either to encourage the use of the new actions.
 - Improved: Added option to toggle the display of button grids in the GremlinEx options panel.  This is the same as holding the control key down when toggling the "show button grid" in the Map to Vjoy mapper.
@@ -275,12 +353,14 @@ Joystick Gremlin EX
 - Fix: Floating point and integer text input wheel events are no longer propagated (that could cause random unexpected scrolling of a parent containers)
 
 
+<!-- TOC --><a name="m27"></a>
 ### (m27)
 - Fix: Input or output axis curves: setting deadzone via buttons not saving values. 
 - Improved: [experimental] Condition tab will show a marker when one or more conditions are defined (I've set it up to pickup any condition however I am not a heavy user of conditions so it's completely possible this will trip up somewhere)
 - Fix: VJOY used button state now takes into account axis to button mappings.
 - Fix: VJoy Remap typo in diagnostics code to handle invalid VJOY IDs
 
+<!-- TOC --><a name="m26"></a>
 ### (m26)
 - Improved: Complete input mappings for an input (all containers) can now be copied and pasted all at once from the clipboard as a set.  This makes is easier to copy/paste multiple container mappings between inputs. Note: when pasting multiple containers, only valid containers in the clipboard will be pasted so if you are missing a container, it's because it wasn't valid for the input.  This comes into play when copying containers for an axis and pasting it to a button input, and vice versa.  (new container toolbar button).
 - Improved: It is now possible to clear all mappings from an input.  A confirmation box will be presented (new container toolbar button).
@@ -290,9 +370,11 @@ Joystick Gremlin EX
 - Fix: Paste action didn't recognize XML ObjectEncoder data
 - Improved: Vjoy Remap will validate the VJOY device ID and gracefully provide an error message with the offending ID rather than causing an exception if it cannot be found in the active VJOY device list.  The action will also check at profile load if an ID is not valid, for example an older profile referencing an ID that no longer exists.  IDs are assigned by the VJOY Configurator.
 
+<!-- TOC --><a name="m25"></a>
 ### (m25)
 - Fix: Curve controller now checks for duplicated points when fitting a curve
 
+<!-- TOC --><a name="m24"></a>
 ### (m24)
 - Improved: The range container now supports directional triggers based on a relative input axis position change. The container can now trigger its actions based on an input increase or decrease, or both, provided that the input change (delta) exceeds the percentage or range set (default 10% deviation).  The use case for this is to trigger a button or key based on a slider input going up or down.  Note: if mapping a button or key, use the pulse feature as the container is only an "on" container - in trigger on change mode, it does not issue a release so the action must self release if that is the desired behavior.
 - Improved: Import profile function UI improvements
@@ -303,11 +385,13 @@ Joystick Gremlin EX
 - Improved: Map to Mouse Ex can now send double-clicks
 - Fix: Input load skips loading vjoy inputs that do not exist anymore whatever the reason and will output a warning log entry if it cannot find something 
 
+<!-- TOC --><a name="m23"></a>
 ### (m23)
 - Improved: 1:1 mapping now has a configuration dialog box to select target and mapping mode.
 - Fix: 1:1 usable mode accounts for vjoy mappings by both vjoy mappers
 - Fix: Input selection can throw a missing argument exception in m22 patch
 
+<!-- TOC --><a name="m22"></a>
 ### (m22)
 - Improved: axis repeater bar no longer causes a small window to flash temporarily on the UI
 - Improved: vjoy remap show/hide button grid checkbox can now change the state for all vjoy remap actions in the profile if the state is changed while a control key is held
@@ -319,41 +403,50 @@ Joystick Gremlin EX
 - Fix: switch container caused an exception when adding a new switch position
 
 
+<!-- TOC --><a name="m21"></a>
 ### (m21)
 - Fix: Legacy remap displays blank (or incorrect) value on reload for certain input choices
 - Fix: TempoEx container condition UI invalid index exception when setting conditions based on actions
 - Improved: Refactored button usage tracking
 
+<!-- TOC --><a name="m20"></a>
 ### (m20)
 - Fix: display details in MIDI inputs would hide details on other entries
 - Fix: MIDI configuration update was not not updating input description consistently
 - Fix: input display fails to update for keyboard entries in m19  
 
 
+<!-- TOC --><a name="m19"></a>
 ### (m19)
 - Improved: legacy remap and map to vjoy actions now synchronize the used data.
 - Improved: action list for button mappings now updates when queried to ensure the usage data is up to date across the entire profile.
 
+<!-- TOC --><a name="m18"></a>
 ### (m18)
 - Improved: Axis names.  GremlinEx will attempt to derive the axis usage name (X, Y, Z, RX, RY, RZ, SL1, SL2) for inputs and VJOY output as reported and mapped by DirectInput. While many device report as expected, some (non VJOY) devices do not report a usage for an axis.  When this happens, the name of the axis will be its axis sequence number (1 to 8). If a usage is defined and can be derived, the specified usage name will be used and displayed in GremlinEx. Names are informational only and GremlinEx will always use the hardware device and input IDs for mapping.
 - Improved: GremlinEx considers axis names when a VJOY definition has skipped axes
 - API: VJOYSelector is now based on data instead of naming conventions which fixes the legacy mapper (remap to vjoy does not use this).
 
+<!-- TOC --><a name="m17"></a>
 ### (m17)
 - Fix: action icon not always updating when adding, changing or removing an action/container.
 - Fix: usage icons on map to vjoy button grid update on profile load
 - Fix: usage icons on map to vjoy button grid show other mappings when clicked
 
+<!-- TOC --><a name="m16"></a>
 ### (m16)
 - Fix: missing raw value in curve  
 
+<!-- TOC --><a name="m15"></a>
 ### (m15)
 - Fix: enabled/disabled state of MIDI and OSC inputs did not impact UI such as sort and device visibility.  They now do.
 
+<!-- TOC --><a name="m14"></a>
 ### (m14)
 - Fix: Gated Axis delete gate does not update range data.
 - Fix: Gated Axis add/remove container or actions in range or gate action could disable input tracking and cause the Gated Axis action to become unresponsive.
 
+<!-- TOC --><a name="m13"></a>
 ### (m13)
 - Fix: Merge Axis action creating invalid axis reference for second device upon initialization if the first device was the last axis on the particular input device selected.
 - Fix: Merge Axis action not marked as a singleton action.
@@ -361,6 +454,7 @@ Joystick Gremlin EX
 - Improved: Map to Vjoy action in an action container will display the correct design time axis output when nested or no data if the parent action does not support it.
 
 
+<!-- TOC --><a name="m12"></a>
 ### (m12)
 - Fix: With a new, unsaved profile, removing a container for a gate or range in the Gated Axis action results also removes the container on the parent action (this was a visual item, upon saving it would load correctly the next time).  This is resolved in m12.  
 - Improved: Singleton actions (actions that can only apply once per input) will generate a message box error if added more than once, or if nested.
@@ -368,28 +462,34 @@ Joystick Gremlin EX
 - Improved: Detail button in profile import will show the capabilities of the source and target for mapping purposes.
 - Fix: debug mode left on in m11 would call up XML profile in the default text editor if they differed.
 
+<!-- TOC --><a name="m11"></a>
 ### (m11)
 - Fix: for midi and osc enabled options not saving properly after changes to the validation logic for these two services introduced in m6.
 
+<!-- TOC --><a name="m10"></a>
 ### (m10)
 - Improved: profiles no longer save empty entries (entries with no mappings and entries that use defaults) - this reduces the size of the saved profile and improves loading/save time.
 - Improved: detection of profile changes when loading a new profile (will now ignore default entries or entries with no mappings)
 - Fix: window title doesn't always get updated when loading a profile from the menu
 
+<!-- TOC --><a name="m9"></a>
 ### (m9)
 - New: left and right panels can be resized via a splitter
 - Fix: Gated Axis add/remove gate manually throws an exception when manually setting the gate count
 
 
+<!-- TOC --><a name="m78"></a>
 ### (m7/8)
 - Fix: saving calibration throws an exception (bad reference)
 - Fix: add gate via the add button throws an exception (bad reference)
 - WIP: profile import - added re-import button on device imports for automatic remap when device changes and axis/button/hat counts changed.
 
+<!-- TOC --><a name="m6"></a>
 ### (m6)
 - Improved: still a WIP: import of profiles now includes un-mapped modes, deselecting a mode in one mapping deselects all, and input descriptions carry over.
 - Fix: curve input causing a recursive exception when moving control points.
 
+<!-- TOC --><a name="m6-1"></a>
 ### (m6)
 - Fix: Updated logic used to determine if changes are made to a profile to avoid excessive prompting to save on profile load if an existing profile is already loaded: the updated check does away with hash values, ignores comments, internal IDs, file encodings and other non-relevant changes as these would trigger a save change prompt, even when there were none on a substantive basis.
 - Improved: still a WIP: improved handling of profile import logic and mapping to devices with fewer axes/buttons/hats. Fix for keyboard, MIDI and OSC inputs that cannot have a remap change - they import as they are since the input is fixed.
@@ -399,19 +499,23 @@ Joystick Gremlin EX
 - Fix: Selecting a new mode does not select an active input in the UI
 - Improved: New profiles will show as "untitled" in the main window title bar
 
+<!-- TOC --><a name="m4"></a>
 ### (m4)
 
 - Added descriptive error message on DirectInput interface load errors if UAC (user access control) prevents it from loading depending on the permissions of the logged in account.  If a DLL load error occurs at startup, running the process in administrator mode usually solves the load issue.
 - Added check for MIDI ports to be available before offering the MIDI device tab.  If you get an exception when changing to the MIDI or OSC devices, please create a GitHub issue and attach the screenshot of the exception.
 
+<!-- TOC --><a name="m3"></a>
 ### (m3)
 - Refactored behavior of *cycle mode* and *temporary mode* switch actions to handle gremlinEx backend changes
 - Bug fix: deleting a mode from a profile did not remove all references or mappings from actions
 
 
+<!-- TOC --><a name="m2"></a>
 ### (m2)
 - Added option to show or hide the button grid in vjoy remap
 
+<!-- TOC --><a name="m1"></a>
 ### (m1)
 
 - Ensure mode names ignore leading/trailing spaces
@@ -421,17 +525,21 @@ Joystick Gremlin EX
 - New switch container (experimental).  The switch container is designed to map a switch with multiple positions to make it easier to map a set of input buttons to actions.  The container is not essential but can be used to map two-way, three-way and rotary buttons more easily, and the functionality is not new - the only "new" aspect is to do this in a single container rather than multiple buttons.
 
 
+<!-- TOC --><a name="134015ex"></a>
 ## 13.40.15ex 
 
 
+<!-- TOC --><a name="m54-hotfix"></a>
 ### (m5.4) hotfix
 - Allow vjoy devices setup as wheel that then misreport direct input data to function in GremlinEx (the hack causes the devices to report fewer axes than they actually have causing a mismatch).  GremlinEx will use the misreported information as "correct".
 
+<!-- TOC --><a name="m53-hotfix"></a>
 ### (m5.3) hotfix
 - The range container now supports press and release actions automatically an mimic a button mapping being "pressed" while in the range and "released" when the axis value exits the range.
 - API: containers and actions now have the concept of an "override" input type and input id for containers that change the behavior of the input to something else so the actions configure themselves correctly (example, containers that split up an axis range)
 - TTS is threaded by default now to avoid text to speech from delaying the execution of containers/actions. This is experimental. All speech will now run in parallel to the rest of the execution graph so the actions will run while the speech executes.  This could lead to unexpected consequences but in general avoids TTS from being such a terrible impact on the timely execution of other commands.
 
+<!-- TOC --><a name="m52-hotfix"></a>
 ### (m5.2) hotfix
 
 - Bug fix: joystick hat incorrect output
@@ -482,7 +590,7 @@ Joystick Gremlin EX
 - added additional log output for device and plugin load
 - added additional log output on device naming mapping
 
-<!-- TOC --><a name="m4"></a>
+<!-- TOC --><a name="m4-1"></a>
 ### (m4)
 
 - Updated plugin - Response Curve EX - uses revamped internal curve mapper
@@ -494,12 +602,12 @@ Joystick Gremlin EX
 	+ help guide
 
 
-<!-- TOC --><a name="m3"></a>
+<!-- TOC --><a name="m3-1"></a>
 ### (m3)
 
 - VjoyRemap plugin now supports curved output directly in the action without having to add a response curve.  The curve can be added or removed.  The curve dialog now has a number of bezier curve presets.  The curve is applied after all the other transforms, including merging.
 
-<!-- TOC --><a name="m2"></a>
+<!-- TOC --><a name="m2-1"></a>
 ### (m2)
 - First attempt with multiple code refactors and bug fixes detailed below.
 - Added cleanup events for action plugins so they can release resources via _cleanup() \[AbstractAction] and _cleanup_ui() \[AbstractActionWidget] - the methods are virtual so are optional but will be called when an action is deleted or unloaded.  This helps with releasing references that could cause problems with the automatic garbage collection and hooks into various events.
@@ -518,7 +626,7 @@ Joystick Gremlin EX
 - Update to QT 6.7.3
 - Refinement of device highlight to clarify options.  If highlighting is enabled, button highlighting can be enabled by holding shift down, and axis highlighting can be enabled temporary by holding the control key.
 
-<!-- TOC --><a name="m1"></a>
+<!-- TOC --><a name="m1-1"></a>
 ### (m1)
 - **Gamepad support** JGEX supports up to four (4) virtual XBox 360 gamepads via VIGEM.  See gamepad section.  Gamepads can be mapped via the new **map to gamepad** action.
 - Improved device mapping output.
@@ -1024,6 +1132,152 @@ The curve button is used to add, or edit an existing curve.  It will show blue i
 
 The delete curve button is used to remove a curve.  A confirmation box will be displayed.
 
+
+<!-- TOC --><a name="calibration"></a>
+### Calibration
+
+The purpose of calibration is to filter and re-scale input data before it is further processed by GremlinEx by curves or action.  The available filters enable you to:
+
+- Tell GremlinEx if the axis has a center detent or not.  Center detents means the input axis usually is held at a center position in normal use.  This is different from a slider axis which is typically only linear and has a minimum/maximum only.
+- Tell GremlinEx if the input should be inverted (reversed).  This feature flips the direction of travel and is hardware dependent. Note that if you need to invert an axis only for a specific profile specific, use the inversion setting with a curve input or response curve setting, or at the action level in Map to Vjoy as the inversion setting in the calibration dialog is global, thus applies to all profiles.
+- If you have a noisy (usually potentiometer based) input, ability to set input deadzones.  Deadzone identify areas of flutter, or noisy input, where the input sends data even if it's not moving, or sends a range of data that varies at the extremity of travel or while in the center position. Inputs that use optical or hall effect sensors to detect motion usually do not need this.
+
+
+Starting with JGEX 13.40.16, calibration is done individually for each input axis as needed.
+
+The calibration button shows in the input axis toolbar for axis devices only as indicated below.
+
+![](calibration_button.png)
+
+The calibration button brings up a dialog to setup calibration for that specific input, which will be listed at the top of the dialog.
+
+When you exit the dialog, the settings are automatically saved and applied. Internally, GremlinEx saves the calibration data to an XML file located in the user profile folder.
+
+If you had a prior calibration profile setup for an input, GremlinEx will attempt to load that data into the dialog, however you should always check the data as imported and to set other options as well.
+
+If GremlinEx detects calibration data for an input that is different from the default (unfiltered) state, the button will be blue indicating a filter is being applied.
+
+
+![](calibration_dialog.png)
+
+<!-- TOC --><a name="global-scope"></a>
+#### Global scope
+
+Any calibration options apply to the input globally across all profiles.  GremlinEx provides alternative ways, at the profile level, to setup deadzones and inversion and response curve that are profile specific.  The global calibration makes particular sense with noisy inputs so that can be setup once for each hardware input without having to repeat the configuration for each profile.
+
+
+Understanding the processing order is important to diagnose unexpected behaviors, or to craft the profile in a way to achieve the desired behavior. 
+
+The GremlinEx processing order is listed here in the order of execution:
+
+- Global scope
+	- Raw input (as provided via the DirectX layer)
+	- Calibration (if any)
+- Profile scope
+	- Input curve (if any)
+	- Containers (most are pass-through)
+		- Actions
+			+ Curved response 
+			+ Individual actions
+		- Output
+
+Each stage of processing is optional and only applies if present/setup. Understanding the order of processing is important.
+	
+Every stage of processing applies to the steps below it.  So an inversion setting in calibration will apply to all downstream processing steps, but an inversion setting in an action will only apply to that action and will be stored as a profile setting.
+
+
+<!-- TOC --><a name="range-and-accuracy"></a>
+#### Range and accuracy
+
+The range of all inputs is normalized -1.0 to +1.0 throughout GremlinEx regardless of the hardware's input range.
+
+The DirectX standard provides 65,536 values (16 bit) for any input, which are normalized to -1.0 to +1.0.
+
+Internally GremlinEx use floating point numbers that far exceed the 16 bit resolution, although it will display three decimal points by default which is usually sufficient for simulation, game or music purposes.  The displayed value is lower resolution than the internal value so no data loss will be experienced.
+
+<!-- TOC --><a name="live-feedback"></a>
+#### Live feedback
+
+As you setup calibration data and change options, the changes you make will be reflected live when you move the input so you can instantly see the impact of your calibration to make sure it provides the expected behavior.
+
+The output visualization is below the main calibration bar, and a numeric value repeater is also provided for the exact numerical value computed by the calibration logic.
+
+<!-- TOC --><a name="centering"></a>
+#### Centering
+
+By default, all inputs are considered centered.  GremlinEx does not know if the input is centered or not, so you need to tell it.  This is because hardware comes with different capabilities and the notion of "centered" is really up to you. It is true that some hardware does report the type, however in my experience, it's up to you to determine how you want to use that input, as it is context specific.  You can have a centered slider if that is what you need for your particular context, and you can remove the center position from a centered input if that is your use-case.
+
+<!-- TOC --><a name="inversion"></a>
+#### Inversion
+
+The inversion setting is a global setting that inverts the input.  This is helpful in some scenarios and is really hardware and context dependent.  For example you may have a control panel that you have mounted upside down, or the hardware naturally reports feedback inverted and you need it to always be reversed.  Inversion does not scale input, it only flips the direction of travel.
+
+<!-- TOC --><a name="calibration-limits"></a>
+#### Calibration limits
+
+The two extremities, left and right in the dialog, determine the maximum (minimum) absolute travel direction of the input axis.  This primarily applies to potentiometer based input axis that may report a range of different values when the input travels to its stops.   The calibrate button resets the left and right nodes to the center position and you can then move the input to its maxium and minimum position to set the limits automatically.  All inputs in GremlinEx are normalized to -1.0 to 1.0 so the limits will appear as a floating point value.
+
+If you have an input that is inconsistent, set the limit to a value that will filter out this inconsistency so you end up with a reliable signal.
+
+You do not need to press the calibrate button to set the limits, they will always move to the minimum/maximum but they will not move "back", meaning that if the values change, it will take the smaller value (minimum side) or larger value (maximum side) so the calibration button just resets the values to 0.0 for convenience.
+
+The minimum and maximum can be set manually via the input boxes.
+
+Once set, the calibration minimum/maximum will scale the input value to -1.0 and +1.0 based on what you have set.  The calibrated value that is computed will be displayed in the output repeater below the calibration bar, and also in the calibrated value repeater for the numeric value output.
+
+<!-- TOC --><a name="calibration-center"></a>
+#### Calibration center
+
+This only applies to centered axis input.  The option will not be visible if the axis is not setup as centered.
+
+The calibration center is provided to set the middle point in the input range that corresponds to the normal center position of the input.  For some devices, this is not necessarily the midpoint value, which is why this is provided in case the hardware is offset.  This happens mostly with non optical or magnetic (hall effect) sensors.
+
+In most cases, this center calibration value should be 0.0, the midpoint between -1.0 and +1.0.
+
+As with the rest of the calibration dialog, the setting is global and will apply to all profiles
+
+You can set the value by pressing the Set Center button while the physical input is in the center position.  It doesn't have to be exact as usually if you need to change the center position, you also need to provide a center deadzone range as it's unlikely the input will always return to that exact position if you need an offset in the first place.
+
+As with the range calibration, you can also manually set this value in the input box.
+
+<!-- TOC --><a name="reset"></a>
+#### Reset
+
+The reset button resets calibration values to default as a convenience. It will not reset deadzones or the centering setting.
+
+<!-- TOC --><a name="deadzones"></a>
+#### Deadzones
+
+Deadzones setup in the calibration window are global, and apply to all profiles regardless of any other deadzones setup down the line via curves or mapped actions.
+
+GremlinEx currently provides three (3) deadzones.  There is one for each extremity of travel.  The third is for centered inputs (it has no meaning if the input is not centered, or continuous).
+
+The purpose of the deadzone is to filter out noisy input towards the extremities or the center.  While the input is in the range specified by the deadzone, it will always report a single value, -1, 0, or +1, for minimum, center and maximum.
+
+The bottom of the dialog is used to define the deadzones.
+
+The values can be set by dragging the knobs or setting an input value.
+
+If the input is centered, the deadzone for the center will not be displayed in the dialog.
+
+The center deadzone has two values, for the low end of the center and the high end of the center.
+
+Extremities only have one value.
+
+The live repeater will instantly display the impact of the applied deadzone so you can visualize the value and tweak the deadzone as desired without having to run a profile.
+
+<!-- TOC --><a name="calibration-tips"></a>
+### Calibration Tips
+
+Calibration is global, so lets you define setting that apply to all profiles at once.  The main one there will probably be the inversion setting.
+
+Calibration and deadzones usually only apply to devices that tend to have noisy inputs, but you can also use the calibration data to "scale" the input globally.
+
+For example, by shifting the center point to an offset, you can scale the response of an input's lower and upper half easily.  A use case for this may be a throttle input for a space game, or for reversers:  You may want a more sensitive upper range value than you want for the lower range so you have more forward resolution than you do going back.  
+
+You can also match the center position to the physical detent position of your input if it has one, as those may not be the exact center as the input reports.
+
+
 <!-- TOC --><a name="curve-editor"></a>
 ### Curve Editor
 
@@ -1091,12 +1345,12 @@ GremlinEx lets you copy the current curve data to the clipboard, and paste it to
 
 GremlinEx can use symmetry mode in which case points left of center will be mirrored to the right of center.  In this mode, a center point is added to the curve if it doesn't exist.
 
-<!-- TOC --><a name="inversion"></a>
+<!-- TOC --><a name="inversion-1"></a>
 #### Inversion
 
 The invert button reverses the curve in the Y axis.
 
-<!-- TOC --><a name="deadzones"></a>
+<!-- TOC --><a name="deadzones-1"></a>
 #### Deadzones
 
 

@@ -158,9 +158,9 @@ class GridButton(QtWidgets.QPushButton):
         pass
         
     
-class GridPopupWindow(QtWidgets.QDialog):
+class GridPopupWindow(gremlin.ui.ui_common.QRememberDialog):
     def __init__(self, vjoy_device_id, input_type, vjoy_input_id):
-        super(GridPopupWindow, self).__init__()
+        super().__init__(self.__class__.__name__)
 
         self.vjoy_device_id = vjoy_device_id
         self.input_type = input_type
@@ -893,6 +893,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _curve_button_cb(self):
         if not self.action_data.curve_data:
             curve_data = gremlin.curve_handler.AxisCurveData()
+            curve_data.calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(self.action_data.hardware_device_guid, self.action_data.hardware_input_id)
             curve_data.curve_update()
             self.action_data.curve_data = curve_data
             
@@ -2099,6 +2100,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
             if node.action.tag in ("response-curve", "response-curve-ex"):
                 nodes.append(node)
         
+        
         # sort the list in reverse priority order (highest prority runs first)
         if nodes:
             nodes.sort(key = lambda x: x.priority)
@@ -2115,6 +2117,10 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
             for action in actions:
                 if action.curve_data:
                     curves.append(action.curve_data)
+
+        # add self
+        if self.action_data.curve_data is not None:
+            curves.append(self.action_data.curve_data)
 
         return curves
 
@@ -3009,6 +3015,7 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
             curve_node = util.get_xml_child(node,"response-curve-ex")
             if curve_node is not None:
                 self.curve_data = gremlin.curve_handler.AxisCurveData()
+                self.curve_data.calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(self.hardware_device_guid, self.hardware_input_id)
                 self.curve_data._parse_xml(curve_node)
                 self.curve_data.curve_update()
 

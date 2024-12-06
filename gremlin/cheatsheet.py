@@ -32,7 +32,7 @@ import gremlin.shared_state
 import gremlin.util
 from PySide6 import QtWidgets, QtCore, QtGui
 from enum import Enum, auto
-
+import gremlin.ui.ui_common
 
 hat_direction_abbrev = {
     "center": "C",
@@ -418,11 +418,11 @@ class ViewInputMode(Enum):
     Device = auto()
     Mode = auto()
 
-class ViewInput(QtWidgets.QDialog):
+class ViewInput(gremlin.ui.ui_common.QRememberDialog):
     ''' displays a dialog that lets the user pick from a list of mapped inputs '''
 
     def __init__(self, parent=None):
-        super().__init__(parent)
+        super().__init__(self.__class__.__name__, parent)
         # make modal
         self.setWindowModality(QtCore.Qt.ApplicationModal)
         self.setMinimumWidth(600)

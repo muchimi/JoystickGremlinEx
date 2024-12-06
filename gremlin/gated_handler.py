@@ -3077,12 +3077,12 @@ class RangeWidgetInfo(QtWidgets.QWidget):
         return "n/a"
 
 
-class GatedAxisInstructions(QtWidgets.QDialog):
+class GatedAxisInstructions(gremlin.ui.ui_common.QRememberDialog):
     '''
     Dialog box for instructions
     '''
     def __init__(self, parent = None):
-        super().__init__(parent)
+        super().__init__(self.__class__.__name__, parent)
         self.setWindowTitle("Gated Axis Mapper Instructions")
         self.setWindowModality(QtCore.Qt.ApplicationModal)
         #self._view = QtWebEngineWidgets.QWebEngineView()
@@ -4331,7 +4331,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
 
   
 
-class ActionContainerUi(QtWidgets.QDialog):
+class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
     """UI to setup the individual action trigger containers and sub actions """
 
     delete_requested = QtCore.Signal(GateInfo) # fired when the remove button is clicked - passes the GateData to blitz
@@ -4344,7 +4344,7 @@ class ActionContainerUi(QtWidgets.QDialog):
 
         from gremlin.ui.device_tab import InputConfigurationWidgetCache
         
-        super().__init__(parent)
+        super().__init__(self.__class__.__name__, parent)
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
 

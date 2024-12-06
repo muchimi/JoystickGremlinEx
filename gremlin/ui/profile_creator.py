@@ -44,7 +44,7 @@ class ProfileCreator(gremlin.ui.ui_common.BaseDialogUi):
         :param profile_data the data to use as the template
         :param parent the parent widget of this one
         """
-        gremlin.ui.ui_common.BaseDialogUi.__init__(self, parent)
+        super().__init__(self.__class__.__name__,  parent)
         self.profile_data = profile_data
         self.new_profile = self._create_empty_profile()
 

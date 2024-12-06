@@ -319,6 +319,9 @@ class EventListener(QtCore.QObject):
 	# occurs when input enabled state changes
 	input_enabled_changed = QtCore.Signal(object) # param - InputItem
 
+	# occurs when calibration data changes
+	calibration_changed = QtCore.Signal(object) # param - CalibrationData object
+
 
 	def __init__(self):
 		"""Creates a new instance."""
@@ -364,10 +367,19 @@ class EventListener(QtCore.QObject):
 		self._process_device_change.connect(self._process_device_change_cb)
 
 		# calibration data access
-		from gremlin.ui.axis_calibration import CalibrationManager
-		self.calibrationManager = CalibrationManager()
+		self._calibrationManager = None
 
 		Thread(target=self._run).start()
+
+	@property
+	def calibrationManager(self):
+		from gremlin.ui.axis_calibration import CalibrationManager
+		
+		if not self._calibrationManager:
+			self._calibrationManager = CalibrationManager()
+
+		return self._calibrationManager
+
 
 	def registerInput(self, item):
 		''' registers an input item '''

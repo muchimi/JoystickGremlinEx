@@ -120,7 +120,7 @@ class InputViewerUi(ui_common.BaseDialogUi):
 
         :param parent the parent of this widget
         """
-        super().__init__(parent)
+        super().__init__(self.__class__.__name__, parent)
 
         self._widget_storage = {}
         self.setMinimumHeight(800)

@@ -681,7 +681,7 @@ class MidiInputListenerWidget(QtWidgets.QFrame):
         gremlin.shared_state.pop_suspend_highlighting()
 
 
-class MidiInputConfigDialog(QtWidgets.QDialog):
+class MidiInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
     ''' dialog showing the MIDI input configuration options '''
 
     def __init__(self, current_mode, index, data, parent):
@@ -689,7 +689,7 @@ class MidiInputConfigDialog(QtWidgets.QDialog):
         :param index - the input item index zero based
         :param identifier - the input item identifier 
         '''
-        super().__init__(parent)
+        super().__init__(self.__class__.__name__, parent)
         # self._sequence = InputKeyboardModel(sequence=sequence)
         main_layout = QtWidgets.QVBoxLayout()
         self.setWindowTitle("Midi Input Mapper")

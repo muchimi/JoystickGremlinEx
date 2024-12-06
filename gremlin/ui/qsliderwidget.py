@@ -950,12 +950,12 @@ class QSliderWidget(QtWidgets.QWidget):
             button = event.button()
             index = self._drag_handle_index
             if button == Qt.MouseButton.LeftButton:
-                if verbose:
-                    syslog.info(f"handle {index} left clicked")
+                # if verbose:
+                #     syslog.info(f"handle {index} left clicked")
                 self.handleClicked.emit(index)
             elif button == Qt.MouseButton.RightButton:
-                if verbose:
-                    syslog.info(f"handle {index} right clicked")
+                # if verbose:
+                #     syslog.info(f"handle {index} right clicked")
                 self.handleRightClicked.emit(index)
             return            
 
@@ -966,12 +966,12 @@ class QSliderWidget(QtWidgets.QWidget):
             if rect.contains(point):
                 button = event.button()
                 if button == Qt.MouseButton.LeftButton:
-                    if verbose:
-                        syslog.info(f"handle {index} left clicked")
+                    # if verbose:
+                    #     syslog.info(f"handle {index} left clicked")
                     self.handleClicked.emit(index)
                 elif button == Qt.MouseButton.RightButton:
-                    if verbose:
-                        syslog.info(f"handle {index} right clicked")
+                    # if verbose:
+                    #     syslog.info(f"handle {index} right clicked")
                     self.handleRightClicked.emit(index)
                 return
             

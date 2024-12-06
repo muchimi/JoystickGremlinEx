@@ -510,12 +510,12 @@ class SimconnectOptions(QtCore.QObject):
 
 
 
-class SimconnectOptionsUi(QtWidgets.QDialog):
+class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
     """UI to set individual simconnect  settings """
 
     def __init__(self, simconnect : SimConnect, parent=None):
         from gremlin.ui import ui_common
-        super().__init__(parent)
+        super().__init__(self.__class__.__name__, parent)
 
         # make modal
         self.setWindowModality(QtCore.Qt.ApplicationModal)
@@ -1369,6 +1369,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _curve_button_cb(self):
         if not self.action_data.curve_data:
             curve_data = gremlin.curve_handler.AxisCurveData()
+            curve_data.calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(self.hardware_device_guid, self.hardware_input_id)
             curve_data.curve_update()
             self.action_data.curve_data = curve_data
             

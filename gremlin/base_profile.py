@@ -1152,6 +1152,7 @@ class InputItem():
                 if child.tag == "response-curve-ex":
                     self.curve_data = gremlin.curve_handler.AxisCurveData()
                     self.curve_data._parse_xml(child)
+                    self.curve_data.calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(self.hardware_device_guid, self.hardware_input_id)
                     break
             self.is_axis = True
 
@@ -2183,8 +2184,9 @@ class Profile():
         # Remove all remap actions from the list of available inputs
         for act in remap_actions:
             # Skip remap actions that have invalid configuration
-            if act.input_type is None:
+            if act.input_type is None or act.input_type not in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat):
                 continue
+            
 
             type_name = InputType.to_string(act.input_type)
             if act.vjoy_input_id in [0, None] \

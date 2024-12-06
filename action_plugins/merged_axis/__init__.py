@@ -28,6 +28,7 @@ import gremlin.shared_state
 from gremlin.ui import ui_common
 import gremlin.types
 import logging
+import gremlin.ui.ui_common
 from gremlin.util import safe_format, safe_read, scale_to_range, clamp
 import gremlin.event_handler
 import gremlin.joystick_handling
@@ -38,7 +39,7 @@ import gremlin.actions
 
 
 
-class ActionContainerUi(QtWidgets.QDialog):
+class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
     """UI to setup the individual action trigger containers and sub actions """
 
     def __init__(self, action_data, parent=None):
@@ -48,7 +49,7 @@ class ActionContainerUi(QtWidgets.QDialog):
         :index: the gate number of the gated input - there will at least be two for low and high - index is an integer 
         '''
         
-        super().__init__(parent)
+        super().__init__(self.__class__.__name__, parent)
 
         # make modal
         self.setWindowModality(QtCore.Qt.ApplicationModal)

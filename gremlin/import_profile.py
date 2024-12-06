@@ -419,13 +419,13 @@ class ImportItem(AbstractTreeItem):
 
 
 
-class ImportProfileDialog(QtWidgets.QDialog):
+class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
     ''' dialog for import options '''
 
 
     def __init__(self, profile_path, parent=None):
 
-        super().__init__(parent)
+        super().__init__(self.__class__.__name__, parent)
 
         # make modal
         self.setWindowModality(QtCore.Qt.ApplicationModal)
@@ -2303,9 +2303,9 @@ class ImportProfileDialog(QtWidgets.QDialog):
 
 
 
-class ImportDetailDialog(QtWidgets.QDialog):
+class ImportDetailDialog(gremlin.ui.ui_common.QRememberDialog):
     def __init__(self, import_item : ImportItem, target_device_guid : dinput.GUID, parent=None):
-        super().__init__(parent)
+        super().__init__(self.__class__.__name__, parent)
 
         # make modal
         self.setWindowModality(QtCore.Qt.ApplicationModal)
@@ -2349,13 +2349,13 @@ class Mapper():
     ''' mapping helper class'''
 
 
-    class MapperDialog(QtWidgets.QDialog):
+    class MapperDialog(gremlin.ui.ui_common.QRememberDialog):
         ''' dialog for mapping options '''
 
 
         def __init__(self, device_info : dinput.DeviceSummary, parent=None):
 
-            super().__init__(parent)
+            super().__init__(self.__class__.__name__, parent)
 
             # make modal
             self.setWindowModality(QtCore.Qt.ApplicationModal)

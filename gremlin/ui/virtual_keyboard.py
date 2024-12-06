@@ -104,7 +104,7 @@ class QKeyWidget(QtWidgets.QPushButton):
 
     
 
-class InputKeyboardDialog(QtWidgets.QDialog):
+class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
     ''' dialog showing a virtual keyboard in which to select key combinations with the keyboard or mouse '''
     
     closed = QtCore.Signal() # sent when the dialog closes
@@ -115,7 +115,7 @@ class InputKeyboardDialog(QtWidgets.QDialog):
         :param select_single - if set, only can select a single key
         :param allow_modifiers - if set - modifier keys along with regular keys are allowed
         '''
-        super().__init__(parent)
+        super().__init__(self.__class__.__name__,parent)
         # self._sequence = InputKeyboardModel(sequence=sequence)
         main_layout = QtWidgets.QVBoxLayout()
         self.setWindowTitle("Keyboard & Mouse Input Mapper")
