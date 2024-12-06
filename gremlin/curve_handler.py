@@ -1605,6 +1605,7 @@ class DeadzoneWidget(QtWidgets.QWidget):
         self.slider = QSliderWidget()
         self.slider.desired_height = 20
         self.slider.setRange(-1.0, 1.0)
+        self.slider.setMarkerVisible(False)
 
         # double slider for centered axes
         self.left_slider.setMarkerVisible(False)
@@ -1664,9 +1665,7 @@ class DeadzoneWidget(QtWidgets.QWidget):
             lambda value: self._update_from_spinner(value,3)
         )
 
-        # Set deadzone positions
-        self.set_values(self.profile_data.deadzone)
-
+        
         # Put everything into the layout
         self.main_layout.addWidget(self.slider,0,0,1,4)
         self.main_layout.addWidget(self.left_slider, 0, 0, 1, 2)
@@ -1693,34 +1692,46 @@ class DeadzoneWidget(QtWidgets.QWidget):
 
         :param values the new deadzone values [min, min center, max center, max]
         """
-        v1, v2 = values[0], values[1]
-        if v1 is None:
-            v1 = -1
-        if v2 is None:
-            v2 = 0
-        v3, v4 = values[2], values[3]
 
-        with QtCore.QSignalBlocker(self.left_slider):
-            self.left_slider.setValue((v1,v2))
-        with QtCore.QSignalBlocker(self.left_lower):
-            self.left_lower.setValue(v1)
-        with QtCore.QSignalBlocker(self.left_upper):            
-            self.left_upper.setValue(v2)
+        if self._centered:
+            v1, v2 = values[0], values[1]
+            if v1 is None:
+                v1 = -1
+            if v2 is None:
+                v2 = 0
+            v3, v4 = values[2], values[3]
 
-        with QtCore.QSignalBlocker(self.slider):
-            self.slider.setValue((v1,v4))
+            with QtCore.QSignalBlocker(self.left_slider):
+                self.left_slider.setValue((v1,v2))
+            with QtCore.QSignalBlocker(self.left_lower):
+                self.left_lower.setValue(v1)
+            with QtCore.QSignalBlocker(self.left_upper):            
+                self.left_upper.setValue(v2)
 
-        v1, v2 = v3, v4
-        if v1 is None:
-            v1 = 0
-        if v2 is None:
-            v2 = 1
-        with QtCore.QSignalBlocker(self.right_slider):
-            self.right_slider.setValue((v1,v2))
-        with QtCore.QSignalBlocker(self.right_lower):
-            self.right_lower.setValue(v1)
-        with QtCore.QSignalBlocker(self.right_upper):
-            self.right_upper.setValue(v2)
+ 
+            v1, v2 = v3, v4
+            if v1 is None:
+                v1 = 0
+            if v2 is None:
+                v2 = 1
+            with QtCore.QSignalBlocker(self.right_slider):
+                self.right_slider.setValue((v1,v2))
+            with QtCore.QSignalBlocker(self.right_lower):
+                self.right_lower.setValue(v1)
+            with QtCore.QSignalBlocker(self.right_upper):
+                self.right_upper.setValue(v2)
+        else:
+            v1, v2 = values[0], values[1]
+            if v1 is None:
+                v1 = -1
+            if v2 is None:
+                v2 = 1
+
+            with QtCore.QSignalBlocker(self.slider):
+                self.slider.setValue((v1,v2))
+
+        self._update()
+
 
 
         self._values = values
@@ -1734,15 +1745,24 @@ class DeadzoneWidget(QtWidgets.QWidget):
         :return current deadzone values
         """
 
-        if self._values is None:
-            self._values = [
-            self.left_lower.value(),
-            self.left_upper.value(),
-            self.right_lower.value(),
-            self.right_upper.value()
-        ]
-            
+        if self._centered:
+            if self._values is None:
+                self._values = [
+                self.left_lower.value(),
+                self.left_upper.value(),
+                self.right_lower.value(),
+                self.right_upper.value()
+            ]
+        else:
+            if self._values is None:
+                self._values = [
+                self.left_lower.value(),
+                self.right_upper.value()
+                ]   
+                
         return self._values
+        
+
     
     def get_min(self) -> float:
         return self.left_lower.value()

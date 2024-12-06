@@ -809,6 +809,7 @@ class InputItem():
         self._is_action = False # true if the object is a sub-item for a sub-action (GateHandler for example)
         self._device_type = None
         self._is_axis = False # true if the item is an axis input
+        self._calibration = None # calibration data if the item is an input axis
         self._curve_data = None # true if the item has its input curved
         self._profile_mode = None
         self._enabled = True # enabled flag
@@ -831,6 +832,17 @@ class InputItem():
         el = gremlin.event_handler.EventListener()
         el.profile_start.connect(self._profile_start)
 
+
+    @property
+    def hasCalibration(self):
+        ''' for axis input devices, returns True if the device has an active calibration '''
+        return self._calibration is not None and self._calibration.hasData
+    
+    @property
+    def calibration(self):
+        ''' for axis input devices, returns the calibration data '''
+        return self.calibration
+    
 
     @QtCore.Slot()
     def _profile_start(self):
@@ -1038,6 +1050,12 @@ class InputItem():
                     self._input_name = f"Axis {info.axis_names[input_id-1]}"
                 else:
                     self._input_name = f"Axis {input_id}"
+
+
+                mgr = gremlin.ui.axis_calibration.CalibrationManager()
+                self._calibration = mgr.getCalibration(self._device_guid, self._input_id)
+
+
                 el.update_input_icons.emit()
             elif self._input_type == InputType.JoystickButton:
                 self._input_name = f"Button {input_id}"

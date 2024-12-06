@@ -1069,7 +1069,8 @@ class InputItemWidget(QtWidgets.QFrame):
         self._curve_icon_active = load_icon("mdi.chart-bell-curve",qta_color="blue")
         self._input_icon_inactive = load_icon("fa.power-off",qta_color="gray")
         self._input_icon_active = load_icon("fa.power-off",qta_color="blue")
-        self._calibration_icon = load_icon("mdi.arrow-expand-horizontal")
+        self._calibration_icon_active = load_icon("mdi.arrow-expand-horizontal",qta_color="blue")
+        self._calibration_icon_inactive = load_icon("mdi.arrow-expand-horizontal",qta_color="gray")
 
 
         # title row
@@ -1094,7 +1095,7 @@ class InputItemWidget(QtWidgets.QFrame):
 
         # calibration button
         self._calibration_button_widget = QtWidgets.QPushButton() 
-        self._calibration_button_widget.setIcon(self._calibration_icon)
+        self._calibration_button_widget.setIcon(self._calibration_icon_active)
         self._calibration_button_widget.setToolTip("Device calibration options")
         self._calibration_button_widget.setFixedSize(24,16)
         self._calibration_button_widget.clicked.connect(self._calibration_button_cb)
@@ -1243,11 +1244,20 @@ class InputItemWidget(QtWidgets.QFrame):
         if self.data.is_curve:
             self._curve_button_widget.setIcon(self._curve_icon_active)
             self.clear_curve_widget.setEnabled(True)
+            
         else:
             self._curve_button_widget.setIcon(self._curve_icon_inactive)
             self.clear_curve_widget.setEnabled(False)
 
+        if curve_visible:
+            has_calibration = self.data.hasCalibration
+            if has_calibration:
+                self._calibration_button_widget.setIcon(self._calibration_icon_active)
+            else:
+                self._calibration_button_widget.setIcon(self._calibration_icon_inactive)
+
         self._curve_container_widget.setVisible(curve_visible)
+        self._calibration_button_widget.setVisible(curve_visible)
 
 
 

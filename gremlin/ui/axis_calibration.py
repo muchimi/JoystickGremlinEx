@@ -249,6 +249,12 @@ class CalibrationData:
         self.device_guid = None # axis device guid this data applies to
         self.input_id = None # axis input id this data applies to
         self._is_centered = True # true if the axis is centered (has a center calibration value)
+        self.reset()
+        
+
+    def reset(self):
+        ''' resets calibration data to defaults '''
+        # do not reset center option
         self._calibrated_min = -1.0
         self._calibrated_max = 1.0
         self._calibrated_center = 0.0 # used only if the stick is centered
@@ -257,13 +263,8 @@ class CalibrationData:
         self._deadzone_center_min = 0.0 # deadzone center left
         self._deadzone_center_max = 0.0 # deadzone center right
         self._inverted = False # true if inverted
+        self._has_data = False # true if the calibration is non default (modifies the output value)
         
-
-    def reset(self):
-        ''' resets calibration data to defaults '''
-        self._calibrated_min = -1.0
-        self._calibrated_max = 1.0
-        self._calibrated_center = 0.0 # used only if the stick is centered
         
 
     def startCalibrate(self):
@@ -278,6 +279,24 @@ class CalibrationData:
     def calibrating(self) -> bool:
         return self._calibrating
 
+    @property
+    def hasData(self) -> bool:
+        ''' True if the calibration data is non default '''
+        return self._has_data
+        
+    
+    def _update(self):
+        ''' updates data flag '''
+        self._has_data = not self._is_centered or \
+            self._inverted or \
+            self._calibrated_min != -1.0 or \
+            self._calibrated_max != 1.0 or \
+            self.calibrated_center != 0.0 or \
+            self._deadzone_min != -1.0 or \
+            self._deadzone_max  != 1.0 or \
+            self._deadzone_center_min != 0.0 or \
+            self._deadzone_center_max != 0.0 
+            
 
     @property
     def inverted(self)-> bool:
@@ -285,6 +304,7 @@ class CalibrationData:
     @inverted.setter
     def inverted(self, value : bool):
         self._inverted = value
+        self._update()
 
         
 
@@ -294,12 +314,13 @@ class CalibrationData:
     @centered.setter
     def centered(self, value : bool):
         self._is_centered = value
+        self._update()
 
     @property
     def deadzone(self) -> list:
         if self._is_centered:
             return [self._deadzone_min, self._deadzone_center_min, self._deadzone_center_max, self.deadzone_max]
-        return [self._deadzone_min, self._deadzone_min, self._deadzone_max, self._deadzone_max]
+        return [self._deadzone_min, self._deadzone_max]
     
     @deadzone.setter
     def deadzone(self, value : list):
@@ -308,6 +329,7 @@ class CalibrationData:
         self.deadzone_center_min = d_left
         self.deadzone_center_max = d_right
         self.deadzone_max = d_end
+        self._update()
         
 
 
@@ -316,28 +338,36 @@ class CalibrationData:
         return self._deadzone_min
     @deadzone_min.setter
     def deadzone_min(self, value):
-        self._deadzone_min = value + 0.0
+        if self._deadzone_min != value:
+            self._deadzone_min = value + 0.0
+            self._update()
 
     @property
     def deadzone_max(self):
         return self._deadzone_max
     @deadzone_max.setter
     def deadzone_max(self, value):
-        self._deadzone_max = value + 0.0
+        if self._deadzone_max:
+            self._deadzone_max = value + 0.0
+            self._update()
 
     @property
     def deadzone_center_min(self):
         return self._deadzone_center_min
     @deadzone_center_min.setter
     def deadzone_center_min(self, value):
-        self._deadzone_center_min = value + 0.0
+        if self._deadzone_center_min != value:
+            self._deadzone_center_min = value + 0.0
+            self._update()
 
     @property
     def deadzone_center_max(self):
         return self._deadzone_center_max
     @deadzone_center_max.setter
     def deadzone_center_max(self, value):
-        self._deadzone_center_max = value + 0.0       
+        if self._deadzone_center_max != value:
+            self._deadzone_center_max = value + 0.0       
+            self._update()
 
 
 
@@ -347,21 +377,27 @@ class CalibrationData:
         return self._calibrated_min
     @calibrated_min.setter
     def calibrated_min(self, value):
-        self._calibrated_min = value + 0.0
+        if self._calibrated_min != value:
+            self._calibrated_min = value + 0.0
+            self._update()
 
     @property
     def calibrated_center(self):
         return self._calibrated_center
     @calibrated_center.setter
     def calibrated_center(self, value):
-        self._calibrated_center = value + 0.0
+        if self._calibrated_center != value:
+            self._calibrated_center = value + 0.0
+            self._update()
 
     @property
     def calibrated_max(self):
             return self._calibrated_max
     @calibrated_max.setter
     def calibrated_max(self, value):
-        self._calibrated_max = value + 0.0
+        if self._calibrated_max != value:
+            self._calibrated_max = value + 0.0
+            self._update()
 
 
     def getValue(self, raw_value, normalize = True):
@@ -560,6 +596,7 @@ class CalibrationDialogEx(QtWidgets.QDialog):
         info = gremlin.joystick_handling.device_info_from_guid(device_guid)
         
         self.main_layout.addWidget(QtWidgets.QLabel(f"{info.name} Axis: {info.axis_names[input_id-1]}"))
+        self.main_layout.addWidget(QtWidgets.QLabel("Note: Calibration options will apply to the computed input data value before any other parts of GremlinEx process the input."))
 
         # device options
         self._options_container_repeater_widget = QtWidgets.QWidget()
@@ -576,17 +613,24 @@ class CalibrationDialogEx(QtWidgets.QDialog):
         self._inverted_widget.clicked.connect(self._inverted_changed)
 
         self._reset_widget = QtWidgets.QPushButton("Reset")
-        self._reset_widget.setToolTip("Resets the calibration to default")
+        self._reset_widget.setToolTip("Resets the calibration information to default and removes any filtering.")
         self._reset_widget.clicked.connect(self._reset_calibration)
 
+        self._calibrate_widget = QtWidgets.QPushButton("Calibrate")
+        self._calibrate_widget.setToolTip("Sets the calibration endpoints to center. After pressing this, move the input axis to its maximum travel positions to automatically set the calibration data.")
+        self._calibrate_widget.clicked.connect(self._start_calibration)
+
+
         self._center_widget = QtWidgets.QPushButton("Set Center")
-        self._center_widget.setToolTip("Sets the center calibration at the current input value")
+        self._center_widget.setToolTip("Sets the center calibration at the current input value.  This is helpful for inputs that do not report the midpoint value while in their center detent or to shift it.")
         self._center_widget.clicked.connect(self._set_center_calibration)
 
         self._options_container_repeater_layout.addWidget(self._centered_widget)
         self._options_container_repeater_layout.addWidget(self._inverted_widget)
         self._options_container_repeater_layout.addWidget(self._center_widget)
+        self._options_container_repeater_layout.addWidget(self._calibrate_widget)
         self._options_container_repeater_layout.addWidget(self._reset_widget)
+
         self._options_container_repeater_layout.addStretch()
 
 
@@ -600,6 +644,7 @@ class CalibrationDialogEx(QtWidgets.QDialog):
 
         self._slider = QSliderWidget()
         self._slider.valueChanged.connect(self._slider_changed)
+        self._slider.setToolTip("Calibration slider.<br>The endpoints represent the minimum/maxium values possible for this axis, and the position of the center detent for centered devices.<br>Sliders will not have a center detent.<br>Move the input to the maximum travel positions to set the enpoints.")
 
         self._repeater = QSliderWidget()
         self._repeater.setReadOnly(True)
@@ -614,17 +659,21 @@ class CalibrationDialogEx(QtWidgets.QDialog):
 
         self._calibrated_value_widget = ui_common.QFloatLineEdit()
         self._calibrated_value_widget.setReadOnly(True)
+        self._calibrated_value_widget.setToolTip("Computed output value based on the current calibration settings.")
 
         self._calibrated_min_widget = ui_common.QFloatLineEdit()
         self._calibrated_min_widget.valueChanged.connect(self._calibrated_min_changed)
+        self._calibrated_min_widget.setToolTip("Minimum value of the axis possible input travel.<br>Move the input to the minimum travel position to set this value after pressing the calibrate button.<br>Can also be set manually.")
         
 
         self._calibrated_max_widget = ui_common.QFloatLineEdit()
         self._calibrated_max_widget.valueChanged.connect(self._calibrated_max_changed)
+        self._calibrated_max_widget.setToolTip("Maximum value of the axis possible input travel.<br>Move the input to the maximum travel position to set this value after pressing the calibrate button.<br>Can also be set manually.")
         
 
         self._calibrated_center_widget = ui_common.QFloatLineEdit()
         self._calibrated_center_widget.valueChanged.connect(self._calibrated_center_changed)
+        self._calibrated_center_widget.setToolTip("For centered inputs, this is the position of the input when it is at the center detent or midpoint of travel.<br>Press the center button to set this value when the axis is in the center position.<br>can also be set manually.")
         
 
         self._calibration_container_widget = QtWidgets.QWidget()
@@ -705,17 +754,24 @@ class CalibrationDialogEx(QtWidgets.QDialog):
         from gremlin.curve_handler import DeadzonePreset
         widget = self.sender()
         preset = widget.data
-
         dd = self._deadzone_widget
-        d_start, d_left, d_right, d_end = dd.get_values()
-        if d_start is None:
-            d_start = -1
-        if d_end is None:
-            d_end = 1
-        if d_left is None:
-            d_left = 0
-        if d_right is None:
-            d_right = 0
+        is_centered = self.action_data.centered
+        if is_centered:
+            d_start, d_left, d_right, d_end = dd.get_values()
+            if d_start is None:
+                d_start = -1
+            if d_end is None:
+                d_end = 1
+            if d_left is None:
+                d_left = 0
+            if d_right is None:
+                d_right = 0
+        else:
+            d_start, d_end = dd.get_values()
+            if d_start is None:
+                d_start = -1
+            if d_end is None:
+                d_end = 1
         
         match preset:
             case DeadzonePreset.center_two :
@@ -742,8 +798,10 @@ class CalibrationDialogEx(QtWidgets.QDialog):
                 d_left = 0
                 d_right = 0
                 d_end = 1
-        
-        dd._update_deadzone([d_start, d_left, d_right, d_end])
+        if is_centered:
+            dd._update_deadzone([d_start, d_left, d_right, d_end])
+        else:
+            dd._update_deadzone([d_start, d_end])
 
 
 
@@ -771,6 +829,14 @@ class CalibrationDialogEx(QtWidgets.QDialog):
         ''' reset calibration for the axis '''
         raw_value = gremlin.joystick_handling.get_axis(self.action_data.device_guid, self.action_data.input_id)
         self.action_data.calibrated_center = raw_value
+        self._update()
+
+    @QtCore.Slot()
+    def _start_calibration(self):
+        ''' resets the calibration data enpoints'''
+        self.action_data._calibrated_min = 0
+        self.action_data._calibrated_max = 0
+        self.action_data._update()
         self._update()
 
     @QtCore.Slot()
@@ -868,6 +934,7 @@ class CalibrationDialogEx(QtWidgets.QDialog):
             self._calibrated_value_widget.setValue(calibrated_value)
         
         with QtCore.QSignalBlocker(self._deadzone_widget):
+            self._deadzone_widget.isCentered = is_centered
             self._deadzone_widget.set_values(self.action_data.deadzone)
             
 
