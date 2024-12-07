@@ -251,6 +251,7 @@ Joystick Gremlin EX
 - Improved: individual input enable button now available on any input to enable or disable it from the profile.  By default, all inputs are enabled when a profile starts.  The buttons can be enabled via an option.
 - Improved: Most dialogs will remember position and size.
 - Fix: Invalid input type in legacy remap
+- Fix: curve in vjoyremap not applied to final output starting with m43
 - New: documentation on calibration
 
 

@@ -328,7 +328,12 @@ class SimConnect():
 		if not self._request_busy:
 			self._request_busy = True
 			if not self._is_connected:
-				self.connect()
+				try:
+					self.connect()
+				except:
+					syslog = logging.getLogger("system")
+					syslog.warning("Simconnect: simulator not running yet - unable to connect.")
+					return
 
 				while not self._is_loop_running:
 					time.sleep(0.1)
