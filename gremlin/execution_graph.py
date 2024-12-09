@@ -160,7 +160,8 @@ class ContainerCallback:
             InputType.Midi,
             InputType.OpenSoundControl,
             InputType.Keyboard,
-            InputType.VirtualButton
+            InputType.VirtualButton,
+            InputType.ModeControl,
         ]:
             value = gremlin.actions.Value(event.is_pressed)
         else:

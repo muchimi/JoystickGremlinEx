@@ -382,7 +382,10 @@ class Control(gremlin.base_profile.AbstractAction):
         if self.device_guid is not None:
             node.set("device_guid", str(self.device_guid))
             device_type = self.get_device_type()
-            node.set("device_type", gremlin.types.DeviceType.to_string(device_type))
+            if device_type is not None:
+                node.set("device_type", gremlin.types.DeviceType.to_string(device_type))
+            else:
+                pass
 
 
         if self.target_input_item is not None:

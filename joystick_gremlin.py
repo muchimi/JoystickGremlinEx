@@ -47,6 +47,7 @@ import gremlin.shared_state
 import gremlin.ui.keyboard_device
 import gremlin.ui.midi_device
 import gremlin.ui.osc_device
+import gremlin.ui.mode_device
 import gremlin.util
 import gremlin.curve_handler
 import gremlin.gated_handler
@@ -907,6 +908,9 @@ class GremlinUi(QtWidgets.QMainWindow):
             self.profile.initialize_joystick_device(device, ["Default"])
 
 
+        # non regular devices
+        self.profile.initialize_regular_devices()
+
         # Update profile information
         self._update_window_title()
 
@@ -1241,6 +1245,28 @@ class GremlinUi(QtWidgets.QMainWindow):
                 gremlin.shared_state.device_type_map[gremlin.ui.osc_device.OscDeviceTabWidget.device_guid] = DeviceType.Osc
                 gremlin.shared_state.device_widget_map[gremlin.ui.osc_device.OscDeviceTabWidget.device_guid] = widget
 
+            # create mode control tab
+            device_profile = self.profile.get_device_modes(
+                    gremlin.ui.mode_device.ModeDeviceTabWidget.device_guid,
+                    DeviceType.ModeControl,
+                    DeviceType.to_string(DeviceType.ModeControl)
+                )
+            
+            widget = gremlin.ui.mode_device.ModeDeviceTabWidget(
+                device_profile,
+                self.current_mode
+            )
+            guid = gremlin.ui.mode_device.ModeDeviceTabWidget.device_guid
+            device_guid = str(guid)
+            widget.data = (TabDeviceType.ModeControl, device_guid)
+            self.ui.devices.addTab(widget, "Mode")
+            self._mode_device_guid = device_guid
+            device_name_map[guid] = "Mode"
+            gremlin.shared_state.device_type_map[guid] = DeviceType.ModeControl
+            gremlin.shared_state.device_widget_map[guid] = widget
+            
+
+
 
             self._vjoy_output_device_guids = []
 
@@ -1398,7 +1424,6 @@ class GremlinUi(QtWidgets.QMainWindow):
         :returns:  list of (device_guid, device_name, tabdevice_type, tab_index)
         '''
         tab_count = self.ui.devices.count()
-        current_profile = gremlin.shared_state.current_profile
         data = {}
         for index in range(tab_count):
             widget = self.ui.devices.widget(index)

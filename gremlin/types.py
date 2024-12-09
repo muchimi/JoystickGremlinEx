@@ -218,6 +218,7 @@ class DeviceType(IntEnum):
     VJoy = 3 # vjoy (virtual)
     Midi = 4 # midi
     Osc = 5 # open source control
+    ModeControl = 6 # mode control
 
     @staticmethod
     def to_string(value):
@@ -245,7 +246,8 @@ _DeviceType_to_display_name = {
     DeviceType.Joystick: "Joystick",
     DeviceType.VJoy: "VJoy",
     DeviceType.Midi: "MIDI",
-    DeviceType.Osc: "OSC"
+    DeviceType.Osc: "OSC",
+    DeviceType.ModeControl: "Mode Control"
 }
 
 _DeviceType_to_string_lookup = {
@@ -253,7 +255,8 @@ _DeviceType_to_string_lookup = {
     DeviceType.Joystick: "joystick",
     DeviceType.VJoy: "vjoy",
     DeviceType.Midi: "midi",
-    DeviceType.Osc: "osc"
+    DeviceType.Osc: "osc",
+    DeviceType.ModeControl: "mode",
 }
 
 
@@ -262,7 +265,8 @@ _DeviceType_to_enum_lookup = {
     "joystick": DeviceType.Joystick,
     "vjoy": DeviceType.VJoy,
     "midi": DeviceType.Midi,
-    "osc": DeviceType.Osc
+    "osc": DeviceType.Osc,
+    "mode": DeviceType.ModeControl,
 
 }
 
@@ -915,6 +919,7 @@ class TabDeviceType(int, Enum):
     VjoyOutput = 6
     Settings = 7
     Plugins = 8
+    ModeControl = 9
 
 
 

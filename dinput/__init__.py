@@ -25,6 +25,7 @@ import time
 import uuid
 import logging
 from gremlin.singleton_decorator import SingletonDecorator
+from gremlin.types import DeviceType
 
 class DILLError(Exception):
 
@@ -415,6 +416,7 @@ class DeviceSummary:
         if data is not None:    
             self.device_guid = GUID(data.device_guid)
             self.device_id = str(self.device_guid)
+            self.device_type = DeviceType.Joystick
             self.vendor_id = data.vendor_id
             self.product_id = data.product_id
             self.joystick_id = data.joystick_id
@@ -443,6 +445,7 @@ class DeviceSummary:
         else:
             self.device_guid = None
             self.device_id = None
+            self.device_type = None
             self.vendor_id = None
             self.product_id = None
             self.joystick_id = None

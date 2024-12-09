@@ -245,6 +245,14 @@ Joystick Gremlin EX
 <!-- TOC --><a name="134016ex-pre-release"></a>
 ## 13.40.16ex (pre-release)
 <!-- TOC --><a name="m44"></a>
+### (m45)
+- New: Mode tab.  The mode tab provides two virtual momentary inputs that trigger whenever a mode is entered or exited.  For mapping purposes, the two inputs will report to actions as a button input so actions like Map to Vjoy will only show options that are applicable to a button.    
+At the moment, these inputs are auto-release inputs, meaning, they will send a release automatically after they are triggered.
+Use these special inputs to map actions that should be executed on mode changes.  The actions listed under mode enter will execute when the mode is called up (switched to).  The actions listed under mode exit will execute when the mode is changed to another mode (switched from).
+	Examples of use-cases for this feature:
+	+ Initialize a mode by setting buttons, axis values or sending a key whenever that mode is switched to.
+	+ Reset or change settings when a mode is changed back. 
+
 ### (m44)  
 - Improved: The legacy calibration method has been deprecated. Legacy data will be loaded if it exists the first time GremlinEx runs from an older version. The calibration tool is removed, and calibration options are moved to individual input via a configuration button for each that brings up a dialog specific to that input. The new features include new visualization of live data, inversion, and deadzone settings applied at the input level without needing a curve. The calibration applies to the input before further processing by GremlinEx, including before any curve is applied.  By default all axes are setup as "centered" and no calibration is applied so no changes are needed unless calibration should be applied.  Calibration data is now saved to a separate XML datafile in the user profile folder where profiles are kept and includes the new flags/options in it.
 - Experimental: ability to disable certain inputs and manage input enabled state at profile runtime via the new control action.  The control action can only be mapped to a momentary input and can control the enabled state on any known input.  The idea of this feature is to (1) enable/disable inputs without having to connect/disconnect them which can cause problems or conflicts or re-ordering (2) for advanced setups where multiple inputs may be mapped to the same output and this is not desirable due to conflict in certain scenarios. 

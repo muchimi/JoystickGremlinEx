@@ -219,6 +219,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
                           InputType.KeyboardLatched,
                           InputType.OpenSoundControl,
                           InputType.Midi,
+                          InputType.ModeControl,
                           ]
 
     def __init__(self, action_data, parent=None):
@@ -1365,7 +1366,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
                 actions = (VjoyAction.VJoyAxis, VjoyAction.VJoyAxisToButton, VjoyAction.VJoyMergeAxis)
                 
                 
-            elif self.action_data.input_type in (InputType.JoystickButton, InputType.Keyboard, InputType.KeyboardLatched, InputType.OpenSoundControl, InputType.Midi):
+            elif self.action_data.input_type in VJoyWidget.input_type_buttons:
                 # various button modes
                 actions = ( VjoyAction.VJoyButton,
                             VjoyAction.VJoyButtonRelease,
@@ -1461,7 +1462,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
                     axis_name = dev.axis_names[id-1]
                     self.cb_vjoy_input_selector.addItem(f"Axis {axis_name}",id)
                     #self.cb_vjoy_input_selector.addItem(f"Axis {id} ({self.get_axis_name(id)})",id)
-            elif input_type in (VJoyWidget.input_type_buttons) or action_mode in (VjoyAction.VJoyAxisToButton, VjoyAction.VJoyHatToButton):
+            elif input_type in VJoyWidget.input_type_buttons or action_mode in (VjoyAction.VJoyAxisToButton, VjoyAction.VJoyHatToButton):
                 count = dev.button_count
                 for id in range(1, count+1):
                     self.cb_vjoy_input_selector.addItem(f"Button {id}",id)
@@ -1892,7 +1893,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
                 with QtCore.QSignalBlocker(self.sb_axis_range_high):
                     self.sb_axis_range_high.setValue(self.action_data.range_high)
 
-            elif self.action_data.input_type in (InputType.JoystickButton, InputType.Keyboard, InputType.KeyboardLatched, InputType.OpenSoundControl, InputType.Midi):
+            elif self.action_data.input_type in VJoyWidget.input_type_buttons:
                 is_button_mode = True
 
             if self.action_data.action_mode == VjoyAction.VJoyAxisToButton:
@@ -2268,6 +2269,9 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
             is_remote = True
             is_local = False
 
+        if self.action_data.vjoy_button_id == 11:
+            pass
+
         if event.is_axis: # self.input_type == InputType.JoystickAxis:
             # axis response mode
          
@@ -2466,6 +2470,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
             else:
                 # basic handling of the button
+
                 if fire_event:
                     if is_local:
                         joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = value.current
@@ -2905,7 +2910,7 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
                 self.set_input_id(index)
 
 
-            valid = False
+            #valid = False
             for input_type in InputType.to_list():
                 attrib_name = InputType.to_string(input_type)
                 if attrib_name in node.attrib:
@@ -2913,11 +2918,11 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
                     self.vjoy_input_id = safe_read(node, attrib_name, int, 1)
                     self.vjoy_axis_id = self.vjoy_input_id
                     self.vjoy_button_id = self.vjoy_input_id
-                    valid = True
+                    #valid = True
                     break
 
-            if not valid:
-                raise gremlin.error.GremlinError(f"VJOYREMAP: Invalid remap type provided: {node.attrib}")
+            # if not valid:
+            #     raise gremlin.error.GremlinError(f"VJOYREMAP: Invalid remap type provided: {node.attrib}")
 
 
             

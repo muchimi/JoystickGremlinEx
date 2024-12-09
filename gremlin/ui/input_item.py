@@ -341,9 +341,10 @@ class InputItemListView(ui_common.AbstractView):
     def __init__(self, parent=None, name = "Not set", custom_widget_handler = None):
         """Creates a new input item view instance
 
-        :param parent the parent of the widget
-        :name name of the list
-        :custom_widget_handler (list_view : InputItemListView, index : int, identifier : InputIdentifier, data, parent = None)
+        :param parent: the parent of the widget
+        :param name: name of the list
+        :param custom_widget_handler: (list_view : InputItemListView, index : int, identifier : InputIdentifier, data, parent = None)
+       
         """
         super().__init__(parent)
 
@@ -379,6 +380,7 @@ class InputItemListView(ui_common.AbstractView):
         el = gremlin.event_handler.EventListener()
         el.profile_device_mapping_changed.connect(self._profile_device_mapping_changed)
         self.widget_map = {} # list of created widgets
+
 
         
 
@@ -1007,11 +1009,11 @@ class InputItemWidget(QtWidgets.QFrame):
     def __init__(self, identifier, parent=None, populate_ui_callback = None, populate_name_callback = None, update_callback = None, config_external = False, data = None):
         """Creates a new instance.
 
-        :param identifier identifying information about the button
-        :param parent the parent widget
-        :param populate_ui  handler to custom input button content - this is created on a second row if it exists - signature populate_ui(inputbutton, container_widget)
-        :param populate_name handler to custom display name - signature populate_name(identifier)
-        :param update_callback handler to refresh widget content - signature update(widget)
+        :param identifier: identifying information about the button
+        :param parent: the parent widget
+        :param populate_ui:  handler to custom input button content - this is created on a second row if it exists - signature populate_ui(inputbutton, container_widget)
+        :param populate_name: handler to custom display name - signature populate_name(identifier)
+        :param update_callback: handler to refresh widget content - signature update(widget)
         
         """
         import gremlin.ui.ui_common
@@ -1051,9 +1053,7 @@ class InputItemWidget(QtWidgets.QFrame):
         self._icon_widget = QtWidgets.QWidget()
         self._icon_layout = QtWidgets.QHBoxLayout(self._icon_widget)
         self._icons = []
-        
-
-
+   
         # top row
         self._multi_row = populate_ui_callback is not None
         self.populate_ui = populate_ui_callback
@@ -1143,15 +1143,15 @@ class InputItemWidget(QtWidgets.QFrame):
         self._title_container_widget.setMinimumHeight(20)
 
         
-        self._description_widget = gremlin.ui.ui_common.QIconLabel()
+        self._description_widget = gremlin.ui.ui_common.QIconLabel(use_wrap=False)
         self._description_widget.setObjectName("description")
         #self._description_widget.setTextMinWidth(280)
         
-        self._comment_widget = gremlin.ui.ui_common.QIconLabel()
+        self._comment_widget = gremlin.ui.ui_common.QIconLabel(use_wrap=False)
         self._comment_widget.setObjectName("comment")
         self._comment_widget.setTextMinWidth(280)
 
-        self._input_description_widget =gremlin.ui.ui_common.QIconLabel()
+        self._input_description_widget =gremlin.ui.ui_common.QIconLabel(use_wrap = False)
         self._input_description_widget.setObjectName("input_description")
         #self._input_description_widget.setTextMinWidth(280)
 
@@ -1803,6 +1803,9 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         assert isinstance(profile_data, gremlin.base_profile.AbstractContainer)
         super().__init__(parent)
 
+        el = gremlin.event_handler.EventListener()
+        el.condition_redraw.connect(self._condition_redraw)
+
         self.profile_data = profile_data
         self.action_widgets = []
 
@@ -1835,6 +1838,14 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         tracker = ConditionStateTracker()
         tracker.register(self.profile_data.input_item, self.profile_data, self.dock_tabs)
 
+    def _condition_redraw(self, data):
+        ''' occurs when a condition redraws '''
+
+        if self.profile_data == data:
+            self._cleanup_ui()
+        
+            
+            
     def _cleanup_ui(self):
         tracker = ConditionStateTracker()
         tracker.unregister(self.profile_data.input_item, self.profile_data)
@@ -1913,7 +1924,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         self.virtual_button_layout.addStretch(10)
 
     def _select_tab(self, view_type):
-        if view_type is None:
+        if view_type is None or self.dock_tabs is None:
             return
 
         try:

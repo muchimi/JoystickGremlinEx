@@ -900,6 +900,10 @@ class ConditionView(ui_common.AbstractView):
 
     def redraw(self):
         """Redraws the entire view."""
+
+        el = gremlin.event_handler.EventListener()
+        el.condition_redraw.emit(self.model.action_data)
+        
         ui_common.clear_layout(self.conditions_layout)
 
         lookup = {}
@@ -914,14 +918,12 @@ class ConditionView(ui_common.AbstractView):
             )
             self.conditions_layout.addWidget(condition_widget)
 
-        eh = gremlin.event_handler.EventListener()
-        eh.condition_state_changed.emit(self.model.action_data)
+        
+        el.condition_state_changed.emit(self.model.action_data)
 
     def _add_condition(self):
         """Adds a condition to the view's model."""
-        data_type = ConditionView.condition_map[
-            self.condition_selector.currentText().split()[0]
-        ][0]
+        data_type = ConditionView.condition_map[self.condition_selector.currentText().split()[0]][0]
         self.model.add_condition(data_type())
         
 

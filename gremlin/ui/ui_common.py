@@ -3846,14 +3846,6 @@ class QSplitTabWidget(QDataWidget):
             self._splitter.setFixedWidth(width)
             self._splitter.setFixedHeight(height)
 
-    
-
-    # @QtCore.Slot(int, int)
-    # def _splitter_moved(self, pos: int, index : int):
-    #     ''' called when the spliter handle is moved '''
-    #     gremlin.config.Configuration().splitter_pos = pos
-    #     TabSplitterData().setPos(pos)
-
 
     def setLeftPanelWidget(self, widget : QtWidgets.QWidget):
         ''' sets the left panel widget '''
