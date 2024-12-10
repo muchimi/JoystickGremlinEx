@@ -470,37 +470,40 @@ class CodeRunner:
             if config.restore_profile_mode_on_start or profile.get_restore_mode():
                 # restore the profile mode
                 mode = profile.get_last_runtime_mode()
-                if verbose:
-                    logging.getLogger("system").error(f"Restore last active profile mode: '{mode}'")
+                syslog.error(f"Start: Restoring the last active profile mode for this profile: '{mode}' - overriding profile start mode '{start_mode}' at user request")
                 
 
                 if mode:
                     if not mode in mode_list:
-                        logging.getLogger("system").error(f"Unable to restore profile mode: '{mode}' no longer exists - using '{start_mode}' instead.")
+                        syslog.error(f"Unable to restore profile mode: '{mode}' no longer exists - using '{start_mode}' instead.")
                         mode = start_mode
+            else:
+                syslog.error(f"Start: Using default Restoring the last active profile mode for this profile: '{mode}'")
 
 
             sendinput.MouseController().start()
 
 
             if not mode in mode_list:
-                logging.getLogger("system").error(f"Unable to select startup mode: '{mode}' no longer exists")
+                syslog.error(f"Unable to select startup mode: '{mode}' no longer exists")
             else:
                 if verbose:
-                    logging.getLogger("system").info(f"Using profile start mode: '{mode}'")
+                    syslog.info(f"Using profile start mode: '{mode}'")
                 self.event_handler.change_mode(mode)
 
 
            
 
-           # tell listener profiles are starting
-                       # start listen
+            # tell listener profiles are starting
+            # start listen
             evt_listener.start()
 
             
-
             #print ("resume!")
             self.event_handler.resume()
+
+            # tell GremlinEx the profile started
+            el.profile_started.emit()
 
 
         except Exception as e:

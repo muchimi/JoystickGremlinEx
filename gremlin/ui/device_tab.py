@@ -382,6 +382,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
         self.description_field.setText(self.item_data.description)
         self.description_field.textChanged.connect(self._edit_description_cb)
         self.description_layout.addWidget(self.description_field)
+        self.description_field.setReadOnly(self.item_data.descriptionReadOnly)        
         del_icon = gremlin.util.load_icon("mdi.delete")
         self.description_clear_button = QtWidgets.QPushButton()
         self.description_clear_button.setIcon(del_icon)

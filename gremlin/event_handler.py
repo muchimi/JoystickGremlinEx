@@ -287,6 +287,7 @@ class EventListener(QtCore.QObject):
 
 	profile_reset = QtCore.Signal() # profile reset signal (when runtime for a profile needs to reset)
 	profile_start = QtCore.Signal() # profile start signal (when a profile starts)
+	profile_started = QtCore.Signal() # profile started signal (after a profile starts)
 	profile_stop = QtCore.Signal() # profile stop signal (when a profile stops)
 	profile_unload = QtCore.Signal() # profile unload signal (when a profile is unloaded and a new profile loaded)
 	request_profile_stop = QtCore.Signal(str) # request the profile to stop (reason: str)
@@ -299,6 +300,8 @@ class EventListener(QtCore.QObject):
 
 	# occurs on mode edit/update/delete
 	modes_changed = QtCore.Signal()
+
+	mode_name_changed = QtCore.Signal(str) # runs when a mode name change occurs for the UI to update
 
 	# functor enable flag changed
 	action_created = QtCore.Signal(object) # runs when an action is created - object = the object that triggered the event 
@@ -363,6 +366,7 @@ class EventListener(QtCore.QObject):
 		self._process_device_change_lock = False
 
 		self._joystick_suspend_count = 0 # stack count for suspend joystick
+		self._input_selection_suspend_count = 0 # stack count for suspend input selection
 
 
 		# keyboard input handling buffer
@@ -381,6 +385,8 @@ class EventListener(QtCore.QObject):
 		# calibration data access
 		self._calibrationManager = None
 
+		self.profile_started.connect(self._profile_started_cb)
+
 		Thread(target=self._run).start()
 
 	@property
@@ -391,6 +397,33 @@ class EventListener(QtCore.QObject):
 			self._calibrationManager = CalibrationManager()
 
 		return self._calibrationManager
+	
+	def _profile_started_cb(self):
+		''' occurs on profile start '''
+		device_guid = gremlin.ui.mode_device.get_mode_device_guid()
+		mode_enter = gremlin.ui.mode_device.ModeInputModeType.ModeEnter
+		delay = 0.250 # delay in seconds between press/release events for mode control change
+		new_mode = gremlin.shared_state.runtime_mode
+
+
+		event_enter_pressed = Event(InputType.ModeControl, 
+						identifier = mode_enter,
+						device_guid= device_guid,
+						is_pressed=True,
+						mode = new_mode)
+		event_enter_released = Event(InputType.ModeControl, 
+						identifier = mode_enter,
+						device_guid= device_guid,
+						is_pressed=False,
+						mode = new_mode)
+		
+		
+		# fire mode change for mode enter (press + release)
+		eh = EventHandler()
+		m2_list, f2_list = eh.process_event(event_enter_pressed)
+		enter_release = Timer(delay, lambda : eh._execute_callbacks(event_enter_released, m2_list, f2_list))
+		enter_release.start()
+
 
 
 	def registerInput(self, item):
@@ -398,14 +431,32 @@ class EventListener(QtCore.QObject):
 		if item.input_type == InputType.JoystickAxis:
 			key = (item.device_guid, item.input_id)
 			self._joystick_input_item_map[key] = item
-		
 
 	def push_joystick(self):
+		''' suspends joystick input '''
 		self._joystick_suspend_count += 1
 
 	def pop_joystick(self):
+		''' restores joystick input '''
 		if self._joystick_suspend_count > 0:
 			self._joystick_suspend_count -= 1
+
+	def push_input_selection(self):
+		self._input_selection_suspend_count += 1
+
+	def pop_input_selection(self):
+		if self._input_selection_suspend_count > 0:
+			self._input_selection_suspend_count -= 1
+
+	@property
+	def joystick_input_suspended(self) -> bool:
+		''' true if joystick input suspended '''
+		return self._joystick_suspend_count > 0
+
+	@property
+	def input_selection_suspended(self) -> bool:
+		''' true if input selection is suspended '''
+		return self._input_selection_suspend_count > 0
 
 
 	def _device_changed_cb(self):
@@ -1316,6 +1367,8 @@ class EventHandler(QtCore.QObject):
 		gremlin.shared_state.edit_mode = new_mode
 
 
+	
+
 	def change_mode(self, new_mode, emit = True, force_update = False):
 		"""Changes the GremlinEx currently active mode.
 
@@ -1336,6 +1389,9 @@ class EventHandler(QtCore.QObject):
 		if new_mode == self.current_mode and not force_update:
 			# already in this mode
 			return
+		
+		el = EventListener()
+		el.push_input_selection()
 		
 		profile_modes = current_profile.get_modes()
 		mode_exists = new_mode in profile_modes
@@ -1444,12 +1500,12 @@ class EventHandler(QtCore.QObject):
 		# update the status bar
 		self.mode_status_update.emit()
 
+		el.pop_input_selection()
+
 		# update the selection
-		eh = EventListener()
 		device_guid, input_type, input_id = gremlin.config.Configuration().get_last_input()
 		if input_type and input_id:
-			eh = gremlin.event_handler.EventListener()
-			eh.select_input.emit(device_guid, input_type, input_id, False)
+			el.select_input.emit(device_guid, input_type, input_id, False)
 		
 
 
@@ -1499,7 +1555,7 @@ class EventHandler(QtCore.QObject):
 		
 		verbose = gremlin.config.Configuration().verbose_mode_inputs
 
-		if True or verbose and event.event_type != InputType.JoystickAxis:
+		if verbose and event.event_type != InputType.JoystickAxis:
 			syslog.info(f"process event - mode [{mode}] event: {str(event)}")
 
 

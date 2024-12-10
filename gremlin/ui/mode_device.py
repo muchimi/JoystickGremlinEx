@@ -60,9 +60,9 @@ class ModeInputModeType(enum.IntEnum):
     def to_display_name(value):
         match value:
             case ModeInputModeType.ModeEnter:
-                return "Mode Enter"
+                return "Mode Activate"
             case ModeInputModeType.ModeExit:
-                return "Mode Exit"
+                return "Mode Deactivate"
         
         return f"Unknown mode: {value}"
 
@@ -135,6 +135,8 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         eh = gremlin.event_handler.EventHandler()
         eh.mode_changed.connect(self._mode_changed_cb)
 
+        el = gremlin.event_handler.EventListener()
+        el.mode_name_changed.connect(self._mode_name_changed)
 
         
         
@@ -143,17 +145,19 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         if selected_index is not None:
             self._select_item_cb(selected_index)
 
-
-
+    @QtCore.Slot(str)
+    def _mode_name_changed(self, name):
+        ''' occurs when there's a mode name change '''
+        self.input_item_list_view.redraw()
 
     def _custom_name_handler(self, input_item):
         ''' gets the custom name for the input item '''
         input_item : gremlin.base_profile.InputItem
         match input_item.input_id:
             case ModeInputModeType.ModeEnter:
-                return f"Mode [{gremlin.shared_state.edit_mode}] Enter"
+                return f"Mode [{gremlin.shared_state.edit_mode}] Activate"
             case ModeInputModeType.ModeExit:
-                return f"Mode [{gremlin.shared_state.edit_mode}] Exitr"
+                return f"Mode [{gremlin.shared_state.edit_mode}] Deactivate"
             
         return f"Mode [{gremlin.shared_state.edit_mod}] Unknown id: {input_item.input_id}"
             
@@ -176,6 +180,8 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             modeEnter.device_guid = get_mode_device_guid()
             modeEnter.description="Enter mode actions"
             config[InputType.ModeControl][ModeInputModeType.ModeEnter] = modeEnter
+        config[InputType.ModeControl][ModeInputModeType.ModeEnter].descriptionReadOnly = True
+
         
         if not ModeInputModeType.ModeExit in config[InputType.ModeControl]:
             modeExit = gremlin.base_profile.InputItem(self._custom_name_handler)
@@ -184,7 +190,9 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             modeExit.input_type = InputType.ModeControl
             modeExit.input_id = ModeInputModeType.ModeExit
             modeExit.description="Exit mode actions"
+            modeExit.descriptionReadonly = True
             config[InputType.ModeControl][ModeInputModeType.ModeExit] = modeExit
+        config[InputType.ModeControl][ModeInputModeType.ModeExit].descriptionReadOnly = True
         
 
     def itemAt(self, index):
@@ -257,6 +265,7 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         data : gremlin.base_profile.InputItem 
         widget.data = data
         widget.create_action_icons(data)
+        widget.setTitle(self._custom_name_handler(data))
         widget.setInputDescription(data.description)
         widget.disable_close()
         widget.disable_edit()
@@ -282,11 +291,15 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         status_widget.setVisible(status is not None)    
 
 
+    
+
+
     def _update_input_widget(self, input_widget, container_widget):
         ''' called when the widget has to update itself on a data change '''
-        input_item : gremlin.base_profile.InputItem = input_widget.identifier
+        
+        # input_item : gremlin.base_profile.InputItem = input_widget.identifier
 
-        input_widget.setTitle(input_item.input_name)
+        # input_widget.setTitle(input_item.input_name)
         # input_widget.setInputDescription(input_item.title_name)
         # input_widget.setToolTip(input_item.display_tooltip)
 

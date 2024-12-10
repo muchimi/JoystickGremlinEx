@@ -44,6 +44,7 @@ from gremlin.input_devices import VjoyAction, remote_state
 from gremlin.util import *
 import gremlin.util
 import vjoy.vjoy
+from functools import partial
 
 
 IdMapToButton = -2 # map to button special ID
@@ -2107,23 +2108,83 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
             nodes.sort(key = lambda x: x.priority)
             nodes.reverse()
             for node in nodes:
-                actions.append(node.action)
+                action = node.action
+                actions.append(action)
         return actions
     
-    def getCurveData(self):
+    def getCurveData(self, event, value):
         ''' returns active curve data that applies to the container through included response curve actions '''
         actions = self.getCurveActions()
         curves = []
         if actions:
             for action in actions:
                 if action.curve_data:
-                    curves.append(action.curve_data)
+                    # see if the curve should apply
+                    if self.shouldExecute(event, value, action):
+                        curves.append(action.curve_data)
 
         # add self
         if self.action_data.curve_data is not None:
             curves.append(self.action_data.curve_data)
 
         return curves
+    
+    def _convert_condition(self, condition):
+        ''' converts a base condition to an action condition '''
+        if isinstance(condition, gremlin.base_conditions.KeyboardCondition):
+                return gremlin.actions.KeyboardCondition(
+                        condition.scan_code,
+                        condition.is_extended,
+                        condition.comparison
+                    )
+                
+        elif isinstance(condition, gremlin.base_conditions.JoystickCondition):
+            return gremlin.actions.JoystickCondition(condition)
+            
+        elif isinstance(condition, gremlin.base_conditions.VJoyCondition):
+            return gremlin.actions.VJoyCondition(condition)
+            
+        elif isinstance(condition, gremlin.base_conditions.InputActionCondition):
+            return gremlin.actions.InputActionCondition(condition.comparison)
+        
+        assert False, f"Invalid base condition to convert: {type(condition).__name__}"
+    
+
+    def _create_activation_condition(self, activation_condition, target):
+        """Creates activation condition objects base on the given data.
+
+        :param activation_condition data about activation condition to be
+            used in order to generate executable nodes
+        """
+        conditions = []
+        for condition in activation_condition.conditions:
+            if isinstance(condition, gremlin.base_conditions.ActivationCondition):
+                for sub_condition in condition.conditions:
+                    conditions.append(self._convert_condition(sub_condition))
+            else:
+                conditions.append(self._convert_condition(condition))
+
+        return gremlin.actions.ActivationCondition(
+            conditions,
+            activation_condition.rule,
+            target
+        )    
+    
+    def shouldExecute(self, event, value, action) -> bool:
+        ''' determines if the given action should execute or not: returns True if the condition is satisfied '''
+
+        activation_condition : gremlin.actions.ActivationCondition =  action.activation_condition
+        if activation_condition is None or not activation_condition.conditions:
+            # no condition
+            return True
+        
+        functor = self._create_activation_condition(activation_condition, self.action_data)
+        
+        return gremlin.actions.ActivationCondition.rule_function[functor._rule](
+            [partial(c, event, value) for c in functor._conditions]
+        )
+ 
+            
 
 
     def applyContainerCurves(self, value : float):
@@ -2163,8 +2224,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         if self.input_type == InputType.JoystickAxis:
             # send initial axis values to the output
 
-            # get the same level curve actions 
-            self.curves = self.getCurveData()
+
 
             usage_data = gremlin.joystick_handling.VJoyUsageState()
             usage_data.set_range(self.vjoy_device_id, self.vjoy_input_id, self.range_low, self.range_high)
@@ -2251,7 +2311,11 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
             # raw_value = gremlin.joystick_handling.get_axis(self.action_data.hardware_device_guid, self.action_data.hardware_input_id)
             # received = action_value.current
-            value = self.action_data.get_filtered_axis_value(curves = self.curves)
+
+            # get list of curves that applies to this input
+            curves = self.getCurveData(event, action_value)
+
+            value = self.action_data.get_filtered_axis_value(curves = curves)
 
             # syslog = logging.getLogger("system")
             # syslog.info(f"VjoyRemap: raw {raw_value:0.3f} received: {received:0.3f}  computed: {value:0.3f}  ")
@@ -2260,7 +2324,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         
         return self._process_event(event, action_value)
     
-    def _process_event(self, event, value):
+    def _process_event(self, event, action_value):
         ''' runs when a joystick even occurs like a button press or axis movement when a profile is running '''
         (is_local, is_remote) = input_devices.remote_state.state
         usage_data = gremlin.joystick_handling.VJoyUsageState()
@@ -2275,18 +2339,18 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         if event.is_axis: # self.input_type == InputType.JoystickAxis:
             # axis response mode
          
-            target = value.current
+            target = action_value.current
 
             # axis mode
             match self.action_mode:
                 case VjoyAction.VJoyAxisToButton:
                     r_min = self.range_low
                     r_max = self.range_high
-                    if value.current >= r_min and value.current <= r_max:
+                    if action_value.current >= r_min and action_value.current <= r_max:
                         if not self.in_range:
                             # axis in range
                             self.in_range = True
-                            # print (f"In range {value.current:0.3f} range: {r_min:0.3f} {r_max:0.3f}")
+                            # print (f"In range {action_value.current:0.3f} range: {r_min:0.3f} {r_max:0.3f}")
                             if is_local:
                                 joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = True
                             if is_remote:
@@ -2294,7 +2358,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                         
                     else:
                         if self.in_range:
-                            # print (f"out of range {value.current:0.3f} range: {r_min:0.3f} {r_max:0.3f}")
+                            # print (f"out of range {action_value.current:0.3f} range: {r_min:0.3f} {r_max:0.3f}")
                             if is_local:
                                 joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = False
                             if is_remote:
@@ -2329,7 +2393,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                             self.thread.start()
 
         elif self.action_mode == VjoyAction.VJoyHatToButton:
-            position = value.current
+            position = action_value.current
             
             pressed_positions = list(self.pressed_hat_buttons.keys())
             is_pressed = position != (0,0) 
@@ -2408,9 +2472,9 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
                     #if event.is_pressed:
                     if is_local:
-                        joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = value.current
+                        joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = action_value.current
                     if is_remote or is_paired:
-                        self.remote_client.send_button(self.vjoy_device_id, self.vjoy_input_id, value.current, force_remote = is_paired )
+                        self.remote_client.send_button(self.vjoy_device_id, self.vjoy_input_id, action_value.current, force_remote = is_paired )
                     
 
                     
@@ -2473,16 +2537,16 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
                 if fire_event:
                     if is_local:
-                        joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = value.current
+                        joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = action_value.current
                     if is_remote:
-                        self.remote_client.send_button(self.vjoy_device_id, self.vjoy_input_id, value.current)
+                        self.remote_client.send_button(self.vjoy_device_id, self.vjoy_input_id, action_value.current)
 
 
         elif self.input_type == InputType.JoystickHat:
             if is_local:
-                joystick_handling.VJoyProxy()[self.vjoy_device_id].hat(self.vjoy_input_id).direction = value.current
+                joystick_handling.VJoyProxy()[self.vjoy_device_id].hat(self.vjoy_input_id).direction = action_value.current
             if is_remote:
-                self.remote_client.send_hat(self.vjoy_device_id, self.vjoy_input_id, value.current)
+                self.remote_client.send_hat(self.vjoy_device_id, self.vjoy_input_id, action_value.current)
 
         
 

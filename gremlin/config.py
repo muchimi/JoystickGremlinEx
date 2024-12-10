@@ -499,7 +499,7 @@ class Configuration:
             current.insert(0, value)
             # normalize and remove duplicates
             current = list(set([os.path.normpath(item.casefold()) for item in current]))
-            current = current[0:8] # remember up to 9
+            current = current[0:14] # remember up to 15
 
             
             self._data["recent_profiles"] = current
@@ -1320,13 +1320,21 @@ class Configuration:
             # don't save while tabs are loading
             return 
         
+        el = gremlin.event_handler.EventListener()
+        if el.input_selection_suspended:
+            # ignore selection requests if selection is suspended
+            return
+
+        
         if not isinstance(device_guid, str):
             device_guid = str(device_guid)
         data : dict = self._profile_data.get("last_input", {})
+        
         verbose = self.verbose_mode_details
+        if verbose:
+            syslog = logging.getLogger("system") 
         
-        
-        if isinstance(input_id, gremlin.base_classes.AbstractInputItem):
+        if input_type != gremlin.input_types.InputType.ModeControl and isinstance(input_id, gremlin.base_classes.AbstractInputItem):
             # convert to an ID we can use
             input_id = input_id.guid
         elif input_id is None:
@@ -1342,10 +1350,10 @@ class Configuration:
                 if guid is not None:
                     input_id = str(guid)
                 else:
-                    logging.getLogger("system").warning(f"SetLastInput(): Don't know how to handle input_id [{input_id}] type: {type(input_id).__name__}")
+                    syslog.warning(f"SetLastInput(): Don't know how to handle input_id [{input_id}] type: {type(input_id).__name__}")
                     input_id = None
         else:
-            logging.getLogger("system").warning(f"SetLastInput(): Don't know how to handle input_id [{input_id}] type: {type(input_id).__name__}")
+            syslog.warning(f"SetLastInput(): Don't know how to handle input_id [{input_id}] type: {type(input_id).__name__}")
             input_id = None
 
         input_type = gremlin.input_types.InputType.convert(input_type)
@@ -1360,7 +1368,7 @@ class Configuration:
 
             if verbose:
                 device_name = gremlin.shared_state.get_device_name(device_guid)
-                logging.getLogger("system").info(f"Saving last input selection: {device_guid} {device_name} {input_type} {input_id}")
+                syslog.info(f"Saving last input selection: {device_guid} {device_name} {input_type} {input_id}")
                 pass
 
 
@@ -1409,6 +1417,9 @@ class Configuration:
                 input_type = gremlin.input_types.InputType.Midi
             elif device_type == gremlin.types.DeviceType.Osc:
                 input_type = gremlin.input_types.InputType.OpenSoundControl
+            elif device_type == gremlin.types.DeviceType.ModeControl:
+                input_type = gremlin.input_types.InputType.ModeControl
+
             if dinput_device_guid in gremlin.shared_state.device_widget_map:
                 widget = gremlin.shared_state.device_widget_map[dinput_device_guid]
                 if input_id is None:
@@ -1430,9 +1441,13 @@ class Configuration:
                         item = widget.input_item_list_model.data(0)
                         input_id = item.input_id
                         save_input_id = input_id.guid
+        elif device_type == gremlin.types.DeviceType.ModeControl:
+            save_input_id = input_id
+            input_type = gremlin.input_types.InputType.ModeControl
+            
                     
         else:
-            assert False, f"Don't know how to handle device type: {type(device_type).__name__}"
+            assert False, f"Config: GetInputId() Don't know how to handle device type: {device_type}"
 
         return (input_type, save_input_id, input_id)
 

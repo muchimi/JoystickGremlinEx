@@ -1408,9 +1408,9 @@ class InputItemWidget(QtWidgets.QFrame):
             self._update_callback(self, self.custom_container_widget)
             return
         
-        if not self._config_external:
+        if not self._config_external or self.populate_name is not None:
             #display_text = self.populate_name(self, self.identifier) if self.populate_name else gremlin.common.input_to_ui_string( self.identifier.input_type,self.identifier.input_id)
-            display_text = self.populate_name(self, self.identifier) if self.populate_name else self.identifier.input_name
+            display_text = self.populate_name(self, self.identifier) if self.populate_name is not None else self.identifier.input_name
             self._title_widget.setText(display_text)
 
         self._update_icons()

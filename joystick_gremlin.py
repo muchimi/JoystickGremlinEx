@@ -1094,6 +1094,8 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         try:
             gremlin.shared_state.is_tab_loading = True
+            el = gremlin.event_handler.EventListener()
+            el.push_input_selection() # prevent selections
 
             self.push_highlighting()
 
@@ -1152,6 +1154,17 @@ class GremlinUi(QtWidgets.QMainWindow):
 
                 widget.inputChanged.connect(self._device_input_changed_cb)
 
+                # pick a default entry for each tab if one is not currently selected
+                last_input_type, last_input_id = self._get_last_input(device_guid)
+                if last_input_id is None:
+                    # get the first input item of the tab
+                    input_item = self._get_input_item(device_guid, 0)
+                    if input_item:
+                        input_id = input_item.input_id
+                        input_type = input_item.input_type
+                        gremlin.shared_state.set_last_input_id(device_guid, input_type, input_id)
+                        self.config.set_last_input(device_guid, input_type, input_id)
+
 
             self._vjoy_input_device_guids = []
 
@@ -1183,6 +1196,11 @@ class GremlinUi(QtWidgets.QMainWindow):
                 device_name_map[device.device_guid] = tab_label
                 self.ui.devices.addTab(widget, tab_label)
                 self._vjoy_input_device_guids.append(device_guid)
+
+
+
+
+
                 index += 1
 
             # Create keyboard tab
@@ -1245,6 +1263,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                 gremlin.shared_state.device_type_map[gremlin.ui.osc_device.OscDeviceTabWidget.device_guid] = DeviceType.Osc
                 gremlin.shared_state.device_widget_map[gremlin.ui.osc_device.OscDeviceTabWidget.device_guid] = widget
 
+
             # create mode control tab
             device_profile = self.profile.get_device_modes(
                     gremlin.ui.mode_device.ModeDeviceTabWidget.device_guid,
@@ -1265,6 +1284,12 @@ class GremlinUi(QtWidgets.QMainWindow):
             gremlin.shared_state.device_type_map[guid] = DeviceType.ModeControl
             gremlin.shared_state.device_widget_map[guid] = widget
             
+            last_input_type, last_input_id = self._get_last_input(device_guid)
+            if last_input_id is None:
+                input_id = gremlin.ui.mode_device.ModeInputModeType.ModeEnter
+                input_type = InputType.ModeControl
+                gremlin.shared_state.set_last_input_id(device_guid, input_type , input_id)
+                self.config.set_last_input(device_guid, input_type, input_id)
 
 
 
@@ -1392,11 +1417,21 @@ class GremlinUi(QtWidgets.QMainWindow):
 
             gremlin.shared_state.is_tab_loading = False
             device_guid = self.config.last_device_guid
+
+
+
+            # dump all tabs
+            # self._dump_tab_map(self._get_tab_map())
+            # pass
+        finally:
+            el.pop_input_selection() # prevent selections
+
             if device_guid is not None:
                 _, restore_input_type, restore_input_id = self.config.get_last_input(device_guid)
                 self._select_input(device_guid, restore_input_type, restore_input_id)
-        finally:
+
             self.pop_highlighting()
+
 
 
     def get_ordered_device_guid_list(self, filter_tab_type : TabDeviceType = TabDeviceType.NotSet):
@@ -1555,6 +1590,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         return (None, None)
 
     def _get_input_item(self, device_guid : str, index : int) -> gremlin.base_profile.InputItem:
+        ''' get the input item at the specified index in the device - index is 0 based '''
         widget = self._get_tab_widget_guid(device_guid)
         if widget is None or not hasattr(widget,"input_item_list_model"):
             return None
@@ -1563,6 +1599,28 @@ class GremlinUi(QtWidgets.QMainWindow):
         if row_count == 0 or index > row_count:
             return None
         return widget.input_item_list_model.data(index)
+    
+    def _get_input_items(self, device_guid : str) -> list[gremlin.base_profile.InputItem]:
+        ''' gets the list of all input items for a given device '''
+        widget = self._get_tab_widget_guid(device_guid)
+        if widget is None or not hasattr(widget,"input_item_list_model"):
+            return None
+
+        row_count = widget.input_item_list_model.rows()
+        return [widget.input_item_list_model.data(index) for index in range(row_count)]
+    
+    def _find_input_item(self, device_guid : str, input_id) -> gremlin.base_profile.InputItem:
+        ''' find the input item matching the input id for a given device '''
+        if not device_guid or input_id is None:
+            # nothing to match
+            return None
+        items = self._get_input_items(device_guid)
+        if items:
+            return next((item for item in items if item.input_id == input_id), None)
+        return None
+        
+
+        
 
     def _select_input(self, device_guid, input_type : InputType = None, input_id = None, force_update = False):
         eh = gremlin.event_handler.EventListener()
@@ -1585,11 +1643,25 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         '''
 
+        # avoid spamming
+        if not force_update and self._last_input_change_timestamp + self._input_delay > time.time():
+                # delay not occured yet
+                return
+        self._last_input_change_timestamp = time.time()
+
+        verbose = gremlin.config.Configuration().verbose_mode_inputs
+
+
+        el = gremlin.event_handler.EventListener()
+        if el.input_selection_suspended:
+            # ignore selection requests if selection is suspended
+            return
+
         self._selection_locked = True
 
         try:
             self.push_highlighting()
-            el = gremlin.event_handler.EventListener()
+            
             el.push_joystick() # suspend joystick input while changing UI
 
             syslog = logging.getLogger("system")
@@ -1600,17 +1672,16 @@ class GremlinUi(QtWidgets.QMainWindow):
             # index of current device tab
             index = self.ui.devices.currentIndex()
             current_device_guid = self._get_tab_guid(index)
-            last_input_type, last_input_id = self._get_last_input(device_guid)
-            if input_type is None and input_id is None:
-                input_type = last_input_type
-                input_id = last_input_id
-                force_update = True # force the selection when setting defaults
+            
+            # see if the request input is found
+            input_item = self._find_input_item(device_guid, input_id)
+            if input_item is None:
+                # not found
+                input_item = self._get_input_item(device_guid, 0)
 
-            # avoid spamming
-            if not force_update and self._last_input_change_timestamp + self._input_delay > time.time():
-                    # delay not occured yet
-                    return
-            self._last_input_change_timestamp = time.time()
+            if input_item:
+                input_type = input_item.input_type
+                input_id = input_item.input_id
 
             syslog.info(f"Select input event: {device_guid} {self._get_device_name(device_guid)} input: {InputType.to_display_name(input_type)} input ID: {input_id}")
 
@@ -1619,18 +1690,29 @@ class GremlinUi(QtWidgets.QMainWindow):
 
             if current_device_guid.casefold() != device_guid.casefold():
                 # change tabs
-                #syslog.info("Tab change requested")
+                if verbose: syslog.info("Tab change requested")
                 index = self._find_tab_index(device_guid)
                 if index is not None:
                     with QtCore.QSignalBlocker(self.ui.devices):
                         self.ui.devices.setCurrentIndex(index)
-                    #syslog.info("Tab change complete")
+                    if verbose: syslog.info("Tab change complete")
 
             if input_id is None:
                 # get the default item to select
+                if verbose: syslog.info(f"Select input: last input ID {input_id} not found - selecting default input ID")
                 last_device_guid, last_input_type, input_id  = self.config.get_last_input(device_guid)
+                if verbose: syslog.info(f"Select input: found {last_device_guid} {last_input_type} {input_id} ")
                 if input_id is None:
-                    last_device_guid, last_input_type_type, input_id  = self.config.get_last_input(device_guid)
+                    input_item = self._get_input_item(device_guid, 0)
+                    if input_item:
+                        
+                        input_id = input_item.input_id
+                        input_type = input_item.input_type
+                        gremlin.shared_state.set_last_input_id(device_guid, input_type , input_id)
+                        self.config.set_last_input(device_guid, input_type, input_id)
+                        last_device_guid = device_guid
+                        last_input_type = input_type
+                        if verbose: syslog.info(f"Select input: defaulting to first item on list {last_device_guid} {last_input_type} {input_id} ")
 
 
 

@@ -2182,7 +2182,10 @@ The setting can be overriden by the global mode reload option set in Options for
                 )
             else:
                 # Update the renamed mode in each device
+
+                new_name = mode_name
                 for device in self._profile.devices.values():
+                    
                     device.modes[name] = device.modes[mode_name]
                     device.modes[name].name = name
                     del device.modes[mode_name]
@@ -2199,6 +2202,10 @@ The setting can be overriden by the global mode reload option set in Options for
                 # rename the startup mode if it's the same
                 if mode_name == gremlin.shared_state.current_profile.get_start_mode():
                     gremlin.shared_state.current_profile.set_start_mode(name)
+
+                # tell the UI of the name change
+                el = gremlin.event_handler.EventListener()
+                el.mode_name_changed.emit(new_name)
 
                 
 

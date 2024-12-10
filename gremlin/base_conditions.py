@@ -187,7 +187,15 @@ class JoystickCondition(AbstractCondition):
         """
         return super().is_valid() and self.input_type is not None
     
-  
+    # def execute(self) -> bool:
+    #     ''' executes the action 
+    #     :returns: True if the condition is valid (met), false if not
+
+    #     '''
+    #     import gremlin.joystick_handling
+    #     if self.is_valid():
+    #         if self.InputType
+    #         value = gremlin.joystick_handling.get_axis()
 
 
 class VJoyCondition(AbstractCondition):

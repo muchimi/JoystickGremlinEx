@@ -9,6 +9,7 @@ Joystick Gremlin EX
 
 - [Changelog](#changelog)
    * [13.40.16ex (pre-release)](#134016ex-pre-release)
+      + [(m45)](#m45)
       + [(m44)  ](#m44)
       + [(m43)](#m43)
       + [(m42)](#m42)
@@ -161,6 +162,12 @@ Joystick Gremlin EX
 - [Profile](#profile)
    * [Profile association](#profile-association)
    * [Profile modes](#profile-modes)
+      + [Mode background](#mode-background)
+      + [Default mode](#default-mode)
+      + [Nesting modes](#nesting-modes)
+      + [Mode addition/removal](#mode-additionremoval)
+      + [Mode device](#mode-device)
+      + [Mode enter / exit use-cases](#mode-enter-exit-use-cases)
    * [General mapping process](#general-mapping-process)
 - [User plugins](#user-plugins)
 - [Containers](#containers)
@@ -244,15 +251,15 @@ Joystick Gremlin EX
 
 <!-- TOC --><a name="134016ex-pre-release"></a>
 ## 13.40.16ex (pre-release)
-<!-- TOC --><a name="m44"></a>
+<!-- TOC --><a name="m45"></a>
 ### (m45)
-- New: Mode tab.  The mode tab provides two virtual momentary inputs that trigger whenever a mode is entered or exited.  For mapping purposes, the two inputs will report to actions as a button input so actions like Map to Vjoy will only show options that are applicable to a button.    
-At the moment, these inputs are auto-release inputs, meaning, they will send a release automatically after they are triggered.
-Use these special inputs to map actions that should be executed on mode changes.  The actions listed under mode enter will execute when the mode is called up (switched to).  The actions listed under mode exit will execute when the mode is changed to another mode (switched from).
-	Examples of use-cases for this feature:
-	+ Initialize a mode by setting buttons, axis values or sending a key whenever that mode is switched to.
-	+ Reset or change settings when a mode is changed back. 
+- New (experimental): Mode tab. The mode tab provides two new virtual buttons that trigger assigned actions whenever a mode is entered (activated) or exited (deactivated). See the mode tab in the documentation [here](#profile-modes)
+- Fix: changing modes will restore the last selected device at edit time
+- Fix: since m31, vjoyremap (Map to Vjoy) ignores conditions set on companion curves
+- Improved: GremlinEx now remembers up to 15 profiles
 
+
+<!-- TOC --><a name="m44"></a>
 ### (m44)  
 - Improved: The legacy calibration method has been deprecated. Legacy data will be loaded if it exists the first time GremlinEx runs from an older version. The calibration tool is removed, and calibration options are moved to individual input via a configuration button for each that brings up a dialog specific to that input. The new features include new visualization of live data, inversion, and deadzone settings applied at the input level without needing a curve. The calibration applies to the input before further processing by GremlinEx, including before any curve is applied.  By default all axes are setup as "centered" and no calibration is applied so no changes are needed unless calibration should be applied.  Calibration data is now saved to a separate XML datafile in the user profile folder where profiles are kept and includes the new flags/options in it.
 - Experimental: ability to disable certain inputs and manage input enabled state at profile runtime via the new control action.  The control action can only be mapped to a momentary input and can control the enabled state on any known input.  The idea of this feature is to (1) enable/disable inputs without having to connect/disconnect them which can cause problems or conflicts or re-ordering (2) for advanced setups where multiple inputs may be mapped to the same output and this is not desirable due to conflict in certain scenarios. 
@@ -1700,13 +1707,66 @@ A profile can be associated with an executable in options, and GremlinEx can aut
 <!-- TOC --><a name="profile-modes"></a>
 ## Profile modes
 
-A profile can have mode, the default mode being called "Default" and is the starting mode.  The "Default" profile can be renamed if needed.
+A profile can have multiple modes.  A mode is a set of unique mappings, specific to that mode.   The default mode being called "Default" and is the starting mode.  Modes are not necessary.  They are provided for more complex mapping scenarios.
 
-Modes can be nested, meaning that a mode can itself contain other modes.  A child node inherits actions from a parent mode if the child mode does not define these inputs.
+<!-- TOC --><a name="mode-background"></a>
+### Mode background
+
+It's important to understand what modes do as it will impact mapping behaviors.  Every mapping (container/action) is attached to a specific input (device and input within that device) as well as its mode.
+
+If the mode changes, a new mappings set is activated and replaces the mapping set from a different mode.
+
+If an action starts in one mode, results in a mode change, any other callbacks by this action may not execute correctly as the mapping has changed while executing.
+
+<!-- TOC --><a name="default-mode"></a>
+### Default mode
+
+Every blank profile starts with the default mode, named "Default".  The name of the profile can be changed if needed.
+
+Every profile must have at least one mode.
+
+Additional modes are optional.
+
+<!-- TOC --><a name="nesting-modes"></a>
+### Nesting modes
+
+Modes can be nested, meaning that a mode can itself contain other modes.  A child node inherits actions from a parent mode if the child mode does not define these inputs.  This means that the actions mapped to the parent mode (or its parent and so one) cascade into a sub mode if that device/input is not mapped.  GremlinEx will walk the chain up to find the first mapped action for that input, and execute it if it finds it.
 
 If this behavior is not desired, the mode can also be a mode without a parent, in which case it will be a standalone mode without inheritance.
 
+<!-- TOC --><a name="mode-additionremoval"></a>
+### Mode addition/removal
+
 Modes can be added or deleted.  Deletions can cause a loss of data as mappings are attached not only to an input, but a specific mode, so avoid deleting modes.
+
+The last mode cannot be deleted.  A profile must have at least one mode defined.
+
+<!-- TOC --><a name="mode-device"></a>
+### Mode device
+
+A special mode device, appearing as the "Mode" tab defines a pair of virtual buttons triggered by GremlinEx on mode change.
+
+One triggers when the mode is entered.  The other triggers when the mode is exited (meaning, the before the new mode that was selected is activated).
+
+Both inputs function as buttons, so containers and actions that support buttons can be mapped to these special inputs.
+
+The mode enter and mode exit virtual buttons are unique to each mode, so each can have a different set (or none).
+
+The mode enter trigger will also trigger on profile start for the mode selected as the default startup mode.  The trigger will happen after any settings on the settings options are applied.
+
+<!-- TOC --><a name="mode-enter-exit-use-cases"></a>
+### Mode enter / exit use-cases
+
+Examples of how mode entry/exit mapping can help solve common mapping problems, because they always execute regardless of physical input state.
+
+- every mode can initialize a known setup as actions like Map to Vjoy can set specific values on axes or activate/deactivate buttons.  If the device enabling is turned on in options, the Control action can also enable/disable specific inputs.
+- Text to speech will correctly execute on mode change.  Note however that the special variable ${current_mode} will reflect the current mode, which may not be the mode the trigger is defined in because of how the wiring works.  
+- Mode exit can be used to "clean up" or reset a state when the mode changes to a different mode, or execute actions to re-enable a device for example.
+
+
+
+
+
 
 
 

@@ -1234,6 +1234,7 @@ class InputItem():
         self._input_name_handler = custom_name_handler # custom handler 
         self.always_execute = False
         self._description = ""
+        self._description_readonly = False # true if description is read/only (cannot be changed)
         #self._containers = base_classes.TraceableList(callback = self._container_change_cb) # container
         self._containers = []
         self._selected = False # true if the item is selected
@@ -1264,7 +1265,6 @@ class InputItem():
         el = gremlin.event_handler.EventListener()
         el.profile_start.connect(self._profile_start)
 
-
     @property
     def hasCalibration(self):
         ''' for axis input devices, returns True if the device has an active calibration '''
@@ -1280,6 +1280,7 @@ class InputItem():
     def _profile_start(self):
         # enable the input at profile start 
         self._enabled = True
+
                 
     @property
     def id(self):
@@ -1303,7 +1304,17 @@ class InputItem():
     
     @description.setter
     def description(self, value):
-        self._description = value
+        if not self._description_readonly:
+            self._description = value
+
+    @property
+    def descriptionReadOnly(self) -> bool:
+        ''' true if description is readonly'''
+        return self._description_readonly
+    
+    @descriptionReadOnly.setter
+    def descriptionReadOnly(self, value: bool):
+        self._description_readonly = value
         
     @property
     def input_name(self) -> str:
@@ -1743,6 +1754,8 @@ class InputItem():
             return f"OSC {self._input_id}"
         elif self._input_type == InputType.Midi:
             return f"Midi {self._input_id}"
+        elif self._input_type == InputType.ModeControl:
+            return f"{gremlin.ui.mode_device.ModeInputModeType.to_display_name(self._input_id)}"
         return f"Unknown input: {self._input_type}"
     
 

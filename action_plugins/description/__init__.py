@@ -37,6 +37,7 @@ class DescriptionActionWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.inner_layout = QtWidgets.QHBoxLayout()
         self.label = QtWidgets.QLabel("<b>Action description</b>")
         self.description = QtWidgets.QLineEdit()
+        #self.description.setReadOnly(self.action_data.descriptionReadOnly)
         self.description.textChanged.connect(self._update_description)
         self.inner_layout.addWidget(self.label)
         self.inner_layout.addWidget(self.description)
@@ -44,6 +45,7 @@ class DescriptionActionWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _populate_ui(self):
         self.description.setText(self.action_data.description)
+        #self.description.setReadOnly(self.action_data.)
 
     def _update_description(self, value):
         self.action_data.description = value
