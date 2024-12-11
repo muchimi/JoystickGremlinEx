@@ -709,7 +709,11 @@ class GremlinUi(QtWidgets.QMainWindow):
     # +---------------------------------------------------------------
 
     def menu_activate(self, activate):
+        if not activate:
+            el = gremlin.event_handler.EventListener()
+            el.profile_stop_toolbar.emit()
         self.activate(activate)
+
 
     def activate(self, activate):
         """Activates and deactivates the code runner.

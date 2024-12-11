@@ -289,6 +289,7 @@ class EventListener(QtCore.QObject):
 	profile_start = QtCore.Signal() # profile start signal (when a profile starts)
 	profile_started = QtCore.Signal() # profile started signal (after a profile starts)
 	profile_stop = QtCore.Signal() # profile stop signal (when a profile stops)
+	profile_stop_toolbar = QtCore.Signal() # profile stop signal (when a profile stops because the toolbar is pressed)
 	profile_unload = QtCore.Signal() # profile unload signal (when a profile is unloaded and a new profile loaded)
 	request_profile_stop = QtCore.Signal(str) # request the profile to stop (reason: str)
 	

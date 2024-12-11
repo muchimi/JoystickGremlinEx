@@ -61,10 +61,7 @@ class ProcessMonitor(QtCore.QObject):
         self.kernel32 = ctypes.windll.kernel32
         el = gremlin.event_handler.EventListener()
         el.profile_start.connect(self.start)
-        #el.profile_stop.connect(self.stop)
-        # kernel32.dll library handle
-        
-
+        el.profile_stop_toolbar.connect(self.stop) # stop listener only if manual toolbar button clicked
 
 
     def start(self):
