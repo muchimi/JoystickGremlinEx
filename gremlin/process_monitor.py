@@ -22,11 +22,18 @@ import time
 import threading
 
 from PySide6 import QtCore
-
+import gremlin.shared_state
+from gremlin.singleton_decorator import SingletonDecorator
 import win32gui
 import win32process
+import logging
+import gremlin.config
+import gremlin.event_handler
 
+# Definition of the flags for limited information queries
+PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
 
+@SingletonDecorator
 class ProcessMonitor(QtCore.QObject):
 
     """Monitors the currently active window process.
@@ -39,11 +46,8 @@ class ProcessMonitor(QtCore.QObject):
     # Signal emitted when the active window changes
     process_changed = QtCore.Signal(str)
 
-    # Definition of the flags for limited information queries
-    PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
 
-    # kernel32.dll library handle
-    kernel32 = ctypes.windll.kernel32
+
 
     def __init__(self):
         """Creates a new instance."""
@@ -54,19 +58,36 @@ class ProcessMonitor(QtCore.QObject):
         self._current_pid = -1
         self.running = False
         self._update_thread = None
+        self.kernel32 = ctypes.windll.kernel32
+        el = gremlin.event_handler.EventListener()
+        el.profile_start.connect(self.start)
+        #el.profile_stop.connect(self.stop)
+        # kernel32.dll library handle
+        
+
+
 
     def start(self):
         """Starts monitoring the current process."""
-        if not self.running:
-            self.running = True
-            self._update_thread = threading.Thread(
-                target=self._update
-            )
-            self._update_thread.start()
+        config = gremlin.config.Configuration()
+        option_auto_load = config.autoload_profiles
+        option_auto_load_on_focus = config.activate_on_process_focus
+        if option_auto_load or option_auto_load_on_focus:
+            if not self.running:
+                syslog = logging.getLogger("system")
+                verbose = gremlin.config.Configuration().verbose_mode_process
+                if verbose: syslog.info("Process Monitor: start")
+                self.running = True
+                self._update_thread = threading.Thread(target=self._update)
+                self._update_thread.start()
 
     def stop(self):
         """Stops monitoring the current process."""
+        
         self.running = False
+        verbose = gremlin.config.Configuration().verbose_mode_process
+        syslog = logging.getLogger("system")
+        if verbose: syslog.info("Process Monitor: stop")
         if self._update_thread is not None:
             if self._update_thread.is_alive():
                 self._update_thread.join()
@@ -75,26 +96,24 @@ class ProcessMonitor(QtCore.QObject):
     def _update(self):
         """Monitors the active process for changes."""
         while self.running:
-            _, pid = win32process.GetWindowThreadProcessId(
-                win32gui.GetForegroundWindow()
-            )
+            _, pid = win32process.GetWindowThreadProcessId(win32gui.GetForegroundWindow())
 
             if pid != self._current_pid:
                 self._current_pid = pid
-                handle = ProcessMonitor.kernel32.OpenProcess(
-                    ProcessMonitor.PROCESS_QUERY_LIMITED_INFORMATION,
+                handle = self.kernel32.OpenProcess(
+                    PROCESS_QUERY_LIMITED_INFORMATION,
                     False,
                     pid
                 )
 
                 self._buffer_size = ctypes.wintypes.DWORD(1024)
-                ProcessMonitor.kernel32.QueryFullProcessImageNameA(
+                self.kernel32.QueryFullProcessImageNameA(
                     handle,
                     0,
                     self._buffer,
                     ctypes.byref(self._buffer_size)
                 )
-                ProcessMonitor.kernel32.CloseHandle(handle)
+                self.kernel32.CloseHandle(handle)
 
                 self._current_path = os.path.normpath(
                     str(self._buffer.value)[2:-1]

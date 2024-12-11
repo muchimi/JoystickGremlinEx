@@ -58,6 +58,8 @@ _suspend_input_highlighting_enabled = 0
 # Timer used to disable input highlighting with a delay
 _suspend_timer = None
 
+# key of the global mode used internally for some global mappings
+# global_mode = "__internal_global__"
 
 ui_ready = False
 

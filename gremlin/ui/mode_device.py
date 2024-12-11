@@ -55,6 +55,8 @@ class ModeInputModeType(enum.IntEnum):
     ''' possible input modes '''
     ModeEnter = 0  # executes on mode enter
     ModeExit = 1 # executes on mode exit
+    ModeGlobalEnter = 2 # executes on any mode change (activate)
+    ModeGlobalExit = 3 # executes on any mode change (deactivate)
 
     @staticmethod
     def to_display_name(value):
@@ -63,6 +65,10 @@ class ModeInputModeType(enum.IntEnum):
                 return "Mode Activate"
             case ModeInputModeType.ModeExit:
                 return "Mode Deactivate"
+            case ModeInputModeType.ModeGlobalEnter:
+                return "Mode Activate (any)"
+            case ModeInputModeType.ModeGlobalExit:
+                return "Mode Deactivate (any)"
         
         return f"Unknown mode: {value}"
 
@@ -158,6 +164,10 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 return f"Mode [{gremlin.shared_state.edit_mode}] Activate"
             case ModeInputModeType.ModeExit:
                 return f"Mode [{gremlin.shared_state.edit_mode}] Deactivate"
+            case ModeInputModeType.ModeGlobalEnter:
+                return f"Mode Activate (any)"
+            case ModeInputModeType.ModeGlobalExit:
+                return f"Mode Deactivate (any)"
             
         return f"Mode [{gremlin.shared_state.edit_mod}] Unknown id: {input_item.input_id}"
             
@@ -171,6 +181,7 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         ''' ensures we have input items for the current mode '''
 
         config = self.device_profile.modes[self.current_mode].config
+        # global_config = self.device_profile.modes[gremlin.shared_state.global_mode].config
 
         if not ModeInputModeType.ModeEnter in config[InputType.ModeControl]:
             modeEnter = gremlin.base_profile.InputItem(self._custom_name_handler)
@@ -193,6 +204,32 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             modeExit.descriptionReadonly = True
             config[InputType.ModeControl][ModeInputModeType.ModeExit] = modeExit
         config[InputType.ModeControl][ModeInputModeType.ModeExit].descriptionReadOnly = True
+
+
+        
+        # config = self.device_profile.modes[gremlin.shared_state.global_mode].config
+
+        # if not ModeInputModeType.ModeGlobalEnter in config[InputType.ModeControl]:
+        #     modeEnter = gremlin.base_profile.InputItem(self._custom_name_handler)
+        #     modeEnter.input_id = ModeInputModeType.ModeEnter
+        #     modeEnter.device_name = "Mode"
+        #     modeEnter.input_type = InputType.ModeControl
+        #     modeEnter.device_guid = get_mode_device_guid()
+        #     modeEnter.description="Enter any mode actions"
+        #     config[InputType.ModeControl][ModeInputModeType.ModeEnter] = modeEnter
+        # config[InputType.ModeControl][ModeInputModeType.ModeEnter].descriptionReadOnly = True
+
+        
+        # if not ModeInputModeType.ModeGlobalExit in config[InputType.ModeControl]:
+        #     modeExit = gremlin.base_profile.InputItem(self._custom_name_handler)
+        #     modeExit.device_name = "Mode"
+        #     modeExit.device_guid = get_mode_device_guid()
+        #     modeExit.input_type = InputType.ModeControl
+        #     modeExit.input_id = ModeInputModeType.ModeExit
+        #     modeExit.description="Exit any mode actions"
+        #     modeExit.descriptionReadonly = True
+        #     config[InputType.ModeControl][ModeInputModeType.ModeExit] = modeExit
+        # config[InputType.ModeControl][ModeInputModeType.ModeExit].descriptionReadOnly = True
         
 
     def itemAt(self, index):
@@ -296,13 +333,7 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def _update_input_widget(self, input_widget, container_widget):
         ''' called when the widget has to update itself on a data change '''
-        
-        # input_item : gremlin.base_profile.InputItem = input_widget.identifier
-
-        # input_widget.setTitle(input_item.input_name)
-        # input_widget.setInputDescription(input_item.title_name)
-        # input_widget.setToolTip(input_item.display_tooltip)
-
+        pass
  
 
     def _populate_input_widget_ui(self, input_widget, container_widget, data):

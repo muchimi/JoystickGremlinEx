@@ -120,7 +120,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.16ex (m45)"
+APPLICATION_VERSION = "13.40.16ex (m46)"
 
 # the main ui
 ui = None
@@ -2233,9 +2233,11 @@ class GremlinUi(QtWidgets.QMainWindow):
         option_auto_load = config.autoload_profiles
         option_auto_load_on_focus = config.activate_on_process_focus
 
-
+        verbose = gremlin.config.Configuration().verbose_mode_process
 
         if not option_auto_load and not option_auto_load_on_focus:
+            if verbose:
+                logging.getLogger("system").info(f"PROC: Process focus change detected: {os.path.basename(path)}  autoload: {option_auto_load}  auto load on focus: {option_auto_load_on_focus} disabled - ignore process change")
             return # ignore if not auto loading profiles or auto activating on focus change
 
         option_restore_mode = config.restore_profile_mode_on_start or self.profile.get_restore_mode()
@@ -2243,9 +2245,10 @@ class GremlinUi(QtWidgets.QMainWindow):
         option_reset_mode_on_process_activate = config.reset_mode_on_process_activate
         eh = gremlin.event_handler.EventHandler()
 
-        verbose = gremlin.config.Configuration().verbose_mode_detailed
+        #verbose = gremlin.config.Configuration().verbose_mode_detailed
+        
         if verbose:
-            logging.getLogger("system").info(f"PROC: Process focus change detected: {os.path.basename(path)}  autoload: {option_auto_load}  keep focus: {option_keep_focus} restore mode: {option_restore_mode}")
+            logging.getLogger("system").info(f"PROC: Process focus change detected: {os.path.basename(path)}  autoload: {option_auto_load}  auto load on focus: {option_auto_load_on_focus} keep focus: {option_keep_focus} restore mode: {option_restore_mode}")
 
         # see if we have a mapping entry for this executable
         profile_item = self._profile_map.get_map(path)
@@ -2475,10 +2478,10 @@ class GremlinUi(QtWidgets.QMainWindow):
         self._set_joystick_input_buttons_highlighting(self.config.highlight_input_buttons)
         if not ignore_minimize:
             self.setHidden(self.config.start_minimized)
-        if self.config.autoload_profiles:
-            self.process_monitor.start()
-        else:
-            self.process_monitor.stop()
+        # if self.config.autoload_profiles:
+        #     self.process_monitor.start()
+        # else:
+        #     self.process_monitor.stop()
 
         if self.config.activate_on_launch:
             self.ui.actionActivate.setChecked(True)

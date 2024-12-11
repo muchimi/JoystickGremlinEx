@@ -901,7 +901,8 @@ class VerboseMode(IntFlag):
     Details = auto() # user interface details
     Condition = auto() # conditions diagnostics
     OSC = auto() # OSC data 
-    All = Keyboard | Joystick | Inputs | Mouse | Details | SimConnect | Condition
+    Process = auto() # process changes
+    All = Keyboard | Joystick | Inputs | Mouse | Details | SimConnect | Condition | Process
 
     def __contains__(self, item):
         return  (self.value & item.value) == item.value

@@ -733,7 +733,11 @@ class Device:
         :param mode_name the name of the mode being checked
         :param device a device to initialize for this mode if specified
         """
-  
+        # if not gremlin.shared_state.global_mode in self.modes:
+        #     mode = Mode(self)
+        #     mode.name = "Global Mode (internal)"
+        #     self.modes[gremlin.shared_state.global_mode] = mode
+
         if mode_name in self.modes:
             mode = self.modes[mode_name]
         else:
@@ -2371,6 +2375,11 @@ class Profile():
                     if mode not in new_device.modes:
                         new_device.modes[mode] = Mode(new_device)
                         new_device.modes[mode].name = mode
+
+                # # global mode
+                # mode = Mode(new_device)
+                # mode.name ="Global mode (internal)"
+                # new_device.modes[gremlin.shared_state.global_mode] = mode
 
         # Parse merge axis entries
         for child in root.iter("merge-axis"):
