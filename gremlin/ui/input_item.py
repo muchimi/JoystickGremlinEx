@@ -905,7 +905,7 @@ class ActionSetView(ui_common.AbstractView):
                 new_action.action_id = get_guid()
                 self.model.add_action(new_action)
         else:
-            action_item = plugin_manager.duplicate(action)
+            action_item = plugin_manager.duplicate(action,self.profile_data)
             self.model.add_action(action_item)
 
 

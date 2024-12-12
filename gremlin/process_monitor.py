@@ -56,12 +56,33 @@ class ProcessMonitor(QtCore.QObject):
         self._buffer_size = ctypes.wintypes.DWORD(1024)
         self._current_path = ""
         self._current_pid = -1
-        self.running = False
+        self._running = False
         self._update_thread = None
         self.kernel32 = ctypes.windll.kernel32
+        self._enabled = False
         el = gremlin.event_handler.EventListener()
         el.profile_start.connect(self.start)
         el.profile_stop_toolbar.connect(self.stop) # stop listener only if manual toolbar button clicked
+        el.process_monitor_changed.connect(self._check_monitor)
+
+    @property
+    def enabled(self) -> bool:
+        return self._enabled
+    
+    @enabled.setter
+    def enabled(self, value : bool):
+        self._enabled = value
+        if not value and self._running:
+            # stop the profile auto 
+            self.stop()
+
+    def _check_monitor(self):
+        ''' executes when process monitoring related actions change '''
+        config = gremlin.config.Configuration()
+        option_auto_load = config.autoload_profiles
+        option_auto_load_on_focus = config.activate_on_process_focus
+        self.enabled = option_auto_load or option_auto_load_on_focus
+        
 
 
     def start(self):
@@ -70,18 +91,21 @@ class ProcessMonitor(QtCore.QObject):
         option_auto_load = config.autoload_profiles
         option_auto_load_on_focus = config.activate_on_process_focus
         if option_auto_load or option_auto_load_on_focus:
-            if not self.running:
+            self._enabled = True
+            if not self._running:
                 syslog = logging.getLogger("system")
                 verbose = gremlin.config.Configuration().verbose_mode_process
                 if verbose: syslog.info("Process Monitor: start")
-                self.running = True
+                self._running = True
                 self._update_thread = threading.Thread(target=self._update)
                 self._update_thread.start()
 
     def stop(self):
         """Stops monitoring the current process."""
-        
-        self.running = False
+        if not self._running:
+            return # nothing to do
+            
+        self._running = False
         verbose = gremlin.config.Configuration().verbose_mode_process
         syslog = logging.getLogger("system")
         if verbose: syslog.info("Process Monitor: stop")
@@ -92,30 +116,31 @@ class ProcessMonitor(QtCore.QObject):
 
     def _update(self):
         """Monitors the active process for changes."""
-        while self.running:
-            _, pid = win32process.GetWindowThreadProcessId(win32gui.GetForegroundWindow())
+        while self._running:
+            if self._enabled:
+                _, pid = win32process.GetWindowThreadProcessId(win32gui.GetForegroundWindow())
 
-            if pid != self._current_pid:
-                self._current_pid = pid
-                handle = self.kernel32.OpenProcess(
-                    PROCESS_QUERY_LIMITED_INFORMATION,
-                    False,
-                    pid
-                )
+                if pid != self._current_pid:
+                    self._current_pid = pid
+                    handle = self.kernel32.OpenProcess(
+                        PROCESS_QUERY_LIMITED_INFORMATION,
+                        False,
+                        pid
+                    )
 
-                self._buffer_size = ctypes.wintypes.DWORD(1024)
-                self.kernel32.QueryFullProcessImageNameA(
-                    handle,
-                    0,
-                    self._buffer,
-                    ctypes.byref(self._buffer_size)
-                )
-                self.kernel32.CloseHandle(handle)
+                    self._buffer_size = ctypes.wintypes.DWORD(1024)
+                    self.kernel32.QueryFullProcessImageNameA(
+                        handle,
+                        0,
+                        self._buffer,
+                        ctypes.byref(self._buffer_size)
+                    )
+                    self.kernel32.CloseHandle(handle)
 
-                self._current_path = os.path.normpath(
-                    str(self._buffer.value)[2:-1]
-                ).replace("\\", "/")
-                self.process_changed.emit(self.current_path)
+                    self._current_path = os.path.normpath(
+                        str(self._buffer.value)[2:-1]
+                    ).replace("\\", "/")
+                    self.process_changed.emit(self.current_path)
 
             time.sleep(1.0)
 

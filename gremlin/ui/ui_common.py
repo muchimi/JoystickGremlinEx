@@ -25,6 +25,8 @@ import logging
 from PySide6 import QtWidgets, QtCore, QtGui
 import PySide6.QtGui
 import PySide6.QtWidgets
+import gremlin.clipboard
+import gremlin.clipboard
 import gremlin.config
 import gremlin.error
 import qtawesome as qta
@@ -902,6 +904,15 @@ class ActionSelector(QtWidgets.QWidget):
 
         eh = gremlin.event_handler.EventHandler()
         eh.last_action_changed.connect(self._last_action_changed)
+        self._container = None
+
+
+    @property
+    def container(self):
+        return self._container
+    @container.setter
+    def container(self, container):
+        self._container = container        
 
     @QtCore.Slot(object, str)
     def _last_action_changed(self, widget, name):
@@ -956,20 +967,20 @@ class ActionSelector(QtWidgets.QWidget):
 
     def _paste_action(self):
         ''' handle paste action '''
-        clipboard = Clipboard()
-        # validate the clipboard data is an action and is of the correct type for the input/container
-        if clipboard.is_action:
-            action_name = clipboard.data.name
-            valid_actions = self._valid_action_list()
-            if action_name in valid_actions:
-                # valid action - clone it and add it
-                # logging.getLogger("system").info("Clipboard paste action trigger...")
-                self.action_paste.emit(clipboard.data)
-            else:
-                # dish out a message
-                MessageBox(title =  f"Invalid Action type ({action_name})",
-                    prompt = "Unable to paste action because it is not valid for the current input")
-                
+        import gremlin.plugin_manager
+        action = gremlin.plugin_manager.ActionPlugins().fromClipboard(self.container)
+        if action is None:
+            return
+        valid_actions = self._valid_action_list()
+        if action.name in valid_actions:
+            # valid action - clone it and add it
+            # logging.getLogger("system").info("Clipboard paste action trigger...")
+            self.action_paste.emit(action)
+        else:
+            # dish out a message
+            MessageBox(title =  f"Invalid Action type ({action.name})",
+                prompt = "Unable to paste action because it is not valid for the current input")
+                    
 
     def _clipboard_changed(self, clipboard):
         ''' handles paste button state based on clipboard data '''

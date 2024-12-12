@@ -49,7 +49,7 @@ class ContainerPlugins:
         self._parent_widget_map = {} # map of item data to QT widget main UI container widget
         self._input_data_container_map = {} # map of item data to the actual containers created for it
 
-        
+
     def reset_functors(self):
         ''' clears functor tracking '''
         self._functors = []
@@ -70,7 +70,7 @@ class ContainerPlugins:
         :return dictionary containing all plugins found
         """
         return self._plugins
-    
+
     def set_widget(self, item_data, widget):
         ''' sets the associated parent widget of a container for the specific input type'''
         self._parent_widget_map[item_data] = widget
@@ -80,7 +80,7 @@ class ContainerPlugins:
         if item_data in self._parent_widget_map.keys():
             return self._parent_widget_map[item_data]
         return None
-    
+
     def set_container_data(self, item_data, container):
         if not item_data in self._input_data_container_map.keys():
             self._input_data_container_map[item_data] = []
@@ -91,7 +91,7 @@ class ContainerPlugins:
         if not item_data in self._input_data_container_map.keys():
             return []
         return self._input_data_container_map[item_data]
-    
+
     def get_parent_widget(self, container):
         ''' gets the parent widget of the given container '''
         for item_data, containers in self._input_data_container_map.items():
@@ -131,7 +131,7 @@ class ContainerPlugins:
         log_sys(f"Using container plugin folder: {walk_path}")
         if not os.path.isdir(walk_path):
             raise error(f"Unable to find container plugins: {walk_path}")
-        
+
         for root, dirs, files in os.walk(walk_path):
 
             for fname in [v for v in files if v == "__init__.py"]:
@@ -180,7 +180,7 @@ class ContainerPlugins:
         node = container.to_xml()
         container_type = node.attrib["type"]
         container_tag_map = self.tag_map
-        
+
         new_container = container_tag_map[container_type](input_item)
         new_container.from_xml(node)
 
@@ -189,15 +189,15 @@ class ContainerPlugins:
         for action_set in new_container.get_action_sets():
             for action in action_set:
                 action.action_id = get_guid()
-        
+
         return new_container
 
 
 
 
-    
 
-       
+
+
 
 
 @SingletonDecorator
@@ -272,7 +272,7 @@ class ActionPlugins:
         self._type_to_action_map = {}
         for input_type in common.InputType.to_list():
             self._type_to_action_map[input_type] = []
-        
+
         for entry in self._plugins.values():
             for input_type in entry.input_types:
                 self._type_to_action_map[input_type].append(entry)
@@ -292,7 +292,7 @@ class ActionPlugins:
         log_sys(f"Using action plugin folder: {walk_path}")
         if not os.path.isdir(walk_path):
             raise error(f"Unable to find action_plugins: {walk_path}")
-        
+
         log_sys("Action plugins:")
         plugin_count = 0
         error_count = 0
@@ -332,15 +332,34 @@ class ActionPlugins:
         node = action.to_xml()
         action_tag = node.tag
         action_tag_map = self.tag_map
-        
+
         new_action = action_tag_map[action_tag](container)
         new_action.from_xml(node)
         new_action.action_id = get_guid()
 
-
-        # dup = copy.deepcopy(action)
-        #dup.parent = action.parent
-        #dup.action_id = get_guid()
-
         return new_action
-    
+
+    def fromClipboard(self, container):
+        ''' grabs an action from the clipboard '''
+        from lxml import etree
+        from gremlin.clipboard import Clipboard, ObjectEncoder, EncoderType
+        import gremlin.base_profile
+        clipboard = Clipboard()
+        if isinstance(clipboard.data, ObjectEncoder):
+            item = clipboard.data
+            if item.encoder_type == EncoderType.Action:
+                xml = item.data
+                if container is None:
+                    # no container provided for the parent - can't duplicate
+                    logging.getLogger("system").error("FromClipboard: unable to instantiate action because no container is provided")
+                    return None
+                if container is not None:
+                    node = etree.fromstring(xml)
+                    action = self.get_class(item.name)(container)
+                    action._parse_xml(node)
+                return action
+        elif isinstance(clipboard.data, gremlin.base_profile.AbstractAction):
+            return action
+        return None
+
+

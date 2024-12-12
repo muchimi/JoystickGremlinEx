@@ -423,7 +423,7 @@ class SwitchContainerWidget(AbstractContainerWidget):
     def _paste_action(self, action):
         ''' pastes an action '''
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.duplicate(action)
+        action_item = plugin_manager.duplicate(action, self.profile_data)
         self.profile_data.add_action(action_item)
         self.container_modified.emit()
 

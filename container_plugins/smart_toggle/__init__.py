@@ -114,7 +114,7 @@ class SmartToggleContainerWidget(AbstractContainerWidget):
         :param action_name the name of the action to add
         """
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.duplicate(action)
+        action_item = plugin_manager.duplicate(action, self.profile_data)
         if self.profile_data.action_sets[0] is None:
             self.profile_data.action_sets[0] = []
         self.profile_data.action_sets[0].append(action_item)

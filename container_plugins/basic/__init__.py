@@ -98,7 +98,7 @@ class BasicContainerWidget(AbstractContainerWidget):
             if action_data.is_action:
                 # verify the action in the clipboard is appropriate for this input
 
-                action_item = plugin_manager.duplicate(action_data.data)
+                action_item = plugin_manager.duplicate(action_data.data, self.profile_data)
 
         self.profile_data.add_action(action_item)
         self.container_modified.emit()
@@ -106,7 +106,7 @@ class BasicContainerWidget(AbstractContainerWidget):
     def _paste_action(self, action):
         ''' paste action'''
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.duplicate(action)
+        action_item = plugin_manager.duplicate(action, self.profile_data)
         self.profile_data.add_action(action_item)
         self.container_modified.emit()
 

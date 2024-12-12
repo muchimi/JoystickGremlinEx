@@ -535,6 +535,8 @@ class Configuration:
         if type(value) == bool:
             self._data["autoload_profiles"] = value
             self.save()
+            el = gremlin.event_handler.EventListener()
+            el.process_monitor_changed.emit() # tell the UI the parameter changed
 
     @property
     def keep_profile_active_on_focus_loss(self):
@@ -779,6 +781,8 @@ class Configuration:
         """Sets whether or not to activate the profile on launch."""
         self._data["activate_on_process_focus"] = bool(value)
         self.save()
+        el = gremlin.event_handler.EventListener()
+        el.process_monitor_changed.emit() # tell the UI the process options changed
 
 
 

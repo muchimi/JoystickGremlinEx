@@ -175,7 +175,7 @@ class DoubleTapContainerWidget(AbstractContainerWidget):
     def _paste_action(self, index, action):
         ''' pastes an action '''
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.duplicate(action)
+        action_item = plugin_manager.duplicate(action, self.profile_data)
         if self.profile_data.action_sets[index] is None:
             self.profile_data.action_sets[index] = []
         self.profile_data.action_sets[index].append(action_item)

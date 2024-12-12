@@ -1135,8 +1135,8 @@ def compare_path(a, b):
         return False
     if b is None:
         return False
-    af = a.replace("\\","/").lower().strip()
-    bf = b.replace("\\","/").lower().strip()
+    af = a.replace("\\","/").casefold().strip()
+    bf = b.replace("\\","/").casefold().strip()
     return af == bf
 
 def compare_nocase(a : str, b : str):

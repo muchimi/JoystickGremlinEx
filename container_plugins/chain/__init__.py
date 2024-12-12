@@ -50,7 +50,9 @@ class ChainContainerWidget(AbstractContainerWidget):
             self.profile_data.get_input_type()
         )
         self.action_selector.action_added.connect(self._add_action)
+        self.action_selector.add_button.setText("Add Step")
         self.action_selector.action_paste.connect(self._paste_action)
+        self.action_selector.container = self.profile_data
 
         self.widget_layout.addWidget(self.action_selector)
 
@@ -103,7 +105,7 @@ class ChainContainerWidget(AbstractContainerWidget):
     def _paste_action(self, action):
         ''' pastes an action '''
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.duplicate(action)
+        action_item = plugin_manager.duplicate(action, self.profile_data)
         self.profile_data.add_action(action_item)
         self.container_modified.emit()
 
@@ -269,7 +271,8 @@ class ChainContainer(AbstractContainer):
 
         :return True if the container is configured properly, False otherwise
         """
-        return len(self.action_sets) > 0
+        #return len(self.action_sets) > 0
+        return True
 
 
 # Plugin definitions

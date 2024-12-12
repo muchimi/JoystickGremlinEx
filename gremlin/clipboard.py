@@ -31,6 +31,7 @@ class ObjectEncoder():
         self._data = data
         self._type : EncoderType = encoder_type
         
+        
 
     @property
     def data(self):
@@ -51,7 +52,8 @@ class ObjectEncoder():
     @name.setter
     def name(self, value):
         self._name = value
-    
+
+
     @property
     def encoder_type(self)->EncoderType:
         return self._type
