@@ -39,7 +39,8 @@ import anytree
 from enum import Enum,auto
 
 from gremlin.singleton_decorator import SingletonDecorator
-
+from PySide6 import QtCore
+from threading import Event
 
 class ExecutionGraphNodeType(Enum):
     ''' types of tree nodes in an execution graph '''
@@ -237,7 +238,7 @@ class VirtualButtonProcess:
         self.virtual_button.process_event(event)
 
 
-class AbstractExecutionGraph(metaclass=ABCMeta):
+class AbstractExecutionGraph(QtCore.QObject):
 
     """Abstract base class for all execution graph type classes.
 
@@ -250,20 +251,29 @@ class AbstractExecutionGraph(metaclass=ABCMeta):
     graph terminates.
     """
 
+    graph_completed = QtCore.Signal(object) # fires when the process events have been all processed - parameter - the grap object just completed
+
     def __init__(self, instance, parent = None):
         """Creates a new execution graph based on the provided data.
 
         :param instance the object to use in order to generate the graph
         """
+        super().__init__()
         self.functors = []
         self.transitions = {}
         self.current_index = 0
+        self.run_event = Event()
         ec = ExecutionContext()
         if parent is None:
             parent = ec.root
         self._build_graph(instance, parent)
+        el = gremlin.event_handler.EventListener()
+        el.profile_stop.connect(self._profile_stop)
 
-                                                      
+    @QtCore.Slot()
+    def _profile_stop(self):
+        # abort if running
+        self.run_event.set()
     
 
     def process_event(self, event, value):
@@ -279,7 +289,7 @@ class AbstractExecutionGraph(metaclass=ABCMeta):
         # this is detected the "press" event is sent and the second run ensures
         # a "release" event is sent.
         process_again = False
-
+        self.run_event.clear()
         
         verbose = gremlin.config.Configuration().verbose_mode_condition
         syslog = logging.getLogger("system")
@@ -302,7 +312,7 @@ class AbstractExecutionGraph(metaclass=ABCMeta):
         
 
         if verbose: syslog.info (f"Execution start:")
-        while self.current_index is not None and len(self.functors) > 0:
+        while self.current_index is not None and len(self.functors) > 0 and not self.run_event.is_set():
             index = self.current_index
             functor = self.functors[index]
             if isinstance(functor, gremlin.actions.ActivationCondition):
@@ -329,12 +339,13 @@ class AbstractExecutionGraph(metaclass=ABCMeta):
 
         self.current_index = 0
 
-        if process_again:
+        if process_again and not self.run_event.is_set():
             time.sleep(0.05)
             self.process_event(event, value)
+
+        self.graph_completed.emit(self)
         return True
 
-    @abstractmethod
     def _build_graph(self, instance, parent_node = None):
         """Builds the graph structure based on the given object's content.
 

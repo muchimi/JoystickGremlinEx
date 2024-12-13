@@ -293,21 +293,28 @@ class InputActionCondition(AbstractCondition):
         return node
 
    
-class AbstractFunctor(metaclass=ABCMeta):
+
+
+class AbstractFunctor(QtCore.QObject):
 
     """Abstract base class defining the interface for functor like classes.
 
     These classes are used in the internal code execution system.
     """
 
-    def __init__(self, instance, parent = None):
+    functor_complete = QtCore.Signal() # fires when a functor has completed its execution completely
+
+    def __init__(self, action_data, parent = None):
         """Creates a new instance, extracting needed information.
 
         :param instance the object which contains the information needed to
             execute it later on
         """
         import gremlin.event_handler
-        self._name = instance.name
+
+        super().__init__()
+
+        self._name = action_data.name
         self.enabled = True
         self.node = parent
         
@@ -318,7 +325,7 @@ class AbstractFunctor(metaclass=ABCMeta):
 
         
 
-    @abstractmethod
+    
     def process_event(self, event, value):
         """Processes the functor using the provided event and value data.
 

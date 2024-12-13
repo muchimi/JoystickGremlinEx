@@ -184,7 +184,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
         el.icon_changed.emit(event)
 
 
-    def _paste_action(self, data_or_action):
+    def _paste_action(self, data_or_action, container):
         """ paste action to the input item """
         import container_plugins.basic
         import gremlin.plugin_manager
@@ -404,7 +404,8 @@ class InputItemConfiguration(QtWidgets.QFrame):
         self.dropdown_layout = QtWidgets.QHBoxLayout(self.dropdown_widget)
 
         self.action_selector = ui_common.ActionSelector(
-            self._input_type
+            self._input_type,
+            None
         )
         self.action_selector.action_added.connect(self._add_action)
         self.action_selector.action_paste.connect(self._paste_action)
@@ -430,7 +431,10 @@ class InputItemConfiguration(QtWidgets.QFrame):
         self.action_selector_layout = QtWidgets.QHBoxLayout(self.action_selector_widget)
 
         self.action_selector = gremlin.ui.ui_common.ActionSelector(
-            gremlin.types.DeviceType.VJoy, parent = self.action_selector_widget
+            gremlin.types.DeviceType.VJoy,
+            None,
+            parent = self.action_selector_widget,
+            
         )
         self.action_selector.action_added.connect(self._add_action)
         self.action_selector.action_paste.connect(self._paste_action)

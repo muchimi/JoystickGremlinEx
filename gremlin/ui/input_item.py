@@ -833,7 +833,8 @@ class ActionSetView(ui_common.AbstractView):
         if self.view_type == ui_common.ContainerViewTypes.Action and \
                 self.profile_data.get_device_type() != DeviceType.VJoy:
             self.action_selector = gremlin.ui.ui_common.ActionSelector(
-                profile_data.parent.input_type
+                profile_data.parent.input_type,
+                profile_data
             )
             self.action_selector.action_added.connect(self._add_action)
             self.action_selector.action_paste.connect(self._paste_action)
@@ -890,7 +891,7 @@ class ActionSetView(ui_common.AbstractView):
 
         self.model.add_action(action)
 
-    def _paste_action(self, action):
+    def _paste_action(self, action, container):
         ''' handles action paste operation '''
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
         if isinstance(action, ObjectEncoder):

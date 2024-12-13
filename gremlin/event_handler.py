@@ -340,6 +340,9 @@ class EventListener(QtCore.QObject):
 	# occurs when calibration data changes
 	calibration_changed = QtCore.Signal(object) # param - CalibrationData object
 
+	# occurs when a macro step completes
+	macro_step_completed = QtCore.Signal(int) # param - macro ID returned by the queue_macro function
+
 
 	def __init__(self):
 		"""Creates a new instance."""
@@ -447,7 +450,10 @@ class EventListener(QtCore.QObject):
 	def push_input_selection(self):
 		self._input_selection_suspend_count += 1
 
-	def pop_input_selection(self):
+	def pop_input_selection(self, reset = False):
+		if reset:
+			self._input_selection_suspend_count = 0
+			return
 		if self._input_selection_suspend_count > 0:
 			self._input_selection_suspend_count -= 1
 

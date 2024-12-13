@@ -334,7 +334,8 @@ class SwitchContainerWidget(AbstractContainerWidget):
 
         self.profile_data.create_or_delete_virtual_button()
         self.action_selector = gremlin.ui.ui_common.ActionSelector(
-            self.profile_data.get_input_type()
+            self.profile_data.get_input_type(),
+            self.profile_data,
         )
 
         
@@ -420,7 +421,7 @@ class SwitchContainerWidget(AbstractContainerWidget):
         self._update_ui()
 
 
-    def _paste_action(self, action):
+    def _paste_action(self, action, container):
         ''' pastes an action '''
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
         action_item = plugin_manager.duplicate(action, self.profile_data)

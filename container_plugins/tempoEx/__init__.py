@@ -138,13 +138,15 @@ class TempoExContainerWidget(AbstractContainerWidget):
         
 
         self.short_action_selector = gremlin.ui.ui_common.ActionSelector(
-            self.profile_data.get_input_type()
+            self.profile_data.get_input_type(),
+            self.profile_data
         )
         self.short_action_selector.action_label.setText("Short Action")
         
 
         self.long_action_selector = gremlin.ui.ui_common.ActionSelector(
-            self.profile_data.get_input_type()
+            self.profile_data.get_input_type(),
+            self.profile_data
         )
         self.long_action_selector.action_label.setText("Long Action")
 
@@ -241,7 +243,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
         self.profile_data.create_or_delete_virtual_button()
         self.container_modified.emit()                
 
-    def _paste_short_action(self, action):
+    def _paste_short_action(self, action, container):
         ''' called when a paste occurs '''
         logging.getLogger("system").info("Paste short action")
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
@@ -261,7 +263,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
         self.profile_data.create_or_delete_virtual_button()
         self.container_modified.emit()                
     
-    def _paste_long_action(self, action):
+    def _paste_long_action(self, action, container):
         ''' called when a paste occurs '''
         logging.getLogger("system").info("Paste long action")
         plugin_manager = gremlin.plugin_manager.ActionPlugins()

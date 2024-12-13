@@ -2276,6 +2276,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         button.is_pressed = False
         self.remote_client.send_button(vjoy_device_id, vjoy_input_id, False)
         self.lock.release()
+        self.functor_complete.emit() # indicate completed
 
     # def smooth(self, value, reverse = False, power = 3):
     #     '''
@@ -2333,8 +2334,11 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
             is_remote = True
             is_local = False
 
-        if self.action_data.vjoy_button_id == 11:
+        if self.action_data.vjoy_button_id == 2:
             pass
+
+        auto_complete = True # assume the functor completes this pass
+
 
         if event.is_axis: # self.input_type == InputType.JoystickAxis:
             # axis response mode
@@ -2389,6 +2393,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                         if self.thread_running is False:
                             if isinstance(self.thread, threading.Thread):
                                 self.thread.join()
+                            auto_complete = False
                             self.thread = threading.Thread(target=self.relative_axis_thread)
                             self.thread.start()
 
@@ -2405,6 +2410,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
                     if is_pulse:
                         if not self.lock.locked():
+                            auto_complete = False
                             threading.Timer(0.01, self._fire_pulse, [self.vjoy_device_id, input_id, self.pulse_delay/1000]).start()
                     else:
                         if not sticky:
@@ -2506,12 +2512,14 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                 
                 # pulse action
                 if fire_event:
+                    auto_complete = False
                     if not self.lock.locked():
                         threading.Timer(0.01, self._fire_pulse, [self.vjoy_device_id, self.vjoy_input_id, self.pulse_delay/1000]).start()
             elif self.action_mode == VjoyAction.VJoyInvertAxis:
                 # invert the specified axis
                 if fire_event:
                     self.toggle_reverse()
+                    
                 
             elif self.action_mode == VjoyAction.VJoySetAxis:
                 # set the value on the specified axis
@@ -2520,6 +2528,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                         joystick_handling.VJoyProxy()[self.vjoy_device_id].axis(self.vjoy_input_id).value = self.target_value
                     if is_remote:
                         self.remote_client.send_axis(self.vjoy_device_id, self.vjoy_input_id, self.target_value)
+                    
 
             elif self.action_mode == VjoyAction.VJoyRangeAxis:
                 # changes the output range on the target device / axis
@@ -2530,6 +2539,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                 # update remote control mode
                 if fire_event:
                     remote_state.mode = self.action_mode
+                    
 
 
             else:
@@ -2540,6 +2550,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                         joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = action_value.current
                     if is_remote:
                         self.remote_client.send_button(self.vjoy_device_id, self.vjoy_input_id, action_value.current)
+                    
 
 
         elif self.input_type == InputType.JoystickHat:
@@ -2547,9 +2558,10 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                 joystick_handling.VJoyProxy()[self.vjoy_device_id].hat(self.vjoy_input_id).direction = action_value.current
             if is_remote:
                 self.remote_client.send_hat(self.vjoy_device_id, self.vjoy_input_id, action_value.current)
+            
 
-        
-
+        if auto_complete:
+            self.functor_complete.emit() # indicate completed
         return True
 
     def relative_axis_thread(self):
@@ -2584,7 +2596,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
             except gremlin.error.VJoyError:
                 self.thread_running = False
 
-
+        self.functor_complete.emit() # indicate completed
 
 
 

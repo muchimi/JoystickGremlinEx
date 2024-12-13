@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations
 import collections
 import ctypes
 from ctypes import wintypes
@@ -30,6 +31,8 @@ import win32con
 import win32api
 
 import gremlin
+import gremlin.config
+import gremlin.event_handler
 from gremlin.singleton_decorator import SingletonDecorator
 from gremlin.input_types import InputType
 import gremlin.error
@@ -295,17 +298,20 @@ def key_from_name(name, validate = False):
 
 
 @SingletonDecorator
-class MacroManager:
+class MacroManager(QtCore.QObject):
 
     """Manages the proper dispatching and scheduling of macros."""
 
     def __init__(self):
         """Initializes the instance."""
+        super().__init__()
         self._active = {}
         self._queue = []
         self._flags = {}
         self._flags_lock = Lock()
         self._queue_lock = Lock()
+
+        self.el = gremlin.event_handler.EventListener()
 
         # Default delay between subsequent message dispatch. This is to get
         # around some games not picking up messages if they are sent in too
@@ -317,6 +323,13 @@ class MacroManager:
         self._schedule_event = Event()
 
         self._run_scheduler_thread = None
+        self.el.profile_stop.connect(self._profile_stop)
+
+
+    @QtCore.Slot()
+    def _profile_stop(self):
+        ''' triggered when profiles stop '''
+        self.stop()
 
     def start(self):
         """Starts the scheduler."""
@@ -344,10 +357,14 @@ class MacroManager:
                 for key, value in self._flags.items():
                     self._flags[key] = False
 
-    def queue_macro(self, macro, is_local = None, is_remote = None):
+    def queue_macro(self, macro : Macro, is_local : bool = None, is_remote : bool = None):
         """Queues a macro in the schedule taking the repeat type into account.
 
-        :param macro the macro to add to the scheduler
+        :param macro: the macro to add to the scheduler
+        :param is_local: local flag (leave default for local execution or set to True)
+        :param is_remote: remote flag (set to True for remote execution or set to )
+        :param completion_callback: callback to call when the step completes, optional params(id) where ID is the macro step id returned by the call
+        :returns id: a unique ID for the macro step
         """
         if isinstance(macro.repeat, ToggleRepeat) and macro.id in self._active:
             self.terminate_macro(macro)
@@ -363,7 +380,9 @@ class MacroManager:
                 self._queue.append(MacroEntry(macro, True, is_local, is_remote))
             self._schedule_event.set()
 
-    def terminate_macro(self, macro):
+        return macro.id
+
+    def terminate_macro(self, macro : Macro):
         """Adds a termination request for a macro to the execution queue.
 
         :param macro the macro to terminate
@@ -423,7 +442,7 @@ class MacroManager:
                     if entry in self._queue:
                         self._queue.remove(entry)
 
-    def _dispatch_macro(self, macro, is_local = None, is_remote = None):
+    def _dispatch_macro(self, macro : Macro, is_local : bool = None, is_remote : bool = None):
         """Dispatches a single macro to be run.
 
         :param macro the macro to dispatch
@@ -438,7 +457,7 @@ class MacroManager:
                 "Attempting to dispatch an already running macro"
             )
 
-    def _execute_macro(self, macro, is_local = None, is_remote = None):
+    def _execute_macro(self, macro : Macro, is_local : bool = None, is_remote : bool = None):
         """Executes a given macro in a separate thread.
 
         This method will run all provided actions and once they all have been
@@ -482,6 +501,7 @@ class MacroManager:
                         action(is_local, is_remote)
                     time.sleep(delay)
 
+
         # Handle simple one shot macros
         else:
             for action in macro.sequence:
@@ -500,8 +520,11 @@ class MacroManager:
                 if macro.id in self._flags:
                     self._flags[macro.id] = False
             self._schedule_event.set()
+            
         except:
             pass
+
+        self.el.macro_step_completed.emit(macro.id) # indicate the macro step has been completed
 
     def _preprocess_macro(self, macro):
         """Inserts pauses as necessary into the macro."""
@@ -656,9 +679,19 @@ class Macro:
         self._sequence.append(KeyAction(key, is_pressed))
 
 
-class MacroAbstractAction:
+class MacroAbstractAction():
 
     """Base class for all macro action."""
+
+    def __init__(self, data = None):
+        self._data = data
+
+    @property
+    def data(self):
+        return self._data
+    @data.setter
+    def data(self, value):
+        self._data = value
 
     def __call__(self, is_local = True, is_remote = False, force_remote = False):
         raise gremlin.error.MissingImplementationError(
@@ -850,6 +883,57 @@ class PauseAction(MacroAbstractAction):
 
         time.sleep(duration)
 
+class GraphAction(MacroAbstractAction):
+    ''' macro to execute an execution graph - used for sequencing/queuing functors in some containers '''
+    def __init__(self, graph, event, value):
+        ''' 
+        :param graph: the execution graph to run
+        :param event: the event to pass to the execution graph (will get cloned and stored)
+        :param value: the action value to pass to the execution graph (will get cloned and stored)
+        '''
+        super().__init__()
+        assert graph is not None,"GraphAction: graph cannot be null"
+
+        self._graph = graph
+        self._graph.graph_completed.connect(self._graph_completed)
+        self._event = event.clone()
+        self._value = value.clone()
+        self._complete_event = None
+        el = gremlin.event_handler.EventListener()
+        el.profile_stop.connect(self._profile_stop)
+        self._complete_event = Event()
+
+    @QtCore.Slot()
+    def _profile_stop(self):
+        # kill any active macro if a profile terminates
+        if self._complete_event is not None and not self._complete_event.is_set():
+            syslog = logging.getLogger("system")
+            verbose = gremlin.config.Configuration().verbose_mode_condition
+            if verbose: syslog.info("GraphAction: profile stop received - stopping execution")
+            self._complete_event.set()
+            time.sleep(0.01)
+
+
+    def __call__(self, is_local = None, is_remote = None, force_remote = None):
+        syslog = logging.getLogger("system")
+        verbose = gremlin.config.Configuration().verbose_mode_condition
+        if verbose: syslog.info(f"GraphAction: call {self.data}")
+        if self._graph is not None:
+            self._complete_event.clear()
+            if verbose: syslog.info(f"GraphAction: execute {self.data}")
+            self._graph.process_event(self._event, self._value)
+            self._complete_event.wait()
+            if verbose: syslog.info(f"GraphAction: completed {self.data}")
+        
+
+    @QtCore.Slot(object)
+    def _graph_completed(self, graph):
+        syslog = logging.getLogger("system")
+        verbose = gremlin.config.Configuration().verbose_mode_condition
+        if verbose: syslog.info(f"GraphAction: event: graph completed {self.data}")
+        if graph == self._graph:
+            if verbose: syslog.info(f"GraphAction: event: set {self.data}")
+            self._complete_event.set()
 
 class VJoyMacroAction(MacroAbstractAction):
 

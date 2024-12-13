@@ -20,6 +20,8 @@ import threading
 import sys
 import uuid
 
+import gremlin.event_handler
+
 
 def module_property(func):
     """Decorator to turn module functions into properties.
@@ -229,6 +231,8 @@ def get_last_input_id():
     device_guid = config.get_last_device_guid()
     if device_guid:
         return gremlin.config.Configuration().get_last_input(device_guid)
+    
+
 
 def last_input_id(device_guid):
     ''' retrieves the last input id for a given input guid (input_type, input_id) of the last selection for this device '''

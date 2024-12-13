@@ -1076,7 +1076,12 @@ class Configuration:
     
     @property
     def verbose_mode_condition(self):
-        ''' true if verbose mode is in simconnect mode '''
+        ''' true if verbose mode is in condition/execution mode '''
+        return self.verbose and VerboseMode.Condition in self.verbose_mode
+    
+    @property
+    def verbose_mode_execution(self):
+        ''' true if verbose mode is in condition/execution mode '''
         return self.verbose and VerboseMode.Condition in self.verbose_mode
     
     @property
@@ -1340,6 +1345,7 @@ class Configuration:
         data : dict = self._profile_data.get("last_input", {})
         
         verbose = self.verbose_mode_details
+        verbose = True
         if verbose:
             syslog = logging.getLogger("system") 
         
@@ -1464,16 +1470,23 @@ class Configuration:
     def get_last_input(self, device_guid = None) -> tuple: # (device_guid, input_type, input_id)
         ''' gets the last input for a given device
          
-        :param: device_guid - the device to look for - if None - uses the last known device
+        :param device_guid: (optional) the device to look for - if None - uses the last known device
+        :returns tuple: (device_guid, input_type, input_id)
            
         '''
 
         syslog = logging.getLogger("system")
 
         if device_guid is None:
-            device_guid = self.get_last_device_guid()
+            # get the last profile device guid
+            device_guid = self._profile_data.get("last_device_guid", None)
+            if not device_guid:
+                return (None, None, None)
+        
+            
 
         verbose = self.verbose_mode_details
+        verbose = True
         if verbose:
             device_name = gremlin.shared_state.get_device_name(device_guid)
         if not isinstance(device_guid, str):

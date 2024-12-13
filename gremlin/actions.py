@@ -110,6 +110,10 @@ class Value:
     def is_pressed(self, value: bool):
         self._is_pressed = value
 
+    def clone(self):
+        ''' clones this value '''
+        import copy
+        return copy.deepcopy(self)
 
     
 class ActivationCondition:

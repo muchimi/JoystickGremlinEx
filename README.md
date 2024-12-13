@@ -252,8 +252,17 @@ Joystick Gremlin EX
 <!-- TOC --><a name="134016ex-pre-release"></a>
 ## 13.40.16ex (pre-release)
 <!-- TOC --><a name="m45"></a>
+### (m47)
+Fix: Some paste of actions causing an exception post refactor to require a secondary parameter in m45.
+Improved: Execution graph will abort on profile stop at the next step which should interrupt large container executions faster.
+Improved: Macro scheduler will abort on profile stop at the next step to interrupt macro execution faster on profile stop.
+Experimental: Sequence container - similar to macros but as a container. This container executes all actions sequentially once triggered.
+Improved: Pause action now functions as a delay as well as a callback pause (mode selectable).  Delay is selectable and entered in milliseconds.
+Fix: Input selection on profile load may have selected the incorrect item.
+
 ### (m46)
 - Improved logic and event handling around automatic process activation based on the active (foreground) process.
+
 ### (m45)
 - New (experimental): Mode tab. The mode tab provides two new virtual buttons that trigger assigned actions whenever a mode is entered (activated) or exited (deactivated). See the mode tab in the documentation [here](#profile-modes)
 - Fix: changing modes will restore the last selected device at edit time

@@ -25,6 +25,8 @@ import logging
 from PySide6 import QtWidgets, QtCore, QtGui
 import PySide6.QtGui
 import PySide6.QtWidgets
+import gremlin.base_classes
+import gremlin.base_profile
 import gremlin.clipboard
 import gremlin.clipboard
 import gremlin.config
@@ -858,14 +860,14 @@ class ActionSelector(QtWidgets.QWidget):
 
     # Signal emitted when an action is going to be added
     action_added = QtCore.Signal(str)  # add button pressed
-    action_paste = QtCore.Signal(object) # paste button pressed
+    action_paste = QtCore.Signal(object, object) # paste button pressed
     
 
-    def __init__(self, input_type, parent=None):
+    def __init__(self, input_type, container, parent=None):
         """Creates a new selector instance.
 
-        :param input_type the input type for which the action selector is
-            being created
+        :param input_type the input type for which the action selector is being created
+        :param container: the owner container
         :param parent the parent of this widget
         """
         super().__init__(parent)
@@ -875,6 +877,7 @@ class ActionSelector(QtWidgets.QWidget):
         self.main_layout = QtWidgets.QHBoxLayout(self)
         self.action_label = QtWidgets.QLabel("Action")
         self.main_layout.addWidget(self.action_label)
+        self._container = container
  
         self.action_dropdown = QComboBox()
         # warning_icon = load_icon("fa.warning", use_qta=True, qta_color = QtGui.QColor('#918B16'))
@@ -896,6 +899,7 @@ class ActionSelector(QtWidgets.QWidget):
         self.paste_button.clicked.connect(self._paste_action)
         self.paste_button.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Minimum)
         self.paste_button.setToolTip("Paste Action")
+        
 
         self.main_layout.addWidget(self.action_dropdown)
         self.main_layout.addWidget(self.add_button)
@@ -910,9 +914,9 @@ class ActionSelector(QtWidgets.QWidget):
     @property
     def container(self):
         return self._container
-    @container.setter
-    def container(self, container):
-        self._container = container        
+    # @container.setter
+    # def container(self, container):
+    #     self._container = container        
 
     @QtCore.Slot(object, str)
     def _last_action_changed(self, widget, name):
@@ -968,14 +972,26 @@ class ActionSelector(QtWidgets.QWidget):
     def _paste_action(self):
         ''' handle paste action '''
         import gremlin.plugin_manager
-        action = gremlin.plugin_manager.ActionPlugins().fromClipboard(self.container)
+        container = self.container
+        if container is None:
+            # find the container if we can
+            parent = self
+            while parent is not None:
+                if hasattr(parent,"profile_data"):
+                    if isinstance(parent.profile_data, gremlin.base_profile.AbstractContainer):
+                        container = parent.profile_data
+                        break
+                parent = parent.parent()
+            
+
+        action = gremlin.plugin_manager.ActionPlugins().fromClipboard(container)
         if action is None:
             return
         valid_actions = self._valid_action_list()
         if action.name in valid_actions:
             # valid action - clone it and add it
             # logging.getLogger("system").info("Clipboard paste action trigger...")
-            self.action_paste.emit(action)
+            self.action_paste.emit(action, self.container)
         else:
             # dish out a message
             MessageBox(title =  f"Invalid Action type ({action.name})",
@@ -3106,6 +3122,77 @@ class QToggleText(QtWidgets.QWidget):
     def value(self, checked):
         self._button.setChecked(checked)
 
+
+class QDelayWidget(QtWidgets.QWidget):
+    ''' widget to collect a delay time in milliseconds '''
+
+    valueChanged = QtCore.Signal() # fired when the value changes
+
+    def __init__(self, value = 250, parent = None):
+        '''
+        
+        :params value: default delay in milliseconds '''
+        super().__init__(parent)
+        self.main_layout = QtWidgets.QHBoxLayout(self)
+        self.main_layout.setContentsMargins(0,0,0,0)
+
+        self.delay_container_widget = QtWidgets.QWidget()
+        self.delay_container_layout = QtWidgets.QHBoxLayout()
+        self.delay_container_widget.setLayout(self.delay_container_layout)
+
+        width = gremlin.ui.ui_common.get_char_width(8)
+
+        delay_label = QtWidgets.QLabel("Delay (ms)")
+        self._delay_widget = QIntLineEdit()
+        self._delay_widget.setRange(0, 20000) # up to 20 seconds
+        self._delay_widget.setMaximumWidth(width)
+        self._delay_widget.setValue(value) # default
+        self._delay_widget.valueChanged.connect(self._value_changed)
+
+        quarter_sec_button = QtWidgets.QPushButton("1/4s")
+        half_sec_button = QtWidgets.QPushButton("1/2s")
+        sec_button = QtWidgets.QPushButton("1s")
+
+        quarter_sec_button.clicked.connect(self._quarter_sec_delay)
+        half_sec_button.clicked.connect(self._half_sec_delay)
+        sec_button.clicked.connect(self._sec_delay)
+
+        
+        self.delay_container_layout.addWidget(delay_label)
+        self.delay_container_layout.addWidget(self._delay_widget)
+        self.delay_container_layout.addWidget(quarter_sec_button)
+        self.delay_container_layout.addWidget(half_sec_button)
+        self.delay_container_layout.addWidget(sec_button)
+        self.delay_container_layout.addStretch()
+
+        self.main_layout.addWidget(self.delay_container_widget)
+
+    def value(self):
+        ''' gets the delay in milliseconds '''
+        return self._delay_widget.value()
+    
+    def setValue(self, value : int):
+        if value >= 0 and value != self._delay_widget.value():
+            self._delay_widget.setValue(value)
+            self.valueChanged.emit()
+
+    @QtCore.Slot()
+    def _value_changed(self):
+        self.valueChanged.emit()
+    
+    @QtCore.Slot()
+    def _quarter_sec_delay(self):
+        self._delay_widget.setValue(250)
+        
+    @QtCore.Slot()
+    def _half_sec_delay(self):
+        self._delay_widget.setValue(500)
+        
+    @QtCore.Slot()
+    def _sec_delay(self):
+        self._delay_widget.setValue(1000)
+        
+
 import gremlin.singleton_decorator
 @gremlin.singleton_decorator.SingletonDecorator
 class QHelper():
@@ -3780,7 +3867,9 @@ class QContentWidget(QtWidgets.QWidget):
     def resizeEvent(self, event):
         self.resized.emit(event.size)
         return super().resizeEvent(event)
-        
+    
+
+
 
 class QSplitTabWidget(QDataWidget):
     ''' tab content widgeth split '''
@@ -4008,3 +4097,5 @@ class BaseDialogUi(QRememberDialog):
             self.confirmClose(event)
         if event.isAccepted():
             self.closed.emit()
+
+

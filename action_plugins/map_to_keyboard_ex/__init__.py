@@ -25,6 +25,7 @@ import gremlin.base_profile
 import gremlin.config
 import gremlin.config
 import gremlin.config
+import gremlin.event_handler
 from gremlin.input_types import InputType
 from gremlin.input_devices import ButtonReleaseActions
 import gremlin.config
@@ -372,6 +373,30 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
         self.release.completed_callback = self._macro_completed
         self.delay_press_release.completed_callback = self._macro_completed
 
+        el = gremlin.event_handler.EventListener()
+        el.macro_step_completed.connect(self._macro_handler)
+
+        # list of the macros we generate
+        self._macro_ids = set()
+
+    def registerMacro(self, id : int):
+        self._macro_ids.add(id)
+
+    def unregisterMacro(self, id : int):
+        if c:
+            self._macro_ids.remove(id)
+
+    def isMacroOurs(self, id : int):
+        ''' true if the macro is one of ours '''
+        return gremlin.macro.MacroManager()
+
+    @QtCore.Slot(int)
+    def _macro_handler(self, id):
+        ''' called when a macro completes '''
+        if self.isMacroOurs(id):
+            self.unregisterMacro(id)
+            self.functor_complete.emit()
+
     def _macro_completed(self):
         ''' called when a macro is done running '''
         self.is_pressed = False
@@ -386,6 +411,7 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
         self._ar_running = False
 
     def process_event(self, event, value):
+        
         if event.event_type == InputType.JoystickAxis or value.current:
             # joystick values or virtual button
             verbose = gremlin.config.Configuration().verbose
@@ -394,21 +420,24 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
                 if verbose:
                     logging.getLogger("system").info(f"MapToKeyboardEx: release")
                 self.is_pressed = False
-                gremlin.macro.MacroManager().queue_macro(self.release)
+                id = gremlin.macro.MacroManager().queue_macro(self.release)
+                self.registerMacro(id)
             elif self.mode == KeyboardOutputMode.Press:
                 # press mode and not already triggered
                 self.is_pressed = True
                 if verbose:
                     logging.getLogger("system").info(f"MapToKeyboardEx: press")
-                gremlin.macro.MacroManager().queue_macro(self.press)
+                id = gremlin.macro.MacroManager().queue_macro(self.press)
+                self.registerMacro(id)
 
             elif self.mode == KeyboardOutputMode.Both:
                 # make and break with delay
                 if not self.is_pressed:
                     if verbose:
                         logging.getLogger("system").info(f"MapToKeyboardEx: both")
-                    gremlin.macro.MacroManager().queue_macro(self.delay_press_release)
+                    id = gremlin.macro.MacroManager().queue_macro(self.delay_press_release)
                     self.is_pressed = True
+                    self.registerMacro(id)
 
             elif self.mode == KeyboardOutputMode.Hold:
                 auto_release = self.needs_auto_release
@@ -416,15 +445,13 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
                 #     auto_release = False
                 if event.is_pressed:
                     # press event
-                    gremlin.macro.MacroManager().queue_macro(self.press)
+                    id = gremlin.macro.MacroManager().queue_macro(self.press)
+                    self.registerMacro(id)
                 # else:
                 #     gremlin.macro.MacroManager().queue_macro(self.release)
 
                 if auto_release:
-                    ButtonReleaseActions().register_callback(
-                        lambda: gremlin.macro.MacroManager().queue_macro(self.release),
-                        event
-                    )
+                    ButtonReleaseActions().register_callback(gremlin.macro.MacroManager().queue_macro(self.release), event)
             elif self.mode == KeyboardOutputMode.AutoRepeat:
                 # setup autorepeat thread
                 if self._ar_thread is None:
@@ -439,12 +466,10 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
             if self._ar_thread is not None:
                 self._ar_thread.join()
                 self._ar_thread = None
-
-            
-            
-        
         
         return True
+    
+
 
     def _ar_execute(self):
         ''' autorepeat run thread '''

@@ -899,7 +899,7 @@ class VerboseMode(IntFlag):
     Mouse = auto() # mouse input
     SimConnect = auto() # simconnect interface
     Details = auto() # user interface details
-    Condition = auto() # conditions diagnostics
+    Condition = auto() # conditions diagnostics / execution graph
     OSC = auto() # OSC data 
     Process = auto() # process changes
     All = Keyboard | Joystick | Inputs | Mouse | Details | SimConnect | Condition | Process

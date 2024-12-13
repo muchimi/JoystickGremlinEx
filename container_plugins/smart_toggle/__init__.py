@@ -77,7 +77,8 @@ class SmartToggleContainerWidget(AbstractContainerWidget):
             widget.model.data_changed.connect(self.container_modified.emit)
         else:
             action_selector = gremlin.ui.ui_common.ActionSelector(
-                self.profile_data.get_input_type()
+                self.profile_data.get_input_type(),
+                self.profile_data,
             )
             action_selector.action_added.connect(self._add_action)
             action_selector.action_paste.connect(self._paste_action)
@@ -108,7 +109,7 @@ class SmartToggleContainerWidget(AbstractContainerWidget):
         self.profile_data.create_or_delete_virtual_button()
         self.container_modified.emit()
 
-    def _paste_action(self, action):
+    def _paste_action(self, action, container):
         """Adds a new action to the container.
 
         :param action_name the name of the action to add

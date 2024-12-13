@@ -79,7 +79,8 @@ class RangeContainerWidget(AbstractContainerWidget):
 
         # self.profile_data.create_or_delete_virtual_button()
         self.action_selector = gremlin.ui.ui_common.ActionSelector(
-            self.profile_data.get_input_type()
+            self.profile_data.get_input_type(),
+            self.profile_data,
         )
 
         action_data: RangeContainer
@@ -325,7 +326,7 @@ class RangeContainerWidget(AbstractContainerWidget):
         self.profile_data.add_action(action_item)
         self.container_modified.emit()      
 
-    def _paste_action(self, action):
+    def _paste_action(self, action, container):
         """ pastes an action into the container """
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
         action_item = plugin_manager.duplicate(action, self.profile_data)

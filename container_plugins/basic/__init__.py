@@ -57,11 +57,13 @@ class BasicContainerWidget(AbstractContainerWidget):
         else:
             if self.profile_data.get_device_type() == gremlin.types.DeviceType.VJoy:
                 action_selector = gremlin.ui.ui_common.ActionSelector(
-                    gremlin.types.DeviceType.VJoy
+                    gremlin.types.DeviceType.VJoy,
+                    self.profile_data,
                 )
             else:
                 action_selector = gremlin.ui.ui_common.ActionSelector(
-                    self.profile_data.parent.input_type
+                    self.profile_data.parent.input_type,
+                    self.profile_data,
                 )
             action_selector.action_added.connect(self._add_action)
             action_selector.action_paste.connect(self._paste_action)
@@ -103,7 +105,7 @@ class BasicContainerWidget(AbstractContainerWidget):
         self.profile_data.add_action(action_item)
         self.container_modified.emit()
 
-    def _paste_action(self, action):
+    def _paste_action(self, action, container):
         ''' paste action'''
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
         action_item = plugin_manager.duplicate(action, self.profile_data)
