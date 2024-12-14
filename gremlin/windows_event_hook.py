@@ -381,6 +381,8 @@ class KeyboardHook:
 
     def stop(self):
         """Stops the hook from running."""
+        syslog = logging.getLogger("system")
+        syslog.info("KEYBOARD: shutdown")
         if self._running:
             self._running = False
             user32.PostThreadMessageW(self._listen_thread.ident, WM_QUIT, 0, 0)
@@ -437,6 +439,8 @@ class MouseHook:
 
     def stop(self):
         """Stops the hook from running."""
+        syslog = logging.getLogger("system")
+        syslog.info("MOUSE: shutdown")
         if self._running:
             self._running = False
             user32.PostThreadMessageW(self._listen_thread.ident, WM_QUIT, 0, 0)

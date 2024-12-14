@@ -32,6 +32,7 @@ from gremlin.clipboard import Clipboard
 import gremlin.config
 import gremlin.event_handler
 import gremlin.joystick_handling
+import gremlin.process_monitor
 import gremlin.shared_state
 import gremlin.types
 import gremlin.ui
@@ -271,6 +272,9 @@ class OptionsUi(ui_common.BaseDialogUi):
     def _save_on_close_cb(self):
         ''' occurs when the dialog is closed - autosave '''
         self._save_map_cb()
+        
+        el = gremlin.event_handler.EventListener()
+        el.process_monitor_changed.emit()
 
 
 
@@ -750,7 +754,7 @@ will remain active until a different profile is loaded.""")
         self.activate_on_launch.setChecked(self.config.activate_on_launch)
         self.activate_on_launch.setToolTip("When set, the last used profile will be automatically activated when GremlinEx starts.")
 
-        self.activate_on_process_focus = QtWidgets.QCheckBox("Auto-Activate on profile focus")
+        self.activate_on_process_focus = QtWidgets.QCheckBox("Auto-Activate on process focus")
         self.activate_on_process_focus.clicked.connect(self._activate_on_process_focus)
         self.activate_on_process_focus.setChecked(self.config.activate_on_process_focus)
         self.activate_on_process_focus.setEnabled(self.config.autoload_profiles)
@@ -2086,10 +2090,10 @@ The setting can be overriden by the global mode reload option set in Options for
         
 
         
-
-    def _profile_restore_flag_cb(self, clicked):
+    @QtCore.Slot(bool)
+    def _profile_restore_flag_cb(self, checked):
         ''' called when the restore last mode checked state is changed '''
-        self._profile.set_restore_mode(clicked)
+        self._profile.set_restore_mode(checked)
 
     def _create_inheritance_change_cb(self, mode):
         """Returns a lambda function callback to change the inheritance of

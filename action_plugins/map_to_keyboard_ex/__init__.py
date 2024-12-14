@@ -383,7 +383,7 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
         self._macro_ids.add(id)
 
     def unregisterMacro(self, id : int):
-        if c:
+        if id in self._macro_idsmacro_ids:
             self._macro_ids.remove(id)
 
     def isMacroOurs(self, id : int):

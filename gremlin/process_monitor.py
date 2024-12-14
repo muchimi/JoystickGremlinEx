@@ -61,9 +61,11 @@ class ProcessMonitor(QtCore.QObject):
         self.kernel32 = ctypes.windll.kernel32
         self._enabled = False
         el = gremlin.event_handler.EventListener()
+        el.shutdown.connect(self.stop)
         el.profile_start.connect(self.start)
         el.profile_stop_toolbar.connect(self.stop) # stop listener only if manual toolbar button clicked
         el.process_monitor_changed.connect(self._check_monitor)
+
 
     @property
     def enabled(self) -> bool:
@@ -82,6 +84,10 @@ class ProcessMonitor(QtCore.QObject):
         option_auto_load = config.autoload_profiles
         option_auto_load_on_focus = config.activate_on_process_focus
         self.enabled = option_auto_load or option_auto_load_on_focus
+
+        if option_auto_load_on_focus:
+            # start monitoring processes if auto activating based on processes
+            self.start()
         
 
 
@@ -90,12 +96,13 @@ class ProcessMonitor(QtCore.QObject):
         config = gremlin.config.Configuration()
         option_auto_load = config.autoload_profiles
         option_auto_load_on_focus = config.activate_on_process_focus
+        syslog = logging.getLogger("system")
+        
         if option_auto_load or option_auto_load_on_focus:
             self._enabled = True
             if not self._running:
-                syslog = logging.getLogger("system")
-                verbose = gremlin.config.Configuration().verbose_mode_process
-                if verbose: syslog.info("Process Monitor: start")
+                # verbose = gremlin.config.Configuration().verbose_mode_process
+                syslog.info("PROC: start")
                 self._running = True
                 self._update_thread = threading.Thread(target=self._update)
                 self._update_thread.start()
@@ -106,9 +113,9 @@ class ProcessMonitor(QtCore.QObject):
             return # nothing to do
             
         self._running = False
-        verbose = gremlin.config.Configuration().verbose_mode_process
+        # verbose = gremlin.config.Configuration().verbose_mode_process
         syslog = logging.getLogger("system")
-        if verbose: syslog.info("Process Monitor: stop")
+        syslog.info("PROC: shutdown")
         if self._update_thread is not None:
             if self._update_thread.is_alive():
                 self._update_thread.join()

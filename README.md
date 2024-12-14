@@ -259,6 +259,11 @@ Joystick Gremlin EX
 - Experimental: Sequence container - similar to macros but as a container. This container executes all actions sequentially once triggered.
 - Improved: Pause action now functions as a delay as well as a callback pause (mode selectable).  Delay is selectable and entered in milliseconds.
 - Fix: Input selection on profile load may have selected the incorrect item.
+- Fix: Relative scaling in vjoy remap now supports value 0 to 1000 (previously was limited at 1)
+- Fix: last runtime mode restore on automatic profile loading based on active process if options are enabled for this.
+- Fix: auto activate profile error or noop when option is enabled and a suitable process is selected and the action is on.
+- Fix: closing GremlinEx when a profile is active no longer leaves the process running (bug introduced with recent process monitoring logic changes)
+- Fix: unknown "hardware_device_guid" member found in profile class introduced in m44
 
 ### (m46)
 - Improved logic and event handling around automatic process activation based on the active (foreground) process.

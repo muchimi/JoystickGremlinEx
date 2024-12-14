@@ -203,6 +203,8 @@ class Configuration:
         if not item:
             self._data["last_mode"] = {}
         self._data["last_mode"][profile_path] = mode_name
+        syslog = logging.getLogger("system")
+        syslog.info(f"CONFIG: last runtime profile mode: [{mode_name}] for profile [{os.path.basename(profile_path)}]")
         self.save()
 
     def get_last_runtime_mode(self, profile_path):

@@ -1609,7 +1609,7 @@ class InputItem():
                 if child.tag == "response-curve-ex":
                     self.curve_data = gremlin.curve_handler.AxisCurveData()
                     self.curve_data._parse_xml(child)
-                    self.curve_data.calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(self.hardware_device_guid, self.hardware_input_id)
+                    self.curve_data.calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(self.device_guid, self.input_id)
                     break
             self.is_axis = True
 
@@ -2043,18 +2043,17 @@ class Profile():
             config.set_last_runtime_mode(self._profile_fname, mode)
             verbose = gremlin.config.Configuration().verbose
             if verbose:
-                syslog.info(f"Profile: {self._profile_name} set last runtime mode: {mode}")
+                syslog.info(f"PROFILE: [{self._profile_name}] set last runtime mode: [{mode}]")
 
     def get_last_runtime_mode(self):
         ''' gets the last used mode '''
-        if self._last_runtime_mode is None:
-            config = gremlin.config.Configuration()
-            mode = config.get_profile_last_runtime_mode()
-            if mode is not None:
-                verbose = gremlin.config.Configuration().verbose
-                if verbose:
-                    syslog.info(f"Profile: {self._profile_name} get last runtime mode: {mode}")
-                self._last_runtime_mode = mode
+        config = gremlin.config.Configuration()
+        mode = config.get_profile_last_runtime_mode()
+        if mode is not None:
+            verbose = gremlin.config.Configuration().verbose
+            if verbose:
+                syslog.info(f"PROFILE: [{self._profile_name}] get last runtime mode: [{mode}]")
+            self._last_runtime_mode = mode
         return self._last_runtime_mode
     
     def set_last_edit_mode(self, mode):
@@ -2288,7 +2287,12 @@ class Profile():
     
     @property
     def profile_file(self):
+        ''' gets the profile file name normalized for a PC case insentitive '''
+        
         return self._profile_fname
+    
+    def setProfileFile(self, value):
+            self._profile_fname = gremlin.util.fix_path(value)
     
     def get_default_mode(self):
         ''' gets the default mode for this profile - this is the mode used if the default startup mode is not specified '''
@@ -2398,7 +2402,7 @@ class Profile():
             # use a default mode
             self._start_mode = self.get_default_mode()
 
-        self._profile_fname = fname.casefold()
+        self._profile_fname = gremlin.util.fix_path(fname)
 
         name, _ = os.path.splitext(os.path.basename(fname))
         self._profile_name = name
@@ -2613,6 +2617,7 @@ class Profile():
         if not mode in modes:
             self._default_start_mode = self.get_root_mode()
         return self._default_start_mode
+    
 
     def get_restore_mode(self):
         ''' gets the start mode for this profile '''

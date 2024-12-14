@@ -23,12 +23,14 @@ to speech system.
 import logging
 import time
 import gremlin.config
+import gremlin.event_handler
 import gremlin.shared_state
 import threading
 import gremlin.threading
 from . import event_handler, util
 import pyttsx3
 import gremlin.singleton_decorator
+from PySide6 import QtCore
 
 
 @gremlin.singleton_decorator.SingletonDecorator
@@ -42,12 +44,16 @@ class TextToSpeech:
         """Creates a new instance."""
         syslog = logging.getLogger("system")
         self.valid = False
+        el = gremlin.event_handler.EventListener()
+        el.shutdown.connect(self.end)
+
         try:
             self.engine = pyttsx3.init()
             self.voices = self.engine.getProperty('voices')
             self.default_voice = next((voice for voice in self.voices if "David Desktop" in voice.name), None)
             self._started = False
             self.valid = True
+            self._tts_thread = None
             verbose = gremlin.config.Configuration().verbose
             if verbose:
                 syslog.info(f"TTS voice listing:")
@@ -58,6 +64,8 @@ class TextToSpeech:
         except Exception as err:
             syslog.error(f"TTS: unable to initialize TTS: {err}")
                 
+
+
 
     def getVoices(self):
         ''' gets a list of defined voices'''
@@ -150,13 +158,21 @@ class TextToSpeech:
         self.engine.endLoop()
 
 
+    @QtCore.Slot()
     def end(self):
         ''' ends the loop '''
+        
         if not self.valid:
             return
         if self._started:
+            syslog = logging.getLogger("system")
+            syslog.info("TTS: shutdown")
             self._tts_thread.stop()
             self._tts_thread.join()
+            try:
+                self.engine.stop()
+            except:
+                pass
             self._started = False
         
 

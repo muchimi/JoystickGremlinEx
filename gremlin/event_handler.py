@@ -20,11 +20,13 @@ import inspect
 import logging
 import time
 import queue
+import threading
 from threading import Thread, Timer
 from typing import Callable
 
 
 
+import gremlin.config
 import gremlin.joystick_handling
 import gremlin.shared_state
 import gremlin.threading
@@ -343,6 +345,12 @@ class EventListener(QtCore.QObject):
 	# occurs when a macro step completes
 	macro_step_completed = QtCore.Signal(int) # param - macro ID returned by the queue_macro function
 
+	# request profile activate/deactivate
+	request_activate = QtCore.Signal(bool)  # param - flag - true to activate, false to deactivate
+
+	# gremlin ex shutdown in progress
+	shutdown = QtCore.Signal() 
+
 
 	def __init__(self):
 		"""Creates a new instance."""
@@ -393,7 +401,9 @@ class EventListener(QtCore.QObject):
 
 		self.profile_started.connect(self._profile_started_cb)
 
-		Thread(target=self._run).start()
+		self._run_event = threading.Event()
+		self._run_thread = Thread(target=self._run)
+		self._run_thread.start()
 
 	@property
 	def calibrationManager(self):
@@ -591,10 +601,22 @@ class EventListener(QtCore.QObject):
 
 	def terminate(self):
 		"""Stops the loop from running."""
+
+		syslog = logging.getLogger("system")
+		syslog.info("EVENT: shutdown requested")
 		self._running = False
 		self.keyboard_hook.stop()
 		if self.mouse_hook:
 			self.mouse_hook.stop()
+		
+
+		# send the shutdown trigger to all code parts
+		if self._run_thread is not None:
+			# terminate run thread
+			self._run_event.set()
+			self._run_thread.join()
+		self.request_activate.emit(False)
+		self.shutdown.emit()
 
 
 	def reload_calibrations(self):
@@ -615,13 +637,13 @@ class EventListener(QtCore.QObject):
 		
 		if not dinput.DILL.initalized:
 			dinput.DILL.init()
-		syslog.info("DILL: input start listen")
+		syslog.info("DILL: start listen")
 		dinput.DILL.set_device_change_callback(self._joystick_device_handler)
 		dinput.DILL.set_input_event_callback(self._joystick_event_handler)
-		while self._running:
+		while self._running and not self._run_event.is_set():
 			# Keep this thread alive until we are done
 			time.sleep(0.05)
-		syslog.info("DILL: input stop listen")
+		syslog.info("DILL: shutdown")
 		dinput.DILL.set_device_change_callback(None)
 		dinput.DILL.set_input_event_callback(None)
 
@@ -1480,6 +1502,7 @@ class EventHandler(QtCore.QObject):
 				self.previous_runtime_mode = self.runtime_mode
 				gremlin.shared_state.runtime_mode = new_mode
 				# remember the last mode for this profile
+				
 				current_profile.set_last_runtime_mode(self.runtime_mode)
 				self.previous_runtime_mode = self.runtime_mode
 				self.runtime_mode = new_mode

@@ -1099,7 +1099,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     def set_mode(self, mode):
         ''' changes the mode of the tab '''
 
-        if gremlin.config.Configuration().verbose:
+        if gremlin.config.Configuration().verbose_mode_detailed:
             syslog = logging.getLogger("system")
             syslog.info(f"Device tab: change mode requested: device tab: {gremlin.shared_state.get_device_name(self.device.device_guid)} current mode: [{self.current_mode}]  new mode: [{mode}] ")
             
@@ -1239,7 +1239,7 @@ class InputConfigurationWidgetCache():
             key = self.getKey(item_data)
             if not key in self._widget_map:
                 self._widget_map[key] = widget
-                if gremlin.config.Configuration().verbose:
+                if gremlin.config.Configuration().verbose_mode_detailed:
                     syslog = logging.getLogger("system")            
                     syslog.info(f"Cache: register {item_data.debug_display}")
             

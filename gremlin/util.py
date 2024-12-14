@@ -1139,6 +1139,11 @@ def compare_path(a, b):
     bf = b.replace("\\","/").casefold().strip()
     return af == bf
 
+def fix_path(a):
+    if a:
+        return a.replace("\\","/").casefold().strip()
+    return a
+
 def compare_nocase(a : str, b : str):
     ''' compares two strings - not case sensitive '''
     if a is None and b is None:
