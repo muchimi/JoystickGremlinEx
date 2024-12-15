@@ -1834,12 +1834,22 @@ class Profile():
         self._dirty = False # dirty flag - indicates the profile data was changed but not saved yet
         self._profile_data : Profile
         self._force_numlock_off = True # if set, forces numlock to be off if it isn't so numpad keys report the correct scan codes
+        self._simconnect_modes = {} # map of simconnect startup modes to aicraft - the key is the SimconnectAicraftDefinition key which is unique per aicraft that can be loaded by MSFS
 
         el = gremlin.event_handler.EventListener()
         el.modes_changed.connect(self._modes_changed_cb)
         
         self.initialize_regular_devices() # non joystick devices
 
+    def setSimconnectMode(self, key, mode):
+        ''' sets the simconnect startup mode for a given aicraft key - the key comes from the SimconnectAicraftDefinition for the aircraft'''
+        self._simconnect_modes[key] = mode
+
+    def getSimconnectMode(self, key):
+        ''' gets the simconnect startup mode for a given aicraft key - the key comes from the SimconnectAicraftDefinition for the aircraft'''
+        if key in self._simconnect_modes:
+            return self._simconnect_modes[key]
+        return None
 
 
     @QtCore.Slot()        
@@ -2349,6 +2359,18 @@ class Profile():
             device.from_xml(child)
             self.vjoy_devices[device.device_guid] = device
 
+        # parse simconnect startup entries
+        self._simconnect_modes = {}
+        for child in root.iter("simconnect"):
+            key_cp = safe_read(child,"key_cp",str)
+            key_ap = safe_read(child,"key_ap",str)
+            mode = safe_read(child,"mode")
+            key = (key_cp, key_ap)
+            self._simconnect_modes[key] = mode
+
+
+
+
         # Ensure that the profile contains an entry for every existing
         # device even if it was not part of the loaded XML and
         # replicate the modes present in the profile. This adds both entries
@@ -2439,6 +2461,16 @@ class Profile():
         for device in device_list:
             devices.append(device.to_xml())
         root.append(devices)
+
+        # simconnect settings
+        for key, mode in self._simconnect_modes.items():
+            child = etree.Element("simconnect")
+            key_cp, key_ap = key
+            
+            child.set("key_cp",key_cp)
+            child.set("key_ap",key_ap)
+            child.set("mode", mode)
+            root.append(child)
 
         # VJoy settings
         add_vjoy = False

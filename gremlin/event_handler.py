@@ -1792,7 +1792,8 @@ class EventHandler(QtCore.QObject):
 			given event
 		"""
 
-		verbose = gremlin.config.Configuration().verbose_mode_details
+		config =  gremlin.config.Configuration()
+		verbose = config.verbose_mode_details # or config.verbose_mode_condition
 
 		# Obtain callbacks matching the event
 		callback_list = []
@@ -1806,16 +1807,15 @@ class EventHandler(QtCore.QObject):
 						self.dump_exectree(device_guid, mode, event)
 
 		if verbose:
-			syslog.debug(f"device: {gremlin.shared_state.get_device_name(event.device_guid)} mode: {self.runtime_mode} found: {len(callback_list)}")
-			if callback_list:
-				pass
+			syslog.debug(f"CALLBACK: device: {gremlin.shared_state.get_device_name(event.device_guid)} mode: {self.runtime_mode} found: {len(callback_list)}")
 
 
 		# Filter events when the system is paused
-		if not self.process_callbacks:
-			return [c[0] for c in callback_list if c[1]]
-		else:
-			return [c[0] for c in callback_list]
+		if callback_list:
+			if not self.process_callbacks:
+				return [c[0] for c in callback_list if c[1]]
+			else:
+				return [c[0] for c in callback_list]
 		
 
 	def _matching_latched_callbacks(self, event, key):

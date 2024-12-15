@@ -2034,7 +2034,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         is_shifted = el.get_shifted_state()
         is_control = el.get_control_state()
-        is_hotkey_autoswitch = config.highlight_hotkey_autoswitch
+        is_hotkey_autoswitch = config.highlight_hotkey_autoswitch # hotkey autoswitch mode (ctrl for axis, shift for button)
 
         # button must be enabled or via the shifted state (shift keys)
         is_button = self.config.highlight_input_buttons or is_shifted
@@ -2217,22 +2217,23 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         config = gremlin.config.Configuration()
 
-        # if gremlin.shared_state.is_running and not config.runtime_ui_update:
-        #     # ignore updates when running a profile unless the UI should be updated
-        #     return
+        verbose = gremlin.config.Configuration().verbose_mode_process
+        syslog = logging.getLogger("system")
 
         # check options
         option_auto_load = config.autoload_profiles
         option_auto_load_on_focus = config.activate_on_process_focus
 
-        verbose = gremlin.config.Configuration().verbose_mode_process
-        syslog = logging.getLogger("system")
+        
         process_base = os.path.basename(path)
-        if not option_auto_load and not option_auto_load_on_focus:
+        if not option_auto_load:
             if verbose:
                 syslog.info(f"PROC: Process focus change detected: {process_base}  autoload: {option_auto_load}  auto load on focus: {option_auto_load_on_focus} disabled - ignore process change")
             return # ignore if not auto loading profiles or auto activating on focus change
 
+
+        if verbose:
+            syslog.info(f"PROC: Process focus change detected: {process_base}  autoload: {option_auto_load}  auto load on focus: {option_auto_load_on_focus} - processing change")
 
         option_keep_focus = config.keep_profile_active_on_focus_loss
         option_reset_mode_on_process_activate = config.reset_mode_on_process_activate

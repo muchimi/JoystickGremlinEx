@@ -371,15 +371,18 @@ class QSliderWidget(QtWidgets.QWidget):
 
     def setMarkerValue(self, value):
         ''' sets the marker(s) value - single float is one marker, passing a tuple creates multiple markers'''
-        if isinstance(value, float) or isinstance(value, int):
-            list_value = [value]
-        else:
-            list_value = value
-        self._marker_pos = list_value
+        try:
+            if isinstance(value, float) or isinstance(value, int):
+                list_value = [value]
+            else:
+                list_value = value
+            self._marker_pos = list_value
 
-        # update geometry + repaint
-        self._update_offsets() 
-        self.update()
+            # update geometry + repaint
+            self._update_offsets() 
+            self.update()
+        except:
+            pass
 
     def minimum(self) -> float:  # type: ignore
         ''' gets the slider's minimum value '''

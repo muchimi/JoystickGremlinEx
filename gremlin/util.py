@@ -587,6 +587,17 @@ def find_files(root_folder, source_pattern = "*") -> list:
     return []
 
 
+def find_folders(root_folder, source_pattern = "*") -> list:
+    ''' looks for a subfolder off the root folder '''
+    import subprocess
+    if not os.path.isdir(root_folder):
+        return []
+    
+    folders = os.listdir(root_folder)
+    return [os.path.join(root_folder, folder) for folder in folders]
+    
+
+
 @SingletonDecorator
 class SearchCache():
     ''' file search cache service '''
@@ -888,8 +899,11 @@ def safe_format(value, data_type, formatter=str):
     """
     if value is None:
         return "none"
-    if data_type is float:
+    if data_type is int:
+        return str(int)
+    elif data_type is float:
         value = float(value)
+        return f"{value:0.8f}"
     if isinstance(value, data_type):
         return formatter(value)
     else:

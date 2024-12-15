@@ -139,7 +139,6 @@ class CodeRunner:
 
         # determine numlock state
         numlock_off = config.numlock_off
-      
 
         # Reset states to their default values
         self._inheritance_tree = inheritance_tree
@@ -353,11 +352,7 @@ class CodeRunner:
                     False
                 )
 
-            # Create vJoy response curve setups
-            # self._vjoy_curves.profile_data = profile.vjoy_devices
-            # self.event_handler.runtime_mode_changed.connect(
-            #     self._vjoy_curves.mode_changed
-            # )
+
 
             # Use inheritance to build input action lookup table
             self.event_handler.build_event_lookup(inheritance_tree)
@@ -367,14 +362,6 @@ class CodeRunner:
                 vjoy_proxy = gremlin.joystick_handling.VJoyProxy()[vid]
                 for aid, value in data.items():
                     vjoy_proxy.axis(linear_index=aid).set_absolute_value(value)
-
-
-
-            # for action in self._actions:
-            #     logging.getLogger("system").info(f"ACTION DATA: {action.name} {type(action).__name__}  enabled: {action.enabled}")
-
-            
-
 
 
             # Connect signals
@@ -466,6 +453,8 @@ class CodeRunner:
             verbose = gremlin.config.Configuration().verbose
 
             # determine the profile start mode
+
+    
             mode = start_mode
             if config.restore_profile_mode_on_start or profile.get_restore_mode():
                 # restore the profile mode

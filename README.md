@@ -264,6 +264,10 @@ Joystick Gremlin EX
 - Fix: auto activate profile error or noop when option is enabled and a suitable process is selected and the action is on.
 - Fix: closing GremlinEx when a profile is active no longer leaves the process running (bug introduced with recent process monitoring logic changes)
 - Fix: unknown "hardware_device_guid" member found in profile class introduced in m44
+- Improved: Simconnect scan speed for aircraft folder data
+- Improved: Simconnect config will pull the current aircraft (if one is loaded in the sim)
+- Improved: Simconnect action has a trigger on release option if mapped to a momentary input (button or hat)
+- New: Simconnect aicraft profile mode is now saved with mode data (if defined).  This mode is auto-selected when an aicraft is detected if the option is selected.
 
 ### (m46)
 - Improved logic and event handling around automatic process activation based on the active (foreground) process.

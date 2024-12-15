@@ -247,9 +247,10 @@ class SimConnect():
 
 
 	def __init__(self, handler, auto_connect=True, library_path=_library_path, verbose = False, 
-			  	sim_paused_callback = None,
-				sim_running_callback = None,
-				aircraft_loaded_callback = None,
+			  	sim_paused_callback = None, # sends sim paused flag
+				sim_running_callback = None, # send sim running flag
+				aircraft_loaded_callback = None, # sends received aircraft loaded data
+				state_callback = None, # sends received state data
 				):
 		''' initializes sim connect 
 		
@@ -282,6 +283,7 @@ class SimConnect():
 		self._sim_start_callback = None
 		self._sim_stop_callback = None
 		self._aircraft_loaded_callback = aircraft_loaded_callback
+		self._state_callback = state_callback
 
 
 		self.handler = handler
@@ -454,7 +456,12 @@ class SimConnect():
 	def handle_state_event(self, pData : SIMCONNECT_RECV_SYSTEM_STATE):
 		if self.verbose:
 			syslog = logging.getLogger("system")
+			int_data = pData.dwInteger
+			float_data = pData.fFloat
+			str_data = pData.szString
 			syslog.info(f"SimConnect: state event: int: {pData.dwInteger} float: {pData.fFloat} str: {pData.szString}")
+			if self._state_callback:
+				self._state_callback(int_data, float_data, str_data)
 		
 
 	# TODO: update callbackfunction to expand functions.
@@ -538,7 +545,7 @@ class SimConnect():
 			self._dll = SimConnectDll(self._library_path)
 			self._my_dispatch_proc_rd = self._dll.DispatchProc(self.simconnect_dispatch_proc)
 			err = self._dll.Open(
-				byref(self._hSimConnect), LPCSTR(b"Request Data"), None, 0, 0, 0
+				byref(self._hSimConnect), LPCSTR(b"GremlinEx"), None, 0, 0, 0
 			)
 			if self.IsHR(err, 0):
 				syslog.info("Simconnect: Connected to Flight Simulator!")
@@ -564,6 +571,7 @@ class SimConnect():
 				self._dll.SubscribeToSystemEvent(
 					self._hSimConnect, self._dll.EventID.EVENT_SIM_RUNNING, b"Sim"
 				)
+				# aircraft loaded data
 				self._dll.SubscribeToSystemEvent(
 					self._hSimConnect, self._dll.EventID.EVENT_SIM_AIRCRAFT_LOADED, b"AircraftLoaded"
 				)
@@ -619,7 +627,12 @@ class SimConnect():
 		
 		self._is_loop_running = False
 
+	def disconnect(self):
+		''' disconnects from the sim '''
+		self.exit()
+
 	def exit(self):
+		''' disconnects from the sim '''
 		if self._is_loop_running:
 			self._quit = 1
 			self.timerThread.join()

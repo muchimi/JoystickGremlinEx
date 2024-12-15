@@ -27,6 +27,7 @@ import gremlin.base_profile
 import gremlin.config
 import gremlin.event_handler
 import gremlin.macro
+import gremlin.shared_state
 import gremlin.ui.ui_common
 import gremlin.ui.input_item
 import gremlin.util
@@ -384,9 +385,10 @@ class SimConnectManager(QtCore.QObject):
     ''' holds simconnect data and manages simconnect '''
 
     aircraft_loaded = QtCore.Signal(str, str) # fires when aircraft title changes (param folder, title)
+    sim_state = QtCore.Signal(int, float, str) # fires when sim state data changes (depends on the state )
     _aircraft_loaded_internal = QtCore.Signal(str) # fires when aircraft title changes
 
-    def __init__(self, handler) -> None:
+    def __init__(self) -> None:
         ''' manages simconnect connections and interactions 
         
         :param handler: handler that responds to simconnect events
@@ -395,13 +397,24 @@ class SimConnectManager(QtCore.QObject):
         '''
         QtCore.QObject.__init__(self)
 
+        el = gremlin.event_handler.EventListener()
+        el.shutdown.connect(self._shutdown)
+        
+
         self.verbose = gremlin.config.Configuration().verbose_mode_simconnect
+
+        self._sm = None
+
+        handler = SimConnectEventHandler()
 
         sm = SimConnect(handler, auto_connect = False,
                         verbose = gremlin.config.Configuration().verbose_mode_simconnect,
                         sim_paused_callback=self._sim_paused_cb,
                         sim_running_callback = self._sim_running_cb,
-                        aircraft_loaded_callback= self._aicraft_loaded_cb)
+                        aircraft_loaded_callback= self._aicraft_loaded_cb,
+                        state_callback=self._state_data_cb,  # receives requested state data 
+
+                        )
         self._sm : SimConnect = sm
 
         handler.simconnect_connected.connect(self._connected)
@@ -436,7 +449,12 @@ class SimConnectManager(QtCore.QObject):
 
 
         self.reload()
-    
+
+    @QtCore.Slot()
+    def _shutdown(self):
+        ''' application shutdown '''
+        self.sim_disconnect()
+
 
     def reload(self, force_update = False):
                 # if the data file doesn't exist, create it in the user's profile folder from the built-in data
@@ -547,7 +565,6 @@ class SimConnectManager(QtCore.QObject):
         syslog.error(f"Simconnect: event not found: {command}")
         
 
-
     @QtCore.Slot()
     def _connected(self):
         self._is_connected = True
@@ -607,10 +624,10 @@ class SimConnectManager(QtCore.QObject):
         return self._is_paused
     
     @property
-    def aircraft_title(self):
+    def current_aircraft_title(self):
         ''' currently loaded aircraft - TITLE from the aircraft.cfg file '''
         return self._aircraft_tile
-
+    
     @property
     def current_aircraft_folder(self):
         ''' returns the path to the currently loaded folder '''
@@ -635,6 +652,18 @@ class SimConnectManager(QtCore.QObject):
             self._aircraft_folder = folder
             self._aircraft_loaded_internal.emit(folder)
 
+    def _state_data_cb(self, int_data, float_data, str_data):
+        ''' occurs when state data is requested '''
+        if gremlin.util.is_binary_string(str_data):
+            str_data = str_data.decode('utf-8')
+        str_data = str_data.casefold()
+        if "aircraft.cfg" in str_data:
+            self._aircraft_folder = str_data
+            self.aircraft_loaded.emit(str_data,None)
+
+        self.sim_state.emit(int_data, float_data, str_data)
+
+
     def get_aircraft_title(self):
         ar = AircraftRequests(self._sm)
         trigger = ar.find("TITLE")
@@ -643,6 +672,11 @@ class SimConnectManager(QtCore.QObject):
             title = title.decode()
         self._aircraft_title = title
         return title
+    
+    def update_aircraft_folder(self):
+        ''' gets the current aircraft data '''
+        self._sm.get_aircraft_loaded()
+
 
     def _aircraft_loaded_internal_cb(self, folder):
         # decode the data into useful bits
@@ -682,7 +716,9 @@ class SimConnectManager(QtCore.QObject):
                 if force_retry or self._connect_attempts > 0:
                     if self._connect_attempts > 0:
                         self._connect_attempts -= 1
+                        time.sleep(0.5)
                     self._sm.connect()
+                    
                     
                 syslog.info("Simconnect: connected to simulator")
             except:
@@ -692,7 +728,7 @@ class SimConnectManager(QtCore.QObject):
             return True
 
         if not self._sm.ok:
-            if self._connect_attempts == 0:
+            if self._connect_attempts == 0 and gremlin.shared_state.is_running:
                 syslog.error("Simconnect: failed to connect to simulator - terminating profile")
                 # request the profile to stop
                 eh = gremlin.event_handler.EventListener()
@@ -715,6 +751,8 @@ class SimConnectManager(QtCore.QObject):
 
     def sim_disconnect(self):
         if self._sm.ok:
+            for request in self._registered_requests.values():
+                self._sm.clear(request)
             self._sm.exit()
 
     @property
@@ -722,13 +760,18 @@ class SimConnectManager(QtCore.QObject):
         ''' true if block maps are valid '''
         return len(self._block_map) > 0
 
-    def block(self, command) -> SimConnectBlock:
+    def block(self, command, clone = True) -> SimConnectBlock:
         ''' gets the command block for a given Simconnect command '''
         s_command, b_command = gremlin.util.to_byte_string(command)
         key = s_command.casefold()
         for cmd in self._commands:
             if key in cmd.casefold():
-                return self._block_map[key]
+                block = self._block_map[key]
+                if clone:
+                    return block.clone()
+                return block
+            
+
         return None
 
     def get_aircraft_data(self):
@@ -760,6 +803,9 @@ class SimConnectManager(QtCore.QObject):
         if title:
             title = title.decode()
         return title
+    
+
+        
 
     def _write_default_xml(self, xml_file):
         ''' writes a default XML file from the base data in the simconnect module '''
@@ -983,7 +1029,7 @@ class SimConnectManager(QtCore.QObject):
 
             nodes = root.xpath('//command')
             for node in nodes:
-                is_ranged = False
+                
                 max_range = 0
                 min_range = 0
                 is_toggle = False
@@ -1008,7 +1054,7 @@ class SimConnectManager(QtCore.QObject):
                     if child.tag == "description":
                         description = get_attribute(child,"value")
                     elif child.tag == "range":
-                        is_ranged = True
+                        
                         is_toggle = get_bool_attribute(child,"toggle",throw_on_missing=True)
                         min_range = get_int_attribute(child,"min",throw_on_missing=True)
                         max_range = get_int_attribute(child,"max",throw_on_missing=True)
@@ -1026,7 +1072,7 @@ class SimConnectManager(QtCore.QObject):
                 block.is_indexed = indexed
                 block._description = description
                 block._invert = invert
-                block._is_ranged = is_ranged
+                
                 block._min_range = min_range  # can be modified by the user
                 block._max_range = max_range  # can be modified by the user
                 block._command_min_range = min_range # original range - cannot be modified
@@ -1207,16 +1253,14 @@ class SimConnectEventHandler(QtCore.QObject):
 
     def __init__(self):
         super().__init__()
-        self._manager = SimConnectManager(self)
 
     @property
-    def manager(self) -> SimConnectManager:
-        ''' gets the simconnect data object '''        
-        return self._manager
-
+    def manager(self):
+        return SimConnectManager()
+        
     @property
     def simconnect(self):
-        return self._manager.simconnect
+        return SimConnectManager().simconnect
     
 
 class SimConnectBlock():
@@ -1239,7 +1283,7 @@ class SimConnectBlock():
         self._output_data_type = OutputType.NotSet
         self._output_mode = SimConnectActionMode.NotSet
         self._command = None # the command text
-        self._set_value = False # true if the item can set a value
+        self._is_set_value = False # true if the item can set a value
         self._readonly = False # if readonly - the request cannot be triggered
         self._is_axis = False # true if the output is an axis variable
         self._is_indexed = False # true if the output is indexed using the :index
@@ -1251,7 +1295,7 @@ class SimConnectBlock():
         self._invert = False # true if the axis output should be inverted
         self._value = 0 # output value
         self._is_value = False # true if the command supports an output value
-        self._is_ranged = False # true if the command is ranged
+        
         self._is_toggle = False # true if the range valuers are either mix or max
         self._notify_enabled_count = 0 # true if notifications are enabled
         self._command = None
@@ -1266,6 +1310,7 @@ class SimConnectBlock():
     @property
     def sm(self) -> SimConnect:
         ''' simconnect object '''
+
         return SimConnectManager().sm
     
     @property
@@ -1309,9 +1354,12 @@ class SimConnectBlock():
 
     @command.setter
     def command(self, value):
-        self._command = value
-        # update flags
-        self.is_axis = value in _simconnect_full_range
+        if value != self._command:
+            self._command = value
+            # update flags
+            self.is_axis = value in _simconnect_full_range
+            
+
 
     @property
     def is_axis(self):
@@ -1362,6 +1410,8 @@ class SimConnectBlock():
 
     @output_mode.setter
     def output_mode(self, value : SimConnectActionMode):
+        if value == SimConnectActionMode.Trigger:
+            pass
         self._output_mode = value
 
     @property
@@ -1517,11 +1567,8 @@ class SimConnectBlock():
     @property
     def is_ranged(self):
         ''' true if the command is a ranged command (suitable for a range of values)'''
-        return self._is_ranged
-    @is_ranged.setter
-    def is_ranged(self, value):
-        self._is_ranged = value
-
+        return self._output_mode == SimConnectActionMode.Ranged
+    
     @property
     def description(self) -> str:
         ''' returns the command description'''
@@ -1552,23 +1599,23 @@ class SimConnectBlock():
 
     def _set_range(self):
         ''' sets the data range from the current command '''
-        is_ranged = False
+        
         if self._command in _simconnect_half_range:
             min_range = 0
             max_range = 16383
-            is_ranged = True
+            
         elif self._command in _simconnect_angle_range:
             min_range = 0
             max_range = 360
-            is_ranged = True
+            
         elif self._command in _simconnect_egt_range:
             min_range = 0
             max_range = 32767
-            is_ranged = True
+            
         elif self.command in _simconnect_full_range:
             min_range = -16383
             max_range = 16383
-            is_ranged = True
+            
         else:
             # default
             min_range = -16383
@@ -1581,7 +1628,7 @@ class SimConnectBlock():
         if self._max_range != max_range:
             self._max_range = max_range
             changed = True
-        self._is_ranged = is_ranged
+        
         if changed:
             self._notify_range_update()
 
@@ -1792,10 +1839,18 @@ class SimConnectBlock():
         
 
 
-    def update(self):
         ''' updates missing values '''
+    def update(self):
         if self._command_type == SimConnectCommandType.NotSet:
             sm = SimConnectManager()
             self._command_type = sm.get_command_type(self._command)
+        # update command data
+
+    def clone(self):
+        import copy
+        # return a clone
+        return copy.deepcopy(self)
 
 
+
+_manager = SimConnectManager()

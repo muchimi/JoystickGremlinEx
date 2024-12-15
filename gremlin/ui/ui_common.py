@@ -445,7 +445,7 @@ class QIntLineEdit(QtWidgets.QLineEdit):
     def value(self) -> int:
         ''' current value, None if not a valid input'''
         if self.hasAcceptableInput():
-            return int(self.text())
+            return int(float(self.text()))
         return None
     
     def isValid(self):
@@ -1819,7 +1819,16 @@ class QDataLineEdit(QtWidgets.QLineEdit):
     def __init__(self, text = None, data = None, parent = None):
         super().__init__(text, parent)
         self._data = data
+        self.setAlignment(Qt.AlignLeft)
         #self.setStyleSheet("QLineEdit{border: #8FBC8F;}")
+
+
+    def setText(self, value):
+        ''' sets the text '''
+        super().setText(value)
+        if self.isReadOnly():
+            self.home(True) # move the cursor left to left align the box in readonly mode
+            self.deselect() # deselect the text selected by the home command
 
     @property
     def data(self):

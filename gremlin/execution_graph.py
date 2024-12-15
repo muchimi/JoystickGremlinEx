@@ -102,6 +102,20 @@ class ExecutionContext():
                 return node
             
         return None
+    
+    def findActionPlugin(self, plugin_name):
+        ''' gets a list of nodes that have a specific class
+         
+        :param plugin_name: matches the name property of an action plugin
+        '''
+        nodes = []
+        for node in anytree.PreOrderIter(self.root):
+            if node.action:
+                if node.action.name == plugin_name:
+                    nodes.append(node)
+
+        return nodes
+
             
 
     def dump(self):
