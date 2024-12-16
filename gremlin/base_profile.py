@@ -56,6 +56,7 @@ import gremlin.shared_state
 from gremlin.singleton_decorator import SingletonDecorator
 import gremlin.util
 import gremlin.ui.ui_common
+from anytree import Node
 
 syslog = logging.getLogger("system")
 
@@ -1280,6 +1281,7 @@ class InputItem():
         return self.calibration
     
 
+
     @QtCore.Slot()
     def _profile_start(self):
         # enable the input at profile start 
@@ -1974,9 +1976,6 @@ class Profile():
         new_device.device_guid = device_guid
         new_device.type = device_type
         self.devices[device_guid] = new_device
-
-    
-
 
     
     def build_inheritance_tree(self):

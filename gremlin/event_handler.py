@@ -161,6 +161,11 @@ class Event:
 				self.identifier,
 				0
 			))
+
+	@property	
+	def hardwareKey(self):
+		''' unique key for the input'''
+		return ((self.device_guid, self.event_type, self.identifier))
 		
 
 	@staticmethod
@@ -190,7 +195,7 @@ class Event:
 		elif self.event_type == InputType.JoystickButton:
 			return f"Event: Button : {self.identifier} pressed: {self.is_pressed} value: {self.value}"
 		elif self.event_type == InputType.ModeControl:
-			return f"Event: Mode Control : {self.identifier} pressed: {self.is_pressed} value: {self.value} mode: {self.mode}  >>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
+			return f"Event: Mode Control : {self.identifier} pressed: {self.is_pressed} value: {self.value} mode: {self.mode}"
 		elif self.event_type == InputType.JoystickHat:
 			return f"Event: Hat : {self.identifier} pressed: {self.is_pressed} value: {self.value}"
 		elif self.event_type == InputType.Midi:
@@ -317,6 +322,8 @@ class EventListener(QtCore.QObject):
 	# selection event - tells the UI to show a different input
 	select_input = QtCore.Signal(object, object, object, bool) # selects a particular input (device_guid, input_type, input_id, force_update)
 
+	button_state_change = QtCore.Signal(object, object, object, bool) # indicates a change in button state
+
 	# mapping changed - either container or action added -
 	mapping_changed = QtCore.Signal(object) # fires when a container or action changes on an InputItem - passes the InputItem as the parameter
 	
@@ -350,6 +357,9 @@ class EventListener(QtCore.QObject):
 
 	# gremlin ex shutdown in progress
 	shutdown = QtCore.Signal() 
+
+	# toggle highlighting mode
+	toggle_highlight = QtCore.Signal(object, object) # param (axis,button)
 
 
 	def __init__(self):
@@ -1741,25 +1751,32 @@ class EventHandler(QtCore.QObject):
 			if event.identifier.command == gremlin.ui.midi_device.MidiCommandType.SysEx:
 					pass
 			if event.device_guid in self.midi_callbacks:
-				callback_list = self.midi_callbacks[event.device_guid].get(
-					self.runtime_mode, {}
-				).get(key, [])
+				import gremlin.execution_graph
+				ec = gremlin.execution_graph.ExecutionContext() # current execution context
+				# search callbacks for mode hierarchy
+				callback_list = ec.getCallbacks(self.midi_callbacks[event.device_guid], key, self.runtime_mode)
+				# callback_list = self.midi_callbacks[event.device_guid].get(
+				# 	self.runtime_mode, {}
+				# ).get(key, [])
 
 		# Filter events when the system is paused
 		if not self.process_callbacks:
 			return [c[0] for c in callback_list if c[1]]
 		else:
 			return [c[0] for c in callback_list]
-			
+		
+
+		
 	def _matching_osc_callbacks(self, event):
 		''' returns list of callbacks matching the event '''
 		callback_list = []
 		if event.event_type == InputType.OpenSoundControl:
 			key = event.identifier.message_key
 			if event.device_guid in self.osc_callbacks:
-				callback_list = self.osc_callbacks[event.device_guid].get(
-					self.runtime_mode, {}
-				).get(key, [])
+				import gremlin.execution_graph
+				ec = gremlin.execution_graph.ExecutionContext() # current execution context
+				# search callbacks for mode hierarchy
+				callback_list = ec.getCallbacks(self.osc_callbacks[event.device_guid], key, self.runtime_mode)
 
 		# Filter events when the system is paused
 		if not self.process_callbacks:

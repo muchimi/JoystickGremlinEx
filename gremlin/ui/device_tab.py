@@ -967,7 +967,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             widget = gremlin.ui.ui_common.ButtonStateWidget()
             #widget.setMaximumWidth(20)
             # automatically update from the joystick
-            widget.hookDevice(data.device_guid, data.input_id)
+            widget.hookDevice(data.device_guid, data.input_type, data.input_id)
             widget.setContentsMargins(0,0,0,0)
             layout.setContentsMargins(0,0,0,0)
             layout.addWidget(widget)

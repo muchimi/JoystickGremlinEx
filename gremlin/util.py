@@ -900,7 +900,7 @@ def safe_format(value, data_type, formatter=str):
     if value is None:
         return "none"
     if data_type is int:
-        return str(int)
+        return str(value)
     elif data_type is float:
         value = float(value)
         return f"{value:0.8f}"
@@ -946,7 +946,7 @@ def parse_guid(value):
     :param value the string representation of the GUID
     :param dinput.GUID object representing the provided value
     """
-    if value is None:
+    if value is None or value == "None" or not value:
         return None
     try:
         tmp = uuid.UUID(value)

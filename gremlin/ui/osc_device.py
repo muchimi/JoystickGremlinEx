@@ -1549,7 +1549,7 @@ class SimpleUDPClient(UDPClient):
         self.send(msg)
 
 
-class OscClient():
+class OscInternalClient():
     def __init__(self, host_ip = "127.0.0.1", output_port = 8001):
         #logging.getLogger("system").info("OSC: server init")
         self._server = host_ip
@@ -1752,7 +1752,7 @@ class OscInterface(QtCore.QObject):
         self._output_port = config.osc_output_port # self._input_port + 1
         self._target_ip = config.osc_host # the OSC target IP
         self._osc_server = OscServer() # the OSC server
-        self._osc_client = OscClient(self._target_ip, self.output_port) # the OSC client
+        self._osc_client = OscInternalClient(self._target_ip, self.output_port) # the OSC client
 
         self.osc_enabled = True # always able to listen to ports
 
@@ -1767,9 +1767,15 @@ class OscInterface(QtCore.QObject):
         finally:
             s.close()
         
-        logging.getLogger("system").info(f"OSC: found local IP: {self._host_ip}")
+        
 
         self._started = False
+
+        if config.osc_enabled:
+            logging.getLogger("system").info(f"OSC: Start")
+            self.start()
+        else:
+            logging.getLogger("system").info(f"OSC: Disabled")
 
 
     @property
@@ -1805,21 +1811,27 @@ class OscInterface(QtCore.QObject):
 
     def _osc_message_handler(self, address, *args):
         ''' handles OSC messages'''
-        # logging.getLogger("system").info(f"OSC: {address}: {args}")
+        verbose = gremlin.config.Configuration().verbose_mode_osc
+        if verbose: logging.getLogger("system").info(f"OSC: {address}: {args}")
         address = address.lower()
         self.osc_message.emit(address, args)
 
     def start(self):
         ''' starts listening to OSC messages '''
-        logging.getLogger("system").info(f"OSC: starting with IP: {self._host_ip} port: {self._input_port} send host: {self._target_ip} port: {self._output_port}")
-        self._osc_server.start(self._host_ip, self._input_port, self._osc_message_handler)
-        self._osc_client.start()
+        if not self._started:
+            logging.getLogger("system").info(f"OSC: starting with IP: {self._host_ip} port: {self._input_port} send host: {self._target_ip} port: {self._output_port}")
+            self._osc_server.start(self._host_ip, self._input_port, self._osc_message_handler)
+            self._osc_client.start()
+            self._started = True
+            
 
 
     def stop(self):
         ''' stops listencing to OSC messages '''
-        self._osc_server.stop()
-        self._osc_client.stop()
+        if self._started:
+            self._osc_server.stop()
+            self._osc_client.stop()
+            self._started = False
 
     def send(self, command : str, v1 = None, v2 = None):
         ''' send data '''
@@ -3067,3 +3079,5 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     def refresh(self):
         """Refreshes the current selection, ensuring proper synchronization."""
         self._select_item_cb(self.input_item_list_view.current_index)
+
+

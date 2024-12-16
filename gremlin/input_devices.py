@@ -1298,7 +1298,7 @@ class OscClient(QtCore.QObject):
         # build a list of input items to midi messages
         self._osc_map = {}  # list of message keys
         for device in profile.devices.values():
-            if device.name == "osc":
+            if device.name == "OSC":
                 for mode in device.modes.values():
                     for input_items in mode.config.values():
                         for input_item in input_items:
@@ -1328,7 +1328,7 @@ class OscClient(QtCore.QObject):
         input_item.data = args
         message_key = input_item.message_key
         
-
+        verbose = gremlin.config.Configuration().verbose_mode_osc
         if message_key in self._osc_map.keys():
             # logging.getLogger("system").info(f"OSC: runtime: processing {message_key}")
             for input_item in self._osc_map[message_key]:
@@ -1381,9 +1381,8 @@ class OscClient(QtCore.QObject):
                     timer = threading.Timer(delay, lambda: self._event_listener.osc_event.emit(release_event))
                     timer.start()
 
-        # else:
-        #     if verbose:
-        #         logging.getLogger("system").info(f"OSC: runtime: ignoring {message_key}")
+        else:
+            if verbose: logging.getLogger("system").info(f"OSC: runtime: ignoring {message_key}")
     
       
 
@@ -2445,5 +2444,4 @@ remote_client = RemoteClient()
 # listens to MIDI input
 midi_client = MidiClient()
 
-# listens to OSC input
 osc_client = OscClient()

@@ -224,7 +224,7 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
 
     valueChanged = QtCore.Signal(float) # fires when the value changes
 
-    def __init__(self, data = None, min_range = -1.0, max_range = 1.0, decimals = 3, step = 0.01, value = 0.0, parent = None):
+    def __init__(self, data = None, min_range = -1.0, max_range = 1.0, decimals = 3, step = 0.01, value = 0.0, chars = 8, parent = None):
         super().__init__(parent)
         self._min_range = min_range
         self._max_range = max_range
@@ -240,7 +240,29 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
         #self.setText("0")
         self.setValue(value)
         self._data = data
+        if chars > 0:
+            self._chars = chars
+            self._update_width(chars)
+        else:
+            self.chars = 0
 
+
+    @property
+    def chars(self) -> int:
+        return self._chars
+    @chars.setter
+    def chars(self, value : int):
+        if value > 0 and value != self._chars:
+            self._chars = value
+            self._update_width(value)
+        else:
+            self._chars = 0
+            self.setMaximumWidth(QSize.maxQSize().width())
+
+    def _update_width(self, chars):
+        w = get_text_width(str("m"*chars))
+        self.setMaximumWidth(w)            
+    
 
     @property
     def data(self):
@@ -248,6 +270,8 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
     @data.setter
     def data(self, value):
         self.data = value
+
+
 
     def eventFilter(self, widget, event):
         t = event.type()
@@ -371,7 +395,7 @@ class QIntLineEdit(QtWidgets.QLineEdit):
 
     valueChanged = QtCore.Signal(float) # fires when the value changes
 
-    def __init__(self, data = None, min_range = -1.0, max_range = 1.0, step = 1, value = 0, parent = None):
+    def __init__(self, data = None, min_range = -1.0, max_range = 1.0, step = 1, value = 0, chars = 8, parent = None):
         super().__init__(parent)
         self._min_range = min_range
         self._max_range = max_range
@@ -385,6 +409,28 @@ class QIntLineEdit(QtWidgets.QLineEdit):
         self.installEventFilter(self)
         self.setValue(value)
         self._data = data
+        if chars > 0:
+            self._chars = chars
+            self._update_width(chars)
+        else:
+            self.chars = 0
+
+
+    @property
+    def chars(self) -> int:
+        return self._chars
+    @chars.setter
+    def chars(self, value : int):
+        if value > 0 and value != self._chars:
+            self._chars = value
+            self._update_width(value)
+        else:
+            self._chars = 0
+            self.setMaximumWidth(QSize.maxQSize().width())
+
+    def _update_width(self, chars):
+        w = get_text_width(str("m"*chars))
+        self.setMaximumWidth(w)            
 
     @property
     def data(self):
@@ -2022,28 +2068,40 @@ class ButtonStateWidget(QtWidgets.QWidget):
         self.setContentsMargins(0,0,0,0)
 
         
-    def hookDevice(self, device_guid, input_id):
-        ''' hooks an axis '''
+    def hookDevice(self, device_guid, input_type, input_id):
+        ''' hooks the input  '''
         self._device_guid = device_guid
         self._input_id = input_id
+        self._input_type = input_type
         
 
         # read the current value
         is_pressed = gremlin.joystick_handling.dinput.DILL().get_button(device_guid, input_id)
-        eh = gremlin.event_handler.EventListener()
-        eh.joystick_event.connect(self._event_handler)
+        el = gremlin.event_handler.EventListener()
+        #el.joystick_event.connect(self._event_handler)
+        el.button_state_change.connect(self._button_state_change)
         self._update_value(is_pressed)
 
     def unhookDevice(self):
-        eh = gremlin.event_handler.EventListener()
-        eh.joystick_event.disconnect(self._event_handler)
+        el = gremlin.event_handler.EventListener()
+        #el.joystick_event.disconnect(self._event_handler)
+        el.button_state_change.disconnect(self._button_state_change)
 
-    def _event_handler(self, event):
-        if gremlin.shared_state.is_running or event.is_axis:
-            return
-        if self._device_guid != event.device_guid or self._input_id != event.identifier:
-            return
-        self._update_value(event.is_pressed)
+
+    @QtCore.Slot(object, object, object, bool)
+    def _button_state_change(self, device_guid, input_type, input_id, is_pressed):
+        ''' called when a button state changes '''
+        if self._device_guid == device_guid and self._input_type == input_type and \
+            self._input_id == input_id:
+            self._update_value(is_pressed)
+
+
+    # def _event_handler(self, event):
+    #     if gremlin.shared_state.is_running or event.is_axis:
+    #         return
+    #     if self._device_guid != event.device_guid or self._input_id != event.identifier:
+    #         return
+    #     self._update_value(event.is_pressed)
 
     def _update_value(self, is_pressed):
         if is_pressed:
@@ -2177,7 +2235,7 @@ class AxisStateWidget(QtWidgets.QWidget):
     def value(self):
         return self._value
 
-    def setValue(self, value, curve_value = None):
+    def setValue(self, value, curve_value = None, percent_value = None, other_value = None):
         """Sets the value shown by the widget.
 
         :param value new value to show
@@ -2209,14 +2267,23 @@ class AxisStateWidget(QtWidgets.QWidget):
             readout = f"{value:+0.3f}"
             readout_curved = f"C{curve_value:+0.3f}"
         if self._show_percentage:
-            percent = int(round(100 * value / (self._max_range - self._min_range)))
+            if percent_value is None:
+                if curve_value is None:
+                    percent = int(round(100 * value / (self._max_range - self._min_range)))
+                else:
+                    percent = int(round(100 * curve_value / (self._max_range - self._min_range)))
+            else:
+                percent = percent_value
+
             if readout:
                 readout += " "
-            readout += f"{percent:d} %"
-            curved_percent = int(round(100 * curve_value / (self._max_range - self._min_range)))
-            if readout_curved:
-                readout_curved += " "
-            readout_curved += f"{curved_percent:d} %"
+            readout += f"{percent:0.3f} %"
+
+        if other_value is not None:
+            if readout:
+                readout += " "
+            readout += f"{other_value}"
+
 
         self._readout_widget.setText(readout)
         if self._show_curved:
@@ -2262,10 +2329,11 @@ class AxisStateWidget(QtWidgets.QWidget):
         ''' reverse flag '''
         return self._reverse
 
-    def hookDevice(self, device_guid, input_id):
+    def hookDevice(self, device_guid, input_type, input_id):
         ''' hooks an axis '''
         self._device_guid = device_guid
         self._input_id = input_id
+        self._input_type = input_type
         self._scale_factor = 1000
         self._value = -1
         self.setRange(-1, 1)

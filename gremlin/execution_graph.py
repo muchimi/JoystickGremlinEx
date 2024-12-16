@@ -91,6 +91,50 @@ class ExecutionContext():
     ''' holds the current execution context '''
     def __init__(self):
         self.root = ExecutionGraphNode(ExecutionGraphNodeType.Root) # root node
+        tree = gremlin.shared_state.current_profile.build_inheritance_tree()
+        root = anytree.Node("")
+        self._walk_mode_tree(root, tree)
+        self._mode_tree = root
+
+
+    def _walk_mode_tree(self, node, branch):
+        for mode, sub_branch in branch.items():
+            child = anytree.Node(mode)
+            child.parent = node
+            self._walk_mode_tree(child, sub_branch)
+
+    @property
+    def modeTree(self):
+        ''' gets the mode tree '''
+        return self._mode_tree
+    
+    def searchModeTree(self, mode):
+        ''' find the node for a mode in the mode tree '''
+        return anytree.search.find_by_attr(self._mode_tree, mode)
+    
+    def getCallbacks(self, callbacks, key, mode):
+        node = anytree.search.find_by_attr(self._mode_tree,mode)
+        callback_list = []
+        if node:
+            # starting point
+            while not callback_list:
+                mode = node.name
+                if not mode:
+                    # reached the top level
+                    break
+                print (f"Search callbacks for mode : {mode} {key}")
+                callback_list = callbacks.get(mode, {}).get(key, [])
+                if callback_list:
+                    print (f"Found callbacks for mode : {mode} key: {key}")
+                    break
+                # bump to parent node if not found
+                node = node.parent
+                print (f"Not found, using parent node: {node.name}")
+        return callback_list
+
+    
+
+
 
     def reset(self):
         self.root = ExecutionGraphNode(ExecutionGraphNodeType.Root) # root node

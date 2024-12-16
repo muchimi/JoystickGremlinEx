@@ -1181,7 +1181,7 @@ class InputItemWidget(QtWidgets.QFrame):
             else:
                 widget = gremlin.ui.ui_common.ButtonStateWidget()
             widget.setMaximumWidth(200)
-            widget.hookDevice(identifier.device_guid, identifier.input_id)
+            widget.hookDevice(identifier.device_guid, identifier.input_type, identifier.input_id)
             self._container_input_axis_layout.addWidget(widget)
             self._container_input_axis_layout.addStretch()
             

@@ -42,6 +42,7 @@ import gremlin.event_handler
 import gremlin.execution_graph
 import gremlin.gamepad_handling
 import gremlin.import_profile
+import gremlin.input_devices
 import gremlin.joystick_handling
 import gremlin.shared_state
 import gremlin.ui.keyboard_device
@@ -170,18 +171,26 @@ class GremlinUi(QtWidgets.QMainWindow):
         # list of detected devices
         self._active_devices = []
 
+
+
+        self.config = gremlin.config.Configuration()
+
         # prevent saving anything until we have a profile loaded
-        eh = gremlin.event_handler.EventListener()
-        eh.push_input_selection()
-        eh.request_activate.connect(self.activate) # hook activation / deactivation requests
-
-
+        el = gremlin.event_handler.EventListener()
+        el.push_input_selection()
+        el.request_activate.connect(self.activate) # hook activation / deactivation requests
+        
 
 
         # highlighing options
-        self._button_highlighting_enabled = False
-        self._input_highlighting_enabled = False
-        self._input_highlight_stack = 0
+        self._icon_on = gremlin.util.load_icon("mdi.record", qta_color="green")
+        self._icon_off = gremlin.util.load_icon("mdi.record", qta_color="lightgray")
+        self._button_highlighting_enabled = self.config.highlight_input_buttons # true if highlighting on buttons
+        self._axis_highlighting_enabled = self.config.highlight_input_axis  # true if highligthing on axes
+        self._input_highlighting_enabled = self.config.highlight_enabled  # on/off global
+        self._input_highlight_stack = 0 # push stack for enable/disable
+        self._last_highlight_key = None    # last event processed for input highlights
+        el.toggle_highlight.connect(self._handle_highlight_state) # input highlighting states
 
         # Process monitor
         self.process_monitor = gremlin.process_monitor.ProcessMonitor()
@@ -190,7 +199,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         # Default path variable before any runtime changes
         self._base_path = list(sys.path)
 
-        self.config = gremlin.config.Configuration()
+
         self.runner = gremlin.code_runner.CodeRunner()
         self.repeater = gremlin.repeater.Repeater(
             [],
@@ -200,6 +209,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         eh = gremlin.event_handler.EventHandler()
         eh.mode_changed.connect(self._update_mode_change)
         eh.mode_status_update.connect(self._update_mode_status_bar)
+        el.mode_name_changed.connect(self._update_mode_status_bar)
+        el.modes_changed.connect(self._update_mode_status_bar)
 
 
         self.tab_guids = []
@@ -303,25 +314,22 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         # update status nar
         self._update_mode_status_bar()
-
-
-
-
+        # startup setups
+        el.toggle_highlight.emit(self.is_axis_highlighting, self.is_button_highlighting)
 
 
     def _joystick_input_handler(self, event):
         ''' handles joystick events in the UI'''
         if gremlin.shared_state.is_running:
             return
+        verbose = self.config.verbose_mode_detailed
         if self._input_highlight_stack > 0:
-            if gremlin.config.Configuration().verbose:
-                syslog.info(f"Highlight:  stack disabled  {self._input_highlight_stack} - skip input")
+            if verbose:syslog.info(f"Highlight:  stack disabled  {self._input_highlight_stack} - skip input")
             return
         if not gremlin.config.Configuration().highlight_enabled:
-            if gremlin.config.Configuration().verbose_mode_detailed:
-                syslog.info(f"Highlight: disabled - skip input")
+            if verbose: syslog.info(f"Highlight: disabled - skip input")
             return
-        #InvokeUiMethod(lambda: self._process_joystick_input_selection(event,self._button_highlighting_enabled))
+        
         self._process_joystick_input_selection(event)
 
 
@@ -739,8 +747,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
             if activate:
                 # Generate the code for the profile and run it
-                if verbose:
-                    logging.getLogger("system").info(f"Activate: activate profile")
+                if verbose: syslog.info(f"Activate: activate profile")
                 self._profile_auto_activated = False
                 ec = gremlin.execution_graph.ExecutionContext()
                 ec.reset()
@@ -813,7 +820,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             el.keyboard_event.disconnect(self.repeater.process_event)
             el.joystick_event.disconnect(self.repeater.process_event)
             self.repeater.stop()
-            self.status_bar_repeater.setText("")
+            self.status_bar_repeater_widget.setText("")
 
     def input_viewer(self):
         """Displays the input viewer dialog."""
@@ -1027,15 +1034,41 @@ class GremlinUi(QtWidgets.QMainWindow):
 
     def _create_statusbar(self):
         """Creates the ui widgets used in the status bar."""
-        self.status_bar_mode = QtWidgets.QLabel("")
-        self.status_bar_mode.setContentsMargins(5, 0, 5, 0)
-        self.status_bar_is_active = QtWidgets.QLabel("")
-        self.status_bar_is_active.setContentsMargins(5, 0, 5, 0)
-        self.status_bar_repeater = QtWidgets.QLabel("")
-        self.status_bar_repeater.setContentsMargins(5, 0, 5, 0)
-        self.ui.statusbar.addWidget(self.status_bar_is_active, 0)
-        self.ui.statusbar.addWidget(self.status_bar_mode, 3)
-        self.ui.statusbar.addWidget(self.status_bar_repeater, 1)
+        self.status_bar_mode_widget = QtWidgets.QLabel("")
+        self.status_bar_mode_widget.setContentsMargins(5, 0, 5, 0)
+        self.status_bar_is_active_widget = QtWidgets.QLabel("")
+        self.status_bar_is_active_widget.setContentsMargins(5, 0, 5, 0)
+        self.status_bar_repeater_widget = QtWidgets.QLabel("")
+        self.status_bar_repeater_widget.setContentsMargins(5, 0, 5, 0)
+        self.status_bar_highlight_axis_widget = QtWidgets.QPushButton()
+        self.status_bar_highlight_axis_widget.setStyleSheet("border: none")
+        self.status_bar_highlight_axis_widget.clicked.connect(self._toggle_axis_highlight)
+        self.status_bar_highlight_button_widget = QtWidgets.QPushButton()
+        self.status_bar_highlight_button_widget.setStyleSheet("border: none")
+        self.status_bar_highlight_button_widget.clicked.connect(self._toggle_button_highlight)
+
+        self.ui.statusbar_widget.addWidget(self.status_bar_is_active_widget, 0)
+        self.ui.statusbar_widget.addWidget(self.status_bar_mode_widget, 3)
+        self.ui.statusbar_widget.addWidget(self.status_bar_repeater_widget, 1)
+        self.ui.statusbar_widget.addWidget(QtWidgets.QLabel("<b>Highlight</b> Axis"), 0)
+        self.ui.statusbar_widget.addWidget(self.status_bar_highlight_axis_widget, 0)
+        self.ui.statusbar_widget.addWidget(QtWidgets.QLabel("Button"), 0)
+        self.ui.statusbar_widget.addWidget(self.status_bar_highlight_button_widget, 0)
+        
+    @QtCore.Slot()
+    def _toggle_axis_highlight(self):
+        eh = gremlin.event_handler.EventListener()
+        status = self.config.highlight_input_axis
+        eh.toggle_highlight.emit(not status, None)
+
+
+    @QtCore.Slot()
+    def _toggle_button_highlight(self, checked):
+        eh = gremlin.event_handler.EventListener()
+        status = self.config.highlight_input_buttons
+        eh.toggle_highlight.emit(None, not status)
+
+
 
     def _create_system_tray(self):
         """Creates the system tray icon and menu."""
@@ -1626,6 +1659,7 @@ class GremlinUi(QtWidgets.QMainWindow):
       
 
         verbose = gremlin.config.Configuration().verbose_mode_inputs
+        #verbose = True
 
 
         el = gremlin.event_handler.EventListener()
@@ -1722,7 +1756,6 @@ class GremlinUi(QtWidgets.QMainWindow):
             current_device_guid, current_input_type, current_input_id = gremlin.shared_state.get_last_input_id()
             if current_device_guid != device_guid or current_input_type != input_type or current_input_id != input_id:
                 gremlin.shared_state.set_last_input_id(device_guid, input_type, input_id)
-                self.config.set_last_input(device_guid, input_type, input_id)
 
         finally:
             self._selection_locked = False
@@ -2018,50 +2051,40 @@ class GremlinUi(QtWidgets.QMainWindow):
             # ignore non joystick inputs
             return
 
-
-        if gremlin.shared_state.is_highlighting_suspended():
-            # skip if highlighting is currently suspended
-            return
-
         config = self.config
         verbose = config.verbose_mode_inputs
 
-        if not config.highlight_enabled:
-            # skip if highlighting master is turned off
-            return
-
         el = gremlin.event_handler.EventListener()
 
-        is_shifted = el.get_shifted_state()
-        is_control = el.get_control_state()
-        is_hotkey_autoswitch = config.highlight_hotkey_autoswitch # hotkey autoswitch mode (ctrl for axis, shift for button)
+        # button state
+        is_button = self.is_button_highlighting
 
-        # button must be enabled or via the shifted state (shift keys)
-        is_button = self.config.highlight_input_buttons or is_shifted
+        # axis state
+        is_axis = self.is_axis_highlighting
 
-        # axis must be enabled or via the shifted state (control keys)
-        is_axis = self.config.highlight_input_axis or is_control
+        if not is_button or is_axis:
+            # nothing to highlight
+            return
 
         # tab switch master switch
-        is_tabswitch_enabled = self.config.highlight_autoswitch or (is_hotkey_autoswitch and (is_shifted or is_control))
+        is_tabswitch_enabled = self.config.highlight_autoswitch
 
 
         if verbose:
-            logging.getLogger("system").info(f"Highlight: axis: {is_axis} button: {is_button}")
+            syslog.info(f"Highlight: axis: {is_axis} button: {is_button}")
 
         if not (is_button or is_axis):
             # no highlighting mode enabled - skip
             return
 
-        buttons_only = is_button and not is_axis
 
-
-
+        #syslog.info(f"Last input: {str(event)}")
 
         if event.event_type == InputType.JoystickAxis:
             # only process if there is a significant deviation for that axis to avoid noisy input an inadvertent motion
 
             if not is_axis:
+                # highlight axis disabled
                 return
 
             # avoid specific axis input spamming
@@ -2084,17 +2107,21 @@ class GremlinUi(QtWidgets.QMainWindow):
             self._joystick_axis_highlight_map[device_guid][event.identifier] = event.value
 
 
+        elif event.event_type == InputType.JoystickButton:
+            # update UI button states 
+            el.button_state_change.emit(event.device_guid, event.event_type, event.identifier, event.is_pressed)
 
+
+
+        if event.event_type != InputType.JoystickAxis and not event.is_pressed:
+            # only process inputs that are presses
+            return
 
 
         # enter critical section
         try:
 
             self.locked = True
-
-
-
-
 
             # Switch to the tab corresponding to the event's device if the option
             # widget = self._get_tab_widget_guid(event.device_guid)
@@ -2105,8 +2132,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             tab_switch_needed = tab_device_guid != device_guid
 
 
-            if verbose:
-                logging.getLogger("system").info(f"Highlight: axis: {is_axis} button: {is_button} switch: {tab_switch_needed}")
+            if verbose: syslog.info(f"HIGHLIGHT: axis: {is_axis} button: {is_button} switch: {tab_switch_needed}")
 
             if tab_switch_needed and not is_tabswitch_enabled:
                 # not setup to auto change tabs (override via shift/control keys)
@@ -2115,13 +2141,12 @@ class GremlinUi(QtWidgets.QMainWindow):
 
             if verbose and tab_switch_needed:
                 device_name = self._get_tab_name_guid(event.device_guid)
-                logging.getLogger("system").info(f"Event: tab switch requested to: {device_name}/{event.device_guid}")
+                if verbose: syslog.info(f"HIGHLIGHT: tab switch requested to: {device_name}/{event.device_guid}")
 
             # prevent spamming tab switches by constant varying inputs
             if tab_switch_needed:
                 if self._last_tab_switch is not None and (self._last_tab_switch + self._input_delay) > time.time():
-                    if verbose:
-                        logging.getLogger("system").info(f"Event: tab switch ignored - events too close")
+                    if verbose: syslog.info(f"HIGHLIGHT: tab switch ignored - events too close")
                     return
                 # remember the switch time for next request
                 self._last_tab_switch = time.time()
@@ -2132,57 +2157,56 @@ class GremlinUi(QtWidgets.QMainWindow):
 
             # get the widget for the tab corresponding to the device
             if not isinstance(widget, gremlin.ui.device_tab.JoystickDeviceTabWidget):
-                if verbose:
-                    logging.getLogger("system").error(f"Event: unable to find tab widget for: {device_name}/{event.device_guid}")
+                syslog.error(f"HIGHLIGHT: unable to find tab widget for: {device_name}/{event.device_guid}")
                 return
 
             # prevent switching based on user options
             if not is_axis and event.event_type == InputType.JoystickAxis:
                 # ignore axis input
-                if verbose:
-                    logging.getLogger("system").info(f"Event: highlight axis input ignored (option off)")
+                if verbose: syslog.info(f"HIGHLIGHT: highlight axis input ignored (option off)")
                 return
 
             if not is_button and event.event_type in (InputType.JoystickButton, InputType.JoystickHat):
                 # ignore button input
-                if verbose:
-                    logging.getLogger("system").info(f"Event: highlight button input ignored (option off)")
+                if verbose: syslog.info(f"HIGHLIGHT: highlight button input ignored (option off)")
                 return
 
-            last_device_guid, last_input_type, last_input_id =  gremlin.shared_state.get_last_input_id()
 
-            input_changed = not last_device_guid or not last_input_type or not last_input_id \
-                or last_device_guid != device_guid or last_input_type != event.event_type or  last_input_id != event.identifier
-
-            if event.event_type == InputType.JoystickAxis:
-                process_input = input_changed
-            else:
-                process_input = input_changed or self._should_process_input(event, widget, buttons_only)
-            if verbose:
-                logging.getLogger("system").info(f"Event: process input {'ok' if process_input else 'ignored'}")
-
-            el.select_input.emit(device_guid, event.event_type, event.identifier, False)
+            hardware_key = event.hardwareKey
+            process_input = False
+            if self._last_highlight_key is None or self._last_highlight_key != hardware_key:
+                process_input = True
+                # if event.event_type == InputType.JoystickAxis:
+                #     process_input = True
+                # else:
+                #     process_input = self._should_process_input(event, widget, buttons_only)
+                # if verbose: syslog.info(f"HIGHLIGHT: process input {'ok' if process_input else 'ignored'}")
 
             if not process_input:
                 return
 
-            
+            self._last_highlight_key = hardware_key
+
+
+            # if event.identifier == 32 and event.is_pressed:
+            #     pass
 
 
             if tab_switch_needed:
                 # change tabs and select
-                if verbose:
-                    logging.getLogger("system").info(f"Event: execute tab switch begin")
-                el.select_input.emit(event.device_guid, event.event_type, event.identifier, False)
+                if verbose: syslog.info(f"HIGHLIGHT: execute tab switch begin")
+                el.select_input.emit(event.device_guid, event.event_type, event.identifier, True)
             else:
                 # highlight the specififed item in the current device
-                el.select_input.emit(event.device_guid, event.event_type, event.identifier, False)
+                device_name = gremlin.shared_state.get_device_name(device_guid)
+                if verbose: syslog.info(f"HIGHLIGHT: select input {device_guid} {device_name} {event.event_type} {event.identifier} {event.is_pressed}")
+                el.select_input.emit(event.device_guid, event.event_type, event.identifier, True)
 
 
+            
 
         finally:
-            if verbose:
-                logging.getLogger("system").info(f"Event: done")
+            if verbose: syslog.info(f"HIGHLIGHT: done")
             self.locked = False
 
     def _tab_moved_cb(self, tab_from, tab_to):
@@ -2407,7 +2431,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             else:
                 remote_msg = "<font color=\"red\">Disabled</font>"
 
-            self.status_bar_is_active.setText(f"<b>Status:</b> {text_running} <b>Local Control</b> {local_msg} <b>Broadcast:</b> {remote_msg}")
+            self.status_bar_is_active_widget.setText(f"<b>Status:</b> {text_running} <b>Local Control</b> {local_msg} <b>Broadcast:</b> {remote_msg}")
             self._update_mode_status_bar()
 
         except e:
@@ -2433,7 +2457,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             if not is_running:
                 msg += f" <b>Edit Mode:</b> {edit_mode if edit_mode else "n/a"}"
 
-            self.status_bar_mode.setText(msg)
+            self.status_bar_mode_widget.setText(msg)
             if self.config.mode_change_message:
                 self.ui.tray_icon.showMessage(f"Runtime Mode: {runtime_mode if runtime_mode else "n/a"} Edit mode: {edit_mode if edit_mode else "n/a"}","",QtWidgets.QSystemTrayIcon.MessageIcon.NoIcon,250)
         except Exception as err:
@@ -2935,7 +2959,72 @@ class GremlinUi(QtWidgets.QMainWindow):
         :param is_enabled if True the input highlighting is enabled and
             disabled otherwise
         """
-        self._button_highlighting_enabled = is_enabled
+        eh = gremlin.event_handler.EventListener()
+        eh.toggle_highlight.emit(None, is_enabled)
+
+    def _set_joystick_input_axis_highlighting(self, is_enabled):
+        """Enables / disables the highlighting of the current input button when used.
+
+        :param is_enabled if True the input highlighting is enabled and
+            disabled otherwise
+        """
+        eh = gremlin.event_handler.EventListener()
+        eh.toggle_highlight.emit(is_enabled, None)        
+
+    @QtCore.Slot(object, object)
+    def _handle_highlight_state(self, axis_state, button_state):
+        if axis_state is not None:
+            self.config.highlight_input_axis = axis_state
+
+        if button_state is not None:
+            self.config.highlight_input_buttons  = button_state
+
+        # update status bar widgets
+        with QtCore.QSignalBlocker(self.status_bar_highlight_axis_widget):
+            icon = self._icon_on if self.config.highlight_input_axis else self._icon_off
+            self.status_bar_highlight_axis_widget.setIcon(icon)
+
+        with QtCore.QSignalBlocker(self.status_bar_highlight_button_widget):
+            icon = self._icon_on if self.config.highlight_input_buttons else self._icon_off
+            self.status_bar_highlight_button_widget.setIcon(icon)
+            
+
+
+
+    @property
+    def is_button_highlighting(self) -> bool:
+        ''' true if button highlighting is currently enabled '''
+        if not self.config.highlight_enabled:
+            return False
+        if self._input_highlight_stack > 0:
+            # suspended
+            return False
+        if gremlin.shared_state.is_highlighting_suspended():
+            # skip if highlighting is currently suspended
+            return False
+        
+        el = gremlin.event_handler.EventListener()
+        is_hotkey_autoswitch = self.config.highlight_hotkey_autoswitch
+        is_shifted = el.get_shifted_state() if is_hotkey_autoswitch else False
+        return self.config.highlight_input_buttons or is_shifted or self._button_highlighting_enabled
+    
+    @property
+    def is_axis_highlighting(self) -> bool:
+        ''' true if button highlighting is currently enabled '''
+        if not self.config.highlight_enabled:
+            return False
+        if self._input_highlight_stack > 0:
+            # suspended
+            return False
+        if gremlin.shared_state.is_highlighting_suspended():
+            # skip if highlighting is currently suspended
+            return False
+        
+        
+        el = gremlin.event_handler.EventListener()
+        is_hotkey_autoswitch = self.config.highlight_hotkey_autoswitch
+        is_control = el.get_shifted_state() if is_hotkey_autoswitch else False
+        return self.config.highlight_input_axis or is_control or self._axis_highlighting_enabled
 
 
     def push_highlighting(self):
@@ -2993,33 +3082,17 @@ class GremlinUi(QtWidgets.QMainWindow):
                 return False
 
 
-            # Check if we should actually react to the event
-            if event == self._last_input_event:
-                return False
-
 
         process_input = False
-        config = gremlin.config.Configuration()
+        is_new_device = self._last_input_event is None or self._last_input_event.hardwareKey != event.hardwareKey
 
         if event.event_type == InputType.JoystickAxis:
             # only worry about axis deviation delta if it's an axis
 
             if buttons_only and not self.input_axis_override:
-                # ignore axis changes if in button only mode and not overriding
-                #syslog.debug("process: axis input: ignored")
                 return False
 
-            if not self._last_input_event:
-                # always process a new input if never processed
-                #syslog.debug("process: new event: processed")
-                process_input = True
-            else:
-                # force a switch if the input has changed
-                is_new_device = self._last_input_event.identifier != event.identifier or self._last_input_event.device_guid != event.device_guid
-                process_input = process_input or is_new_device
-
-            process_input = process_input or gremlin.input_devices.JoystickInputSignificant().should_process(event, deviation)
-
+            process_input = gremlin.input_devices.JoystickInputSignificant().should_process(event, deviation)
 
             self._input_delay = 1
 
@@ -3027,11 +3100,10 @@ class GremlinUi(QtWidgets.QMainWindow):
                 if self._last_input_timestamp + self._input_delay > time.time():
                     # delay not occured yet
                     process_input = False
-                    #syslog.debug("process: delay ignore")
 
 
         else:
-            process_input = True
+            process_input = is_new_device
             self._input_delay = 0.25
 
         if process_input:
@@ -3049,7 +3121,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         :param text the text to display
         """
-        self.status_bar_repeater.setText(
+        self.status_bar_repeater_widget.setText(
             "<b>Repeater: </b> {}".format(text)
         )
 
@@ -3133,17 +3205,7 @@ if __name__ == "__main__":
 
     gremlin.shared_state.ui_ready = False
 
-    # Path manging to ensure Gremlin starts independent of the CWD
-    sys.path.insert(0, gremlin.util.userprofile_path())
-    gremlin.util.setup_userprofile()
-
-    # Fix some dumb Qt bugs
-    QtWidgets.QApplication.addLibraryPath(os.path.join(
-        os.path.dirname(PySide6.__file__),
-        "plugins"
-    ))
-
-    # Configure logging for system and user events
+        # Configure logging for system and user events
     configure_logger({
         "name": "system",
         "level": logging.DEBUG,
@@ -3156,6 +3218,18 @@ if __name__ == "__main__":
         "logfile": os.path.join(gremlin.util.userprofile_path(), "user.log"),
         "format": "%(asctime)s %(message)s"
     })
+
+    # Path manging to ensure Gremlin starts independent of the CWD
+    sys.path.insert(0, gremlin.util.userprofile_path())
+    gremlin.util.setup_userprofile()
+
+    # Fix some dumb Qt bugs
+    QtWidgets.QApplication.addLibraryPath(os.path.join(
+        os.path.dirname(PySide6.__file__),
+        "plugins"
+    ))
+
+
 
     syslog = logging.getLogger("system")
 
@@ -3207,6 +3281,7 @@ if __name__ == "__main__":
     # check for gamepad availability via VIGEM
     if gremlin.gamepad_handling.gamepadAvailable():
         gremlin.gamepad_handling.gamepad_initialization()
+
 
     # Check if vJoy is properly setup and if not display an error
     # and terminate GremlinEx

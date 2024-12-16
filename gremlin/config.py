@@ -1615,9 +1615,7 @@ class Configuration:
     def osc_enabled(self) -> bool:
         ''' True if OSC support is enabled'''
         if self._osc_enabled is None:
-            from gremlin.ui.osc_device import OscInterface
-            osc = OscInterface()
-            self._osc_enabled = osc.osc_enabled and self._data.get("osc_enabled", True)
+            self._osc_enabled = self._data.get("osc_enabled", True)
         return self._osc_enabled
     
         
