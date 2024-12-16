@@ -46,14 +46,16 @@ def millis():
 class Request(object):
 
 	
-	def __init__(self, definitions, sm, time=10, dec=None, settable=False, attempts=10, callback = None):
+	def __init__(self, definitions, sm, time=10, dec=None, settable=False, attempts=10, callback = None, is_client_data = False):
 		''' request 
 		
 		:param deff:  definitions (command, datatype)
 		:callback : callback to call when the value of this request is set by the simulator
 		
 		'''
+		self.is_client_data = is_client_data
 		self.DATA_DEFINITION_ID = None
+		self.CLIENT_DATA_ID = None
 		self.definitions = []
 		self.description = dec
 		self._name = None
@@ -167,22 +169,35 @@ class Request(object):
 
 		command = self.definitions[0][0]
 
+		if self.is_client_data and self.CLIENT_DATA_ID is None:
+			self.CLIENT_DATA_ID = self._sm.new_client_data_id()
+
 		if self.DATA_DEFINITION_ID is None:
 			self.DATA_DEFINITION_ID = self._sm.new_def_id()
 			self.DATA_REQUEST_ID = self._sm.new_request_id()
 			self.buffer = None
 			self._sm.Requests[self.DATA_REQUEST_ID.value] = self
 
+		if self.is_client_data:
+			err = self._sm._dll.AddToClientDataDefinition(
+				self._sm._hSimConnect,
+				self.DATA_DEFINITION_ID.value,
+				0, # offset
+				4096, # buffer size
+				0, # epsilon
+				SIMCONNECT_UNUSED, # datum
+			)
 
-		err = self._sm._dll.AddToDataDefinition(
-			self._sm._hSimConnect,
-			self.DATA_DEFINITION_ID.value,
-			command,
-			rtype,
-			DATATYPE,
-			0,
-			SIMCONNECT_UNUSED,
-		)
+		else:
+			err = self._sm._dll.AddToDataDefinition(
+				self._sm._hSimConnect,
+				self.DATA_DEFINITION_ID.value,
+				command,
+				rtype,
+				DATATYPE,
+				0,
+				SIMCONNECT_UNUSED,
+			)
 		if self._sm.IsHR(err, 0):
 			self.defined = True
 			temp = DWORD(0)
@@ -193,6 +208,10 @@ class Request(object):
 		else:
 			syslog.error(f"Simconnect: request defintion error: {command}")
 			return False
+
+
+
+
 
 
 class RequestHelper:
@@ -435,6 +454,10 @@ class SimConnect():
 			syslog = logging.getLogger("system")
 			syslog.warning(f"SimConnect: Event ID: {dwRequestID} is not handled")
 
+	def handle_clientdata_event(self, ObjData):
+		self.handle_simobject_event(ObjData)
+			
+
 	def handle_exception_event(self, exc):
 		_exception = SIMCONNECT_EXCEPTION(exc.dwException).name
 		_unsendid = exc.UNKNOWN_SENDID
@@ -525,6 +548,10 @@ class SimConnect():
 			# data
 			pObjData = cast(pData, POINTER(SIMCONNECT_RECV_SIMOBJECT_DATA)).contents
 			self.handle_simobject_event(pObjData)
+		elif dwID == SIMCONNECT_RECV_ID.SIMCONNECT_RECV_ID_CLIENT_DATA:
+			# client data
+			pObjData = cast(pData, POINTER(SIMCONNECT_RECV_CLIENT_DATA)).contents
+			self.handle_clientdata_event(pObjData)
 
 
 		else:
@@ -685,13 +712,23 @@ class SimConnect():
 	def _request_data(self, request : Request):
 		if self._dll is not None:
 			request.buffer = None
-			self._dll.RequestDataOnSimObjectType(
-				self._hSimConnect,
-				request.DATA_REQUEST_ID.value,
-				request.DATA_DEFINITION_ID.value,
-				0,
-				SIMCONNECT_SIMOBJECT_TYPE.SIMCONNECT_SIMOBJECT_TYPE_USER,
-			)
+			if request.is_client_data:
+				self._dll.RequestClientData(
+					self._hSimConnect,
+					request.CLIENT_DATA_ID.value,
+					request.DATA_REQUEST_ID.value,
+					request.DATA_DEFINITION_ID.value,
+					SIMCONNECT_PERIOD.SIMCONNECT_PERIOD_ONCE,
+					SIMCONNECT_CLIENT_DATA_REQUEST_FLAG.SIMCONNECT_CLIENT_DATA_REQUEST_FLAG_DEFAULT,
+					)
+			else:
+				self._dll.RequestDataOnSimObjectType(
+					self._hSimConnect,
+					request.DATA_REQUEST_ID.value,
+					request.DATA_DEFINITION_ID.value,
+					0,
+					SIMCONNECT_SIMOBJECT_TYPE.SIMCONNECT_SIMOBJECT_TYPE_USER,
+				)
 			temp = DWORD(0)
 			self._dll.GetLastSentPacketID(self._hSimConnect, temp)
 			request.LastID = temp.value
@@ -699,17 +736,30 @@ class SimConnect():
 	def _request_periodic_data(self, request : Request):
 		if self._dll is not None:
 			request.buffer = None
-			self._dll.RequestDataOnSimObject(
-				self._hSimConnect,
-				request.DATA_REQUEST_ID.value,
-				request.DATA_DEFINITION_ID.value,
-				0, # object ID 0 = aircraft
-				SIMCONNECT_PERIOD.SIMCONNECT_PERIOD_VISUAL_FRAME, #  specifies how often the data is to be sent by the server and received by the client
-				SIMCONNECT_DATA_REQUEST_FLAG.SIMCONNECT_DATA_REQUEST_FLAG_CHANGED, # 0 or changed or tagged
-				0, # origin The number of times the data should be transmitted before this communication is ended. The default is zero, which means the data should be transmitted endlessly.
-				0, # interval The number of times the data should be transmitted before this communication is ended. The default is zero, which means the data should be transmitted endlessly.
-				0 # limit The number of times the data should be transmitted before this communication is ended. The default is zero, which means the data should be transmitted endlessly.
-			)
+			if request.is_client_data:
+				self._dll.RequestClientData(
+					self._hSimConnect,
+					request.CLIENT_DATA_ID.value,
+					request.DATA_REQUEST_ID.value,
+					request.DATA_DEFINITION_ID.value,
+					SIMCONNECT_PERIOD.SIMCONNECT_PERIOD_VISUAL_FRAME,
+					SIMCONNECT_DATA_REQUEST_FLAG.SIMCONNECT_DATA_REQUEST_FLAG_CHANGED,
+					0, # origin The number of times the data should be transmitted before this communication is ended. The default is zero, which means the data should be transmitted endlessly.
+					0, # interval The number of times the data should be transmitted before this communication is ended. The default is zero, which means the data should be transmitted endlessly.
+					0 # limit The number of times the data should be transmitted before this communication is ended. The default is zero, which means the data should be transmitted endlessly.
+					)
+			else:
+				self._dll.RequestDataOnSimObject(
+					self._hSimConnect,
+					request.DATA_REQUEST_ID.value,
+					request.DATA_DEFINITION_ID.value,
+					0, # object ID 0 = aircraft
+					SIMCONNECT_PERIOD.SIMCONNECT_PERIOD_VISUAL_FRAME, #  specifies how often the data is to be sent by the server and received by the client
+					SIMCONNECT_DATA_REQUEST_FLAG.SIMCONNECT_DATA_REQUEST_FLAG_CHANGED, # 0 or changed or tagged
+					0, # origin The number of times the data should be transmitted before this communication is ended. The default is zero, which means the data should be transmitted endlessly.
+					0, # interval The number of times the data should be transmitted before this communication is ended. The default is zero, which means the data should be transmitted endlessly.
+					0 # limit The number of times the data should be transmitted before this communication is ended. The default is zero, which means the data should be transmitted endlessly.
+				)
 			temp = DWORD(0)
 			self._dll.GetLastSentPacketID(self._hSimConnect, temp)
 			request.LastID = temp.value			
@@ -718,13 +768,24 @@ class SimConnect():
 		''' stops a request for periodic data setup with request_periodic_data'''
 		if self._dll is not None:
 			request.buffer = None
-			self._dll.RequestDataOnSimObject(
-				self._hSimConnect,
-				request.DATA_REQUEST_ID.value,
-				request.DATA_DEFINITION_ID.value,
-				0,
-				SIMCONNECT_PERIOD.SIMCONNECT_PERIOD_NEVER,
-			)
+			if request.is_client_data:
+				self._dll.RequestClientData(
+					self._hSimConnect,
+					request.CLIENT_DATA_ID.value,
+					request.DATA_REQUEST_ID.value,
+					request.DATA_DEFINITION_ID.value,
+					SIMCONNECT_PERIOD.SIMCONNECT_PERIOD_NEVER,
+					SIMCONNECT_CLIENT_DATA_REQUEST_FLAG.SIMCONNECT_CLIENT_DATA_REQUEST_FLAG_DEFAULT,
+					)
+
+			else:
+				self._dll.RequestDataOnSimObject(
+					self._hSimConnect,
+					request.DATA_REQUEST_ID.value,
+					request.DATA_DEFINITION_ID.value,
+					0,
+					SIMCONNECT_PERIOD.SIMCONNECT_PERIOD_NEVER,
+				)
 
 	def clear(self, request):
 		''' clears a request '''
@@ -802,6 +863,18 @@ class SimConnect():
 			return True
 		else:
 			return False
+		
+
+	def new_client_data_id(self):
+		if self._dll is None:
+			return None
+		
+		_name = "ClientData" + str(len(list(self._dll.CLIENT_DATA_DEFINITION_ID)))
+		names = [m.name for m in self._dll.CLIENT_DATA_DEFINITION_ID] + [_name]
+
+		self._dll.CLIENT_DATA_DEFINITION_ID = Enum(self._dll.CLIENT_DATA_DEFINITION_ID.__name__, names)
+		CLIENT_DATA_DEFINITION_ID = list(self._dll.CLIENT_DATA_DEFINITION_ID)[-1]
+		return CLIENT_DATA_DEFINITION_ID
 
 	def new_def_id(self):
 		if self._dll is None:
@@ -1030,3 +1103,30 @@ class SimConnect():
 			simInitPos,
 			rqst.value
 		)
+
+	def createClientData(self, request_id, size = 4096, flags = 0):
+		''' creates a user data area
+		  https://docs.flightsimulator.com/html/Programming_Tools/SimConnect/API_Reference/Events_And_Data/SimConnect_CreateClientData.htm
+		'''
+		if self._dll is None:
+			return False
+		hr = self._dll.CreateClientData(self._hSimConnect, request_id, size, flags)
+		if not self.IsHR(hr, 0):
+			return False
+		return True
+	
+	def getNextClientDataDefinitionId(self):
+		return self._dll.CLIENT_DATA_DEFINITION_ID
+	
+	def addToClientDataDefinition(self, definition_id, offset, size):
+		''' adds to the client data definition, returns true on success '''
+		if self._dll is None:
+			return False
+		hr = self._dll.AddToClientDataDefinition(self._hSimConnect, definition_id, offset, size, 0, 0)
+		if not self.IsHR(hr, 0):
+			return False
+		return True
+	
+
+
+	

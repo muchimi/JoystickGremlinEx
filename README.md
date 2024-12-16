@@ -253,28 +253,34 @@ Joystick Gremlin EX
 ## 13.40.16ex (pre-release)
 <!-- TOC --><a name="m45"></a>
 ### (m47)
-- Fix: Some paste of actions causing an exception post refactor to require a secondary parameter in m45.
-- Improved: Execution graph will abort on profile stop at the next step which should interrupt large container executions faster.
-- Improved: Macro scheduler will abort on profile stop at the next step to interrupt macro execution faster on profile stop.
-- Experimental: Sequence container - similar to macros but as a container. This container executes all actions sequentially once triggered.
-- Improved: Pause action now functions as a delay as well as a callback pause (mode selectable).  Delay is selectable and entered in milliseconds.
-- Fix: Input selection on profile load may have selected the incorrect item.
-- Fix: Relative scaling in vjoy remap now supports value 0 to 1000 (previously was limited at 1)
-- Fix: last runtime mode restore on automatic profile loading based on active process if options are enabled for this.
-- Fix: auto activate profile error or noop when option is enabled and a suitable process is selected and the action is on.
-- Fix: closing GremlinEx when a profile is active no longer leaves the process running (bug introduced with recent process monitoring logic changes)
-- Fix: unknown "hardware_device_guid" member found in profile class introduced in m44
+- API: in general, the code makes more use of internal events to start/stop and record changes and simplify the logic, which results in performance gains.
+- API: in general, more detailed diagnostics logging if the appropriate log option is enabled.  Warning: log entries can have a performance hit on GremlinEx when executing profiles.
+- Improved: Keyboard, OSC and MIDI input now support mappings via mode hierarchy and match the behavior of regular axis, button and hat inputs: If a mapping is not found for a keyboard/OSC/MIDI defined in the current mode, and a mapping exists for that input in a parent mode, the parent mode mapping will trigger.  This behavior was missing in prior releases pending improvements to the execution tree, which exists as of m42 which now make this possible.
+- Improved: The execution graph will abort on profile stop at the next step which should interrupt large container executions and return to edit mode much faster.
+- Improved: The macro scheduler will now abort on profile stop at the next step if a stop request occurs while the macro executes.  Before this, a macro usually had to completely execute before stopping.
+- New (experimental): Sequence container - similar to macros but as a container. This container executes all actions sequentially once triggered.
+- Improved: Pause action now functions as a delay as well as a callback pause (mode selectable).  The delay is selectable and entered in milliseconds.
+- Improved: Filter box added to the process picker dialog.
+- Improved: MIDI and OSC listening interfaces won't automatically start if there are no MIDI or OSC inputs defined in the profile.
 - Improved: Simconnect
-	- scan speed for aircraft folder data
+	- scan speed for aircraft folder data - the community folder scan will now only look for folders that contain player flyable aircraft and do its best to ignore the rest (the MSFS folder structure is convoluted so there is only so much that can be done here...)
 	- config will pull the current aircraft (if one is loaded in the sim)
 	- Simconnect action has a trigger on release option if mapped to a momentary input (button or hat)
 	- Simconnect aicraft profile mode is now saved with mode data (if defined).  This mode is auto-selected when an aicraft is detected if the option is selected.
 	- Many missing simvars added
 	- Simconnect action data can now be entered as normalized (-1 to +1) or MSFS range and displays percentages
-- New: clickable highlight button repeaters on the status bar (bottom right). Click to change auto-highlight status without going to options.
-- Improved: OSC and MIDI input supports mode hierarchy.  If a mapping is not found for the input in the current mode, and a mapping exists for a parent mode, that mapping will be used.
+	- simconnect_lvars.xml can be user edited to define L: variables that will be loaded by GremlinEx.  LVars are custom defined by aircraft and thus user customizable.  There is currently no interface to edit LVARs - that has to be manually done currently.  A sample file is created if it doesn't exist.
+- New: clickable highlight button repeaters on the status bar (bottom right). Click to change auto-highlight status without going to options.  
 
-
+Fixes:
+- Fix: Restore last mode on profile to process mapping wasn't saving correctly.
+- Fix: Restore last mode on profile activation does not restore the last profile that was selected (this is related to the prior fix). There may be more work needed on this as process to profile mapping and auto-loading is rather convoluted with all the options available.
+- Fix: auto activate profile error or noop when option is enabled and a suitable process is selected and the action is on.
+- Fix: closing GremlinEx when a profile is active no longer leaves the process running (bug introduced with recent process monitoring logic changes)
+- Fix: unknown "hardware_device_guid" member found in profile class introduced in m44
+- Fix: Some paste of actions causing an exception post refactor to require a secondary parameter introduced in m45.
+- Fix: Input selection on profile load may have selected the incorrect item.
+- Fix: Relative scaling in vjoy remap now supports value 0 to 1000 (previously was limited at 1)
 
 ### (m46)
 - Improved logic and event handling around automatic process activation based on the active (foreground) process.

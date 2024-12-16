@@ -1316,7 +1316,7 @@ class OscClient(QtCore.QObject):
 
     def stop(self):
         ''' stops the client '''
-        self._interface.stop()
+        pass
 
     def _osc_message_cb(self, message, args):
         ''' called when an OSC message is received '''

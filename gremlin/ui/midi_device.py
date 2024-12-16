@@ -477,6 +477,10 @@ class MidiInterface(QtCore.QObject):
 
         self._monitored_ports = set()
         self.midi_enabled = False
+
+        
+        el = gremlin.event_handler.EventListener()
+        el.profile_start.connect(self._profile_start)
         
         try:
 
@@ -499,6 +503,26 @@ class MidiInterface(QtCore.QObject):
     
         for port in self._port_names:
             logging.getLogger("system").info(f"MIDI device detected: {port}")
+
+    @QtCore.Slot()
+    def _profile_start(self):
+        ''' called at profile start '''
+        config = gremlin.config.Configuration()
+        if config.midi_enabled:
+            # see if this profile defines any MIDI items
+            if not self._started:
+                ec = gremlin.execution_graph.ExecutionContext()
+                if ec.hasInputType(InputType.Midi):
+                    logging.getLogger("system").info(f"MIDI: Start")
+                    self.start()
+                else:
+                    logging.getLogger("system").info(f"MIDI: no MIDI definitions found - start skipped")
+            else:
+                logging.getLogger("system").info(f"MIDI: Running")
+
+            
+        else:
+            logging.getLogger("system").info(f"MIDI: Disabled")
 
     def start(self, port_name_or_list = None):
         ''' starts listeners 

@@ -432,6 +432,7 @@ class SimConnectManager(QtCore.QObject):
 
         self._aircraft_tile = None # current title from aircraft.cfg
         self._simvars_xml =  os.path.join(gremlin.util.userprofile_path(), "simconnect_simvars.xml")
+        self._lvars_xml = os.path.join(gremlin.util.userprofile_path(), "simconnect_lvars.xml")
 
 
         self._connect_attempts = 3 # number of connection attempts before giving up
@@ -453,6 +454,7 @@ class SimConnectManager(QtCore.QObject):
     @QtCore.Slot()
     def _shutdown(self):
         ''' application shutdown '''
+        syslog.info("SIMCONNECT: shutdown")
         self.sim_disconnect()
 
 
@@ -477,9 +479,37 @@ class SimConnectManager(QtCore.QObject):
             self._write_default_xml(self._simvars_xml)
 
 
+        self._block_map = {}
+
         # load the data - including any user modifications/additions
         if os.path.isfile(self._simvars_xml):
             self._load_xml(self._simvars_xml)
+
+        # load any LVAR definitions defined by the user
+        if not os.path.isfile(self._lvars_xml):
+            # create an lvar sample file
+            xml = '''<?xml version='1.0' encoding='UTF-8'?>
+<commands>
+	<command value="L:A32NX_FCU_EFIS_L_DISPLAY_BARO_MODE" type="lvar" datatype="int" units="Number" category="none" settable="true" axis="false" indexed="false">
+		<description value="Flybywire A320 neo set left FCU baro position STD 0 QNH 1 QFE 2"/> 
+	</command>
+	<command value="L:A32NX_FCU_EFIS_R_DISPLAY_BARO_MODE" type="lvar" datatype="int" units="Number" category="none" settable="true" axis="false" indexed="false">
+		<description value="Flybywire A320 neo set right FCU baro position STD 0 QNH 1 QFE 2"/> 
+	</command>
+</commands>'''
+            try:
+                with open(self._lvars_xml,"w") as f:
+                    f.write(xml)
+                    f.flush()
+            except:
+                syslog.warning(f"Unable to write sample LVAR file to {self._lvars_xml}")
+        if os.path.isfile(self._lvars_xml):
+            self._load_xml(self._lvars_xml)
+
+
+
+        
+
 
         if len(self._block_map) > 0:
             # process lists
@@ -1018,7 +1048,7 @@ class SimConnectManager(QtCore.QObject):
             return default
 
 
-        self._block_map = {}
+
         if not xml_source or not os.path.isfile(xml_source):
             syslog.error(f"SimconnectData: unable to load XML simvars: {xml_source}")
             return False

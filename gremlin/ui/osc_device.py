@@ -25,6 +25,7 @@ import threading
 import gremlin.config
 import gremlin.event_handler
 import gremlin.event_handler
+import gremlin.execution_graph
 from gremlin.types import DeviceType
 from gremlin.input_types import InputType
 import gremlin.shared_state
@@ -1675,6 +1676,15 @@ class OscServer():
         self._dispatcher = None
         self._callback = None
 
+        eh = gremlin.event_handler.EventListener()
+        eh.shutdown.connect(self._shutdown)
+
+
+    @QtCore.Slot()
+    def _shutdown(self):
+        ''' app shutdown received '''
+        self.stop()
+
     @property
     def started(self):
         ''' true if server is started or in the process of starting '''
@@ -1709,6 +1719,10 @@ class OscServer():
             self._server_thread.start()
             self._running = True
 
+            syslog = logging.getLogger("system")
+            syslog.info("OSC: start")        
+
+
 
 
     def stop(self):
@@ -1723,10 +1737,6 @@ class OscServer():
         self._server_thread = None
         self._running = False
         #logging.getLogger("system").info("OSC: server stopped")
-
-    def __del__(self):
-        #logging.getLogger("system").info("OSC stopping...")
-        self.stop()
 
     
 
@@ -1756,6 +1766,10 @@ class OscInterface(QtCore.QObject):
 
         self.osc_enabled = True # always able to listen to ports
 
+        el = gremlin.event_handler.EventListener()
+        el.profile_start.connect(self._profile_start)
+
+
         # find our current IP address
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.settimeout(0)
@@ -1777,6 +1791,28 @@ class OscInterface(QtCore.QObject):
         else:
             logging.getLogger("system").info(f"OSC: Disabled")
 
+
+    @QtCore.Slot()
+    def _profile_start(self):
+        ''' called on profile start
+        
+        ensure the OSC server is running if the profile has OSC items
+        
+        '''
+        from gremlin.input_types import InputType
+        config = gremlin.config.Configuration()
+        if config.osc_enabled:
+            if not self._started:
+                ec = gremlin.execution_graph.ExecutionContext()
+                if ec.hasInputType(InputType.OpenSoundControl):
+                    logging.getLogger("system").info(f"OSC: Start")
+                    self.start()
+                else:
+                    logging.getLogger("system").info(f"OSC: no OSC definitions found - start skipped")
+            else:
+                logging.getLogger("system").info(f"OSC: Running")
+        else:
+            logging.getLogger("system").info(f"OSC: Disabled by option")
 
     @property
     def input_port(self):

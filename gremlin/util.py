@@ -861,7 +861,7 @@ def safe_read(node, key, type_cast=None, default_value=None):
     value = default_value
     if not key in node.keys():
         if default_value is None:
-            msg = f"Attempted to read attribute '{key}' which does not exist."
+            msg = f"Attempted to read attribute '{key}' which does not exist and no default value is provided."
             logging.getLogger("system").error(msg)
             raise error.ProfileError(msg)
     else:

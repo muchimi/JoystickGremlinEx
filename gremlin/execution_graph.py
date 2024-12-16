@@ -63,6 +63,7 @@ class ExecutionGraphNode(anytree.NodeMixin):
         self.priority : int = 0 # execution priority of nodes at the same tree level
         self.nodeType : ExecutionGraphNodeType = node_type
         self.mode : str = None
+        self.input_type : InputType = InputType.NotSet
 
 
     def __str__(self):
@@ -98,6 +99,7 @@ class ExecutionContext():
 
 
     def _walk_mode_tree(self, node, branch):
+        ''' walks a mode tree manually to build the mode hierarchy (recursive)'''
         for mode, sub_branch in branch.items():
             child = anytree.Node(mode)
             child.parent = node
@@ -159,6 +161,16 @@ class ExecutionContext():
                     nodes.append(node)
 
         return nodes
+
+    def hasInputType(self, input_type):
+        ''' true if the execution tree contains mappings with input types of the specified type  '''
+        node : ExecutionGraphNode
+        for node in anytree.PreOrderIter(self.root):
+            if node.nodeType == ExecutionGraphNodeType.Container:
+                input_item = node.container.parent
+                if input_item.input_type == input_type:
+                    return True
+        return False
 
             
 
@@ -517,12 +529,6 @@ class ContainerExecutionGraph(AbstractExecutionGraph):
         verbose = gremlin.config.Configuration().verbose_mode_details
 
         sequence = []
-
-
-        # Add virtual button transform as the first functor if present
-        # if container.virtual_button:
-        #     self.functors.append(self._create_virtual_button(container))
-        #     sequence.append("Condition")
 
         # tree node for this container
         node = ExecutionGraphNode(ExecutionGraphNodeType.Container)

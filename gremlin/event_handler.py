@@ -1837,10 +1837,12 @@ class EventHandler(QtCore.QObject):
 
 	def _matching_latched_callbacks(self, event, key):
 		callback_list = []
-		if event.device_guid in self.latched_callbacks:
-			callback_list = self.latched_callbacks[event.device_guid].get(
-				self.runtime_mode, {}
-			).get(key, [])
+		if event.event_type in (InputType.KeyboardLatched, InputType.Keyboard):
+			if event.device_guid in self.latched_callbacks:
+				import gremlin.execution_graph
+				ec = gremlin.execution_graph.ExecutionContext() # current execution context
+				# search callbacks for mode hierarchy
+				callback_list = ec.getCallbacks(self.latched_callbacks[event.device_guid], key, self.runtime_mode)
 
 		# Filter events when the system is paused
 		if not self.process_callbacks:

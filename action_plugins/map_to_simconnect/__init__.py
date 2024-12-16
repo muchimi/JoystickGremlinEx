@@ -155,7 +155,7 @@ class SimconnectOptions(QtCore.QObject):
         self._sort_mode = SimconnectSortMode.NotSet
         self.parse_xml()
         self._simconnect = simconnect
-
+       
 
     @property
     def current_aircraft_folder(self):
@@ -174,8 +174,8 @@ class SimconnectOptions(QtCore.QObject):
         return self._community_folder
     @community_folder.setter
     def community_folder(self, value):
-        self._community_folder = value
-
+        if os.path.isdir(value) and value != self._community_folder:
+            self._community_folder = value
         
 
     def validate(self):
@@ -251,6 +251,11 @@ class SimconnectOptions(QtCore.QObject):
     def auto_mode_select(self, value):
         self._auto_mode_select = value
         
+    
+
+
+            
+
 
 
     def save(self):
@@ -409,9 +414,12 @@ class SimconnectOptions(QtCore.QObject):
         ''' gets the active community folder '''
         from gremlin.ui import ui_common
         if not self._community_folder or not os.path.isdir(self._community_folder):
-            self._community_folder = self.get_community_folder()
-        if not self._community_folder or not os.path.isdir(self._community_folder):
-            return None
+            folder = self.get_community_folder()
+            if os.path.isdir(folder):
+               folder = None
+            
+            self._community_folder = folder
+        
         return self._community_folder
 
 
@@ -539,6 +547,10 @@ class SimconnectOptions(QtCore.QObject):
         if not community_folder:
             return
         
+
+        # scan for lvars
+        self._scan_lvars()
+        
         progress = QtWidgets.QProgressDialog(parent = owner, labelText ="Scanning folders... (this can take a while)", cancelButtonText = "Cancel", minimum = 0, maximum= 100) #, flags = QtCore.Qt.FramelessWindowHint)
         progress.setWindowModality(QtCore.Qt.WindowModality.WindowModal)
         progress.setValue(0)
@@ -640,7 +652,7 @@ class SimconnectMonitor():
         self._started = False
         self._mode_change_enabled = False
         el= gremlin.event_handler.EventListener()
-        el.profile_started.connect(self.start) # occurs after a profile has started to change the default mode if needed
+        el.profile_started.connect(self._profile_start) # occurs after a profile has started to change the default mode if needed
         el.profile_stop.connect(self.stop)
         el.shutdown.connect(self._shutdown)
 
@@ -665,6 +677,19 @@ class SimconnectMonitor():
                     return mode
             
         return None
+    
+    @QtCore.Slot()
+    def _profile_start(self):
+        ''' occurs when a profile starts '''
+        import gremlin.execution_graph
+        ec = gremlin.execution_graph.ExecutionContext()
+        if ec.findActionPlugin(MapToSimConnect.name):
+            logging.getLogger("system").info(f"SCMONITOR: Start")
+            self.start()
+        else:
+            self.stop() # stop monitoring if it was
+            logging.getLogger("system").info(f"SCMONITOR: no simconnect mappings found - start skipped")
+
     
     def start(self):
         ''' starts monitoring for aicraft changes '''

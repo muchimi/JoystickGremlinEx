@@ -2228,7 +2228,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
 
 
-    def _process_changed_cb(self, path):
+    def _process_changed_cb(self, new_process_path):
         """Handles changes in the active windows process focus
 
         If the active process has a known associated profile it is
@@ -2249,10 +2249,10 @@ class GremlinUi(QtWidgets.QMainWindow):
         option_auto_load_on_focus = config.activate_on_process_focus
 
         
-        process_base = os.path.basename(path)
+        process_base = os.path.basename(new_process_path)
         if not option_auto_load:
             if verbose:
-                syslog.info(f"PROC: Process focus change detected: {process_base}  autoload: {option_auto_load}  auto load on focus: {option_auto_load_on_focus} disabled - ignore process change")
+                syslog.info(f"PROC: Process focus change detected: {process_base}  autoload: {option_auto_load}  auto load on focus: {option_auto_load_on_focus}: change profile on process change option is disabled - skipping")
             return # ignore if not auto loading profiles or auto activating on focus change
 
 
@@ -2263,23 +2263,23 @@ class GremlinUi(QtWidgets.QMainWindow):
         option_reset_mode_on_process_activate = config.reset_mode_on_process_activate
         eh = gremlin.event_handler.EventHandler()
 
-        #verbose = gremlin.config.Configuration().verbose_mode_detailed
-        
-        if verbose:
-            syslog.info(f"PROC: Process change detected: {process_base}")
+       
 
         # see if we have a mapping entry for this executable
-        profile_item = self._profile_map.get_map(path)
+        profile_item = self._profile_map.get_map(new_process_path)
+
         profile_path = profile_item.profile if profile_item else None
         profile_change = False # assume no profile change
         #print (f"Profile: {profile_item}")
         mode = None # assume no mode change needed
+
+
         
         if verbose:
             if profile_path:
                 syslog.info(f"PROC: found profile map [{os.path.basename(profile_path)}] for process {process_base} - current profile: [{self.profile.name}]  runtime mode: [{gremlin.shared_state.runtime_mode}]")
             else:
-                syslog.info(f"PROC: no profile mapping found for process [{process_base}]  [full process: {path.replace("/","\\")}] - current profile: [{self.profile.name}]  runtime mode: [{gremlin.shared_state.runtime_mode}]")
+                syslog.info(f"PROC: no profile mapping found for process [{process_base}]  [full process: {new_process_path.replace("/","\\")}] - current profile: [{self.profile.name}]  runtime mode: [{gremlin.shared_state.runtime_mode}]")
 
         if profile_path:
             # profile entry found - see if we need to change profiles
@@ -2294,8 +2294,10 @@ class GremlinUi(QtWidgets.QMainWindow):
                 if verbose:
                     syslog.info(f"PROC: process change: switch profile needed from [{os.path.basename(self.profile.profile_file)}] ->  [{os.path.basename(profile_path)}]")
 
+                # save the current profile's last used mode
                 self.profile.set_last_runtime_mode(gremlin.shared_state.runtime_mode)
                 self._runtime_mode_map[self.profile.profile_file] = gremlin.shared_state.runtime_mode
+
                 if verbose:
                     syslog.info(f"PROC: process change: save runtime mode  [{gremlin.shared_state.runtime_mode}] for [{os.path.basename(self.profile.profile_file)}]")
                 
@@ -2311,9 +2313,16 @@ class GremlinUi(QtWidgets.QMainWindow):
                 # figure out which mode to restore mode for the new profile
                 if verbose:
                     syslog.info(f"PROC: profile change: [{self.profile.name}] profile restore mode flag: [{self.profile.get_restore_mode()}], global restore mode flag: [{config.restore_profile_mode_on_start}]")
+
+                # profile set option to restore on auto activate
                 option_restore_mode = config.restore_profile_mode_on_start or gremlin.shared_state.current_profile.get_restore_mode()
+                if profile_item: 
+                    restore_profile_mode = profile_item.restore_last_mode_on_auto_activate
+                    option_restore_mode = option_restore_mode or restore_profile_mode
+                
                 if option_restore_mode:
                     # get the mode to restore
+
                     key = self.profile.profile_file
                     if key in self._runtime_mode_map:
                         mode = self._runtime_mode_map[key]
@@ -2321,9 +2330,8 @@ class GremlinUi(QtWidgets.QMainWindow):
                             syslog.info(f"PROC: profile change: [{os.path.basename(profile_path)}] restore last mode: [{mode}] from cache")
                     else:
                         mode = self.profile.get_last_runtime_mode()
-
-                    if verbose:
-                        syslog.info(f"PROC: profile change: [{os.path.basename(profile_path)}] restore last mode: [{mode}] from profile")
+                        if verbose:
+                            syslog.info(f"PROC: profile change: [{os.path.basename(profile_path)}] restore last mode: [{mode}] from profile")
                 else:
                     mode = self.profile.get_default_start_mode()
                     if verbose:
@@ -3367,7 +3375,3 @@ if __name__ == "__main__":
 
     syslog.info("Terminating GremlinEx")
     sys.exit(0)
-
-
-
-

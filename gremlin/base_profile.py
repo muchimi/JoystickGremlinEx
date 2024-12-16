@@ -3093,12 +3093,12 @@ class ProfileMapItem():
         self._modes = []
         self._default_mode = None # default mode for the profile (user defined) - if not set - this is the first root mode in the profile
         self._last_mode = None # last moded used by the profile (start mode)
-        self._restore_mode = False
+        self._restore_mode_on_auto_activate = False
         self._index = -1
         self._warning = None
         self._valid = True # assume valid
         #self._force_numlock_off = True
-        
+        self._data = None
         self._update()
 
     @property
@@ -3110,16 +3110,6 @@ class ProfileMapItem():
             # uniformly store paths
             value = value.replace("\\","/").lower().strip()
         self._profile = value
-
-    # @property
-    # def numlock_force(self):
-    #     return self._force_numlock_off
-    
-    # @numlock_force.setter
-    # def numlock_force(self, value):
-    #     self._force_numlock_off = value
-    #     self._update()
-
 
     @property
     def process(self):
@@ -3144,13 +3134,14 @@ class ProfileMapItem():
         return self._process and self.profile
     
     @property
-    def restore_mode(self) -> bool:
+    def restore_last_mode_on_auto_activate(self) -> bool:
         ''' true if the profile has the restore last used mode flag set '''
-        return self._restore_mode
+        return self._restore_mode_on_auto_activate
     
-    @restore_mode.setter
-    def restore_mode(self, value):
-        self._restore_mode = value
+    @restore_last_mode_on_auto_activate.setter
+    def restore_last_mode_on_auto_activate(self, value):
+        self._restore_mode_on_auto_activate = value
+        self.save()
 
     @property
     def default_mode(self) -> str:
@@ -3169,7 +3160,7 @@ class ProfileMapItem():
     def last_mode(self, value):
         self._last_mode = value
 
-    def get_profile_data(self) -> ProfileOptionsData:
+    def _get_profile_data(self) -> ProfileOptionsData:
         ''' gets the list of profile modes in a given profile
         :returns tuple (mode_list, default_mode, last_mode, restore_mode_flag)
         '''
@@ -3245,7 +3236,7 @@ class ProfileMapItem():
         
         current_profile : Profile = gremlin.shared_state.current_profile
         if compare_path(current_profile.profile_file, profile):
-            current_profile.set_restore_mode(self._restore_mode)
+            current_profile.set_restore_mode(self._restore_mode_on_auto_activate)
             if self._default_mode:
                 current_profile.set_start_mode(self._default_mode)
             #current_profile.set_force_numlock(self._force_numlock_off)
@@ -3260,7 +3251,7 @@ class ProfileMapItem():
                 parser = etree.XMLParser(remove_blank_text=True)
                 tree = etree.parse(profile, parser)
                 for element in tree.xpath("//profile"):
-                    element.set("restore_last", str(self._restore_mode))
+                    element.set("restore_last", str(self._restore_mode_on_auto_activate))
                     if self._default_mode:
                         element.set("default_mode", self._default_mode)
                     element.set("start_mode", self.last_mode)
@@ -3290,15 +3281,18 @@ class ProfileMapItem():
 
                 tree.write(profile, pretty_print=True,xml_declaration=True,encoding="utf-8")
 
+            # save the profile map
+
             except Exception as ex:
                 logging.getLogger("system").error(f"PROC MAP: Unable to open profile mapping: {profile}:\n{ex}")
 
     def _update(self):
-        pd = self.get_profile_data()
+        pd = self._get_profile_data()
+        self._data = pd
         self._modes = pd.mode_list
         self._default_mode = pd.default_mode
         self._last_mode = pd.start_mode
-        self._restore_mode = pd.restore_last
+        self._restore_mode_on_auto_activate = pd.restore_last
         #self._force_numlock_off = pd.force_numlock_off
 
     @property
@@ -3346,10 +3340,13 @@ class ProfileMap():
                 for element in tree.xpath("//map"):
                     process = element.get("process")
                     profile = element.get("profile")
+                    restore = safe_read(element, "restore_mode", bool, False)
                     item = gremlin.base_profile.ProfileMapItem(profile, process)
                     if "startup_mode" in element.attrib:
                         mode = element.get("startup_mode")
                         item.default_mode = mode
+                        item.restore_last_mode_on_auto_activate = restore
+
                     self._items.append(item)
                     if verbose:
                         logging.getLogger("system").info(f"PROC MAP: Registered mapping: {process} -> {profile}")
@@ -3369,7 +3366,12 @@ class ProfileMap():
         for item in self._items:
             if item.valid:
                 # print (f"Saving item: process: {item.process} profile: {item.profile}")
-                etree.SubElement(root,"map", profile = item.profile, process = item.process, startup_mode = item.default_mode)
+                etree.SubElement(root,"map", 
+                                 profile = item.profile, 
+                                 process = item.process, 
+                                 startup_mode = item.default_mode, 
+                                 restore_mode=str(item.restore_last_mode_on_auto_activate)
+                                 )
 
         try:
             # save the file
@@ -3451,7 +3453,7 @@ class ProfileMap():
                 warning = f"Mapping incomplete"
                 self._valid = False
 
-            pd = item.get_profile_data()
+            pd = item._get_profile_data()
             if pd.mode_list:
                 if item.default_mode is not None and not item.default_mode in pd.mode_list:
                     valid = False

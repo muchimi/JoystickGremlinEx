@@ -223,7 +223,7 @@ class Axis:
         return self._value
 
     @value.setter
-    def value(self, value):
+    def value(self, p_value):
         """Sets the position of the axis based on a value between [-1, 1].
 
         :param value the position of the axis in the range [-1, 1]
@@ -232,24 +232,31 @@ class Axis:
         import gremlin.event_handler
         from gremlin.input_types import InputType
 
+        if p_value is None or p_value < -1.0 or p_value > 1.0:
+            logging.getLogger("system").warning(
+                "Wrong data type provided, has to be float in [-1, 1]"
+                f" provided value was {p_value}"
+            )
+            return
+
         eh = gremlin.event_handler.EventListener()
-        event = gremlin.event_handler.VjoyEvent(self.vjoy_id, InputType.JoystickAxis, self.axis_id - 0x30 + 1, value)
+        event = gremlin.event_handler.VjoyEvent(self.vjoy_id, InputType.JoystickAxis, self.axis_id - 0x30 + 1, p_value)
         eh.vjoy_event.emit(event)
 
         self.vjoy_dev.ensure_ownership()
 
         # Log an error on invalid data but continue processing by clamping
         # the values in the next step
-        if 1.0 - abs(value) < -0.001:
+        if 1.0 - abs(p_value) < -0.001:
             logging.getLogger("system").warning(
                 "Wrong data type provided, has to be float in [-1, 1],"
-                f" provided value was {value:.2f}"
+                f" provided value was {p_value:.2f}"
             )
 
         # Normalize value to [-1, 1] and apply response curve and deadzone
         # settings
         self._value = self._response_curve_fn(
-            self._deadzone_fn(min(1.0, max(-1.0, value)))
+            self._deadzone_fn(min(1.0, max(-1.0, p_value)))
         )
 
         if not VJoyInterface.SetAxis(

@@ -204,9 +204,6 @@ class OptionsUi(ui_common.BaseDialogUi):
         self._create_general_page()
         self._create_profile_page()
 
-        # do not create the page for now as this serves no purpose with new version of HID guardian
-        # self._create_hidguardian_page()
-
         # closing bar
         close_button = QtWidgets.QPushButton("Close")
         close_button.clicked.connect(self.close)
@@ -960,30 +957,6 @@ This setting is also available on a profile by profile basis on the profile tab,
         self.config.save()
         super().closeEvent(event)
 
-    # def populate_executables(self, executable_name=None):
-    #     """Populates the profile drop down menu.
-
-    #     :param executable_name name of the executable to pre select
-    #     """
-    #     self.profile_field.textChanged.disconnect(self._update_profile)
-    #     self.executable_selection.clear()
-    #     executable_list = self.config.get_executable_list()
-    #     for path in executable_list:
-    #         self.executable_selection.addItem(path)
-    #     self.profile_field.textChanged.connect(self._update_profile)
-
-    #     # Select the provided executable if it exists, otherwise the first one
-    #     # in the list
-    #     index = 0
-    #     if executable_name is not None and executable_name in executable_list:
-    #         index = self.executable_selection.findText(executable_name)
-    #     self.executable_selection.setCurrentIndex(index)
-
-    # def _profile_restore_flag_cb(self, checked):
-    #     ''' called when the restore last mode checked state is changed '''
-    #     self.config.current_profile.set_restore_mode(checked)
-
-
     def _update_highlight_options(self):
         ''' enables/disables device highlight options based on state '''
         enabled = self.config.highlight_enabled
@@ -1355,13 +1328,14 @@ This setting is also available on a profile by profile basis on the profile tab,
     def _save_map_cb(self):
         ''' saves the current mappings and options '''
         pushCursor()
-        for item in self._profile_mapper.items():
-            item.save()
+
+        syslog = logging.getLogger("system")
 
         # reflect any changes to the grid button
         eh = gremlin.event_handler.VjoyRemapEventHandler()
         eh.grid_visible_changed.emit(self.config.button_grid_visible)
-
+        for item in self._profile_mapper.items():
+            item.save()
 
         self._profile_mapper.save_profile_map()
         popCursor()
@@ -1403,7 +1377,8 @@ This setting is also available on a profile by profile basis on the profile tab,
 
             exe_widget = None
             xml_widget = None
-            pd = item.get_profile_data()
+
+            pd = item._get_profile_data()
             
             mode_enabled = bool(pd.mode_list)
 
@@ -1437,15 +1412,11 @@ This setting is also available on a profile by profile basis on the profile tab,
                 
 
                 restore_widget = ui_common.QDataCheckbox("Restore last mode on start", item)
-                restore_widget.setChecked(pd.restore_last)
-                restore_widget.clicked.connect(self._restore_changed)
+                restore_widget.setChecked(item.restore_last_mode_on_auto_activate)
+                restore_widget.clicked.connect(self._restore_profile_last_mode_on_change)
                 restore_widget.setToolTip("When set, restores the last used mode if the profile has been automatically loaded on process change")
 
-                # force_numlock_widget = ui_common.QDataCheckbox("Force numlock off", item)
-                # force_numlock_widget.setToolTip("When set, GremlinEx will force the keyboard numlock state to Off to prevent issues with numpad keymapping")
-                # force_numlock_widget.setChecked(pd.force_numlock_off)
-                # force_numlock_widget.clicked.connect(self._force_numlock_cb)
-                
+
 
                 mode_widget = ui_common.QDataComboBox(item)
                 
@@ -1513,16 +1484,19 @@ This setting is also available on a profile by profile basis on the profile tab,
         widget = self.sender()
         item : gremlin.base_profile.ProfileMapItem = widget.data
         item.default_mode = widget.currentText()
+        
 
-    def _restore_changed(self, checked):
+    def _restore_profile_last_mode_on_change(self, checked):
         widget = self.sender()
         item : gremlin.base_profile.ProfileMapItem = widget.data
-        item.restore_mode = checked
+        item.restore_last_mode_on_auto_activate = checked
+        
 
     def _force_numlock_cb(self, checked):
         widget = self.sender()
         item : gremlin.base_profile.ProfileMapItem = widget.data
         item.numlock_force = checked
+        
         
 
     def _process_open_cb(self, widget):
@@ -1649,9 +1623,18 @@ class ProcessWindow(ui_common.BaseDialogUi):
 
         process_list = gremlin.process_monitor.list_current_processes()
         self.list_model.setStringList(process_list)
+      
+        self.filter_widget = QtWidgets.QLineEdit()
+        self.filter_widget.textChanged.connect(self._filter_changed)
+        self.filter_widget.setToolTip("Process filter")
+        self.main_layout.addWidget(self.filter_widget)
+
+        self.proxy_model = QtCore.QSortFilterProxyModel()
+        self.proxy_model.setFilterCaseSensitivity(QtCore.Qt.CaseSensitivity.CaseInsensitive)
+        self.proxy_model.setSourceModel(self.list_model)
 
         self.list_view = QtWidgets.QListView()
-        self.list_view.setModel(self.list_model)
+        self.list_view.setModel(self.proxy_model)
         self.list_view.setEditTriggers(
             QtWidgets.QAbstractItemView.NoEditTriggers
         )
@@ -1713,7 +1696,14 @@ class ProcessWindow(ui_common.BaseDialogUi):
         self.close()
 
 
+    @QtCore.Slot()
+    def _filter_changed(self):
+        ''' text changed '''
+        self.proxy_model.setFilterFixedString(self.filter_widget.text())
 
+
+
+    @QtCore.Slot(int)
     def _selection_changed(self, index):
         self._current_selection_qindex = index
 
