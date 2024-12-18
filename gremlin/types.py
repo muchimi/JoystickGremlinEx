@@ -902,7 +902,8 @@ class VerboseMode(IntFlag):
     Condition = auto() # conditions diagnostics / execution graph
     OSC = auto() # OSC data 
     Process = auto() # process changes
-    All = Keyboard | Joystick | Inputs | Mouse | Details | SimConnect | Condition | Process
+    Exec = auto() # execution trees
+    All = Keyboard | Joystick | Inputs | Mouse | Details | SimConnect | Condition | Process | Exec
 
     def __contains__(self, item):
         return  (self.value & item.value) == item.value

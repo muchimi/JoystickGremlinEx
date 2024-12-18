@@ -121,6 +121,7 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.absolute_checkbox.setChecked(True)
             self.relative_checkbox = QtWidgets.QRadioButton("Relative")
             self.relative_scaling = ui_common.DynamicDoubleSpinBox()
+            self.relative_scaling.setRange(0,1000)
 
             self.remap_type_layout.addStretch()
             self.remap_type_layout.addWidget(self.absolute_checkbox)

@@ -2052,7 +2052,7 @@ class Profile():
             config.set_last_runtime_mode(self._profile_fname, mode)
             verbose = gremlin.config.Configuration().verbose
             if verbose:
-                syslog.info(f"PROFILE: [{self._profile_name}] set last runtime mode: [{mode}]")
+                syslog.info(f"PROFILE: [{self._profile_name}] store last runtime mode: [{mode}]")
 
     def get_last_runtime_mode(self):
         ''' gets the last used mode '''
@@ -2072,6 +2072,10 @@ class Profile():
             config = gremlin.config.Configuration()
             self._last_edit_mode = mode
             config.set_profile_last_edit_mode(mode)
+            verbose = gremlin.config.Configuration().verbose
+            if verbose:
+                syslog.info(f"PROFILE: [{self._profile_name}] store last edit mode: [{mode}]")
+
 
     def get_last_edit_mode(self):
         ''' gets the last used mode '''
@@ -2079,7 +2083,10 @@ class Profile():
             config = gremlin.config.Configuration()
             mode = config.get_profile_last_edit_mode()
             if mode is not None:
-                self._last_edit_mode = mode
+                verbose = gremlin.config.Configuration().verbose
+                if verbose:
+                    syslog.info(f"PROFILE: [{self._profile_name}] get last edit mode: [{mode}]")
+                    self._last_edit_mode = mode
         return self._last_edit_mode
 
 
@@ -2211,6 +2218,8 @@ class Profile():
             for _, mode in device.modes.items():
                 modes.append(mode.name)
         return list(set(modes))  # unduplicated
+    
+
     
 
     def find_mode(self, mode_text) -> str:
@@ -2650,11 +2659,11 @@ class Profile():
         return self._default_start_mode
     
 
-    def get_restore_mode(self):
+    def get_restore_mode(self) -> bool:
         ''' gets the start mode for this profile '''
         return self._restore_last_mode
     
-    def set_restore_mode(self, value):
+    def set_restore_mode(self, value : bool):
         ''' sets the start up mode '''
         self._restore_last_mode = value
         verbose = gremlin.config.Configuration().verbose

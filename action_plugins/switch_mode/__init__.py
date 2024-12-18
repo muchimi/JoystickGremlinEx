@@ -17,15 +17,18 @@
 
 
 import os
-from PySide6 import QtWidgets
+from PySide6 import QtWidgets, QtCore
 from lxml import etree as ElementTree
 
 import gremlin.base_profile
+import gremlin.event_handler
+import gremlin.execution_graph
 from gremlin.input_types import InputType
 import gremlin.profile
 import gremlin.ui.input_item
 import gremlin.ui.ui_common
-
+import gremlin.util
+import gremlin.shared_state
 
 
 class SwitchModeWidget(gremlin.ui.input_item.AbstractActionWidget):
@@ -37,19 +40,45 @@ class SwitchModeWidget(gremlin.ui.input_item.AbstractActionWidget):
         assert isinstance(action_data, SwitchMode)
 
     def _create_ui(self):
-        self.mode_list = gremlin.ui.ui_common.QComboBox()
-        for entry in gremlin.profile.mode_list(self.action_data):
-            self.mode_list.addItem(entry)
-        self.mode_list.activated.connect(self._mode_list_changed_cb)
-        self.main_layout.addWidget(self.mode_list)
+        self.mode_selector_widget = gremlin.ui.ui_common.QComboBox()
+        self._update_modes()
+        self.mode_selector_widget.currentIndexChanged.connect(self._mode_selected_changed)
+        self.main_layout.addWidget(self.mode_selector_widget)
+        el = gremlin.event_handler.EventListener()
+        el.modes_changed.connect(self._update_modes)
 
-    def _mode_list_changed_cb(self):
-        self.action_data.mode_name = self.mode_list.currentText()
-        self.action_modified.emit()
+    @QtCore.Slot()
+    def _update_modes(self):
+        ''' called when mode list needs to be updated '''
+        # update the list of available modes 
+        with QtCore.QSignalBlocker(self.mode_selector_widget):
+            mode = self.action_data.mode_name # current mode
+            self.mode_selector_widget.clear()
+            index = 0
+            select_index = None
+            ec = gremlin.execution_graph.ExecutionContext()
+            modes = ec.getModeNames(as_tuple=True)
+            #modes = gremlin.shared_state.current_profile.get_modes()
+            for entry, display in modes:
+                self.mode_selector_widget.addItem(display, entry)
+                if mode and select_index is None and entry == mode:
+                    select_index = index
+            if select_index is not None:
+                self.mode_selector_widget.setCurrentIndex(select_index)
+            elif self.mode_selector_widget.count():
+                self.mode_selector_widget.setCurrentIndex(0)
+        self._mode_selected_changed()
+
+    def _mode_selected_changed(self):
+        mode = self.mode_selector_widget.currentData()
+        if mode:
+            if self.action_data.mode_name != mode:
+                self.action_data.mode_name = mode
+                #self.action_modified.emit()
 
     def _populate_ui(self):
-        mode_id = self.mode_list.findText(self.action_data.mode_name)
-        self.mode_list.setCurrentIndex(mode_id)
+        index = self.mode_selector_widget.findData(self.action_data.mode_name)
+        self.mode_selector_widget.setCurrentIndex(index)
 
 
 class SwitchModeFunctor(gremlin.base_profile.AbstractFunctor):

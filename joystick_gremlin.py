@@ -121,7 +121,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_VERSION = "13.40.16ex (m47)"
+APPLICATION_VERSION = "13.40.16ex (m48)"
 
 # the main ui
 ui = None
@@ -743,7 +743,9 @@ class GremlinUi(QtWidgets.QMainWindow):
 
 
             from gremlin.config import Configuration
-            verbose = Configuration().verbose
+            config = Configuration()
+            verbose = config.verbose
+            verbose_mode_exec = config.verbose_mode_exec
 
             if activate:
                 # Generate the code for the profile and run it
@@ -751,6 +753,9 @@ class GremlinUi(QtWidgets.QMainWindow):
                 self._profile_auto_activated = False
                 ec = gremlin.execution_graph.ExecutionContext()
                 ec.reset()
+
+
+                # start the profile with the specified runtime mode
                 self.runner.start(
                     self.profile.build_inheritance_tree(),
                     self.profile.settings,
@@ -760,8 +765,8 @@ class GremlinUi(QtWidgets.QMainWindow):
                 #print ("set icon ACTIVE")
                 self.ui.tray_icon.setIcon(load_icon("gfx/icon_active.ico"))
 
-                if verbose:
-                    ec.dump()
+                if verbose_mode_exec:
+                    ec.dumpActive()
 
 
                 # tell callbacks they are starting
@@ -773,7 +778,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                 if verbose:
                     logging.getLogger("system").info(f"Deactivate profile requested")
                 if is_running:
-                    # running - save the last running mode
+                    # running - save the last running mode to the executing profile
                     self.profile.set_last_runtime_mode(gremlin.shared_state.runtime_mode)
 
                 
@@ -2287,16 +2292,17 @@ class GremlinUi(QtWidgets.QMainWindow):
             if not compare_path(self.profile.profile_file, profile_path):
                 
                 # deactivate
-                self.activate(False)
+                self.activate(False) # this saves the current profile runtime mode
                 self.ui.actionActivate.setChecked(False)
+
+                # remember the last mode
+                self._runtime_mode_map[self.profile.profile_file] = gremlin.shared_state.runtime_mode
 
                 # change profile
                 if verbose:
                     syslog.info(f"PROC: process change: switch profile needed from [{os.path.basename(self.profile.profile_file)}] ->  [{os.path.basename(profile_path)}]")
 
-                # save the current profile's last used mode
-                self.profile.set_last_runtime_mode(gremlin.shared_state.runtime_mode)
-                self._runtime_mode_map[self.profile.profile_file] = gremlin.shared_state.runtime_mode
+                
 
                 if verbose:
                     syslog.info(f"PROC: process change: save runtime mode  [{gremlin.shared_state.runtime_mode}] for [{os.path.basename(self.profile.profile_file)}]")
@@ -2305,7 +2311,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                 # load the new profile
                 self._do_load_profile(profile_path)
                 self.ui.actionActivate.setChecked(True)
-                self.activate(True)
+                self.activate(True) # this will also restore the profile runtime mode based on current options
 
                 self._profile_auto_activated = True # remember the profile was auto activated by virtue of a process change
                 profile_change = True
@@ -2314,28 +2320,28 @@ class GremlinUi(QtWidgets.QMainWindow):
                 if verbose:
                     syslog.info(f"PROC: profile change: [{self.profile.name}] profile restore mode flag: [{self.profile.get_restore_mode()}], global restore mode flag: [{config.restore_profile_mode_on_start}]")
 
-                # profile set option to restore on auto activate
-                option_restore_mode = config.restore_profile_mode_on_start or gremlin.shared_state.current_profile.get_restore_mode()
-                if profile_item: 
-                    restore_profile_mode = profile_item.restore_last_mode_on_auto_activate
-                    option_restore_mode = option_restore_mode or restore_profile_mode
+                # # profile set option to restore on auto activate
+                # option_restore_mode = config.restore_profile_mode_on_start or gremlin.shared_state.current_profile.get_restore_mode()
+                # if profile_item: 
+                #     restore_profile_mode = profile_item.restore_last_mode_on_auto_activate
+                #     option_restore_mode = option_restore_mode or restore_profile_mode
                 
-                if option_restore_mode:
-                    # get the mode to restore
+                # if option_restore_mode:
+                #     # get the mode to restore
 
-                    key = self.profile.profile_file
-                    if key in self._runtime_mode_map:
-                        mode = self._runtime_mode_map[key]
-                        if verbose:
-                            syslog.info(f"PROC: profile change: [{os.path.basename(profile_path)}] restore last mode: [{mode}] from cache")
-                    else:
-                        mode = self.profile.get_last_runtime_mode()
-                        if verbose:
-                            syslog.info(f"PROC: profile change: [{os.path.basename(profile_path)}] restore last mode: [{mode}] from profile")
-                else:
-                    mode = self.profile.get_default_start_mode()
-                    if verbose:
-                        syslog.info(f"PROC: profile change: [{os.path.basename(profile_path)}] restore default mode: [{mode}] (option to restore last mode is off)")
+                #     key = self.profile.profile_file
+                #     if key in self._runtime_mode_map:
+                #         mode = self._runtime_mode_map[key]
+                #         if verbose:
+                #             syslog.info(f"PROC: profile change: [{os.path.basename(profile_path)}] restore last mode: [{mode}] from cache")
+                #     else:
+                #         mode = self.profile.get_last_runtime_mode()
+                #         if verbose:
+                #             syslog.info(f"PROC: profile change: [{os.path.basename(profile_path)}] restore last mode: [{mode}] from profile")
+                # else:
+                #     mode = self.profile.get_default_start_mode()
+                #     if verbose:
+                #         syslog.info(f"PROC: profile change: [{os.path.basename(profile_path)}] restore default mode: [{mode}] (option to restore last mode is off)")
             else:
                 mode = self.profile.get_last_runtime_mode()
                 if verbose: syslog.info(f"PROC: profile change: [{profile_base}] is already activated - current mode: [{mode}]")
@@ -2654,22 +2660,26 @@ class GremlinUi(QtWidgets.QMainWindow):
                 last_edit_mode = self.profile.get_root_mode()
                 gremlin.config.Configuration().set_profile_last_edit_mode(last_edit_mode)
 
-            last_runtime_mode = gremlin.config.Configuration().get_profile_last_runtime_mode()
-            if not last_runtime_mode:
-                last_runtime_mode = self.profile.get_root_mode()
-                gremlin.config.Configuration().set_profile_last_runtime_mode(last_runtime_mode)
+            # if self.profile.get_restore_mode():
+            #     # restore profile mode when loading is selected
+            #     last_runtime_mode = gremlin.config.Configuration().get_profile_last_runtime_mode()
+            #     if not last_runtime_mode:
+            #         last_runtime_mode = self.profile.get_root_mode()
+            #     if last_runtime_mode:
+            #         syslog.info("PROFILE: restore last runtime mode on profile load is selected")
+            #         gremlin.config.Configuration().set_profile_last_runtime_mode(last_runtime_mode)
 
             modes = new_profile.get_modes()
             if not last_edit_mode in modes:
                 # no longer in the current mode list
                 last_edit_mode = new_profile.get_default_mode()
-            if not last_runtime_mode in modes:
-                last_runtime_mode = new_profile.get_default_mode()
+            # if not last_runtime_mode in modes:
+            #     last_runtime_mode = new_profile.get_default_mode()
 
 
 
             eh = gremlin.event_handler.EventHandler()
-            eh.set_runtime_mode(last_runtime_mode)
+            # eh.set_runtime_mode(last_runtime_mode)
             eh.set_edit_mode(last_edit_mode)
 
             current_mode = gremlin.shared_state.current_mode
@@ -2881,17 +2891,33 @@ class GremlinUi(QtWidgets.QMainWindow):
         :return name of the mode that was the last to be active, or the
             first top level mode if none was ever used before
         """
-        last_mode = self.config.get_profile_last_runtime_mode()
+        config = gremlin.config.Configuration()
+        option_restore_mode = config.restore_profile_mode_on_start or gremlin.shared_state.current_profile.get_restore_mode()
+        syslog = logging.getLogger("system")
+        syslog.info(f"RUNTIME MODE: Runtime mode determination for profile [{self.profile.name}]")
+
+        if option_restore_mode:
+            syslog.info("\tAutomatic restore runtime mode is activated")
+            key = self.profile.profile_file
+            if key in self._runtime_mode_map:
+                last_mode = self._runtime_mode_map[key]
+                syslog.info(f"\tusing cached runtime mode [{last_mode}]")
+            else:
+                last_mode = self.profile.get_last_runtime_mode()
+                syslog.info(f"\tusing profile saved last runtime mode [{last_mode}]")
+
+        else:
+            last_mode = self.profile.get_default_mode()
+            syslog.info(f"\tusing profile default start mode [{last_mode}]")
+        
         mode_list = gremlin.profile.mode_list(self.profile)
 
-        if last_mode in mode_list:
-            # mode exists
-            return last_mode
-        else:
-            # pick a new last mode and remember it
-            last_mode = self.profile.get_root_mode()
-            self.config.set_profile_last_runtime_mode(last_mode)
-            return last_mode
+        if not last_mode in mode_list:
+            syslog.info(f"\tMode {last_mode} not found")
+            default_mode = self.profile.get_root_mode()
+            syslog.info(f"\tMode {last_mode} not found - using [{default_mode}]")
+
+        return last_mode
 
 
 

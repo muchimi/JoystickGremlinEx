@@ -21,6 +21,9 @@ from PySide6 import QtCore, QtGui, QtWidgets
 from lxml import etree as ElementTree
 
 from PySide6.QtGui import QIcon
+from PySide6.QtCore import QModelIndex
+
+
 import gremlin.base_profile 
 import gremlin.event_handler
 from gremlin.input_types import InputType
@@ -28,6 +31,79 @@ import gremlin.shared_state
 import gremlin.ui.input_item
 import gremlin.ui.ui_common
 
+
+
+class CycleModeModel(QtCore.QAbstractItemModel):
+    def __init__(self):
+        super().__init__()
+        self._data = {}
+        
+    def rowCount(self, parent = None):
+        return len(self._data)
+
+    def columnCount(self, parent = None):
+        return 1
+    
+    def clear(self):
+        self._data.clear()
+
+    def addItem(self, display, mode):
+        count = len(self._data)
+        self.beginInsertRows(QModelIndex(), count, count)
+        self._data[count] = (mode, display)
+        self.endInsertRows()
+
+    def data(self, index : QModelIndex, role = QtCore.Qt.DisplayRole):
+        if not index.isValid():
+            return None
+        
+        if role == QtCore.Qt.DisplayRole:
+            row = index.row()
+            return self._data[row][1]
+        return None
+    
+    def swap(self, index_a, index_b):
+        ''' swaps two indices '''
+        data_a = self._data[index_a]
+        data_b = self._data[index_b]
+        self._data[index_a] = data_b
+        self._data[index_b] = data_a
+
+    def moveUp(self, index):
+        count = len(self._data)
+        if index == 0 or count == 1:
+            return
+        index_a = index
+        index_b = index - 1
+        self.swap(index_a, index_b)
+
+    def moveDown(self, index):
+        count = len(self._data)
+        if index == count or count == 1:
+            return
+        index_a = index
+        index_b = index + 1
+        self.swap(index_a, index_b)
+
+    def remove(self, index):
+        if index in self._data:
+            del self._data[index]
+
+    def modes(self):
+        ''' gets the modes in the list'''
+        return [data[0] for data in self._data.values()]
+    
+    def index(self, row, column, parent=QModelIndex()):
+        if not row in self._data:
+            return QModelIndex()
+
+        return self.createIndex(row, column, row)
+    
+    def parent(self, index):
+        return QModelIndex()
+
+    def __len__(self):
+        return len(self._data)
 
 class CycleModesWidget(gremlin.ui.input_item.AbstractActionWidget):
 
@@ -39,12 +115,18 @@ class CycleModesWidget(gremlin.ui.input_item.AbstractActionWidget):
         super().__init__(action_data, parent=parent)
         assert(isinstance(action_data, CycleModes))
 
+
+
+        
+
     def _create_ui(self):
 
         from gremlin.util import load_icon
 
-        self.model = QtCore.QStringListModel()
+        self.ec = gremlin.execution_graph.ExecutionContext()
+        self.model = CycleModeModel()
         self.view = QtWidgets.QListView()
+        self.view.setModel(self.model)
    
         self.view.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
 
@@ -62,15 +144,20 @@ class CycleModesWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self.down.clicked.connect(self._down_cb)
 
-        self.actions_layout = QtWidgets.QGridLayout()
-        self.actions_layout.addWidget(self.mode_list_widget, 0, 0)
-        self.actions_layout.addWidget(self.add, 0, 1)
-        self.actions_layout.addWidget(self.delete, 0, 2)
-        self.actions_layout.addWidget(self.up, 1, 1)
-        self.actions_layout.addWidget(self.down, 1, 2)
+        self.button_container_widget = QtWidgets.QWidget()
+        self.button_container_layout = QtWidgets.QHBoxLayout(self.button_container_widget)
+        self.button_container_layout.addWidget(QtWidgets.QLabel("Mode:"))
+        self.button_container_layout.addWidget(self.mode_list_widget)
+        self.button_container_layout.addStretch()
+        self.button_container_layout.addWidget(self.add)
+        self.button_container_layout.addWidget(self.delete)
+        self.button_container_layout.addWidget(self.up)
+        self.button_container_layout.addWidget(self.down)
+        
+
 
         self.main_layout.addWidget(self.view)
-        self.main_layout.addLayout(self.actions_layout)
+        self.main_layout.addWidget(self.button_container_widget)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
 
         eh = gremlin.event_handler.EventListener()
@@ -83,16 +170,21 @@ class CycleModesWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def save_changes(self):
         """Saves UI state to the profile."""
-        mode_list = self.model.stringList()
+        mode_list = self.model.modes()
         self.action_data.mode_list = mode_list
         self.action_modified.emit()
 
     def _update_mode_list(self):
+
+        
         with QtCore.QSignalBlocker(self.mode_list_widget):
             self.mode_list_widget.clear()
-            modes = gremlin.shared_state.current_profile.get_modes()
-            for mode in modes:
-                self.mode_list_widget.addItem(mode)
+            
+            mode_data = self.ec.getModeNames(as_tuple=True)
+            #modes = gremlin.shared_state.current_profile.get_modes()
+            self.model.clear()
+            for mode, display in mode_data:
+                self.mode_list_widget.addItem(display, mode)
 
         # verify the modes in the cycle are valid
         mode_list = self.action_data.mode_list
@@ -100,8 +192,12 @@ class CycleModesWidget(gremlin.ui.input_item.AbstractActionWidget):
         for mode in mode_list:
             if not mode in modes:
                 mode_list.remove(mode)
-        self.model.setStringList(mode_list)
-        self.view.setModel(self.model)
+        self.model.clear()
+        for mode in mode_list:
+            node = self.ec.searchModeTree(mode)
+            self.model.addItem(node.display, mode)
+        
+        
       
         
 
@@ -117,47 +213,33 @@ class CycleModesWidget(gremlin.ui.input_item.AbstractActionWidget):
     @QtCore.Slot()
     def _add_cb(self):
         """Adds the currently selected mode to the list of modes."""
-        mode_list = self.model.stringList()
-        mode_list.append(self.mode_list_widget.currentText())
-        self.model.setStringList(mode_list)
+        
+        mode = self.mode_list_widget.currentData()
+        display = self.mode_list_widget.currentText()
+        
+        self.model.addItem(display, mode)
         self.save_changes()
 
     @QtCore.Slot()
     def _up_cb(self):
         """Moves the currently selected mode upwards."""
-        mode_list = self.model.stringList()
         index = self.view.currentIndex().row()
-        new_index = index - 1
-        if new_index >= 0:
-            mode_list[index], mode_list[new_index] =\
-                mode_list[new_index], mode_list[index]
-            self.model.setStringList(mode_list)
-            self.view.setCurrentIndex(self.model.index(new_index, 0))
-            self.save_changes()
+        self.model.moveUp(index)
+        self.save_changes()
 
     @QtCore.Slot()
     def _down_cb(self):
         """Moves the currently selected mode downwards."""
-        mode_list = self.model.stringList()
         index = self.view.currentIndex().row()
-        new_index = index + 1
-        if new_index < len(mode_list):
-            mode_list[index], mode_list[new_index] =\
-                mode_list[new_index], mode_list[index]
-            self.model.setStringList(mode_list)
-            self.view.setCurrentIndex(self.model.index(new_index, 0))
-            self.save_changes()
+        self.model.moveDown(index)
+        self.save_changes()
 
     @QtCore.Slot()
     def _remove_cb(self):
         """Removes the currently selected mode from the list of modes."""
-        mode_list = self.model.stringList()
         index = self.view.currentIndex().row()
-        if 0 <= index < len(mode_list):
-            del mode_list[index]
-            self.model.setStringList(mode_list)
-            self.view.setCurrentIndex(self.model.index(0, 0))
-            self.save_changes()
+        self.mode.remove(index)
+        self.save_changes()
 
 
 class CycleModesFunctor(gremlin.base_profile.AbstractFunctor):

@@ -32,6 +32,7 @@ from gremlin.input_types import InputType
 import gremlin.actions
 import gremlin.error
 import gremlin.input_types
+import gremlin.joystick_handling
 import gremlin.plugin_manager
 import gremlin.base_conditions
 import gremlin.shared_state
@@ -49,7 +50,34 @@ class ExecutionGraphNodeType(Enum):
     ActionSet = auto()
     Action = auto()
     Mode = auto() 
+    Device = auto()
+    InputItem = auto()
     
+class ExecutionModeNode(anytree.NodeMixin):
+    ''' holds a mode node '''
+    def __init__(self, mode: str = None):
+        super().__init__()
+        self.mode = mode # mode name
+        self._display = None # display name for the mode
+
+    def _update(self):
+        display = ""
+        node = self
+        while node.mode:
+            if display:
+                display = f"/{node.mode}{display}"
+            else:
+                display = f"/{node.mode}"
+            node = node.parent
+        self._display = display
+        
+    @property
+    def display(self):
+        if not self._display and self.mode:
+            self._update()
+        return self._display
+
+        
 
 class ExecutionGraphNode(anytree.NodeMixin):
     ''' tree node '''
@@ -64,6 +92,8 @@ class ExecutionGraphNode(anytree.NodeMixin):
         self.nodeType : ExecutionGraphNodeType = node_type
         self.mode : str = None
         self.input_type : InputType = InputType.NotSet
+        self.device = None
+        self.input_item = None
 
 
     def __str__(self):
@@ -82,26 +112,52 @@ class ExecutionGraphNode(anytree.NodeMixin):
                 stub = self.action.name
             case ExecutionGraphNodeType.Mode:
                 stub = self.mode
-        return f"{msg} {stub}"
+            case ExecutionGraphNodeType.InputItem:
+                stub = self.input_item.display_name
+            case ExecutionGraphNodeType.Device:
+                stub = self.device.name
+        return f"{msg}: {stub}"
                 
 
-
+class ExecutionContextInputData():
+    ''' holds an input item configuration '''
+    def __init__(self, input_item, mode : str, modes: list):
+        self.input_item = input_item # the input item
+        self.mode = mode # mode the input is referenced by
+        self.modes = modes # modes referencing this input item
 
 @SingletonDecorator
 class ExecutionContext():
     ''' holds the current execution context '''
     def __init__(self):
+       
+       el = gremlin.event_handler.EventListener()
+       el.modes_changed.connect(self.reset) # reload data on mode changes
+       el.profile_start.connect(self.reset) # reload data on profile start
+       el.profile_changed.connect(self.reset) # reload data on profile change
+       self.reset()
+
+    def reset(self):
+        ''' reloads the execution context to capture changes '''
+        syslog = logging.getLogger("system")
+        syslog.info("CONTEXT: reload")
         self.root = ExecutionGraphNode(ExecutionGraphNodeType.Root) # root node
+        self._build_execution_tree(self.root)
+
         tree = gremlin.shared_state.current_profile.build_inheritance_tree()
-        root = anytree.Node("")
-        self._walk_mode_tree(root, tree)
-        self._mode_tree = root
+        root_mode = ExecutionModeNode()
+        self._walk_mode_tree(root_mode, tree)
+        self._mode_tree = root_mode
+
+        verbose = gremlin.config.Configuration().verbose_mode_exec
+        if verbose:
+            self.dump()
 
 
     def _walk_mode_tree(self, node, branch):
         ''' walks a mode tree manually to build the mode hierarchy (recursive)'''
         for mode, sub_branch in branch.items():
-            child = anytree.Node(mode)
+            child = ExecutionModeNode(mode)
             child.parent = node
             self._walk_mode_tree(child, sub_branch)
 
@@ -110,36 +166,83 @@ class ExecutionContext():
         ''' gets the mode tree '''
         return self._mode_tree
     
-    def searchModeTree(self, mode):
+    def searchModeTree(self, mode : str) -> ExecutionModeNode:
         ''' find the node for a mode in the mode tree '''
-        return anytree.search.find_by_attr(self._mode_tree, mode)
+        syslog = logging.getLogger("system")
+        nodes = anytree.search.findall_by_attr(self._mode_tree, mode, name="mode")
+        if nodes:
+            if len(nodes) > 1:
+                syslog.warning(f"CONTEXT: More than one mode named {mode} detected - returning the first one")
+                for node in nodes:
+                    syslog.warning(f"\t{node.display} [{node.mode}]")
+            return nodes[0]
+        return None
+    
+    
+    def getModeNames(self, as_tuple = False) -> list:
+        ''' gets the mode names as a list of tuples '''
+        if as_tuple:
+            return [(node.mode, node.display) for node in anytree.PreOrderIter(self._mode_tree) if node.mode]
+        
+        return [node.mode for node in anytree.PreOrderIter(self._mode_tree) if node.mode]
+    
+
+
+    
+    def getModes(self) -> list:
+        ''' returns the list of defined modes in the execution tree '''
+        return [node.mode for node in anytree.PreOrderIter(self.root) if node.nodeType == ExecutionGraphNodeType.Mode and node.mode]
+        
     
     def getCallbacks(self, callbacks, key, mode):
-        node = anytree.search.find_by_attr(self._mode_tree,mode)
         callback_list = []
+        verbose = gremlin.config.Configuration().verbose_mode_inputs
+        syslog = logging.getLogger("system")
+        node = self.searchModeTree(mode)
+            
         if node:
             # starting point
-            while not callback_list:
-                mode = node.name
+            while not callback_list and node is not None:
+                mode = node.mode
                 if not mode:
                     # reached the top level
                     break
-                print (f"Search callbacks for mode : {mode} {key}")
+                if verbose: syslog.info(f"CONTEXT: Search callbacks for mode : {mode} {key}")
                 callback_list = callbacks.get(mode, {}).get(key, [])
                 if callback_list:
-                    print (f"Found callbacks for mode : {mode} key: {key}")
+                    if verbose: syslog.info(f"\tFound callbacks for mode : {mode} key: {key}")
                     break
                 # bump to parent node if not found
                 node = node.parent
-                print (f"Not found, using parent node: {node.name}")
+                if verbose: syslog.info(f"\tNot found, using parent node: {node.name}")
         return callback_list
 
+    def getModeHierarchy(self, mode):
+        ''' gets a list of parent modes for the given mode '''
+        modes = []
+        node = anytree.search.find_by_attr(self.modeTree,mode, "mode")
+        while node.mode:
+            modes.append(node.mode)
+            node = node.parent
+
+        return modes
+
+    def getMappedInputs(self, input_type : InputType) -> list[ExecutionContextInputData]:
+        ''' gets a list of all inputs in the execution tree of that current type that have a container defined'''
+        input_items = []
+        node: ExecutionGraphNode
+        for node in anytree.PreOrderIter(self.root):
+            if node.nodeType == ExecutionGraphNodeType.InputItem:
+                input_item = node.input_item
+                if input_item.input_type == input_type:
+                    mode = node.mode
+                    modes = self.getModeHierarchy(mode)
+                    item = ExecutionContextInputData(input_item, mode, modes)
+                    input_items.append(item)
+
+        return input_items
+
     
-
-
-
-    def reset(self):
-        self.root = ExecutionGraphNode(ExecutionGraphNodeType.Root) # root node
 
     def find(self, item):
         ''' looks for a container, action or action set in the execution tree node '''
@@ -166,22 +269,99 @@ class ExecutionContext():
         ''' true if the execution tree contains mappings with input types of the specified type  '''
         node : ExecutionGraphNode
         for node in anytree.PreOrderIter(self.root):
-            if node.nodeType == ExecutionGraphNodeType.Container:
-                input_item = node.container.parent
+            if node.nodeType == ExecutionGraphNodeType.InputItem:
+                input_item = node.input_item
                 if input_item.input_type == input_type:
                     return True
         return False
 
-            
-
     def dump(self):
+        self.dumpExecTree()
+        self.dumpModeTree()    
+
+    def dumpExecTree(self):
         # dumps the execution tree
         syslog = logging.getLogger("system")
         syslog.info(f"Execution Tree:")
 
         for pre, fill, node in anytree.RenderTree(self.root, style=anytree.AsciiStyle()):
             syslog.info(f"{pre}{str(node)}")
+
+    def dumpActive(self):
+        ''' dumps active execution nodes ONLY'''
+        syslog = logging.getLogger("system")
+        syslog.info(f"Execution Tree:")
+
+        for pre, fill, node in anytree.RenderTree(self.root, style=anytree.AsciiStyle()):
+            if anytree.search.findall_by_attr(node, ExecutionGraphNodeType.Action, "nodeType"):
+                syslog.info(f"{pre}{str(node)}")
         
+
+    def dumpModeTree(self):
+        syslog = logging.getLogger("system")
+        syslog.info(f"Mode Tree:")
+        for pre, fill, node in anytree.RenderTree(self.modeTree, style=anytree.AsciiStyle()):
+            syslog.info(f"{pre}{node.display} [{node.mode}]")
+
+
+    def _build_execution_tree(self, root):
+        profile = gremlin.shared_state.current_profile
+        mode_source = gremlin.shared_state.current_profile.traverse_mode()
+        mode_source.sort(key = lambda x: x[0]) # sort parent to child
+        mode_list = [mode for (_,mode) in mode_source] # parent mode first
+
+        mode_nodes = {}
+        for mode in mode_list:
+            mode_item = gremlin.execution_graph.ExecutionGraphNode(gremlin.execution_graph.ExecutionGraphNodeType.Mode)
+            mode_item.parent = self.root
+            mode_item.mode = mode
+            mode_nodes[mode] = mode_item
+
+        for device in profile.devices.values():
+            device_node = ExecutionGraphNode(ExecutionGraphNodeType.Device)
+            device_node.device = device
+            device_node.parent = root
+            for mode in device.modes.values():
+                mode_item = mode_nodes[mode.name]
+                mode_node = ExecutionGraphNode(ExecutionGraphNodeType.Mode)
+                mode_node.mode = mode.name
+                mode_node.parent = device_node
+                for input_items in mode.config.values():
+                    for input_item in input_items.values():
+                        # Only add callbacks for input items that actually
+                        # contain actions
+
+                        input_node = ExecutionGraphNode(ExecutionGraphNodeType.InputItem)
+                        input_node.parent = mode_node
+                        input_node.input_item = input_item
+                        input_node.mode = mode.name
+                        
+                        if len(input_item.containers) == 0:
+                            # no containers = no actions = skip
+                            continue
+                        
+                        for container in input_item.containers:
+                            if not container.is_valid():
+                                test = container.is_valid()
+                                logging.getLogger("system").warning(
+                                    "Incomplete container ignored"
+                                )
+                                continue
+                            container_node = ExecutionGraphNode(ExecutionGraphNodeType.Container)
+                            container_node.parent = input_node
+                            container_node.container = container
+                            container_node.mode = mode.name
+
+                            for action_set in container.action_sets:
+                                action_set_node = ExecutionGraphNode(ExecutionGraphNodeType.ActionSet)
+                                action_set_node.parent = container_node
+                                action_set_node.mode = mode.name
+                                for action in action_set:
+                                    action_node = ExecutionGraphNode(ExecutionGraphNodeType.Action)
+                                    action_node.parent = action_set_node
+                                    action_node.action = action
+                                    action_node.mode = mode.name
+
 
 
 
@@ -534,6 +714,7 @@ class ContainerExecutionGraph(AbstractExecutionGraph):
         node = ExecutionGraphNode(ExecutionGraphNodeType.Container)
         node.container = container
         node.parent = parent
+        node.mode = container.profile_mode
 
 
         # If container based conditions exist add them before any actions
@@ -704,6 +885,8 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
                             device_guid = device_guid,
                             identifier= input_id
                     )
+                    device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
+                    print (f"Added extra functor: {device_name} mode: {mode} event: {str(event)} ")
                     eh.add_latched_functor(device_guid, mode, event, functor)
                 
 

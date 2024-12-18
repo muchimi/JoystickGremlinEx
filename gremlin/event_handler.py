@@ -355,11 +355,17 @@ class EventListener(QtCore.QObject):
 	# request profile activate/deactivate
 	request_activate = QtCore.Signal(bool)  # param - flag - true to activate, false to deactivate
 
+	# request OSC start/stop
+	request_osc= QtCore.Signal(bool) # param - flag - true to start, false to stop
+
 	# gremlin ex shutdown in progress
 	shutdown = QtCore.Signal() 
 
 	# toggle highlighting mode
 	toggle_highlight = QtCore.Signal(object, object) # param (axis,button)
+
+	# heartbeat
+	heartbeat = QtCore.Signal() # ticks every 30 seconds
 
 
 	def __init__(self):
@@ -414,6 +420,11 @@ class EventListener(QtCore.QObject):
 		self._run_event = threading.Event()
 		self._run_thread = Thread(target=self._run)
 		self._run_thread.start()
+
+		self._keep_alive_event = threading.Event()
+		self._keep_alive_thread = threading.Thread(target = self._keep_alive)
+		self._keep_alive_thread.setName("heartbeat")
+		self._keep_alive_thread.start()
 
 	@property
 	def calibrationManager(self):
@@ -625,6 +636,11 @@ class EventListener(QtCore.QObject):
 			# terminate run thread
 			self._run_event.set()
 			self._run_thread.join()
+
+		# stop heart beat
+		self._keep_alive_event.set()
+		self._keep_alive_thread.join()
+
 		self.request_activate.emit(False)
 		self.shutdown.emit()
 
@@ -656,6 +672,16 @@ class EventListener(QtCore.QObject):
 		syslog.info("DILL: shutdown")
 		dinput.DILL.set_device_change_callback(None)
 		dinput.DILL.set_input_event_callback(None)
+
+
+	def _keep_alive(self):
+		''' keep alive 30 second hearbeat '''
+		notify_time = time.time()
+		while not self._keep_alive_event.is_set():
+			if time.time() >= notify_time:
+				self.heartbeat.emit()
+				notify_time = time.time() + 30
+			time.sleep(1)
 
 
 	def _joystick_event_handler(self, data):
@@ -756,9 +782,9 @@ class EventListener(QtCore.QObject):
 			return
 		
 		self._process_device_change_lock = True
+		syslog = logging.getLogger("system")
 
 		try:
-			syslog = syslog
 			
 			is_running = gremlin.shared_state.is_running
 			gremlin.shared_state.has_device_changes = True
@@ -1423,8 +1449,12 @@ class EventHandler(QtCore.QObject):
 		is_running = gremlin.shared_state.is_running
 		
 
-		if verbose and not is_running:
-			syslog.debug(f"EVENT: (edit time) change mode to [{new_mode}] requested - active mode: [{gremlin.shared_state.runtime_mode}]  current mode: [{gremlin.shared_state.current_mode}] profile '{current_profile.name}'")
+		if verbose:
+			if is_running:
+				syslog.debug(f"EVENT: (runtime) change mode to [{new_mode}] requested - active mode: [{gremlin.shared_state.runtime_mode}]  current mode: [{gremlin.shared_state.current_mode}] profile '{current_profile.name}'")	
+			else:
+				syslog.debug(f"EVENT: (edit time) change mode to [{new_mode}] requested - active mode: [{gremlin.shared_state.runtime_mode}]  current mode: [{gremlin.shared_state.current_mode}] profile '{current_profile.name}'")
+		
 
 
 		if new_mode == self.current_mode and not force_update:
@@ -1665,28 +1695,31 @@ class EventHandler(QtCore.QObject):
 							return
 						# else:
 						# 	print (f"No callbacks found for: {latch_key}")
-
+				verbose = gremlin.config.Configuration().verbose_mode_inputs
 			else:
 				if verbose:
 					syslog.info("No matching events")
 			return
 						
 		elif event.event_type ==InputType.Midi:
-			verbose = gremlin.config.Configuration().verbose_mode_details
 			m_list = self._matching_midi_callbacks(event)
+			if verbose and not m_list: syslog.info(f"EVENT: [MIDI] no matching inputs for {str(event.identifier.message_key)} mode: {self.runtime_mode}")
 					
 		elif event.event_type == InputType.OpenSoundControl:
-			verbose = gremlin.config.Configuration().verbose_mode_details
 			m_list = self._matching_osc_callbacks(event)
+			if verbose and not m_list: syslog.info(f"EVENT: [OSC] no matching inputs for {event.identifier.message_key} mode: {self.runtime_mode}")
+				
+			
 		elif event.event_type in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat):
-			verbose = gremlin.config.Configuration().verbose_mode_joystick
 			m_list = self._matching_callbacks(event)
 			f_list = self._matching_functors(event)
+			if verbose and not m_list: syslog.info(f"EVENT: [Joystick] no matching inputs for {str(event.identifier)} mode: {self.runtime_mode}")
 		else:
 			# other inputs including control inputs
-			verbose = gremlin.config.Configuration().verbose_mode_details
+			verbose = gremlin.config.Configuration().verbose_mode_inputs
 			m_list = self._matching_callbacks(event)
 			f_list = self._matching_functors(event)
+			if verbose and not m_list: syslog.info(f"EVENT: [Generic] no matching inputs for {str(event.identifier)} mode: {self.runtime_mode}")
 
 		
 		self._execute_callbacks(event, m_list, f_list)
@@ -1778,6 +1811,11 @@ class EventHandler(QtCore.QObject):
 				# search callbacks for mode hierarchy
 				callback_list = ec.getCallbacks(self.osc_callbacks[event.device_guid], key, self.runtime_mode)
 
+			verbose = config.Configuration().verbose_mode_osc
+			if verbose and not callback_list:
+				syslog = logging.getLogger("system")
+				syslog.info(f"OSC: no callbacks found for key: [{key}] mode: [{self.runtime_mode}]")
+
 		# Filter events when the system is paused
 		if not self.process_callbacks:
 			return [c[0] for c in callback_list if c[1]]
@@ -1791,12 +1829,26 @@ class EventHandler(QtCore.QObject):
 		functors_list = []
 		device_guid = event.device_guid
 		if device_guid in self.latched_functors:
-			mode = self.runtime_mode
-			if mode in self.latched_functors[device_guid].keys():
-				if event in self.latched_functors[device_guid][mode].keys():
-					functors_list = self.latched_functors[device_guid][mode][event]
-
+			import gremlin.execution_graph
+			ec = gremlin.execution_graph.ExecutionContext() # current execution context
+			modes = ec.getModeHierarchy(self.runtime_mode)
+			for mode in modes:
+				if mode in self.latched_functors[device_guid].keys():
+					if event in self.latched_functors[device_guid][mode].keys():
+						functors_list = self.latched_functors[device_guid][mode][event]
+						if functors_list:
+							break
 		return functors_list
+				
+
+		# device_guid = event.device_guid
+		# if device_guid in self.latched_functors:
+		# 	mode = self.runtime_mode
+		# 	if mode in self.latched_functors[device_guid].keys():
+		# 		if event in self.latched_functors[device_guid][mode].keys():
+		# 			functors_list = self.latched_functors[device_guid][mode][event]
+
+		# return functors_list
 
 
 	def _matching_callbacks(self, event):

@@ -1016,17 +1016,19 @@ class RemoteClient(QtCore.QObject):
         self._alive_thread = None
         self._alive_thread_stop_requested = False
 
+        el = gremlin.event_handler.EventListener()
+        el.heartbeat.connect(self._alive_ticker)
 
     def start(self):
         ''' creates a multicast client send socket'''
-        if self._broadcast_enabled:
-            # alive thread is only on master machine
-            if not self._alive_thread:
-                syslog.debug("Starting Alive thread...")
-                self._alive_thread_stop_requested = False
-                self._alive_thread = threading.Thread(target=self._alive_ticker)
-                self._alive_thread.setName("remote_alive")
-                self._alive_thread.start()
+        # if self._broadcast_enabled:
+        #     # alive thread is only on master machine
+        #     if not self._alive_thread:
+        #         syslog.debug("Starting Alive thread...")
+        #         # self._alive_thread_stop_requested = False
+        #         # self._alive_thread = threading.Thread(target=self._alive_ticker)
+        #         # self._alive_thread.setName("remote_alive")
+        #         # self._alive_thread.start()
 
         self.ensure_socket()
 
@@ -1057,19 +1059,27 @@ class RemoteClient(QtCore.QObject):
             syslog.debug("Gremlin RPC client stopped.")
 
     def _alive_ticker(self):
-        ''' sends an alive packet to keep the remote alive '''
+        ''' sends an alive packet to keep the ports alive '''
 
-        notify_time = time.time()
-        while not self._alive_thread_stop_requested:
-            if time.time() >= notify_time:
+        if self._broadcast_enabled:
                 data = {}
                 data["sender"] = self._id
                 data["action"] = "hb"
                 raw_data = msgpack.packb(data)
                 self._send(raw_data)
                 syslog.debug("Alive heartbeat")
-                notify_time = time.time() + 30
-            time.sleep(1)
+
+        # notify_time = time.time()
+        # while not self._alive_thread_stop_requested:
+        #     if time.time() >= notify_time:
+        #         data = {}
+        #         data["sender"] = self._id
+        #         data["action"] = "hb"
+        #         raw_data = msgpack.packb(data)
+        #         self._send(raw_data)
+        #         syslog.debug("Alive heartbeat")
+        #         notify_time = time.time() + 30
+        #     time.sleep(10)
         
 
     def _send(self, data = None):
@@ -1273,7 +1283,7 @@ class RemoteClient(QtCore.QObject):
 
             
 
-class OscClient(QtCore.QObject):
+class InputOscClient(QtCore.QObject):
     ''' runtime client for OSC messages '''
 
     def __init__(self):
@@ -2444,4 +2454,4 @@ remote_client = RemoteClient()
 # listens to MIDI input
 midi_client = MidiClient()
 
-osc_client = OscClient()
+osc_client = InputOscClient()

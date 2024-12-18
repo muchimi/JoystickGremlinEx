@@ -252,6 +252,10 @@ Joystick Gremlin EX
 <!-- TOC --><a name="134016ex-pre-release"></a>
 ## 13.40.16ex (pre-release)
 <!-- TOC --><a name="m45"></a>
+### (m48)
+- API: UDP ports keep alive now event based (this is for the OSC and remote control capability).
+- Fix: scale value not loading correctly from profile on restart for VjoyRemap and legacy remap not allowing scales > 1.0.  
+
 ### (m47)
 - API: in general, the code makes more use of internal events to start/stop and record changes and simplify the logic, which results in performance gains.
 - API: in general, more detailed diagnostics logging if the appropriate log option is enabled.  Warning: log entries can have a performance hit on GremlinEx when executing profiles.

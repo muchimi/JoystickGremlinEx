@@ -825,6 +825,8 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.container_merge_options_widget = QtWidgets.QWidget()
         self.container_merge_options_layout = QtWidgets.QHBoxLayout(self.container_merge_options_widget)
         self._merge_widgets_map = {}
+        
+
         for merge_type in MergeOperationType:
             if merge_type != MergeOperationType.NotSet:
                 rb = gremlin.ui.ui_common.QDataRadioButton(text = MergeOperationType.to_display_name(merge_type), data = merge_type)
@@ -2654,7 +2656,7 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         self._merge_device_guid : dinput.GUID = None # input guid for the merge device
         self.merge_input_id : int = None # input id of the merged input
         self.merge_input_type : gremlin.input_types.InputType =  gremlin.input_types.InputType.JoystickAxis # only merging axes at this point
-        self._merge_mode : MergeOperationType = MergeOperationType.NotSet # default merge method
+        self._merge_mode : MergeOperationType = MergeOperationType.Center # default merge method
         self.output_range_min : float = -1.0 # min for merged output
         self.output_range_max : float = 1.0 # max for merged output
         self.merge_invert : bool = False # inversion flag for merged output
@@ -3031,7 +3033,7 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
 
             if "axis-type" in node.attrib:
                 self.axis_mode = safe_read(node, "axis-type", str, "absolute")
-            if "axis-scaline" in node.attrib:
+            if "axis-scaling" in node.attrib:
                 self.axis_scaling = safe_read(node, "axis-scaling", float, 1.0)
 
             if "pulse_delay" in node.attrib:

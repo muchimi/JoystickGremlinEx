@@ -47,6 +47,7 @@ import gremlin.user_plugin
 import gremlin.sendinput as sendinput
 import gremlin.execution_graph
 import anytree
+import traceback
 
 syslog = logging.getLogger("system")
 
@@ -496,11 +497,14 @@ class CodeRunner:
 
 
         except Exception as e:
-            msg = f"Unable to launch profile due to an error: {e}"
+            tb_msg = traceback.format_exc()
             # re-enable tabs
             self.enableUI()
-            syslog.debug(msg)
-            gremlin.util.display_error(msg)
+            syslog.error("Unable to launch profile:")
+            syslog.error(f"Error: {e}")
+            syslog.error(f"Traceback: {tb_msg}")
+
+            gremlin.util.display_error(f"Unable to launch profile due to an error: {tb_msg}")
             
             
 

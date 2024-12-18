@@ -24,8 +24,6 @@ from PySide6 import QtWidgets, QtCore, QtGui
 import threading
 import gremlin.config
 import gremlin.event_handler
-import gremlin.event_handler
-import gremlin.execution_graph
 from gremlin.types import DeviceType
 from gremlin.input_types import InputType
 import gremlin.shared_state
@@ -1550,34 +1548,43 @@ class SimpleUDPClient(UDPClient):
         self.send(msg)
 
 
-class OscInternalClient():
-    def __init__(self, host_ip = "127.0.0.1", output_port = 8001):
+class OscClient():
+    def __init__(self, host_ip = "127.0.0.1", output_port = 8001, name = None):
         #logging.getLogger("system").info("OSC: server init")
-        self._server = host_ip
+        self._server_ip = host_ip
         self._output_port = output_port
         self._client = None
         self._started = False
+        self._name = name
 
     def setPort(self, port):
         self._output_port = port
 
     def setHost(self, host : str):
-        self._server = host
+        self._server_ip = host
 
+    def setName(self, value : str):
+        self._name = value
     
-    def start(self):
+    def start(self, server_ip = None, server_port = None):
         '''
         starts the OSC client to send OSC commands
         :param host_ip = ip address of server in format xxx.xxx.xxx.xxx
         :param input_port = input port, numeric, default 8000
         '''
+
+        if server_ip:
+            self._server_ip = server_ip
+        if server_port:
+            self._output_port = server_port
         
         syslog = logging.getLogger("system")
-        if self._server is not None and self._output_port is not None:
-            self._client = UDPClient(self._server, self._output_port)
+        if self._server_ip is not None and self._output_port is not None:
+            self._client = UDPClient(self._server_ip, self._output_port)
             self._started = True
+            syslog.info(f"OSC client: {self._name} starting {self._server_ip} port: {self._output_port}")
         else:
-            syslog.error("Invalid OSC configuration, provide server IP and port #")
+            syslog.error(f"OSC client: {self._name} Invalid OSC configuration, provide server IP and port #")
 
     def stop(self):
         if self._started:
@@ -1614,14 +1621,14 @@ class OscInternalClient():
         
         
         '''
-        if not self._started:
-            self.start()
-
-
+        syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_osc
+        if not self._started:
+            return # not started
+        
         if verbose:
-            syslog = logging.getLogger("system")
-            msg = f"Send OSC: {command}"
+            
+            msg = f"OSC (internal): Send OSC: {command}"
             if v1 is not None:
                 msg += f" {v1}"
             if v2 is not None:
@@ -1643,19 +1650,17 @@ class OscInternalClient():
 
 class OscServer():
 
-    def thread_loop(self):
+    def _server_thread_loop(self):
         ''' main threading loop '''
         
         #logging.getLogger("system").info("OSC: server starting")
         self._dispatcher = OscDispatcher()
         self._dispatcher.set_default_handler(self._callback)
         self._server = BlockingOSCUDPServer((self._host_ip, self._input_port), self._dispatcher)
-        
+        logging.getLogger("system").info("OSC: server starting")
         # this blocks until the server is shutdown
-        logging.getLogger("system").info("OSC: server running")
+        self._server.serve_forever()  # blocks until shutdown
 
-        # this runs after the server has shutdown
-        self._server.serve_forever()  # Blocks forever
         logging.getLogger("system").info("OSC: server shutdown")
         self._server = None
 
@@ -1670,7 +1675,7 @@ class OscServer():
         self._missed_count = 0
         self._start_requested = False
         self._lock = threading.Lock()
-        self._server_thread = threading.Thread(target=self.thread_loop)
+        self._server_thread = None
         self._host_ip = None
         self._input_port = None
         self._dispatcher = None
@@ -1715,12 +1720,13 @@ class OscServer():
             self._callback = callback
             
             self._stop = False
-            self._server_thread = threading.Thread(target=self.thread_loop)
+            self._server_thread = threading.Thread(target=self._server_thread_loop)
+            self._server_thread.setName("OSC server listener")
             self._server_thread.start()
             self._running = True
 
             syslog = logging.getLogger("system")
-            syslog.info("OSC: start")        
+            syslog.info(f"OSC: start {self._host_ip} port {self._input_port}")        
 
 
 
@@ -1736,7 +1742,7 @@ class OscServer():
         self._server_thread.join()
         self._server_thread = None
         self._running = False
-        #logging.getLogger("system").info("OSC: server stopped")
+        logging.getLogger("system").info("OSC: server stopped")
 
     
 
@@ -1755,21 +1761,6 @@ class OscInterface(QtCore.QObject):
         super().__init__()
 
 
-        #self._host_ip = "192.168.1.59"
-        # host OSC listen port (UDP) - make sure the host's firewall allows that port in
-        config = gremlin.config.Configuration()
-        self._input_port = config.osc_port
-        self._output_port = config.osc_output_port # self._input_port + 1
-        self._target_ip = config.osc_host # the OSC target IP
-        self._osc_server = OscServer() # the OSC server
-        self._osc_client = OscInternalClient(self._target_ip, self.output_port) # the OSC client
-
-        self.osc_enabled = True # always able to listen to ports
-
-        el = gremlin.event_handler.EventListener()
-        el.profile_start.connect(self._profile_start)
-
-
         # find our current IP address
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.settimeout(0)
@@ -1780,17 +1771,30 @@ class OscInterface(QtCore.QObject):
             self._host_ip= '127.0.0.1'
         finally:
             s.close()
-        
-        
+
+        #self._host_ip = "192.168.1.59"
+        # host OSC listen port (UDP) - make sure the host's firewall allows that port in
+        config = gremlin.config.Configuration()
+        self._started = False
+        self._input_port = config.osc_port
+        self._output_port = config.osc_output_port # self._input_port + 1
+        self._target_ip = config.osc_host
+        self._target_port = config.osc_output_port
+        self._osc_server = OscServer() # the OSC server
+        self._osc_internal_client = OscClient(self._host_ip, self.output_port,"internal") # the OSC internal client for loop messages
+        self._osc_client = OscClient(self._target_ip, self._target_port) # the OSC client
+
+        self.osc_enabled = True # always able to listen to ports
+
+        el = gremlin.event_handler.EventListener()
+        el.profile_start.connect(self._profile_start)
+        el.request_osc.connect(self._request_osc_state)
+
+
+       
+
 
         self._started = False
-
-        if config.osc_enabled:
-            logging.getLogger("system").info(f"OSC: Start")
-            self.start()
-        else:
-            logging.getLogger("system").info(f"OSC: Disabled")
-
 
     @QtCore.Slot()
     def _profile_start(self):
@@ -1799,20 +1803,44 @@ class OscInterface(QtCore.QObject):
         ensure the OSC server is running if the profile has OSC items
         
         '''
-        from gremlin.input_types import InputType
+        import gremlin.execution_graph
         config = gremlin.config.Configuration()
+        verbose = config.verbose_mode_osc
+        syslog = logging.getLogger("system")
         if config.osc_enabled:
-            if not self._started:
-                ec = gremlin.execution_graph.ExecutionContext()
-                if ec.hasInputType(InputType.OpenSoundControl):
-                    logging.getLogger("system").info(f"OSC: Start")
+            ec = gremlin.execution_graph.ExecutionContext()
+            uses_osc = ec.hasInputType(InputType.OpenSoundControl)
+            if uses_osc:
+                if verbose:
+                    # dump the mappings to the log file
+                    syslog.info("OSC: Listening for commands:")
+                    items = ec.getMappedInputs(InputType.OpenSoundControl)
+                    item: gremlin.execution_graph.ExecutionContextInputData
+                    for item in items:
+                        syslog.info(f"\t{item.input_item.input_id.display_name}  key: {item.input_item.input_id.message_key} mode: {item.mode}  mode hiearchy: {item.modes}")
+
+            if uses_osc:
+                if not self._started:
+                    ec = gremlin.execution_graph.ExecutionContext()
+                    if verbose: syslog.info(f"OSC: Start")
                     self.start()
                 else:
-                    logging.getLogger("system").info(f"OSC: no OSC definitions found - start skipped")
+                    syslog.info(f"OSC: Running")
             else:
-                logging.getLogger("system").info(f"OSC: Running")
+                syslog.info(f"OSC: no OSC mappings found - start skipped")
         else:
-            logging.getLogger("system").info(f"OSC: Disabled by option")
+            syslog.info(f"OSC: Disabled by option")
+
+
+    @QtCore.Slot(bool)
+    def _request_osc_state(self, state : bool):
+        from gremlin.input_types import InputType
+
+        if state:
+            self.start()
+        else:
+            self.stop()
+
 
     @property
     def input_port(self):
@@ -1849,25 +1877,41 @@ class OscInterface(QtCore.QObject):
         ''' handles OSC messages'''
         verbose = gremlin.config.Configuration().verbose_mode_osc
         if verbose: logging.getLogger("system").info(f"OSC: {address}: {args}")
-        address = address.lower()
+        address = address.casefold()
+        if address == "/noop":
+            # heartbeat
+            #logging.getLogger("system").info(f"OSC: tick") 
+            return
         self.osc_message.emit(address, args)
 
     def start(self):
         ''' starts listening to OSC messages '''
+
         if not self._started:
             logging.getLogger("system").info(f"OSC: starting with IP: {self._host_ip} port: {self._input_port} send host: {self._target_ip} port: {self._output_port}")
             self._osc_server.start(self._host_ip, self._input_port, self._osc_message_handler)
-            self._osc_client.start()
+            self._osc_internal_client.start(self._host_ip, self._input_port)
+            self._osc_client.start(self._target_ip, self._output_port)
             self._started = True
+            el = gremlin.event_handler.EventListener()
+            el.heartbeat.connect(self._keep_alive)
             
 
+    def _keep_alive(self):
+        if self._started:
+            self._osc_internal_client.send("/noop")
+            
 
     def stop(self):
         ''' stops listencing to OSC messages '''
         if self._started:
             self._osc_server.stop()
             self._osc_client.stop()
+            self._osc_internal_client.stop()
             self._started = False
+            el = gremlin.event_handler.EventListener()
+            el.heartbeat.disconnect(self._keep_alive)
+
 
     def send(self, command : str, v1 = None, v2 = None):
         ''' send data '''

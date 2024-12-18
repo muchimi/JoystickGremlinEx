@@ -204,7 +204,7 @@ class Configuration:
             self._data["last_mode"] = {}
         self._data["last_mode"][profile_path] = mode_name
         syslog = logging.getLogger("system")
-        syslog.info(f"CONFIG: last runtime profile mode: [{mode_name}] for profile [{os.path.basename(profile_path)}]")
+        syslog.info(f"CONFIG: storing last runtime profile mode: [{mode_name}] for profile [{os.path.basename(profile_path)}]")
         self.save()
 
     def get_last_runtime_mode(self, profile_path):
@@ -1096,7 +1096,11 @@ class Configuration:
         ''' true if verbose mode is in OSC mode '''
         return self.verbose and VerboseMode.Process in self.verbose_mode
     
-
+    @property
+    def verbose_mode_exec(self):
+        ''' true if verbose mode is in Exec(ute) mode '''
+        return self.verbose and VerboseMode.Exec in self.verbose_mode
+    
     @property
     def midi_enabled(self):
         ''' true if MIDI module is enabled '''
@@ -1137,7 +1141,6 @@ class Configuration:
         self._data["osc_output_port"] = value
         self.save()
     
-
     @property
     def osc_host(self):
         ''' OSC client host (this is the IP the client sends OSC data to)'''
@@ -1148,9 +1151,6 @@ class Configuration:
     def osc_host(self, value : str):
         self._data["osc_host"] = value
         self.save()
-
-
-
 
     @property
     def show_scancodes(self):
