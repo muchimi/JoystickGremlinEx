@@ -259,7 +259,7 @@ class ExecutionContext():
         '''
         nodes = []
         for node in anytree.PreOrderIter(self.root):
-            if node.action:
+            if node.nodeType == ExecutionGraphNodeType.Action:
                 if node.action.name == plugin_name:
                     nodes.append(node)
 

@@ -1628,7 +1628,7 @@ class OscClient():
         
         if verbose:
             
-            msg = f"OSC (internal): Send OSC: {command}"
+            msg = f"OSC (internal): Send OSC: {command}  target: {self._server_ip}  port: {self._output_port}"
             if v1 is not None:
                 msg += f" {v1}"
             if v2 is not None:
@@ -1809,7 +1809,7 @@ class OscInterface(QtCore.QObject):
         syslog = logging.getLogger("system")
         if config.osc_enabled:
             ec = gremlin.execution_graph.ExecutionContext()
-            uses_osc = ec.hasInputType(InputType.OpenSoundControl)
+            uses_osc = ec.hasInputType(InputType.OpenSoundControl) or ec.findActionPlugin("Map to OSC")
             if uses_osc:
                 if verbose:
                     # dump the mappings to the log file
