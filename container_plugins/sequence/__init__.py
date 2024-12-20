@@ -64,12 +64,12 @@ class SequenceContainerWidget(AbstractContainerWidget):
 
         self.widget_layout.addWidget(self.action_selector)
 
-        self.trigger_widget = QtWidgets.QCheckBox("Trigger on release")
-        self.trigger_widget.setToolTip("Triggers the sequence on input release instead of input press")
-        self.trigger_widget.setChecked(self.profile_data.trigger_on_release)
-        self.trigger_widget.clicked.connect(self._trigger_mode_changed)
+        self._trigger_on_release_widget = QtWidgets.QCheckBox("Trigger on release")
+        self._trigger_on_release_widget.setToolTip("Triggers the sequence on input release instead of input press")
+        self._trigger_on_release_widget.setChecked(self.profile_data.trigger_on_release)
+        self._trigger_on_release_widget.clicked.connect(self._trigger_mode_changed)
 
-        self.widget_layout.addWidget(self.trigger_widget)
+        self.widget_layout.addWidget(self._trigger_on_release_widget)
         self.widget_layout.addStretch()
 
         self.action_layout.addLayout(self.widget_layout)

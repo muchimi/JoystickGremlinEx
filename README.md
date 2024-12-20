@@ -9,50 +9,7 @@ Joystick Gremlin EX
 
 - [Changelog](#changelog)
    * [13.40.16ex (pre-release)](#134016ex-pre-release)
-      + [(m45)](#m45)
-      + [(m44)  ](#m44)
-      + [(m43)](#m43)
-      + [(m42)](#m42)
-      + [(m41)](#m41)
-      + [(m40)](#m40)
-      + [(m39)](#m39)
-      + [(m38)](#m38)
-      + [(m37)](#m37)
-      + [(m36)](#m36)
-      + [(m35)](#m35)
-      + [(m34)](#m34)
-      + [(m33)](#m33)
-      + [(m32)](#m32)
-      + [(m31)](#m31)
-      + [(m30)](#m30)
-      + [(m29)](#m29)
-      + [(m28)](#m28)
-      + [(m27)](#m27)
-      + [(m26)](#m26)
-      + [(m25)](#m25)
-      + [(m24)](#m24)
-      + [(m23)](#m23)
-      + [(m22)](#m22)
-      + [(m21)](#m21)
-      + [(m20)](#m20)
-      + [(m19)](#m19)
-      + [(m18)](#m18)
-      + [(m17)](#m17)
-      + [(m16)](#m16)
-      + [(m15)](#m15)
-      + [(m14)](#m14)
-      + [(m13)](#m13)
-      + [(m12)](#m12)
-      + [(m11)](#m11)
-      + [(m10)](#m10)
-      + [(m9)](#m9)
-      + [(m7/8)](#m78)
-      + [(m6)](#m6)
-      + [(m6)](#m6-1)
-      + [(m4)](#m4)
-      + [(m3)](#m3)
-      + [(m2)](#m2)
-      + [(m1)](#m1)
+      + [(patches)](#patches)
    * [13.40.15ex ](#134015ex)
       + [(m5.4) hotfix](#m54-hotfix)
       + [(m5.3) hotfix](#m53-hotfix)
@@ -251,10 +208,16 @@ Joystick Gremlin EX
 
 <!-- TOC --><a name="134016ex-pre-release"></a>
 ## 13.40.16ex (pre-release)
-<!-- TOC --><a name="m45"></a>
+
 ### (m48)
+- New: OSC send action.  This allows GremlinEx to send OSC commands outbound.  For now it's a single IP address and port specified in the options menu.  OSC commands start with a forward slash (improperly formatted commands will not send), and it has two optional parameters per the OSC protocol which can be integer or floating point.
+- Improved: profile runtime determination startup logic consolidated and simplified. The change primarily impacts profiles attached to processes for automatic load/execution if those options are enabled for automatic profile execution/swaps.
+- Improved: UI will now display mode hierarchies as folders in the actions that change profiles to make it easier to visualize mode nesting.  This is a visual change only and does not change the mode names in any way.
 - API: UDP ports keep alive now event based (this is for the OSC and remote control capability).
+- API: Execution tree is built before a profile is started. This is available through the new ExecutionContext.
 - Fix: scale value not loading correctly from profile on restart for VjoyRemap and legacy remap not allowing scales > 1.0.  
+- Fix: UI exception when not using joystick input repeaters
+
 
 ### (m47)
 - API: in general, the code makes more use of internal events to start/stop and record changes and simplify the logic, which results in performance gains.
@@ -296,7 +259,6 @@ Fixes:
 - Improved: GremlinEx now remembers up to 15 profiles
 
 
-<!-- TOC --><a name="m44"></a>
 ### (m44)  
 - Improved: The legacy calibration method has been deprecated. Legacy data will be loaded if it exists the first time GremlinEx runs from an older version. The calibration tool is removed, and calibration options are moved to individual input via a configuration button for each that brings up a dialog specific to that input. The new features include new visualization of live data, inversion, and deadzone settings applied at the input level without needing a curve. The calibration applies to the input before further processing by GremlinEx, including before any curve is applied.  By default all axes are setup as "centered" and no calibration is applied so no changes are needed unless calibration should be applied.  Calibration data is now saved to a separate XML datafile in the user profile folder where profiles are kept and includes the new flags/options in it.
 - Experimental: ability to disable certain inputs and manage input enabled state at profile runtime via the new control action.  The control action can only be mapped to a momentary input and can control the enabled state on any known input.  The idea of this feature is to (1) enable/disable inputs without having to connect/disconnect them which can cause problems or conflicts or re-ordering (2) for advanced setups where multiple inputs may be mapped to the same output and this is not desirable due to conflict in certain scenarios. 
@@ -307,19 +269,19 @@ Fixes:
 - New: documentation on calibration
 
 
-<!-- TOC --><a name="m43"></a>
+
 ### (m43)
 - Improved: curve dialog window on input has scrollbars for lower resolution displays.
 - Fix: Simconnect functor exception with new API tree feature
 
-<!-- TOC --><a name="m42"></a>
+
 ### (m42)
 - API: Refactored the execution graph to also create a new execution tree data structure.  This makes it much easier to navigate the execution graph at runtime from any point of the execution, output diagnostics and derive latched actions.
 - Improved: The API improvement simplifies curve computations and resolves merged axis curve application in map to vjoy.
 - Fix: last runtime profile restore on profile start non longer throws an exception if option is enabled
 - Fix: automatic profile load based on mapped process if option is enabled
 
-<!-- TOC --><a name="m41"></a>
+
 ### (m41)
 - Improved: Keyboard mapper Ex enhanced display of selected keys.
 - Improved: Simconnect (MSFS) supports two-way communication via OSC (see osc_msfs.py as the demo of the parking brakes).  The demo OSC/Pilot and user plugin module to support two way comms is in the demo msfs zip file.  Note: this is not OSC/Pilot specific - just provided as a demo here.  The concept is similar with other OSC surface control software  although it may have to be tweaked based on that software's capabilities.
@@ -330,28 +292,28 @@ Fixes:
 <!-- TOC --><a name="m40"></a>
 ### (m40)
 - Fix: small update for mouse ex not releasing mouse button (thanks for reporting!)
-<!-- TOC --><a name="m39"></a>
+
 ### (m39)
 - Improved: OSC output can send to any IP address (set IP and port in options).  The prior implementation was sending to the local server only.
 
-<!-- TOC --><a name="m38"></a>
+
 ### (m38)
 - Fix: removed redundant "force numlock off" check box in profile to process mapping as that option is superfluous.  Each profile can set its own option in the profile config window, or it can be set globally in options.  Those two methods are sufficient to achieve the desired behavior.  
 - Fix: Curves applied to input axes not always loaded post converting to the new curve editor.
 - New: Conditions have their own verbose mode for log output for troubleshooting conditions in the log.  When this is enabled, the execution plan and the outcome of tested conditions will be output to the log to help diagnose issues around conditions.  Conditions and execution plans are very complicated (warning, when enabled, as with most verbose modes, this can generate a lot of log data and consequently slows GremlinEx down significantly).
 - Fix: Docktab for mappings generating an internal Python exception because the C++ reference was garbage collected before the Python reference.
 
-<!-- TOC --><a name="m37"></a>
+
 ### (m37)
 - Fix: exception on mode change with certain curve setups  
 
-<!-- TOC --><a name="m36"></a>
+
 ### (m36)
 - Improved: Added OSC send capability
 - Improved: Added VJOY output events  
 - New: GremlinEx to OSC vjoy output script user plugin demo
 
-<!-- TOC --><a name="m35"></a>
+
 ### (m35)
 - Improved: Condition processing for containers and actions are now cumulative, meaning that each container has a set of conditions for the whole container, and another concurrent set for each action in the container to toggle each one individually.  If a condition on a container fails, the whole container is disabled, regardless of the individual conditions on actions.
 - Improved: Condition logic
@@ -359,11 +321,11 @@ Fixes:
 - Fix: Keyboard input: Arrows keys no longer get translated to Numpad arrow keys
 - API: reworked the container and actions conditions API.
 
-<!-- TOC --><a name="m34"></a>
+
 ### (m34)
 - Unreleased test version
 
-<!-- TOC --><a name="m33"></a>
+
 ### (m33)
 - New: Map to vjoy, hat to button mode has a new sticky option.  When enabled and the position mapping is in the hold mode, any pressed hat positions will "stick" until the hat is returned to center, and when disabled, only the current hat position is pressed.   This mode is only relevant when in hold mode, it has no meaning in the pulse mode for obvious reasons.
 - Fix: Tempo/TempoEx/Chain/Switch/Button did not support hats as input
@@ -372,12 +334,12 @@ Fixes:
 
 
 
-<!-- TOC --><a name="m32"></a>
+
 ### (m32)
 - Improved: cross-reference data returned by Vjoy API with data returned by DirectInput and more detailed log data for what was detected.  This can help with troubleshooting.
 - Fix: typo in tempo/tempoEx in variable name
 - Fix: possible tray icon exception when the application exits and the tray icon has already been discarded.
-<!-- TOC --><a name="m31"></a>
+
 ### (m31)
 - Improved: support for Simconnect for MSFS2024.  This is a work in progress and does not include all planned features, such as, a facility to add custom simvars from add-on products.  The barebones module is functional with MSFS 2024 released Tuesday, November 10th, 2024.
 - Improved: Map to vjoy adds a new hat to button mode to map up to 8 hat positions directly to buttons.  The buttons can be pulsed or held.
@@ -387,16 +349,16 @@ Fixes:
 - Known issue: condition marker does not always update in all use cases (this does not impact functionality)
 - Known issue: conditions if also mapped for their own actions may cause some conflicts because they fire at the same time.
 
-<!-- TOC --><a name="m30"></a>
+
 ### (m30)
 - Fix for condition tab error when adding a condition that applies to the container - related to the addition of the status flag in m27 
 
-<!-- TOC --><a name="m29"></a>
+
 ### (m29)
 - Fix for m28 vjoy mapper ignoring curve data on load due to a tag change in m28
 - Fix for missing panel in vjoy mapper for some other button modes (m28 fixed the axis to button but missed a few others that had the same issue when mapping to a button input)
 
-<!-- TOC --><a name="m28"></a>
+
 ### (m28)
 - Improved: GremlinEx can automatically convert legacy Remap and Response Curve to their GremlinEx version provided that options are enabled from the Profile page in the options.  Converting is recommended and will occur when a profile is loaded.  When the convert option is selected, the legacy mappers will no longer be visible from the action drop down either to encourage the use of the new actions.
 - Improved: Added option to toggle the display of button grids in the GremlinEx options panel.  This is the same as holding the control key down when toggling the "show button grid" in the Map to Vjoy mapper.
@@ -406,14 +368,14 @@ Fixes:
 - Fix: Floating point and integer text input wheel events are no longer propagated (that could cause random unexpected scrolling of a parent containers)
 
 
-<!-- TOC --><a name="m27"></a>
+
 ### (m27)
 - Fix: Input or output axis curves: setting deadzone via buttons not saving values. 
 - Improved: [experimental] Condition tab will show a marker when one or more conditions are defined (I've set it up to pickup any condition however I am not a heavy user of conditions so it's completely possible this will trip up somewhere)
 - Fix: VJOY used button state now takes into account axis to button mappings.
 - Fix: VJoy Remap typo in diagnostics code to handle invalid VJOY IDs
 
-<!-- TOC --><a name="m26"></a>
+
 ### (m26)
 - Improved: Complete input mappings for an input (all containers) can now be copied and pasted all at once from the clipboard as a set.  This makes is easier to copy/paste multiple container mappings between inputs. Note: when pasting multiple containers, only valid containers in the clipboard will be pasted so if you are missing a container, it's because it wasn't valid for the input.  This comes into play when copying containers for an axis and pasting it to a button input, and vice versa.  (new container toolbar button).
 - Improved: It is now possible to clear all mappings from an input.  A confirmation box will be presented (new container toolbar button).
@@ -423,11 +385,11 @@ Fixes:
 - Fix: Paste action didn't recognize XML ObjectEncoder data
 - Improved: Vjoy Remap will validate the VJOY device ID and gracefully provide an error message with the offending ID rather than causing an exception if it cannot be found in the active VJOY device list.  The action will also check at profile load if an ID is not valid, for example an older profile referencing an ID that no longer exists.  IDs are assigned by the VJOY Configurator.
 
-<!-- TOC --><a name="m25"></a>
+
 ### (m25)
 - Fix: Curve controller now checks for duplicated points when fitting a curve
 
-<!-- TOC --><a name="m24"></a>
+
 ### (m24)
 - Improved: The range container now supports directional triggers based on a relative input axis position change. The container can now trigger its actions based on an input increase or decrease, or both, provided that the input change (delta) exceeds the percentage or range set (default 10% deviation).  The use case for this is to trigger a button or key based on a slider input going up or down.  Note: if mapping a button or key, use the pulse feature as the container is only an "on" container - in trigger on change mode, it does not issue a release so the action must self release if that is the desired behavior.
 - Improved: Import profile function UI improvements
@@ -438,13 +400,13 @@ Fixes:
 - Improved: Map to Mouse Ex can now send double-clicks
 - Fix: Input load skips loading vjoy inputs that do not exist anymore whatever the reason and will output a warning log entry if it cannot find something 
 
-<!-- TOC --><a name="m23"></a>
+
 ### (m23)
 - Improved: 1:1 mapping now has a configuration dialog box to select target and mapping mode.
 - Fix: 1:1 usable mode accounts for vjoy mappings by both vjoy mappers
 - Fix: Input selection can throw a missing argument exception in m22 patch
 
-<!-- TOC --><a name="m22"></a>
+
 ### (m22)
 - Improved: axis repeater bar no longer causes a small window to flash temporarily on the UI
 - Improved: vjoy remap show/hide button grid checkbox can now change the state for all vjoy remap actions in the profile if the state is changed while a control key is held
@@ -456,50 +418,50 @@ Fixes:
 - Fix: switch container caused an exception when adding a new switch position
 
 
-<!-- TOC --><a name="m21"></a>
+
 ### (m21)
 - Fix: Legacy remap displays blank (or incorrect) value on reload for certain input choices
 - Fix: TempoEx container condition UI invalid index exception when setting conditions based on actions
 - Improved: Refactored button usage tracking
 
-<!-- TOC --><a name="m20"></a>
+
 ### (m20)
 - Fix: display details in MIDI inputs would hide details on other entries
 - Fix: MIDI configuration update was not not updating input description consistently
 - Fix: input display fails to update for keyboard entries in m19  
 
 
-<!-- TOC --><a name="m19"></a>
+
 ### (m19)
 - Improved: legacy remap and map to vjoy actions now synchronize the used data.
 - Improved: action list for button mappings now updates when queried to ensure the usage data is up to date across the entire profile.
 
-<!-- TOC --><a name="m18"></a>
+
 ### (m18)
 - Improved: Axis names.  GremlinEx will attempt to derive the axis usage name (X, Y, Z, RX, RY, RZ, SL1, SL2) for inputs and VJOY output as reported and mapped by DirectInput. While many device report as expected, some (non VJOY) devices do not report a usage for an axis.  When this happens, the name of the axis will be its axis sequence number (1 to 8). If a usage is defined and can be derived, the specified usage name will be used and displayed in GremlinEx. Names are informational only and GremlinEx will always use the hardware device and input IDs for mapping.
 - Improved: GremlinEx considers axis names when a VJOY definition has skipped axes
 - API: VJOYSelector is now based on data instead of naming conventions which fixes the legacy mapper (remap to vjoy does not use this).
 
-<!-- TOC --><a name="m17"></a>
+
 ### (m17)
 - Fix: action icon not always updating when adding, changing or removing an action/container.
 - Fix: usage icons on map to vjoy button grid update on profile load
 - Fix: usage icons on map to vjoy button grid show other mappings when clicked
 
-<!-- TOC --><a name="m16"></a>
+
 ### (m16)
 - Fix: missing raw value in curve  
 
-<!-- TOC --><a name="m15"></a>
+
 ### (m15)
 - Fix: enabled/disabled state of MIDI and OSC inputs did not impact UI such as sort and device visibility.  They now do.
 
-<!-- TOC --><a name="m14"></a>
+
 ### (m14)
 - Fix: Gated Axis delete gate does not update range data.
 - Fix: Gated Axis add/remove container or actions in range or gate action could disable input tracking and cause the Gated Axis action to become unresponsive.
 
-<!-- TOC --><a name="m13"></a>
+
 ### (m13)
 - Fix: Merge Axis action creating invalid axis reference for second device upon initialization if the first device was the last axis on the particular input device selected.
 - Fix: Merge Axis action not marked as a singleton action.
@@ -507,7 +469,7 @@ Fixes:
 - Improved: Map to Vjoy action in an action container will display the correct design time axis output when nested or no data if the parent action does not support it.
 
 
-<!-- TOC --><a name="m12"></a>
+
 ### (m12)
 - Fix: With a new, unsaved profile, removing a container for a gate or range in the Gated Axis action results also removes the container on the parent action (this was a visual item, upon saving it would load correctly the next time).  This is resolved in m12.  
 - Improved: Singleton actions (actions that can only apply once per input) will generate a message box error if added more than once, or if nested.
@@ -515,34 +477,34 @@ Fixes:
 - Improved: Detail button in profile import will show the capabilities of the source and target for mapping purposes.
 - Fix: debug mode left on in m11 would call up XML profile in the default text editor if they differed.
 
-<!-- TOC --><a name="m11"></a>
+
 ### (m11)
 - Fix: for midi and osc enabled options not saving properly after changes to the validation logic for these two services introduced in m6.
 
-<!-- TOC --><a name="m10"></a>
+
 ### (m10)
 - Improved: profiles no longer save empty entries (entries with no mappings and entries that use defaults) - this reduces the size of the saved profile and improves loading/save time.
 - Improved: detection of profile changes when loading a new profile (will now ignore default entries or entries with no mappings)
 - Fix: window title doesn't always get updated when loading a profile from the menu
 
-<!-- TOC --><a name="m9"></a>
+
 ### (m9)
 - New: left and right panels can be resized via a splitter
 - Fix: Gated Axis add/remove gate manually throws an exception when manually setting the gate count
 
 
-<!-- TOC --><a name="m78"></a>
+
 ### (m7/8)
 - Fix: saving calibration throws an exception (bad reference)
 - Fix: add gate via the add button throws an exception (bad reference)
 - WIP: profile import - added re-import button on device imports for automatic remap when device changes and axis/button/hat counts changed.
 
-<!-- TOC --><a name="m6"></a>
+
 ### (m6)
 - Improved: still a WIP: import of profiles now includes un-mapped modes, deselecting a mode in one mapping deselects all, and input descriptions carry over.
 - Fix: curve input causing a recursive exception when moving control points.
 
-<!-- TOC --><a name="m6-1"></a>
+
 ### (m6)
 - Fix: Updated logic used to determine if changes are made to a profile to avoid excessive prompting to save on profile load if an existing profile is already loaded: the updated check does away with hash values, ignores comments, internal IDs, file encodings and other non-relevant changes as these would trigger a save change prompt, even when there were none on a substantive basis.
 - Improved: still a WIP: improved handling of profile import logic and mapping to devices with fewer axes/buttons/hats. Fix for keyboard, MIDI and OSC inputs that cannot have a remap change - they import as they are since the input is fixed.
@@ -552,23 +514,23 @@ Fixes:
 - Fix: Selecting a new mode does not select an active input in the UI
 - Improved: New profiles will show as "untitled" in the main window title bar
 
-<!-- TOC --><a name="m4"></a>
+
 ### (m4)
 
 - Added descriptive error message on DirectInput interface load errors if UAC (user access control) prevents it from loading depending on the permissions of the logged in account.  If a DLL load error occurs at startup, running the process in administrator mode usually solves the load issue.
 - Added check for MIDI ports to be available before offering the MIDI device tab.  If you get an exception when changing to the MIDI or OSC devices, please create a GitHub issue and attach the screenshot of the exception.
 
-<!-- TOC --><a name="m3"></a>
+
 ### (m3)
 - Refactored behavior of *cycle mode* and *temporary mode* switch actions to handle gremlinEx backend changes
 - Bug fix: deleting a mode from a profile did not remove all references or mappings from actions
 
 
-<!-- TOC --><a name="m2"></a>
+
 ### (m2)
 - Added option to show or hide the button grid in vjoy remap
 
-<!-- TOC --><a name="m1"></a>
+
 ### (m1)
 
 - Ensure mode names ignore leading/trailing spaces
@@ -1610,11 +1572,15 @@ There are some tools that let you visualize what MIDI messages the computer is r
 <!-- TOC --><a name="osc-device-open-sound-control"></a>
 ## OSC device (Open Sound Control)
 
-GremlinEx, as of 13.40.14ex, can map OSC messages and use those to trigger actions.  OSC is generally much easier to setup and program than MIDI.  For more info on OSC, visit 
+GremlinEx, as of 13.40.14ex, can map OSC messages as input and use those to trigger actions.  OSC is generally much easier to setup and program than MIDI.  For more information on the open sound control protocol, visit [OpenSoundControl.org](https://OpenSoundControl.org).
+
+As of 13.40.16ex, GremlinEx can also send OSC messages.
 
 Unlike hardware devices, OSC inputs must be user defined and added to tell GremlinEx what to listen to. GremlinEx supports any OSC message, although in the current version, limits are imposed on parameter types for ease of processing/mapping to a VJOY device:
 
 OSC messages must consist of a text part, example  /this_is_my_test_fader followed by a numeric value (float or int).   Extra parameters are currently ignored, but can be provided without error.
+
+Important: all OSC commands must start with a forward slash or they will be ignored.  OSC commands also accept one or two numeric parameters, floating point or integer.  It is customary for faders and axes to use a value of 0.0 to 1.0 for a range of values, and for momentary buttons to use a value of 1.0 when pressed, and 0.0 when released.
 
 <!-- TOC --><a name="osc-port"></a>
 ### OSC port

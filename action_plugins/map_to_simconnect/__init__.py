@@ -1450,6 +1450,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._button_mode_container_layout = QtWidgets.QHBoxLayout(self._button_mode_container_widget)
 
         self._trigger_on_release_widget = QtWidgets.QCheckBox("Trigger on release")
+        self._trigger_on_release_widget.setToolTip("When enabled, the action will trigger when the input is released.")
         self._trigger_on_release_widget.clicked.connect(self._trigger_on_release_cb)
 
         self._button_mode_container_layout.addWidget(self._trigger_on_release_widget)

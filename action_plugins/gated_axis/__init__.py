@@ -42,10 +42,6 @@ class GatedAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.container_layout = QtWidgets.QVBoxLayout(self.container_widget)
         self.container_widget.setContentsMargins(0,0,0,0)
 
-        # cache = gremlin.gated_handler.GatedAxisWidgetCache()
-        # widget = cache.retrieve(self.action_data)
-        # if not widget:
-
         self.gate_widget  = gremlin.gated_handler.GatedAxisWidget(action_data = self.action_data,
                                                                 show_configuration=False,
                                                                 parent=self
@@ -89,6 +85,8 @@ class GatedAxis(gremlin.base_profile.AbstractAction):
     # override default allowed input types here if not all
     input_types = [
         InputType.JoystickAxis,
+        InputType.OpenSoundControl,
+        InputType.Midi
     ]
 
     functor = GatedAxisFunctor

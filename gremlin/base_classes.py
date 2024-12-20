@@ -16,11 +16,9 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-
-from lxml import etree as ElementTree
-from gremlin.util import *
 from gremlin.base_conditions import *
 from collections.abc import MutableSequence
+
 
 
 
@@ -215,14 +213,17 @@ def empty_copy(obj):
     return newcopy      
 
 
-class AbstractInputItem():
+class AbstractInputItem(QtCore.QObject):
     ''' base class for input items for MIDI, OSC and KEYBOARD items '''
+
     def __init__(self):
+        super().__init__()
         self._id = uuid.uuid4() # GUID (unique) if loaded from XML - will reload that one
         self._guid = str(self.id).replace("-","")
         self._display_name = None
         self._description = None
         self._input_description = None
+        self._axis_value = None
 
     @property
     def guid(self):
@@ -260,4 +261,26 @@ class AbstractInputItem():
     
     def setInputDescription(self, value : str):
         self._input_description = value
+
+            
+    @property
+    def axis_value(self) -> float:
+        ''' gets the current axis value '''
+        if self._axis_value is None:
+            return 0.0
+        return self._axis_value
+    
+    
+    def setAxisValue(self, value : float):
+        ''' sets the axis value and triggers a joystick input event 
+        
+        :param value: the floating point value to set (-1 to +1)
+        :param emit: flag to trigger a joystick event if the value is set
+        
+        '''
+        import gremlin.event_handler
+        import gremlin.util
+        if self.axis_value is None or value != self._axis_value:
+            self._axis_value = value
+
 

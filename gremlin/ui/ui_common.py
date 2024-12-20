@@ -215,6 +215,15 @@ class NoKeyboardPushButton(QtWidgets.QPushButton):
         pass
 
 
+
+    @property
+    def data(self):
+        return self._data
+    @data.setter
+    def data(self, value):
+        self.data = value
+
+
 class QFloatLineEdit(QtWidgets.QLineEdit):
     ''' double input validator with optional range limits for input axis
     
@@ -264,12 +273,6 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
         self.setMaximumWidth(w)            
     
 
-    @property
-    def data(self):
-        return self._data
-    @data.setter
-    def data(self, value):
-        self.data = value
 
 
 
@@ -1862,11 +1865,26 @@ class QDataPushButton(QtWidgets.QPushButton):
 
 class QDataLineEdit(QtWidgets.QLineEdit):
     ''' a checkbox that has a data property to track an object associated with the checkbox '''
+    valueChanged = QtCore.Signal() # fires when the text has changed AND we lost the focus
+
+
     def __init__(self, text = None, data = None, parent = None):
         super().__init__(text, parent)
         self._data = data
         self.setAlignment(Qt.AlignLeft)
         #self.setStyleSheet("QLineEdit{border: #8FBC8F;}")
+        super().textChanged.connect(self._text_changed_cb)
+
+
+
+    def _text_changed_cb(self):
+        self._text_changed = True
+
+
+    def focusOutEvent(self, event):
+        if self._text_changed:
+            self.valueChanged.emit()
+        return super().focusOutEvent(event)
 
 
     def setText(self, value):
@@ -1883,6 +1901,10 @@ class QDataLineEdit(QtWidgets.QLineEdit):
     @data.setter
     def data(self, value):
         self._data = value
+
+
+
+
 
 class QDataIPLineEdit(QDataLineEdit):
     ''' IP input text box '''
@@ -2124,7 +2146,7 @@ class AxisStateWidget(QtWidgets.QWidget):
     
     valueChanged = QtCore.Signal(float, float) # (input_value, curved_value)
 
-    def __init__(self, axis_id = None, show_percentage = True, show_value = True, show_label = True, orientation = QtCore.Qt.Orientation.Vertical, parent=None):
+    def __init__(self, axis_id = None, show_percentage = True, show_value = True, show_label = True, show_curve = True, orientation = QtCore.Qt.Orientation.Vertical, parent=None):
         """Creates a new instance.
 
         :param axis_id id of the axis, used in the label
@@ -2146,6 +2168,7 @@ class AxisStateWidget(QtWidgets.QWidget):
         self._show_percentage = show_percentage
         self._show_value = show_value
         self._show_label = show_label
+        self._show_curved = show_curve
 
         self._readout_widget = QtWidgets.QLabel()
         self._readout_curved_widget = QtWidgets.QLabel()
@@ -2169,8 +2192,6 @@ class AxisStateWidget(QtWidgets.QWidget):
         self._reverse = False
         self._decimals = 3
 
-        # show the curved data by default
-        self._show_curved = True
         
         self._width = 10
         self._update_css()

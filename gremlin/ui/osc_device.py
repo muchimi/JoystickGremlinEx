@@ -24,6 +24,7 @@ from PySide6 import QtWidgets, QtCore, QtGui
 import threading
 import gremlin.config
 import gremlin.event_handler
+import gremlin.input_devices
 from gremlin.types import DeviceType
 from gremlin.input_types import InputType
 import gremlin.shared_state
@@ -51,6 +52,7 @@ from collections.abc import Iterable
 import struct
 from datetime import datetime, timedelta, date
 
+import gremlin.ui.ui_common
 from gremlin.util import *
 from lxml import etree as ElementTree
 
@@ -1550,7 +1552,7 @@ class SimpleUDPClient(UDPClient):
 
 class OscClient():
     def __init__(self, host_ip = "127.0.0.1", output_port = 8001, name = None):
-        #logging.getLogger("system").info("OSC: server init")
+     
         self._server_ip = host_ip
         self._output_port = output_port
         self._client = None
@@ -1630,9 +1632,9 @@ class OscClient():
             
             msg = f"OSC (internal): Send OSC: {command}  target: {self._server_ip}  port: {self._output_port}"
             if v1 is not None:
-                msg += f" {v1}"
+                msg += f" v1 {v1}"
             if v2 is not None:
-                msg += f" {v2}"
+                msg += f" v2 {v2}"
             syslog.info(msg)
 
         builder = OscMessageBuilder(command)
@@ -1888,7 +1890,7 @@ class OscInterface(QtCore.QObject):
         ''' starts listening to OSC messages '''
 
         if not self._started:
-            logging.getLogger("system").info(f"OSC: starting with IP: {self._host_ip} port: {self._input_port} send host: {self._target_ip} port: {self._output_port}")
+            logging.getLogger("system").info(f"OSC (interface): starting with IP: {self._host_ip} port: {self._input_port} send host: {self._target_ip} port: {self._output_port}")
             self._osc_server.start(self._host_ip, self._input_port, self._osc_message_handler)
             self._osc_internal_client.start(self._host_ip, self._input_port)
             self._osc_client.start(self._target_ip, self._output_port)
@@ -1925,8 +1927,11 @@ class OscInterface(QtCore.QObject):
 
 
 
+
 class OscInputItem(AbstractInputItem):
     ''' holds OSC input data '''
+
+    
 
     class InputMode(enum.Enum):
         ''' possible input modes '''
@@ -1955,6 +1960,9 @@ class OscInputItem(AbstractInputItem):
         self._max_range = 1.0 
         self._autorelease = False # true if auto-release
         self._autorelease_delay = 250 # default release delay
+        self._axis_value = 0.0 # current axis value when the input is in axis mode
+
+
 
     @property
     def autoRelease(self) -> bool:
@@ -1994,6 +2002,9 @@ class OscInputItem(AbstractInputItem):
     @property
     def is_axis(self) -> bool:
         return self._mode == OscInputItem.InputMode.Axis
+
+        
+
 
     
     @property 
@@ -2104,6 +2115,16 @@ class OscInputItem(AbstractInputItem):
         ''' returns the sorting key for this message '''
         return self._message_key
     
+    def setMessageKey(self, value):
+        if self.message_key is None or self._message_key != value:
+            # ensure OSC is started so we can listen to OSC inputs
+            self._message_key = value
+            el = gremlin.event_handler.EventListener()
+            osc_input = gremlin.input_devices.InputOscClient()
+            osc_input.registerInput(self)
+            
+            
+    
     def _data_to_string(self, data):
         ''' returns a string representation of the data '''
         return list_to_csv(data)
@@ -2116,9 +2137,9 @@ class OscInputItem(AbstractInputItem):
     def _update(self):
         ''' updates the message key based on the current config '''
         if self._command_mode == OscInputItem.CommandMode.Data:
-            self._message_key = f"{self.message} {self._data_to_string(self._message_data)}"
+            self.setMessageKey(f"{self.message} {self._data_to_string(self._message_data)}")
         elif self._command_mode == OscInputItem.CommandMode.Message:
-            self._message_key = self.message
+            self.setMessageKey(self.message)
         else:
             raise ValueError(f"_update(): don't know how to handle {self._command_mode}")
         
@@ -2131,10 +2152,10 @@ class OscInputItem(AbstractInputItem):
         ''' reads an input item from xml '''
         if node.tag == "input":
             self.id = read_guid(node, "guid")
-            self._message = safe_read(node, "cmd", str)
-            csv = safe_read(node, "data", str)
+            self._message = safe_read(node, "cmd", str,"")
+            csv = safe_read(node, "data", str,"")
             self._message_data = csv_to_list(csv)
-            self._mode_from_string(safe_read(node, "mode", str))
+            self._mode_from_string(safe_read(node, "mode", str, ""))
             self._command_mode = OscInputItem.command_mode_from_string(safe_read(node,"cmd_mode", str))
             self._min_range = safe_read(node,"min",float, 0.0)
             self._max_range = safe_read(node,"max",float, 1.0)
@@ -2150,10 +2171,13 @@ class OscInputItem(AbstractInputItem):
         ''' writes the input item to XML'''
         node = ElementTree.Element("input")
         node.set("guid", str(self.id))
-        node.set("cmd", self.message)
-        node.set("data", list_to_csv(self._message_data))
+        if self.message:
+            node.set("cmd", self.message)
+        if self._message_data:
+            node.set("data", list_to_csv(self._message_data))
         node.set("mode", self.mode_string)
-        node.set("cmd_mode", self.command_mode_string)
+        if self.command_mode_from_string:
+            node.set("cmd_mode", self.command_mode_string)
         node.set("min", str(self._min_range))
         node.set("max", str(self._max_range))
         node.set("autorelease", str(self._autorelease))
@@ -2346,7 +2370,8 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         self._command = None # OSC command text
         self._command_data = [] # OSC arguments
 
-        self._command_widget = QtWidgets.QLineEdit()
+        self._command_widget = gremlin.ui.ui_common.QDataLineEdit()
+        self._command_widget.valueChanged.connect(self._command_changed)
         self._data_widget = QtWidgets.QLineEdit()
 
         self.config_layout.addWidget(QtWidgets.QLabel("Cmd:"))
@@ -2508,6 +2533,11 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         self._validate()
         self._update_display()
 
+    @QtCore.Slot()
+    def _command_changed(self):
+        ''' command text changed '''
+        self._command = self._command_widget.text()
+        self._validate()
 
     def _pulse_value_changed(self, value):
         ''' called when the pulse value changes '''
@@ -2555,11 +2585,11 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
                 if self._mode == OscInputItem.InputMode.Axis:
                     # cannot be an axis mode for sysex or program change
                     
-                    valid = len(self._command_data) > 0 # in axis mode, data MUST be provided
-                    if not valid:
-                        self._validation_message_widget.setText(f"Data value must be given in axis mode")
-                        self._validation_message_widget.setIcon("fa.warning",True, color="red")
-                        return
+                    # valid = len(self._command_data) > 0 # in axis mode, data MUST be provided
+                    # if not valid:
+                    #     self._validation_message_widget.setText(f"Data value must be given in axis mode")
+                    #     self._validation_message_widget.setIcon("fa.warning",True, color="red")
+                    #     return
                 
                     if self._min_range > self._max_range:
                         self._validation_message_widget.setText(f"Min range must be less than max range")
@@ -2572,6 +2602,8 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
                         return
                     
                     # ensure the argument is numeric
+                    if not self._command_data:
+                        self._command_data = [0]
                     arg = self._command_data[0]
                     if not (isinstance(arg, int) or isinstance(arg, float)):
                         self._validation_message_widget.setText(f"First data item must be a number for axis input")
@@ -2660,7 +2692,7 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
             
         elif self._mode == OscInputItem.InputMode.Axis:
             self._container_mode_description_widget.setText(f"The input act as an axis input using the OSC value.<br>Use this mode if mapping to an axis output (OSC value messages only)")
-            self._command_mode = OscInputItem.CommandMode.Message # force message mode in axis as the value will determine the state
+            #self._command_mode = OscInputItem.CommandMode.Message # force message mode in axis as the value will determine the state
             with QtCore.QSignalBlocker(self._mode_axis_widget):
                 self._mode_axis_widget.setChecked(True)
             
@@ -2681,7 +2713,8 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
             self._data_widget.setEnabled(True) # enable the value area if in message + data mode
 
         self._container_range_widget.setVisible(self._mode == OscInputItem.InputMode.Axis)
-        self._command_widget.setText(self._command)
+        with QtCore.QSignalBlocker(self._command_widget):
+            self._command_widget.setText(self._command)
         csv = list_to_csv(self._command_data)
         self._data_widget.setText(csv)
 

@@ -1312,7 +1312,8 @@ class InputItemWidget(QtWidgets.QFrame):
             self._curve_button_widget.setIcon(self._curve_icon_inactive)
         self.clear_curve_widget.setEnabled(enabled)
         if self.identifier.input_type == InputType.JoystickAxis:
-            self.axis_widget.show_curved = enabled
+            if self.axis_widget is not None: # will be null if input axes not displayed
+                self.axis_widget.show_curved = enabled
 
 
     @QtCore.Slot(float)

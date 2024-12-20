@@ -1047,7 +1047,12 @@ class GateData():
             self._hooked = True
             el = gremlin.event_handler.EventListener()
             el.joystick_event.connect(self._joystick_event_handler)
-            self._axis_value = gremlin.joystick_handling.get_axis(self._action_data.hardware_device_guid, self._action_data.hardware_input_id)
+            if self._action_data.input_is_hardware():
+                self._axis_value = gremlin.joystick_handling.get_axis(self._action_data.hardware_device_guid, self._action_data.hardware_input_id)
+            else:
+                self._axis_value = self._action_data.hardware_input_id.axis_value
+            
+
 
     def unhook(self):
         ''' unhook events '''
@@ -1215,13 +1220,12 @@ class GateData():
             # ignore if a different input axis on the input device
             return
 
-        raw_value = event.raw_value
-
         # process curved intput
-        input_value = gremlin.joystick_handling.get_curved_axis(self._action_data.hardware_device_guid, 
+        if not event.is_virtual:
+            input_value = gremlin.joystick_handling.get_curved_axis(self._action_data.hardware_device_guid, 
                                                         self._action_data.hardware_input_id)
-
-        #input_value = gremlin.joystick_handling.scale_to_range(raw_value, source_min = -32767, source_max = 32767, target_min = -1, target_max = 1)
+        else:
+            input_value = event.raw_value
 
 
         # run mode - execute the functors with the gate data
@@ -3158,11 +3162,11 @@ class GatedAxisWidget(QtWidgets.QWidget):
 
         self.main_layout = QtWidgets.QGridLayout(self)
 
-        if action_data.hardware_input_type != InputType.JoystickAxis:
+        is_axis = action_data.input_is_axis()
+        if not is_axis:
             missing = QtWidgets.QLabel("Invalid input type - joystick axis expected")
             self.main_layout.addWidget(missing)
             return
-        
 
         self._grab_icon = load_icon("mdi.record-rec",qta_color = "red")
         self._setup_icon = load_icon("fa.gear")
@@ -3170,7 +3174,12 @@ class GatedAxisWidget(QtWidgets.QWidget):
         self._setup_container_icon = load_icon("ei.cog-alt",qta_color="#365a75")
         
         # get the curent axis normalized value -1 to +1
-        value = gremlin.joystick_handling.get_curved_axis(action_data.hardware_device_guid, action_data.hardware_input_id)
+        if  action_data.input_is_hardware():
+            value = gremlin.joystick_handling.get_curved_axis(action_data.hardware_device_guid, action_data.hardware_input_id)
+        else:
+            # virtual device
+            value = self.action_data.hardware_input_id.axis_value
+            
         self._axis_value = value
 
         # axis input gate widget
@@ -3258,8 +3267,6 @@ class GatedAxisWidget(QtWidgets.QWidget):
         self.container_options_layout.addWidget(self._display_label_widget)
         self.container_options_layout.addWidget(self._display_mode_widget)
         self.container_options_layout.addStretch()
-
-       
 
         self.container_gate_ui_widget = QtWidgets.QWidget()
         #self.container_gate_ui_widget.setStyleSheet("Background-color: red;")
@@ -3826,55 +3833,6 @@ class GatedAxisWidget(QtWidgets.QWidget):
         self.duplicate_requested.emit(self._gate_data)
             
     
-    # @QtCore.Slot(object)
-    # def _joystick_event_ui_update_cb(self, event):
-    #     ''' handles joystick input in design mode
-        
-    #     grab real time hardware input to update the widget
-        
-    #     '''
-    #     #print (f"joystick event in gateaxis widget: {self.action_data.hardware_device_name} {self.action_data.hardware_input_id}")
-        
-        
-    #     if not event.is_axis:
-    #         # ignore if not an axis event and if the profile is running, or input for a different device
-    #         return
-        
-    #     if self.action_data.hardware_device_guid != event.device_guid:
-    #         # print (f"device mis-match: {str(self._data.hardware_device_guid)}  {str(event.device_guid)}")
-    #         return
-            
-    #     if self.action_data.hardware_input_id != event.identifier:
-    #         # print (f"input mismatch: {self._data.hardware_input_id} {event.identifier}")
-    #         return
-
-    #     raw_value = event.raw_value
-    #     input_value = gremlin.joystick_handling.scale_to_range(raw_value,
-    #                                                            source_min = -32767,
-    #                                                            source_max = 32767,
-    #                                                            target_min = self._slider.minimum(),
-    #                                                            target_max = self._slider.maximum())
-        
-        
-    #     self._axis_value = input_value
-        
-    #     # run the update on the UI thread
-    #     #InvokeUiMethod(lambda: self._update_slider(input_value))
-    #     # assert_ui_thread()
-    #     self._update_slider_marker(input_value)
-
-
-
-
-
-        #self._call_update_slider(input_value)
-        
-
-    # def _call_update_slider(self, value):
-    #     ''' asks the UI to update the slider '''
-    #     eh = GateEventHandler()
-    #     eh.slider_marker_update.emit(value)
-
     @QtCore.Slot(float)
     def _slider_marker_update_handler(self, value):
         ''' updates the slider marker position '''

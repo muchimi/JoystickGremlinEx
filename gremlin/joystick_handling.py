@@ -24,6 +24,7 @@ import dinput
 
 import gremlin.base_classes
 import gremlin.event_handler
+import gremlin.joystick_handling
 import gremlin.shared_state
 
 from . import common, error, util
@@ -105,6 +106,10 @@ def button_input_devices() -> list[DeviceSummary]:
     return devices
 
 
+def is_hardware_device(device_guid) -> bool:
+    ''' true if the device is a hardware device '''
+    return device_guid in _joystick_device_guid_map
+
 def vjoy_devices() -> list[DeviceSummary]:
     """Returns the list of vJoy devices.
 
@@ -149,13 +154,17 @@ def get_axis(guid, index, normalized = True):
     :param: normalized  - if set - normalizes to -1.0 +1.0 floating point
        
     '''
+    
     value = dinput.DILL.get_axis(guid, index)
     if normalized:
         return gremlin.util.scale_to_range(value, source_min = -32767, source_max = 32767, target_min = -1, target_max = 1)
+        
+    
 
 def get_curved_axis(guid, index):
     ''' returns curved data same as the event handler '''
     eh = gremlin.event_handler.EventListener()
+    gremlin.joystick_handling.axis_input_devices
     value = dinput.DILL.get_axis(guid, index)
     return eh.apply_transforms(guid, index, value)
 

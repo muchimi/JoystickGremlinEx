@@ -264,6 +264,18 @@ class ExecutionContext():
                     nodes.append(node)
 
         return nodes
+    
+    def findInputItem(self, device_guid, input_id):
+        ''' finds the input item corresponding to the device and id specififed, None if not found '''
+        ''' true if the execution tree contains mappings with input types of the specified type  '''
+        node : ExecutionGraphNode
+        for node in anytree.PreOrderIter(self.root):
+            if node.nodeType == ExecutionGraphNodeType.InputItem:
+                input_item = node.input_item
+                if input_item.device_guid == device_guid and input_item.input_id == input_id:
+                    return input_item
+                
+        return None
 
     def hasInputType(self, input_type):
         ''' true if the execution tree contains mappings with input types of the specified type  '''

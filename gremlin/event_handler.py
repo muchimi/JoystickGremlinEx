@@ -358,6 +358,10 @@ class EventListener(QtCore.QObject):
 	# request OSC start/stop
 	request_osc= QtCore.Signal(bool) # param - flag - true to start, false to stop
 
+	# signals the need to register an OSC input item
+	register_osc_input = QtCore.Signal(object) # param input_item being registered 
+	
+
 	# gremlin ex shutdown in progress
 	shutdown = QtCore.Signal() 
 
@@ -682,7 +686,6 @@ class EventListener(QtCore.QObject):
 				self.heartbeat.emit()
 				notify_time = time.time() + 30
 			time.sleep(1)
-
 
 	def _joystick_event_handler(self, data):
 		"""Callback for joystick events.

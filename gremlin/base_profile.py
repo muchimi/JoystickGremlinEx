@@ -822,6 +822,8 @@ class AbstractAction(ProfileData):
         self._enabled = False # true if the action is enabled
         self.singleton = False # true if the action can only appear once in the input's mapping
         self.parent_container = parent # holds the reference to the parent container holding this action
+        self._is_axis = False
+        self._is_hardware = None
 
         eh = gremlin.event_handler.EventListener()
         eh.action_created.emit(self)
@@ -873,16 +875,26 @@ class AbstractAction(ProfileData):
 
     def input_is_axis(self):
         ''' true if the input is an axis type input '''
+
+        is_axis = False
         if hasattr(self, "hardware_input_type"):
             input_type : InputType = self.hardware_input_type
-            return input_type == InputType.JoystickAxis
+            if input_type == InputType.JoystickAxis:
+                return True
                 
-
-        is_axis = hasattr(self.hardware_input_id, "is_axis") and self.hardware_input_id.is_axis
-        if hasattr(self.input_item,"is_axis"):
+        if hasattr(self.hardware_input_id, "is_axis"):
+            is_axis = self.hardware_input_id.is_axis
+            return is_axis
+        if hasattr(self.input_item,"is_axis") and hasattr(self._input_item,"axis_value"):
             is_axis = is_axis or self.input_item.is_axis
-        is_axis = is_axis or self.input_type == InputType.JoystickAxis 
-        return is_axis        
+        
+        return is_axis
+    
+    def input_is_hardware(self):
+        ''' true if the device is a hardware input device '''
+        if self._is_hardware is None:
+            self._is_hardware =  gremlin.joystick_handling.is_hardware_device(self.hardware_device_guid)
+        return self._is_hardware
 
     @property
     def enabled(self):

@@ -861,6 +861,18 @@ def safe_read(node, key, type_cast=None, default_value=None):
     value = default_value
     if not key in node.keys():
         if default_value is None:
+            match type_cast:
+                case str():
+                    default_value = ""
+                case int():
+                    default_value = 0
+                case float():
+                    default_value = 0.0
+                case bool():
+                    default_value = False
+                case _:
+                    pass
+        if default_value is None:
             msg = f"Attempted to read attribute '{key}' which does not exist and no default value is provided."
             logging.getLogger("system").error(msg)
             raise error.ProfileError(msg)

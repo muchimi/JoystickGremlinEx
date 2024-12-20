@@ -996,8 +996,6 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         if not event.is_axis:
             return
 
-        value = None
-
         if self.action_data.action_mode == VjoyAction.VJoyMergeAxis:
             # merge - check two sets
             if event.device_guid == self.action_data.hardware_device_guid and event.device_guid == self.action_data.merge_device_guid:
@@ -1017,8 +1015,9 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
                 return
             if event.identifier != self.action_data.hardware_input_id:
                 return
-            if event.is_custom:
-                value = event.value
+
+        
+        value = event.value
 
         self._update_axis_widget(value)
 
@@ -1036,7 +1035,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         '''
         # always read the current input as the value could be from another device for merged inputs
-        if self.input_type == InputType.JoystickAxis:
+        if self.action_data.input_is_axis(): # == InputType.JoystickAxis:
 
             raw_value = self.action_data.get_raw_axis_value()
             if value is None:
@@ -1513,7 +1512,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         merge_visible =  False
         repeater_visible = False
 
-        axis_repeater_visible = self.input_type == InputType.JoystickAxis
+        axis_repeater_visible = self.action_data.input_is_axis() #input_type == InputType.JoystickAxis
 
         if self._is_axis:
             grid_visible = action == VjoyAction.VJoyAxisToButton
@@ -2697,26 +2696,52 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
 
 
     def get_raw_axis_value(self):
-        return gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, self.hardware_input_id)
+        if self.input_is_hardware():
+            return gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, self.hardware_input_id)
+        return self.hardware_input_id.axis_value
 
     def get_filtered_axis_value(self, value : float = None, curves : list = None) -> float:
         ''' computes the output value for the current configuration  '''
 
         if value is None:
-            value = gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid,
+
+            if self.input_is_hardware():
+                value = gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid,
                                                         self.hardware_input_id)
+            else:
+                value = self.hardware_input_id.axis_value
+                print (value)
+                
 
             if curves:
                 for curve_data in curves:
                     value = curve_data.curve_value(value)
 
-        if self.merge_mode != MergeOperationType.NotSet:
+        if self.action_mode == VjoyAction.VJoyMergeAxis and self.merge_mode != MergeOperationType.NotSet:
             if self.merge_device_id and self.merge_input_id:
                 # always read v1 and v2 because the input value may be of either inputs
-                v1 = gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid,
-                                                        self.hardware_input_id)
-                v2 = gremlin.joystick_handling.get_curved_axis(self.merge_device_guid,
+                v1 = None
+                v2 = None
+                if gremlin.joystick_handling.is_hardware_device(self.hardware_device_guid):
+                    v1 = gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid,
+                                                            self.hardware_input_id)
+                else: 
+                    v1 = self.hardware_input_id.axis_value
+                if gremlin.joystick_handling.is_hardware_device(self.merge_device_guid):
+                    v2 = gremlin.joystick_handling.get_curved_axis(self.merge_device_guid,
                                                     self.merge_input_id)
+                else:
+                    # find the merged device
+                    ec = gremlin.execution_graph.ExecutionContext()
+                    input_item = ec.findInputItem(self.merge_device_guid,
+                                                    self.merge_input_id)
+                    if input_item:
+                        v2 = input_item.axis_value
+
+                if v1 is None or v2 is None:
+                    # something wasn't found
+                    syslog.error("VjoyRemap: merge: unable to get an axis value, one of the inputs was not found.")
+                    return 0.0
 
                 # apply any local curves to the values
                 if curves:
