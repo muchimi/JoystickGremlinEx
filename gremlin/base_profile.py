@@ -1373,6 +1373,8 @@ class InputItem():
     @property
     def is_axis(self) -> bool:
         ''' true if this item is setup as an axis input (linear) '''
+        if self._input_id and hasattr(self._input_id,"is_axis"):
+            return self._input_id.is_axis
         return self._is_axis or self._input_type == InputType.JoystickAxis
     @is_axis.setter
     def is_axis(self, value : bool):
@@ -1381,10 +1383,8 @@ class InputItem():
     @property
     def is_button(self) -> bool:
         ''' true if this item is setup as an axis input (momentary) '''
-        return self._is_button or self._input_type in (InputType.JoystickButton, InputType.JoystickHat)
-    @is_button.setter
-    def is_button(self, value : bool):
-        self._is_button = value        
+        return not self.is_axis
+    
 
     def add_container(self, container):
         self._containers.append(container)

@@ -2003,7 +2003,7 @@ class OscInputItem(AbstractInputItem):
     
     @property
     def is_button(self) -> bool:
-        return self._mode == OscInputItem.InputMode.Button
+        return self._mode != OscInputItem.InputMode.Axis
 
         
 
@@ -2120,10 +2120,12 @@ class OscInputItem(AbstractInputItem):
     def setMessageKey(self, value):
         if self.message_key is None or self._message_key != value:
             # ensure OSC is started so we can listen to OSC inputs
-            self._message_key = value
-            el = gremlin.event_handler.EventListener()
-            osc_input = InputOscClient()
-            osc_input.registerInput(self)
+            if self._message_key != value:
+                osc_input = InputOscClient()
+                if self._message_key:
+                    osc_input.unregisterInput(self)
+                self._message_key = value
+                osc_input.registerInput(self)
             
             
     
@@ -3215,26 +3217,6 @@ class InputOscClient(QtCore.QObject):
         self._osc_map = {}  # map of message keys to inputs 
         self._started = False
 
-
-
-    # def _update(self):
-    #     ''' updates OSC mapping inputs '''
-    #     import gremlin.execution_graph
-    #     config = gremlin.config.Configuration()
-    #     self._input_item_map = {} # map of input items keyd by message key
-    #     if config.osc_enabled:
-    #         ec = gremlin.execution_graph.ExecutionContext()
-    #         if not gremlin.shared_state.is_running:
-    #             ec.reset() # update execution graph with most current changes
-    #             uses_osc = ec.hasInputType(InputType.OpenSoundControl) or ec.findActionPlugin("Map to OSC")
-    #             if uses_osc:
-    #                 items = ec.getMappedInputs(InputType.OpenSoundControl)
-    #                 item: gremlin.execution_graph.ExecutionContextInputData
-    #                 for item in items:
-    #                     input_id = item.input_id
-    #                     self._input_item_map[input_id.message_key] = item
-
-
     @QtCore.Slot()
     def _profile_start(self):
         ''' called on profile start
@@ -3259,7 +3241,6 @@ class InputOscClient(QtCore.QObject):
                         syslog.info(f"\t{input_item.display_name}  key: [{input_item.message_key}] input mode: [{item_mode}]")
 
             if not self._started:
-                ec = gremlin.execution_graph.ExecutionContext()
                 if verbose: syslog.info(f"OSC: Start")
                 self.start()
             else:
@@ -3276,8 +3257,7 @@ class InputOscClient(QtCore.QObject):
     
     def registerInput(self, input_item):
         ''' registers an OSC input item '''
-        
-        from gremlin.ui.osc_device import OscInputItem
+       
         if isinstance(input_item, OscInputItem):
             if not self._started:
                 # ensure OSC is listening
@@ -3292,6 +3272,17 @@ class InputOscClient(QtCore.QObject):
                 logging.getLogger("system").info(f"OSC: register trigger on: {input_item.display_name} mode: {input_item.mode_string} key: {message_key}")
         
 
+    def unregisterInput(self, input_item):
+        ''' unregisters an OSC input item '''
+        syslog = logging.getLogger("system")
+        verbose = gremlin.config.Configuration().verbose_mode_midi
+        if isinstance(input_item, OscInputItem):
+            message_key = input_item.message_key
+            if message_key in self._osc_map:
+                if input_item in self._osc_map[message_key]:
+                    self._osc_map[message_key].remove(input_item)
+                    if verbose:
+                        syslog.info(f"OSC: unregister trigger on: {input_item.display_name} mode: {input_item.mode_string} key: {message_key}")
 
     def start(self):
         ''' starts the client '''
@@ -3322,12 +3313,13 @@ class InputOscClient(QtCore.QObject):
         from gremlin.ui.osc_device import OscInputItem
         self._osc_map = {}  # list of message keys
         profile = gremlin.shared_state.current_profile
-        for device in profile.devices.values():
-            if device.name == "OSC":
-                for mode in device.modes.values():
-                    for input_items in mode.config.values():
-                        for input_item in input_items:
-                            self.registerInput(input_item)
+        if profile:
+            for device in profile.devices.values():
+                if device.name == "OSC":
+                    for mode in device.modes.values():
+                        for input_items in mode.config.values():
+                            for input_item in input_items:
+                                self.registerInput(input_item)
 
 
     def stop(self):

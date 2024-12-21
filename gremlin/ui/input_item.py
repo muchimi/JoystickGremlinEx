@@ -72,7 +72,6 @@ class InputIdentifier(QtCore.QObject):
         self._input_guid = get_guid() # unique internal GUID for this entry
         self._input_name = input_name
         self._is_axis = is_axis
-        self._is_button = is_button
 
 
     @property
@@ -110,18 +109,11 @@ class InputIdentifier(QtCore.QObject):
     def is_axis(self) -> bool:
         ''' true if this item is setup as an axis input (linear) '''
         return self._is_axis
-    # @is_axis.setter
-    # def is_axis(self, value : bool):
-    #     self._is_axis = value
-    
 
     @property
     def is_button(self) -> bool:
         ''' true if this item is setup as an button input (momentary) '''
-        return self._is_button 
-    # @is_button.setter
-    # def is_button(self, value : bool):
-    #     self._is_button = value
+        return not self._is_axis
     
 class InputItemListModel(ui_common.AbstractModel):
 
@@ -1205,7 +1197,6 @@ class InputItemWidget(QtWidgets.QFrame):
             else:
                 widget = gremlin.ui.ui_common.ButtonStateWidget()
             widget.setMaximumWidth(200)
-            
             widget.hookDevice(identifier.device_guid, identifier.input_type, identifier.input_id)
             self._container_input_axis_layout.addWidget(widget)
             self._container_input_axis_layout.addStretch()

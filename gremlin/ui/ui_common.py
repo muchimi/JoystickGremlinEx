@@ -2099,7 +2099,7 @@ class ButtonStateWidget(QtWidgets.QWidget):
         self._input_id = input_id
         self._input_type = input_type
         is_pressed = False
-        if self._input_type == InputType.OpenSoundControl:
+        if self._input_type in (InputType.OpenSoundControl, InputType.Midi):
             is_pressed = input_id.button_value
         elif gremlin.joystick_handling.is_hardware_device(device_guid):
             # read the current value
@@ -2377,7 +2377,7 @@ class AxisStateWidget(QtWidgets.QWidget):
         self._value = -1
         self.setRange(-1, 1)
         self._is_hardware_input = gremlin.joystick_handling.is_hardware_device(device_guid)
-        if self._input_type == InputType.OpenSoundControl:
+        if self._input_type in (InputType.OpenSoundControl, InputType.Midi):
             raw_value = input_id.axis_value
         elif self._is_hardware_input:
             raw_value = gremlin.joystick_handling.dinput.DILL().get_axis(device_guid, input_id)

@@ -903,7 +903,8 @@ class VerboseMode(IntFlag):
     OSC = auto() # OSC data 
     Process = auto() # process changes
     Exec = auto() # execution trees
-    All = Keyboard | Joystick | Inputs | Mouse | Details | SimConnect | Condition | Process | Exec
+    Midi = auto() # midi mode
+    All = Keyboard | Joystick | Inputs | Mouse | Details | SimConnect | Condition | Process | Exec | Midi
 
     def __contains__(self, item):
         return  (self.value & item.value) == item.value

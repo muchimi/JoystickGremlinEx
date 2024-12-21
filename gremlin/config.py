@@ -1092,6 +1092,11 @@ class Configuration:
         return self.verbose and VerboseMode.OSC in self.verbose_mode
     
     @property
+    def verbose_mode_midi(self):
+        ''' true if verbose mode is in MIDI mode '''
+        return self.verbose and VerboseMode.Midi in self.verbose_mode
+    
+    @property
     def verbose_mode_process(self):
         ''' true if verbose mode is in OSC mode '''
         return self.verbose and VerboseMode.Process in self.verbose_mode

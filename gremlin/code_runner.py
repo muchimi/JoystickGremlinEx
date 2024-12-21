@@ -424,7 +424,7 @@ class CodeRunner:
 
             # listen to MIDI
             if config.midi_enabled:
-                gremlin.input_devices.midi_client.start()
+                evt_listener.request_midi.emit(True)
 
             # listen to OSC
             if config.osc_enabled:
@@ -519,11 +519,7 @@ class CodeRunner:
         el = gremlin.event_handler.EventListener()
         eh = gremlin.event_handler.EventHandler()
 
-        # stop midi client
-        gremlin.input_devices.midi_client.stop()
 
-        # stop OSC client  // KEEP running so inputs continue to function
-        #el.request_osc.emit(False)
 
         # stop remote client
         gremlin.input_devices.remote_client.stop()

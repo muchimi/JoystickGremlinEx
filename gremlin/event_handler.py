@@ -356,10 +356,13 @@ class EventListener(QtCore.QObject):
 	request_activate = QtCore.Signal(bool)  # param - flag - true to activate, false to deactivate
 
 	# request OSC start/stop
-	request_osc= QtCore.Signal(bool) # param - flag - true to start, false to stop
+	request_osc = QtCore.Signal(bool) # param - flag - true to start, false to stop
 
-	# signals the need to register an OSC input item
-	register_osc_input = QtCore.Signal(object) # param input_item being registered 
+	# request MIDI start/stop
+	request_midi = QtCore.Signal(bool) # param - flag - true to start, false to stop
+
+	# # signals the need to register an OSC input item
+	# register_osc_input = QtCore.Signal(object) # param input_item being registered 
 	
 
 	# gremlin ex shutdown in progress
@@ -1289,7 +1292,7 @@ class EventHandler(QtCore.QObject):
 				
 			elif event.event_type == InputType.Midi:
 				# MIDI event
-				verbose = gremlin.config.Configuration().verbose
+				verbose = gremlin.config.Configuration().verbose_mode_midi
 				midi_input = event.identifier
 				key = midi_input.message_key
 				if device_guid not in self.midi_callbacks.keys():
@@ -1300,6 +1303,7 @@ class EventHandler(QtCore.QObject):
 					self.midi_callbacks[device_guid][mode][key] = []
 				data = self.midi_callbacks[device_guid][mode][key]
 				data.append((self._install_plugins(callback),permanent))
+				if verbose: syslog.info(f"MIDI: register callback {mode} {key}")
 
 			elif event.event_type == InputType.OpenSoundControl:
 				# OSC event
