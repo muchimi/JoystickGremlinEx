@@ -338,6 +338,7 @@ class MacroManager(QtCore.QObject):
         self._is_running = True
         if self._run_scheduler_thread is None:
             self._run_scheduler_thread = Thread(target=self._run_scheduler)
+            self._run_scheduler_thread.setName("Macro scheduler")
         if not self._run_scheduler_thread.is_alive():
             self._run_scheduler_thread.start()
 
@@ -366,6 +367,8 @@ class MacroManager(QtCore.QObject):
         :param completion_callback: callback to call when the step completes, optional params(id) where ID is the macro step id returned by the call
         :returns id: a unique ID for the macro step
         """
+        syslog = logging.getLogger("system")
+        syslog.info("queue macro")
         if isinstance(macro.repeat, ToggleRepeat) and macro.id in self._active:
             self.terminate_macro(macro)
         else:
@@ -381,11 +384,15 @@ class MacroManager(QtCore.QObject):
             self._schedule_event.set()
 
         return macro.id
+
     
     def clear_queue(self):
         ''' clears the current macro queue '''
+        syslog = logging.getLogger("system")
+        syslog.info("macro clear queue")
         with self._queue_lock:
             self._queue.clear()
+            self._schedule_event.set()
             
 
     def terminate_macro(self, macro : Macro):
@@ -393,13 +400,19 @@ class MacroManager(QtCore.QObject):
 
         :param macro the macro to terminate
         """
-        self._queue.append(MacroEntry(macro, False, macro.is_local, macro.is_remote))
+        syslog = logging.getLogger("system")
+        syslog.info("terminate macro")
+        with self._queue_lock:
+            self._queue.append(MacroEntry(macro, False, macro.is_local, macro.is_remote))
         self._schedule_event.set()
 
     def _run_scheduler(self):
         """Dispatches macros as required."""
         while self._is_running:
             # Wake up when the event triggers and reset it
+            # while not self._queue or not self._schedule_event.is_set():
+            #     time.sleep(0.01)
+            #     continue
             self._schedule_event.wait()
             self._schedule_event.clear()
 
@@ -429,8 +442,8 @@ class MacroManager(QtCore.QObject):
                                 self._queue.remove(queue_entry)
                     # Don't run a queued macro if the same instance is already
                     # running
-                    elif entry.macro.id in self._active:
-                        continue
+                    # elif entry.macro.id in self._active:
+                    #     continue
                     # Handle exclusive macros
                     elif entry.macro.exclusive:
                         has_exclusive = True

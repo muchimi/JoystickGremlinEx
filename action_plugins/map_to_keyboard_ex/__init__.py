@@ -480,7 +480,8 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
                         id = gremlin.macro.MacroManager().queue_macro(self.press)
                         self.registerMacro(id)
                     if auto_release:
-                        ButtonReleaseActions().register_callback(gremlin.macro.MacroManager().queue_macro(self.release), event)
+                        callback = lambda : gremlin.macro.MacroManager().queue_macro(self.release)
+                        ButtonReleaseActions().register_callback(callback, event)
             elif self.mode == KeyboardOutputMode.AutoRepeat:
                 # setup autorepeat thread
                 if verbose:

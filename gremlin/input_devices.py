@@ -591,6 +591,7 @@ class SimpleRegistry:
         :param callback the function to execute
         :param interval the time between executions
         """
+        assert callable(callback)
         self._registry[callback] =  callback
 
 
@@ -629,6 +630,7 @@ class ModeChangeRegistry():
         :param callback the function to execute
         :param interval the time between executions
         """
+        assert callable(callback)
         self._registry[callback] = callback
 
 
@@ -683,6 +685,7 @@ class StateChangeRegistry():
         :param callback the function to execute
         :param interval the time between executions
         """
+        assert callable(callback)
         self._registry[callback] = callback
 
 
@@ -1728,6 +1731,8 @@ class ButtonReleaseActions(QtCore.QObject):
         """
         release_evt = physical_event.clone()
         release_evt.is_pressed = False
+
+        assert callable(callback)
 
         if release_evt not in self._registry:
             self._registry[release_evt] = []
