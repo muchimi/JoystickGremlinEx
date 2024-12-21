@@ -200,9 +200,7 @@ class MidiInputItem(AbstractInputItem):
         self._mode = MidiInputItem.InputMode.Button  # mode is button or axis 
 
 
-    @property
-    def is_axis(self):
-        return self._mode == MidiInputItem.InputMode.Axis
+    
 
     @property
     def message(self):
@@ -235,12 +233,20 @@ class MidiInputItem(AbstractInputItem):
     def mode_from_string(self, value):
         if value == "axis":
             self._mode = MidiInputItem.InputMode.Axis
+            self.is_button = False
+            self.is_axis = True
         elif value == "button":
             self._mode = MidiInputItem.InputMode.Button
+            self.is_button = True
+            self.is_axis = False
         elif value == "change":
-            self._mode = MidiInputItem.InputMode.change
+            self._mode = MidiInputItem.InputMode.OnChange
+            self.is_button = True
+            self.is_axis = False
         else:
             raise ValueError(f"mode_from_string(): don't know how to handle {value}")
+        
+
 
     
     @mode.setter
@@ -351,6 +357,7 @@ class MidiInputItem(AbstractInputItem):
 
             # build the unique key to distinguish entries - the key includes the port and mode so that two inputs using the same message can be used in different modes
             self._command = command
+            self._message_key = MidiInterface().buildMessageKey(command, self._port_name, message)
             if command == MidiCommandType.SysEx:
                 self._message_key = f"{self._port_name} {byte_list_to_string(message.bytes())}" # key is the whole sysex message
             else:
@@ -479,8 +486,8 @@ class MidiInterface(QtCore.QObject):
         self.midi_enabled = False
 
         
-        el = gremlin.event_handler.EventListener()
-        el.profile_start.connect(self._profile_start)
+        self._event_listener = gremlin.event_handler.EventListener()
+        self._event_listener.profile_start.connect(self._profile_start)
         
         try:
 
@@ -510,19 +517,40 @@ class MidiInterface(QtCore.QObject):
         config = gremlin.config.Configuration()
         if config.midi_enabled:
             # see if this profile defines any MIDI items
-            if not self._started:
-                ec = gremlin.execution_graph.ExecutionContext()
-                if ec.hasInputType(InputType.Midi):
-                    logging.getLogger("system").info(f"MIDI: Start")
-                    self.start()
-                else:
-                    logging.getLogger("system").info(f"MIDI: no MIDI definitions found - start skipped")
+            ec = gremlin.execution_graph.ExecutionContext()
+            if ec.hasInputType(InputType.Midi):
+                logging.getLogger("system").info(f"MIDI: Start")
+
+                # get a list of MIDI items
+                self._midi_map = {}
+                input_nodes = ec.getMappedInputs(InputType.Midi)
+                for input_data in input_nodes:
+                    input_item = input_data.input_item
+                    input_id = input_item.input_id
+                    if input_item.containers:
+                        # has a container - store the key
+                        message_key = input_id.message_key
+                        self._midi_map[message_key] = input_id
+
+
+                self.start()
+
+
+
             else:
-                logging.getLogger("system").info(f"MIDI: Running")
+                logging.getLogger("system").info(f"MIDI: no MIDI definitions found - start skipped")
+
 
             
         else:
             logging.getLogger("system").info(f"MIDI: Disabled")
+
+    def buildMessageKey(self, command, port_name, message):
+        ''' builds a MIDI message key from data '''
+        if command == MidiCommandType.SysEx:
+            return f"{port_name} {byte_list_to_string(message.bytes())}" # key is the whole sysex message
+        return f"{port_name} {message.bytes()[0]} {message.bytes()[1]}" # 
+        
 
     def start(self, port_name_or_list = None):
         ''' starts listeners 
@@ -595,6 +623,54 @@ class MidiInterface(QtCore.QObject):
     def _message_cb(self, port_name, port_index, message):
         ''' called when a MIDI message is received '''
         self.midi_message.emit(port_name, port_index, message)
+
+        mido_type = message.type
+        command = MidiCommandType.from_mido_type(mido_type)
+        message_key = self.buildMessageKey(command, port_name, message)
+        if message_key in self._midi_map:
+            input_item = self._midi_map[message_key]
+            input_type = InputType.Midi
+            device_guid = MidiDeviceTabWidget.device_guid
+            if input_item.is_axis:
+                # trigger an axis event
+
+                # convert MIDI range to axis range 
+                value = gremlin.util.scale_to_range(message.value, source_min = 0, source_max=127)
+
+                input_item.setAxisValue(value)
+                event = gremlin.event_handler.Event(
+                    event_type = input_type,
+                    device_guid = device_guid,
+                    identifier = input_item,
+                    is_pressed = False,
+                    value = value,
+                    raw_value = value,
+                    is_virtual = True, # indicate we are not a hardware input
+                    is_axis = True)
+
+                self._event_listener.joystick_event.emit(event)
+
+            elif input_item.is_button:
+                # trigger a button event 
+                is_pressed = message.value > 0
+                event = gremlin.event_handler.Event(
+                    event_type = input_type,
+                    device_guid = device_guid,
+                    identifier = input_item,
+                    is_pressed = is_pressed,
+                    value = is_pressed,
+                    raw_value = is_pressed,
+                    is_virtual = True, # indicate we are not a hardware input
+                    is_axis = False)
+
+                self._event_listener.joystick_event.emit(event)
+                self._event_listener.button_state_change.emit(
+                        MidiDeviceTabWidget.device_guid,
+                        InputType.OpenSoundControl,
+                        input_item,
+                        is_pressed
+                )
+
 
     @property
     def ports(self):
@@ -1633,6 +1709,7 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         is_axis = mode == MidiInputItem.InputMode.Axis
         self._item_data.is_axis = is_axis
         self._item_data.item_data.is_axis = is_axis
+        self._item_data.item_data.is_button = not is_axis
 
         self.input_item_list_view.update_item(index)
 
