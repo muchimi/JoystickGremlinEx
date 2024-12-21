@@ -322,7 +322,7 @@ class EventListener(QtCore.QObject):
 	# selection event - tells the UI to show a different input
 	select_input = QtCore.Signal(object, object, object, bool) # selects a particular input (device_guid, input_type, input_id, force_update)
 
-	button_state_change = QtCore.Signal(object, object, object, bool) # indicates a change in button state
+	button_state_change = QtCore.Signal(object, object, object, bool) # indicates a change in button state params: (device_guid, input_type, input_id, is_pressed)
 
 	# mapping changed - either container or action added -
 	mapping_changed = QtCore.Signal(object) # fires when a container or action changes on an InputItem - passes the InputItem as the parameter
@@ -370,6 +370,9 @@ class EventListener(QtCore.QObject):
 
 	# heartbeat
 	heartbeat = QtCore.Signal() # ticks every 30 seconds
+
+	# autorepeat abort flag
+	autorepeat_clear =  QtCore.Signal() # fire this to abort any keyboard autorepeat actions
 
 
 	def __init__(self):

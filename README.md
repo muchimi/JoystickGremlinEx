@@ -208,7 +208,11 @@ Joystick Gremlin EX
 
 <!-- TOC --><a name="134016ex-pre-release"></a>
 ## 13.40.16ex (pre-release)
-
+### (m49)
+- New: OSC live input status. At edit time, GremlinEx will listen for OSC events to drive axis inputs and buttons as hardware inputs do.  OSC inputs can behave either as linear or momentary inputs (linear if mode is set to axis, uses the first variable as the input value), and momentary if not (a value of 1 indicates pressed, 0 indicates released).
+- API: OSC clients are now pooled per server/port.
+- Improved: It is now possible to use the Keyboard Ex mapper with containers that do not auto-release.  Autorelease (and a key make) can now get canceled by adding a blank Keyboard Ex action with no keys, set it to release mode.  When triggered, it will stop the auto-repeat function globally and release any pressed keys. This enables using auto-repeat in containers that do not auto-release automatically (by design). One such use-case for this is to autorepeat keystrokes while the input is in a gated axis range (trigger autorepeat on range enter), and another key entry set to stop the autorepeat can be triggered when the range exits. A typical scenario would be using an axis input for a rotary input, and is particularly useful with OSC rotary inputs on glass input surfaces that send an axis value corresponding to the position of the knob.
+- API: The macro manager now has a clear queue function that can clear scheduled actions that haven't executed yet, in effect stopping macro executions.
 ### (m48)
 - New: OSC send action.  This allows GremlinEx to send OSC commands outbound.  For now it's a single IP address and port specified in the options menu.  OSC commands start with a forward slash (improperly formatted commands will not send), and it has two optional parameters per the OSC protocol which can be integer or floating point.
 - Improved: profile runtime determination startup logic consolidated and simplified. The change primarily impacts profiles attached to processes for automatic load/execution if those options are enabled for automatic profile execution/swaps.

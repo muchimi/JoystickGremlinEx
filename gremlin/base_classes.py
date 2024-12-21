@@ -224,6 +224,7 @@ class AbstractInputItem(QtCore.QObject):
         self._description = None
         self._input_description = None
         self._axis_value = None
+        self._button_value = False # true if the equivalent of "pressed"
 
     @property
     def guid(self):
@@ -282,5 +283,12 @@ class AbstractInputItem(QtCore.QObject):
         import gremlin.util
         if self.axis_value is None or value != self._axis_value:
             self._axis_value = value
+
+    @property
+    def button_value(self) -> bool:
+        return self._button_value
+    
+    def setButtonValue(self, value: bool):
+        self._button_value = value
 
 

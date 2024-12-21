@@ -50,23 +50,29 @@ import lxml
 
 from gremlin.ui import virtual_button
 
-class InputIdentifier:
+class InputIdentifier(QtCore.QObject):
 
     """Represents the identifier of a single input item."""
 
-    def __init__(self, input_type, device_guid, input_id, device_type, input_name):
+    def __init__(self, input_type, device_guid, input_id, device_type, input_name, is_axis = False, is_button = False):
         """Creates a new instance.
 
-        :param input_type the type of input
-        :param input_id the identifier of the input
-        :param device_type the type of device this input belongs to
+        :param input_type: the type of input
+        :param input_id: the identifier of the input
+        :param device_type: the type of device this input belongs to
+        :param input_name: the name to display 
+        :param is_axis: true if the input is an axis behavior
+        :param is_button: true if the input is a button behavior
         """
+        super().__init__()
         self._input_type = input_type
         self._device_guid = device_guid
         self._input_id = input_id
         self._device_type = device_type
         self._input_guid = get_guid() # unique internal GUID for this entry
         self._input_name = input_name
+        self._is_axis = is_axis
+        self._is_button = is_button
 
 
     @property
@@ -96,11 +102,27 @@ class InputIdentifier:
     def input_name(self, value : str):
         self._input_name = value
 
-
     @property
     def guid(self):
         return self._input_guid
+    
+    @property
+    def is_axis(self) -> bool:
+        ''' true if this item is setup as an axis input (linear) '''
+        return self._is_axis
+    # @is_axis.setter
+    # def is_axis(self, value : bool):
+    #     self._is_axis = value
+    
 
+    @property
+    def is_button(self) -> bool:
+        ''' true if this item is setup as an button input (momentary) '''
+        return self._is_button 
+    # @is_button.setter
+    # def is_button(self, value : bool):
+    #     self._is_button = value
+    
 class InputItemListModel(ui_common.AbstractModel):
 
     """Model storing a device's input item list."""
@@ -479,7 +501,9 @@ class InputItemListView(ui_common.AbstractView):
                         data.device_guid,
                         data.input_id,
                         data.device_type,
-                        data.input_name
+                        data.input_name,
+                        is_axis = data.is_axis,
+                        is_button = data.is_button
                     )
 
                     if self.custom_widget_handler:
@@ -1174,13 +1198,14 @@ class InputItemWidget(QtWidgets.QFrame):
         self.axis_widget = None
 
 
-        if self.identifier.input_type in (InputType.JoystickAxis, InputType.JoystickButton) and config.show_input_axis:
+        if config.show_input_axis and (self.identifier.is_axis or self.identifier.is_button or self.identifier.input_type in (InputType.JoystickAxis, InputType.JoystickButton)):
             
-            if self.identifier.input_type == InputType.JoystickAxis:
+            if self.identifier.is_axis:
                 widget = gremlin.ui.ui_common.AxisStateWidget(show_label = False, orientation=QtCore.Qt.Orientation.Horizontal, show_percentage=False)
             else:
                 widget = gremlin.ui.ui_common.ButtonStateWidget()
             widget.setMaximumWidth(200)
+            
             widget.hookDevice(identifier.device_guid, identifier.input_type, identifier.input_id)
             self._container_input_axis_layout.addWidget(widget)
             self._container_input_axis_layout.addStretch()

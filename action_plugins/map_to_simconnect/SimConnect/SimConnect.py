@@ -23,6 +23,7 @@ from ctypes.wintypes import *
 import logging
 import time
 
+import gremlin.config
 import gremlin.util
 from .Enum import *
 from .Constants import *
@@ -282,7 +283,7 @@ class SimConnect():
 		self.Requests = {}
 		self.Facilities = []
 
-		self.verbose = True # verbose
+		self.verbose = gremlin.config.Configuration().verbose_mode_simconnect
 		self.verbose_details = False
 		self._library_path = library_path
 		self._hSimConnect = HANDLE()
@@ -386,13 +387,13 @@ class SimConnect():
 	def handle_id_event(self, event):
 		syslog = logging.getLogger("system")
 		uEventID = event.uEventID
-		if uEventID == self._dll.EventID.EVENT_SIM_START:
+		if uEventID == self._dll.EventID.EVENT_SIM_START.value:
 			self.handler.simconnect_sim_start.emit()
 			syslog.info("SimConnect: event: SIM START")
 			self.running = True
 			if self._sim_running_callback:
 				self._sim_running_callback(True)
-		elif uEventID == self._dll.EventID.EVENT_SIM_STOP:
+		elif uEventID == self._dll.EventID.EVENT_SIM_STOP.value:
 			self.handler.simconnect_sim_stop.emit()
 			if self.verbose:
 				syslog.info("SimConnect: event: SIM Stop")
@@ -400,21 +401,21 @@ class SimConnect():
 			if self._sim_running_callback:
 				self._sim_running_callback(False)
 		# Unknow whay not reciving
-		elif uEventID == self._dll.EventID.EVENT_SIM_PAUSED:
+		elif uEventID == self._dll.EventID.EVENT_SIM_PAUSED.value:
 			self.handler.simconnect_sim_paused.emit()
 			if self.verbose:
 				syslog.info("SimConnect: event: SIM Paused")
 			self.paused = True
 			if self._sim_paused_callback:
 				self._sim_paused_callback(True)
-		elif uEventID == self._dll.EventID.EVENT_SIM_UNPAUSED:
+		elif uEventID == self._dll.EventID.EVENT_SIM_UNPAUSED.value:
 			self.handler.simconnect_sim_unpaused.emit()
 			if self.verbose:
 				syslog.info("SimConnect: event: SIM Unpaused")
 			self.paused = False
 			if self._sim_paused_callback:
 				self._sim_paused_callback(False)
-		elif uEventID == self._dll.EventID.EVENT_SIM_RUNNING:
+		elif uEventID == self._dll.EventID.EVENT_SIM_RUNNING.value:
 			self.handler.simconnect_sim_running.emit()
 			if self.verbose:
 				syslog.info("SimConnect: event: SIM Running")
@@ -422,8 +423,7 @@ class SimConnect():
 			self.running = state
 			if self._sim_running_callback:
 				self._sim_running_callback(state)
-		elif uEventID == self._dll.EventID.EVENT_SIM_AIRCRAFT_LOADED:
-			
+		elif uEventID == self._dll.EventID.EVENT_SIM_AIRCRAFT_LOADED.value:
 			aircraft_air = event.dwData
 			if self.verbose:
 				syslog.info(f"SimConnect: event: AIRCRAFT LOADED: {aircraft_air}")
@@ -431,6 +431,9 @@ class SimConnect():
 			if self._aircraft_loaded_callback:
 				self._aircraft_loaded_callback(folder)
 			self.handler.simconnect_aircraft_loaded.emit(folder)
+
+		else:
+			syslog.error(f"SIMCONNECT: received event {uEventID} - don't know how to handle")
 
 	def handle_simobject_event(self, ObjData):
 		
@@ -477,14 +480,15 @@ class SimConnect():
 		syslog.warning(_exception)
 
 	def handle_state_event(self, pData : SIMCONNECT_RECV_SYSTEM_STATE):
+		
+		int_data = pData.dwInteger
+		float_data = pData.fFloat
+		str_data = pData.szString
 		if self.verbose:
 			syslog = logging.getLogger("system")
-			int_data = pData.dwInteger
-			float_data = pData.fFloat
-			str_data = pData.szString
 			syslog.info(f"SimConnect: state event: int: {pData.dwInteger} float: {pData.fFloat} str: {pData.szString}")
-			if self._state_callback:
-				self._state_callback(int_data, float_data, str_data)
+		if self._state_callback:
+			self._state_callback(int_data, float_data, str_data)
 		
 
 	# TODO: update callbackfunction to expand functions.

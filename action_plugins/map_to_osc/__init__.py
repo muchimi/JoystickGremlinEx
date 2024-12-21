@@ -463,9 +463,6 @@ class MapToOscWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._server_container_layout.addWidget(self._server_reset_widget)
         self._server_container_layout.addStretch()
 
-
-
-
         # self._trigger_on_release_widget = QtWidgets.QCheckBox("Trigger on release")
         # self._trigger_on_release_widget.setToolTip("When enabled, the action will trigger when the input is released.")
         # self._trigger_on_release_widget.clicked.connect(self._trigger_on_release_cb)
@@ -703,8 +700,10 @@ class MapToOscFunctor(gremlin.base_profile.AbstractFunctor):
     def profile_start(self):
         ''' occurs when process starts '''
         device_name = gremlin.joystick_handling.device_name_from_guid(self.action_data.hardware_device_guid)
-        self.osc_client = OscClient(name=f"OSC {device_name}/{self.action_data.hardware_input_id}")
-        self.osc_client.start(self.action_data.server_ip, self.action_data.server_port)
+        self.osc_client = self.oscInterface.getClient(self.action_data.server_ip,
+                                            self.action_data.server_port,                                            
+                                            name=f"OSC {device_name}/{self.action_data.hardware_input_id}")
+        self.osc_client.start()
 
     def profile_stop(self):
         if self.osc_client is not None:

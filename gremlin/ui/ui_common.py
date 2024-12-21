@@ -131,11 +131,11 @@ class AbstractView(QtWidgets.QWidget):
 
     # Signal emitted when a entry is selected
     item_selected = QtCore.Signal(int, bool) # index of the item being selected
-    item_edit = QtCore.Signal(object, int, object)  # widget, index, model data object 
+    item_edit = QtCore.Signal(object, int, object)  # widget, index, model data object
     item_edit_curve = QtCore.Signal(object, int, object) # widget, index , model data object
     item_delete_curve = QtCore.Signal(object, int, object) # widget, index , model data object
     item_closed = QtCore.Signal(object, int, object)  # widget, index, model data object
-    
+
 
     def __init__(self, parent=None):
         """Creates a new view instance.
@@ -226,9 +226,9 @@ class NoKeyboardPushButton(QtWidgets.QPushButton):
 
 class QFloatLineEdit(QtWidgets.QLineEdit):
     ''' double input validator with optional range limits for input axis
-    
+
         this line edit behaves like a spin box so it's interchangeable
-    
+
     '''
 
     valueChanged = QtCore.Signal(float) # fires when the value changes
@@ -270,8 +270,8 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
 
     def _update_width(self, chars):
         w = get_text_width(str("m"*chars))
-        self.setMaximumWidth(w)            
-    
+        self.setMaximumWidth(w)
+
 
 
 
@@ -295,7 +295,7 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
                     v -= self._step * factor
                 v = gremlin.util.clamp(v, self._min_range, self._max_range)
                 self.setValue(v)
-                
+
             return True # filter the wheel event
         elif t == QtCore.QEvent.Type.FocusAboutToChange:
             if not self.hasAcceptableInput():
@@ -307,7 +307,7 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
             self.setValue(self.value())
         return False
 
-        
+
     def _update_value(self, value):
         if value is None:
             return
@@ -319,7 +319,7 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
             self.valueChanged.emit(value)
 
 
-        
+
     @QtCore.Slot()
     def _validate(self):
         ''' called whenever the text changes '''
@@ -336,15 +336,15 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
         if self.hasAcceptableInput():
             return float(self.text())
         return None
-    
+
     def isValid(self):
         ''' true if the input in the box is currently valid'''
         return self.hasAcceptableInput()
-    
+
     def step(self):
         ''' mouse wheel step value'''
         return self._step
-    
+
     def setStep(self, step):
         self._step = step
 
@@ -353,7 +353,7 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
 
     def decimals(self):
         return self._decimals
-    
+
     def setDecimals(self, decimals):
         if decimals < 0:
             decimals = 0
@@ -382,7 +382,7 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
         self._min_range = bottom
         self._validator.setBottom(bottom)
         self._update_value(self.value())
-        
+
     def minimum(self):
         return self._min_range
 
@@ -391,9 +391,9 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
 
 class QIntLineEdit(QtWidgets.QLineEdit):
     ''' integer input validator with optional range limits for input axis
-    
+
         this line edit behaves like a spin box so it's interchangeable
-    
+
     '''
 
     valueChanged = QtCore.Signal(float) # fires when the value changes
@@ -403,7 +403,7 @@ class QIntLineEdit(QtWidgets.QLineEdit):
         self._min_range = min_range
         self._max_range = max_range
         self._step = step
-        
+
 
         self._validator = QtGui.QIntValidator(bottom=min_range, top=max_range)
         self._validator.setLocale(self.locale()) # handle correct floating point separator
@@ -433,7 +433,7 @@ class QIntLineEdit(QtWidgets.QLineEdit):
 
     def _update_width(self, chars):
         w = get_text_width(str("m"*chars))
-        self.setMaximumWidth(w)            
+        self.setMaximumWidth(w)
 
     @property
     def data(self):
@@ -456,7 +456,7 @@ class QIntLineEdit(QtWidgets.QLineEdit):
                     v -= self._step
                 v = gremlin.util.clamp(v, self._min_range, self._max_range)
                 self.setValue(v)
-            
+
             return True # filter the wheel event
         elif t == QtCore.QEvent.Type.FocusAboutToChange:
             if not self.hasAcceptableInput():
@@ -468,7 +468,7 @@ class QIntLineEdit(QtWidgets.QLineEdit):
             self.setValue(self.value())
         return False
 
-        
+
     def _update_value(self, value):
         other = self.value()
         if value is None and other is None:
@@ -480,7 +480,7 @@ class QIntLineEdit(QtWidgets.QLineEdit):
             self.valueChanged.emit(value)
 
 
-        
+
     @QtCore.Slot()
     def _validate(self):
         ''' called whenever the text changes '''
@@ -496,15 +496,15 @@ class QIntLineEdit(QtWidgets.QLineEdit):
         if self.hasAcceptableInput():
             return int(float(self.text()))
         return None
-    
+
     def isValid(self):
         ''' true if the input in the box is currently valid'''
         return self.hasAcceptableInput()
-    
+
     def step(self):
         ''' mouse wheel step value'''
         return self._step
-    
+
     def setStep(self, step):
         self._step = step
 
@@ -535,7 +535,7 @@ class QIntLineEdit(QtWidgets.QLineEdit):
 
     def maximum(self):
         return self._max_range
-                
+
 
 
 class DynamicDoubleSpinBox(QFloatLineEdit):
@@ -602,9 +602,9 @@ class DynamicDoubleSpinBox_legacy(QtWidgets.QDoubleSpinBox):
 
             # Convert number to a string representation we can convert to
             # a float so we can truncate the decimal places as required
-            
+
             format_string = f"{{:.{self.decimals():d}f}}"
-    
+
             try:
                 value_string = format_string.format(float(value_string))
             except:
@@ -677,7 +677,7 @@ class AbstractInputSelector(QtWidgets.QWidget):
 
         # Get the index of the combo box associated with this device
         dev_id = self._device_id_registry.index(device_id)
-        
+
         # input_name = gremlin.common.input_to_ui_string(input_type, input_id)
         # entry_id = self.input_item_dropdowns[dev_id].findText(input_name)
         entry_id = -1
@@ -691,14 +691,14 @@ class AbstractInputSelector(QtWidgets.QWidget):
                 entry_id = index
                 # print ("found!")
                 break
-                    
-            
+
+
 
         # Select and display correct combo boxes and entries within
         with QtCore.QSignalBlocker(self.device_dropdown):
             self.device_dropdown.setCurrentIndex(dev_id)
 
-            
+
             for entry in self.input_item_dropdowns:
                 with QtCore.QSignalBlocker(entry):
                     entry.setVisible(False)
@@ -747,8 +747,8 @@ class AbstractInputSelector(QtWidgets.QWidget):
             self._device_id_registry.append(self._device_identifier(device))
         self.main_layout.addWidget(self.device_dropdown)
         self.device_dropdown.activated.connect(self._update_device)
-        
-        
+
+
 
     def _create_input_dropdown(self):
         count_map = {
@@ -769,11 +769,11 @@ class AbstractInputSelector(QtWidgets.QWidget):
             selection.setStyleSheet("QComboBox { combobox-popup: 0; }")
             self._input_type_registry.append([])
             self.selection_widget = selection
-            
+
 
             # Add items based on the input type
             max_col = 32
-         
+
             for input_type in self.valid_types:
                 item_count = count_map[input_type](device)
                 for i in range(item_count):
@@ -787,7 +787,7 @@ class AbstractInputSelector(QtWidgets.QWidget):
                             input_id
                         )
                     selection.addItem(s_ui, (input_type, input_id))
-                    
+
                     self._input_type_registry[-1].append(input_type)
 
             # Add the selection and hide it
@@ -801,7 +801,7 @@ class AbstractInputSelector(QtWidgets.QWidget):
         # Show the first entry by default
         if len(self.input_item_dropdowns) > 0:
             self.input_item_dropdowns[0].setVisible(True)
-   
+
 
     def _execute_callback(self):
         self.change_cb(self.get_selection())
@@ -825,7 +825,7 @@ class JoystickSelector(AbstractInputSelector):
         :param parent the parent of this widget
         """
         super().__init__(change_cb, valid_types, parent)
-        
+
 
     def _initialize(self):
         potential_devices = sorted(
@@ -910,7 +910,7 @@ class ActionSelector(QtWidgets.QWidget):
     # Signal emitted when an action is going to be added
     action_added = QtCore.Signal(str)  # add button pressed
     action_paste = QtCore.Signal(object, object) # paste button pressed
-    
+
 
     def __init__(self, input_type, container, parent=None):
         """Creates a new selector instance.
@@ -927,7 +927,7 @@ class ActionSelector(QtWidgets.QWidget):
         self.action_label = QtWidgets.QLabel("Action")
         self.main_layout.addWidget(self.action_label)
         self._container = container
- 
+
         self.action_dropdown = QComboBox()
         # warning_icon = load_icon("fa.warning", use_qta=True, qta_color = QtGui.QColor('#918B16'))
         for name in self._valid_action_list():
@@ -948,7 +948,7 @@ class ActionSelector(QtWidgets.QWidget):
         self.paste_button.clicked.connect(self._paste_action)
         self.paste_button.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Minimum)
         self.paste_button.setToolTip("Paste Action")
-        
+
 
         self.main_layout.addWidget(self.action_dropdown)
         self.main_layout.addWidget(self.add_button)
@@ -965,7 +965,7 @@ class ActionSelector(QtWidgets.QWidget):
         return self._container
     # @container.setter
     # def container(self, container):
-    #     self._container = container        
+    #     self._container = container
 
     @QtCore.Slot(object, str)
     def _last_action_changed(self, widget, name):
@@ -1008,7 +1008,7 @@ class ActionSelector(QtWidgets.QWidget):
                     continue
                 action_list.append(entry.name)
         return sorted(action_list)
-    
+
 
     def _add_action(self, clicked=False):
         """Handles selecting of an action to be added.
@@ -1031,7 +1031,7 @@ class ActionSelector(QtWidgets.QWidget):
                         container = parent.profile_data
                         break
                 parent = parent.parent()
-            
+
 
         action = gremlin.plugin_manager.ActionPlugins().fromClipboard(container)
         if action is None:
@@ -1045,7 +1045,7 @@ class ActionSelector(QtWidgets.QWidget):
             # dish out a message
             MessageBox(title =  f"Invalid Action type ({action.name})",
                 prompt = "Unable to paste action because it is not valid for the current input")
-                    
+
 
     def _clipboard_changed(self, clipboard):
         ''' handles paste button state based on clipboard data '''
@@ -1055,8 +1055,8 @@ class ActionSelector(QtWidgets.QWidget):
             self.paste_button.setToolTip(f"Paste action ({clipboard.data.name})")
         else:
             self.paste_button.setToolTip(f"Paste action (not available)")
-    
-     
+
+
 
 def _inheritance_tree_to_labels(labels, tree, level):
     """Generates labels to use in the dropdown menu indicating inheritance.
@@ -1094,7 +1094,7 @@ def get_mode_list(profile_data):
                     mode_names.append(entry[0])
                     display_names.append(entry[1])
         else:
-            
+
             mode_names.append(entry[0])
             display_names.append(entry[1])
 
@@ -1113,7 +1113,7 @@ class ModeWidget(QtWidgets.QWidget):
 
     # Signal emitted when the mode changes
     edit_mode_changed = QtCore.Signal(str) # when the edit mode changes
-    
+
 
     def __init__(self, parent=None):
         """Creates a new instance.
@@ -1143,7 +1143,7 @@ class ModeWidget(QtWidgets.QWidget):
                 el.profile_stop.disconnect(self._profile_stop_cb)
         except:
             pass
-    
+
 
     @QtCore.Slot()
     def _profile_start_cb(self):
@@ -1167,7 +1167,7 @@ class ModeWidget(QtWidgets.QWidget):
             modes = gremlin.shared_state.current_profile.get_modes()
             while self.edit_mode_selector.count() > 0:
                     self.edit_mode_selector.removeItem(0)
-            
+
             mode_list = get_mode_list(profile_data)
             self.mode_list = [x[1] for x in mode_list]
             # Create mode name labels visualizing the tree structure
@@ -1201,7 +1201,7 @@ class ModeWidget(QtWidgets.QWidget):
             index = 0
             current_index = 0
             last_edit_mode = gremlin.config.Configuration().get_profile_last_edit_mode()
-  
+
             if not last_edit_mode in modes:
                 last_edit_mode = gremlin.shared_state.current_profile.get_default_mode()
             for display_name, mode_name in zip(display_names, mode_names):
@@ -1256,7 +1256,7 @@ class ModeWidget(QtWidgets.QWidget):
         self.edit_mode_selector.setSizePolicy(exp_min_sp)
         self.edit_mode_selector.setMinimumContentsLength(20)
         self.edit_mode_selector.setToolTip("Selects the active profile mode being edited")
-        
+
 
         # add the mode change button
         self.mode_change = QtWidgets.QPushButton()
@@ -1269,7 +1269,7 @@ class ModeWidget(QtWidgets.QWidget):
 
         # Add widgets to the layout
         self.main_layout.addStretch(10)
-                
+
         self.main_layout.addWidget(self.edit_label)
         self.main_layout.addWidget(self.edit_mode_selector)
         self.main_layout.addWidget(self.mode_change)
@@ -1299,12 +1299,12 @@ class ModeWidget(QtWidgets.QWidget):
     def currentIndex(self) -> int:
         ''' current selector index '''
         return self.edit_mode_selector.currentIndex()
-    
+
     def currentMode(self) -> str:
         ''' current selection text '''
         return self.edit_mode_selector.currentText()
 
-    
+
     def setCurrentIndex(self, index):
         self.edit_mode_selector.setCurrentIndex(index)
 
@@ -1474,7 +1474,7 @@ class InputListenerWidget(QtWidgets.QFrame):
                     if not self._abort_timer.is_alive():
                         self._abort_timer.start()
             else:
-                
+
                 self._abort_timer.cancel()
                 if not self._aborting:
                     self.item_selected.emit(self._multi_key_storage)
@@ -1497,7 +1497,7 @@ class InputListenerWidget(QtWidgets.QFrame):
             self._abort_timer.cancel()
             time.sleep(0.1)
 
-    
+
     def closeEvent(self, evt):
         """Closes the overlay window."""
         event_listener = gremlin.event_handler.EventListener()
@@ -1518,7 +1518,7 @@ class InputListenerWidget(QtWidgets.QFrame):
 
         # print ("input widget close")
         super().closeEvent(evt)
-        
+
 
 
     def _valid_event_types_string(self):
@@ -1567,23 +1567,23 @@ def get_layout_widgets(layout) -> list:
             widgets.append(child.widget())
 
     return widgets
-        
 
-        
+
+
 class QComboBox (QtWidgets.QComboBox):
     ''' a max limited combo box '''
     def __init__(self, parent = None):
         super().__init__(parent)
-        
-        # hack to ensure maximum items property is respected 
+
+        # hack to ensure maximum items property is respected
         #self.setEditable(True) # this is so max items works
         # self.lineEdit().setFrame(False)
         # self.lineEdit().setReadOnly(True)
         self.setStyleSheet('QComboBox {combobox-popup: 0}')
-        
-        
+
+
         self.setMaxVisibleItems(20)
-        
+
 class NoWheelComboBox (QComboBox):
     ''' implements a combo box with no-wheel scrolling to avoid inadvertent switching of entries while scolling containers '''
 
@@ -1596,7 +1596,7 @@ class NoWheelComboBox (QComboBox):
         # blitz wheel events if the box is not in focus
         if self.hasFocus():
             return super().wheelEvent(event)
-    
+
 class ConfirmPushButton(QtWidgets.QPushButton):
     ''' confirmation push button '''
 
@@ -1604,7 +1604,7 @@ class ConfirmPushButton(QtWidgets.QPushButton):
 
     def __init__(self, text = None, title = "Confirmation Required", prompt = "Are you sure?", show_callback = None, parent = None ) -> None:
         ''' shows a confirm dialog box on click
-        
+
         :param text button text
         :param title dialog title
         :param prompt dialog body (question)
@@ -1627,7 +1627,7 @@ class ConfirmPushButton(QtWidgets.QPushButton):
             result = self.show_callback()
             if not result:
                 return
-        
+
         from gremlin.util import load_pixmap
         message_box = QtWidgets.QMessageBox()
         pixmap = load_pixmap("warning.svg")
@@ -1644,7 +1644,7 @@ class ConfirmPushButton(QtWidgets.QPushButton):
         result = message_box.exec()
         if result == QtWidgets.QMessageBox.StandardButton.Ok:
             self.confirmed.emit(self)
-        
+
 class ConfirmBox():
     def __init__(self, title = "Confirmation Required", prompt = "Are you sure?", parent = None):
 
@@ -1664,7 +1664,7 @@ class ConfirmBox():
 
     def show(self):
         return self._message_box.exec()
-    
+
 class QMessageBox(QtWidgets.QMessageBox):
     def __init__(self, width = 400, height = 100, parent = None):
         super().__init__(parent)
@@ -1681,7 +1681,7 @@ class MessageBox():
 
         from gremlin.util import load_pixmap
         self._message_box = QMessageBox(parent = parent)
-        
+
         if is_warning:
             pixmap = load_pixmap("warning.svg")
             pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
@@ -1694,7 +1694,7 @@ class MessageBox():
         self._message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
         gremlin.util.centerDialog(self._message_box)
         self._message_box.exec()
-    
+
 
 
 
@@ -1704,7 +1704,7 @@ class QHLine(QtWidgets.QFrame):
         super().__init__(parent)
         self.setFrameShape(QtWidgets.QFrame.Shape.HLine)
         self.setFrameShadow(QtWidgets.QFrame.Shadow.Sunken)
-        
+
 class QWrapableLabel(QtWidgets.QLabel):
     ''' wrappable label '''
     def __init__(self, *args, **kwargs):
@@ -1733,7 +1733,7 @@ class QIconLabel(QtWidgets.QWidget):
         self._icon_widget = QtWidgets.QLabel()
         if icon_path:
             self.setIcon(icon_path, use_qta, color = icon_color)
-            
+
         container_layout.addWidget(self._icon_widget)
         container_layout.addSpacing(self.HorizontalSpacing)
         if use_wrap:
@@ -1766,7 +1766,7 @@ class QIconLabel(QtWidgets.QWidget):
         else:
             # clear the pixmap
             self._icon_widget.setPixmap(QtGui.QPixmap())
-        
+
     def setText(self, text = None):
         ''' sets the text of the label '''
         if text:
@@ -1798,11 +1798,11 @@ class QDataWidget(QtWidgets.QWidget):
     @property
     def data(self):
         return self._data
-    
+
     @data.setter
     def data(self, value):
         self._data = value
-    
+
 
 class QDataLabel(QtWidgets.QLabel):
     ''' data enabled label widget '''
@@ -1813,7 +1813,7 @@ class QDataLabel(QtWidgets.QLabel):
     @property
     def data(self):
         return self._data
-    
+
     @data.setter
     def data(self, value):
         self._data = value
@@ -1827,7 +1827,7 @@ class QDataCheckbox(QtWidgets.QCheckBox):
     @property
     def data(self):
         return self._data
-    
+
     @data.setter
     def data(self, value):
         self._data = value
@@ -1843,7 +1843,7 @@ class QDataRadioButton(QtWidgets.QRadioButton):
     @property
     def data(self):
         return self._data
-    
+
     @data.setter
     def data(self, value):
         self._data = value
@@ -1857,7 +1857,7 @@ class QDataPushButton(QtWidgets.QPushButton):
     @property
     def data(self):
         return self._data
-    
+
     @data.setter
     def data(self, value):
         self._data = value
@@ -1871,6 +1871,7 @@ class QDataLineEdit(QtWidgets.QLineEdit):
     def __init__(self, text = None, data = None, parent = None):
         super().__init__(text, parent)
         self._data = data
+        self._text_changed = True
         self.setAlignment(Qt.AlignLeft)
         #self.setStyleSheet("QLineEdit{border: #8FBC8F;}")
         super().textChanged.connect(self._text_changed_cb)
@@ -1897,7 +1898,7 @@ class QDataLineEdit(QtWidgets.QLineEdit):
     @property
     def data(self):
         return self._data
-    
+
     @data.setter
     def data(self, value):
         self._data = value
@@ -1925,7 +1926,7 @@ class QDataComboBox(QComboBox):
     @property
     def data(self):
         return self._data
-    
+
     @data.setter
     def data(self, value):
         self._data = value
@@ -1946,14 +1947,14 @@ class QPathLineItem(QtWidgets.QWidget):
         :param: text - the default content
         :data: optional data parameters
         :dir_mode: true if the entry is a folder, false if it's a file
-        
+
         '''
         super().__init__(parent)
 
         self._text = text
         self._header = header
         self._dir_mode = dir_mode
-        
+
 
         self._file_widget = QtWidgets.QLineEdit()
         self._file_widget.installEventFilter(self)
@@ -1980,13 +1981,13 @@ class QPathLineItem(QtWidgets.QWidget):
         self._data = data
 
         self._file_changed()
-        
+
         self.setLayout(self._layout)
 
     @property
     def header_width(self):
         return self._header_widget.frameGeometry().width()
-    
+
     @header_width.setter
     def header_width(self, value):
         self._header_widget.setMaximumWidth(value)
@@ -2022,7 +2023,7 @@ class QPathLineItem(QtWidgets.QWidget):
         else:
             # clear the pixmap
             self._icon_widget.setPixmap(QtGui.QPixmap())
-        
+
     def setText(self, text = None):
         ''' sets the text of the label '''
         with QtCore.QSignalBlocker(self._file_widget):
@@ -2033,7 +2034,7 @@ class QPathLineItem(QtWidgets.QWidget):
                 self._text = ""
                 self._file_widget.setText("")
         self._file_changed()
-    
+
 
     def text(self):
         return self._text
@@ -2062,12 +2063,12 @@ class QPathLineItem(QtWidgets.QWidget):
     def valid(self):
         ''' true if the file exists '''
         return os.path.isfile(self._text)
-    
+
     @property
     def data(self):
         ''' object reference for this widget '''
         return self._data
-    
+
     @data.setter
     def data(self, value):
         self._data = value
@@ -2075,7 +2076,7 @@ class QPathLineItem(QtWidgets.QWidget):
 
 class ButtonStateWidget(QtWidgets.QWidget):
     ''' visualizes the state of a button '''
-    
+
     def __init__(self, parent = None):
         super().__init__(parent)
         icon_size = QtCore.QSize(16,16)
@@ -2086,23 +2087,31 @@ class ButtonStateWidget(QtWidgets.QWidget):
         off_icon = load_icon("mdi.record",use_qta=True,qta_color="#979EA8")
         self._off_pixmap = off_icon.pixmap(icon_size)
         self.main_layout = QtWidgets.QHBoxLayout(self)
+        self.main_layout.setSpacing(0)
         self.main_layout.addWidget(self._button_widget)
         self.setContentsMargins(0,0,0,0)
 
-        
+
     def hookDevice(self, device_guid, input_type, input_id):
         ''' hooks the input  '''
+        import gremlin.joystick_handling
         self._device_guid = device_guid
         self._input_id = input_id
         self._input_type = input_type
-        
+        is_pressed = False
+        if self._input_type == InputType.OpenSoundControl:
+            is_pressed = input_id.button_value
+        elif gremlin.joystick_handling.is_hardware_device(device_guid):
+            # read the current value
 
-        # read the current value
-        is_pressed = gremlin.joystick_handling.dinput.DILL().get_button(device_guid, input_id)
+            is_pressed = gremlin.joystick_handling.dinput.DILL().get_button(device_guid, input_id)
+        self._update_value(is_pressed)
+
+
         el = gremlin.event_handler.EventListener()
         #el.joystick_event.connect(self._event_handler)
         el.button_state_change.connect(self._button_state_change)
-        self._update_value(is_pressed)
+
 
     def unhookDevice(self):
         el = gremlin.event_handler.EventListener()
@@ -2139,11 +2148,11 @@ class ButtonStateWidget(QtWidgets.QWidget):
 class AxisStateWidget(QtWidgets.QWidget):
 
     """Visualizes the current state of an axis."""
-    
+
     css_vertical = r"QProgressBar::chunk {background: QLinearGradient( x1: 0, y1: 0, x2: 1, y2: 0,stop: 0 #78d,stop: 0.4999 #46a,stop: 0.5 #45a,stop: 1 #238 ); border-radius: 7px; border: 1px solid black;}"
     #css_horizontal = r"QProgressBar::chunk {background: QLinearGradient( x1: 0, y1: 0, x2: 0, y2: 1,stop: 0 #78d,stop: 0.4999 #46a,stop: 0.5 #45a,stop: 1 #238 ); border-radius: 7px; border: 1px solid black;}"
     css_horizontal = r"QProgressBar::chunk {background: QLinearGradient( x1: 0, y1: 0, x2: 0, y2: 1,stop: 0 #77a ,stop: 0.4999 #477,stop: 0.5 #45a,stop: 1 #238 ); border-radius: 7px; border: 1px solid black;}"
-    
+
     valueChanged = QtCore.Signal(float, float) # (input_value, curved_value)
 
     def __init__(self, axis_id = None, show_percentage = True, show_value = True, show_label = True, show_curve = True, orientation = QtCore.Qt.Orientation.Vertical, parent=None):
@@ -2174,7 +2183,7 @@ class AxisStateWidget(QtWidgets.QWidget):
         self._readout_curved_widget = QtWidgets.QLabel()
 
         self._label_widget = QtWidgets.QLabel()
-        
+
         if axis_id:
             self.setLabel(f"Axis {axis_id}")
 
@@ -2191,15 +2200,18 @@ class AxisStateWidget(QtWidgets.QWidget):
         self._raw_value = 0
         self._reverse = False
         self._decimals = 3
+        self._is_hardware_input = False # true if the device is a hardware device, set in HookDevice()
 
-        
+
         self._width = 10
         self._update_css()
         self._update_range()
 
-      
+        self.main_layout.setSpacing(0)
 
-    
+
+
+
     @property
     def show_curved(self) -> bool:
         ''' true if repeater shows curved data '''
@@ -2209,9 +2221,9 @@ class AxisStateWidget(QtWidgets.QWidget):
         if value != self._show_curved:
             self._show_curved = value
             self.setValue(self._value, self._curve_value)
-    
 
-    
+
+
 
     def _create_primitives(self):
         self._marker = [
@@ -2233,7 +2245,7 @@ class AxisStateWidget(QtWidgets.QWidget):
         if self._orientation == QtCore.Qt.Orientation.Vertical:
             css = AxisStateWidget.css_vertical + f";width {self._width}px"
             self._progress_widget.setMaximumWidth(self._width)
-            
+
         elif self._orientation == QtCore.Qt.Orientation.Horizontal:
             css = AxisStateWidget.css_horizontal+ f";height {self._width}px"
             self._progress_widget.setMaximumHeight(self._width)
@@ -2268,25 +2280,30 @@ class AxisStateWidget(QtWidgets.QWidget):
         value += 0   # avoid negative 0 (WHY?)
         self._value = value
 
-        if curve_value is None:
-            eh = gremlin.event_handler.EventListener()
-            curve_value = eh._apply_curve_ex(self._device_guid, self._input_id, value)
-        self._curve_value = curve_value
+        if curve_value is not None:
+            # eh = gremlin.event_handler.EventListener()
+            # curve_value = eh._apply_curve_ex(self._device_guid, self._input_id, value)
+            self._curve_value = curve_value
+            display_value = curve_value
+            curve_visible = self._show_curved
 
-        display_value = curve_value if self._show_curved else value
+        else:
+            display_value = value
+            curve_visible = False
+            self._curve_value = value
+
 
         if self._reverse:
             display_value = gremlin.util.scale_to_range(display_value, invert=True)
 
         scaled_value = self._scale_factor * display_value
-        #print (f"{scaled_value}")
         self._progress_widget.setValue(scaled_value)
         self._progress_widget.update()
         readout = ""
         readout_curved = ""
         if self._show_value:
             readout = f"{value:+0.3f}"
-            readout_curved = f"C{curve_value:+0.3f}"
+            readout_curved = f"C{curve_value:+0.3f}" if curve_visible else ""
         if self._show_percentage:
             if percent_value is None:
                 if curve_value is None:
@@ -2307,7 +2324,7 @@ class AxisStateWidget(QtWidgets.QWidget):
 
 
         self._readout_widget.setText(readout)
-        if self._show_curved:
+        if curve_visible:
             self._readout_curved_widget.setText(readout_curved)
         else:
             self._readout_curved_widget.setText("")
@@ -2352,18 +2369,21 @@ class AxisStateWidget(QtWidgets.QWidget):
 
     def hookDevice(self, device_guid, input_type, input_id):
         ''' hooks an axis '''
+        import gremlin.joystick_handling
         self._device_guid = device_guid
         self._input_id = input_id
         self._input_type = input_type
         self._scale_factor = 1000
         self._value = -1
         self.setRange(-1, 1)
-
-        # read the current value
-        raw_value = gremlin.joystick_handling.dinput.DILL().get_axis(device_guid, input_id)
+        self._is_hardware_input = gremlin.joystick_handling.is_hardware_device(device_guid)
+        if self._input_type == InputType.OpenSoundControl:
+            raw_value = input_id.axis_value
+        elif self._is_hardware_input:
+            raw_value = gremlin.joystick_handling.dinput.DILL().get_axis(device_guid, input_id)
+        self._update_value(raw_value)
         eh = gremlin.event_handler.EventListener()
         eh.joystick_event.connect(self._event_handler)
-        self._update_value(raw_value)
 
     def unhookDevice(self):
         eh = gremlin.event_handler.EventListener()
@@ -2372,22 +2392,25 @@ class AxisStateWidget(QtWidgets.QWidget):
     def _event_handler(self, event):
         if gremlin.shared_state.is_running or not event.is_axis:
             return
-        
+
         if self._device_guid != event.device_guid or self._input_id != event.identifier:
             return
-        
+
         self._update_value(event.raw_value)
 
     def _update_value(self, raw_value):
         # invert the input if needed
-        eh = gremlin.event_handler.EventListener()
-        value = eh._apply_calibration_ex(self._device_guid, self._input_id, raw_value)
-        curve_value = eh._apply_curve_ex(self._device_guid, self._input_id, value)
-        self.setValue(value, curve_value)
+        if self._is_hardware_input:
+            eh = gremlin.event_handler.EventListener()
+            value = eh._apply_calibration_ex(self._device_guid, self._input_id, raw_value)
+            curve_value = eh._apply_curve_ex(self._device_guid, self._input_id, value)
+            self.setValue(value, curve_value)
+        else:
+            self.setValue(raw_value)
 
-        
 
-        
+
+
 class AxesCurrentState(QtWidgets.QGroupBox):
 
     """Displays the current state of all axes on a device."""
@@ -2566,7 +2589,7 @@ class AxesTimeline(QtWidgets.QGroupBox):
         3: "#4daf4a",
         4: "#984ea3",
         5: "#ff7f00",
-        6: "#8a8a2c", 
+        6: "#8a8a2c",
         7: "#a65628",
         8: "#f781bf"
     }
@@ -2692,7 +2715,7 @@ class TimeLinePlotWidget(QtWidgets.QWidget):
         p.drawPixmap(0, 0, self._pixmap)
         p.end()
 
-        
+
 
     def add_point(self, value, series_id=0):
         """Adds a data point to a time series.
@@ -2776,9 +2799,9 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
         layout = QtWidgets.QHBoxLayout()
         layout.setContentsMargins(0,0,0,0)
         self.setLayout(layout)
-        
 
-        
+
+
         el = gremlin.event_handler.EventListener()
         if vis_type == gremlin.types.VisualizationType.AxisCurrent:
             self._create_current_axis()
@@ -2881,7 +2904,7 @@ class ButtonState(QtWidgets.QGroupBox):
         QPushButton:flat {
             border: none; /* no border for a flat push button */
         }
-        
+
         QPushButton:!enabled
         {
              color: #000000;
@@ -2944,7 +2967,7 @@ class QRowSelectorFrame(QtWidgets.QFrame):
 
     def setSelectable(self, value):
         self._selectable = value
-    
+
     def getSelectable(self):
         return self._selectable
 
@@ -2958,7 +2981,7 @@ class QRowSelectorFrame(QtWidgets.QFrame):
     @property
     def selected(self):
         return self._selected
-    
+
     @selected.setter
     def selected(self, value):
         # change selection mode
@@ -2976,12 +2999,12 @@ class QRowSelectorFrame(QtWidgets.QFrame):
     @property
     def data(self):
         return self._data
-    
+
     @data.setter
     def data(self, value):
         self._data = value
 
-                             
+
 def get_text_width(text):
     ''' gets the average text width '''
     lbl = QtWidgets.QLabel("w")
@@ -3185,7 +3208,7 @@ class QAnimatedToggle(QToggle):
 class QToggleText(QtWidgets.QWidget):
     ''' switched checkbox  '''
     clicked = QtCore.Signal()
-    
+
     def __init__(self, text = None, parent = None):
         super().__init__(parent)
         self.main_layout = QtWidgets.QHBoxLayout(self)
@@ -3197,7 +3220,7 @@ class QToggleText(QtWidgets.QWidget):
         if text is not None:
             self._label.setText(text)
         self._button.clicked.connect(self._clicked_cb)
-        
+
 
     @QtCore.Slot()
     def _clicked_cb(self):
@@ -3228,7 +3251,7 @@ class QDelayWidget(QtWidgets.QWidget):
 
     def __init__(self, value = 250, parent = None):
         '''
-        
+
         :params value: default delay in milliseconds '''
         super().__init__(parent)
         self.main_layout = QtWidgets.QHBoxLayout(self)
@@ -3255,7 +3278,7 @@ class QDelayWidget(QtWidgets.QWidget):
         half_sec_button.clicked.connect(self._half_sec_delay)
         sec_button.clicked.connect(self._sec_delay)
 
-        
+
         self.delay_container_layout.addWidget(delay_label)
         self.delay_container_layout.addWidget(self._delay_widget)
         self.delay_container_layout.addWidget(quarter_sec_button)
@@ -3268,7 +3291,7 @@ class QDelayWidget(QtWidgets.QWidget):
     def value(self):
         ''' gets the delay in milliseconds '''
         return self._delay_widget.value()
-    
+
     def setValue(self, value : int):
         if value >= 0 and value != self._delay_widget.value():
             self._delay_widget.setValue(value)
@@ -3277,24 +3300,24 @@ class QDelayWidget(QtWidgets.QWidget):
     @QtCore.Slot()
     def _value_changed(self):
         self.valueChanged.emit()
-    
+
     @QtCore.Slot()
     def _quarter_sec_delay(self):
         self._delay_widget.setValue(250)
-        
+
     @QtCore.Slot()
     def _half_sec_delay(self):
         self._delay_widget.setValue(500)
-        
+
     @QtCore.Slot()
     def _sec_delay(self):
         self._delay_widget.setValue(1000)
-        
+
 
 import gremlin.singleton_decorator
 @gremlin.singleton_decorator.SingletonDecorator
 class QHelper():
-    
+
     def __init__(self, show_percent = False, decimals = 3, single_step = 0.01):
         self._show_percent = show_percent
         self._decimals = decimals
@@ -3308,42 +3331,42 @@ class QHelper():
         if self.show_percent:
             return 2
         return self._decimals
-    
+
     @decimals.setter
     def decimals(self, value):
         self._decimals = value
-    
+
     @property
     def single_step(self):
         if self.show_percent:
             return 0.1
         return self._single_step
-    
+
     @property
     def min_range(self):
         ''' current min range '''
         return self._min_range
-    
+
     @min_range.setter
     def min_range(self, value):
         self._min_range = value
-    
+
     @property
     def max_range(self):
         ''' current max range '''
         return self._max_range
-    
+
     @max_range.setter
     def max_range(self, value):
         self._max_range = value
-    
+
     @property
     def show_percent(self):
         return self._show_percent
     @show_percent.setter
     def show_percent(self, value):
         self._show_percent = value
-    
+
     def get_double_spinbox(self, id, value, min_range = -1.0, max_range = 1.0) -> DynamicDoubleSpinBox:
         ''' creates a double spin box formatted for the display mode '''
         show_percent = self.show_percent
@@ -3362,14 +3385,14 @@ class QHelper():
         sb_widget.setValue(value)
 
         return sb_widget
-    
+
     def to_value(self, value):
         ''' returns a [-1,+1] value converted to the range output'''
         if self.show_percent:
             return gremlin.util.scale_to_range(value, target_min = 0, target_max = 100)
         else:
             return gremlin.util.scale_to_range(value, target_min = self.min_range, target_max = self.max_range)
-    
+
 
 class QDoubleClickSpinBox(QtWidgets.QSpinBox):
     ''' double click to reset spinbox '''
@@ -3781,7 +3804,7 @@ class QFlowLayout(QtWidgets.QLayout):
         y = effective.y()
         lineheight = 0
 
-        
+
         # visible_count = len(self._items)
         # invisible_count = 0
 
@@ -3808,16 +3831,16 @@ class QFlowLayout(QtWidgets.QLayout):
                     vspace = widget.style().layoutSpacing(
                         QtWidgets.QSizePolicy.PushButton,
                         QtWidgets.QSizePolicy.PushButton, QtCore.Qt.Vertical)
-                item_w = item.sizeHint().width() + hspace    
+                item_w = item.sizeHint().width() + hspace
                 max_w = max(max_w,item_w)
                 lineheight = max(lineheight, item.sizeHint().height())
             # compute columns
-            
+
             usable_width = effective.right() - x
             if max_w == 0:
                 max_w = usable_width
             max_col = max(1, usable_width // max_w)
-            
+
             # print (f"available width {usable_width} max widget {max_w} columns: {max_col}")
             for col in range(max_col):
                 pos_x[col] = col * max_w
@@ -3867,18 +3890,18 @@ class QFlowLayout(QtWidgets.QLayout):
                         QtWidgets.QSizePolicy.PushButton,
                         QtWidgets.QSizePolicy.PushButton, QtCore.Qt.Vertical)
                 nextX = x + item.sizeHint().width() + hspace
-                
+
                 if nextX - hspace > effective.right() and lineheight > 0:
                     x = effective.x()
                     y = y + lineheight + vspace
                     nextX = x + item.sizeHint().width() + hspace
                     lineheight = 0
-                    
+
                 if not testonly:
                     item.setGeometry(
                         QtCore.QRect(QtCore.QPoint(x, y), item.sizeHint()))
                 x = nextX
-            
+
                 lineheight = max(lineheight, item.sizeHint().height())
 
         return y + lineheight - rect.y() + bottom
@@ -3909,12 +3932,12 @@ class QBubble(QtWidgets.QLabel):
 
 
 
-    
+
 class ActionLabel(QtWidgets.QLabel):
 
     """Handles showing the correct icon for the given action."""
 
-    
+
 
     def __init__(self, action_entry, parent=None):
         """Creates a new label for the given entry.
@@ -3926,12 +3949,12 @@ class ActionLabel(QtWidgets.QLabel):
         icon = action_entry.icon()
         if icon is None:
             icon = gremlin.util.load_icon("fa.question-circle-o")
-    
+
         self._width = 20
         if isinstance(icon, str):
             # convert to icon if a path is given
             icon = load_icon(icon)
-        
+
         if isinstance(icon, QtGui.QIcon):
             pixmap = icon.pixmap(self._width)
         else:
@@ -3965,7 +3988,7 @@ class QContentWidget(QtWidgets.QWidget):
     def resizeEvent(self, event):
         self.resized.emit(event.size)
         return super().resizeEvent(event)
-    
+
 
 
 
@@ -3978,17 +4001,17 @@ class QSplitTabWidget(QDataWidget):
 
         self._content_widget = QContentWidget()
         self._content_widget.resized.connect(self._content_resized)
-        self._content_widget.setContentsMargins(0,0,0,0)        
+        self._content_widget.setContentsMargins(0,0,0,0)
 
         self._splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal, self._content_widget)
-        
+
 
         self._left_panel_widget = QtWidgets.QWidget()
-        self._left_panel_widget.setContentsMargins(0,0,0,0)        
+        self._left_panel_widget.setContentsMargins(0,0,0,0)
         self._left_panel_widget.setMinimumWidth(200)
 
         self._right_panel_widget = QtWidgets.QWidget()
-        self._right_panel_widget.setContentsMargins(0,0,0,0)        
+        self._right_panel_widget.setContentsMargins(0,0,0,0)
 
         self._left_panel_layout = QtWidgets.QVBoxLayout(self._left_panel_widget)
         self._left_panel_layout.setContentsMargins(0,0,0,0)
@@ -4010,15 +4033,15 @@ class QSplitTabWidget(QDataWidget):
 
         self._left_panel_layout.addWidget(self._left_container_widget)
         self._right_panel_layout.addWidget(self._right_container_widget)
-        
+
         # tabSplitterData = TabSplitterData()
         # tabSplitterData.register(self._splitter)
 
 
         # self._splitter.splitterMoved.connect(self._splitter_moved)
 
-        
-        self._splitter.addWidget(self._left_panel_widget) 
+
+        self._splitter.addWidget(self._left_panel_widget)
         self._splitter.addWidget(self._right_panel_widget)
         self._splitter.setStretchFactor(0,1)
         self._splitter.setStretchFactor(1,3)
@@ -4031,7 +4054,7 @@ class QSplitTabWidget(QDataWidget):
         self._splitter.setCollapsible(1, False)
         self.main_layout.addWidget(self._content_widget)
 
-    
+
 
     @QtCore.Slot(QtCore.QSize)
     def _content_resized(self, size : QtCore.QSize):
@@ -4074,7 +4097,7 @@ class QSplitTabWidget(QDataWidget):
     def clearRighttPanel(self):
         ''' removes all widgets from the right panel '''
         gremlin.util.clear_layout(self._right_container_layout)
-        
+
 
 
 class QRememberDialog(QtWidgets.QDialog):
@@ -4087,14 +4110,14 @@ class QRememberDialog(QtWidgets.QDialog):
         assert key,"unique key must be provided"
         self.window_key = key
         self.apply_window_settings()
-        
+
 
     def getResizable(self) -> bool:
         return self._resizable
     def setResizable(self, value: bool):
         self._resizable = value
         if value:
-            self.layout().setSizeConstraint(QtWidgets.QLayout.SizeConstraint.SetNoConstraint)    
+            self.layout().setSizeConstraint(QtWidgets.QLayout.SizeConstraint.SetNoConstraint)
         else:
             self.layout().setSizeConstraint(QtWidgets.QLayout.SizeConstraint.SetFixedSize)
 
@@ -4162,10 +4185,10 @@ class MarkdownDialog(QRememberDialog):
                 md = f.read()
             self._view.setMarkdown(md)
             return True
-        return False        
-    
+        return False
 
-   
+
+
 
 class BaseDialogUi(QRememberDialog):
 

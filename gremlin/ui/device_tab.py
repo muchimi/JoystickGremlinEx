@@ -920,13 +920,11 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         
         
         if data.input_type == InputType.JoystickAxis:
-            #widget = input_item.InputItemWidget(identifier = identifier, parent=parent,  populate_ui_callback=self._populate_axis_input_widget_ui, data = data)
             widget = input_item.InputItemWidget(identifier = identifier, parent=parent, data = data)
             widget.setIcon("joystick_no_frame.png",use_qta=False)
-            if widget.axis_widget is not None:
+            if widget.axis_widget is not None and identifier.is_axis:
                 widget.axis_widget.valueChanged.connect(lambda x: self._update_input_value_changed_cb(index, x))
         elif data.input_type == InputType.JoystickButton:
-            #widget = input_item.InputItemWidget(identifier = identifier, parent=parent, populate_ui_callback=self._populate_button_input_widget_ui, data = data)
             widget = input_item.InputItemWidget(identifier = identifier, parent=parent, data = data)
             widget.setIcon("mdi.gesture-tap-button")
         elif data.input_type == InputType.JoystickHat:
@@ -943,7 +941,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     
 
     def _populate_axis_input_widget_ui(self, input_widget, container_widget, data):
-        ''' called when the widget is created for an axis input  '''
+        ''' called when the repeater widget is created for an axis input  '''
 
         if gremlin.config.Configuration().show_input_axis:
             layout = QtWidgets.QVBoxLayout(container_widget)

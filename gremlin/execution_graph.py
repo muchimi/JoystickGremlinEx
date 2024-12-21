@@ -28,6 +28,7 @@ import gremlin.base_classes
 import gremlin.base_profile
 import gremlin.config
 import gremlin.event_handler
+import gremlin.gated_handler
 from gremlin.input_types import InputType
 import gremlin.actions
 import gremlin.error
@@ -52,6 +53,8 @@ class ExecutionGraphNodeType(Enum):
     Mode = auto() 
     Device = auto()
     InputItem = auto()
+    Gate = auto() # gate type for gated data
+    Range = auto() # range type for gated data
     
 class ExecutionModeNode(anytree.NodeMixin):
     ''' holds a mode node '''
@@ -94,6 +97,8 @@ class ExecutionGraphNode(anytree.NodeMixin):
         self.input_type : InputType = InputType.NotSet
         self.device = None
         self.input_item = None
+        self.gate = None # holds the gate info
+        self.range = None # holds the range info
 
 
     def __str__(self):
@@ -116,6 +121,12 @@ class ExecutionGraphNode(anytree.NodeMixin):
                 stub = self.input_item.display_name
             case ExecutionGraphNodeType.Device:
                 stub = self.device.name
+            case ExecutionGraphNodeType.Gate:
+                stub = str(self.gate)
+            case ExecutionGraphNodeType.Range:
+                stub = str(self.range)
+            case _:
+                stub = f"Don't know how to display type: {self.nodeType}"
         return f"{msg}: {stub}"
                 
 
@@ -373,6 +384,49 @@ class ExecutionContext():
                                     action_node.parent = action_set_node
                                     action_node.action = action
                                     action_node.mode = mode.name
+
+                                    if action.name == "Gated Axis":
+                                        gate_data : gremlin.gated_handler.GateData = action.gate_data
+                                        for gate in gate_data.getGates():
+                                            gate_node = ExecutionGraphNode(ExecutionGraphNodeType.Gate)
+                                            gate_node.parent = action_node
+                                            gate_node.gate = gate
+                                            for condition, item_data in gate.item_data_map.items():
+                                                for container in item_data.containers:
+                                                    gate_container_node = ExecutionGraphNode(ExecutionGraphNodeType.Container)
+                                                    gate_container_node.parent = gate_node
+                                                    gate_container_node.container = container
+                                                    for action_set in container.action_sets:
+                                                        gate_action_set_node = ExecutionGraphNode(ExecutionGraphNodeType.ActionSet)
+                                                        gate_action_set_node.parent = gate_container_node
+                                                        gate_action_set_node.mode = mode.name
+                                                        for gate_action in action_set:
+                                                            gate_action_node = ExecutionGraphNode(ExecutionGraphNodeType.Action)
+                                                            gate_action_node.parent = gate_action_set_node
+                                                            gate_action_node.action = gate_action
+                                                            gate_action_node.mode = mode.name
+
+                                            for range_info in gate_data.getUsedRanges():
+                                                 range_node = ExecutionGraphNode(ExecutionGraphNodeType.Range)
+                                                 range_node.parent = action_node
+                                                 for condition, item_data in range_info.item_data_map.items():
+                                                     for container in item_data.containers:
+                                                        range_container_node = ExecutionGraphNode(ExecutionGraphNodeType.Container)
+                                                        range_container_node.parent = range_node
+                                                        range_container_node.container = container
+                                                        for action_set in container.action_sets:
+                                                            range_action_set_node = ExecutionGraphNode(ExecutionGraphNodeType.ActionSet)
+                                                            range_action_set_node.parent = range_container_node
+                                                            range_action_set_node.mode = mode.name
+                                                            for range_action in action_set:
+                                                                range_action_node = ExecutionGraphNode(ExecutionGraphNodeType.Action)
+                                                                range_action_node.parent = range_action_set_node
+                                                                range_action_node.action = range_action
+                                                                range_action_node.mode = mode.name
+
+
+
+
 
 
 

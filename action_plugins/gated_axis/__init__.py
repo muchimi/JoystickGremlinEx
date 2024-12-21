@@ -105,9 +105,11 @@ class GatedAxis(gremlin.base_profile.AbstractAction):
     def _cleanup(self):
         ''' clean ourselves up '''
         super()._cleanup()
-        self.gates.clear()
-        self.gate_data.unhook()
-        self.gate_data = None
+        if self.gates:
+            self.gates.clear()
+        if self.gate_data:
+            self.gate_data.unhook()
+            self.gate_data = None
 
 
     def icon(self):

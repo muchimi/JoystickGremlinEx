@@ -135,8 +135,10 @@ class SimconnectOptions(QtCore.QObject):
 
 
     ''' holds simconnect mapper options for all actions '''
-    def __init__(self, simconnect : SimConnect):
+    def __init__(self, manager : SimConnectManager):
         super().__init__()
+        self._manager = manager
+
         self._profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
         self._mode_list = self._profile.get_modes()
         base_file = "simconnect_config.xml"
@@ -154,20 +156,16 @@ class SimconnectOptions(QtCore.QObject):
 
         self._sort_mode = SimconnectSortMode.NotSet
         self.parse_xml()
-        self._simconnect = simconnect
+        self._simconnect = manager.simconnect
        
 
     @property
     def current_aircraft_folder(self):
-        if self._simconnect.ok:
-            return self._aircraft_folder
-        return None
+        return self._manager.current_aircraft_folder
     
     @property
     def current_aircraft_title(self):
-        if self._simconnect.ok:
-            return self._aircraft_title
-        return None
+        return self._manager.current_aircraft_title
     
     @property
     def community_folder(self):
@@ -224,7 +222,7 @@ class SimconnectOptions(QtCore.QObject):
         ''' gets an item by aircraft name (not case sensitive)'''
         if not aircraft:
             return None
-        key = aircraft.lower().strip()
+        key = aircraft.casefold().strip()
         item : SimconnectAicraftDefinition
         for item in self._aircraft_definitions:
             if item.key == key:
@@ -238,10 +236,19 @@ class SimconnectOptions(QtCore.QObject):
         for item in self._aircraft_definitions:
             if title in item.titles:
                 return item
-            
         return None
     
 
+    def find_definition_by_aicraft_folder(self, folder) -> SimconnectAicraftDefinition:
+        ''' gets an item by aircraft name (not case sensitive)'''
+        if not folder:
+            return None
+        key = folder.casefold().strip()
+        item : SimconnectAicraftDefinition
+        for item in self._aircraft_definitions:
+            if item.aircraft_path == key:
+                return item
+        return None
         
     
     @property
@@ -662,7 +669,7 @@ class SimconnectMonitor():
 
         if self._manager.is_running:
             # sim is running
-            options = SimconnectOptions(self._manager.simconnect)
+            options = SimconnectOptions(self._manager)
             state_folder = self._manager.current_aircraft_folder
 
             if state_folder:
@@ -702,16 +709,37 @@ class SimconnectMonitor():
             syslog.error("SCMONITOR: Unable to start monitor, sim is not running")
             return
         self._started = True
-        options = SimconnectOptions(self._manager.simconnect)
+        options = SimconnectOptions(self._manager)
         # see if we need to change modes automatically
         self._mode_change_enabled = options.auto_mode_select
         if self._mode_change_enabled:
-            self._manager.aircraft_loaded.connect(self._aircraft_loaded)
+            self._wait_thread = threading.Thread(target = self._wait_thread_loop)
+            self._wait_thread.setName("mode loop - wait for aircraft data")
+            self._wait_thread.start()
+            #self._manager.aircraft_loaded.connect(self._aircraft_loaded)
             # request the current aircraft
             self._manager.update_aircraft_folder()
         
+
         
-            
+    def _wait_thread_loop(self):
+        ''' waits for the folder / aicraft mode to become available. '''
+        current_time = time.time()
+        timeout = current_time + 15 # no more than 15 seconds
+        loaded = False
+        while time.time() < timeout:
+            if self._manager.is_connected:
+                folder = self._manager.current_aircraft_folder
+                if folder is not None:
+                    self._aircraft_loaded()
+                    loaded = True
+                    break
+            time.sleep(0.25)
+
+        if not loaded:
+              syslog = logging.getLogger("system")
+              syslog.error("SCMONITOR: unable to determine aicraft model - timeout occurred")
+
 
 
 
@@ -726,16 +754,16 @@ class SimconnectMonitor():
     def _shutdown(self):
         ''' program exit '''
         syslog = logging.getLogger("system")
-        syslog.info("SCMonitor: shutdown")
+        syslog.info("SCMONITOR: shutdown")
         self.stop()
         if self._mode_change_enabled:
             self._manager.aircraft_loaded.disconnect(self._aircraft_loaded)
         self._manager = None
 
     @QtCore.Slot(str, str)
-    def _aircraft_loaded(self, folder, title):
+    def _aircraft_loaded(self, folder = None, title = None):
         syslog = logging.getLogger("system")
-        syslog.info(f"SCMONITOR: Aircraft changed detected: {title}")
+        syslog.info(f"SCMONITOR: Aircraft changed detected")
         mode = self.getStartupMode()
         if mode:
             # request a mode change 
@@ -2254,16 +2282,6 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         self.manager : SimConnectManager = eh.manager
         self.valid = False
 
-    
-    def profile_start(self):
-        ''' occurs when the profile starts '''
-
-
-        eh = SimConnectEventHandler()
-        eh.request_connect.emit()
-        self.reconnect_timeout = 5
-        self.last_reconnect_time = None
-        
         # self.action_data.gate_data.process_callback = self.process_gated_event
         if self.action_data.block is None or not self.action_data.block.command_type != SimConnectCommandType.NotSet:
             syslog.error(f"Simconnect: invalid block: {self.command}")
@@ -2271,6 +2289,19 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
             return
         
         self.valid = True
+
+    
+    def profile_start(self):
+        ''' occurs when the profile starts '''
+
+
+        eh = SimConnectEventHandler()
+        eh.request_connect.emit()
+        
+        self.reconnect_timeout = 5
+        self.last_reconnect_time = None
+        
+
 
 
         
@@ -2291,6 +2322,12 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
     
     def process_event(self, event, action_value : gremlin.actions.Value):
         ''' runs when a joystick event occurs like a button press or axis movement when a profile is running '''
+
+        block = self.action_data.block
+        if block:
+            syslog.info(f"SIMCONNECT: process event {block.command}")
+            if "ARM" in block.command:
+                pass
 
         if not self.valid:
             return
@@ -2479,7 +2516,9 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
 
 
     def get_raw_axis_value(self):
-        return gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, self.hardware_input_id)        
+        if self.input_is_hardware():
+            return gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, self.hardware_input_id)
+        return self.hardware_input_id.axis_value
 
 
     def display_name(self):

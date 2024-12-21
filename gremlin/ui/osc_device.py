@@ -25,6 +25,7 @@ import threading
 import gremlin.config
 import gremlin.event_handler
 import gremlin.input_devices
+import gremlin.shared_state
 from gremlin.types import DeviceType
 from gremlin.input_types import InputType
 import gremlin.shared_state
@@ -1783,55 +1784,16 @@ class OscInterface(QtCore.QObject):
         self._target_ip = config.osc_host
         self._target_port = config.osc_output_port
         self._osc_server = OscServer() # the OSC server
-        self._osc_internal_client = OscClient(self._host_ip, self.output_port,"internal") # the OSC internal client for loop messages
-        self._osc_client = OscClient(self._target_ip, self._target_port) # the OSC client
-
         self.osc_enabled = True # always able to listen to ports
+        self._client_pool = {} # pool of clients keyed by (ip,port)
+        self._osc_internal_client = self.getClient(self._host_ip, self.output_port,"internal") # the OSC internal client for loop messages
+        self._osc_client = self.getClient(self._target_ip, self._target_port) # the default OSC client setup in the configuration file
 
         el = gremlin.event_handler.EventListener()
-        el.profile_start.connect(self._profile_start)
         el.request_osc.connect(self._request_osc_state)
 
-
-       
-
-
         self._started = False
-
-    @QtCore.Slot()
-    def _profile_start(self):
-        ''' called on profile start
-        
-        ensure the OSC server is running if the profile has OSC items
-        
-        '''
-        import gremlin.execution_graph
-        config = gremlin.config.Configuration()
-        verbose = config.verbose_mode_osc
-        syslog = logging.getLogger("system")
-        if config.osc_enabled:
-            ec = gremlin.execution_graph.ExecutionContext()
-            uses_osc = ec.hasInputType(InputType.OpenSoundControl) or ec.findActionPlugin("Map to OSC")
-            if uses_osc:
-                if verbose:
-                    # dump the mappings to the log file
-                    syslog.info("OSC: Listening for commands:")
-                    items = ec.getMappedInputs(InputType.OpenSoundControl)
-                    item: gremlin.execution_graph.ExecutionContextInputData
-                    for item in items:
-                        syslog.info(f"\t{item.input_item.input_id.display_name}  key: {item.input_item.input_id.message_key} mode: {item.mode}  mode hiearchy: {item.modes}")
-
-            if uses_osc:
-                if not self._started:
-                    ec = gremlin.execution_graph.ExecutionContext()
-                    if verbose: syslog.info(f"OSC: Start")
-                    self.start()
-                else:
-                    syslog.info(f"OSC: Running")
-            else:
-                syslog.info(f"OSC: no OSC mappings found - start skipped")
-        else:
-            syslog.info(f"OSC: Disabled by option")
+ 
 
 
     @QtCore.Slot(bool)
@@ -1842,6 +1804,43 @@ class OscInterface(QtCore.QObject):
             self.start()
         else:
             self.stop()
+
+    def getClient(self, server : str, port : int, name : str = None) -> OscClient:
+        ''' gets the client for that server/port '''
+        key = (server, port)
+        if not key in self._client_pool:
+            client = OscClient(server, port, name)
+            self._client_pool[key] = client
+            verbose = gremlin.config.Configuration().verbose_mode_osc
+            if verbose:
+                syslog = logging.getLogger("system")
+                syslog.info(f"OSC: register client {key}")
+
+
+        return self._client_pool[key]
+    
+    def closeClient(self, client : OscClient):
+        ''' removes a client from the pool '''
+        if client is not None:
+            key = (client._server_ip, client._output_port)
+            if key in self._client_pool:
+                client.stop()
+                verbose = gremlin.config.Configuration().verbose_mode_osc
+                if verbose:
+                    syslog = logging.getLogger("system")
+                    syslog.info(f"OSC: unregister client {key}")
+                del self._client_pool[key]
+
+    
+    def stopClients(self):
+        ''' stops all registered clients '''
+        for client in self._client_pool.values():
+            client.stop()
+
+    def startClients(self):
+        ''' starts all registered clients '''
+        for client in self._client_pool.values():
+            client.start()
 
 
     @property
@@ -1876,7 +1875,7 @@ class OscInterface(QtCore.QObject):
         logging.getLogger("system").info(msg)
 
     def _osc_message_handler(self, address, *args):
-        ''' handles OSC messages'''
+        ''' handles internal OSC messages'''
         verbose = gremlin.config.Configuration().verbose_mode_osc
         if verbose: logging.getLogger("system").info(f"OSC: {address}: {args}")
         address = address.casefold()
@@ -1892,11 +1891,11 @@ class OscInterface(QtCore.QObject):
         if not self._started:
             logging.getLogger("system").info(f"OSC (interface): starting with IP: {self._host_ip} port: {self._input_port} send host: {self._target_ip} port: {self._output_port}")
             self._osc_server.start(self._host_ip, self._input_port, self._osc_message_handler)
-            self._osc_internal_client.start(self._host_ip, self._input_port)
-            self._osc_client.start(self._target_ip, self._output_port)
+            self.startClients()
             self._started = True
             el = gremlin.event_handler.EventListener()
             el.heartbeat.connect(self._keep_alive)
+            
             
 
     def _keep_alive(self):
@@ -1907,18 +1906,18 @@ class OscInterface(QtCore.QObject):
     def stop(self):
         ''' stops listencing to OSC messages '''
         if self._started:
+
             self._osc_server.stop()
-            self._osc_client.stop()
-            self._osc_internal_client.stop()
+            self.stopClients()
             self._started = False
             el = gremlin.event_handler.EventListener()
             el.heartbeat.disconnect(self._keep_alive)
+            
 
 
     def send(self, command : str, v1 = None, v2 = None):
-        ''' send data '''
+        ''' send data via the default client '''
         self._osc_client.send(command, v1, v2)
-
 
 
 ''' end OscInterface ================================================================================================== '''
@@ -1963,7 +1962,6 @@ class OscInputItem(AbstractInputItem):
         self._axis_value = 0.0 # current axis value when the input is in axis mode
 
 
-
     @property
     def autoRelease(self) -> bool:
         return self._autorelease
@@ -2002,6 +2000,10 @@ class OscInputItem(AbstractInputItem):
     @property
     def is_axis(self) -> bool:
         return self._mode == OscInputItem.InputMode.Axis
+    
+    @property
+    def is_button(self) -> bool:
+        return self._mode == OscInputItem.InputMode.Button
 
         
 
@@ -2120,7 +2122,7 @@ class OscInputItem(AbstractInputItem):
             # ensure OSC is started so we can listen to OSC inputs
             self._message_key = value
             el = gremlin.event_handler.EventListener()
-            osc_input = gremlin.input_devices.InputOscClient()
+            osc_input = InputOscClient()
             osc_input.registerInput(self)
             
             
@@ -3026,8 +3028,6 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         widget.enable_edit()
         widget.setIcon("mdi.surround-sound")
 
-
-
         # remember what widget is at what index
         widget.index = index
         return widget
@@ -3194,3 +3194,254 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self._select_item_cb(self.input_item_list_view.current_index)
 
 
+
+@gremlin.singleton_decorator.SingletonDecorator
+class InputOscClient(QtCore.QObject):
+    ''' runtime client for OSC messages 
+    
+        this is where inbound OSC messages are processed 
+    
+    '''
+
+    def __init__(self):
+        
+        super().__init__()
+        self._interface = None
+
+        self._event_handler = gremlin.event_handler.EventHandler()
+        self._event_listener = gremlin.event_handler.EventListener()
+        self._event_listener.request_osc.connect(self._request_osc_state)
+        self._event_listener.profile_start.connect(self._profile_start)
+        self._osc_map = {}  # map of message keys to inputs 
+        self._started = False
+
+
+
+    # def _update(self):
+    #     ''' updates OSC mapping inputs '''
+    #     import gremlin.execution_graph
+    #     config = gremlin.config.Configuration()
+    #     self._input_item_map = {} # map of input items keyd by message key
+    #     if config.osc_enabled:
+    #         ec = gremlin.execution_graph.ExecutionContext()
+    #         if not gremlin.shared_state.is_running:
+    #             ec.reset() # update execution graph with most current changes
+    #             uses_osc = ec.hasInputType(InputType.OpenSoundControl) or ec.findActionPlugin("Map to OSC")
+    #             if uses_osc:
+    #                 items = ec.getMappedInputs(InputType.OpenSoundControl)
+    #                 item: gremlin.execution_graph.ExecutionContextInputData
+    #                 for item in items:
+    #                     input_id = item.input_id
+    #                     self._input_item_map[input_id.message_key] = item
+
+
+    @QtCore.Slot()
+    def _profile_start(self):
+        ''' called on profile start
+        
+        ensure the OSC server is running if the profile has OSC items
+        
+        '''
+        import gremlin.execution_graph
+        config = gremlin.config.Configuration()
+        verbose = config.verbose_mode_osc
+        syslog = logging.getLogger("system")
+        self._update_messages()
+       
+        if self._osc_map:
+            if verbose:
+                # dump the mappings to the log file
+                syslog.info("OSC: Listening for commands:")
+                
+                for items in self._osc_map.values():
+                    for input_item in items:
+                        item_mode = "axis" if input_item.is_axis else "momentary"
+                        syslog.info(f"\t{input_item.display_name}  key: [{input_item.message_key}] input mode: [{item_mode}]")
+
+            if not self._started:
+                ec = gremlin.execution_graph.ExecutionContext()
+                if verbose: syslog.info(f"OSC: Start")
+                self.start()
+            else:
+                syslog.info(f"OSC: Running")
+        else:
+            syslog.info(f"OSC: no OSC mappings found - start skipped")        
+
+    @QtCore.Slot(bool)
+    def _request_osc_state(self, state : bool):
+        if state:
+            self.start()
+        else:
+            self.stop()
+    
+    def registerInput(self, input_item):
+        ''' registers an OSC input item '''
+        
+        from gremlin.ui.osc_device import OscInputItem
+        if isinstance(input_item, OscInputItem):
+            if not self._started:
+                # ensure OSC is listening
+                self._start()
+
+            message_key = input_item.message_key
+            if not message_key in self._osc_map.keys():
+                self._osc_map[message_key] = []
+        
+            self._osc_map[message_key].append(input_item)
+            if self._verbose:
+                logging.getLogger("system").info(f"OSC: register trigger on: {input_item.display_name} mode: {input_item.mode_string} key: {message_key}")
+        
+
+
+    def start(self):
+        ''' starts the client '''
+        
+        # build a list of messages configured for input
+
+
+        # build a list of input items to midi messages
+        self._update_messages()
+       
+        
+
+    def _start(self):
+        from gremlin.ui.osc_device import OscInterface
+        import gremlin.shared_state
+        if self._started:
+            return
+        self._interface = OscInterface()
+        self._interface.start() # ensure started
+        self._interface.osc_message.connect(self._osc_message_cb)
+
+        self._verbose = gremlin.config.Configuration().verbose
+        self._started = True
+
+
+    def _update_messages(self):
+        ''' refresh OSC message we're listening to '''
+        from gremlin.ui.osc_device import OscInputItem
+        self._osc_map = {}  # list of message keys
+        profile = gremlin.shared_state.current_profile
+        for device in profile.devices.values():
+            if device.name == "OSC":
+                for mode in device.modes.values():
+                    for input_items in mode.config.values():
+                        for input_item in input_items:
+                            self.registerInput(input_item)
+
+
+    def stop(self):
+        ''' stops the client '''
+        if self._started:
+            self._interface.osc_message.disconnect(self._osc_message_cb)
+            self._interface = None
+        self._started = False
+        
+
+    def _osc_message_cb(self, message, args):
+        ''' called when an OSC message is received '''
+        from gremlin.ui.osc_device import OscInputItem, OscDeviceTabWidget
+        from gremlin.input_types import InputType
+        # get the input items behind this message
+        input_item = OscInputItem()
+        input_item.message = message # this decodes the data
+        input_item.data = args
+        message_key = input_item.message_key
+        
+        verbose = gremlin.config.Configuration().verbose_mode_osc
+        if message_key in self._osc_map.keys():
+            # logging.getLogger("system").info(f"OSC: runtime: processing {message_key}")
+            for input_item in self._osc_map[message_key]:
+
+                # button press mode - if the value is in the top half of the range, the button is considered pressed
+                is_axis = False
+                raw_value = args[0]
+                
+                autorelease = False
+                
+                input_type = InputType.OpenSoundControl
+                if input_item.mode == OscInputItem.InputMode.Axis:
+                    # trigger an axis event
+                    is_pressed = False
+                    # map to -1 +1 range for vjoy output
+                    #value = gremlin.util.scale_to_range(raw_value, source_min = 0, source_max = 1.0, target_min = input_item.min_range, target_max = input_item.max_range)
+                    value = gremlin.util.scale_to_range(raw_value, source_min = 0, source_max = 1.0)
+
+                    is_axis = True
+                    # update the current axis value for the input
+                    if input_item.axis_value != value:
+                        input_item.setAxisValue(value)
+                        event = gremlin.event_handler.Event(
+                            event_type = input_type,
+                            device_guid = OscDeviceTabWidget.device_guid,
+                            identifier = input_item,
+                            is_pressed = False,
+                            value = value,
+                            raw_value = value,
+                            is_virtual = True, # indicate we are not a hardware input
+                            is_axis = True)
+
+                        self._event_listener.joystick_event.emit(event)
+                        return
+
+                elif input_item.mode == OscInputItem.InputMode.OnChange:
+                    is_pressed = True
+                    value = raw_value
+                elif input_item.mode == OscInputItem.InputMode.Button:
+                    # trigger a button press event
+                    is_pressed = raw_value != 0.0   #for OSC pressed is any value except 0
+                    value = 1 if is_pressed else 0
+                    autorelease = input_item._autorelease
+                    input_item.setButtonValue(is_pressed)
+                    event = gremlin.event_handler.Event(
+                            event_type = input_type,
+                            device_guid = OscDeviceTabWidget.device_guid,
+                            identifier = input_item,
+                            is_pressed = is_pressed,
+                            value = is_pressed,
+                            raw_value = is_pressed,
+                            is_virtual = True, # indicate we are not a hardware input
+                            is_axis = False)
+
+                    self._event_listener.joystick_event.emit(event)
+                    self._event_listener.button_state_change.emit(
+                         OscDeviceTabWidget.device_guid,
+                         InputType.OpenSoundControl,
+                         input_item,
+                         is_pressed
+                    )
+                    return
+                
+
+                if self._verbose:
+                    logging.getLogger("system").info(f"OSC: send event: is_pressed: {is_pressed} value: {value} raw value: {raw_value} is axis: {is_axis}")
+
+                if not is_axis:
+                    event = gremlin.event_handler.Event(
+                        event_type = input_type,
+                        device_guid = OscDeviceTabWidget.device_guid,
+                        identifier = input_item,
+                        is_pressed = is_pressed,
+                        value = value,
+                        raw_value = raw_value,
+                        is_virtual = True, # indicate we are not a hardware input
+                        is_axis = is_axis)
+
+                    self._event_listener.osc_event.emit(event)
+
+
+                    if autorelease:
+                        # schedule an autorelease event
+                        delay = input_item.autorelease_delay/1000 # ms to s
+                        release_event = event.clone()
+                        release_event.is_pressed = False
+                        release_event.value = 0
+                        timer = threading.Timer(delay, lambda: self._event_listener.osc_event.emit(release_event))
+                        timer.start()
+
+        else:
+            if verbose: logging.getLogger("system").info(f"OSC: runtime: ignoring {message_key}")
+
+
+# listen to OSC input
+osc_client = InputOscClient()

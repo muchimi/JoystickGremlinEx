@@ -980,6 +980,7 @@ class GateData():
         self._last_value = None # last input value
         self._last_range = None # last range object
         self._last_range_exit_trigger = None # range that triggered the last exit
+        self._last_range_enter_trigger = None # range that triggered the last enter
         self._last_in_range_trigger_map = {} # maps the last in-range trigger for a given range
 
         self._gate_item_map = {} # holds the input item data for gates index by gate index
@@ -1131,6 +1132,7 @@ class GateData():
         self.updateRanges() # ensure we have the latest ranges
 
         verbose = gremlin.config.Configuration().verbose_mode_detailed
+        # verbose = True
         if verbose:
             syslog.info("GateData: Starting profile with ranges:")
             self.dumpActiveRanges()
@@ -1162,14 +1164,18 @@ class GateData():
         # range entry/exit/transit
         for range_info in self._active_ranges:
             for condition, item_data in range_info.item_data_map.items():
+                if verbose:syslog.info(f"GATE: condition [{GateCondition.to_display_name(condition)}]")
                 if item_data.containers:
                     callbacks = []
                     for container in item_data.containers:
                         callbacks.extend(container.generate_callbacks())
                     if verbose:
-                        syslog.info(f"Range trigger: {range_info.range_display()} condition [{GateCondition.to_display_name(condition)}] callbacks: {len(callbacks)}")
-                    callbacks_map[range_info] = {}
+                        syslog.info(f"\tadd range triggers: {range_info.range_display()}  callback count: {len(callbacks)}")
+                    if not range_info in callbacks_map:
+                        callbacks_map[range_info] = {}
                     callbacks_map[range_info][condition] = callbacks
+                else:
+                    if verbose:syslog.info(f"\tno mappings found")
                 
         self._callbacks = callbacks_map
 
@@ -1294,7 +1300,6 @@ class GateData():
                     value.is_pressed = True
                     event.is_pressed = True
                 elif trigger.mode == TriggerMode.RangeExit:
-                    
                     # exit range
                     if verbose:
                         syslog.info("Trigger: range exit")
@@ -1788,6 +1793,21 @@ class GateData():
                 return rng
         return None
     
+    def getGateRanges(self, gate : GateInfo):
+        ranges = self._get_ranges()
+        rng : RangeInfo
+        left_range = None
+        right_range = None
+        for rng in ranges:
+            if rng.g1 == gate:
+                right_range = rng
+            if rng.g2 == gate:
+                left_range = rng
+        return (left_range, right_range)
+
+
+
+    
     def deleteGate(self, data):
         ''' removes a gate '''
         id = data.id
@@ -2148,6 +2168,7 @@ class GateData():
         self._last_value = None
         self._last_range = None
         self._last_range_exit_trigger = None # range that triggered the last exit
+        self._last_range_enter_trigger = None # range that triggered the last enter
         self._range_list = self._get_ranges()
         self._gate_list = self._get_used_items() # ordered list of gates by index and value
 
@@ -2196,6 +2217,7 @@ class GateData():
             
             # the last range we saw            
             last_range = self._last_range
+            
 
             if last_range is not None and (current_value < last_range.v1 or current_value > last_range.v2):
                 # ensure the last range min/max are set if the value is outside the range
@@ -2256,20 +2278,23 @@ class GateData():
                         #     pass
                             
 
-                if last_range != range_info and range_info.hasContainers(GateCondition.EnterRange):
-                    # trigger on range entry when crossing from another range
-                    td = TriggerData()
-                    if range_info.mode == GateRangeOutputMode.Fixed:
-                        mode = TriggerMode.FixedValue
-                    else:
-                        mode = TriggerMode.ValueInRange
-                    td.mode = mode
-                    td.condition = GateCondition.EnterRange
-                    td.value = current_value
-                    td.range = range_info
-                    td.last_range = self._last_range
-                    td.is_range = True
-                    triggers.append(td)
+                # if last_range != range_info and range_info.hasContainers(GateCondition.EnterRange):
+                #     # trigger on range entry when crossing from another range
+                #     if self._last_range_enter_trigger is None or self._last_range_enter_trigger != range_info:
+                #         td = TriggerData()
+                #         if range_info.mode == GateRangeOutputMode.Fixed:
+                #             mode = TriggerMode.FixedValue
+                #         else:
+                #             mode = TriggerMode.ValueInRange
+                #         td.mode = TriggerMode.RangeEnter
+                #         td.condition = GateCondition.EnterRange
+                #         td.value = current_value
+                #         td.range = range_info
+                #         td.last_range = self._last_range
+                #         td.is_range = True
+                #         triggers.append(td)
+                #         self._last_range_enter_trigger = range_info
+
 
                 
 
@@ -2286,17 +2311,20 @@ class GateData():
                 td.is_range = True
                 triggers.append(td)
 
-            # process exit exit range 
-            if last_range is not None and last_range != range_info and last_range.hasContainers(GateCondition.ExitRange):
-                # trigger exit range
-                td = TriggerData()
-                td.mode = TriggerMode.RangeExit
-                td.value = current_value
-                td.last_value = last_value
-                td.range = last_range
-                td.condition = GateCondition.ExitRange
-                td.is_range = True
-                triggers.append(td)
+            # # process exit exit range 
+            # if last_range is not None and last_range != range_info and last_range.hasContainers(GateCondition.ExitRange):
+            #     # trigger exit range
+            #     if self._last_range_exit_trigger is None or self._last_range_exit_trigger != range_info:
+            #         td = TriggerData()
+            #         td.mode = TriggerMode.RangeExit
+            #         td.value = current_value
+            #         td.last_value = last_value
+            #         td.range = last_range
+            #         td.condition = GateCondition.ExitRange
+            #         td.is_range = True
+            #         triggers.append(td)
+            #         self._last_range_exit_trigger = range_info
+            #         self._last_range_enter_range = None # clear the prior entered range as we're entering a new range
             
 
             # get the list of crossed gates since last check
@@ -2308,6 +2336,35 @@ class GateData():
 
             for gate in crossed_gates:
                 # check for one way gates we passed
+
+
+                # also trigger a range enter and range exit
+                ranges = self.getGateRanges(gate)
+                for r in ranges:
+                    if r is None:
+                        continue
+
+                    if r.valueInRange(last_value):
+                        # range exited
+                        td = TriggerData()
+                        td.mode = TriggerMode.RangeExit
+                        td.condition = GateCondition.ExitRange
+                        td.value = current_value
+                        td.range = r
+                        td.is_range = True
+                        triggers.append(td)
+
+
+                    if r.valueInRange(current_value):
+                        # range enter
+                        td = TriggerData()
+                        td.mode = TriggerMode.RangeEnter
+                        td.condition = GateCondition.EnterRange
+                        td.value = current_value
+                        td.range = r
+                        td.is_range = True
+                        triggers.append(td)
+                        
 
 
                 v = gate.value
@@ -2334,6 +2391,10 @@ class GateData():
                         td.condition = GateCondition.OnCrossDecrease
                         td.mode = TriggerMode.GateCrossed
                         triggers.append(td)
+
+        
+
+
                     
                 if gate.hasContainers(GateCondition.OnCrossIncrease):
                     # add gate cross increase trigger
@@ -2368,7 +2429,9 @@ class GateData():
                 self._trigger_range_lines = self._trim_list(self._trigger_range_lines, self._trigger_line_count)
                 self._trigger_gate_lines = self._trim_list(self._trigger_gate_lines, self._trigger_line_count)
 
-            if gremlin.config.Configuration().verbose_mode_details:
+            verbose = gremlin.config.Configuration().verbose_mode_details
+            # verbose = True
+            if verbose:
                 # dump the triggerrs
                 syslog.info(f"Trigger results for value {current_value}:")
                 for trigger in triggers:
@@ -2762,7 +2825,7 @@ class TriggerData():
         
         if self.mode in (TriggerMode.FixedValue, TriggerMode.ValueInRange, TriggerMode.ValueOutOfRange, TriggerMode.RangeEnter, TriggerMode.RangeExit, TriggerMode.RangedValue):
             value_stub = "n/a" if self.value is None else f"{self.value:0.{_decimals}f} / {self.range.to_percent(self.value):0.2f}%"
-            return f"{stub} value: {value_stub}% range [{self.range.range_display()}"
+            return f"{stub} value: {value_stub}% range [{self.range.range_display()}]"
         else:
             percent = gremlin.util.scale_to_range(self.value,-1,1,0,100)
             value_stub = "n/a" if self.value is None else f"{self.value:0.{_decimals}f} / {percent:0.2f}%"
@@ -4494,8 +4557,12 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
 
     def _current_input_axis(self):
         ''' gets the current input axis value '''
-        return gremlin.joystick_handling.get_curved_axis(self._action_data.hardware_device_guid, 
-                                                  self._action_data.hardware_input_id) 
+        device_guid = self._action_data.hardware_device_guid
+        input_id = self._action_data.hardware_input_id
+        if gremlin.joystick_handling.is_hardware_device(device_guid):
+            return gremlin.joystick_handling.get_curved_axis(device_guid, input_id)
+        else:
+            return input_id.axis_value
 
 
     def _trigger_handler(self, trigger: TriggerData):

@@ -1259,6 +1259,7 @@ class InputItem():
         self._device_type = None
         self._device_name = None
         self._is_axis = False # true if the item is an axis input
+        self._is_button = False # true if the item is a button input
         self._calibration = None # calibration data if the item is an input axis
         self._curve_data = None # true if the item has its input curved
         self._profile_mode = None
@@ -1371,11 +1372,19 @@ class InputItem():
 
     @property
     def is_axis(self) -> bool:
-        ''' true if this item is setup as an axis input (non momentary'''
-        return self._is_axis
+        ''' true if this item is setup as an axis input (linear) '''
+        return self._is_axis or self._input_type == InputType.JoystickAxis
     @is_axis.setter
     def is_axis(self, value : bool):
         self._is_axis = value
+
+    @property
+    def is_button(self) -> bool:
+        ''' true if this item is setup as an axis input (momentary) '''
+        return self._is_button or self._input_type in (InputType.JoystickButton, InputType.JoystickHat)
+    @is_button.setter
+    def is_button(self, value : bool):
+        self._is_button = value        
 
     def add_container(self, container):
         self._containers.append(container)
@@ -1508,6 +1517,7 @@ class InputItem():
         if input_id is not None and self._device_guid is not None:
             if self._input_type == InputType.JoystickAxis:
                 self.is_axis = True # indicate we are an axis
+                self._is_button = False
                 el = gremlin.event_handler.EventListener()
                 el.registerInput(self)
                 info = gremlin.joystick_handling.device_info_from_guid(self._device_guid)
@@ -1526,6 +1536,9 @@ class InputItem():
                 self._input_name = f"Button {input_id}"
             elif self._input_type == InputType.JoystickHat:
                 self._input_name = f"Hat {input_id}"
+            elif self._input_type in (InputType.JoystickButton, InputType.JoystickHat):
+                self._is_axis = False
+                self._is_button = True
                 
 
             elif self._input_type in (InputType.Keyboard, InputType.KeyboardLatched):
@@ -1540,8 +1553,14 @@ class InputItem():
                         self._input_name(f"Unable to parse type: {type(input_id).__name__}")
             elif self._input_type == InputType.ModeControl:
                 self._input_name = f"Mode [{gremlin.shared_state.edit_mode}] {'enter' if self._input_id == 0 else 'exit'} actions"
+            elif self._input_type == InputType.OpenSoundControl:
+                self._is_axis = self.input_id.is_axis
+                self._is_button = self.input_id.is_button
+                
             else:
                 self._input_name = f"{InputType.to_string(self._input_type).capitalize()} {input_id}"
+
+            
 
     
             
@@ -1558,7 +1577,11 @@ class InputItem():
         container_tag_map = container_plugins.tag_map
         self.input_type = InputType.to_enum(node.tag)
         if "id" in node.attrib.keys():
-            self.input_id = safe_read(node, "id", int)
+            s_id = node.get("id")
+            if s_id.isnumeric():
+                self.input_id = safe_read(node, "id", int)
+            else:
+                self.input_id = s_id
         self._description = safe_read(node, "description", str)
         self.always_execute = read_bool(node, "always-execute", False)
 
@@ -1609,7 +1632,7 @@ class InputItem():
                 if child.tag == "input":
                     osc_input_item.parse_xml(child)
             self.input_id = osc_input_item
-            self.is_axis = osc_input_item.is_axis
+            
 
         elif self.input_type == InputType.ModeControl:
             # mode control entries - input id is the only item we need
@@ -3350,7 +3373,7 @@ class ProfileMap():
   
     def load_profile_map(self):
         ''' loads the mapping of profile xmls to processes '''
-        verbose = True # gremlin.config.Configuration().verbose_mode_inputs
+        verbose = gremlin.config.Configuration().verbose_mode_inputs
         fname = self.get_profile_map_file()
         self._items = []
         if os.path.isfile(fname):

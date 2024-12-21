@@ -1347,7 +1347,7 @@ class Configuration:
         data : dict = self._profile_data.get("last_input", {})
         
         verbose = self.verbose_mode_details
-        verbose = True
+        # verbose = True
         if verbose:
             syslog = logging.getLogger("system") 
         
@@ -1488,7 +1488,7 @@ class Configuration:
             
 
         verbose = self.verbose_mode_details
-        verbose = True
+        # verbose = True
         if verbose:
             device_name = gremlin.shared_state.get_device_name(device_guid)
         if not isinstance(device_guid, str):

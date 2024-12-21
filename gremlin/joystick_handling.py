@@ -154,10 +154,11 @@ def get_axis(guid, index, normalized = True):
     :param: normalized  - if set - normalizes to -1.0 +1.0 floating point
        
     '''
-    
-    value = dinput.DILL.get_axis(guid, index)
-    if normalized:
-        return gremlin.util.scale_to_range(value, source_min = -32767, source_max = 32767, target_min = -1, target_max = 1)
+    if is_hardware_device(guid):
+        value = dinput.DILL.get_axis(guid, index)
+        if normalized:
+            return gremlin.util.scale_to_range(value, source_min = -32767, source_max = 32767, target_min = -1, target_max = 1)
+    return 0.0
         
     
 

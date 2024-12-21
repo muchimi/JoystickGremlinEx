@@ -381,6 +381,12 @@ class MacroManager(QtCore.QObject):
             self._schedule_event.set()
 
         return macro.id
+    
+    def clear_queue(self):
+        ''' clears the current macro queue '''
+        with self._queue_lock:
+            self._queue.clear()
+            
 
     def terminate_macro(self, macro : Macro):
         """Adds a termination request for a macro to the execution queue.

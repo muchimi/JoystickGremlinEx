@@ -39,17 +39,17 @@ QML_IMPORT_NAME = "Gremlin.Device"
 QML_IMPORT_MAJOR_VERSION = 1
 
 
-@QtQml.QmlElement
-class InputIdentifier(QtCore.QObject):
+# @QtQml.QmlElement
+# class InputIdentifier(QtCore.QObject):
 
-    """Stores the identifier of a single input item."""
+#     """Stores the identifier of a single input item."""
 
-    def __init__(self, parent=None):
-        super().__init__(parent)
+#     def __init__(self, parent=None):
+#         super().__init__(parent)
 
-        self.device_guid = None
-        self.input_type = None
-        self.input_id = None
+#         self.device_guid = None
+#         self.input_type = None
+#         self.input_id = None
 
 
 @QtQml.QmlElement
