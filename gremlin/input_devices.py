@@ -1805,7 +1805,10 @@ class ButtonReleaseActions(QtCore.QObject):
             new_list = []
             for entry in self._registry[event]:
                 if entry.event.is_pressed == event.is_pressed:
-                    entry.callback()
+                    try:
+                        entry.callback()
+                    except:
+                        pass
                 else:
                     new_list.append(entry)
             self._registry[event] = new_list

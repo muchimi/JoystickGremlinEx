@@ -1681,7 +1681,7 @@ class SimConnectBlock():
     def register(self):
         ''' registers a block command '''
         if not self.sm.is_connected():
-            # not connected
+            # not connectedkl
             return False
 
         if self._command:
