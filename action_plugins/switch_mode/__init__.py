@@ -25,11 +25,12 @@ import gremlin.event_handler
 import gremlin.execution_graph
 from gremlin.input_types import InputType
 import gremlin.profile
+import gremlin.shared_state
 import gremlin.ui.input_item
 import gremlin.ui.ui_common
 import gremlin.util
 import gremlin.shared_state
-
+import gremlin.config
 
 class SwitchModeWidget(gremlin.ui.input_item.AbstractActionWidget):
 
@@ -52,7 +53,7 @@ class SwitchModeWidget(gremlin.ui.input_item.AbstractActionWidget):
         ''' called when mode list needs to be updated '''
         # update the list of available modes 
         with QtCore.QSignalBlocker(self.mode_selector_widget):
-            mode = self.action_data.mode_name # current mode
+            mode = self.action_data.mode # current mode
             self.mode_selector_widget.clear()
             index = 0
             select_index = None
@@ -63,21 +64,20 @@ class SwitchModeWidget(gremlin.ui.input_item.AbstractActionWidget):
                 self.mode_selector_widget.addItem(display, entry)
                 if mode and select_index is None and entry == mode:
                     select_index = index
+                index += 1
             if select_index is not None:
-                self.mode_selector_widget.setCurrentIndex(select_index)
+                with QtCore.QSignalBlocker(self.mode_selector_widget):
+                    self.mode_selector_widget.setCurrentIndex(select_index)
             elif self.mode_selector_widget.count():
                 self.mode_selector_widget.setCurrentIndex(0)
         self._mode_selected_changed()
 
     def _mode_selected_changed(self):
         mode = self.mode_selector_widget.currentData()
-        if mode:
-            if self.action_data.mode_name != mode:
-                self.action_data.mode_name = mode
-                #self.action_modified.emit()
+        self.action_data.mode = mode
 
     def _populate_ui(self):
-        index = self.mode_selector_widget.findData(self.action_data.mode_name)
+        index = self.mode_selector_widget.findData(self.action_data.mode)
         self.mode_selector_widget.setCurrentIndex(index)
 
 
@@ -85,17 +85,20 @@ class SwitchModeFunctor(gremlin.base_profile.AbstractFunctor):
 
     def __init__(self, action, parent = None):
         super().__init__(action, parent)
-        self.mode_name = action.mode_name
+        self.action_data = action
 
     def process_event(self, event, value):
         import gremlin.control_action
+        import gremlin.config        
         import logging
+        
         if event.is_pressed or value.current:
-            logging.getLogger("system").info(f"ACTION SWITCH: mode switch to [{self.mode_name}] requested")
-            if self.mode_name:
-                gremlin.control_action.switch_mode(self.mode_name)
-        else:
-            logging.getLogger("system").info(f"ACTION SWITCH: mode switch to [{self.mode_name}] ignored - not pressed")
+            verbose =  gremlin.config.Configuration().verbose
+            mode = self.action_data.mode
+            current_mode =  gremlin.shared_state.runtime_mode
+            if mode and current_mode and mode != current_mode:
+                if verbose: logging.getLogger("system").info(f"ACTION SWITCH: mode switch from [{current_mode}] to [{mode}] requested")
+                gremlin.control_action.switch_mode(mode)
         return True
 
 
@@ -115,11 +118,19 @@ class SwitchMode(gremlin.base_profile.AbstractAction):
     def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
-        self.mode_name = ""
+        self._mode = ""
+
+    @property
+    def mode(self) -> str:
+        return self._mode
+    
+    @mode.setter
+    def mode(self, value: str):
+        self._mode = value
 
     def display_name(self):
         ''' returns a display string for the current configuration '''
-        return f"Switch to: {self.mode_name}"
+        return f"Switch to: {self.mode}"
 
     def icon(self):
         return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
@@ -136,11 +147,11 @@ class SwitchMode(gremlin.base_profile.AbstractAction):
         ]
 
     def _parse_xml(self, node):
-        self.mode_name = node.get("name")
+        self.mode = node.get("name")
 
     def _generate_xml(self):
         node = ElementTree.Element("switch-mode")
-        node.set("name", self.mode_name)
+        node.set("name", self.mode)
         return node
 
     def _is_valid(self):

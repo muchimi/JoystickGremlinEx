@@ -707,9 +707,10 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.curve_update_handler = {} # map of curve handlers to the input by index
 
         self.device = device
+        self.widget_tracker = gremlin.ui.ui_common.DeviceWidgetTracker() # caches the  InputConfigurationItem for this item
         self.last_item_data_key = None
         self.last_item_index = 0
-
+        self.device_guid = device.device_guid
      
         self.device_profile.ensure_mode_exists(current_mode, self.device)
 
@@ -1003,7 +1004,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         new_key = None
         if item_data is not None:
-            new_key = _cache.getKey(item_data)
+            new_key = item_data.id
 
             if new_key == self.last_item_data_key and not force_update:
                 # same input - nothing to do
@@ -1021,21 +1022,19 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 widget.deleteLater()    
 
             
-        self.last_item_data_key = new_key
+        self.last_item_data_key = item_data.id
         self.last_item_index = index
-
-
 
         if item_data is not None:
             # if there is data, hide the empty container and grab the last content, or create a new widget for it
             # there is a widget for each combination of device, input type and input ID
             # self._empty_widget.hide()
-            widget = _cache.retrieve(new_key)
+
+            widget = self.widget_tracker.getWidget(self.device_guid, item_data.input_type, item_data.input_id, item_data.id)
             if not widget:
                 # not in cache, create it and add to cache for this device/input combination
                 widget = InputItemConfiguration(item_data, parent = self)
-                _cache.register(item_data, widget)
-                
+                print("not in cache")
 
                 widget.action_model.data_changed.connect(self._create_change_cb(index))
                 widget.description_changed.connect(lambda x: self._description_changed_cb(index, x))
@@ -1047,8 +1046,12 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 input_id = item_data.input_id
                 self.inputChanged.emit(device_guid, input_type, input_id)
                 self._right_container_layout.addWidget(widget)       
+                self.widget_tracker.registerWidget(widget, self.device_guid, item_data.input_type, item_data.input_id, item_data.id)
+            else:
+                print("cached")
+            
 
-            elif force_update:
+            if force_update:
                 # update the container to reflect the data change
                 widget.setItemData(item_data)
 
@@ -1232,31 +1235,15 @@ class InputConfigurationWidgetCache():
         self._widget_map = {}
 
 
-    def register(self, item_data, widget):
-        if item_data:
-            key = self.getKey(item_data)
-            if not key in self._widget_map:
-                self._widget_map[key] = widget
-                if gremlin.config.Configuration().verbose_mode_detailed:
-                    syslog = logging.getLogger("system")            
-                    syslog.info(f"Cache: register {item_data.debug_display}")
+    def register(self, key, widget):
+        if not key in self._widget_map:
+            self._widget_map[key] = widget
+            
             
     def clear(self):
         ''' clears the cache '''
-        if gremlin.config.Configuration().verbose:
-            syslog = logging.getLogger("system")            
-            syslog.info(f"Cache: clear widget cache")
         self._widget_map.clear()
 
-
-    def getKey(self, item_data):
-        # device_guid = item_data.device_guid
-        # input_id = item_data.input_id
-        # input_type = item_data.input_type
-        # mode = item_data.profile_mode
-        id = item_data.id
-        return id # (device_guid, input_id, input_type, mode, id)
-        
 
     def retrieve(self, key):
         if key in self._widget_map:
@@ -1265,16 +1252,13 @@ class InputConfigurationWidgetCache():
     
     def retrieve_by_data(self,item_data):
         if item_data:
-            key = self.getKey(item_data)
-            if key in self._widget_map:
-                return self._widget_map[key]
+            key = item_data.id
+            return self.retrieve(key)
         return None
-        
-    def remove(self,item_data):
-        if item_data:
-            key = self.getKey(item_data)
-            if key in self._widget_map:
-                del self._widget_map[key]
+
+    def remove(self, key):
+        if key in self._widget_map:
+            del self._widget_map[key]
 
     def dump(self):
         ''' dumps the cache content to the log for debug purposes '''

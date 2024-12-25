@@ -208,6 +208,13 @@ Joystick Gremlin EX
 
 <!-- TOC --><a name="134016ex-pre-release"></a>
 ## 13.40.16ex (pre-release)
+
+### (m50)
+- Improved: Reworked UI performance and device highlighting.
+- Improved: Simconnect automatic profile mode switch for aircraft changes as a new lock option to freeze the mode to a specific aircraft. This is necessary because GremlinEx has several options now to change modes (for different purposes and needs) that would change the mode outside of the profile (example, via a process focus change followed by a restore to default mode) and locking is a way to prevent this behavior.  This only impacts Simconnect.
+- New: Automatic backups of profiles on saving.  GremlinEx will save by default the last 5 profiles, named numerically based on the profile.  If more than five backups are found, the oldest one is removed.
+
+
 ### (m49)
 - New: OSC and MIDI live input status. At edit time, GremlinEx will listen for OSC or MIDI events to real-time update the inputs as their hardware input counterparts can. OSC and MIDI inputs can behave either as linear (axis) or momentary (button) inputs. For OSC, a value of 1.0 indicates the button is pressed, and 0.0 indicates the button is released (other values are ignored).  For MIDI, a value of 0-63 indicates the button is released, and 64 to 127 indicates the button is pressed.
 - API: OSC clients are now pooled per server/port.

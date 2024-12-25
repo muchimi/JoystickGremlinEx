@@ -219,7 +219,7 @@ class KeyboardInputItem(AbstractInputItem):
             # ignore
             return
         if not self._key:
-            self._message_key = ""
+            self._message_key = self._guid
             self._title_name = "Keyboard Input (not configured)"
             self._display_name = ""
             self._description = ""
@@ -354,6 +354,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
  
 
         widget = InputItemConfiguration()
+        
         self.setRightPanelWidget(widget)
 
         button_container_widget = QtWidgets.QWidget()

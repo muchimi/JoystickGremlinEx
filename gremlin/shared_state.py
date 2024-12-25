@@ -60,6 +60,8 @@ _suspend_input_highlighting_enabled = 0
 # Timer used to disable input highlighting with a delay
 _suspend_timer = None
 
+application_version = "0.0" # application version (set at runtime)
+
 # key of the global mode used internally for some global mappings
 # global_mode = "__internal_global__"
 

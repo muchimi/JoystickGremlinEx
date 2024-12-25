@@ -593,7 +593,7 @@ class DILL:
                 if not os.path.isfile(_dll_path):
                     msg = f"Unable to continue - missing dll: {_dll_path}"
                     display_error(msg)
-                    logging.getLogger("system").critical(msg)
+                    syslog.critical(msg)
                     os._exit(1)
 
             dll_version = get_dll_version(_dll_path)
@@ -606,7 +606,7 @@ class DILL:
             except Exception as error:
                 msg = f"Unable to load DirectInput interface dll: {_dll_path}\nThis could be due to UAC (try running in Administrator mode) or {error}"
                 display_error(msg)
-                logging.getLogger("system").critical(msg)
+                syslog.critical(msg)
                 os._exit(1)
 
             try:
@@ -623,14 +623,18 @@ class DILL:
             DILL.initalized = True
 
 
-            # display a list of all ditected devices
-            
-            device_count = DILL.get_device_count()
-            syslog.info("DILL: device detection summary")
-            for index in range(device_count):
-                dev = DILL.get_device_information_by_index(index)
-                syslog.info(f"\tIndex: [{index}] {str(dev)}")
-            syslog.info("DILL: end device detection summary")
+           
+
+    @staticmethod
+    def dumpDevices():
+        ''' reload devices if count was 0 '''
+        syslog = logging.getLogger("system")
+        device_count = DILL.get_device_count()
+        syslog.info("DILL: device detection summary")
+        for index in range(device_count):
+            dev = DILL.get_device_information_by_index(index)
+            syslog.info(f"\tIndex: [{index}] {str(dev)}")
+        syslog.info("DILL: end device detection summary")
 
 
     @staticmethod

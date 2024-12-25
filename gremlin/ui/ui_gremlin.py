@@ -14,21 +14,33 @@ class Ui_Gremlin(object):
         main_window.resize(800, 600)
         self.main = QtWidgets.QWidget(main_window)
         self.main.setObjectName("main")
-        self.horizontalLayout = QtWidgets.QHBoxLayout(self.main)
-        self.horizontalLayout.setObjectName("horizontalLayout")
-        self.devices = QtWidgets.QTabWidget(self.main)
-        self.devices.setObjectName("devices")
+        self.main_layout = QtWidgets.QVBoxLayout(self.main)
 
-       
-        self.tab = QtWidgets.QWidget()
-        self.tab.setObjectName("tab")
-        self.horizontalLayout_3 = QtWidgets.QHBoxLayout(self.tab)
-        self.horizontalLayout_3.setObjectName("horizontalLayout_3")
-        self.devices.addTab(self.tab, "")
-        self.tab_2 = QtWidgets.QWidget()
-        self.tab_2.setObjectName("tab_2")
-        self.devices.addTab(self.tab_2, "")
-        self.horizontalLayout.addWidget(self.devices)
+        
+
+        #self.devices = QtWidgets.QTabWidget()
+        self.devices = QtWidgets.QTabBar()
+        self.devices.setMovable(True)
+        self.devices.setUsesScrollButtons(True)
+        self.devices.setObjectName("devices")
+        
+        # content panel below the tab
+        self.tab_bar_widget = QtWidgets.QWidget()
+        self.tab_bar_widget.setContentsMargins(0,0,0,0)
+        #self.tab_bar_widget.setStyleSheet("background: yellow")
+        self.tab_bar_layout = QtWidgets.QVBoxLayout(self.tab_bar_widget)
+        self.tab_bar_layout.setContentsMargins(0,0,0,0)
+        self.tab_bar_widget.setMaximumHeight(30)
+
+        self.tab_bar_layout.addWidget(self.devices)
+
+        # content panel below the tab
+        self.tab_content_widget = QtWidgets.QWidget()
+        #self.tab_content_widget.setStyleSheet("background: green")
+        self.tab_content_layout = QtWidgets.QVBoxLayout(self.tab_content_widget)
+        
+        self.main_layout.addWidget(self.tab_bar_widget)
+        self.main_layout.addWidget(self.tab_content_widget)
         
         main_window.setCentralWidget(self.main)
         self.menubar = QtWidgets.QMenuBar(main_window)
@@ -161,8 +173,7 @@ class Ui_Gremlin(object):
     def retranslateUi(self, Gremlin):
         _translate = QtCore.QCoreApplication.translate
         Gremlin.setWindowTitle(_translate("GremlinEx", "Joystick Gremlin Ex"))
-        self.devices.setTabText(self.devices.indexOf(self.tab), _translate("GremlinEx", "Tab 1"))
-        self.devices.setTabText(self.devices.indexOf(self.tab_2), _translate("GremlinEx", "Tab 2"))
+        
         self.menuFile.setTitle(_translate("GremlinEx", "&File"))
         self.menuRecent.setTitle(_translate("GremlinEx", "Recent"))
         self.menuTools.setTitle(_translate("GremlinEx", "&Tools"))

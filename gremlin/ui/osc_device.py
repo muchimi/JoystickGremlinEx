@@ -1930,7 +1930,7 @@ class OscInterface(QtCore.QObject):
 class OscInputItem(AbstractInputItem):
     ''' holds OSC input data '''
 
-    
+    message_key_changed = QtCore.Signal(str, str) # fires when message key changes 
 
     class InputMode(enum.Enum):
         ''' possible input modes '''
@@ -1954,12 +1954,20 @@ class OscInputItem(AbstractInputItem):
         self._title_name = "OSC (not configured)"
         self._display_name =  ""
         self._display_tooltip = "Input configuration not set"
-        self._message_key = "" # unique key that identifies this input
+        self._device_guid = OscDeviceTabWidget.device_guid
+        self._input_type = InputType.OpenSoundControl
+        self._message_key = None
+        self.setMessageKey(self._guid)
         self._min_range = 0.0
         self._max_range = 1.0 
         self._autorelease = False # true if auto-release
         self._autorelease_delay = 250 # default release delay
         self._axis_value = 0.0 # current axis value when the input is in axis mode
+
+        tracker = gremlin.ui.ui_common.DeviceWidgetTracker()
+        tracker.registerWidget(self, self._device_guid, self._input_type, self._message_key, self._guid)
+        client = InputOscClient()
+        client.registerInput(self)
 
 
     @property
@@ -2121,15 +2129,30 @@ class OscInputItem(AbstractInputItem):
         if self.message_key is None or self._message_key != value:
             # ensure OSC is started so we can listen to OSC inputs
             if self._message_key != value:
+
+                tracker = gremlin.ui.ui_common.DeviceWidgetTracker()
+                tracker.unregisterWidget(self._device_guid, self._input_type, self._message_key, self._guid)
+                client = InputOscClient()
+                client.unregisterInput(self)
+
+                # indicate key changed
+                self.message_key_changed.emit(self._message_key, value)
+
                 osc_input = InputOscClient()
                 if self._message_key:
                     osc_input.unregisterInput(self)
-                self._message_key = value
+
                 osc_input.registerInput(self)
+
+                print (f"OSC update message key from {self._message_key} to {value}")
+                
+                self._message_key = value
+                tracker.registerWidget(self, self._device_guid, self._input_type, self._message_key, self._guid)
+                client.registerInput(self)
             
             
-    
-    def _data_to_string(self, data):
+    @staticmethod
+    def data_to_string(data):
         ''' returns a string representation of the data '''
         return list_to_csv(data)
         
@@ -2137,15 +2160,28 @@ class OscInputItem(AbstractInputItem):
     def _string_to_data(self, value):
         ''' converts a string representation of the data to a list of args '''
         return csv_to_list(value)
+    
+
+    @staticmethod
+    def toMessageKey(command_mode : OscInputItem.CommandMode, message, args):
+        if command_mode == OscInputItem.CommandMode.Data:
+            return f"{message} {OscInputItem.data_to_string(args)}"
+        elif command_mode == OscInputItem.CommandMode.Message:
+            return message
+        else:
+            raise ValueError(f"_update(): don't know how to handle {self._command_mode}")
+
 
     def _update(self):
         ''' updates the message key based on the current config '''
-        if self._command_mode == OscInputItem.CommandMode.Data:
-            self.setMessageKey(f"{self.message} {self._data_to_string(self._message_data)}")
-        elif self._command_mode == OscInputItem.CommandMode.Message:
-            self.setMessageKey(self.message)
-        else:
-            raise ValueError(f"_update(): don't know how to handle {self._command_mode}")
+        message_key =  OscInputItem.toMessageKey(self._command_mode, self.message, None)
+        self.setMessageKey(message_key)
+        # if self._command_mode == OscInputItem.CommandMode.Data:
+        #     self.setMessageKey(f"{self.message} {self._data_to_string(self._message_data)}")
+        # elif self._command_mode == OscInputItem.CommandMode.Message:
+        #     self.setMessageKey(self.message)
+        # else:
+        #     raise ValueError(f"_update(): don't know how to handle {self._command_mode}")
         
         # update data string from the raw data
         self._message_data_string = list_to_csv(self._message_data)
@@ -2220,7 +2256,7 @@ class OscInputItem(AbstractInputItem):
         target._title_name = source._title_name
         target._display_name =  source._display_name
         target._display_tooltip = source._display_tooltip
-        target._message_key = source._message_key
+        target.message_key = source._message_key
         target._min_range = source._min_range
         target._max_range = source._max_range
         target._update_display_name()
@@ -3335,13 +3371,24 @@ class InputOscClient(QtCore.QObject):
         from gremlin.ui.osc_device import OscInputItem, OscDeviceTabWidget
         from gremlin.input_types import InputType
         # get the input items behind this message
-        input_item = OscInputItem()
-        input_item.message = message # this decodes the data
-        input_item.data = args
-        message_key = input_item.message_key
+        tracker = gremlin.ui.ui_common.DeviceWidgetTracker()
+        cache = tracker.getCache(OscDeviceTabWidget.device_guid, InputType.OpenSoundControl)
+        command = OscInputItem.CommandMode.Message
+        # look for the the message
+        message_key = OscInputItem.toMessageKey(command, message, args)
+
+        # look for the widget 
+        widget = None
+        if message_key in cache:
+            for key in cache[message_key]:
+                widget = cache[message_key][key]
+                if widget.guid == key:
+                    break
+        
+
         
         verbose = gremlin.config.Configuration().verbose_mode_osc
-        if message_key in self._osc_map.keys():
+        if message_key in self._osc_map:
             # logging.getLogger("system").info(f"OSC: runtime: processing {message_key}")
             for input_item in self._osc_map[message_key]:
 
@@ -3374,6 +3421,14 @@ class InputOscClient(QtCore.QObject):
                             is_axis = True)
 
                         self._event_listener.joystick_event.emit(event)
+
+                        # self._event_listener.axis_state_change.emit(
+                        #                     event.device_guid,
+                        #                     event.event_type,
+                        #                     input_item,               
+                        #                     event.value
+                        #                 )
+
                         return
 
                 elif input_item.mode == OscInputItem.InputMode.OnChange:
@@ -3396,12 +3451,14 @@ class InputOscClient(QtCore.QObject):
                             is_axis = False)
 
                     self._event_listener.joystick_event.emit(event)
-                    self._event_listener.button_state_change.emit(
-                         OscDeviceTabWidget.device_guid,
-                         InputType.OpenSoundControl,
-                         input_item,
-                         is_pressed
-                    )
+                    if widget:
+                        # there is a widget to notify
+                        self._event_listener.button_state_change.emit(
+                            OscDeviceTabWidget.device_guid,
+                            InputType.OpenSoundControl,
+                            widget,
+                            is_pressed
+                        )
                     return
                 
 

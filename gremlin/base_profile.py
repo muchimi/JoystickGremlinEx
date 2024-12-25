@@ -1279,9 +1279,11 @@ class InputItem():
                     break
                 item = item.parent
 
+        self._message_key = None # message key for this input (device_guid, input_type, input_id)
 
         el = gremlin.event_handler.EventListener()
         el.profile_start.connect(self._profile_start)
+
 
     @property
     def hasCalibration(self):
@@ -1293,7 +1295,6 @@ class InputItem():
         ''' for axis input devices, returns the calibration data '''
         return self.calibration
     
-
 
     @QtCore.Slot()
     def _profile_start(self):
@@ -1559,11 +1560,6 @@ class InputItem():
                 
             else:
                 self._input_name = f"{InputType.to_string(self._input_type).capitalize()} {input_id}"
-
-            
-
-    
-            
     
 
     def from_xml(self, node):
@@ -2680,7 +2676,7 @@ class Profile():
         verbose = gremlin.config.Configuration().verbose
         if verbose:
             logging.getLogger("system").info(f"Profile {self.name}: set default start mode to {value}")
-        self.save()
+        self.save(backup = False)
 
     def get_default_start_mode(self):
         ''' gets the profile's default startup mode '''
@@ -2704,9 +2700,9 @@ class Profile():
         verbose = gremlin.config.Configuration().verbose
         if verbose:
             logging.getLogger("system").info(f"Profile {self.name}: set auto-restore flag {value}")
-        self.save()
+        self.save(backup = False)
 
-    def save(self, save_as_name = None):
+    def save(self, save_as_name = None, backup = True):
         ''' saves the profile '''
 
         if save_as_name is None:
@@ -2720,6 +2716,58 @@ class Profile():
         else:
             use_name = save_as_name
 
+        # do a backup
+        if backup and os.path.isfile(use_name):
+            backup_max = 5
+            backup_count = 1
+            base_name = os.path.basename(use_name)
+            base_name = gremlin.util.strip_ext(base_name)
+            backup_files = []
+            
+            # get the backup number
+            pattern = f"{base_name}.*.xml"
+            profile_path = gremlin.util.userprofile_path()
+            backup_path = os.path.join(profile_path, gremlin.shared_state.application_version)
+            if not os.path.isdir(backup_path):
+                try:
+                    os.makedirs(backup_path)
+                except Exception as err:
+                    syslog.error(f"BACKUP: unable to create backup folder {backup_path}:  {err}")
+                
+            if os.path.isdir(backup_path):
+                backup_files = gremlin.util.find_files(backup_path, pattern)
+                start_count = 0
+                modified_data = []
+                for backup_file in backup_files:
+                    modified = os.path.getmtime(backup_file) 
+                    f_name = os.path.basename(backup_file)
+                    splits = f_name.split(".")
+                    s_count = splits[1]
+                    if s_count.isnumeric():
+                        count = int(s_count)
+                        if count > start_count:
+                            start_count = count
+
+                    modified_data.append((modified, backup_file))
+
+                # keep the count of files in check 
+                if len(backup_files) > backup_max:
+                    modified_data.sort(key = lambda x: x[0])
+                    _, oldest_file = modified_data[0]
+                    try:
+                        os.unlink(oldest_file)
+                    except Exception as err:
+                        syslog.error(f"BACKUP: save error: Unable to remove oldest backup profile: {oldest_file}:  {err}")    
+
+                # next file
+                backup_count=start_count + 1
+                backup_file = os.path.join(backup_path, f"{base_name}.{backup_count}.xml")
+                try:
+                    shutil.copyfile(use_name, backup_file)
+                except Exception as err:
+                    syslog.error(f"BACKUP: save error: Unable to backup profile: {err}")
+                    return
+                
         if use_name:
             self.to_xml(use_name)
         else:
@@ -3511,6 +3559,3 @@ class ProfileMap():
     @property
     def valid(self):
         return self._valid
-
-            
-            

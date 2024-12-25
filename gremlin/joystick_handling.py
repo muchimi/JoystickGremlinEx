@@ -323,6 +323,7 @@ def joystick_devices_initialization():
     """
 
     import gremlin.util
+    import time
     global _joystick_devices, _joystick_init_lock, _joystick_initialized, _joystick_device_guid_map
 
     _joystick_initialized = False
@@ -332,17 +333,33 @@ def joystick_devices_initialization():
     _joystick_init_lock.acquire()
 
     syslog = logging.getLogger("system")
-    syslog.info("Initializing joystick devices")
-    syslog.debug(
-        f"{dinput.DILL.get_device_count():d} joysticks detected"
-    )
+    syslog.info("INIT: Initializing joystick devices")
+
+    dinput.DILL.init()
+    device_count = dinput.DILL.get_device_count()
+    if device_count == 0:
+        # no hardware input detected
+        syslog.info("INIT: no DirectInput devices detected - waiting for data")
+        max_retries = 3
+        attempt = 1
+        while device_count == 0 and attempt <= max_retries:
+            time.sleep(0.25)
+            device_count = dinput.DILL.get_device_count()
+            syslog.info(f"INIT: attempt number {attempt}")
+            attempt += 1
+
+    if device_count:
+        syslog.info(f"INIT: {device_count} hardware devices detected:")
+        dinput.DILL.dumpDevices()
+    else:
+        syslog.warning(f"INIT: DirectX reports no hardware devices detected")
+        
 
     # Process all connected devices in order to properly initialize the
     # device registry
     devices = []
     _joystick_devices = []
     _joystick_device_guid_map = {}
-    device_count = dinput.DILL.get_device_count()
     virtual_count = 0
     real_count = 0
     virtual_devices = {}
@@ -358,7 +375,7 @@ def joystick_devices_initialization():
         else:
             real_count += 1
 
-    syslog.info(f"Found {real_count} hardware devices and {virtual_count} virtual devices")
+    syslog.info(f"INIT: Found {real_count} hardware devices and {virtual_count} virtual devices")
 
 
     # Process all devices again to detect those that have been added and those

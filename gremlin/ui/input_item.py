@@ -569,7 +569,7 @@ class InputItemListView(ui_common.AbstractView):
 
     def _widget_selection_change_cb(self, widget):
         ''' called when a widget selection changes '''
-        self.select_item(widget.index, user_selected=True)
+        self.select_item(widget.index, user_selected=True, force_update=False)
 
 
 
@@ -1054,6 +1054,10 @@ class InputItemWidget(QtWidgets.QFrame):
         self._title_container_layout.setVerticalSpacing(0)
 
         self.identifier = identifier
+        self._device_guid = identifier.device_guid
+        self._input_type = identifier.input_type
+        self._input_id = identifier.input_id
+
         self.data = data
         self._selected = False
         self._enabled = True # this determines if the input is active 
@@ -1188,20 +1192,27 @@ class InputItemWidget(QtWidgets.QFrame):
         
         config = gremlin.config.Configuration()
         self.axis_widget = None
+        self.button_widget = None
 
 
         if config.show_input_axis and (self.identifier.is_axis or self.identifier.is_button or self.identifier.input_type in (InputType.JoystickAxis, InputType.JoystickButton)):
             
+            state_widget = gremlin.ui.ui_common.StateTracker()
             if self.identifier.is_axis:
                 widget = gremlin.ui.ui_common.AxisStateWidget(show_label = False, orientation=QtCore.Qt.Orientation.Horizontal, show_percentage=False)
+                self.axis_widget = widget
+
             else:
                 widget = gremlin.ui.ui_common.ButtonStateWidget()
+                self.button_widget = widget
+                
+
             widget.setMaximumWidth(200)
             widget.hookDevice(identifier.device_guid, identifier.input_type, identifier.input_id)
             self._container_input_axis_layout.addWidget(widget)
             self._container_input_axis_layout.addStretch()
             
-            self.axis_widget = widget
+            
 
         self._container_input_axis_layout.addWidget(self._curve_container_widget)
         self.main_layout.addWidget(self._container_input_axis_widget)
@@ -1240,6 +1251,23 @@ class InputItemWidget(QtWidgets.QFrame):
         self._curve_container_widget.setVisible(curve_visible) 
         self.update_display()
 
+        if hasattr(identifier.input_id,"message_key_changed"):
+            identifier.input_id.message_key_changed.connect(self._message_key_changed)
+
+
+    def _message_key_changed(self, old_message_key, new_message_key):
+        state_tracker = gremlin.ui.ui_common.StateTracker()
+
+        print (f"INPUT ITEM: message change {old_message_key} to {new_message_key}")
+
+        if old_message_key:
+            state_tracker.unregisterAxisState(self._device_guid, self._input_type, old_message_key)
+            state_tracker.unregisterButtonState(self._device_guid, self._input_type,old_message_key)
+
+        if self.axis_widget:
+            state_tracker.registerAxisState(self.axis_widget, self._device_guid, self._input_type, new_message_key)
+        if self.button_widget:
+            state_tracker.registerButtonState(self.button_widget, self._device_guid, self._input_type, new_message_key)
 
     @QtCore.Slot(object)
     def _update_enabled_state(self, input_item ): # : gremlin.base_profile.InputItem
@@ -1545,7 +1573,19 @@ class InputItemWidget(QtWidgets.QFrame):
     QtCore.Slot()
     def _close_button_cb(self):
         ''' fires the closed event when the close button has been pressed '''
+        
+
+        # remove the tracker objects
+        widget_tracker = gremlin.ui.ui_common.StateTracker()
+        device_guid = self._device_guid
+        input_type = self._input_type
+        input_id = self._input_id
+        widget_tracker.unregisterAxisState(device_guid, input_type, input_id)
+        widget_tracker.unregisterButtonState(device_guid, input_type, input_id)
+
         self.closed.emit(self)
+        
+
 
     QtCore.Slot()
     def _edit_button_cb(self):

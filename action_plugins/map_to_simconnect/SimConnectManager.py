@@ -48,6 +48,36 @@ class DataThreadingEvent(threading.Event):
         self.data = None
 
 
+class SimconnectCommand(enum.IntEnum):
+    ''' internal commands '''
+    SyncAircraftMode = auto() # synchronizes the profile mode with the current aircraft 
+
+    @staticmethod
+    def to_enum(value):
+        return _simconnect_command_to_enum[value]
+    
+    @staticmethod
+    def to_string(value):
+        return _simconnect_command_to_string[value]
+    
+    @staticmethod
+    def to_display_name(value):
+        return _simconnect_command_description[value]
+   
+
+_simconnect_command_to_enum = {
+    "sync_aicraft" : SimconnectCommand.SyncAircraftMode,
+}
+
+_simconnect_command_description = {
+    SimconnectCommand.SyncAircraftMode: "Synchronize profile mode with aircraft"
+}
+
+_simconnect_command_to_string = {
+    SimconnectCommand.SyncAircraftMode: "sync_aircraft",
+}
+
+
 ''' full axis range commands -16883 to + 16383 '''
 _simconnect_full_range = [
                         "AXIS_THROTTLE_SET",
@@ -398,7 +428,8 @@ class SimConnectManager(QtCore.QObject):
         QtCore.QObject.__init__(self)
 
         el = gremlin.event_handler.EventListener()
-        el.shutdown.connect(self._shutdown)
+        el.shutdown.connect(self._shutdown) # trap application shutdown
+
         
 
         self.verbose = gremlin.config.Configuration().verbose_mode_simconnect
@@ -448,14 +479,23 @@ class SimConnectManager(QtCore.QObject):
         self._registered_requests = {}
         self._registered_events = {}
 
-
+        # load simconnect data
         self.reload()
+
+        # load internal commands
+        self.load_internal()
 
     @QtCore.Slot()
     def _shutdown(self):
         ''' application shutdown '''
         syslog.info("SIMCONNECT: shutdown")
         self.sim_disconnect()
+
+
+
+
+    def load_internal(self):
+        ''' loads GremlinEx simconnect internal commands '''
 
 
     def reload(self, force_update = False):

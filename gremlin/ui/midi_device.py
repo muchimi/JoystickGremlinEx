@@ -165,6 +165,8 @@ _string_to_midi_lookup = {
 class MidiInputItem(AbstractInputItem):
     ''' holds the data for a MIDI device '''
 
+    message_key_changed = QtCore.Signal(str, str) # fires when message key changes 
+
     class InputMode(enum.Enum):
         ''' possible input modes '''
         Axis = 0  # input is variable
@@ -196,8 +198,10 @@ class MidiInputItem(AbstractInputItem):
         self._display_name = None
         self._display_tooltip = "Input configuration not set"
         self._command = None # decoded command
-        self._message_key = "" # key for this message category
+        self._message_key = self._guid # key for this message category
         self._mode = MidiInputItem.InputMode.Button  # mode is button or axis 
+        self._device_guid = MidiDeviceTabWidget.device_guid
+        self._input_type = InputType.Midi
 
 
     
@@ -218,14 +222,22 @@ class MidiInputItem(AbstractInputItem):
         return self._message_key
     
     def setMessageKey(self, value):
+        assert value
         if self.message_key is None or self._message_key != value:
             # ensure MIDI is started so we can listen to MIDI inputs
             if self._message_key != value:
+
+                # indicate key changed
+                self.message_key_changed.emit(self._message_key, value)
                 midi_input = MidiClient()
-                if not self._message_key:
-                    midi_input.unregisterInput(self)
+                if self._message_key:
+                    midi_input.unregisterInput(self)    
+
+                
                 self._message_key = value
                 midi_input.registerInput(self)
+
+
     
 
     
@@ -393,7 +405,7 @@ class MidiInputItem(AbstractInputItem):
             
         else:
             self._display_name = f"MIDI {port_name}/(not configured)"
-            self._message_key = ""
+            self._message_key = self._guid # unique ID of this input
 
 
 
@@ -440,11 +452,6 @@ class MidiInputItem(AbstractInputItem):
         ''' used for sorting purposes '''        
         # keep as is (don't sort)
         return False
-    
-    # def __eq__(self, other):
-    #     ''' compares two midi inputs to see if they are the same '''
-    #     return self._message_key == other._message_key
-
 
 
 class MidiListener(AbortableThread):
@@ -1978,6 +1985,8 @@ class MidiClient(QtCore.QObject):
                         is_axis = True)
 
                     self._event_listener.joystick_event.emit(event)
+
+
 
                 elif input_item.is_button:
                     # trigger a button event 

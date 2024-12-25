@@ -139,13 +139,19 @@ class SimconnectOptions(QtCore.QObject):
         super().__init__()
         self._manager = manager
 
-        self._profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
-        self._mode_list = self._profile.get_modes()
+        el = gremlin.event_handler.EventListener()
+        el.profile_loaded.connect(self._profile_loaded) # trap profile load to update modes
+        el.profile_start.connect(self._profile_modes_changed) # trap profile start to update modes
+        el.modes_changed.connect(self._profile_modes_changed) # trap edit mode mode changes to update modes
+
+
+
         base_file = "simconnect_config.xml"
-        user_source = os.path.join(gremlin.util.userprofile_path(),base_file)
+        user_source = os.path.join(gremlin.util.userprofile_path(), base_file)
         self._xml_source = user_source
-        
-        self._auto_mode_select = True # if set, autoloads the mode associated with the aircraft if such a mode exists
+
+        self._auto_mode_select = True # if set, autoloads the mode associated with the aircraft if such a mode exists, on by default
+        self._auto_mode_lock = True # if set, mode changes other the mapped aicraft will be ignored
         self._aircraft_definitions = [] # holds aicraft entries
         self._titles = []
         # Steam version
@@ -155,9 +161,25 @@ class SimconnectOptions(QtCore.QObject):
         self._community_folder = os.path.join(app_data, "Local","Packages","Microsoft.Limitless_8wekyb3d8bbwe","LocalCache","Packages","Community")
 
         self._sort_mode = SimconnectSortMode.NotSet
-        self.parse_xml()
+
+        self._profile = None
+        self._mode_list = []
+
         self._simconnect = manager.simconnect
-       
+
+        self.parse_xml()
+
+    @QtCore.Slot()
+    def _profile_loaded(self):
+        ''' profile is loaded '''
+        self._profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
+        self._mode_list = self._profile.get_modes()
+
+    @QtCore.Slot()
+    def _profile_modes_changed(self):
+        ''' profile modes changed '''
+        self._mode_list = self._profile.get_modes()
+
 
     @property
     def current_aircraft_folder(self):
@@ -253,12 +275,20 @@ class SimconnectOptions(QtCore.QObject):
     
     @property
     def auto_mode_select(self):
+        ''' true if automatic mode selection for aicraft is enabled '''
         return self._auto_mode_select
     @auto_mode_select.setter
     def auto_mode_select(self, value):
         self._auto_mode_select = value
         
-    
+    @property
+    def auto_mode_lock(self):
+        ''' true if mode locking is enabled '''
+        return self._auto_mode_lock and self._auto_mode_select # both must be enabled to lock a profile
+    @auto_mode_lock.setter
+    def auto_mode_lock(self, value):
+        self._auto_mode_lock = value
+        
 
 
             
@@ -278,8 +308,6 @@ class SimconnectOptions(QtCore.QObject):
     
         self._titles = []
 
-        default_mode = gremlin.shared_state.current_profile.get_default_mode()
-        
         
         try:
             parser = etree.XMLParser(remove_blank_text=True)
@@ -289,6 +317,8 @@ class SimconnectOptions(QtCore.QObject):
             for node in nodes:
                 if "auto_mode_select" in node.attrib:
                     self._auto_mode_select = safe_read(node,"auto_mode_select",bool,True)
+                if "auto_mode_lock" in node.attrib:
+                    self._auto_mode_lock = safe_read(node,"auto_mode_lock",bool,True)
                 if "community_folder" in node.attrib:
                     self._community_folder = safe_read(node,"community_folder", str, "")
                 if "sort" in node.attrib:
@@ -313,7 +343,7 @@ class SimconnectOptions(QtCore.QObject):
                     icao_manufacturer = safe_read(node,"manufacturer", str, "")
                     icao_type = safe_read(node,"type", str, "")
                     path = safe_read(node,"path", str, "")
-                    mode = safe_read(node,"mode", str, default_mode)
+                    mode = safe_read(node,"mode", str, "")
                     id = safe_read(node,"id", str, "")
                     state_folder = safe_read(node,"state_folder",str,"")
                     community_path = safe_read(node,"community_path",str,"")
@@ -369,6 +399,9 @@ class SimconnectOptions(QtCore.QObject):
         node_options = etree.SubElement(root, "options")
         # selection mode
         node_options.set("auto_mode_select",str(self._auto_mode_select))
+        # autolock mode
+        node_options.set("auto_mode_lock", str(self._auto_mode_lock))
+
         if self._community_folder and os.path.isdir(self._community_folder):
             # save valid community folder
             node_options.set("community_folder", self._community_folder)
@@ -657,11 +690,14 @@ class SimconnectMonitor():
         self._manager = SimConnectManager()
         self._manager.aircraft_loaded.connect(self._aircraft_loaded)
         self._started = False
-        self._mode_change_enabled = False
+        self._options = SimconnectOptions(self._manager)
         el= gremlin.event_handler.EventListener()
-        el.profile_started.connect(self._profile_start) # occurs after a profile has started to change the default mode if needed
-        el.profile_stop.connect(self.stop)
-        el.shutdown.connect(self._shutdown)
+        el.profile_started.connect(self._profile_start) # trap profile start
+        el.profile_stop.connect(self.stop) # trap profile stop
+        el.shutdown.connect(self._shutdown) # trap application shutdown
+        el.mode_changed.connect(self._mode_changed) # trap runtime mode changes - these occur post validation
+
+        
 
 
     def getStartupMode(self):
@@ -669,11 +705,11 @@ class SimconnectMonitor():
 
         if self._manager.is_running:
             # sim is running
-            options = SimconnectOptions(self._manager)
+            
             state_folder = self._manager.current_aircraft_folder
 
             if state_folder:
-                item = options.find_definition_by_state(state_folder)
+                item = self._options.find_definition_by_state(state_folder)
                 if item is not None:
                     # found the aicraft entry
                     key = item.key
@@ -692,6 +728,10 @@ class SimconnectMonitor():
         ec = gremlin.execution_graph.ExecutionContext()
         if ec.findActionPlugin(MapToSimConnect.name):
             logging.getLogger("system").info(f"SCMONITOR: Start")
+
+            eh = gremlin.event_handler.EventHandler()
+            eh.registerModeValidator(self._mode_change_validator) # filter mode change requests and discard them if needed to avoid other logic to interrupt Simconnect activities
+            
             self.start()
         else:
             self.stop() # stop monitoring if it was
@@ -709,15 +749,12 @@ class SimconnectMonitor():
             syslog.error("SCMONITOR: Unable to start monitor, sim is not running")
             return
         self._started = True
-        options = SimconnectOptions(self._manager)
         # see if we need to change modes automatically
-        self._mode_change_enabled = options.auto_mode_select
-        if self._mode_change_enabled:
+        
+        if self._options.auto_mode_select:
             self._wait_thread = threading.Thread(target = self._wait_thread_loop)
             self._wait_thread.setName("mode loop - wait for aircraft data")
             self._wait_thread.start()
-            #self._manager.aircraft_loaded.connect(self._aircraft_loaded)
-            # request the current aircraft
             self._manager.update_aircraft_folder()
         
 
@@ -747,7 +784,7 @@ class SimconnectMonitor():
         ''' stop monitorin  '''
         if not self._started:
             return 
-        if self._mode_change_enabled:
+        if self._options.auto_mode_select:
             self._manager.aircraft_loaded.disconnect(self._aircraft_loaded)
         self._started = False
 
@@ -755,9 +792,18 @@ class SimconnectMonitor():
         ''' program exit '''
         syslog = logging.getLogger("system")
         syslog.info("SCMONITOR: shutdown")
+
+        # remove the validator 
+        eh = gremlin.event_handler.EventHandler()
+        eh.unregisterModeValidator(self._mode_change_validator) 
+
+        # stop
         self.stop()
-        if self._mode_change_enabled:
+
+        # remove the handler for aircraft changes
+        if self._options.auto_mode_select:
             self._manager.aircraft_loaded.disconnect(self._aircraft_loaded)
+
         self._manager = None
 
     @QtCore.Slot(str, str)
@@ -766,9 +812,38 @@ class SimconnectMonitor():
         syslog.info(f"SCMONITOR: Aircraft changed detected")
         mode = self.getStartupMode()
         if mode:
-            # request a mode change 
-            eh = gremlin.event_handler.EventHandler()
-            eh.change_mode(mode)
+            self.change_mode(mode)
+
+    def _mode_change_validator(self, new_mode) -> bool:
+        ''' validate a request for a mode change '''
+        if not gremlin.shared_state.is_running:
+            # allow mode change at edit time
+            return True
+        
+        syslog = logging.getLogger("system")
+        syslog.info(f"SCMONITOR: Profile mode change request to: {new_mode}")
+        mode = self.getStartupMode()
+        if mode and mode != new_mode and self._options.auto_mode_lock:
+            syslog.warning(f"SCMONITOR: per option request denied - aicraft mode lock is enabled and locked to mode [{mode}]")
+            return False
+        
+        # allowed
+        return True
+
+    def change_mode(self, mode):
+        ''' force a mode change '''
+        eh = gremlin.event_handler.EventHandler()
+        eh.change_mode(mode)
+
+    @QtCore.Slot(str)
+    def _mode_changed(self, new_mode):        
+        ''' triggered on runtime mode changes '''
+        syslog = logging.getLogger("system")
+        syslog.info(f"SCMONITOR: Profile mode change request to mode [{new_mode}]")
+        mode = self.getStartupMode()
+        if mode and mode != new_mode and self._options.auto_mode_select:
+            syslog.info(f"SCMONITOR: per option - restoring mode for aicraft mode [{mode}]")
+            self.change_mode(mode)
 
 
         
@@ -814,6 +889,12 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self._auto_mode_switch.setToolTip("When enabled, the profile mode will automatically change based on the mode associated with the active player aircraft in Flight Simulator")
         self._auto_mode_switch.setChecked(self.options.auto_mode_select)
         self._auto_mode_switch.clicked.connect(self._auto_mode_select_cb)
+
+        self._auto_mode_lock = QtWidgets.QCheckBox("Lock the mode to the active aicraft")
+        self._auto_mode_lock.setToolTip("When enabled, the profile mode mapped to the aircraft will stay locked in that mode and other mode changes will be ignored.\pThis prevents inadvertent loss of control due to other GremlinEx actions.")
+        self._auto_mode_lock.setChecked(self.options.auto_mode_select)
+        self._auto_mode_lock.clicked.connect(self._auto_mode_lock_cb)
+        
 
         self._msfs_path_widget = ui_common.QPathLineItem(header="MSFS Community Folder", text = self.options.community_folder, dir_mode=True)
         self._msfs_path_widget.pathChanged.connect(self._community_folder_changed_cb)
@@ -947,6 +1028,12 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         ''' auto mode changed'''
         self.options.auto_mode_select = checked
 
+    @QtCore.Slot(bool)
+    def _auto_mode_lock_cb(self, checked):
+        ''' auto mode lock changed'''
+        self.options.auto_mode_lock = checked
+
+
     @QtCore.Slot()
     def _scan_aircraft_cb(self):
         self.options.scan_aircraft_config(self)
@@ -1005,6 +1092,10 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
         # current aircraft
         self._update_current_aircraft()
+
+
+        # mode locking is only enabled if auto mode change enabled
+        self._auto_mode_lock.setEnabled(self._auto_mode_switch.isChecked())
 
 
         # figure out the size of the header part of the control so things line up

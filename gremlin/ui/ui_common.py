@@ -53,7 +53,198 @@ import gremlin.util
 
 from gremlin.singleton_decorator import SingletonDecorator
 
+class WidgetTracker():
 
+    def __init__(self):
+        self._widget_cache = {}
+    
+    def registerWidget(self, widget):
+        ''' registers widget for cleanup - this is needed because QT doesn't tell us when widgets are discarded so we need to manually track this here 
+        so widgets cleanup correctly and remove any hooks / references '''
+        self._widget_cache[widget] = widget
+
+    def unregisterWidget(self, widget):
+        ''' removes a widget from the cleanup list'''
+        if widget in self._widget_cache:
+            if hasattr(widget, "_cleanup_ui"):
+                widget._cleanup_ui()
+            del self._widget_cache[widget]
+
+    def clearRegisteredWidgets(self):
+        ''' cleanup all widgets '''
+        for widget in self._widget_cache.values():
+            if hasattr(widget, "_cleanup_ui"):
+                widget._cleanup_ui()
+        self._widget_cache.clear()
+
+
+
+@SingletonDecorator
+class DeviceWidgetTracker():
+    def __init__(self):
+        self._widget_cache = {}
+
+    def registerWidget(self, widget, device_guid, input_type, input_id, key):
+        if not isinstance(device_guid, str):
+            device_guid = str(device_guid)
+        if not device_guid in self._widget_cache:
+            self._widget_cache[device_guid] = {}
+        if not input_type in self._widget_cache[device_guid]:
+            self._widget_cache[device_guid][input_type] = {}
+        if not input_id in self._widget_cache[device_guid][input_type]:
+            self._widget_cache[device_guid][input_type][input_id] = {}
+
+        self._widget_cache[device_guid][input_type][input_id][key] = widget
+
+    def unregisterWidget(self, device_guid, input_type, input_id, key):
+        if not isinstance(device_guid, str):
+            device_guid = str(device_guid)
+        if device_guid in self._widget_cache:
+            if input_type in self._widget_cache[device_guid]:
+                if input_id in self._widget_cache[device_guid][input_type]:
+                    if key in self._widget_cache[device_guid][input_type][input_id]:
+                        del self._widget_cache[device_guid][input_type][input_id]
+
+    def clear(self):
+        self._widget_cache.clear()
+
+    def getWidget(self, device_guid, input_type, input_id, key):
+        if not isinstance(device_guid, str):
+            device_guid = str(device_guid)
+        if device_guid in self._widget_cache:
+            if input_type in self._widget_cache[device_guid]:
+                if input_id in self._widget_cache[device_guid][input_type]:
+                    if key in self._widget_cache[device_guid][input_type][input_id]: 
+                        return self._widget_cache[device_guid][input_type][input_id][key]
+        return None
+
+    def getCache(self, device_guid, input_type):
+        if not isinstance(device_guid, str):
+            device_guid = str(device_guid)
+        if device_guid in self._widget_cache:
+            if input_type in self._widget_cache[device_guid]:
+                return self._widget_cache[device_guid][input_type]
+
+
+@SingletonDecorator
+class StateTracker():
+    def __init__(self):
+        self._axis_cache = {}
+        self._button_cache = {}
+        el = gremlin.event_handler.EventListener()
+        el.button_state_change.connect(self._button_state_change)
+        el.axis_state_change.connect(self._axis_state_change)
+
+    def _key(self, input_id):
+        if hasattr(input_id, "message_key"):
+            # item has a special key to use for indexing input ID
+            return input_id.message_key
+        return str(input_id)
+
+
+    def registerButtonState(self, widget, device_guid, input_type, input_id):
+        if not isinstance(device_guid, str):
+            device_guid = str(device_guid)
+        if not device_guid in self._button_cache:
+            self._button_cache[device_guid] = {}
+        if not input_type in self._button_cache[device_guid]:
+            self._button_cache[device_guid][input_type] = {}
+        key = self._key(input_id)
+        assert key
+        print (f"Add button {key}")
+        self._button_cache[device_guid][input_type][key] = widget
+
+    def unregisterButtonState(self, device_guid, input_type, input_id):
+        if not isinstance(device_guid, str):
+            device_guid = str(device_guid)
+        if device_guid in self._button_cache:
+            if input_type in self._button_cache[device_guid]:
+                key = self._key(input_id)
+                if key in self._button_cache[device_guid][input_type]:
+                    print (f"Remove button {key}")
+                    del self._button_cache[device_guid][input_type][key]
+
+    def registerAxisState(self, widget, device_guid, input_type, input_id):
+        if not isinstance(device_guid, str):
+            device_guid = str(device_guid)
+        if not device_guid in self._axis_cache:
+            self._axis_cache[device_guid] = {}
+        if not input_type in self._axis_cache[device_guid]:
+            self._axis_cache[device_guid][input_type] = {}
+        key = self._key(input_id)
+        self._axis_cache[device_guid][input_type][key] = widget
+        
+
+    def clear(self):
+        self._axis_cache.clear()
+        self._button_cache.clear()
+
+    def unregisterAxisState(self, device_guid, input_type, input_id):
+        if not isinstance(device_guid, str):
+            device_guid = str(device_guid)
+        if device_guid in self._axis_cache:
+            if input_type in self._axis_cache[device_guid]:
+                key = self._key(input_id)
+                if key in self._axis_cache[device_guid][input_type]:
+                    del self._axis_cache[device_guid][input_type][key]
+
+
+    def _button_state_change(self, device_guid, input_type, input_id, is_pressed):
+        if not isinstance(device_guid, str):
+            device_guid = str(device_guid)
+        if device_guid in self._button_cache:
+            if input_type in self._button_cache[device_guid]:
+                key = self._key(input_id)
+                if key in self._button_cache[device_guid][input_type]:
+                    widget = self._button_cache[device_guid][input_type][key]
+                    if widget.enabled:
+                        widget._update_value(is_pressed)
+                else:
+                    print (f"Button not found: {key} - choices: {list(self._button_cache[device_guid][input_type].keys())}")
+                    
+
+    
+    def _axis_state_change(self, device_guid, input_type, input_id, value):
+        if not isinstance(device_guid, str):
+            device_guid = str(device_guid)
+        if device_guid in self._axis_cache:
+            if input_type in self._axis_cache[device_guid]:
+                key = self._key(input_id)
+                if key in self._axis_cache[device_guid][input_type]:
+                    widget = self._axis_cache[device_guid][input_type][key]
+                    if widget.enabled:
+                        widget._update_value(value)
+                        
+    
+    def getButtonWidget(self, device_guid, input_type, input_id):
+        ''' gets the widget registered for a button state tracking'''
+        if not isinstance(device_guid, str):
+            device_guid = str(device_guid)
+        if device_guid in self._button_cache:
+            if input_type in self._button_cache[device_guid]:
+                key = self._key(input_id)
+                if key in self._button_cache[device_guid][input_type]:
+                    widget = self._button_cache[device_guid][input_type][key]
+                    return widget
+                
+        return None
+    
+    def getAxisWidget(self, device_guid, input_type, input_id):
+        if not isinstance(device_guid, str):
+            device_guid = str(device_guid)
+        if device_guid in self._axis_cache:
+            if input_type in self._axis_cache[device_guid]:
+                key = self._key(input_id)
+                if key in self._axis_cache[device_guid][input_type]:
+                    widget = self._axis_cache[device_guid][input_type][key]
+                    return widget
+        return None
+    
+    
+
+
+_tabsplitter_tracker = WidgetTracker()
+_state_tracker = StateTracker()
 
 class ContainerViewTypes(enum.Enum):
 
@@ -2077,9 +2268,14 @@ class QPathLineItem(QtWidgets.QWidget):
 class ButtonStateWidget(QtWidgets.QWidget):
     ''' visualizes the state of a button '''
 
+    deleted = QtCore.Signal() # triggers on delete
+
     def __init__(self, parent = None):
         super().__init__(parent)
         icon_size = QtCore.QSize(16,16)
+        self._device_guid = None
+        self._input_id = None
+        self._input_type = None
         self._button_widget = QtWidgets.QLabel()
         self._button_widget.setContentsMargins(0,0,0,0)
         on_icon = load_icon("mdi.record",use_qta=True,qta_color="red")
@@ -2090,6 +2286,16 @@ class ButtonStateWidget(QtWidgets.QWidget):
         self.main_layout.setSpacing(0)
         self.main_layout.addWidget(self._button_widget)
         self.setContentsMargins(0,0,0,0)
+
+        self._handler_connected = False
+        el = gremlin.event_handler.EventListener()
+        el.tab_selected.connect(self._tab_selected)
+        el.tab_unselected.connect(self._tab_unselected)
+        
+
+    def _cleanup_ui(self):
+        self.unhookDevice()
+        self.deleted.emit()
 
 
     def hookDevice(self, device_guid, input_type, input_id):
@@ -2103,36 +2309,73 @@ class ButtonStateWidget(QtWidgets.QWidget):
             is_pressed = input_id.button_value
         elif gremlin.joystick_handling.is_hardware_device(device_guid):
             # read the current value
-
             is_pressed = gremlin.joystick_handling.dinput.DILL().get_button(device_guid, input_id)
         self._update_value(is_pressed)
 
+        self._tab_selected(device_guid)
 
-        el = gremlin.event_handler.EventListener()
-        #el.joystick_event.connect(self._event_handler)
-        el.button_state_change.connect(self._button_state_change)
 
 
     def unhookDevice(self):
+        self._tab_unselected(self._device_guid)
+
+    @QtCore.Slot(str)
+    def _tab_selected(self, device_guid):
+        ''' triggered when a tab is selected 
+        
+        :param device_guid: the device selected
+        
+        '''        
+        if self._handler_connected:
+            # already connected
+            return
+        if self._device_guid:
+            syslog = logging.getLogger("system")
+            device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
+            if isinstance(device_guid, str):
+                device_guid = gremlin.util.parse_guid(device_guid)
+            el = gremlin.event_handler.EventListener()
+            if self._device_guid == device_guid:
+                # connect the handler
+                input_id = self._input_id
+                # syslog.info(f"ButtonState: {device_name} button {input_id} connect")
+                _state_tracker.registerButtonState(self, self._device_guid, self._input_type, self._input_id)
+                self._handler_connected = True
+
+
+    @property
+    def enabled(self) -> bool:
+        return self._handler_connected
+
+
+    
+    @QtCore.Slot(str)
+    def _tab_unselected(self, device_guid):
+        ''' triggered when a device tab is deselected, also used to force a disconnect
+         
+        :param device_guid: the device to deselect - if None - deselect all
+          
+        '''
+        if not self._handler_connected:
+            # not connected
+            return 
+        syslog = logging.getLogger("system")
         el = gremlin.event_handler.EventListener()
-        #el.joystick_event.disconnect(self._event_handler)
-        el.button_state_change.disconnect(self._button_state_change)
+        if device_guid:
+            if isinstance(device_guid, str):
+                device_guid = gremlin.util.parse_guid(device_guid)
+            disconnect = self._device_guid == device_guid
+            device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
+        else:
+            disconnect = True
+            device_name = 'reset'
+            
+        if disconnect:
+            input_id = self._input_id
+            # syslog.info(f"ButtonState: (unselect) {device_name} button {input_id} disconnect")
+            _state_tracker.unregisterButtonState(self._device_guid, self._input_type, self._input_id)
+            self._handler_connected = False
 
-
-    @QtCore.Slot(object, object, object, bool)
-    def _button_state_change(self, device_guid, input_type, input_id, is_pressed):
-        ''' called when a button state changes '''
-        if self._device_guid == device_guid and self._input_type == input_type and \
-            self._input_id == input_id:
-            self._update_value(is_pressed)
-
-
-    # def _event_handler(self, event):
-    #     if gremlin.shared_state.is_running or event.is_axis:
-    #         return
-    #     if self._device_guid != event.device_guid or self._input_id != event.identifier:
-    #         return
-    #     self._update_value(event.is_pressed)
 
     def _update_value(self, is_pressed):
         if is_pressed:
@@ -2142,8 +2385,12 @@ class ButtonStateWidget(QtWidgets.QWidget):
             self._button_widget.setPixmap(self._off_pixmap)
             #self._button_widget.setText(" ")
 
+    def setValue(self, is_pressed):
+        ''' value '''
+        self._update_value(is_pressed)
 
 
+_axis_widget_cache = []
 
 class AxisStateWidget(QtWidgets.QWidget):
 
@@ -2154,6 +2401,7 @@ class AxisStateWidget(QtWidgets.QWidget):
     css_horizontal = r"QProgressBar::chunk {background: QLinearGradient( x1: 0, y1: 0, x2: 0, y2: 1,stop: 0 #77a ,stop: 0.4999 #477,stop: 0.5 #45a,stop: 1 #238 ); border-radius: 7px; border: 1px solid black;}"
 
     valueChanged = QtCore.Signal(float, float) # (input_value, curved_value)
+    deleted = QtCore.Signal() # indicates the item is being deleted
 
     def __init__(self, axis_id = None, show_percentage = True, show_value = True, show_label = True, show_curve = True, orientation = QtCore.Qt.Orientation.Vertical, parent=None):
         """Creates a new instance.
@@ -2201,16 +2449,25 @@ class AxisStateWidget(QtWidgets.QWidget):
         self._reverse = False
         self._decimals = 3
         self._is_hardware_input = False # true if the device is a hardware device, set in HookDevice()
-
+        self._handler_connected = False # not connected
 
         self._width = 10
         self._update_css()
         self._update_range()
 
+        # hook tab events
+        el = gremlin.event_handler.EventListener()
+        el.tab_selected.connect(self._tab_selected)
+        el.tab_unselected.connect(self._tab_unselected)
+
+
         self.main_layout.setSpacing(0)
 
-
-
+    def _cleanup_ui(self):
+        ''' item is being deleted '''
+        self.unhookDevice()
+        self.deleted.emit()
+        
 
     @property
     def show_curved(self) -> bool:
@@ -2368,7 +2625,7 @@ class AxisStateWidget(QtWidgets.QWidget):
         return self._reverse
 
     def hookDevice(self, device_guid, input_type, input_id):
-        ''' hooks an axis '''
+        ''' hooks an axis (manual)'''
         import gremlin.joystick_handling
         self._device_guid = device_guid
         self._input_id = input_id
@@ -2376,37 +2633,92 @@ class AxisStateWidget(QtWidgets.QWidget):
         self._scale_factor = 1000
         self._value = -1
         self.setRange(-1, 1)
+        
         self._is_hardware_input = gremlin.joystick_handling.is_hardware_device(device_guid)
         if self._input_type in (InputType.OpenSoundControl, InputType.Midi):
             raw_value = input_id.axis_value
         elif self._is_hardware_input:
             raw_value = gremlin.joystick_handling.dinput.DILL().get_axis(device_guid, input_id)
         self._update_value(raw_value)
-        eh = gremlin.event_handler.EventListener()
-        eh.joystick_event.connect(self._event_handler)
+
+        self._handler_connected = False
+        self._tab_selected(device_guid)
+
 
     def unhookDevice(self):
-        eh = gremlin.event_handler.EventListener()
-        eh.joystick_event.disconnect(self._event_handler)
+        self._tab_unselected(self._device_guid)
+        
 
-    def _event_handler(self, event):
-        if gremlin.shared_state.is_running or not event.is_axis:
+    @property
+    def enabled(self) -> bool:
+        return self._handler_connected        
+
+    @QtCore.Slot(str)
+    def _tab_selected(self, device_guid):
+        ''' triggered when a tab is selected 
+        
+        :param device_guid: the device selected
+        
+        '''
+        if self._handler_connected:
+            # already connected
             return
+        syslog = logging.getLogger("system")
+        device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
+        if isinstance(device_guid, str):
+            device_guid = gremlin.util.parse_guid(device_guid)
+        el = gremlin.event_handler.EventListener()
+        if self._device_guid == device_guid:
+            # connect the handler
+            input_id = self._input_id
+            # syslog.info(f"AxisState: {device_name} axis {input_id} connect")
+            _state_tracker.registerAxisState(self, self._device_guid, self._input_type, self._input_id)
+            self._handler_connected = True
 
-        if self._device_guid != event.device_guid or self._input_id != event.identifier:
+
+    
+    @QtCore.Slot(str)
+    def _tab_unselected(self, device_guid):
+        ''' triggered when a device tab is deselected, also used to force a disconnect
+         
+        :param device_guid: the device to deselect - if None - deselect all
+          
+        '''
+        if not self._handler_connected:
+            # not connected 
             return
+        syslog = logging.getLogger("system")
+        el = gremlin.event_handler.EventListener()
+        if device_guid:
+            if isinstance(device_guid, str):
+                device_guid = gremlin.util.parse_guid(device_guid)
+            disconnect = self._device_guid == device_guid
+            device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
+        else:
+            disconnect = True
+            device_name = "reset"
+            
+        if disconnect:
+            # disconnect the handler
+            input_id = self._input_id
+            # syslog.info(f"AxisState: (unselect) {device_name} axis {input_id} disconnect")
+            _state_tracker.unregisterAxisState(self._device_guid, self._input_type, self._input_id)
+            self._handler_connected = False
+        
 
-        self._update_value(event.raw_value)
 
-    def _update_value(self, raw_value):
+    def _update_value(self, value):
         # invert the input if needed
         if self._is_hardware_input:
-            eh = gremlin.event_handler.EventListener()
-            value = eh._apply_calibration_ex(self._device_guid, self._input_id, raw_value)
-            curve_value = eh._apply_curve_ex(self._device_guid, self._input_id, value)
-            self.setValue(value, curve_value)
+            #eh = gremlin.event_handler.EventListener()
+            # value = eh._apply_calibration_ex(self._device_guid, self._input_id, raw_value)
+            # curve_value = eh._apply_curve_ex(self._device_guid, self._input_id, value)
+            #print (f"raw: {raw_value:0.3f} calibrated: {value:0.3f} curved: {curve_value:0.3f}")
+            #self.setValue(value, curve_value)
+            self.setValue(value)
         else:
-            self.setValue(raw_value)
+            self.setValue(value)
+            #self.setValue(raw_value)
 
 
 
@@ -4018,6 +4330,7 @@ class QSplitTabWidget(QDataWidget):
 
         self._right_panel_layout = QtWidgets.QVBoxLayout(self._right_panel_widget)
         self._right_panel_layout.setContentsMargins(0,0,0,0)
+        
 
 
         # left panel, list view on top, buttons on bottom
@@ -4026,20 +4339,15 @@ class QSplitTabWidget(QDataWidget):
         self._left_container_layout = QtWidgets.QVBoxLayout(self._left_container_widget)
         self._left_container_layout.setContentsMargins(0,0,0,0)
 
+        # right panel
         self._right_container_widget = QtWidgets.QWidget()
         self._right_container_widget.setContentsMargins(0,0,0,0)
         self._right_container_layout = QtWidgets.QVBoxLayout(self._right_container_widget)
         self._right_container_layout.setContentsMargins(0,0,0,0)
-
+        
+        # place items in left_container_layout or right_container_layout
         self._left_panel_layout.addWidget(self._left_container_widget)
         self._right_panel_layout.addWidget(self._right_container_widget)
-
-        # tabSplitterData = TabSplitterData()
-        # tabSplitterData.register(self._splitter)
-
-
-        # self._splitter.splitterMoved.connect(self._splitter_moved)
-
 
         self._splitter.addWidget(self._left_panel_widget)
         self._splitter.addWidget(self._right_panel_widget)
@@ -4053,6 +4361,12 @@ class QSplitTabWidget(QDataWidget):
         self._splitter.setCollapsible(0, False)
         self._splitter.setCollapsible(1, False)
         self.main_layout.addWidget(self._content_widget)
+
+        _tabsplitter_tracker.registerWidget(self)
+
+    def _cleanup_ui(self):
+        ''' remove '''
+        _tabsplitter_tracker.unregisterWidget(self)
 
 
 
@@ -4081,12 +4395,19 @@ class QSplitTabWidget(QDataWidget):
 
     def setRightPanelWidget(self, widget : QtWidgets.QWidget):
         ''' sets the right panel widget '''
+        #print ("set right panel")
         gremlin.util.clear_layout(self._right_container_layout)
         if widget is not None:
+            # test_widget = QtWidgets.QWidget()
+            # test_layout = QtWidgets.QVBoxLayout(test_widget)
+            # test_layout.addWidget(QtWidgets.QLabel("test"))
+            #test_layout.addWidget(widget)
+            #self._right_container_layout.addWidget(test_widget)
             self._right_container_layout.addWidget(widget)
 
     def addRightPanelWidget(self, widget : QtWidgets.QWidget):
         ''' sets the left panel widget '''
+        #print ("add right panel")
         if widget is not None:
             self._right_container_layout.addWidget(widget)
 
@@ -4096,6 +4417,7 @@ class QSplitTabWidget(QDataWidget):
 
     def clearRighttPanel(self):
         ''' removes all widgets from the right panel '''
+        #print ("clear right panel")
         gremlin.util.clear_layout(self._right_container_layout)
 
 

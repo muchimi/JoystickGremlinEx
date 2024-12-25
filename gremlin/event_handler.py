@@ -27,6 +27,7 @@ from typing import Callable
 
 
 import gremlin.config
+import gremlin.config
 import gremlin.joystick_handling
 import gremlin.shared_state
 import gremlin.threading
@@ -241,8 +242,12 @@ class EventListener(QtCore.QObject):
 	via QT's signal/slot interface.
 	"""
 
+	ui_ready = QtCore.Signal() # tell the UI all is ready
+
 	# Signal emitted when joystick events are received
 	joystick_event = QtCore.Signal(Event)
+
+	hardware_input_event = QtCore.Signal(object, object, object) # called for any input event (device_guid, input_type, input_id)
 
 	vjoy_event = QtCore.Signal(VjoyEvent)
 
@@ -308,10 +313,12 @@ class EventListener(QtCore.QObject):
 	# occurs on broadcast mode change
 	broadcast_changed = QtCore.Signal(StateChangeEvent)
 
-	# occurs on mode edit/update/delete
+	# occurs on mode edit/update/delete of modes (edit time only)
 	modes_changed = QtCore.Signal()
 
 	mode_name_changed = QtCore.Signal(str) # runs when a mode name change occurs for the UI to update
+
+	mode_changed = QtCore.Signal(str) # runs when the rungime profile mode changes (runtime mode only, when a profile has been started)
 
 	# functor enable flag changed
 	action_created = QtCore.Signal(object) # runs when an action is created - object = the object that triggered the event 
@@ -320,9 +327,19 @@ class EventListener(QtCore.QObject):
 	action_delete = QtCore.Signal(object, object, object) # fires when an action is about to be deleted, passes the inputItem, container, action as a parameters
 
 	# selection event - tells the UI to show a different input
-	select_input = QtCore.Signal(object, object, object, bool) # selects a particular input (device_guid, input_type, input_id, force_update)
+	select_input = QtCore.Signal(object, object, object, bool, bool) # selects a particular input (device_guid, input_type, input_id, force_update, force_switch)
+
+	input_selected = QtCore.Signal(object) # widget item was selected, parameter = InputItemWidget
+	input_item_selected = QtCore.Signal(object, int) # widget item was selected, parameter = InputItem, index of input item in the listview
+	input_unselected = QtCore.Signal(object) # widget item was unselected selected, parameter = InputItemWidget
+
+	tab_selected = QtCore.Signal(str) # tab selected, the device_guid (str) is passed as the parameter - this is triggered when a device tab is selected and made visible
+	tab_unselected = QtCore.Signal(str) # tab unselected, the device_guid (str) is passed as the parameter - this is triggered when a device tab is selected and made visible
+
 
 	button_state_change = QtCore.Signal(object, object, object, bool) # indicates a change in button state params: (device_guid, input_type, input_id, is_pressed)
+
+	axis_state_change = QtCore.Signal(object, object, object, float) # indicates a change in axis state params: (device_guid, input_type, input_id, is_pressed)
 
 	# mapping changed - either container or action added -
 	mapping_changed = QtCore.Signal(object) # fires when a container or action changes on an InputItem - passes the InputItem as the parameter
@@ -369,7 +386,7 @@ class EventListener(QtCore.QObject):
 	shutdown = QtCore.Signal() 
 
 	# toggle highlighting mode
-	toggle_highlight = QtCore.Signal(object, object) # param (axis,button)
+	toggle_highlight = QtCore.Signal(object, object, object) # param (axis,button)
 
 	# heartbeat
 	heartbeat = QtCore.Signal() # ticks every 30 seconds
@@ -429,6 +446,7 @@ class EventListener(QtCore.QObject):
 
 		self._run_event = threading.Event()
 		self._run_thread = Thread(target=self._run)
+		self._run_thread.setName("EventListener run thread")
 		self._run_thread.start()
 
 		self._keep_alive_event = threading.Event()
@@ -713,6 +731,7 @@ class EventListener(QtCore.QObject):
 		from gremlin.util import dill_hat_lookup
 		verbose = config.Configuration().verbose_mode_joystick
 		
+		
 		event = dinput.InputEvent(data)
 		
 		#breakpoint()
@@ -741,6 +760,11 @@ class EventListener(QtCore.QObject):
 				is_axis = True,
 				is_virtual = is_virtual
 			))
+
+			# notify axis change for tab switches
+			if not gremlin.shared_state.is_running:
+				self.axis_state_change.emit(event.device_guid, InputType.JoystickAxis, event.input_index, value)
+
 		elif event.input_type == dinput.InputType.Button:
 			self.joystick_event.emit(Event(
 				event_type= InputType.JoystickButton,
@@ -749,14 +773,27 @@ class EventListener(QtCore.QObject):
 				is_pressed=event.value == 1,
 				is_virtual = is_virtual
 			))
+			if not gremlin.shared_state.is_running:
+				self.button_state_change.emit(event.device_guid, 
+								 InputType.JoystickButton,
+								 event.input_index, 
+								 event.value == 1)
+			
 		elif event.input_type == dinput.InputType.Hat:
+			value = dill_hat_lookup[event.value]
 			self.joystick_event.emit(Event(
 				event_type= InputType.JoystickHat,
 				device_guid=event.device_guid,
 				identifier=event.input_index,
-				value = dill_hat_lookup[event.value],
+				is_pressed = value,
 				is_virtual = is_virtual
 			))
+			if not gremlin.shared_state.is_running:
+				self.button_state_change.emit(event.device_guid,
+								 		  InputType.JoystickHat,
+										  event.input_index,
+										  value)
+
 
 	def _joystick_device_handler(self, data, action):
 		"""Callback for device change events.
@@ -1028,8 +1065,31 @@ class EventHandler(QtCore.QObject):
 		"""Initializes the EventHandler instance."""
 		QtCore.QObject.__init__(self)
 		self.plugins = {}
+		self._mode_validator_callbacks = {}  # list of validators (callbacks) that return a boolean True if the mode change can occur - signature must be callable(str)->bool
 		self.reset()
 
+	def registerModeValidator(self, callback):
+		assert callable(callback)
+		self._mode_validator_callbacks[callback] = callback
+
+	def unregisterModeValidator(self, callback):
+		if callback in self._mode_validator_callbacks:
+			del self._mode_validator_callbacks[callback]
+
+	def clearModeValidator(self):
+		self._mode_validator_callbacks.clear()
+
+	def runModeValidator(self, mode):
+		''' runs through all current validators to see if a mode change can occur '''
+		result = True # assume we can
+		for callback in self._mode_validator_callbacks:
+			result = result and callback(mode)
+			if not result: 
+				break
+
+		return result
+
+		
 
 	def reset(self):
 		config =  gremlin.config.Configuration()
@@ -1454,7 +1514,8 @@ class EventHandler(QtCore.QObject):
 
 		import gremlin.ui.mode_device
 
-		verbose = gremlin.config.Configuration().verbose
+		config = gremlin.config.Configuration()
+		verbose = config.verbose
 		current_profile = gremlin.shared_state.current_profile
 		is_running = gremlin.shared_state.is_running
 		
@@ -1547,6 +1608,10 @@ class EventHandler(QtCore.QObject):
 				exit_release = Timer(delay, lambda : self._execute_callbacks(event_exit_released, m1_list, f1_list))
 				exit_release.start()
 				
+				result = self.runModeValidator(new_mode)
+				if not result:
+					syslog.warning(f"Profile: {current_profile.name} - mode change request to {new_mode} not authorized by a module - request ignored")
+					return
 
 
 				self.previous_runtime_mode = self.runtime_mode
@@ -1556,9 +1621,18 @@ class EventHandler(QtCore.QObject):
 				current_profile.set_last_runtime_mode(self.runtime_mode)
 				self.previous_runtime_mode = self.runtime_mode
 				self.runtime_mode = new_mode
-				syslog.debug(f"Profile: {current_profile.name} - Runtime Mode switch to: {new_mode}")
+				if verbose: syslog.info(f"Profile: {current_profile.name} - Runtime Mode switch to: {new_mode}")
 				if emit:
-					self.runtime_mode_changed.emit(self.runtime_mode)
+					self.runtime_mode_changed.emit(new_mode)
+
+				# tell other internal components the mode is changing (runtime only)
+				el = EventListener()
+				el.mode_changed.emit(new_mode)
+				
+				if config.initial_load_mode_tts:
+					# output verbal notification if requested
+					tts = gremlin.tts.TextToSpeech()
+					tts.speak(f"Profile mode change to {new_mode}")
 
 
 				# fire mode change for mode enter (press + release)
@@ -1587,7 +1661,7 @@ class EventHandler(QtCore.QObject):
 		# update the selection
 		device_guid, input_type, input_id = gremlin.config.Configuration().get_last_input()
 		if input_type and input_id:
-			el.select_input.emit(device_guid, input_type, input_id, False)
+			el.select_input.emit(device_guid, input_type, input_id, False, True)
 		
 
 

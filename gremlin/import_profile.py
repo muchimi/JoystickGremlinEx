@@ -2702,7 +2702,7 @@ class Mapper():
                 device_guid, input_type, input_id = gremlin.config.Configuration().get_last_input()
                 if input_type and input_id:
                     eh = gremlin.event_handler.EventListener()
-                    eh.select_input.emit(device_guid, input_type, input_id, True)
+                    eh.select_input.emit(device_guid, input_type, input_id, True, False)
             finally:
                 gremlin.util.popCursor()
 
