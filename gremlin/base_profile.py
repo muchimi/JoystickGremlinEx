@@ -2503,13 +2503,14 @@ class Profile():
 
         # simconnect settings
         for key, mode in self._simconnect_modes.items():
-            child = etree.Element("simconnect")
-            key_cp, key_ap = key
-            
-            child.set("key_cp",key_cp)
-            child.set("key_ap",key_ap)
-            child.set("mode", mode)
-            root.append(child)
+            if key:
+                child = etree.Element("simconnect")
+                key_cp, key_ap = key
+                
+                child.set("key_cp",key_cp)
+                child.set("key_ap",key_ap)
+                child.set("mode", mode)
+                root.append(child)
 
         # VJoy settings
         add_vjoy = False
@@ -2764,6 +2765,7 @@ class Profile():
                 backup_file = os.path.join(backup_path, f"{base_name}.{backup_count}.xml")
                 try:
                     shutil.copyfile(use_name, backup_file)
+                    syslog.error(f"BACKUP: backup profile: {backup_file}")
                 except Exception as err:
                     syslog.error(f"BACKUP: save error: Unable to backup profile: {err}")
                     return

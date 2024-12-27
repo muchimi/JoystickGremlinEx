@@ -1931,6 +1931,7 @@ class OscInputItem(AbstractInputItem):
     ''' holds OSC input data '''
 
     message_key_changed = QtCore.Signal(str, str) # fires when message key changes 
+    input_mode_changed = QtCore.Signal() # fires when the repeater mode changes axis or button
 
     class InputMode(enum.Enum):
         ''' possible input modes '''
@@ -1999,11 +2000,13 @@ class OscInputItem(AbstractInputItem):
     def mode(self) -> OscInputItem.InputMode:
         ''' input mode '''
         return self._mode
-    
-    @mode.setter
-    def mode(self, value : OscInputItem.InputMode):
-        self._mode = value
-        self._update()
+        
+    def setMode(self, value : OscInputItem.InputMode):
+        ''' changes the input mode'''
+        if self._mode != value:
+            self._mode = value
+            self._update()
+            self.input_mode_changed.emit()
 
     @property
     def is_axis(self) -> bool:
@@ -3178,7 +3181,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         input_item : OscInputItem = identifier.input_id
         input_item._message = message # OSC command message as text
         input_item._message_data = data  # arguments as a list
-        input_item._mode = mode
+        input_item.setMode(mode)
         input_item._command_mode = command_mode
         input_item._min_range = min_range
         input_item._max_range = max_range
@@ -3248,6 +3251,7 @@ class InputOscClient(QtCore.QObject):
 
         self._event_handler = gremlin.event_handler.EventHandler()
         self._event_listener = gremlin.event_handler.EventListener()
+        # self._event_listener.osc_message.connect(self._osc_message_cb)
         self._event_listener.request_osc.connect(self._request_osc_state)
         self._event_listener.profile_start.connect(self._profile_start)
         self._osc_map = {}  # map of message keys to inputs 
@@ -3422,12 +3426,12 @@ class InputOscClient(QtCore.QObject):
 
                         self._event_listener.joystick_event.emit(event)
 
-                        # self._event_listener.axis_state_change.emit(
-                        #                     event.device_guid,
-                        #                     event.event_type,
-                        #                     input_item,               
-                        #                     event.value
-                        #                 )
+                        self._event_listener.axis_state_change.emit(
+                                            event.device_guid,
+                                            event.event_type,
+                                            input_item,               
+                                            event.value
+                                        )
 
                         return
 

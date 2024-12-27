@@ -1081,6 +1081,22 @@ class GremlinUi(QtWidgets.QMainWindow):
         # Tray icon
         self.ui.tray_icon.activated.connect(self._tray_icon_activated_cb)
 
+        # Simconnect configuration
+        self.ui.actionSimconnectOptions.triggered.connect(self.showSimconnectOptions)
+
+
+    def showSimconnectOptions(self):
+        ''' displays the simconnect options dialog '''
+        from action_plugins.map_to_simconnect import SimconnectOptionsUi
+        from action_plugins.map_to_simconnect.SimConnectManager import SimConnectManager
+        profile = gremlin.shared_state.current_profile
+        profile_file = profile.profile_file
+        if not profile_file or not os.path.isfile(profile_file):
+            gremlin.ui.ui_common.MessageBox(prompt="Please save the current profile before accessing Simconnect options.")
+            return 
+        dialog = SimconnectOptionsUi(SimConnectManager().simconnect)
+        dialog.exec()
+
     def _create_1to1_mapping(self):
         ''' maps one to one '''
         mapper = gremlin.import_profile.Mapper()
@@ -1330,6 +1346,8 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         assert_ui_thread()
 
+        device_guid = None
+
         try:
             gremlin.shared_state.is_tab_loading = True
             el = gremlin.event_handler.EventListener()
@@ -1397,7 +1415,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                 with QtCore.QSignalBlocker(self.ui.devices):
                     self.ui.devices.addTab(tab_label)
 
-                print(f"add device: {tab_label}")
+                # print(f"add device: {tab_label}")
 
                 gremlin.shared_state.device_widget_map[device_profile.device_guid] = widget
 
@@ -1704,14 +1722,24 @@ class GremlinUi(QtWidgets.QMainWindow):
             # dump all tabs
             # self._dump_tab_map(self._get_tab_map())
             # pass
-        finally:
-            el.pop_input_selection(reset = True) # prevent selections
+      
+        except Exception as err:
+            pass
 
-            if device_guid is not None:
-                _, restore_input_type, restore_input_id = self.config.get_last_input(device_guid)
-                self._select_input(device_guid, restore_input_type, restore_input_id, force_switch=True)
+
+        finally:
+            try:
+                el.pop_input_selection(reset = True) # prevent selections
+
+                if device_guid is not None:
+                    _, restore_input_type, restore_input_id = self.config.get_last_input(device_guid)
+                    self._select_input(device_guid, restore_input_type, restore_input_id, force_switch=True)
+                
+            except Exception as err:
+                pass
 
             self.pop_highlighting()
+
 
 
 
@@ -2137,8 +2165,8 @@ class GremlinUi(QtWidgets.QMainWindow):
 
     def _refresh_tab(self):
         ''' refreshes the current device tab '''
-        current_widget = self.ui.devices.currentWidget()
-        if hasattr(current_widget,"refresh"):
+        current_widget = self._current_tab_widget
+        if current_widget and hasattr(current_widget,"refresh"):
             current_widget.refresh()
 
 

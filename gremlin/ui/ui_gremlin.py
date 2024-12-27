@@ -166,6 +166,13 @@ class Ui_Gremlin(object):
         self.toolBar.addAction(self.actionOpen)
         self.toolBar.addAction(self.actionActivate)
 
+
+        self.actionSimconnectOptions = QtGui.QAction(main_window, text = "Simconnect...")
+        self.actionSimconnectOptions.setObjectName("actionSimconnectOptions")
+
+        self.menuTools.addSeparator()
+        self.menuTools.addAction(self.actionSimconnectOptions)
+        
         self.retranslateUi(main_window)
         self.devices.setCurrentIndex(0)
         QtCore.QMetaObject.connectSlotsByName(main_window)

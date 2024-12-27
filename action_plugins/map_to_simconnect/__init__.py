@@ -47,6 +47,8 @@ import gremlin.joystick_handling
 import gremlin.actions
 import gremlin.curve_handler
 from gremlin.input_types import InputType
+from action_plugins.map_to_simconnect.SimConnectManager import SimConnectManager
+
 
 class QHLine(QtWidgets.QFrame):
     def __init__(self, parent = None):
@@ -77,6 +79,43 @@ class CommandValidator(QtGui.QValidator):
             pass
         return QtGui.QValidator.State.Invalid
     
+
+
+    
+class SimconnectSortMode(Enum):
+    NotSet = auto()
+    AicraftAscending = auto()
+    AircraftDescending = auto()
+    Mode = auto()
+
+class SimconnectManualDefinition():
+    ''' holds a manual entry for a mode '''
+    def __init__(self, 
+                 id = None,
+                 sim_name = None,
+                 mode = None):
+        
+        self.id = id if id else gremlin.util.get_guid()
+        self.sim_name = sim_name
+        self.mode = mode
+
+        # runtime item (not saved or loaded)
+        self.selected = False # for UI interation - selected mode
+        self.error_status = None
+
+    @property
+    def display_name(self):
+        return f"{self.sim_name}"
+    
+    @property
+    def key(self):
+        if self.sim_name:
+            return self.sim_name.casefold()
+        return ""
+
+
+
+    
 class SimconnectAicraftDefinition():
     ''' holds the data entry for a single aicraft from the MSFS config data '''
     def __init__(self, id = None, 
@@ -89,6 +128,7 @@ class SimconnectAicraftDefinition():
                  community_path = None, 
                  aircraft_path = None,
                  state_folder = None,
+				 sim_name = None
                  ):
         self.icao_type = icao_type
         self.icao_manufacturer = icao_manufacturer
@@ -97,7 +137,7 @@ class SimconnectAicraftDefinition():
         self.path = path.casefold() if path else ""
         self.state_folder = state_folder.casefold() if state_folder else ""
         self.mode = mode
-        
+        self.sim_name = sim_name
         self.id = id if id else gremlin.util.get_guid()
 
         assert community_path and aircraft_path,"Community path and Aircraft path are primary keys and cannot be NULL"
@@ -110,26 +150,20 @@ class SimconnectAicraftDefinition():
         self.selected = False # for UI interation - selected mode
         self.error_status = None
 
+
     @property
     def display_name(self):
         return f"{self.icao_manufacturer} {self.icao_model} ({self.aircraft_path})"
     
     @property
     def key(self):
-        return (self.community_path, self.aircraft_path)  # unique key
+        self.aircraft_path.casefold()  # unique key is the path
 
     @property
     def valid(self):
         ''' true if the item contains valid data '''
         return not self.error_status and self.aircraft and self.mode
    
-    
-class SimconnectSortMode(Enum):
-    NotSet = auto()
-    AicraftAscending = auto()
-    AircraftDescending = auto()
-    Mode = auto()
-
 @gremlin.singleton_decorator.SingletonDecorator
 class SimconnectOptions(QtCore.QObject):
 
@@ -153,12 +187,13 @@ class SimconnectOptions(QtCore.QObject):
         self._auto_mode_select = True # if set, autoloads the mode associated with the aircraft if such a mode exists, on by default
         self._auto_mode_lock = True # if set, mode changes other the mapped aicraft will be ignored
         self._aircraft_definitions = [] # holds aicraft entries
+        self._aircraft_manual_definitions = [] # holds manual aicraft entries 
         self._titles = []
         # Steam version
-        #self._community_folder = r"C:\Microsoft Flight Simulator\Community"
-        # Microsoft store version MSFS 2024: %appdata%\Local\Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache\Packages\Community
-        app_data = os.getenv("appdata")
-        self._community_folder = os.path.join(app_data, "Local","Packages","Microsoft.Limitless_8wekyb3d8bbwe","LocalCache","Packages","Community")
+
+        self._community_folder = gremlin.shared_state.community_folder
+
+        
 
         self._sort_mode = SimconnectSortMode.NotSet
 
@@ -196,6 +231,7 @@ class SimconnectOptions(QtCore.QObject):
     def community_folder(self, value):
         if os.path.isdir(value) and value != self._community_folder:
             self._community_folder = value
+            gremlin.shared_state.community_folder = value
         
 
     def validate(self):
@@ -237,7 +273,19 @@ class SimconnectOptions(QtCore.QObject):
                 return item
         return None
 
+    def find_definition_by_sim_name(self, name_string):
+        ''' gets an item based on the state data which is a partial subfolder '''
 
+        
+        # lookup scanned entries
+        item = next((item for item in self._aircraft_definitions if item.sim_name == name_string), None)
+        if item:
+            return item
+        # lookup manual entries
+        item = next((item for item in self._aircraft_manual_definitions if item.sim_name == name_string), None)
+        if item:
+            return item
+        return None
 
 
     def find_definition_by_aicraft(self, aircraft) -> SimconnectAicraftDefinition:
@@ -348,6 +396,9 @@ class SimconnectOptions(QtCore.QObject):
                     state_folder = safe_read(node,"state_folder",str,"")
                     community_path = safe_read(node,"community_path",str,"")
                     aircraft_path = safe_read(node,"aircraft_path",str,"")
+                    sim_name = None
+                    if "sim_name" in node.attrib:
+                        sim_name = node.get("sim_name")
                     titles = []
                     node_titles = None
                     for child in node:
@@ -367,8 +418,19 @@ class SimconnectOptions(QtCore.QObject):
                                                            mode = mode,
                                                            community_path=community_path,
                                                            aircraft_path=aircraft_path,
-                                                           state_folder = state_folder)
+                                                           state_folder = state_folder,
+                                                           sim_name = sim_name)
                         self._aircraft_definitions.append(item)
+
+            node_user_items = root.xpath("//user_items")
+            for node in node_user_items:
+                mode = safe_read(node,"mode", str, "")
+                id = safe_read(node,"id", str, "")
+                sim_name = safe_read(node,"sim_name", str, "")
+                item =SimconnectManualDefinition(id, sim_name, mode)
+                self._aircraft_manual_definitions.append(item)
+
+
 
             node_titles = None
             nodes = root.xpath("//titles")
@@ -418,6 +480,8 @@ class SimconnectOptions(QtCore.QObject):
                 node.set("path", item.path)
                 node.set("id", item.id)
                 node.set("state_folder", item.state_folder)
+                if item.sim_name:
+                    node.set("sim_name", item.sim_name)
                 
                 if item.community_path:
                     node.set("community_path", item.community_path)
@@ -430,6 +494,22 @@ class SimconnectOptions(QtCore.QObject):
                     for title in item.titles:
                         child = etree.SubElement(node_titles, "title")
                         child.text = title
+
+        if self._aircraft_manual_definitions:
+            node_items = etree.SubElement(root,"user_items")
+            for item in self._aircraft_manual_definitions:
+                node = etree.SubElement(node_items,"item")
+                node.set("id", item.id)
+                if item.sim_name:
+                   node.set("sim_name", item.sim_name)
+                else:
+                    node.set("sim_name", "")
+                    
+                if item.mode:
+                    node.set("mode", item.mode)
+                else:
+                    node.set("mode", "")
+
         
         try:
             # save the file
@@ -478,7 +558,7 @@ class SimconnectOptions(QtCore.QObject):
             return
 
         aicraft_folder = os.path.join(os.path.dirname(community_folder), folder)
-        item = self._read_folder(aicraft_folder)
+        item = self._read_aicraft_config(aicraft_folder)
         if item:
             if verbose:
                 syslog.error(f"SIMCONNECT: added aircraft definition: {item.display_name}")
@@ -554,6 +634,23 @@ class SimconnectOptions(QtCore.QObject):
 
         aircraft_name = os.path.basename(aircraft_path)
         community_name = os.path.basename(community_path)
+
+
+        sim_name = None
+        work_cfg = aircraft_cfg.replace("/", os.sep).casefold()			
+        splits = work_cfg.split(os.sep)
+        max_index = len(splits)
+        index = 0
+        while splits[index] != "simobjects" and index < max_index:
+            index+=1
+        index+=1
+        if index < max_index:
+            while splits[index] != "airplanes" and index < max_index:
+                index+=1
+        index+=1
+        if index < max_index:
+            sim_name = splits[index]
+			
         
         if titles:
             titles = list(set(titles))
@@ -568,7 +665,8 @@ class SimconnectOptions(QtCore.QObject):
                                                 path = path,
                                                 community_path = community_name,
                                                 aircraft_path = aircraft_name,
-                                                state_folder = state_folder
+                                                state_folder = state_folder,
+                                                sim_name = sim_name
                                                 )
             
             self._aircraft_definitions.append(item)
@@ -589,7 +687,7 @@ class SimconnectOptions(QtCore.QObject):
         
 
         # scan for lvars
-        self._scan_lvars()
+        #self._scan_lvars()
         
         progress = QtWidgets.QProgressDialog(parent = owner, labelText ="Scanning folders... (this can take a while)", cancelButtonText = "Cancel", minimum = 0, maximum= 100) #, flags = QtCore.Qt.FramelessWindowHint)
         progress.setWindowModality(QtCore.Qt.WindowModality.WindowModal)
@@ -655,7 +753,7 @@ class SimconnectOptions(QtCore.QObject):
             # update modes that exist already so they are preserved between scans
             mapped_modes = {}
             for item in self._aircraft_definitions:
-                mapped_modes[item.display_name.lower()] = (item.id, item.mode)
+                mapped_modes[item.key] = (item.id, item.mode)
             
             self._aircraft_definitions = items
 
@@ -663,9 +761,9 @@ class SimconnectOptions(QtCore.QObject):
             self.sort()
         
             for item in self._aircraft_definitions:
-                display_name = item.display_name.lower()
-                if display_name in mapped_modes.keys():
-                    item.id, item.mode = mapped_modes[display_name]
+                key = item.key
+                if key in mapped_modes.keys():
+                    item.id, item.mode = mapped_modes[key]
 
         self.save()
         progress.close()
@@ -676,10 +774,13 @@ class SimconnectOptions(QtCore.QObject):
         ''' sorts definitions '''
         if self._sort_mode == SimconnectSortMode.AicraftAscending:
             self._aircraft_definitions.sort(key = lambda x: x.key)
+            self._aircraft_manual_definitions.sort(key = lambda x: x.key)
         elif self._sort_mode == SimconnectSortMode.AircraftDescending:
             self._aircraft_definitions.sort(key = lambda x: x.key, reverse = True)
+            self._aircraft_manual_definitions.sort(key = lambda x: x.key)
         elif self._sort_mode == SimconnectSortMode.Mode:
-            self._aircraft_definitions.sort(key = lambda x: (x.mode.lower(), x.key))
+            self._aircraft_definitions.sort(key = lambda x: (x.mode.casefold(), x.key))
+            self._aircraft_manual_definitions.sort(key = lambda x: (x.mode.casefold(), x.key))
 
 @SingletonDecorator
 class SimconnectMonitor():
@@ -688,7 +789,9 @@ class SimconnectMonitor():
         syslog = logging.getLogger("system")
         syslog.info("SCMonitor: listening")
         self._manager = SimConnectManager()
-        self._manager.aircraft_loaded.connect(self._aircraft_loaded)
+        self._manager.sim_aircraft_loaded.connect(self._sim_aircraft_loaded)
+        self._manager.sim_start.connect(self._sim_start)
+        self._manager.sim_stop.connect(self._sim_stop)
         self._started = False
         self._options = SimconnectOptions(self._manager)
         el= gremlin.event_handler.EventListener()
@@ -696,6 +799,8 @@ class SimconnectMonitor():
         el.profile_stop.connect(self.stop) # trap profile stop
         el.shutdown.connect(self._shutdown) # trap application shutdown
         el.mode_changed.connect(self._mode_changed) # trap runtime mode changes - these occur post validation
+
+        self._auto_reconnect_event = threading.Event() # controls reconnect thread exit
 
         
 
@@ -707,15 +812,22 @@ class SimconnectMonitor():
             # sim is running
             
             state_folder = self._manager.current_aircraft_folder
+            name = self._manager.current_aircraft_sim_name
+            title = self._manager.current_aircraft_title
 
-            if state_folder:
-                item = self._options.find_definition_by_state(state_folder)
+            syslog = logging.getLogger("system")
+
+            syslog.info(f"SCMONITOR: Aircraft changed: mode lookup for {title}/{name}")
+
+            if name:
+                #item = self._options.find_definition_by_state(state_folder)
+                item = self._options.find_definition_by_sim_name(name)
                 if item is not None:
                     # found the aicraft entry
                     key = item.key
                     profile = gremlin.shared_state.current_profile
                     mode = profile.getSimconnectMode(key)
-                    syslog = logging.getLogger("system")
+                    
                     syslog.info(f"SCMONITOR: Aircraft changed profile mode select: {mode}")
                     return mode
             
@@ -742,51 +854,80 @@ class SimconnectMonitor():
         ''' starts monitoring for aicraft changes '''
         if self._started:
             return
-        if not self._manager.is_running:
-            self._manager.reconnect() # connect if we're not connected
-        if not self._manager.is_running:
-            syslog = logging.getLogger("system")
-            syslog.error("SCMONITOR: Unable to start monitor, sim is not running")
-            return
+        
+        # start the reconnect thread
+        self._auto_reconnect_thread = threading.Thread(target = self._auto_reconnect_loop)
+        self._auto_reconnect_thread.setName("SCMONITOR: auto-reconnect")
+        self._auto_reconnect_event.clear()
+        self._auto_reconnect_thread.start()
         self._started = True
+
+        # if not self._manager.is_running:
+        #     self._manager.reconnect() # connect if we're not connected
+        # if not self._manager.is_running:
+        #     syslog = logging.getLogger("system")
+        #     syslog.error("SCMONITOR: Unable to start monitor, sim is not running")
+        #     return
+        
         # see if we need to change modes automatically
+
+        self._manager.sim_connect()
         
         if self._options.auto_mode_select:
-            self._wait_thread = threading.Thread(target = self._wait_thread_loop)
-            self._wait_thread.setName("mode loop - wait for aircraft data")
-            self._wait_thread.start()
-            self._manager.update_aircraft_folder()
+            if self._manager.connected:
+                self._get_aircraft()
         
-
         
-    def _wait_thread_loop(self):
-        ''' waits for the folder / aicraft mode to become available. '''
-        current_time = time.time()
-        timeout = current_time + 15 # no more than 15 seconds
-        loaded = False
-        while time.time() < timeout:
-            if self._manager.is_connected:
-                folder = self._manager.current_aircraft_folder
-                if folder is not None:
-                    self._aircraft_loaded()
-                    loaded = True
-                    break
-            time.sleep(0.25)
+    def _get_aircraft(self):
+        ''' updates the current aircraft '''
+        title =  self._manager.current_aircraft_title
+        folder = self._manager.current_aircraft_folder
+        if title:
+            self._sim_aircraft_loaded(folder, title)
+        else:
+            self._manager.request_loaded_aircraft()
 
-        if not loaded:
-              syslog = logging.getLogger("system")
-              syslog.error("SCMONITOR: unable to determine aicraft model - timeout occurred")
-
-
-
-
+    
     def stop(self):
         ''' stop monitorin  '''
         if not self._started:
             return 
+        self._auto_reconnect_event.set()
+        self._auto_reconnect_thread.join()
+
         if self._options.auto_mode_select:
-            self._manager.aircraft_loaded.disconnect(self._aircraft_loaded)
+            self._manager.sim_aircraft_loaded.disconnect(self._sim_aircraft_loaded)
         self._started = False
+
+        
+    # def _wait_thread_loop(self):
+    #     ''' waits for the folder / aicraft mode to become available. '''
+    #     current_time = time.time()
+    #     timeout = current_time + 15 # no more than 15 seconds
+    #     loaded = False
+    #     while time.time() < timeout:
+    #         if self._manager.is_connected:
+    #             folder = self._manager.current_aircraft_folder
+    #             if folder is not None:
+    #                 self._sim_aircraft_loaded()
+    #                 loaded = True
+    #                 break
+    #         time.sleep(0.25)
+
+    #     if not loaded:
+    #           syslog = logging.getLogger("system")
+    #           syslog.error("SCMONITOR: unable to determine aicraft model - timeout occurred")
+
+
+    def _auto_reconnect_loop(self):
+        while not self._auto_reconnect_event.is_set():
+            if not self._manager.running:
+                self._manager.ensure_running()
+            time.sleep(1)
+
+
+    
+
 
     def _shutdown(self):
         ''' program exit '''
@@ -802,17 +943,30 @@ class SimconnectMonitor():
 
         # remove the handler for aircraft changes
         if self._options.auto_mode_select:
-            self._manager.aircraft_loaded.disconnect(self._aircraft_loaded)
+            self._manager.sim_aircraft_loaded.disconnect(self._sim_aircraft_loaded)
 
         self._manager = None
 
     @QtCore.Slot(str, str)
-    def _aircraft_loaded(self, folder = None, title = None):
+    def _sim_aircraft_loaded(self, folder = None, name = None, title = None):
         syslog = logging.getLogger("system")
-        syslog.info(f"SCMONITOR: Aircraft changed detected")
+        syslog.info(f"SCMONITOR: Aircraft changed detected: {title}/{name}")
         mode = self.getStartupMode()
         if mode:
             self.change_mode(mode)
+
+    @QtCore.Slot()
+    def _sim_start(self):
+        ''' sim started event '''
+        syslog = logging.getLogger("system")
+        syslog.info(f"SCMONITOR: sim start")
+
+
+    @QtCore.Slot()
+    def _sim_stop(self):
+        ''' sim stop event '''
+        syslog = logging.getLogger("system")
+        syslog.info(f"SCMONITOR: sim stop")        
 
     def _mode_change_validator(self, new_mode) -> bool:
         ''' validate a request for a mode change '''
@@ -860,10 +1014,10 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
         # make modal
         self.setWindowModality(QtCore.Qt.ApplicationModal)
-        self.smmgr = SimConnectManager()
-        self.smmgr.reconnect()
-        self.smmgr.aircraft_loaded.connect(self._aircraft_loaded)
-        self.smmgr.sim_state.connect(self._sim_state)
+        self._manager = SimConnectManager()
+        self._manager.reconnect()
+        self._manager.sim_aircraft_loaded.connect(self._aircraft_loaded)
+        self._manager.sim_state.connect(self._sim_state)
 
 
         # Actual configuration object being managed
@@ -891,7 +1045,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self._auto_mode_switch.clicked.connect(self._auto_mode_select_cb)
 
         self._auto_mode_lock = QtWidgets.QCheckBox("Lock the mode to the active aicraft")
-        self._auto_mode_lock.setToolTip("When enabled, the profile mode mapped to the aircraft will stay locked in that mode and other mode changes will be ignored.\pThis prevents inadvertent loss of control due to other GremlinEx actions.")
+        self._auto_mode_lock.setToolTip("When enabled, the profile mode mapped to the aircraft will stay locked in that mode and other mode changes will be ignored.\nThis prevents inadvertent loss of control due to other GremlinEx actions.")
         self._auto_mode_lock.setChecked(self.options.auto_mode_select)
         self._auto_mode_lock.clicked.connect(self._auto_mode_lock_cb)
         
@@ -944,10 +1098,20 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self.container_map_layout = QtWidgets.QVBoxLayout(self.container_map_widget)
         self.container_map_layout.setContentsMargins(0,0,0,0)
 
+        self.manual_container_map_widget = QtWidgets.QWidget()
+        self.manual_container_map_layout = QtWidgets.QVBoxLayout(self.manual_container_map_widget)
+        self.manual_container_map_layout.setContentsMargins(0,0,0,0)
+
         # add aircraft map items
         self.scroll_area = QtWidgets.QScrollArea()
         self.scroll_widget = QtWidgets.QWidget()
         self.scroll_layout = QtWidgets.QVBoxLayout()
+
+
+        # add manual aircraft map items
+        self.manual_scroll_area = QtWidgets.QScrollArea()
+        self.manual_scroll_widget = QtWidgets.QWidget()
+        self.manual_scroll_layout = QtWidgets.QVBoxLayout()
 
         # Configure the widget holding the layout with all the buttons
         self.scroll_widget.setLayout(self.scroll_layout)
@@ -963,15 +1127,51 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setWidget(self.scroll_widget)
 
+
+
+        # Configure the widget holding the layout with all the buttons
+        self.manual_scroll_widget.setLayout(self.manual_scroll_layout)
+        self.manual_scroll_widget.setSizePolicy(
+            QtWidgets.QSizePolicy.Expanding,
+            QtWidgets.QSizePolicy.Expanding
+        )
+        self.manual_scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+        self.manual_scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+
+        # Configure the scroll area
+        #self.scroll_area.setMinimumWidth(300)
+        self.manual_scroll_area.setWidgetResizable(True)
+        self.manual_scroll_area.setWidget(self.manual_scroll_widget)
+
+
+
         self.map_widget = QtWidgets.QWidget()
         self.map_layout = QtWidgets.QGridLayout(self.map_widget)
         self.map_layout.setContentsMargins(0,0,0,0)
+
+        self.manual_map_widget = QtWidgets.QWidget()
+        self.manual_map_layout = QtWidgets.QGridLayout(self.manual_map_widget)
+        self.manual_map_layout.setContentsMargins(0,0,0,0)
+
         
 
         self.scroll_layout.addWidget(self.map_widget)
         self.scroll_layout.setContentsMargins(6,0,6,0)
         self.scroll_layout.addStretch()
+
+
         self.container_map_layout.addWidget(self.scroll_area)
+        self.manual_container_map_layout.addWidget(self.manual_scroll_area)
+
+
+        
+        self.manual_scroll_layout.addWidget(self.manual_map_widget)
+        self.manual_scroll_layout.setContentsMargins(6,0,6,0)
+        self.manual_scroll_layout.addStretch()
+        self.manual_container_map_layout.addWidget(self.manual_scroll_area)
+
+
+
 
         # end scrolling container widget definition
 
@@ -979,19 +1179,43 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self.close_button_widget = QtWidgets.QPushButton("Close")
         self.close_button_widget.clicked.connect(self.close_button_cb)
 
+        self.add_entry_widget = QtWidgets.QPushButton("Add Manual Entry")
+        self.add_entry_widget.setToolTip("Adds a manual entry")
+        self.add_entry_widget.clicked.connect(self.add_entry_cb)
+
+
 
         button_bar_widget = QtWidgets.QWidget()
         button_bar_layout = QtWidgets.QHBoxLayout(button_bar_widget)
+
+        button_bar_layout.addWidget(self.add_entry_widget)
         button_bar_layout.addStretch()
         button_bar_layout.addWidget(self.close_button_widget)
 
+        top_bar_container_widget = QtWidgets.QWidget()
+        top_bar_container_layout = QtWidgets.QHBoxLayout(top_bar_container_widget)
 
-        self.main_layout.addWidget(self._auto_mode_switch)
+        top_bar_container_layout.addWidget(self._auto_mode_switch)
+        top_bar_container_layout.addWidget(self._auto_mode_lock)
+        top_bar_container_layout.addStretch()
+        
+        self.main_layout.addWidget(top_bar_container_widget)
         self.main_layout.addWidget(self._msfs_path_widget)
         self.main_layout.addWidget(self.container_bar_widget)
         self.main_layout.addWidget(self.container_map_widget)
+        self.main_layout.addWidget(self.manual_container_map_widget)
         self.main_layout.addWidget(button_bar_widget)
 
+        # figure out the size of the header part of the control so things line up
+        lbl = QtWidgets.QLabel("w")
+        char_width = lbl.fontMetrics().averageCharWidth()
+        headers = ["Aicraft:"]
+        width = 0
+        for header in headers:
+            width = max(width, char_width*(len(header)))
+
+        self._width = width
+        self._char_width = char_width
 
         
         self._populate_ui()
@@ -1014,6 +1238,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
     def _community_folder_changed_cb(self, widget, text):
         if os.path.isdir(text):
             self.options.community_folder = text
+             
 
     def closeEvent(self, event):
         ''' occurs on window close '''
@@ -1043,7 +1268,8 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
     def _update_current_aircraft(self):
         ''' request an update from simconnect on the current aircraft '''
-        self.smmgr.update_aircraft_folder() # will trigger the aircraft loaded callback 
+        if self._manager.connected:
+            self._manager.request_loaded_aircraft() # will trigger the aircraft loaded callback 
 
 
 
@@ -1075,6 +1301,12 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         if item:
             self._aircraft_loaded(item.path, item.display_name)
 
+    @QtCore.Slot()
+    def add_entry_cb(self):
+        item = SimconnectManualDefinition()
+        self.options._aircraft_manual_definitions.append(item)
+        self._update_manual_list()
+        
 
 
     @QtCore.Slot()
@@ -1082,33 +1314,13 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         ''' called when close button clicked '''
         self.close()
 
-    
 
-    def _populate_ui(self):
-        ''' populates the map of aircraft to profile modes '''
-
-        from gremlin.ui import ui_common
-        self.options.validate()
-
-        # current aircraft
-        self._update_current_aircraft()
-
-
-        # mode locking is only enabled if auto mode change enabled
-        self._auto_mode_lock.setEnabled(self._auto_mode_switch.isChecked())
-
-
-        # figure out the size of the header part of the control so things line up
-        lbl = QtWidgets.QLabel("w")
-        char_width = lbl.fontMetrics().averageCharWidth()
-        headers = ["Aicraft:"]
-        width = 0
-        for header in headers:
-            width = max(width, char_width*(len(header)))
+    def _update_scanned_list(self):
+        ''' updates the regular scanned list '''
 
 
         # clear the widgets
-        ui_common.clear_layout(self.map_layout)
+        gremlin.ui.ui_common.clear_layout(self.map_layout)
 
         # display one row per aicraft found
         if not self.options._aircraft_definitions:
@@ -1123,8 +1335,13 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
         self._mode_selector_map = {}
         self._selected_cb_map = {}
+
+
+        self._manual_mode_selector_map = {}
+        self._manual_selected_cb_map = {}
+
         row = 0
-        display_width = width
+        display_width = self._width
 
         # current profile
         profile = gremlin.shared_state.current_profile
@@ -1142,6 +1359,8 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
                 aircraft_header_widget = QtWidgets.QWidget()
                 aircraft_header_layout = QtWidgets.QHBoxLayout(aircraft_header_widget)
+
+                sim_name_widget = QtWidgets.QLabel("Sim Name")
 
                 self.display_header_widget = QtWidgets.QLabel("Aicraft")
                 aircraft_header_layout.addWidget(self.display_header_widget)
@@ -1191,70 +1410,89 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
                 aircraft_widget = QtWidgets.QLabel("Aircraft Folder")
 
 
-                row_selector = ui_common.QRowSelectorFrame()
+                row_selector = gremlin.ui.ui_common.QRowSelectorFrame()
                 row_selector.setSelectable(False)
                 spacer = QDataWidget()
                 spacer.setMinimumWidth(3)
                 self.map_layout.addWidget(row_selector, 0, 0, 1, -1)
                 
-                self.map_layout.addWidget(spacer, 0, 1)
-                self.map_layout.addWidget(select_widget, 0, 2)
-                self.map_layout.addWidget(aircraft_header_widget, 0, 3)
-                self.map_layout.addWidget(mode_header_widget, 0, 4)
-                self.map_layout.addWidget(manufacturer_widget, 0, 5)
-                self.map_layout.addWidget(model_widget, 0, 6)
-                self.map_layout.addWidget(type_widget, 0, 7)
-                self.map_layout.addWidget(community_widget,0,8)
-                self.map_layout.addWidget(aircraft_widget,0,9)
+                col = 1
+                self.map_layout.addWidget(spacer, 0, col)
+                col+=1
+                self.map_layout.addWidget(select_widget, 0, col)
+                col+=1
+                self.map_layout.addWidget(aircraft_header_widget, 0, col)
+                col+=1
+                self.map_layout.addWidget(sim_name_widget, 0, col)
+                col+=1
+                self.map_layout.addWidget(mode_header_widget, 0, col)
+                col+=1
+                self.map_layout.addWidget(manufacturer_widget, 0, col)
+                col+=1
+                self.map_layout.addWidget(model_widget, 0, col)
+                col+=1
+                self.map_layout.addWidget(type_widget, 0, col)
+                col+=1
+                self.map_layout.addWidget(community_widget, 0, col)
+                col+=1
+                self.map_layout.addWidget(aircraft_widget, 0, col)
+                col+=1
 
                 row+=1
-                continue
+                
 
             
              # selector
-            row_selector = ui_common.QRowSelectorFrame(selected = item.selected)
+            row_selector = gremlin.ui.ui_common.QRowSelectorFrame(selected = item.selected)
             row_selector.setMinimumHeight(30)
             row_selector.selected_changed.connect(self._row_selector_clicked_cb)
-            selected_widget = ui_common.QDataCheckbox(data = (item, row_selector))
+            selected_widget = gremlin.ui.ui_common.QDataCheckbox(data = (item, row_selector))
             selected_widget.setChecked(item.selected)
             selected_widget.checkStateChanged.connect(self._selected_changed_cb)
             row_selector.data = ((item, selected_widget))
 
             # aicraft display
-            self.display_header_widget = ui_common.QDataLineEdit(data = (item, selected_widget))
+            self.display_header_widget = gremlin.ui.ui_common.QDataLineEdit(data = (item, selected_widget))
             self.display_header_widget.setReadOnly(True)
             self.display_header_widget.setText(item.display_name)
             self.display_header_widget.installEventFilter(self)
-            w = len(item.display_name)*char_width
+            w = len(item.display_name)* self._char_width
             if w > display_width:
                 display_width = w
 
+
+            name_widget = gremlin.ui.ui_common.QDataLineEdit(data = (item, selected_widget))
+            name_widget.setReadOnly(True)
+            if item.sim_name:
+                name_widget.setText(item.sim_name)
+            name_widget.installEventFilter(self)    
+
             # manufacturer
-            manufacturer_widget = ui_common.QDataLineEdit(data = (item, selected_widget))
+            manufacturer_widget = gremlin.ui.ui_common.QDataLineEdit(data = (item, selected_widget))
             manufacturer_widget.setReadOnly(True)
             manufacturer_widget.setText(item.icao_manufacturer)
             manufacturer_widget.installEventFilter(self)
 
             # model
-            model_widget = ui_common.QDataLineEdit(data = (item, selected_widget))
+            model_widget = gremlin.ui.ui_common.QDataLineEdit(data = (item, selected_widget))
             model_widget.setReadOnly(True)
             model_widget.setText(item.icao_model)
             model_widget.installEventFilter(self)
 
             # type
-            type_widget = ui_common.QDataLineEdit(data = (item, selected_widget))
+            type_widget = gremlin.ui.ui_common.QDataLineEdit(data = (item, selected_widget))
             type_widget.setReadOnly(True)
             type_widget.setText(item.icao_type)
             type_widget.installEventFilter(self)
 
             # community folder
-            community_widget = ui_common.QDataLineEdit(data = (item, selected_widget))
+            community_widget = gremlin.ui.ui_common.QDataLineEdit(data = (item, selected_widget))
             community_widget.setReadOnly(True)
             community_widget.setText(item.community_path)
             community_widget.installEventFilter(self)
 
             # aircraft folder
-            aircraft_widget = ui_common.QDataLineEdit(data = (item, selected_widget))
+            aircraft_widget = gremlin.ui.ui_common.QDataLineEdit(data = (item, selected_widget))
             aircraft_widget.setReadOnly(True)
             aircraft_widget.setText(item.aircraft_path)
             aircraft_widget.installEventFilter(self)
@@ -1263,7 +1501,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
        
 
             # mode drop down
-            mode_selector = ui_common.QDataComboBox(data = (item, selected_widget))
+            mode_selector = gremlin.ui.ui_common.QDataComboBox(data = (item, selected_widget))
 
    
 
@@ -1286,15 +1524,27 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
             spacer.setMinimumWidth(3)
             spacer.installEventFilter(self)
             
-            self.map_layout.addWidget(spacer, row, 1)
-            self.map_layout.addWidget(selected_widget, row, 2)
-            self.map_layout.addWidget(self.display_header_widget, row, 3 )
-            self.map_layout.addWidget(mode_selector, row, 4 )
-            self.map_layout.addWidget(manufacturer_widget,row, 5 )
-            self.map_layout.addWidget(model_widget,row, 6)
-            self.map_layout.addWidget(type_widget,row, 7)
-            self.map_layout.addWidget(community_widget,row, 8)
-            self.map_layout.addWidget(aircraft_widget,row, 9)
+            col = 1
+            self.map_layout.addWidget(spacer, row, col)
+            col +=1
+            self.map_layout.addWidget(selected_widget, row, col)
+            col +=1
+            self.map_layout.addWidget(self.display_header_widget, row, col)
+            col +=1
+            self.map_layout.addWidget(name_widget, row, col)
+            col +=1
+            self.map_layout.addWidget(mode_selector, row, col)
+            col +=1
+            self.map_layout.addWidget(manufacturer_widget,row, col)
+            col +=1
+            self.map_layout.addWidget(model_widget,row, col)
+            col +=1
+            self.map_layout.addWidget(type_widget,row, col)
+            col +=1
+            self.map_layout.addWidget(community_widget,row, col)
+            col +=1
+            self.map_layout.addWidget(aircraft_widget,row, col)
+            col +=1
 
             spacer = QDataWidget()
             spacer.installEventFilter(self)
@@ -1307,6 +1557,139 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
         self.map_layout.setColumnStretch(3,2)
         self.map_layout.setColumnMinimumWidth(3, display_width)
+
+
+
+    def _update_manual_list(self):
+        ''' updates the manual user entries '''
+
+        # manual entries
+        # clear the widgets
+        gremlin.ui.ui_common.clear_layout(self.manual_map_layout)
+        if not self.options._aircraft_manual_definitions:
+            missing = QtWidgets.QLabel("No manual mappings found.")
+            missing.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
+            self.manual_map_layout.addWidget(missing)
+            return
+        
+
+        # headers
+
+
+        row = 0
+        for item in self.options._aircraft_manual_definitions:
+
+            if row == 0:
+
+
+                row_selector = gremlin.ui.ui_common.QRowSelectorFrame()
+                row_selector.setSelectable(False)
+                spacer = QDataWidget()
+                spacer.setMinimumWidth(3)
+
+                select_widget = QtWidgets.QCheckBox()
+                select_widget.clicked.connect(self._global_selected_changed_cb)
+                select_widget.setToolTip("Select/Deselect All")
+
+
+                sim_name_widget = QtWidgets.QLabel("Sim Name")
+                mode_widget = QtWidgets.QLabel("Mode")
+
+
+                self.manual_map_layout.addWidget(row_selector, 0, 0, 1, -1)
+                
+                col = 1
+                self.manual_map_layout.addWidget(spacer, 0, col)
+                col += 2
+                self.manual_map_layout.addWidget(sim_name_widget, 0, col)
+                col += 1
+                self.manual_map_layout.addWidget(mode_widget, 0, col)
+                row +=1 
+                
+
+
+
+            # selector
+            row_selector = gremlin.ui.ui_common.QRowSelectorFrame(selected = item.selected)
+            row_selector.setMinimumHeight(30)
+            row_selector.selected_changed.connect(self._row_selector_clicked_cb)
+            selected_widget = gremlin.ui.ui_common.QDataCheckbox(data = (item, row_selector))
+            selected_widget.setChecked(item.selected)
+            selected_widget.checkStateChanged.connect(self._selected_changed_cb)
+            row_selector.data = ((item, selected_widget))
+
+            name_widget = gremlin.ui.ui_common.QDataLineEdit(data = (item, selected_widget))
+            if item.sim_name:
+                name_widget.setText(item.sim_name)
+            name_widget.valueChanged.connect(self._name_changed_cb)
+            name_widget.installEventFilter(self) 
+
+            # mode drop down
+            mode_selector = gremlin.ui.ui_common.QDataComboBox(data = (item, selected_widget))
+   
+
+            for display_mode, mode in self.mode_pair_list:
+                mode_selector.addItem(display_mode, mode)
+
+            profile = gremlin.shared_state.current_profile
+            default_mode = profile.get_default_mode()
+            mode = profile.getSimconnectMode(item.key)
+            if not mode:
+                mode = default_mode
+
+            index = mode_selector.findData(mode)
+            mode_selector.setCurrentIndex(index)
+            mode_selector.currentIndexChanged.connect(self._mode_selector_changed_cb)
+            self._manual_mode_selector_map[item] = mode_selector
+            self._manual_selected_cb_map[item] = selected_widget
+
+            spacer = QDataWidget()
+            spacer.setMinimumWidth(3)
+            spacer.installEventFilter(self)
+            
+            self.manual_map_layout.addWidget(row_selector, row , 0 , 1, -1)
+            col = 1
+            self.manual_map_layout.addWidget(spacer, row, col)
+            col +=1
+            self.manual_map_layout.addWidget(selected_widget, row, col)
+            col +=1
+            self.manual_map_layout.addWidget(name_widget, row, col)
+            col +=1
+            self.manual_map_layout.addWidget(mode_selector, row, col)
+            col +=1
+
+            self._selected_cb_map[item] = selected_widget
+    
+
+    @QtCore.Slot(str)
+    def _name_changed_cb(self):
+        widget = self.sender()
+        data = widget.data
+        item, _ = data
+        item.sim_name = widget.text()
+
+    def _populate_ui(self):
+        ''' populates the map of aircraft to profile modes '''
+
+        from gremlin.ui import ui_common
+        self.options.validate()
+
+        # current aircraft
+        self._update_current_aircraft()
+
+        self._update_scanned_list()
+        self._update_manual_list()
+
+
+        # mode locking is only enabled if auto mode change enabled
+        self._auto_mode_lock.setEnabled(self._auto_mode_switch.isChecked())
+
+
+
+
+       
+
+      
 
 
         gremlin.util.popCursor()
@@ -1403,6 +1786,8 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
                     mode_index = selector.findData(mode)
                 selector.setCurrentIndex(mode_index)
 
+
+
     @QtCore.Slot()
     def _active_button_cb(self):
         widget = self.sender()
@@ -1456,8 +1841,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.action_data.events.range_changed.connect(self._action_range_changed)
         
 
-        handler = SimConnectEventHandler()
-        self._simconnect = handler.simconnect
+        self._simconnect = SimConnectManager().simconnect
 
         # handler to update curve widget if displayed
         self.curve_update_handler = None
@@ -1504,7 +1888,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         # list of possible events to trigger
         self._command_selector_widget = gremlin.ui.ui_common.QComboBox()
-        self._command_list = self.action_data.smd.get_command_name_list()
+        self._command_list = self.action_data._manager.get_command_name_list()
         self._command_selector_widget.setEditable(True)
         self._command_selector_widget.addItems(self._command_list)
         self._command_selector_widget.currentIndexChanged.connect(self._command_changed_cb)
@@ -1977,12 +2361,13 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _show_options_dialog_cb(self):
         ''' displays the simconnect options dialog'''
+        from action_plugins.map_to_simconnect.SimConnectManager import SimConnectManager
         profile = gremlin.shared_state.current_profile
         profile_file = profile.profile_file
         if not profile_file or not os.path.isfile(profile_file):
             gremlin.ui.ui_common.MessageBox(prompt="Please save the current profile before accessing Simconnect options.")
             return 
-        dialog = SimconnectOptionsUi(self._simconnect)
+        dialog = SimconnectOptionsUi(SimConnectManager().simconnect)
         dialog.exec()
 
 
@@ -2369,8 +2754,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         self.action_data : MapToSimConnect = action
         self.command = action.command # the command to execute
         self.value = action.value # the value to send (None if no data to send)
-        eh = SimConnectEventHandler()
-        self.manager : SimConnectManager = eh.manager
+        self.manager : SimConnectManager = SimConnectManager()
         self.valid = False
 
         # self.action_data.gate_data.process_callback = self.process_gated_event
@@ -2391,8 +2775,13 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         
         self.reconnect_timeout = 5
         self.last_reconnect_time = None
-        
 
+        
+        self.manager.reconnect()
+
+        # update the loaded aircraft so this sets the profile mode if needed
+        self.manager.request_loaded_aircraft()
+        
 
 
         
@@ -2547,8 +2936,9 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         self.parent = parent
         self.events = MapToSimConnectHelper()
 
-        eh = SimConnectEventHandler()
-        self.smd  = eh.manager
+        #eh = SimConnectEventHandler()
+        from .SimConnectManager import SimConnectManager
+        self._manager = SimConnectManager()
 
 
         self.input_type = self.get_input_type()
@@ -2641,7 +3031,7 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         ''' updates the data block with the current command '''
         if self._command is None:
             self._command = self._default_command()
-        self._block = self.smd.block(self._command)
+        self._block = self._manager.block(self._command)
 
    
     
@@ -2784,7 +3174,7 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         self.__dict__.update(state)
         # sm is not serialized, add it
         eh = SimConnectEventHandler()
-        self.smd = eh.manager
+        self._manager = eh.manager
 
 version = 1
 name = "map-to-simconnect"

@@ -951,8 +951,8 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
                             device_guid = device_guid,
                             identifier= input_id
                     )
-                    device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
-                    print (f"Added extra functor: {device_name} mode: {mode} event: {str(event)} ")
+                    # device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
+                    # print (f"Added extra functor: {device_name} mode: {mode} event: {str(event)} ")
                     eh.add_latched_functor(device_guid, mode, event, functor)
                 
 

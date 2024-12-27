@@ -123,10 +123,10 @@ class MapToKeyboardFunctor(gremlin.base_profile.AbstractFunctor):
     def process_event(self, event, value):
         if value.current:
             gremlin.macro.MacroManager().queue_macro(self.press)
-            print("press")
+            # print("press")
 
             if self.needs_auto_release:
-                print ("auto release event ")
+                # print ("auto release event ")
                 event_release = event.clone()               
                 event_release.is_pressed = False
                 ButtonReleaseActions().register_callback(
@@ -135,7 +135,7 @@ class MapToKeyboardFunctor(gremlin.base_profile.AbstractFunctor):
                 )
         else:
             if not self.needs_auto_release:
-                print ("release")
+                # print ("release")
                 gremlin.macro.MacroManager().queue_macro(self.release)
         return True
 

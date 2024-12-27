@@ -326,6 +326,8 @@ class SIMCONNECT_CLIENT_EVENT_ID(AutoName):  # client-defined client event ID
 	EVENT_SIM_UNPAUSED = auto()
 	EVENT_SIM_RUNNING = auto()
 	EVENT_SIM_AIRCRAFT_LOADED = auto()
+	EVENT_SIM_PAUSE_STATE = auto()
+	
 	pass
 
 

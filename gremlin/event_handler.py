@@ -960,8 +960,8 @@ class EventListener(QtCore.QObject):
 			key_id = (event.button_id.value + 0x1000, False)
 			self._keyboard_state[key_id] = event.is_pressed
 
-			if event.is_pressed:
-				print(f"mouse pressed {event.button_id}")
+			# if event.is_pressed:
+			# 	print(f"mouse pressed {event.button_id}")
 
 			self.mouse_event.emit(Event(
 				event_type= InputType.Mouse,

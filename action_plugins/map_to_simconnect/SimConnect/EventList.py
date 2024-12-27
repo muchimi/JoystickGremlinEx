@@ -6,8 +6,9 @@ class Event(object):
 	def __call__(self, value=0):
 		if self.event is None:
 			self.event = self.sm.map_to_sim_event(self.deff)
-		syslog.info(f"send {self.description} {value}")
-		self.sm.send_event(self.event, DWORD(int(value)))
+		if self.sm._dll:
+			syslog.info(f"Simcnnect: send {self.description} {value}")
+			self.sm.send_event(self.event, DWORD(int(value)))
 
 	def __init__(self, definition, sm, description=''):
 		self.deff = definition

@@ -47,11 +47,12 @@ from qtpy.QtCore import (
 
 from qtpy.QtWidgets import QCheckBox
 from qtpy.QtGui import QColor, QBrush, QPaintEvent, QPen, QPainter
-
 from gremlin.util import load_pixmap, load_icon
 import gremlin.util
-
+import gremlin.ui.ui_common
 from gremlin.singleton_decorator import SingletonDecorator
+
+
 
 class WidgetTracker():
 
@@ -151,7 +152,7 @@ class StateTracker():
             self._button_cache[device_guid][input_type] = {}
         key = self._key(input_id)
         assert key
-        print (f"Add button {key}")
+        # print (f"Add button {key}")
         self._button_cache[device_guid][input_type][key] = widget
 
     def unregisterButtonState(self, device_guid, input_type, input_id):
@@ -161,7 +162,7 @@ class StateTracker():
             if input_type in self._button_cache[device_guid]:
                 key = self._key(input_id)
                 if key in self._button_cache[device_guid][input_type]:
-                    print (f"Remove button {key}")
+                    # print (f"Remove button {key}")
                     del self._button_cache[device_guid][input_type][key]
 
     def registerAxisState(self, widget, device_guid, input_type, input_id):
@@ -172,6 +173,8 @@ class StateTracker():
         if not input_type in self._axis_cache[device_guid]:
             self._axis_cache[device_guid][input_type] = {}
         key = self._key(input_id)
+        assert key
+        # print (f"Add axis {key}")
         self._axis_cache[device_guid][input_type][key] = widget
         
 
@@ -199,8 +202,11 @@ class StateTracker():
                     widget = self._button_cache[device_guid][input_type][key]
                     if widget.enabled:
                         widget._update_value(is_pressed)
-                else:
-                    print (f"Button not found: {key} - choices: {list(self._button_cache[device_guid][input_type].keys())}")
+                # else:
+                #     if not gremlin.shared_state.is_running:
+                #         # display only at edit mode
+                #         syslog = logging.getLogger("system")
+                #         syslog.debug (f"Button not found: {key} - choices: {list(self._button_cache[device_guid][input_type].keys())}")
                     
 
     
@@ -214,6 +220,12 @@ class StateTracker():
                     widget = self._axis_cache[device_guid][input_type][key]
                     if widget.enabled:
                         widget._update_value(value)
+                # else:
+                #     if not gremlin.shared_state.is_running:
+                #         # display only at edit mode
+                #         syslog = logging.getLogger("system")
+                #         syslog.debug (f"axis not found: {key} - choices: {list(self._axis_cache[device_guid][input_type].keys())}")
+                    
                         
     
     def getButtonWidget(self, device_guid, input_type, input_id):
@@ -1468,7 +1480,7 @@ class ModeWidget(QtWidgets.QWidget):
 
     def _manage_modes_cb(self):
         ''' calls up the mode change dialog '''
-        import gremlin.ui.ui_common
+        
         if not self.profile.profile_file or not os.path.isfile(self.profile.profile_file):
             gremlin.ui.ui_common.MessageBox(prompt = "Please save the profile before configuring modes.")
             return
@@ -2272,6 +2284,13 @@ class ButtonStateWidget(QtWidgets.QWidget):
 
     def __init__(self, parent = None):
         super().__init__(parent)
+
+
+        self.setContentsMargins(0,0,0,0)
+        self.main_layout = QtWidgets.QHBoxLayout(self)
+        self.main_layout.setSpacing(0)
+        self.main_layout.setContentsMargins(0,0,0,0)
+
         icon_size = QtCore.QSize(16,16)
         self._device_guid = None
         self._input_id = None
@@ -2282,10 +2301,9 @@ class ButtonStateWidget(QtWidgets.QWidget):
         self._on_pixmap = on_icon.pixmap(icon_size)
         off_icon = load_icon("mdi.record",use_qta=True,qta_color="#979EA8")
         self._off_pixmap = off_icon.pixmap(icon_size)
-        self.main_layout = QtWidgets.QHBoxLayout(self)
-        self.main_layout.setSpacing(0)
+        self._button_widget.setMaximumHeight(icon_size.height())
+        
         self.main_layout.addWidget(self._button_widget)
-        self.setContentsMargins(0,0,0,0)
 
         self._handler_connected = False
         el = gremlin.event_handler.EventListener()
@@ -2411,13 +2429,20 @@ class AxisStateWidget(QtWidgets.QWidget):
         """
         super().__init__(parent)
 
+
         self._scale_factor = 1000
         if orientation == QtCore.Qt.Orientation.Vertical:
             self.main_layout = QtWidgets.QVBoxLayout(self)
         else:
             self.main_layout = QtWidgets.QHBoxLayout(self)
+            
+        self.setContentsMargins(0,0,0,0)
+        self.main_layout.setSpacing(0)
+        self.main_layout.setContentsMargins(0,0,0,0)
+        
 
         self._progress_widget = QtWidgets.QProgressBar(parent = self)
+        self._progress_widget.setContentsMargins(0,0,0,0)
         self._progress_widget.setOrientation(orientation)
         self._progress_widget.setTextVisible(False)
 
@@ -2439,7 +2464,7 @@ class AxisStateWidget(QtWidgets.QWidget):
         self.main_layout.addWidget(self._progress_widget)
         self.main_layout.addWidget(self._readout_widget)
         self.main_layout.addWidget(self._readout_curved_widget)
-        self.main_layout.addStretch()
+        
         self._min_range = -1.0
         self._max_range = 1.0
         self._device_guid = None
@@ -2460,8 +2485,10 @@ class AxisStateWidget(QtWidgets.QWidget):
         el.tab_selected.connect(self._tab_selected)
         el.tab_unselected.connect(self._tab_unselected)
 
-
-        self.main_layout.setSpacing(0)
+        if orientation == QtCore.Qt.Orientation.Horizontal:
+            self.main_layout.addStretch()
+            
+        
 
     def _cleanup_ui(self):
         ''' item is being deleted '''
@@ -2663,15 +2690,18 @@ class AxisStateWidget(QtWidgets.QWidget):
         if self._handler_connected:
             # already connected
             return
-        syslog = logging.getLogger("system")
+        
         device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
         if isinstance(device_guid, str):
             device_guid = gremlin.util.parse_guid(device_guid)
-        el = gremlin.event_handler.EventListener()
+        
         if self._device_guid == device_guid:
             # connect the handler
             input_id = self._input_id
-            # syslog.info(f"AxisState: {device_name} axis {input_id} connect")
+            verbose = gremlin.config.Configuration().verbose_mode_inputs
+            if verbose: 
+                syslog = logging.getLogger("system")
+                syslog.info(f"AxisState: {device_name} axis {str(input_id)} connect")
             _state_tracker.registerAxisState(self, self._device_guid, self._input_type, self._input_id)
             self._handler_connected = True
 
@@ -4309,6 +4339,8 @@ class QSplitTabWidget(QDataWidget):
     def __init__(self, parent = None):
         super().__init__(parent)
 
+        self._lock = False
+
         self.main_layout = QtWidgets.QVBoxLayout(self)
 
         self._content_widget = QContentWidget()
@@ -4366,7 +4398,11 @@ class QSplitTabWidget(QDataWidget):
 
     def _cleanup_ui(self):
         ''' remove '''
-        _tabsplitter_tracker.unregisterWidget(self)
+        if not self._lock:
+            self._lock = True
+            _tabsplitter_tracker.unregisterWidget(self)
+            self._lock = False
+
 
 
 

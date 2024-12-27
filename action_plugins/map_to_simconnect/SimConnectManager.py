@@ -32,6 +32,7 @@ import gremlin.ui.ui_common
 import gremlin.ui.input_item
 import gremlin.util
 from .SimConnect import *
+from .SimConnect.SimConnect import *
 from .SimConnect.Enum import *
 from gremlin.singleton_decorator import SingletonDecorator
 import enum
@@ -239,14 +240,6 @@ _trigger_mode_to_enum = {
 
 
 
-class RangeEvent():
-    def __init__(self):
-
-        self.min = 0
-        self.min_custom = 0
-        self.max = 0
-        self.max_custom = 0
-
 
 
 class OutputType(enum.Enum):
@@ -414,9 +407,15 @@ _simconnect_event_category_to_enum_lookup = {
 class SimConnectManager(QtCore.QObject):
     ''' holds simconnect data and manages simconnect '''
 
-    aircraft_loaded = QtCore.Signal(str, str) # fires when aircraft title changes (param folder, title)
+    sim_aircraft_loaded = QtCore.Signal(str, str, str) # fires when aircraft title changes (param folder, name, title)
+    sim_start = QtCore.Signal() # fires when the sim starts
+    sim_stop = QtCore.Signal() # fires when the sim stops
+    sim_running = QtCore.Signal(bool) # fires when the sim is running
+    sim_paused = QtCore.Signal(bool) # fires when sim is paused or unpaused (state = pause state)
+    
+    
     sim_state = QtCore.Signal(int, float, str) # fires when sim state data changes (depends on the state )
-    _aircraft_loaded_internal = QtCore.Signal(str) # fires when aircraft title changes
+    _aircraft_loaded_internal = QtCore.Signal(str, str) # fires when aircraft (name, title)
 
     def __init__(self) -> None:
         ''' manages simconnect connections and interactions 
@@ -430,38 +429,34 @@ class SimConnectManager(QtCore.QObject):
         el = gremlin.event_handler.EventListener()
         el.shutdown.connect(self._shutdown) # trap application shutdown
 
-        
-
         self.verbose = gremlin.config.Configuration().verbose_mode_simconnect
 
         self._sm = None
 
         handler = SimConnectEventHandler()
-
-        sm = SimConnect(handler, auto_connect = False,
-                        verbose = gremlin.config.Configuration().verbose_mode_simconnect,
-                        sim_paused_callback=self._sim_paused_cb,
-                        sim_running_callback = self._sim_running_cb,
-                        aircraft_loaded_callback= self._aicraft_loaded_cb,
-                        state_callback=self._state_data_cb,  # receives requested state data 
-
-                        )
+        
+        sm = SimConnect(handler, auto_connect = False)
         self._sm : SimConnect = sm
 
-        handler.simconnect_connected.connect(self._connected)
-        handler.simconnect_disconnected.connect(self._disconnected)
-        handler.simconnect_sim_paused.connect(self._paused)
-        handler.simconnect_sim_unpaused.connect(self._unpaused)
-        handler.simconnect_sim_running.connect(self._running)
-        handler.simconnect_sim_start.connect(self._start)
-        handler.simconnect_sim_stop.connect(self._stop)
+        handler.simconnect_aircraft_loaded.connect(self._aicraft_loaded_cb)
+        handler.simconnect_connected.connect(self._connected_cb)
+        handler.simconnect_disconnected.connect(self._disconnected_cb)
+        handler.simconnect_sim_paused.connect(self._sim_paused_cb)
+        # handler.simconnect_sim_paused.connect(self._paused)
+        # handler.simconnect_sim_unpaused.connect(self._unpaused)
+        handler.simconnect_sim_running.connect(self._running_cb)
+        handler.simconnect_sim_start.connect(self._start_cb)
+        handler.simconnect_sim_stop.connect(self._stop_cb)
+        
 
         self._aircraft_events = AircraftEvents(self._sm)
         self._aircraft_requests = AircraftRequests(self._sm)
         self._aircraft_loaded_internal.connect(self._aircraft_loaded_internal_cb)
+        
 
 
         self._aircraft_tile = None # current title from aircraft.cfg
+        self._aircraft_name = None # current name from aicraft cfg path
         self._simvars_xml =  os.path.join(gremlin.util.userprofile_path(), "simconnect_simvars.xml")
         self._lvars_xml = os.path.join(gremlin.util.userprofile_path(), "simconnect_lvars.xml")
 
@@ -474,6 +469,7 @@ class SimConnectManager(QtCore.QObject):
         self._is_connected = False
         self._is_running = False
         self._aircraft_folder = None
+        self._aircraft_title = None
 
         self._registered_feed_blocks = {}
         self._registered_requests = {}
@@ -553,8 +549,7 @@ class SimConnectManager(QtCore.QObject):
 
         if len(self._block_map) > 0:
             # process lists
-            b = SimConnectBlock()
-            
+            #b = SimConnectBlock
             self._commands = [b.command for b in self._block_map.values()]
             self._commands.sort()
 
@@ -618,6 +613,7 @@ class SimConnectManager(QtCore.QObject):
             self._registered_requests[key] = request
         
         return self._registered_requests[key]
+    
             
 
     def setSimvar(self, command, datatype, value):
@@ -636,7 +632,7 @@ class SimConnectManager(QtCore.QObject):
         
 
     @QtCore.Slot()
-    def _connected(self):
+    def _connected_cb(self):
         self._is_connected = True
         if self.verbose:
             syslog.info(f"Simconnect Event: connected")
@@ -644,42 +640,59 @@ class SimConnectManager(QtCore.QObject):
         self.setFeedEnabled(True)
 
     @QtCore.Slot()
-    def _disconnected(self):
+    def _disconnected_cb(self):
         self._is_connected = False
         if self.verbose:
             syslog.info(f"Simconnect Event: disconnected")
 
         self.setFeedEnabled(False)
 
+
+
+    @QtCore.Slot(bool)
+    def _paused_state_cb(self, state):
+        self._is_paused = state
+        self.sim_paused.emit(state)
+
     @QtCore.Slot()
-    def _paused(self):
+    def _paused_cb(self):
         self._is_paused = True
         if self.verbose:
             syslog.info(f"Simconnect Event: paused")
 
     @QtCore.Slot()
-    def _unpaused(self):
+    def _unpaused_cb(self):
         if self.verbose:
             self._is_paused = False
             syslog.info(f"Simconnect Event: unpaused")
 
     @QtCore.Slot()
-    def _start(self):
+    def _start_cb(self):
         if self.verbose:
             syslog.info(f"Simconnect Event: started")
             self._is_started = True
+            self.sim_start.emit()
+            # update the aircraft
+            self.request_loaded_aircraft()
 
     @QtCore.Slot()
-    def _stop(self):
+    def _stop_cb(self):
         if self.verbose:
             syslog.info(f"Simconnect Event: stopped")
             self._is_started = False
+            self.sim_stop.emit()
 
-    @QtCore.Slot()
-    def _running(self):
+    @QtCore.Slot(bool)
+    def _running_cb(self, state: bool):
         if self.verbose:
-            syslog.info(f"Simconnect Event: running")
-            self._is_running = True
+            syslog.info(f"Simconnect Event: running: {state}")
+            self._is_running = state
+            self.sim_running.emit(state)
+            if state:
+                self.sim_start.emit()
+            else:
+                self.sim_stop.emit()
+
 
     @property
     def is_connected(self):
@@ -699,6 +712,11 @@ class SimConnectManager(QtCore.QObject):
         return self._aircraft_tile
     
     @property
+    def current_aircraft_sim_name(self):
+        ''' currently loaded aircraft - TITLE from the aircraft.cfg file '''
+        return self._aircraft_name
+    
+    @property
     def current_aircraft_folder(self):
         ''' returns the path to the currently loaded folder '''
         return self._aircraft_folder    
@@ -716,11 +734,12 @@ class SimConnectManager(QtCore.QObject):
         self._is_running = state
 
 
-    def _aicraft_loaded_cb(self, folder):
-        ''' occurs when a new aircraft is loaded '''
+    def _aicraft_loaded_cb(self, folder, name):
+        ''' called when a new aircraft is loaded '''
         if folder != self._aircraft_folder:
             self._aircraft_folder = folder
-            self._aircraft_loaded_internal.emit(folder)
+            self._aircraft_name = name
+            self._aircraft_loaded_internal.emit(folder, name)
 
     def _state_data_cb(self, int_data, float_data, str_data):
         ''' occurs when state data is requested '''
@@ -729,29 +748,39 @@ class SimConnectManager(QtCore.QObject):
         str_data = str_data.casefold()
         if "aircraft.cfg" in str_data:
             self._aircraft_folder = str_data
-            self.aircraft_loaded.emit(str_data,None)
+            #self.sim_aircraft_loaded.emit(str_data,None)
 
         self.sim_state.emit(int_data, float_data, str_data)
 
 
-    def get_aircraft_title(self):
-        ar = AircraftRequests(self._sm)
-        trigger = ar.find("TITLE")
-        title = trigger.get()
-        if title:
-            title = title.decode()
-        self._aircraft_title = title
-        return title
+    def get_aircraft_title(self, force_update = False):
+        if not self._aircraft_tile or force_update:
+            self._aircraft_title = None
+            ar = AircraftRequests(self._sm)
+            trigger = ar.find("TITLE")
+            title = trigger.get()
+            if title:
+                title = title.decode()
+            self._aircraft_title = title
+        return self._aircraft_title
     
-    def update_aircraft_folder(self):
+    def request_loaded_aircraft(self):
         ''' gets the current aircraft data '''
-        self._sm.get_aircraft_loaded()
+        if self._aircraft_name:
+            return self._aircraft_name
+        self._sm.requestAircraftLoaded()
 
 
-    def _aircraft_loaded_internal_cb(self, folder):
+
+    def _aircraft_loaded_internal_cb(self, folder, name):
         # decode the data into useful bits
-        title = self.get_aircraft_title()
-        self.aircraft_loaded.emit(folder, title)
+        syslog = logging.getLogger("system")
+        title = self.get_aircraft_title(True)
+        self._aircraft_tile = title
+        self._aircraft_folder = folder
+        self._aircraft_name = name
+        syslog.info(f"Simconnect (mgr): sim aircraft loaded event: {title}/{name}")
+        self.sim_aircraft_loaded.emit(folder, name, title)
 
 
 
@@ -772,6 +801,11 @@ class SimConnectManager(QtCore.QObject):
             # attempt to reconnect
             self.reconnect(True)
         return self._sm.ok
+    
+    @property
+    def connected(self) -> bool:
+        ''' true if GremlinEx is connected to the simulator '''
+        return self._sm.ok
 
     @property
     def simconnect(self) -> SimConnect:
@@ -781,33 +815,29 @@ class SimConnectManager(QtCore.QObject):
 
     def reconnect(self, force_retry = False):
         # not connected
-        if not self.is_running:
+        if not self.connected:
             try:
                 if force_retry or self._connect_attempts > 0:
                     if self._connect_attempts > 0:
                         self._connect_attempts -= 1
                         time.sleep(0.5)
                     self._sm.connect()
-                    
-                    
-                syslog.info("Simconnect: connected to simulator")
+               
             except:
                 pass
-        else:
-            # already connected
-            return True
 
-        if not self._sm.ok:
-            if self._connect_attempts == 0 and gremlin.shared_state.is_running:
-                syslog.error("Simconnect: failed to connect to simulator - terminating profile")
-                # request the profile to stop
-                eh = gremlin.event_handler.EventListener()
-                eh.request_profile_stop.emit()
-            return False
+            if not self._sm.ok:
+                if self._connect_attempts == 0 and gremlin.shared_state.is_running:
+                    syslog.error("Simconnect: failed to connect to simulator - terminating profile")
+                    # request the profile to stop
+                    eh = gremlin.event_handler.EventListener()
+                    eh.request_profile_stop.emit()
+                return False
+            
+            else:
+                syslog.info("Simconnect: connected to simulator")
 
-        # on connection - grab the current aircraft da
-        title = self.get_aircraft_title()
-        self._aircraft_title = title
+
 
 
         return True # connected  
@@ -1206,9 +1236,7 @@ class SimConnectManager(QtCore.QObject):
 
     def ensure_running(self):
         ''' ensure simconnect is connected '''
-        if not self._sm.ok:
-            return False
-        return self._sm.running
+        return self._sm.is_connected()
 
     def get_category_list(self):
         ''' returns the list of supported command categories '''
@@ -1294,44 +1322,6 @@ class SimConnectManager(QtCore.QObject):
         # done    
         event.data = retval
         event.set()
-
-    
-class SimConnectEvent:
-    ''' holds event data for the simconnect_event signal '''
-    def __init__(self, command: str = None, value = None):
-        self.command = command
-        self.value = value
-
-
-
-@gremlin.singleton_decorator.SingletonDecorator
-class SimConnectEventHandler(QtCore.QObject):
-    ''' handles events related to simconnect '''
-    range_changed = QtCore.Signal(object, RangeEvent) # fires when the block range values change (block, event)
-    value_changed = QtCore.Signal(object) # fires when the block output value changes (block)
-    request_connect = QtCore.Signal() # request simconnect to connect
-    request_disconnect = QtCore.Signal() # request simconnect to disconnect
-    simconnect_connected = QtCore.Signal() # sim connected
-    simconnect_disconnected = QtCore.Signal() # sim disconnected
-    simconnect_sim_start = QtCore.Signal() # sim started
-    simconnect_sim_stop = QtCore.Signal() # sim stopped
-    simconnect_sim_paused = QtCore.Signal() # sim paused
-    simconnect_sim_unpaused = QtCore.Signal() # sim unpaused
-    simconnect_sim_running = QtCore.Signal() # sim running
-    simconnect_aircraft_loaded = QtCore.Signal(str) # sim aircraft loaded (sends what was loaded)
-    simconnect_event = QtCore.Signal(SimConnectEvent) # fires when we get a Simconnect data value notice
-
-    def __init__(self):
-        super().__init__()
-
-    @property
-    def manager(self):
-        return SimConnectManager()
-        
-    @property
-    def simconnect(self):
-        return SimConnectManager().simconnect
-    
 
 class SimConnectBlock():
     ''' holds simconnect block information '''

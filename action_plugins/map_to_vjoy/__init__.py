@@ -2710,7 +2710,7 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
                                                         self.hardware_input_id)
             else:
                 value = self.hardware_input_id.axis_value
-                print (value)
+                # print (value)
                 
 
             if curves:

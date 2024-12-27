@@ -108,12 +108,14 @@ class InputIdentifier(QtCore.QObject):
     @property
     def is_axis(self) -> bool:
         ''' true if this item is setup as an axis input (linear) '''
+        if self._input_id and hasattr(self._input_id, "is_axis"):
+            return self._input_id.is_axis
         return self._is_axis
 
     @property
     def is_button(self) -> bool:
         ''' true if this item is setup as an button input (momentary) '''
-        return not self._is_axis
+        return not self.is_axis
     
 class InputItemListModel(ui_common.AbstractModel):
 
@@ -1037,26 +1039,35 @@ class InputItemWidget(QtWidgets.QFrame):
         super().__init__()
         self.parent = parent
 
+        self.setFrameShape(QtWidgets.QFrame.Box)
         self.main_layout = QtWidgets.QVBoxLayout(self)
+        self.main_layout.setContentsMargins(0,0,0,0)
         self.main_layout.setSpacing(0)
         self.setObjectName("main_layout")
-        self.main_layout.setContentsMargins(8,2,2,2)
+        self.setContentsMargins(1,1,1,1)
 
         self._container_widget = QtWidgets.QWidget()
         self._container_layout = QtWidgets.QGridLayout(self._container_widget)
+        #self._container_widget.setStyleSheet("background: yellow;")
         self._container_widget.setContentsMargins(0,0,0,0)
         self._container_layout.setContentsMargins(0,0,0,0)
+        self._container_layout.setSpacing(0)
 
         self._title_container_widget = QtWidgets.QWidget()
         self._title_container_layout = QtWidgets.QGridLayout(self._title_container_widget)
+        #self._title_container_widget.setStyleSheet("background: red;")
         self._title_container_widget.setContentsMargins(0,0,0,0)
         self._title_container_layout.setContentsMargins(0,0,0,0)
-        self._title_container_layout.setVerticalSpacing(0)
+        self._title_container_layout.setSpacing(0)
 
         self.identifier = identifier
+        self._input_id = identifier.input_id
+        if hasattr(self._input_id, "input_mode_changed"):
+            # hook identifiers that can change mode from axis to button or vice versa so the repeaters match
+            self._input_id.input_mode_changed.connect(self._update_repeater)
         self._device_guid = identifier.device_guid
         self._input_type = identifier.input_type
-        self._input_id = identifier.input_id
+        
 
         self.data = data
         self._selected = False
@@ -1068,11 +1079,14 @@ class InputItemWidget(QtWidgets.QFrame):
         self._update_callback = update_callback # callback to use when a specific widget index must be updated
 
         self._title_widget = gremlin.ui.ui_common.QIconLabel()
+        self._title_widget.setContentsMargins(0,0,0,0)
         self._title_widget.setText("Input Not configured")
         self._title_widget.setObjectName("title")
         
         self._icon_widget = QtWidgets.QWidget()
         self._icon_layout = QtWidgets.QHBoxLayout(self._icon_widget)
+        self._icon_widget.setContentsMargins(0,0,0,0)
+        self._icon_layout.setContentsMargins(0,0,0,0)
         self._icons = []
    
         # top row
@@ -1083,7 +1097,8 @@ class InputItemWidget(QtWidgets.QFrame):
 
         self._data = data # InputItem
 
-        self.setFrameShape(QtWidgets.QFrame.Box)
+        
+        
 
         # icons
         self._curve_icon_inactive = load_icon("mdi.chart-bell-curve",qta_color="gray")
@@ -1166,11 +1181,15 @@ class InputItemWidget(QtWidgets.QFrame):
         
         self._description_widget = gremlin.ui.ui_common.QIconLabel(use_wrap=False)
         self._description_widget.setObjectName("description")
+        self._description_widget.setContentsMargins(0,0,0,0)
+
         #self._description_widget.setTextMinWidth(280)
         
         self._comment_widget = gremlin.ui.ui_common.QIconLabel(use_wrap=False)
         self._comment_widget.setObjectName("comment")
         self._comment_widget.setTextMinWidth(280)
+        self._comment_widget.setContentsMargins(0,0,0,0)
+        #self._comment_widget.setStyleSheet("Background: blue;")
 
         self._input_description_widget =gremlin.ui.ui_common.QIconLabel(use_wrap = False)
         self._input_description_widget.setObjectName("input_description")
@@ -1187,32 +1206,15 @@ class InputItemWidget(QtWidgets.QFrame):
 
         self._container_input_axis_widget = QtWidgets.QWidget()
         self._container_input_axis_layout = QtWidgets.QHBoxLayout(self._container_input_axis_widget)
-        self._container_input_axis_widget.setContentsMargins(0,0,0,0)
+        self._container_input_axis_widget.setContentsMargins(8,0,0,0)
         self._container_input_axis_layout.setContentsMargins(0,0,0,0)
         
-        config = gremlin.config.Configuration()
+        
         self.axis_widget = None
         self.button_widget = None
 
-
-        if config.show_input_axis and (self.identifier.is_axis or self.identifier.is_button or self.identifier.input_type in (InputType.JoystickAxis, InputType.JoystickButton)):
-            
-            state_widget = gremlin.ui.ui_common.StateTracker()
-            if self.identifier.is_axis:
-                widget = gremlin.ui.ui_common.AxisStateWidget(show_label = False, orientation=QtCore.Qt.Orientation.Horizontal, show_percentage=False)
-                self.axis_widget = widget
-
-            else:
-                widget = gremlin.ui.ui_common.ButtonStateWidget()
-                self.button_widget = widget
-                
-
-            widget.setMaximumWidth(200)
-            widget.hookDevice(identifier.device_guid, identifier.input_type, identifier.input_id)
-            self._container_input_axis_layout.addWidget(widget)
-            self._container_input_axis_layout.addStretch()
-            
-            
+        self._update_repeater() # create the correct repeater widget
+        
 
         self._container_input_axis_layout.addWidget(self._curve_container_widget)
         self.main_layout.addWidget(self._container_input_axis_widget)
@@ -1222,14 +1224,18 @@ class InputItemWidget(QtWidgets.QFrame):
 
             self.custom_container_widget = QtWidgets.QWidget() 
             self.custom_container_widget.setContentsMargins(0,0,0,0)
-            self.custom_container_widget.setMaximumHeight(32)
+            #self.custom_container_widget.setMaximumHeight(32)
+            self.custom_container_widget.setVisible(False)
+            
             # the layout is set in populate UI
             self.populate_ui(self, self.custom_container_widget, self.data)
         else:
             self.custom_container_widget = None
 
         if self.custom_container_widget:
+            #self.custom_container_widget.setStyleSheet("background: purple")
             self._container_layout.addWidget(self.custom_container_widget,self._row_custom_content,0) # custom container
+            
         
        
         curve_visible = self.identifier.input_type == InputType.JoystickAxis
@@ -1253,6 +1259,58 @@ class InputItemWidget(QtWidgets.QFrame):
 
         if hasattr(identifier.input_id,"message_key_changed"):
             identifier.input_id.message_key_changed.connect(self._message_key_changed)
+
+    def _update_repeater(self):
+        ''' updates the repeaters based on the type of widget '''
+        
+        config = gremlin.config.Configuration()
+        remove_axis = False
+        remove_button = False
+        current_axis_widget = self.axis_widget
+        current_button_widget = self.button_widget
+        
+        widget = None # widget created for the repeater
+
+        if config.show_input_axis and (self.identifier.is_axis or self.identifier.is_button or self.identifier.input_type in (InputType.JoystickAxis, InputType.JoystickButton)):
+            
+            if self.identifier.is_axis:
+                # axis
+                if not current_axis_widget:
+                    widget = gremlin.ui.ui_common.AxisStateWidget(show_label = False, orientation=QtCore.Qt.Orientation.Horizontal, show_percentage=False)
+                    self.axis_widget = widget
+                # remove button widget if we changed modes
+                if self.button_widget:
+                    remove_button = True
+
+            else:
+                # button
+                if not current_button_widget:
+                    widget = gremlin.ui.ui_common.ButtonStateWidget()
+                    self.button_widget = widget
+
+                # remove axis widget if we changed modes
+                if self.axis_widget:
+                    remove_axis = True
+                
+
+                
+        if current_axis_widget and remove_axis:
+            current_axis_widget.unhookDevice()
+            gremlin.util.clear_layout(self._container_input_axis_layout)
+            self.axis_widget = None
+
+        if current_button_widget and remove_button:
+            current_button_widget.unhookDevice()
+            gremlin.util.clear_layout(self._container_input_axis_layout)
+            self.button_widget = None
+               
+
+        if widget:
+            # widget created
+            widget.setMaximumWidth(200)
+            widget.hookDevice(self.identifier.device_guid, self.identifier.input_type, self.identifier.input_id)
+            self._container_input_axis_layout.addWidget(widget)                
+            self._container_input_axis_layout.addStretch()
 
 
     def _message_key_changed(self, old_message_key, new_message_key):

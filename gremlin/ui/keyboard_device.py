@@ -648,9 +648,10 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         layout = QtWidgets.QVBoxLayout(container_widget)
         self._status_widget = gremlin.ui.ui_common.QIconLabel(parent=container_widget)
+        self._status_widget.setContentsMargins(0,0,0,0)
         self._status_widget.setVisible(False)
         self._status_widget.setObjectName("status")
-        
+        layout.setSpacing(0)
         layout.setContentsMargins(0,0,0,0)
         layout.addWidget(self._status_widget)
         self._update_input_widget(input_widget, container_widget)

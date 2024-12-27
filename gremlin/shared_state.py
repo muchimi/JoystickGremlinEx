@@ -259,6 +259,23 @@ def load_state(id):
         return data
     return None
 
+
+# simconnect community folders
+community_folder = None
+def _get_simconnect_community_folder():
+    # Steam version
+    #self._community_folder = r"C:\Microsoft Flight Simulator\Community"
+    # Microsoft store version MSFS 2024: %appdata%\Local\Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache\Packages\Community
+    import os
+    app_data = os.getenv("LOCALAPPDATA")
+    global community_folder
+    # C:\Users\XXXXXX\AppData\Local\Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache\Packages\Community
+    community_folder = os.path.join(app_data, "Packages","Microsoft.Limitless_8wekyb3d8bbwe","LocalCache","Packages","Community")
+
+
+_get_simconnect_community_folder()
+
+
 _icon_path_cache = {}
 
 def _get_root_path():

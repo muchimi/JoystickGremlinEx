@@ -210,9 +210,10 @@ Joystick Gremlin EX
 ## 13.40.16ex (pre-release)
 
 ### (m50)
-- Improved: Reworked UI performance and device highlighting.
-- Improved: Simconnect automatic profile mode switch for aircraft changes as a new lock option to freeze the mode to a specific aircraft. This is necessary because GremlinEx has several options now to change modes (for different purposes and needs) that would change the mode outside of the profile (example, via a process focus change followed by a restore to default mode) and locking is a way to prevent this behavior.  This only impacts Simconnect.
-- New: Automatic backups of profiles on saving.  GremlinEx will save by default the last 5 profiles, named numerically based on the profile.  If more than five backups are found, the oldest one is removed.
+- Improved: Reworked UI logic to improve performance.  UI is significantly more responsive across the board especially when changing inputs or devices if the input was selected at least once.
+- Improved: UI Inputs now use less vertical space to reduce the height of the input list.
+- Improved: The Simconnect feature to automatically switch profile modes based on the current player aircraft has a new locking option to freeze the mode to a specific aircraft.  This is necessary because GremlinEx has several potentially conflicting options to change modes (for different purposes and needs).  The lock feature only impacts profiles using Simconnect and when automatic profile switching is enabled.  The idea of automatic profile mode switching is each aircraft can have its own mode, with unique mappings.
+- New: GremlinEx will now make automatic backups of profiles when saving a profile.  The last 5 profiles will be saved, and named numerically based on the profile. If more than five backups are found, the oldest one is removed.  The backups are saved to a folder named after the version of GremlinEx profile to make them easier to locate by version.  The log file will contain the backup file name whenever a profile is saved. 
 
 
 ### (m49)

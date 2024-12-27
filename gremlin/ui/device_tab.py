@@ -1034,7 +1034,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             if not widget:
                 # not in cache, create it and add to cache for this device/input combination
                 widget = InputItemConfiguration(item_data, parent = self)
-                print("not in cache")
+                # print("not in cache")
 
                 widget.action_model.data_changed.connect(self._create_change_cb(index))
                 widget.description_changed.connect(lambda x: self._description_changed_cb(index, x))
@@ -1047,8 +1047,8 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 self.inputChanged.emit(device_guid, input_type, input_id)
                 self._right_container_layout.addWidget(widget)       
                 self.widget_tracker.registerWidget(widget, self.device_guid, item_data.input_type, item_data.input_id, item_data.id)
-            else:
-                print("cached")
+            # else:
+            #     print("cached")
             
 
             if force_update:

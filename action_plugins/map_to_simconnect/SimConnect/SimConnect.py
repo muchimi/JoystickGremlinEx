@@ -24,6 +24,7 @@ import logging
 import time
 
 import gremlin.config
+import gremlin.shared_state
 import gremlin.util
 from .Enum import *
 from .Constants import *
@@ -262,19 +263,47 @@ class RequestHelper:
 
 
 
+class RangeEvent():
+    def __init__(self):
+
+        self.min = 0
+        self.min_custom = 0
+        self.max = 0
+        self.max_custom = 0
+
+class SimConnectEvent:
+    ''' holds event data for the simconnect_event signal '''
+    def __init__(self, command: str = None, value = None):
+        self.command = command
+        self.value = value
+
+
+
+@gremlin.singleton_decorator.SingletonDecorator
+class SimConnectEventHandler(QtCore.QObject):
+	''' handles events related to simconnect '''	
+	range_changed = QtCore.Signal(object, RangeEvent) # fires when the block range values change (block, event)
+	value_changed = QtCore.Signal(object) # fires when the block output value changes (block)
+	request_connect = QtCore.Signal() # request simconnect to connect
+	request_disconnect = QtCore.Signal() # request simconnect to disconnect
+	simconnect_connected = QtCore.Signal() # sim connected
+	simconnect_disconnected = QtCore.Signal() # sim disconnected
+	simconnect_sim_start = QtCore.Signal() # sim started
+	simconnect_sim_stop = QtCore.Signal() # sim stopped
+	simconnect_sim_paused = QtCore.Signal(bool) # sim pause (state)
+	simconnect_sim_running = QtCore.Signal(bool) # sim running (state)
+	simconnect_aircraft_loaded = QtCore.Signal(str, str) # sim aircraft loaded (folder, name) 
+	simconnect_event = QtCore.Signal(SimConnectEvent) # fires when we get a Simconnect data value notice
+	simconnect_state_changed = QtCore.Signal(int, float, str) # state change data (int, float, str)	
+
 class SimConnect():
 	''' MSFS simconnect interface '''
 
 
-	def __init__(self, handler, auto_connect=True, library_path=_library_path, verbose = False, 
-			  	sim_paused_callback = None, # sends sim paused flag
-				sim_running_callback = None, # send sim running flag
-				aircraft_loaded_callback = None, # sends received aircraft loaded data
-				state_callback = None, # sends received state data
-				):
+	def __init__(self, handler : SimConnectEventHandler, auto_connect=True, library_path=_library_path):
 		''' initializes sim connect 
 		
-		:param handler: SimConnectEventHandler
+		:param handler: SimConnectEventHandler - the handler to signals
 		
 		'''
 		
@@ -282,7 +311,6 @@ class SimConnect():
 		
 		self.Requests = {}
 		self.Facilities = []
-
 		self.verbose = gremlin.config.Configuration().verbose_mode_simconnect
 		self.verbose_details = False
 		self._library_path = library_path
@@ -297,28 +325,10 @@ class SimConnect():
 		self.DEFINITION_POS = None
 		self.DEFINITION_WAYPOINT = None
 		self._my_dispatch_proc_rd = None
-		
-		self._sim_paused_callback = sim_paused_callback
-		self._sim_running_callback = sim_running_callback
-		self._sim_start_callback = None
-		self._sim_stop_callback = None
-		self._aircraft_loaded_callback = aircraft_loaded_callback
-		self._state_callback = state_callback
+		self._aircraft_loaded_event = threading.Event() # locks the aircraft process thread in case we get multiple concurrent calls
 
+		self.handler : SimConnectEventHandler = handler # used to trigger various events
 
-		self.handler = handler
-		
-		# hook connect
-		handler.simconnect_connected.connect(self._connected)
-
-		# hook disconnect
-		handler.simconnect_disconnected.connect(self._disconnected)
-
-		# hook disconnect request
-		handler.request_disconnect.connect(self._disconnect_request)
-
-		# hook connect request
-		handler.request_connect.connect(self._connect_request)
 	
 		if auto_connect:
 			self.connect()
@@ -384,56 +394,96 @@ class SimConnect():
 		_hr = ctypes.HRESULT(hr)
 		return ctypes.c_ulong(_hr.value).value == value
 
-	def handle_id_event(self, event):
+	def handle_id_event(self, event : SIMCONNECT_RECV_EVENT):
 		syslog = logging.getLogger("system")
 		uEventID = event.uEventID
 		if uEventID == self._dll.EventID.EVENT_SIM_START.value:
+			self.running = True
 			self.handler.simconnect_sim_start.emit()
 			syslog.info("SimConnect: event: SIM START")
-			self.running = True
-			if self._sim_running_callback:
-				self._sim_running_callback(True)
 		elif uEventID == self._dll.EventID.EVENT_SIM_STOP.value:
-			self.handler.simconnect_sim_stop.emit()
 			if self.verbose:
 				syslog.info("SimConnect: event: SIM Stop")
 			self.running = False
-			if self._sim_running_callback:
-				self._sim_running_callback(False)
-		# Unknow whay not reciving
-		elif uEventID == self._dll.EventID.EVENT_SIM_PAUSED.value:
-			self.handler.simconnect_sim_paused.emit()
+			self.handler.simconnect_sim_stop.emit()
+		elif uEventID == self._dll.EventID.EVENT_SIM_PAUSE_STATE.value:
+			paused = event.dwData == 1
 			if self.verbose:
-				syslog.info("SimConnect: event: SIM Paused")
-			self.paused = True
-			if self._sim_paused_callback:
-				self._sim_paused_callback(True)
-		elif uEventID == self._dll.EventID.EVENT_SIM_UNPAUSED.value:
-			self.handler.simconnect_sim_unpaused.emit()
-			if self.verbose:
-				syslog.info("SimConnect: event: SIM Unpaused")
-			self.paused = False
-			if self._sim_paused_callback:
-				self._sim_paused_callback(False)
+				syslog.info(f"SimConnect: event: SIM Pause State {paused}")
+			self.paused = paused
+			self.handler.simconnect_sim_paused.emit(paused)
+		# elif uEventID == self._dll.EventID.EVENT_SIM_PAUSED.value:
+		# 	self.handler.simconnect_sim_paused.emit()
+		# 	if self.verbose:
+		# 		syslog.info("SimConnect: event: SIM Paused")
+		# 	self.paused = True
+		# 	self.handler.simconnect_sim_paused.emit(self.paused)
+		# elif uEventID == self._dll.EventID.EVENT_SIM_UNPAUSED.value:
+		# 	self.handler.simconnect_sim_unpaused.emit()
+		# 	if self.verbose:
+		# 		syslog.info("SimConnect: event: SIM Unpaused")
+		# 	self.paused = False
+		# 	self.handler.simconnect_sim_paused.emit(self.paused)
 		elif uEventID == self._dll.EventID.EVENT_SIM_RUNNING.value:
-			self.handler.simconnect_sim_running.emit()
 			if self.verbose:
 				syslog.info("SimConnect: event: SIM Running")
 			state = event.dwData != 0
 			self.running = state
-			if self._sim_running_callback:
-				self._sim_running_callback(state)
-		elif uEventID == self._dll.EventID.EVENT_SIM_AIRCRAFT_LOADED.value:
-			aircraft_air = event.dwData
-			if self.verbose:
-				syslog.info(f"SimConnect: event: AIRCRAFT LOADED: {aircraft_air}")
-			folder = os.path.dirname(aircraft_air)
-			if self._aircraft_loaded_callback:
-				self._aircraft_loaded_callback(folder)
-			self.handler.simconnect_aircraft_loaded.emit(folder)
+			self.handler.simconnect_sim_running.emit(state)
 
-		else:
-			syslog.error(f"SIMCONNECT: received event {uEventID} - don't know how to handle")
+		elif uEventID == self._dll.EventID.EVENT_SIM_AIRCRAFT_LOADED.value:
+			aircraft_cfg = event.dwData # air file loaded
+			if self.verbose:
+				syslog.info(f"SimConnect: event: AIRCRAFT LOADED: {aircraft_cfg}")
+			self.handle_folder_event(aircraft_cfg.decode())
+
+			
+
+		# else:
+		# 	syslog.error(f"SIMCONNECT: received event {uEventID} - don't know how to handle")
+
+	
+
+	def _process_aircraft_string(self, aircraft_cfg):
+		''' processes an aircraft string - could be a load event or a folder event '''
+		name = self._read_aicraft_config(aircraft_cfg)
+		if name:
+			self.handler.simconnect_aircraft_loaded.emit(aircraft_cfg, name)
+		self._aircraft_loaded_event.clear()
+
+
+
+	def _read_aicraft_config(self, aircraft_cfg):
+		''' reads a configuration folder and extracts a configuration object '''
+		import re
+		syslog = logging.getLogger("system")
+		verbose = gremlin.config.Configuration().verbose_mode_simconnect
+		if verbose: syslog.info(f"Simconnect: parsing: {aircraft_cfg}")
+		
+		if not aircraft_cfg:
+			syslog.error(f"Simconnect: error - invalid aircraft string: {aircraft_cfg}")
+			return 
+		
+		# Example 1: SimObjects\Airplanes\a400m\presets\inibuilds\a400m_cargo\config\aircraft.CFG
+		# Example 2: c:\users\XXXX\appdata\local\packages\microsoft.limitless_8wekyb3d8bbwe\localstate\streamedpackages\asobo-aircraft-h125\content\simobjects\airplanes\asobo_h125\presets\asobo\h125_rescue\config
+		work_cfg = aircraft_cfg.replace("/", os.sep).casefold()			
+		splits = work_cfg.split(os.sep)
+		max_index = len(splits)
+		index = 0
+		while splits[index] != "simobjects" and index < max_index:
+			index+=1
+		index+=1
+		if index < max_index:
+			while splits[index] != "airplanes" and index < max_index:
+				index+=1
+		index+=1
+		if index < max_index:
+			aircraft_name = splits[index]
+			if verbose: syslog.info(f"Simconnect: found {aircraft_name}")
+			return aircraft_name
+			
+		
+		return None            			
 
 	def handle_simobject_event(self, ObjData):
 		
@@ -461,6 +511,8 @@ class SimConnect():
 		self.handle_simobject_event(ObjData)
 			
 
+
+
 	def handle_exception_event(self, exc):
 		_exception = SIMCONNECT_EXCEPTION(exc.dwException).name
 		_unsendid = exc.UNKNOWN_SENDID
@@ -480,15 +532,29 @@ class SimConnect():
 		syslog.warning(_exception)
 
 	def handle_state_event(self, pData : SIMCONNECT_RECV_SYSTEM_STATE):
-		
+		''' handles simconnect state changes - this receives the aicraft data '''
 		int_data = pData.dwInteger
 		float_data = pData.fFloat
 		str_data = pData.szString
 		if self.verbose:
 			syslog = logging.getLogger("system")
 			syslog.info(f"SimConnect: state event: int: {pData.dwInteger} float: {pData.fFloat} str: {pData.szString}")
-		if self._state_callback:
-			self._state_callback(int_data, float_data, str_data)
+
+		if str_data:
+			aircraft_cfg = str_data.decode()
+			if not self._aircraft_loaded_event.is_set():
+				self._aircraft_loaded_event.set()
+				self._process_aircraft_string(aircraft_cfg)
+		self.handler.simconnect_state_changed.emit(int_data, float_data, str_data)
+
+	def handle_folder_event(self, aircraft_cfg):
+		''' folder received '''
+		if not self._aircraft_loaded_event.is_set():
+			self._aircraft_loaded_event.set()
+			thread = threading.Thread(target = self._process_aircraft_string, args = [aircraft_cfg])
+			thread.setName("process aircraft file thread")
+			thread.start()
+
 		
 
 	# TODO: update callbackfunction to expand functions.
@@ -496,21 +562,21 @@ class SimConnect():
 		# print("my_dispatch_proc")
 		syslog = logging.getLogger("system")
 		dwID = pData.contents.dwID
-		if dwID == SIMCONNECT_RECV_ID.SIMCONNECT_RECV_ID_EVENT:
+		if dwID == SIMCONNECT_RECV_ID.SIMCONNECT_RECV_ID_EVENT.value:
 			evt = cast(pData, POINTER(SIMCONNECT_RECV_EVENT)).contents
 			self.handle_id_event(evt)
 
-		elif dwID == SIMCONNECT_RECV_ID.SIMCONNECT_RECV_ID_SYSTEM_STATE:
-			state = cast(pData, POINTER(SIMCONNECT_RECV_SYSTEM_STATE)).contents
-			self.handle_state_event(state)
+		elif dwID == SIMCONNECT_RECV_ID.SIMCONNECT_RECV_ID_SYSTEM_STATE.value:
+			data = cast(pData, POINTER(SIMCONNECT_RECV_SYSTEM_STATE)).contents
+			self.handle_state_event(data)
 
-		elif dwID == SIMCONNECT_RECV_ID.SIMCONNECT_RECV_ID_SIMOBJECT_DATA_BYTYPE:
+		elif dwID == SIMCONNECT_RECV_ID.SIMCONNECT_RECV_ID_SIMOBJECT_DATA_BYTYPE.value:
 			pObjData = cast(
 				pData, POINTER(SIMCONNECT_RECV_SIMOBJECT_DATA_BYTYPE)
 			).contents
 			self.handle_simobject_event(pObjData)
 
-		elif dwID == SIMCONNECT_RECV_ID.SIMCONNECT_RECV_ID_OPEN:
+		elif dwID == SIMCONNECT_RECV_ID.SIMCONNECT_RECV_ID_OPEN.value:
 
 			syslog.info("Simconnect: SIM OPEN")
 			self.ok = True
@@ -546,8 +612,9 @@ class SimConnect():
 			pObjData = cast(pData, POINTER(SIMCONNECT_RECV_EVENT_FILENAME)).contents
 			file = pObjData.zFileName.decode()
 			folder = os.path.dirname(file)
-			if self._aircraft_loaded_callback:
-				self._aircraft_loaded_callback(folder)
+			# example: c:\users\XXX\appdata\local\packages\microsoft.limitless_8wekyb3d8bbwe\localstate\streamedpackages\asobo-aircraft-h125\content\simobjects\airplanes\asobo_h125\presets\asobo\h125_rescue\config
+			self.handle_folder_event(folder)
+			
 		elif dwID == SIMCONNECT_RECV_ID.SIMCONNECT_RECV_ID_SIMOBJECT_DATA:
 			# data
 			pObjData = cast(pData, POINTER(SIMCONNECT_RECV_SIMOBJECT_DATA)).contents
@@ -568,9 +635,11 @@ class SimConnect():
 	def connect(self):
 		if self._is_connected:
 			# already connected
-			return 
+			return
 		syslog = logging.getLogger("system")
 		try:
+
+
 			self._is_loop_running = False
 			self._quit = 0
 			self._dll = SimConnectDll(self._library_path)
@@ -584,27 +653,36 @@ class SimConnect():
 
 				# The user is in control of the aircraft
 				self._dll.SubscribeToSystemEvent(
-					self._hSimConnect, self._dll.EventID.EVENT_SIM_START, b"SimStart"
+					self._hSimConnect, self._dll.EventID.EVENT_SIM_START.value, b"SimStart"
 				)
+				self._dll.SetSystemEventState(self._hSimConnect, self._dll.EventID.EVENT_SIM_START, SIMCONNECT_STATE.SIMCONNECT_STATE_ON)
+
 				# The user is navigating the UI.
 				self._dll.SubscribeToSystemEvent(
-					self._hSimConnect, self._dll.EventID.EVENT_SIM_STOP, b"SimStop"
+					self._hSimConnect, self._dll.EventID.EVENT_SIM_STOP.value, b"SimStop"
 				)
+				self._dll.SetSystemEventState(self._hSimConnect, self._dll.EventID.EVENT_SIM_STOP.value, SIMCONNECT_STATE.SIMCONNECT_STATE_ON)
+
 				# Request a notification when the flight is paused
 				self._dll.SubscribeToSystemEvent(
-					self._hSimConnect, self._dll.EventID.EVENT_SIM_PAUSED, b"Paused"
+					self._hSimConnect, self._dll.EventID.EVENT_SIM_PAUSE_STATE.value, b"Pause"
 				)
+				self._dll.SetSystemEventState(self._hSimConnect, self._dll.EventID.EVENT_SIM_PAUSE_STATE.value, SIMCONNECT_STATE.SIMCONNECT_STATE_ON)
+				# # Request a notification when the flight is paused
+				# self._dll.SubscribeToSystemEvent(
+				# 	self._hSimConnect, self._dll.EventID.EVENT_SIM_PAUSED.value, b"Paused"
+				# )
+				# # Request a notification when the flight is un-paused.
+				# self._dll.SubscribeToSystemEvent(
+				# 	self._hSimConnect, self._dll.EventID.EVENT_SIM_UNPAUSED.value, b"Unpaused"
+				# )
 				# Request a notification when the flight is un-paused.
 				self._dll.SubscribeToSystemEvent(
-					self._hSimConnect, self._dll.EventID.EVENT_SIM_UNPAUSED, b"Unpaused"
-				)
-				# Request a notification when the flight is un-paused.
-				self._dll.SubscribeToSystemEvent(
-					self._hSimConnect, self._dll.EventID.EVENT_SIM_RUNNING, b"Sim"
+					self._hSimConnect, self._dll.EventID.EVENT_SIM_RUNNING.value, b"Sim"
 				)
 				# aircraft loaded data
 				self._dll.SubscribeToSystemEvent(
-					self._hSimConnect, self._dll.EventID.EVENT_SIM_AIRCRAFT_LOADED, b"AircraftLoaded"
+					self._hSimConnect, self._dll.EventID.EVENT_SIM_AIRCRAFT_LOADED.value, b"AircraftLoaded"
 				)
 
 			syslog = logging.getLogger("system")
@@ -622,11 +700,21 @@ class SimConnect():
 		
 	def run(self):
 		if not self._is_loop_running:
-			self.timerThread = threading.Thread(target=self._run)
-			self.timerThread.daemon = True
-			self.timerThread.start()
+			self._runThread = threading.Thread(target=self._run)
+			self._runThread.setName("Simconnect Run")
+			self._runThread.daemon = True
+			self._runThread.start()
 			while self.ok is False:
 				pass
+
+	def requestAircraftLoaded(self):
+		''' makes a request for the current loaded aircraft '''
+		if self._dll:
+			self._dll.RequestSystemState(self._hSimConnect,
+									 self._dll.EventID.EVENT_SIM_AIRCRAFT_LOADED.value,
+									 b"AircraftLoaded"
+                                         )        
+
 
 
 	def _run(self):
@@ -665,8 +753,9 @@ class SimConnect():
 	def exit(self):
 		''' disconnects from the sim '''
 		if self._is_loop_running:
-			self._quit = 1
-			self.timerThread.join()
+			self._quit = 1 # kill the thread loop
+			self._runThread.join()
+			# this also resets the flags
 
 	def is_connected(self, auto_connect = True):
 		''' determines if connected and optionally starts the connection '''
@@ -1039,15 +1128,7 @@ class SimConnect():
 		)
 
 
-	def get_aircraft_loaded(self):
-		''' returns the path to the loaded active aircraft '''
-		if self._dll is None:
-			return False
-		hr = self._dll.RequestSystemState(
-			self._hSimConnect,
-			self._dll.EventID.EVENT_SIM_AIRCRAFT_LOADED,
-			b"AircraftLoaded"
-		)
+
 
 
 	def dic_to_flight(self, dic, fpath):

@@ -183,8 +183,8 @@ class Device(QtCore.QAbstractListModel):
                 input_info[1],
             )
 
-    @Slot(int, result=InputIdentifier)
-    def inputIdentifier(self, index: int) -> InputIdentifier:
+    @Slot(int, object)
+    def inputIdentifier(self, index: int):
         """Returns the InputIdentifier for input with the specified index.
 
         Args:
@@ -195,7 +195,8 @@ class Device(QtCore.QAbstractListModel):
             An InputIdentifier instance referring to the input item with
             the given index.
         """
-        identifier = InputIdentifier(self)
+        import gremlin.ui.input_item
+        identifier = gremlin.ui.input_item.InputIdentifier(self)
         identifier.device_guid = self._device.device_guid
         input_info = self._convert_index(index)
         identifier.input_type = input_info[0]

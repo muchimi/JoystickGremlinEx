@@ -166,6 +166,7 @@ class MidiInputItem(AbstractInputItem):
     ''' holds the data for a MIDI device '''
 
     message_key_changed = QtCore.Signal(str, str) # fires when message key changes 
+    input_mode_changed = QtCore.Signal() # fires when the input mode changes 
 
     class InputMode(enum.Enum):
         ''' possible input modes '''
@@ -246,6 +247,14 @@ class MidiInputItem(AbstractInputItem):
         ''' input mode '''
         return self._mode
     
+    
+    def setMode(self, value : MidiInputItem.InputMode):
+        ''' changes the input mode '''
+        if self._mode != value:
+            self._mode = value
+            self._mode_string = MidiInputItem.InputMode.to_string(value)
+            self.input_mode_changed.emit()
+    
     @property
     def mode_string(self):
         if self._mode == MidiInputItem.InputMode.Axis:
@@ -273,11 +282,7 @@ class MidiInputItem(AbstractInputItem):
     def is_button(self) -> bool:
         return self._mode != MidiInputItem.InputMode.Axis
 
-    
-    @mode.setter
-    def mode(self, value):
-        self._mode = value
-        self._mode_string = MidiInputItem.InputMode.to_string(value)
+
 
 
     @property
@@ -307,7 +312,7 @@ class MidiInputItem(AbstractInputItem):
             self.port_name = safe_read(node, "port", str)
             mode = self.mode_from_string(safe_read(node, "mode", str))
             if mode is not None:
-                self.mode = mode
+                self.setMode(mode)
             data = safe_read(node, "data", str)
             bytes = byte_string_to_list(data)
             self.message = mido.Message.from_bytes(bytes) if bytes else None
