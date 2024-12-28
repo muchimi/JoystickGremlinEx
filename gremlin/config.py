@@ -1754,3 +1754,14 @@ class Configuration:
         self.save()
 
     
+    @property 
+    def backup_count(self) -> int:
+         return self._data.get("backup_count", 5)
+    @backup_count.setter
+    def backup_count(self, value: int):
+        if value < 0:
+            value = 0
+        elif value > 50:
+            value = 50
+        self._data["backup_count"]= value
+        self.save()

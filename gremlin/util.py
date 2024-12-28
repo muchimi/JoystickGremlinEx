@@ -1138,14 +1138,14 @@ def pushCursor():
         QtWidgets.QApplication.processEvents()
     _cursor_push+=1
 
-def popCursor():
+def popCursor(reset = False):
     ''' restores form wait cusor '''
     global _cursor_push
     if _cursor_push > 0:
         _cursor_push -= 1
-        if _cursor_push == 0:
-            QtWidgets.QApplication.restoreOverrideCursor()
-            QtWidgets.QApplication.processEvents()
+    if _cursor_push == 0 or reset:
+        QtWidgets.QApplication.restoreOverrideCursor()
+        QtWidgets.QApplication.processEvents()
 
 def isCursorActive():
     ''' true if the cursor stack is not empty '''

@@ -401,6 +401,9 @@ class SimConnect():
 			self.running = True
 			self.handler.simconnect_sim_start.emit()
 			syslog.info("SimConnect: event: SIM START")
+		elif uEventID == self._dll.EventID.EVENT_SIM_REQUEST_AIRCRAFT.value:
+			# aircraft request
+			pass
 		elif uEventID == self._dll.EventID.EVENT_SIM_STOP.value:
 			if self.verbose:
 				syslog.info("SimConnect: event: SIM Stop")
@@ -436,7 +439,7 @@ class SimConnect():
 			if self.verbose:
 				syslog.info(f"SimConnect: event: AIRCRAFT LOADED: {aircraft_cfg}")
 			self.handle_folder_event(aircraft_cfg.decode())
-
+		
 			
 
 		# else:
@@ -682,7 +685,7 @@ class SimConnect():
 				)
 				# aircraft loaded data
 				self._dll.SubscribeToSystemEvent(
-					self._hSimConnect, self._dll.EventID.EVENT_SIM_AIRCRAFT_LOADED.value, b"AircraftLoaded"
+					self._hSimConnect, self._dll.EventID.EVENT_SIM_REQUEST_AIRCRAFT.value, b"AircraftLoaded"
 				)
 
 			syslog = logging.getLogger("system")
@@ -711,7 +714,7 @@ class SimConnect():
 		''' makes a request for the current loaded aircraft '''
 		if self._dll:
 			self._dll.RequestSystemState(self._hSimConnect,
-									 self._dll.EventID.EVENT_SIM_AIRCRAFT_LOADED.value,
+									 self._dll.EventID.EVENT_SIM_REQUEST_AIRCRAFT.value,
 									 b"AircraftLoaded"
                                          )        
 

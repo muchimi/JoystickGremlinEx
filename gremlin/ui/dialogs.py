@@ -54,7 +54,8 @@ class ProfileOptionsUi(gremlin.ui.ui_common.QRememberDialog):
     """UI to set individual profile settings """
     start_mode_changed = QtCore.Signal(str)  # when the start mode changes
 
-    def __init__(self, parent=None):
+    def __init__(self, mode = None, parent=None):
+        ''' creates a mode UI - if a mode is specified - selects that mode to start '''
         super().__init__(self.__class__.__name__, parent)
 
         # make modal
@@ -120,15 +121,15 @@ class ProfileOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self.main_layout.addWidget(self.start_container_widget)
         self.main_layout.addWidget(close_button_widget)
 
-        self.populate_selector()
+        self.populate_selector(mode)
 
-    def populate_selector(self):
+    def populate_selector(self, mode = None):
 
         self.start_mode_selector.currentIndexChanged.disconnect(self._start_mode_changed_cb)
         while self.start_mode_selector.count() > 0:
             self.start_mode_selector.removeItem(0)
 
-        start_mode = self.profile.get_start_mode()
+        start_mode = mode if mode else self.profile.get_start_mode()
         default_mode = self.profile.get_default_mode()
         if not start_mode in self.mode_list:
             # the start mode no longer exists - use the default mode
@@ -164,6 +165,7 @@ class ProfileOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
     def _close_cb(self):
         self.close()
+
 
 
 
@@ -860,6 +862,26 @@ This setting is also available on a profile by profile basis on the profile tab,
         add_map_widget.clicked.connect(self._add_profile_map_cb)
         add_map_widget.setToolTip("Adds a new application (process) to profile mapping entry")
 
+        backup_container_widget = QtWidgets.QWidget()
+        backup_container_widget.setContentsMargins(0,0,0,0)
+        backup_container_layout = QtWidgets.QHBoxLayout(backup_container_widget)
+
+
+        self.backup_count_widget = gremlin.ui.ui_common.QIntLineEdit()
+        self.backup_count_widget.setRange(0, 50)
+        count = self.config.backup_count
+        self.backup_count_widget.setValue(count)
+        self.backup_count_widget.valueChanged.connect(self._backup_count_changed)
+        self.backup_count_widget.setToolTip("Number of backups to make when saving a profile.\nSet to 0 to disable backups.")
+
+        self.backup_count_disabled = QtWidgets.QLabel("(disabled)")
+        self.backup_count_disabled.setVisible(count == 0)
+
+        backup_container_layout.addWidget(QtWidgets.QLabel("Profile backup count:"))
+        backup_container_layout.addWidget(self.backup_count_widget)
+        backup_container_layout.addWidget(self.backup_count_disabled)
+        backup_container_layout.addStretch()
+
         self.profile_page_layout.addWidget(container_bar_widget, row, 0)
         row+=1
         container_bar_layout.addWidget(QtWidgets.QLabel("Process/Profile map:"))
@@ -869,6 +891,8 @@ This setting is also available on a profile by profile basis on the profile tab,
         container_bar_layout.addWidget(sort_process_widget)
         container_bar_layout.addWidget(add_map_widget)
 
+        self.profile_page_layout.addWidget(backup_container_widget, row, 0)
+        row+=1
 
         self.profile_page_layout.addWidget(container_bar_widget, row, 0 )
         row+=1
@@ -981,6 +1005,13 @@ This setting is also available on a profile by profile basis on the profile tab,
         self.activate_on_process_focus.setEnabled(checked)
         self.config.autoload_profiles = checked
 
+    @QtCore.Slot()
+    def _backup_count_changed(self):
+        count = self.backup_count_widget.value()
+        self.config.backup_count = count
+        self.backup_count_disabled.setVisible(count == 0)
+
+    
     @QtCore.Slot(bool)
     def _keep_focus(self, checked):
         self.config.keep_profile_active_on_focus_loss = checked
@@ -1864,15 +1895,15 @@ class ModeManagerUi(ui_common.BaseDialogUi):
 
     """Enables the creation of modes and configuring their inheritance."""
 
-    def __init__(self, profile_data, parent=None):
+    def __init__(self, profile, mode = None, parent=None):
         """Creates a new instance.
 
-        :param profile_data the data being profile whose modes are being
-            configured
+        :param profile: the profile to modify
+        :param mode: the startup mode to select (optional)
         :param parent the parent of this widget
         """
         super().__init__(self.__class__.__name__, parent)
-        self._profile = profile_data
+        self._profile = profile
         self.setWindowTitle("Mode Manager")
 
         self.mode_dropdowns = {}
@@ -2067,7 +2098,6 @@ The setting can be overriden by the global mode reload option set in Options for
         self.mode_layout.addWidget(QtWidgets.QLabel("Profile start mode"), row, 0)
         self.mode_layout.addWidget(self.mode_default_selector,row,1)
         row += 1
-
 
         mode = gremlin.shared_state.current_profile.get_start_mode()
         self.mode_default_selector.setCurrentText(mode)

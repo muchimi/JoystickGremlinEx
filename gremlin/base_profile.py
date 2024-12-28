@@ -2154,7 +2154,7 @@ class Profile():
 
     def add_mode(self, name, inherited_name = None, emit = True):
         import gremlin.event_handler
-        ''' adds a new mode'''
+        ''' adds a new mode parented to inherited_name'''
         if name in self.mode_list():
             logging.getLogger("system").warning(f"Add Mode: error: mode {name} already exists")
             return False
@@ -2240,17 +2240,25 @@ class Profile():
                     root_modes.append(mode_name)
         return list(set(root_modes))  # unduplicated
     
-    def get_modes(self) -> list[str]:
+    def get_modes(self, casefold = False) -> list[str]:
         ''' get all profile mode names '''
         modes = []
         for device in self.devices.values():
             if device.type != DeviceType.Keyboard:
                 continue
             for _, mode in device.modes.items():
-                modes.append(mode.name)
+                if casefold:
+                    modes.append(mode.name.casefold())    
+                else:
+                    modes.append(mode.name)
         return list(set(modes))  # unduplicated
     
 
+    def is_mode(self, mode) -> bool:
+        ''' true if the mode exists in the current profile '''
+        modes = self.get_modes(True)
+        mode = mode.casefold()
+        return mode in modes
     
 
     def find_mode(self, mode_text) -> str:
@@ -2348,6 +2356,8 @@ class Profile():
         modes = self.get_root_modes()
         if modes:
             return modes[0]
+        
+    
 
     def from_xml(self, fname):
         """Parses the global XML document into the profile data structure.
@@ -2718,8 +2728,8 @@ class Profile():
             use_name = save_as_name
 
         # do a backup
-        if backup and os.path.isfile(use_name):
-            backup_max = 5
+        backup_max = gremlin.config.Configuration().backup_count
+        if backup_max > 0 and backup and os.path.isfile(use_name):
             backup_count = 1
             base_name = os.path.basename(use_name)
             base_name = gremlin.util.strip_ext(base_name)

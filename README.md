@@ -160,6 +160,7 @@ Joystick Gremlin EX
    * [Invert](#invert)
    * [Output](#output)
    * [Action configuration](#action-configuration)
+- [Simconnect (MSFS)](#simconnect-msfs)
 - [Range container](#range-container)
       + [Ranges](#ranges-1)
       + [Include/exclude flag](#includeexclude-flag)
@@ -171,6 +172,7 @@ Joystick Gremlin EX
       + [Pressed block](#pressed-block)
       + [Release block](#release-block)
 - [TempoEx Container (tempo with chain)](#tempoex-container-tempo-with-chain)
+- [Sequence Container](#sequence-container)
 - [Plugin Script enhancements](#plugin-script-enhancements)
       + [@gremlin.input_devices.gremlin_start](#gremlininput_devicesgremlin_start)
       + [@gremlin.input_devices.gremlin_stop](#gremlininput_devicesgremlin_stop)
@@ -210,10 +212,15 @@ Joystick Gremlin EX
 ## 13.40.16ex (pre-release)
 
 ### (m50)
-- Improved: Reworked UI logic to improve performance.  UI is significantly more responsive across the board especially when changing inputs or devices if the input was selected at least once.
-- Improved: UI Inputs now use less vertical space to reduce the height of the input list.
-- Improved: The Simconnect feature to automatically switch profile modes based on the current player aircraft has a new locking option to freeze the mode to a specific aircraft.  This is necessary because GremlinEx has several potentially conflicting options to change modes (for different purposes and needs).  The lock feature only impacts profiles using Simconnect and when automatic profile switching is enabled.  The idea of automatic profile mode switching is each aircraft can have its own mode, with unique mappings.
-- New: GremlinEx will now make automatic backups of profiles when saving a profile.  The last 5 profiles will be saved, and named numerically based on the profile. If more than five backups are found, the oldest one is removed.  The backups are saved to a folder named after the version of GremlinEx profile to make them easier to locate by version.  The log file will contain the backup file name whenever a profile is saved. 
+- Improved: This patch includes a significant rework of the UI (user interface) "wiring" logic to improve performance and resolve issues with highlighting options, and in particular it eliminates a problematic QT behavior that was causing numerous headaches and bugs (QT is the library under the hood that renders the UI). The UI is significantly more responsive across the board.
+- Improved: The inputs panel (left) are more compact and use less vertical space, so less scrolling.
+- Improved: The interface to Microsoft Flight Simulator has been reworked and tested with MSFS 2024. The Simconnect feature to automatically switch profile modes based on the current player aircraft now has a mode locking option to freeze the mode to a specific aircraft.  This is necessary because GremlinEx has potentially conflicting options to change modes that work well with other application but cause a loss of control if profile modes are associated with aircraft. The lock feature only impacts profiles using Simconnect and when automatic profile switching is enabled.  The idea of automatic profile mode switching is each aircraft can have its own mode, with unique and inherited mappings, control curves and gated components.
+
+The documentation has been updated to explain the MSFS connectivity and how profile modes can be used to create mappings to multiple aircraft.  GremlinEx has been tested with MSFS 2024 with built-in aicraft and third party commercial add-ons (such as the FenixSim Airbus series). While the GremlinEx Simconnect interface is completely bi-directional, however the Map to Simconnect action is send only for obvious reasons.  Note to plugin users: the API and calls have changed in this version due to changes in threading to maintain a high response rate with the sim, so the code may need to be tweaked.
+
+The Simconnect features are still in development.
+
+- New: GremlinEx will now make automatic backups of profiles when saving a profile.  The number of backups kept is determined by a new option in the profiles options dialog.  If the count is zero, backups will be disabled. GremlinEx will store numerically named backups named based on the profile name. If the total count of per profile backups is exceeded, the oldest one is removed.  The backups are saved to a folder named after the version of GremlinEx so it is easier to undo changes made by a new version if this becomes necessary.  The log file will contain the backup file name whenever a profile is saved.  Profiles are saved in the profile folder (%userprofile%\Joystick Gremlin Ex).
 
 
 ### (m49)
@@ -2171,6 +2178,65 @@ The actions defined in this dialog are only executed for this action and will no
 
 Each merge axis action contains its own sets of sub-containers/sub-actions.
 
+<!-- TOC --><a name="simconnect-msfs"></a>
+# Simconnect (MSFS)
+
+GremlinEx uses Simconnect to interface with Microsoft Flight Simulator(R) 2020 and 2024.  Simconnect is the API provided by Microsoft/Asobo to interact with the simulator. GremlinEx implements a two-way interface to Simconnect, and provides one action that can be used to map a hardware input to a simulator control or axis via Simconnect.  The two-way functionality is accessible via user plugins if needed, and internally used to detect the active aircraft to handle profile mode changes based on the aicraft type.
+
+
+## Concept
+
+The GremlinEx concept for working with MSFS is to setup a (single) profile for MSFS that contains as the default mode all generic mappings for controls that are commmon to every aircraft aircraft (example, a gear handle, pause/unpause, lights).  The profile can then have a submode for each mapping specific to an aicraft (example, throttles or condition levers).  This allows a single profile to be used for all aircraft and have different configurations for each, such as curves, gates, and simvars specific to the aircraft being flown.
+
+GremlinEx provides an automatic mechanism to switch profile modes for each aircraft based on what it has detected is the active aircraft.  This is dynamic so when a new aicraft is loaded, the mode, if defined in options, will be activated if it exists in the profile.
+
+As of this version, GremlinEx must run on the same computer running MSFS.  This is a MSFS requirement.
+
+## Configuration
+
+The Simconnect configuration is accessible via the tools menu, or via the configuration button on the action itself.
+
+The configuration dialog can automatically scan the community folder for the list of locally installed aircraft (add-ons).  With MSFS 2024, some aicraft can be streamed and they are stored encrypted locally on the computer so GremlinEx.  Those will need to be manually entered in the configuration dialog as GremlinEx cannot detect those automatically.
+
+If you would like to use the mode mapping feature, you will need to make sure there is an entry for each aircraft variant as reported by the sim to a profile mode.  If no entry exist, the default mode will be used.
+
+The configuration, if MSFS is running, can show you the active aircraft detected at the top of the window.
+
+## Map to Simconnect Action
+
+The map to simconnect action lets you map a simvar or event to the simulator. GremlinEx supports simple triggers (send a command to the simulator), send a fixed value (usually for events that require an on or off status, or a specific value), and a ranged output, usually for throttles, flaps, condition levers (any axis type).
+
+GremlinEx uses a normalized axis range of -1 to +1 for the input, and this gets mapped to the range used by the simvar.
+
+Important: Simconnect can have numerous entries for the same function (example, throttles), and not all aircraft respond to these entries.  Consult the documentation of the specific aircraft, especially third party add-ons, for the specific Simconnect variables they use as input.
+
+## General flow and connectivity
+
+It's recommended that you run MSFS first before you activate a GremlinEx profile: GremlinEx will immediately attempt to connect to MSFS via Simconnect when the profile starts, or when in the configuration window.   GremlinEx will enter a retry mode if it cannot connect, and eventually give up. To re-attempt the connection, you will need to stop the profile, and start it again, or close the configuration dialog and open it again.
+
+Attempts can time-out and fail for many reasons, first and foremost is that Simconnect is not available immediately when MSFS runs.  It can take several minutes after the simulator is started before Simconnect is available.  A rule of thumb is that Simconnect is only available when the simulator's interface is available and loading has completed. MSFS can take a very long time to load.
+
+For the automatic mode switching to happen, two requirements must be met: 
+(1) an entry (case insensitive) must exist in the configuration dialog that maps the specific aircraft variant to a mode you wish to use.  The aircraft variant name is unique across all aircraft in the simulator and is specified by the add-on's configuration and is unique for each variant.  That name can be very cryptic.
+(2) a corresponding mode must exist in the profile.   The mode can be anything you want, and indeed, can be re-used by multiple aircraft where it makes sense.
+
+In the GremlinEx configuration options, you can enable verbose Simconnect mode that will add detailed entries in the log file of the interactions with Simconnect - including status, what aircraft is detected and when it is detected, and data GremlinEx is sending via Simconnect.
+
+## Tips
+
+The log file (with verbose Simconnect mode enabled) will record detailed entries of any problems or errors, such as connectivity errors and data sent/received.
+
+The main issue is usually that the profile is activated and Simconnect is not available.  This can be easily fixed by stopping the profile, waiting for MSFS's user interface to be active, and then start the profile.
+
+The other issue is that the data sent to MSFS isn't used by the aircraft being flown, or the data is out of range/invalid.
+
+The mode lock features in GremlinEx's Simconnect options will freeze the mode to a specific mapping and will disable any mode change (switch mode, cycle mode) in GremlinEx to prevent inadvertent mode changes.
+
+
+
+
+
+
 
 <!-- TOC --><a name="range-container"></a>
 # Range container
@@ -2254,6 +2320,15 @@ The chain delay is included although it will conflict with long press.  I may re
 
 Within each action set, the chain group entries can be re-ordered, or can be removed.
 
+
+<!-- TOC --><a name="sequence-container"></a>
+# Sequence Container 
+
+This experimental container executes all contained actions in sequence, similar to a macro.  The difference between this container and others is the order of execution is guaranteed and each action runs in sequence rather than in parallel.
+
+Actions execute in the order they are listed and they can be re-ordered if needed.
+
+The purpose of this container is to add macro-like functionality using mappings instead of the macro action itself.
 
 
 

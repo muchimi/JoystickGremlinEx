@@ -121,7 +121,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_BASE = "m50_test_3"
+APPLICATION_BASE = "m50"
 APPLICATION_VERSION = f"13.40.16ex ({APPLICATION_BASE})"
 
 
@@ -1211,7 +1211,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         if hide:
             widget.setVisible(False)
         self.ui.tab_content_layout.addWidget(widget)
-        syslog.info(f"TAB: register widget for tab: {device_guid} {device_name}")
+        # syslog.info(f"TAB: register widget for tab: {device_guid} {device_name}")
 
     def unregisterWidget(self, device_guid):
         ''' removes a widget from the cleanup list'''
@@ -3031,7 +3031,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             config = gremlin.config.Configuration()
             
             device_guid, restore_input_type, restore_input_id = config.get_last_input()
-            syslog.info(f"LOAD: restore last selection: {device_guid} {restore_input_type} {restore_input_id}")
+            # syslog.info(f"LOAD: restore last selection: {device_guid} {restore_input_type} {restore_input_id}")
             self._select_input(device_guid, restore_input_type, restore_input_id, force_update=True)
 
 
