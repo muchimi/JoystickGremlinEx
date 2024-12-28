@@ -842,6 +842,10 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
             device = data["device"]
             target = data["target"]
             value = data["value"]
+            if "relative_value" in data:
+                relative_value = data["relative_value"]
+            else:
+                relative_value = 0.0
             proxy = gremlin.joystick_handling.VJoyProxy()
             if device in proxy.vjoy_devices:
                 # valid device
@@ -852,6 +856,12 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
                     if target > 0 and target < vjoy.button_count:
                         proxy[device].button(target).is_pressed = value
                 elif action == "axis":
+                    if value is None:
+                        # relative mode = get the current value
+                        value = proxy[device].axis(target).value    
+                    if relative_value:
+                        # apply the relative value
+                        value = gremlin.util.clamp(value + relative_value, -1.0, +1.0)
                     if target > 0 and target <= vjoy.axis_count:
                         proxy[device].axis(target).value = value
                 elif action == "hat":
@@ -1116,7 +1126,7 @@ class RemoteClient(QtCore.QObject):
             self._send(raw_data)
             #syslog.debug(f"remote gremlin event toggle button: {device_id} {button_id}")
 
-    def send_axis(self, device_id, axis_id, value, force_remote = False):
+    def send_axis(self, device_id, axis_id, value, relative_value = None, force_remote = False):
         ''' handles a remote joystick event '''
         if self.enabled or force_remote:
             data = {}
@@ -1125,6 +1135,7 @@ class RemoteClient(QtCore.QObject):
             data["device"] = device_id
             data["target"] = axis_id
             data["value"] = value
+            data["relative_value"] = relative_value
             raw_data = msgpack.packb(data)
             self._send(raw_data)
             #syslog.debug(f"remote gremlin event set axis: {device_id} {axis_id} {value}")

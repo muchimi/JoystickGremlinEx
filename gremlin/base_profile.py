@@ -350,6 +350,8 @@ class AbstractContainer(ProfileData):
         self.current_view_type = None
         self.parent_node = node
 
+        self._action_sets_callback = None # callback to return different action sets if needed for containers that do their own thing
+
         # attached hardware device to this container
 
         input_item = _get_input_item(parent)
@@ -365,7 +367,7 @@ class AbstractContainer(ProfileData):
             self.device_input_type = None
             self.device = None
 
-        
+
     @property
     def has_conditions(self):
         ''' true if the container has conditions defined '''
@@ -412,6 +414,7 @@ class AbstractContainer(ProfileData):
         count = 0
         if self.activation_condition is not None:
             # check each action set for conditions
+
             for action_set in self.action_sets:
                 action : AbstractAction
                 if action_set:

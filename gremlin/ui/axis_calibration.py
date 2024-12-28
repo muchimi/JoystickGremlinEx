@@ -843,7 +843,7 @@ class CalibrationDialogEx(gremlin.ui.ui_common.QRememberDialog):
     @QtCore.Slot()
     def _deadzone_changed(self):
         ''' deadzone widget changed '''
-        values = self._deadzone_widget.get_values()
+        values = self._deadzone_widget.values()
         self.action_data.deadzone = values
 
 

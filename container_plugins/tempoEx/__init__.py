@@ -581,12 +581,15 @@ class TempoExContainer(AbstractContainer):
         self.timeout = 0.0
         self.chain_short = True
         self.chain_long = True
-        
-        # # setup dummy action set (even if we're not using the default action set, the container won't be executed if it doesn't have at least one action defined)
-        # action_name_map = gremlin.plugin_manager.ActionPlugins().tag_map
-        # noop = action_name_map["noop"](self)
-        # self.action_sets = [[noop]]
-    
+        self.custom_action_sets = True # indicate we use custom action sets
+
+    @property
+    def action_sets(self):
+        ''' gets the action sets for this container '''
+        return self.short_action_sets + self.long_action_sets
+    @action_sets.setter
+    def action_sets(self, value):
+        pass
 
 
     def _parse_xml(self, node):
@@ -610,10 +613,12 @@ class TempoExContainer(AbstractContainer):
                 action_set = []
                 self._parse_action_xml(as_node, action_set)
                 self.short_action_sets.append(action_set)
+                self.action_sets.append(action_set)
             if as_node.tag == "long-action-set":
                 action_set = []
                 self._parse_action_xml(as_node, action_set)
                 self.long_action_sets.append(action_set)
+                self.action_sets.append(action_set)
 
 
     def _generate_xml(self):

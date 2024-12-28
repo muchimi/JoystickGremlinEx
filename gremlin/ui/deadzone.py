@@ -58,6 +58,7 @@ from lxml import etree
 
 
 class DeadzonePreset(enum.IntEnum):
+    center_zero = 0
     center_two = 1
     center_five = 2
     center_ten = 3
@@ -71,6 +72,7 @@ class DeadzonePreset(enum.IntEnum):
         return _deadzone_preset_string_lookup[value]
 
 _deadzone_preset_string_lookup = {    
+    DeadzonePreset.center_zero : "Center 0%",
     DeadzonePreset.center_two : "Center 2%",
     DeadzonePreset.center_five : "Center 5%",
     DeadzonePreset.center_ten : "Center 10%",
@@ -93,20 +95,18 @@ class DeadzoneWidget(QtWidgets.QWidget):
         :param parent the parent widget
         """
         super().__init__(parent)
-        self._values = None
-
-
-
         self.profile_data = profile_data
         self.main_layout = QtWidgets.QGridLayout(self)
         self.event_lock = False
         self._centered = False
 
-        # Create the two sliders
+        # Create the two sliders for centered deadzones
         self.left_slider = QSliderWidget()
 
-        # single slider for non-centered axes
+        # use a single slider for non-centered axes
         self.slider = QSliderWidget()
+
+
         self.slider.desired_height = 20
         self.slider.setRange(-1.0, 1.0)
         self.slider.setMarkerVisible(False)
@@ -170,9 +170,11 @@ class DeadzoneWidget(QtWidgets.QWidget):
         )
 
 
-        self.container_deadzone_widget = QtWidgets.QWidget()
-        self.container_deadzone_layout = QtWidgets.QHBoxLayout(self.container_deadzone_widget)
-        self.container_deadzone_layout.addWidget(QtWidgets.QLabel("Deadzone"))
+
+
+        self.container_preset_widget = QtWidgets.QWidget()
+        self.container_preset_layout = QtWidgets.QHBoxLayout(self.container_preset_widget)
+        self.container_preset_layout.addWidget(QtWidgets.QLabel("Deadzone"))
 
         from gremlin.curve_handler import DeadzonePreset
         self._center_presets = []
@@ -181,17 +183,15 @@ class DeadzoneWidget(QtWidgets.QWidget):
             button = ui_common.QDataPushButton(name)
             button.data = preset
             button.clicked.connect(self._deadzone_preset_cb)
-            self.container_deadzone_layout.addWidget(button)
-            if "Center" in name:
+            self.container_preset_layout.addWidget(button)
+            if self._is_center_preset(preset):
                 self._center_presets.append(button)
 
-        self.container_deadzone_layout.addStretch()
+        self.container_preset_layout.addStretch()
 
-
-        
         # Put everything into the layout
         row = 0
-        self.main_layout.addWidget(self.container_deadzone_widget, row, 0, 1, 4)
+        self.main_layout.addWidget(self.container_preset_widget, row, 0, 1, 4)
         row += 1
         self.main_layout.addWidget(self.slider, row, 0, 1, 4)
         self.main_layout.addWidget(self.left_slider, row, 0, 1, 2)
@@ -234,6 +234,9 @@ class DeadzoneWidget(QtWidgets.QWidget):
 
         self._update()
 
+    def _is_center_preset(self, preset):
+        ''' true if a center preset '''
+        return preset in (DeadzonePreset.center_zero, DeadzonePreset.center_two, DeadzonePreset.center_five, DeadzonePreset.center_ten)
 
     @QtCore.Slot() 
     def _deadzone_preset_cb(self):
@@ -241,24 +244,16 @@ class DeadzoneWidget(QtWidgets.QWidget):
         from gremlin.curve_handler import DeadzonePreset
         widget = self.sender()
         preset = widget.data
-        
-        is_centered = self.isCentered
-        if is_centered:
-            d_start, d_left, d_right, d_end = self.get_values()
-            if d_start is None:
-                d_start = -1
-            if d_end is None:
-                d_end = 1
-            if d_left is None:
-                d_left = 0
-            if d_right is None:
-                d_right = 0
-        else:
-            d_start, d_end = self.get_values()
-            if d_start is None:
-                d_start = -1
-            if d_end is None:
-                d_end = 1
+
+        d_start, d_left, d_right, d_end = self.values()
+        if d_start is None:
+            d_start = -1
+        if d_end is None:
+            d_end = 1
+        if d_left is None:
+            d_left = 0
+        if d_right is None:
+            d_right = 0
         
         match preset:
             case DeadzonePreset.center_two :
@@ -285,10 +280,8 @@ class DeadzoneWidget(QtWidgets.QWidget):
                 d_left = 0
                 d_right = 0
                 d_end = 1
-        if is_centered:
-            self._update_deadzone([d_start, d_left, d_right, d_end])
-        else:
-            self._update_deadzone([d_start, d_end])
+
+        self._update_deadzone([d_start, d_left, d_right, d_end])
 
 
     @property
@@ -300,85 +293,64 @@ class DeadzoneWidget(QtWidgets.QWidget):
             self._centered = value
             self._update()
 
-    def set_values(self, values):
+    # def setValues(self, values):
+    #     v1,v2,v3,v4 = values
+    #     self.left_lower.setValue(v1),
+    #     self.left_upper.setValue(v2),
+    #     self.right_lower.setValue(v3),
+    #     self.right_upper.setValue(v4)
+
+
+    def setValues(self, values):
         """Sets the deadzone values.
 
         :param values the new deadzone values [min, min center, max center, max]
         """
 
-        if self._centered:
-            v1, v2 = values[0], values[1]
-            if v1 is None:
-                v1 = -1
-            if v2 is None:
-                v2 = 0
-            v3, v4 = values[2], values[3]
+        current = self.values()
+        if current == values:
+            # no change
+            return
 
-            with QtCore.QSignalBlocker(self.left_slider):
-                self.left_slider.setValue((v1,v2))
-            with QtCore.QSignalBlocker(self.left_lower):
-                self.left_lower.setValue(v1)
-            with QtCore.QSignalBlocker(self.left_upper):            
-                self.left_upper.setValue(v2)
+        v1,v2,v3,v4 = values
 
- 
-            v1, v2 = v3, v4
-            if v1 is None:
-                v1 = 0
-            if v2 is None:
-                v2 = 1
-            with QtCore.QSignalBlocker(self.right_slider):
-                self.right_slider.setValue((v1,v2))
-            with QtCore.QSignalBlocker(self.right_lower):
-                self.right_lower.setValue(v1)
-            with QtCore.QSignalBlocker(self.right_upper):
-                self.right_upper.setValue(v2)
-        else:
-            v1, v2 = values[0], values[1]
-            if v1 is None:
-                v1 = -1
-            if v2 is None:
-                v2 = 1
-
-            with QtCore.QSignalBlocker(self.slider):
-                self.slider.setValue((v1,v2))
+        with QtCore.QSignalBlocker(self.left_slider):
+            self.left_slider.setValue((v1,v2))
+        with QtCore.QSignalBlocker(self.left_lower):
+            self.left_lower.setValue(v1)
+        with QtCore.QSignalBlocker(self.left_upper):            
+            self.left_upper.setValue(v2)
+        with QtCore.QSignalBlocker(self.right_slider):
+            self.right_slider.setValue((v3,v4))
+        with QtCore.QSignalBlocker(self.right_lower):
+            self.right_lower.setValue(v3)
+        with QtCore.QSignalBlocker(self.right_upper):
+            self.right_upper.setValue(v4)
+        with QtCore.QSignalBlocker(self.slider):
+            self.slider.setValue((v1,v4))
 
         self._update()
+       
+
+        self.changed.emit()
 
 
-
-        self._values = values
-        for index, value in enumerate(values):
-            self.profile_data.deadzone[index] = value
-
-
-    def get_values(self):
+    def values(self):
         """Returns the current deadzone values.
 
         :return current deadzone values
         """
-
-        if self._centered:
-            if self._values is None:
-                self._values = [
-                self.left_lower.value(),
-                self.left_upper.value(),
-                self.right_lower.value(),
-                self.right_upper.value()
+        return [
+            self.left_lower.value(),
+            self.left_upper.value(),
+            self.right_lower.value(),
+            self.right_upper.value()
             ]
-        else:
-            if self._values is None:
-                self._values = [
-                self.left_lower.value(),
-                self.right_upper.value()
-                ]   
-                
-        return self._values
         
-
     
     def get_min(self) -> float:
         return self.left_lower.value()
+
     def get_max(self) -> float:
         return self.right_upper.value()
     
@@ -447,7 +419,7 @@ class DeadzoneWidget(QtWidgets.QWidget):
         :param widget which slider widget to update
         """
 
-        values = self.get_values()
+        values = self.values()
         if index > len(values):
             # two handle situation
             index = 1
@@ -455,7 +427,7 @@ class DeadzoneWidget(QtWidgets.QWidget):
         current = values[index]
         if current != value:
             values[index] = value
-            self.set_values(values)
+            self.setValues(values)
 
         
 
@@ -463,18 +435,8 @@ class DeadzoneWidget(QtWidgets.QWidget):
 
     def _update_deadzone(self, data : list):
         ''' updates the deadzone text values '''
-        for index, value in enumerate(data):
-            match index:
-                case 0:
-                    self.left_lower.setValue(value)
-                case 1:
-                    self.left_upper.setValue(value)
-                case 2:
-                    self.right_lower.setValue(value)
-                case 3:
-                    self.right_upper.setValue(value)
-
-            self.profile_data.deadzone[index] = value
+        self.setValues(data)
+        self.profile_data.deadzone = data
         self.changed.emit() # notify we changed
             
 
@@ -495,7 +457,7 @@ class DeadzoneWidget(QtWidgets.QWidget):
             self.right_lower.setVisible(False)
 
         for button in self._center_presets:
-            preset : CurvePreset = button.data
-            if preset in (DeadzonePreset.center_two, DeadzonePreset.center_five, DeadzonePreset.center_ten):
+            preset = button.data
+            if self._is_center_preset(preset):
                 button.setVisible(is_centered)
 

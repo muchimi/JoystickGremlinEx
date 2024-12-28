@@ -1671,6 +1671,11 @@ class AxisCurveWidget(QtWidgets.QWidget):
 
         self.container_options_layout.addWidget(self.handle_symmetry_widget)        
 
+        self.centered_widget = QtWidgets.QCheckBox("Centered")
+        self.centered_widget.clicked.connect(self._centered_changed_cb)
+
+
+        self.container_options_layout.addWidget(self.centered_widget)    
         self.container_options_layout.addStretch()
 
         self.copy_button_widget = QtWidgets.QPushButton()
@@ -1686,6 +1691,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
         self.paste_button_widget.setMaximumWidth(24)
         self.paste_button_widget.setToolTip("Paste curve")
         self.paste_button_widget.clicked.connect(self._paste_curve_cb)
+
 
         self.container_options_layout.addWidget(self.copy_button_widget)
         self.container_options_layout.addWidget(self.paste_button_widget)
@@ -1773,28 +1779,16 @@ class AxisCurveWidget(QtWidgets.QWidget):
         self.curve_view = QtWidgets.QGraphicsView(self.curve_scene)
         self._configure_response_curve_view()
 
-        
-
-        # Deadzone configuration
-        self.container_deadzone_widget = QtWidgets.QWidget()
-        self.container_deadzone_widget.setContentsMargins(0,0,0,0)
-        self.container_deadzone_layout = QtWidgets.QHBoxLayout(self.container_deadzone_widget)
-        self.container_deadzone_layout.setContentsMargins(0,0,0,0)
-
-        self.container_deadzone_layout.addWidget(QtWidgets.QLabel("Deadzone"))
-        for preset in DeadzonePreset:
-            button = ui_common.QDataPushButton(DeadzonePreset.to_display(preset))
-            button.data = preset
-            button.clicked.connect(self._deadzone_preset_cb)
-            self.container_deadzone_layout.addWidget(button)
-
-        self.container_deadzone_layout.addStretch()
-        
+       
         self.container_repeater_widget = QtWidgets.QWidget()
         self.container_repeater_widget.setContentsMargins(0,0,0,0)
         self.container_repeater_layout = QtWidgets.QHBoxLayout(self.container_repeater_widget)
         self.container_repeater_layout.setContentsMargins(0,0,0,0)
         self.reapeater_widget = ui_common.AxisStateWidget(orientation=QtCore.Qt.Orientation.Horizontal)
+
+
+
+        
 
 
         self.container_repeater_layout.addWidget(QtWidgets.QLabel("Input:"))
@@ -1814,7 +1808,6 @@ class AxisCurveWidget(QtWidgets.QWidget):
         self.main_layout.addWidget(self.container_curve_widget)
         self.main_layout.addWidget(self.container_repeater_widget)
         self.main_layout.addWidget(self.container_control_widget)
-        self.main_layout.addWidget(self.container_deadzone_widget)
         self.main_layout.addWidget(self.deadzone_widget)
 
         self._update_ui()
@@ -1831,8 +1824,17 @@ class AxisCurveWidget(QtWidgets.QWidget):
         
         self.curve_scene.redraw_scene()
 
-        # # Set deadzone values
-        # self.deadzone_widget.set_values(self.action_data.deadzone)
+        with QtCore.QSignalBlocker(self.centered_widget):
+            self.centered_widget.setChecked(self.action_data.isCentered)
+
+        # Set deadzone values
+        self.deadzone_widget.setValues(self.action_data.deadzone)
+        self.deadzone_widget.isCentered = self.action_data.isCentered
+
+    @QtCore.Slot(bool)
+    def _centered_changed_cb(self, checked):
+        self.action_data.isCentered = checked
+        self.deadzone_widget.isCentered = checked
 
     @QtCore.Slot()
     def _show_help(self):
@@ -1983,6 +1985,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
                                 (-0.08, 0.0), (0.0, 0.0), (0.08, 0.0),
                                 (1.0, 0.0), (1.0, 1.0),
                                     ]
+                
         else:
             self.action_data.control_points = control_points
             
@@ -2008,6 +2011,10 @@ class AxisCurveWidget(QtWidgets.QWidget):
         )
         self.curve_view = QtWidgets.QGraphicsView(self.curve_scene)
         self._configure_response_curve_view()
+
+        # update the deadzone widget
+        is_centered = curve_type == CurveType.Bezier
+        self.deadzone_widget.isCentered = is_centered
 
     @QtCore.Slot(bool)
     def _curve_symmetry_cb(self, checked):
@@ -2035,6 +2042,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
         widget = self.sender()
         preset : CurvePreset = widget.data
         curve_type = CurveType.Bezier
+        is_centered = True # assume centered
         match preset:
             case CurvePreset.Bezier1:
                 # max 10% 
@@ -2064,6 +2072,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
                 # reset to cubic linear
                 curve_type = CurveType.Cubic
                 control_points =  [(-1.0, -1.0), (1.0, 1.0)]
+                is_centered = False
 
             case _:
                 syslog.error(f"Curve preset: don't know how to handle {preset}")
@@ -2071,6 +2080,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
 
         self.action_data.symmetry_mode = SymmetryMode.NoSymmetry
         self.action_data.mapping_type = curve_type
+        self.action_data.isCentered = is_centered
         self._change_curve_type(curve_type, control_points)
         self._update_ui()
         self.update_value(self.last_value)
@@ -2080,9 +2090,13 @@ class AxisCurveWidget(QtWidgets.QWidget):
         ''' handles deadzone presets '''
         widget = self.sender()
         preset : DeadzonePreset = widget.data
+        
+
+        
 
         dd = self.deadzone_widget
-        d_start, d_left, d_right, d_end = dd.get_values()
+        d_start, d_left, d_right, d_end = dd.values()
+            
         if d_start is None:
             d_start = -1
         if d_end is None:
@@ -2093,6 +2107,9 @@ class AxisCurveWidget(QtWidgets.QWidget):
             d_right = 0
         
         match preset:
+            case DeadzonePreset.center_zero :
+                d_left = 0.0
+                d_right = 0.0
             case DeadzonePreset.center_two :
                 d_left = -0.02 * 2
                 d_right = 0.02 * 2
@@ -2128,6 +2145,11 @@ class AxisCurveWidget(QtWidgets.QWidget):
     def _deadzone_modified_cb(self):
         ''' called when deadzones are modified '''
         self.action_data.curve_update()
+        values = self.deadzone_widget.values()
+        print (f"deadzone: {values}")
+        for index, value in enumerate(values):
+            self.action_data.deadzone[index] = value
+
         self._update_ui()
         self.update_value(self.last_value)
 
@@ -2179,6 +2201,7 @@ class AxisCurveData():
         self.show_input_axis = gremlin.config.Configuration().show_input_axis
         self.deadzone_fn = None
         self.response_fn = None
+        self.isCentered = False 
 
         el = gremlin.event_handler.EventListener()
         el.profile_start.connect(self.profile_start)
@@ -2202,10 +2225,15 @@ class AxisCurveData():
         :param node the XML node to parse
         """
 
+        if not node.tag in ("curve-data","response-curve-ex"):
+            return
+
         if "mode" in node.attrib:
             mode = node.get("mode")
             self.symmetry_mode = SymmetryMode.to_enum(mode)
 
+        if "centered" in node.attrib:
+            self.isCentered = safe_read(node,"centered", bool, False)
 
         self.control_points = []
         for child in node:
@@ -2235,8 +2263,10 @@ class AxisCurveData():
 
         :return XML node representing the object's data
         """
-        node = ElementTree.Element("response-curve-ex")
+        node = ElementTree.Element("curve-data")
         node.set("mode", SymmetryMode.to_string(self.symmetry_mode))
+
+        node.set("centered", str(self.isCentered))
 
         # Response curve mapping
         if len(self.control_points) > 0:

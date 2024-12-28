@@ -1317,8 +1317,16 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.sb_button_to_axis_value.setDecimals(3)
         self.sb_button_to_axis_value.setValue(self.action_data.target_value)
 
-        self.target_value_container_layout.addWidget(QtWidgets.QLabel("Axis Value:"))
+        
+        self.target_is_relative = QtWidgets.QCheckBox("Relative")
+        self.target_is_relative.setToolTip("When enabled, the value is added to the current axis (relative value)")
+        self.target_is_relative.setChecked(self.action_data.target_is_relative)
+        self.target_is_relative.clicked.connect(self._target_relative_changed)
+
+
+        self.target_value_container_layout.addWidget(QtWidgets.QLabel("Set Value:"))
         self.target_value_container_layout.addWidget(self.sb_button_to_axis_value)
+        self.target_value_container_layout.addWidget(self.target_is_relative)
         self.target_value_container_layout.addStretch()
 
         self.main_layout.addWidget(self.selector_widget)
@@ -1334,7 +1342,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self.chkb_exec_on_release.clicked.connect(self._exec_on_release_changed)
         self.chkb_paired.clicked.connect(self._paired_changed)
-        #self.target_value_text.textChanged.connect(self._target_value_changed)
+        
         self.pulse_spin_widget.valueChanged.connect(self._pulse_value_changed)
         self.start_button_group.buttonClicked.connect(self._start_changed)
         self.sb_button_range_low.valueChanged.connect(self._button_range_low_changed)
@@ -1477,6 +1485,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             self._populate_grid(self.action_data.vjoy_device_id, self.action_data.vjoy_input_id)
 
 
+    @QtCore.Slot(float)
     def _target_value_changed(self, value):
         ''' called when the value box changes '''
         if value.isnumeric():
@@ -1487,7 +1496,9 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.target_value_valid = False
 
 
-
+    @QtCore.Slot(bool)
+    def _target_relative_changed(self, checked):
+        self.action_data.target_is_relative = checked
 
     def _update_ui(self):
         ''' updates ui based on the current action requested to show/hide needed components '''
@@ -2066,6 +2077,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         self.pulse_delay = action_data.pulse_delay
         self.start_pressed = action_data.start_pressed
         self.target_value = action_data.target_value
+        self.target_is_relative = action_data.target_is_relative
         self.target_value_valid = action_data.target_value_valid
         self.range_low = action_data.range_low
         self.range_high = action_data.range_high
@@ -2519,11 +2531,18 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
             elif self.action_mode == VjoyAction.VJoySetAxis:
                 # set the value on the specified axis
+                
+
                 if self.target_value_valid and fire_event:
                     if is_local:
-                        joystick_handling.VJoyProxy()[self.vjoy_device_id].axis(self.vjoy_input_id).value = self.target_value
+                        if self.target_is_relative:
+                            value = joystick_handling.VJoyProxy()[self.vjoy_device_id].axis(self.vjoy_input_id).value
+                            value = gremlin.util.clamp(value + self.target_value, -1.0, 1.0)
+                        else:
+                            value = self.target_value
+                        joystick_handling.VJoyProxy()[self.vjoy_device_id].axis(self.vjoy_input_id).value = value
                     if is_remote:
-                        self.remote_client.send_axis(self.vjoy_device_id, self.vjoy_input_id, self.target_value)
+                        self.remote_client.send_axis(self.vjoy_device_id, self.vjoy_input_id, None, self.target_value)
 
 
             elif self.action_mode == VjoyAction.VJoyRangeAxis:
@@ -2682,6 +2701,8 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         self.start_pressed = False # true if a button starts as pressed when the profile is loaded
         self.target_value = 0.0
         self.target_value_valid = True
+        self.target_is_relative = False # true if the set value axis is a relative value (+ or -)
+
 
         self.vjoy_map = {}  # list of vjoy devices by their vjoy index ID
         self.refresh_vjoy()
@@ -3071,6 +3092,9 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
                 self.target_value  = safe_read(node,"target_value", float, 0.0)
                 self.target_value_valid = True
 
+            if "target_relative" in node.attrib:
+                self.target_is_relative = safe_read(node,"target_relative", bool, False)
+
             if "range_low" in node.attrib:
                 self.range_low = safe_read(node,"range_low", float, -1.0)
 
@@ -3115,7 +3139,11 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
                 self.grid_visible = safe_read(node,"grid_visible", bool, True)
 
             # curve data
-            curve_node = util.get_xml_child(node,"response-curve-ex")
+            curve_node = util.get_xml_child(node,"curve-data")
+            if not curve_node:
+                # older style
+                curve_node = util.get_xml_child(node,"response-curve-ex")
+            
             if curve_node is not None:
                 self.curve_data = gremlin.curve_handler.AxisCurveData()
                 self.curve_data.calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(self.hardware_device_guid, self.hardware_input_id)
@@ -3187,6 +3215,7 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
 
             case VjoyAction.VJoySetAxis:
                 node.set("target_value", safe_format(self.target_value, float))
+                node.set("target_relative", safe_format(self.target_is_relative, bool))
 
             case VjoyAction.VJoyMergeAxis:
                 node.set("merge_mode", MergeOperationType.to_string(self.merge_mode))
@@ -3222,7 +3251,6 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
 
         if self.curve_data is not None:
             curve_node =  self.curve_data._generate_xml()
-            curve_node.tag = "response-curve-ex"
             node.append(curve_node)
 
         if VjoyAction.is_command(self.action_mode) or self.action_mode:

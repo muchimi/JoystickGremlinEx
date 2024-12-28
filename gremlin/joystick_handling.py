@@ -309,6 +309,7 @@ def reset_devices():
     logging.getLogger("system").info("Joystick device change detected - re-initializing joysticks")
     joystick_devices_initialization()
     el = gremlin.event_handler.EventListener()
+
     el.device_change_event.emit()
 
 
