@@ -475,9 +475,9 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                     self._default_info_map[InputType.JoystickHat] = self._default_hat_map_info
 
         # default keyboard
-        self.keyboard_device_guid = keyboard_device.get_keyboard_device_guid()
-        self.midi_device_guid = midi_device.get_midi_device_guid()
-        self.osc_device_guid = osc_device.get_osc_device_guid()
+        self.keyboard_device_guid = gremlin.shared_state.keyboard_tab_guid
+        self.midi_device_guid = gremlin.shared_state.midi_tab_guid
+        self.osc_device_guid = gremlin.shared_state.osc_tab_guid
         self._default_info_map[InputType.Keyboard] = (self.keyboard_device_guid, None)
         self._default_info_map[InputType.KeyboardLatched] = (self.keyboard_device_guid, None)
         self._default_info_map[InputType.Midi] = (self.midi_device_guid, None)
@@ -864,7 +864,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
             if not mode in self.description_map[device_guid]:
                 self.description_map[device_guid][mode] = {}
             self.description_map[device_guid][mode][input_id] = description
-            logging.getLogger("system").info(f"register description: device guid: {str(device_guid)} {gremlin.joystick_handling.device_name_from_guid(device_guid)} mode: {mode} input: {input_id} description: {description}")
+            logging.getLogger("system").info(f"register description: device guid: {str(device_guid)} {gremlin.shared_state.get_device_name(device_guid)} mode: {mode} input: {input_id} description: {description}")
 
 
     def _get_description(self, device_guid, mode, input_id):
@@ -1555,7 +1555,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                         target_device_guid = default_target_device_guid
                         target_input_id = default_target_input_id
 
-                    target_device_name = gremlin.joystick_handling.device_name_from_guid(target_device_guid)
+                    target_device_name = gremlin.shared_state.get_device_name(target_device_guid)
 
                     if verbose:
                         syslog.info(f"\t\t{input_item.input_name} -> {target_device_name}")
@@ -1834,7 +1834,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                     item.description = source_input_item.description
                     item.input_type = input_type
 
-                    item.device_guid = keyboard_device.get_keyboard_device_guid()
+                    item.device_guid = gremlin.shared_state.keyboard_tab_guid
                     items[input_type].append(item)
 
                 elif input_type == InputType.Midi:
@@ -1844,7 +1844,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                     item.input_description = source_input_item.input_description
                     item.description = source_input_item.description
                     item.input_type = input_type
-                    item.device_guid = midi_device.get_midi_device_guid()
+                    item.device_guid = gremlin.shared_state.midi_tab_guid
                     items[input_type].append(item)
                 elif input_type == InputType.OpenSoundControl:
                     # OSC input - single device
@@ -1853,7 +1853,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                     item.input_description = source_input_item.input_description
                     item.description = source_input_item.description
                     item.input_type = input_type
-                    item.device_guid = osc_device.get_osc_device_guid()
+                    item.device_guid = gremlin.shared_state.osc_tab_guid
                     items[input_type].append(item)
 
                 elif input_type == InputType.JoystickAxis:

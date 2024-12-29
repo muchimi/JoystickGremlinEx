@@ -746,7 +746,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         # Add modifiable device label
         label_layout = QtWidgets.QHBoxLayout()
-        label_layout.setContentsMargins(10, 9, 9, 0)
+        label_layout.setContentsMargins(0,4,0,0)
         label_layout.addWidget(QtWidgets.QLabel("<b>Device Label</b>"))
         line_edit = QtWidgets.QLineEdit()
         line_edit.setText(device_profile.label)

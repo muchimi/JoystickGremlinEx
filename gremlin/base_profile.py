@@ -1976,7 +1976,7 @@ class Profile():
         ''' setup suported non joystick devices '''
         
         # Keyboard
-        device_guid = gremlin.ui.keyboard_device.get_keyboard_device_guid()
+        device_guid = gremlin.shared_state.keyboard_tab_guid
         device_type = DeviceType.Keyboard
         new_device = Device(self)
         new_device.name = DeviceType.to_display_name(device_type)
@@ -1985,7 +1985,7 @@ class Profile():
         self.devices[device_guid] = new_device
 
         # MIDI
-        device_guid = gremlin.ui.midi_device.get_midi_device_guid()
+        device_guid = gremlin.shared_state.midi_tab_guid
         device_type = DeviceType.Midi
         new_device = Device(self)
         new_device.name = DeviceType.to_display_name(device_type)
@@ -1994,7 +1994,7 @@ class Profile():
         self.devices[device_guid] = new_device
 
         # OSC
-        device_guid = gremlin.ui.osc_device.get_osc_device_guid()
+        device_guid = gremlin.shared_state.osc_tab_guid
         device_type = DeviceType.Osc
         new_device = Device(self)
         new_device.name = DeviceType.to_display_name(device_type)
@@ -2003,7 +2003,7 @@ class Profile():
         self.devices[device_guid] = new_device
 
         # mode control
-        device_guid = gremlin.ui.mode_device.get_mode_device_guid()
+        device_guid = gremlin.shared_state.mode_tab_guid
         device_type = DeviceType.ModeControl
         new_device = Device(self)
         new_device.name = DeviceType.to_display_name(device_type)

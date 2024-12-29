@@ -1905,6 +1905,7 @@ class QHLine(QtWidgets.QFrame):
     ''' horizontal line '''
     def __init__(self, parent = None):
         super().__init__(parent)
+        self.setContentsMargins(0,1,0,1)
         self.setFrameShape(QtWidgets.QFrame.Shape.HLine)
         self.setFrameShadow(QtWidgets.QFrame.Shadow.Sunken)
 
@@ -2349,7 +2350,7 @@ class ButtonStateWidget(QtWidgets.QWidget):
             return
         if self._device_guid:
             syslog = logging.getLogger("system")
-            device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
+            device_name = gremlin.shared_state.get_device_name(device_guid)
             if isinstance(device_guid, str):
                 device_guid = gremlin.util.parse_guid(device_guid)
             el = gremlin.event_handler.EventListener()
@@ -2383,7 +2384,7 @@ class ButtonStateWidget(QtWidgets.QWidget):
             if isinstance(device_guid, str):
                 device_guid = gremlin.util.parse_guid(device_guid)
             disconnect = self._device_guid == device_guid
-            device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
+            device_name = gremlin.shared_state.get_device_name(device_guid)
         else:
             disconnect = True
             device_name = 'reset'
@@ -2691,7 +2692,7 @@ class AxisStateWidget(QtWidgets.QWidget):
             # already connected
             return
         
-        device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
+        device_name = gremlin.shared_state.get_device_name(device_guid)
         if isinstance(device_guid, str):
             device_guid = gremlin.util.parse_guid(device_guid)
         
@@ -2723,7 +2724,7 @@ class AxisStateWidget(QtWidgets.QWidget):
             if isinstance(device_guid, str):
                 device_guid = gremlin.util.parse_guid(device_guid)
             disconnect = self._device_guid == device_guid
-            device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
+            device_name = gremlin.shared_state.get_device_name(device_guid)
         else:
             disconnect = True
             device_name = "reset"
@@ -4342,6 +4343,8 @@ class QSplitTabWidget(QDataWidget):
         self._lock = False
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
+        self.main_layout.setContentsMargins(0,0,0,0)
+        self.setContentsMargins(0,0,0,0)
 
         self._content_widget = QContentWidget()
         self._content_widget.resized.connect(self._content_resized)
@@ -4351,10 +4354,12 @@ class QSplitTabWidget(QDataWidget):
 
 
         self._left_panel_widget = QtWidgets.QWidget()
+        #self._left_panel_widget.setStyleSheet("background: green")
         self._left_panel_widget.setContentsMargins(0,0,0,0)
         self._left_panel_widget.setMinimumWidth(200)
 
         self._right_panel_widget = QtWidgets.QWidget()
+        #self._right_panel_widget.setStyleSheet("background: blue")
         self._right_panel_widget.setContentsMargins(0,0,0,0)
 
         self._left_panel_layout = QtWidgets.QVBoxLayout(self._left_panel_widget)
@@ -4578,3 +4583,63 @@ class BaseDialogUi(QRememberDialog):
             self.closed.emit()
 
 
+
+class QTabHeader(QtWidgets.QTabBar):
+    ''' wrapper for tab bar to catch mouse events on tab bar '''
+
+    tabMoveCompleted = QtCore.Signal(int, int) # triggers once a tab moved has been completed 
+    tabChanged = QtCore.Signal(int) # triggers when a tab is selected, aware of tab drag ops
+
+    def __init__(self, parent = None):
+        super().__init__(parent)
+
+        self.installEventFilter(self)
+        self._mouse_down = False
+        self._to_index = None
+        self._from_index = None
+        self._mouse_down_index = None
+        self._move_in_progress = False
+        self.tabMoved.connect(self._tab_moved)
+        #self.currentChanged.connect(self._tab_selected)
+
+    @property
+    def moveInProgress(self) -> bool:
+        return self._move_in_progress or self._mouse_down
+    
+    @QtCore.Slot(int)
+    def _tab_selected(self, index):
+        print (f"internal tab selected {index}")
+        self._current_index = index
+        if not (self._move_in_progress or self._mouse_down):
+            self.tabChanged.emit(index)
+
+    @QtCore.Slot(int, int)
+    def _tab_moved(self, from_index, to_index):
+        self._move_in_progress = True
+        self._from_index = from_index
+        self._to_index = to_index
+        print (f"internal tab move {from_index} {to_index}")
+
+
+    def eventFilter(self, widget, event):
+        t = event.type()
+        if t == QtCore.QEvent.Type.MouseButtonPress:
+            self._mouse_down = True
+            self._mouse_down_index = self.currentIndex()
+            print (f"mouse down - {self._mouse_down_index}")
+        elif t == QtCore.QEvent.Type.MouseButtonRelease:
+            self._mouse_down = False
+            index = self.currentIndex()
+            print (f"mouse up {index}")
+            if self._move_in_progress:
+                print (f"move completed: {self._from_index} to {self._to_index}")
+                self._move_in_progress = False
+                self.tabMoveCompleted.emit(self._from_index, self._to_index)
+            elif index != self._mouse_down_index:
+                # fire the tab change on release if there is a tab change
+                self.tabChanged.emit(index)
+            
+        return False # allow further processing
+
+   
+    

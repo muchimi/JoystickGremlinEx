@@ -25,7 +25,8 @@ import dinput
 import gremlin.base_classes
 import gremlin.event_handler
 import gremlin.joystick_handling
-import gremlin.shared_state
+
+
 
 from . import common, error, util
 from vjoy import vjoy
@@ -251,7 +252,7 @@ def device_name_from_guid(guid : str | dinput.GUID) -> str:
     ''' gets device name from GUID '''
     assert (_joystick_initialized)
     if isinstance(guid, str):
-        guid = util.parse_guid(guid) # convert to dinput GUID 
+        guid = util.parse_guid(guid) # convert to dinput GUID
     if guid in _joystick_device_guid_map.keys():
         return _joystick_device_guid_map[guid].name
     return None

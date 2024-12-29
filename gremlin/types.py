@@ -212,7 +212,7 @@ class xIntEnum(IntEnum):
 class DeviceType(IntEnum):
 
     """Enumeration of the different possible input types."""
-
+    NotSet = 0 # not set
     Keyboard = 1 # keyboard
     Joystick = 2 # game controller
     VJoy = 3 # vjoy (virtual)
@@ -242,6 +242,7 @@ class DeviceType(IntEnum):
 
 
 _DeviceType_to_display_name = {
+    DeviceType.NotSet: "(invalid)",
     DeviceType.Keyboard: "Keyboard",
     DeviceType.Joystick: "Joystick",
     DeviceType.VJoy: "VJoy",
@@ -251,6 +252,7 @@ _DeviceType_to_display_name = {
 }
 
 _DeviceType_to_string_lookup = {
+    DeviceType.NotSet: "invalid",
     DeviceType.Keyboard: "keyboard",
     DeviceType.Joystick: "joystick",
     DeviceType.VJoy: "vjoy",
@@ -261,6 +263,7 @@ _DeviceType_to_string_lookup = {
 
 
 _DeviceType_to_enum_lookup = {
+    "invalid": DeviceType.NotSet,
     "keyboard": DeviceType.Keyboard,
     "joystick": DeviceType.Joystick,
     "vjoy": DeviceType.VJoy,
@@ -923,7 +926,6 @@ class TabDeviceType(int, Enum):
     Settings = 7
     Plugins = 8
     ModeControl = 9
-
 
 
 class GamePadOutput(Enum):

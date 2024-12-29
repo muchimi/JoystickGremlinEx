@@ -21,6 +21,10 @@ import sys
 import uuid
 
 import gremlin.event_handler
+import gremlin.joystick_handling
+from gremlin.input_types import InputType
+from gremlin.types import DeviceType
+import logging
 
 
 def module_property(func):
@@ -78,21 +82,88 @@ is_running = False
 _suspend_ui_keyinput = 0
 
 # list of device names to their GUID
-device_guid_to_name_map = {}
+_virtual_device_guid_to_name_map = {}
+
+# UUID of the plugins tab
+plugins_tab_guid = gremlin.util.parse_guid('dbce0add-460c-480f-9912-31f905a84247')
+# UUID of the settings tab
+settings_tab_guid = gremlin.util.parse_guid('5b70b5ba-bded-41a8-bd91-d8a209b8e981')
+# UUID of the MIDI tab
+midi_tab_guid = gremlin.util.parse_guid('1b56ecf7-0624-4049-b7b3-8d9b7d8ed7e0')
+# UUID of the OSC tab
+osc_tab_guid = gremlin.util.parse_guid('ccb486e8-808e-4b3f-abe7-bcb380f39aa4')
+# UUID of the keyboard tab
+keyboard_tab_guid = gremlin.util.parse_guid('6f1d2b61-d5a0-11cf-bfc7-444553540000')
+# UUID of the mode tab
+mode_tab_guid = gremlin.util.parse_guid('b3b159a0-4d06-4bd6-93f9-7583ec08b877')
+
+# map of virtual devics to their input types
+virtual_device_guid_type_map = [
+    (plugins_tab_guid, DeviceType.NotSet),
+    (settings_tab_guid, DeviceType.NotSet),
+    (midi_tab_guid, DeviceType.Midi),
+    (osc_tab_guid, DeviceType.Osc),
+    (mode_tab_guid, DeviceType.ModeControl)
+]
+
+
+# setup default device names
+def _init_special_device_guids():
+    ''' setup the non HID hardware device name maps '''
+    import dinput
+    global _virtual_device_guid_to_name_map
+    _virtual_device_guid_to_name_map[str(keyboard_tab_guid).casefold()] = "Keyboard"
+    _virtual_device_guid_to_name_map[str(osc_tab_guid).casefold()] = "OSC"
+    _virtual_device_guid_to_name_map[str(midi_tab_guid).casefold()] = "MIDI"
+    _virtual_device_guid_to_name_map[str(settings_tab_guid).casefold()] = "Settings"
+    _virtual_device_guid_to_name_map[str(plugins_tab_guid).casefold()] = "Plugins"
+    _virtual_device_guid_to_name_map[str(mode_tab_guid).casefold()] = "Modes"
+    _virtual_device_guid_to_name_map[str(dinput.GUID_Virtual).casefold()] = "(VirtualButton)"
+    _virtual_device_guid_to_name_map[str(dinput.GUID_Invalid).casefold()] = "(Invalid)"
+            
+
+
+_init_special_device_guids()
+    
+
+
+def get_virtual_device_name(device_guid):
+    ''' gets a device name - expect a string or a GUID'''
+    if not isinstance(device_guid, str):
+        device_guid = str(device_guid)
+    device_guid = device_guid.casefold()
+    if device_guid in _virtual_device_guid_to_name_map:
+        return _virtual_device_guid_to_name_map[device_guid]
+    return None
 
 def get_device_name(device_guid):
-    if isinstance(device_guid, str):
-        import gremlin.util
-        device_guid = gremlin.util.parse_guid(device_guid)
-    if device_guid in device_guid_to_name_map:
-        return device_guid_to_name_map[device_guid]
-    return "Not found"
+    ''' gets the name corresponding to a hardware or virtual device '''
+    device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
+    if not device_name:
+        device_name = get_virtual_device_name(device_guid)
+    if not device_name:
+        logging.getLogger("system").error(f"Unable to find device name for id: {device_guid}")
+        pass
+    return device_name
+
+# map of device type to hardware GUID (DeviceType enum)
+device_type_map = {}
+
+def reload_device_map():
+    # setup device types
+    global device_type_map
+    device_type_map = {}
+    for device in gremlin.joystick_handling.joystick_devices():
+        gremlin.shared_state.device_type_map[device.device_guid] = device.device_type
+    # virtual devices
+    for device_guid, device_type in gremlin.shared_state.virtual_device_guid_type_map:
+        gremlin.shared_state.device_type_map[device_guid] = device_type
+
 
 # map of device profiles - indexed by hardware GUID
 device_profile_map = {}
 
-# map of device type to hardware GUID (DeviceType enum)
-device_type_map = {}
+
 
 # map of device widgets by hardware GUID (widget)
 device_widget_map = {}
@@ -121,7 +192,6 @@ def _current_mode() -> str:
     return edit_mode
 
 def resetState():
-    device_guid_to_name_map.clear()
     device_profile_map.clear()
     current_profile = None
     runtime_mode = None

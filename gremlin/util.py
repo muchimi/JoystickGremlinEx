@@ -960,6 +960,8 @@ def parse_guid(value):
     """
     if value is None or value == "None" or not value:
         return None
+    if isinstance(value, dinput.GUID):
+        return value
     try:
         tmp = uuid.UUID(value)
         raw_guid = dinput._GUID()

@@ -47,8 +47,6 @@ import gremlin.util
 import gremlin.base_profile
 
 
-def get_mode_device_guid():
-    return parse_guid('b3b159a0-4d06-4bd6-93f9-7583ec08b877')
 
 
 class ModeInputModeType(enum.IntEnum):
@@ -80,7 +78,7 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     """Widget used to configure mode change actions """
     
     # IMPORTANT: MUST BE A DID FORMATTED ID ON CUSTOM INPUTS
-    device_guid = get_mode_device_guid()
+    device_guid = gremlin.shared_state.mode_tab_guid
 
     def __init__(
             self,
@@ -188,7 +186,7 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             modeEnter.input_id = ModeInputModeType.ModeEnter
             modeEnter.device_name = "Mode"
             modeEnter.input_type = InputType.ModeControl
-            modeEnter.device_guid = get_mode_device_guid()
+            modeEnter.device_guid = gremlin.shared_state.mode_tab_guid
             modeEnter.description="Enter mode actions"
             config[InputType.ModeControl][ModeInputModeType.ModeEnter] = modeEnter
         config[InputType.ModeControl][ModeInputModeType.ModeEnter].descriptionReadOnly = True
@@ -197,7 +195,7 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         if not ModeInputModeType.ModeExit in config[InputType.ModeControl]:
             modeExit = gremlin.base_profile.InputItem(self._custom_name_handler)
             modeExit.device_name = "Mode"
-            modeExit.device_guid = get_mode_device_guid()
+            modeExit.device_guid = gremlin.shared_state.mode_tab_guid
             modeExit.input_type = InputType.ModeControl
             modeExit.input_id = ModeInputModeType.ModeExit
             modeExit.description="Exit mode actions"
@@ -207,29 +205,7 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
 
         
-        # config = self.device_profile.modes[gremlin.shared_state.global_mode].config
 
-        # if not ModeInputModeType.ModeGlobalEnter in config[InputType.ModeControl]:
-        #     modeEnter = gremlin.base_profile.InputItem(self._custom_name_handler)
-        #     modeEnter.input_id = ModeInputModeType.ModeEnter
-        #     modeEnter.device_name = "Mode"
-        #     modeEnter.input_type = InputType.ModeControl
-        #     modeEnter.device_guid = get_mode_device_guid()
-        #     modeEnter.description="Enter any mode actions"
-        #     config[InputType.ModeControl][ModeInputModeType.ModeEnter] = modeEnter
-        # config[InputType.ModeControl][ModeInputModeType.ModeEnter].descriptionReadOnly = True
-
-        
-        # if not ModeInputModeType.ModeGlobalExit in config[InputType.ModeControl]:
-        #     modeExit = gremlin.base_profile.InputItem(self._custom_name_handler)
-        #     modeExit.device_name = "Mode"
-        #     modeExit.device_guid = get_mode_device_guid()
-        #     modeExit.input_type = InputType.ModeControl
-        #     modeExit.input_id = ModeInputModeType.ModeExit
-        #     modeExit.description="Exit any mode actions"
-        #     modeExit.descriptionReadonly = True
-        #     config[InputType.ModeControl][ModeInputModeType.ModeExit] = modeExit
-        # config[InputType.ModeControl][ModeInputModeType.ModeExit].descriptionReadOnly = True
         
 
     def itemAt(self, index):

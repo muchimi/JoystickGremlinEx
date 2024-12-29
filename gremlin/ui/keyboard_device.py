@@ -298,15 +298,14 @@ class KeyboardInputItem(AbstractInputItem):
 
 
 
-def get_keyboard_device_guid():
-    return parse_guid('6F1D2B61-D5A0-11CF-BFC7-444553540000')
+
 
 class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     """Widget used to configure keyboard inputs """
 
     # IMPORTANT: MUST BE A DID FORMATTED ID ON CUSTOM INPUTS (this one happens to match the regular keyboard device ID)
-    device_guid = get_keyboard_device_guid()
+    device_guid = gremlin.shared_state.keyboard_tab_guid
 
     def __init__(
             self,

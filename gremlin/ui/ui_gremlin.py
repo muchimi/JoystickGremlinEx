@@ -10,6 +10,7 @@ from PySide6 import QtCore, QtGui, QtWidgets
 
 class Ui_Gremlin(object):
     def setupUi(self, main_window):
+        import gremlin.ui.ui_common
         main_window.setObjectName("Gremlin")
         main_window.resize(800, 600)
         self.main = QtWidgets.QWidget(main_window)
@@ -17,27 +18,30 @@ class Ui_Gremlin(object):
         self.main_layout = QtWidgets.QVBoxLayout(self.main)
 
         
-
-        #self.devices = QtWidgets.QTabWidget()
-        self.devices = QtWidgets.QTabBar()
-        self.devices.setMovable(True)
-        self.devices.setUsesScrollButtons(True)
-        self.devices.setObjectName("devices")
-        
         # content panel below the tab
-        self.tab_bar_widget = QtWidgets.QWidget()
+        self.tab_bar_widget = QtWidgets.QWidget(parent=self.main)
         self.tab_bar_widget.setContentsMargins(0,0,0,0)
         #self.tab_bar_widget.setStyleSheet("background: yellow")
         self.tab_bar_layout = QtWidgets.QVBoxLayout(self.tab_bar_widget)
         self.tab_bar_layout.setContentsMargins(0,0,0,0)
         self.tab_bar_widget.setMaximumHeight(30)
+        
 
+        #self.devices = QtWidgets.QTabWidget()
+        self.devices = gremlin.ui.ui_common.QTabHeader(parent = self.tab_bar_widget)
+        self.devices.setMovable(True)
+        self.devices.setUsesScrollButtons(True)
+        self.devices.setObjectName("devices")
+        
         self.tab_bar_layout.addWidget(self.devices)
 
         # content panel below the tab
-        self.tab_content_widget = QtWidgets.QWidget()
+        self.tab_content_widget = QtWidgets.QWidget(self.main)
+        self.tab_content_widget.setContentsMargins(0,0,0,0)
         #self.tab_content_widget.setStyleSheet("background: green")
         self.tab_content_layout = QtWidgets.QVBoxLayout(self.tab_content_widget)
+        self.tab_content_layout.setContentsMargins(0,0,0,0)
+        
         
         self.main_layout.addWidget(self.tab_bar_widget)
         self.main_layout.addWidget(self.tab_content_widget)

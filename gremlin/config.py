@@ -1400,11 +1400,6 @@ class Configuration:
         device_guid = self._profile_data.get("last_device_guid",None)
         if device_guid is None:
             device_guid = self._data.get("last_device_guid",None)
-        if device_guid is None:
-            # get the first device available
-            if len(gremlin.shared_state.device_guid_to_name_map):
-                devices = list(gremlin.shared_state.device_guid_to_name_map.keys())
-                device_guid = devices[0]
         return device_guid
         
 

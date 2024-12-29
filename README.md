@@ -210,6 +210,11 @@ Joystick Gremlin EX
 
 <!-- TOC --><a name="134016ex-pre-release"></a>
 ## 13.40.16ex (pre-release)
+### (m52)
+- fix: tab reorder and selecting tabs not always updating the display to show the correct device.
+- fix: hat input in some situations not detected
+
+
 ### (m51)
 - Fix: Centering presets visible on non-centered curves causing an exception.
 - Improved: All curves can now force a centering mode for deadzone purposes (new "centered" option) regardless of curve type.  This option may not make any sense on certain curve shapes but is there nonetheless if you need to force a centered deadzone on the input depending on your use-case.

@@ -1396,15 +1396,13 @@ class MidiInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         return self._mode
         
 
-def get_midi_device_guid():
-    return parse_guid('1b56ecf7-0624-4049-b7b3-8d9b7d8ed7e0')
 
 class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     """Widget used to configure open sound control (OSC) inputs """
 
     # IMPORTANT: MUST BE A DID FORMATTED ID ON CUSTOM INPUTS
-    device_guid = get_midi_device_guid()
+    device_guid = gremlin.shared_state.midi_tab_guid
 
     def __init__(
             self,

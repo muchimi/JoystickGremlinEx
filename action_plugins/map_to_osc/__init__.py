@@ -699,7 +699,7 @@ class MapToOscFunctor(gremlin.base_profile.AbstractFunctor):
 
     def profile_start(self):
         ''' occurs when process starts '''
-        device_name = gremlin.joystick_handling.device_name_from_guid(self.action_data.hardware_device_guid)
+        device_name = gremlin.shared_state.get_device_name(self.action_data.hardware_device_guid)
         self.osc_client = self.oscInterface.getClient(self.action_data.server_ip,
                                             self.action_data.server_port,                                            
                                             name=f"OSC {device_name}/{self.action_data.hardware_input_id}")

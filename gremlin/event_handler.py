@@ -26,8 +26,8 @@ from typing import Callable
 
 
 
-import gremlin.config
-import gremlin.config
+
+
 import gremlin.joystick_handling
 import gremlin.shared_state
 import gremlin.threading
@@ -465,7 +465,7 @@ class EventListener(QtCore.QObject):
 	
 	def _profile_started_cb(self):
 		''' occurs on profile start '''
-		device_guid = gremlin.ui.mode_device.get_mode_device_guid()
+		device_guid = gremlin.shared_state.mode_tab_guid
 		mode_enter = gremlin.ui.mode_device.ModeInputModeType.ModeEnter
 		delay = 0.250 # delay in seconds between press/release events for mode control change
 		new_mode = gremlin.shared_state.runtime_mode
@@ -786,7 +786,9 @@ class EventListener(QtCore.QObject):
 				device_guid=event.device_guid,
 				identifier=event.input_index,
 				is_pressed = value,
-				is_virtual = is_virtual
+				is_virtual = is_virtual,
+				value = value,
+				raw_value= value
 			))
 			if not gremlin.shared_state.is_running:
 				self.button_state_change.emit(event.device_guid,
@@ -1574,8 +1576,8 @@ class EventHandler(QtCore.QObject):
 
 
 			if self.runtime_mode != new_mode or force_update:
-
-				device_guid = gremlin.ui.mode_device.get_mode_device_guid()
+				import gremlin.shared_state
+				device_guid = gremlin.shared_state.mode_tab_guid
 				mode_enter = gremlin.ui.mode_device.ModeInputModeType.ModeEnter
 				mode_exit = gremlin.ui.mode_device.ModeInputModeType.ModeExit
 				delay = 0.250 # delay in seconds between press/release events for mode control change
