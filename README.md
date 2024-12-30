@@ -213,6 +213,7 @@ Joystick Gremlin EX
 ### (m53)
 - Fix: For profiles using Simconnect, a failure to connect on profile start (such as, simulator is not running or not "ready") is now handled more gracefully.  The profile will automatically stop when this happens and display a message box on connection  failures.  A profile using Simconnect should only start when the simulator is fully loaded and available, which can take significant time.  The rule of thumb is Simconnect is available when the Simulator's user interface becomes available.
 - Fix: Toolbar icon updates when GremlinEx is activated via the system tray menu.
+- Fix: Settings and Plugins tabs no longer cause an assertion when selected (introduced in m50)
 
 ### (m52)
 - Fix: tab reorder and selecting tabs not always updating the display to show the correct device.

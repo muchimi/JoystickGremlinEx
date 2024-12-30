@@ -1461,7 +1461,12 @@ class Configuration:
         elif device_type == gremlin.types.DeviceType.ModeControl:
             save_input_id = input_id
             input_type = gremlin.input_types.InputType.ModeControl
-            
+        elif device_type == gremlin.types.DeviceType.NotSet:
+            # settings or other non input type page
+            input_type = gremlin.input_types.InputType.NotSet
+            save_input_id = None
+            input_id = None
+        
                     
         else:
             assert False, f"Config: GetInputId() Don't know how to handle device type: {device_type}"
