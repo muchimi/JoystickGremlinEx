@@ -317,6 +317,7 @@ class SimConnect():
 		self._hSimConnect = HANDLE()
 		self._quit = 0
 		self.ok = False
+		self._abort = False # true if we're aborting and should stop running
 		self.running = False
 		self._is_loop_running = False  # true if the DLL event listen loop is running
 		self._is_connected = False # true if the DLL is hooked
@@ -341,7 +342,7 @@ class SimConnect():
 				
 	@QtCore.Slot()
 	def _connected(self):
-		# marke completed
+		# mark completed
 		self._request_busy = False
 		syslog = logging.getLogger("system")
 		syslog.info(f"Simconnect: connect request completed")
@@ -638,7 +639,10 @@ class SimConnect():
 	def connect(self):
 		if self._is_connected:
 			# already connected
-			return
+			return True
+		if self._abort:
+			# abort
+			return False
 		syslog = logging.getLogger("system")
 		try:
 
@@ -695,11 +699,18 @@ class SimConnect():
 			self.run()
 
 				
-		except OSError:
-			syslog.error("Simconnect: Did not find Flight Simulator running.")
+		except Exception as err:
+			gremlin.shared_state.abort = True
+			self._abort = True
+			self._dll = None
+			msg = "Simconnect: Did not find Flight Simulator running."
+			syslog.error(msg)
 			eh = gremlin.event_handler.EventListener()
-			#eh.request_profile_stop.emit("Did not find Flight Simulator running.")
-			raise ConnectionError("Did not find Flight Simulator running.")
+			eh.abort.emit()
+			self.exit()
+			eh.request_profile_stop.emit(msg) # tell components the profile should stop
+			return False
+	
 		
 	def run(self):
 		if not self._is_loop_running:
@@ -762,15 +773,19 @@ class SimConnect():
 
 	def is_connected(self, auto_connect = True):
 		''' determines if connected and optionally starts the connection '''
+		if self._abort:
+			return False
 		if self.ok:
 			return True
 		# attempt to connect
 		if auto_connect:
-			self.connect()
+			return self.connect()
 		return self.ok
 	
 	def is_running(self, auto_connect = True):
 		''' determines if the event loop is running or not '''
+		if self._abort:
+			return False
 		if not self._is_loop_running and auto_connect:
 			self.connect()
 

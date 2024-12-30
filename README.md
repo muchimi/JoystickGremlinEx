@@ -210,9 +210,13 @@ Joystick Gremlin EX
 
 <!-- TOC --><a name="134016ex-pre-release"></a>
 ## 13.40.16ex (pre-release)
+### (m53)
+- Fix: For profiles using Simconnect, a failure to connect on profile start (such as, simulator is not running or not "ready") is now handled more gracefully.  The profile will automatically stop when this happens and display a message box on connection  failures.  A profile using Simconnect should only start when the simulator is fully loaded and available, which can take significant time.  The rule of thumb is Simconnect is available when the Simulator's user interface becomes available.
+- Fix: Toolbar icon updates when GremlinEx is activated via the system tray menu.
+
 ### (m52)
-- fix: tab reorder and selecting tabs not always updating the display to show the correct device.
-- fix: hat input in some situations not detected
+- Fix: tab reorder and selecting tabs not always updating the display to show the correct device.
+- Fix: hat input in some situations not detected
 
 
 ### (m51)

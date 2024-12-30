@@ -888,14 +888,14 @@ class SimConnectDll(object):
 		#   SIMCONNECT_CLIENT_DATA_ID ClientDataID
 		#   SIMCONNECT_CLIENT_DATA_DEFINITION_ID DefineID
 		#   SIMCONNECT_CLIENT_DATA_SET_FLAG Flags
-		#   DWORD dwReserved
+		#   DWORD dwReserved  set to 0
 		#   DWORD cbUnitSize
 		#   void * pDataSet);
 		self.SetClientData = self.SimConnect.SimConnect_SetClientData
 		self.SetClientData.restype = HRESULT
 		self.SetClientData.argtypes = [
 			HANDLE,
-			self.CLIENT_DATA_ID,
+			self.CLIENT_DATA_ID, 
 			self.CLIENT_DATA_DEFINITION_ID,
 			SIMCONNECT_CLIENT_DATA_SET_FLAG,
 			DWORD,
@@ -982,3 +982,4 @@ class SimConnectDll(object):
 			SIMCONNECT_FACILITY_LIST_TYPE,
 			self.DATA_REQUEST_ID,
 		]
+

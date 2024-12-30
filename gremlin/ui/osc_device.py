@@ -1791,6 +1791,7 @@ class OscInterface(QtCore.QObject):
 
         el = gremlin.event_handler.EventListener()
         el.request_osc.connect(self._request_osc_state)
+        
 
         self._started = False
  

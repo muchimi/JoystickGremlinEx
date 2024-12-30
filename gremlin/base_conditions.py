@@ -322,6 +322,7 @@ class AbstractFunctor(QtCore.QObject):
         el = gremlin.event_handler.EventListener()
         el.profile_start.connect(self.profile_start)
         el.profile_stop.connect(self.profile_stop)
+        el.abort.connect(self.profile_stop) # abort also stops the profile
 
         
 

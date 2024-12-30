@@ -428,6 +428,8 @@ class SimConnectManager(QtCore.QObject):
 
         el = gremlin.event_handler.EventListener()
         el.shutdown.connect(self._shutdown) # trap application shutdown
+        el.abort.connect(self._shutdown) # trap abort
+        el.profile_stop.connect(self._shutdown) # trap profile stop
 
         self.verbose = gremlin.config.Configuration().verbose_mode_simconnect
 
@@ -458,6 +460,8 @@ class SimConnectManager(QtCore.QObject):
         self._aircraft_tile = None # current title from aircraft.cfg
         self._aircraft_name = None # current name from aicraft cfg path
         self._simvars_xml =  os.path.join(gremlin.util.userprofile_path(), "simconnect_simvars.xml")
+
+        # https://docs.flightsimulator.com/html/Programming_Tools/SimConnect/API_Reference/Events_And_Data/SimConnect_AddToDataDefinition.htm
         self._lvars_xml = os.path.join(gremlin.util.userprofile_path(), "simconnect_lvars.xml")
 
 
@@ -470,6 +474,8 @@ class SimConnectManager(QtCore.QObject):
         self._is_running = False
         self._aircraft_folder = None
         self._aircraft_title = None
+
+        self._abort = False # true if processing should stop
 
         self._registered_feed_blocks = {}
         self._registered_requests = {}
@@ -486,6 +492,7 @@ class SimConnectManager(QtCore.QObject):
         ''' application shutdown '''
         syslog.info("SIMCONNECT: shutdown")
         self.sim_disconnect()
+        self._abort = True
 
 
 
@@ -816,6 +823,10 @@ class SimConnectManager(QtCore.QObject):
     def reconnect(self, force_retry = False):
         # not connected
         if not self.connected:
+
+            if self._abort:
+                # abort mode
+                return False 
             try:
                 if force_retry or self._connect_attempts > 0:
                     if self._connect_attempts > 0:
@@ -826,12 +837,15 @@ class SimConnectManager(QtCore.QObject):
             except:
                 pass
 
+
+
             if not self._sm.ok:
                 if self._connect_attempts == 0 and gremlin.shared_state.is_running:
-                    syslog.error("Simconnect: failed to connect to simulator - terminating profile")
+                    msg = "Simconnect: failed to connect to simulator - terminating profile"
+                    syslog.error(msg)
                     # request the profile to stop
                     eh = gremlin.event_handler.EventListener()
-                    eh.request_profile_stop.emit()
+                    eh.request_profile_stop.emit(msg)
                 return False
             
             else:

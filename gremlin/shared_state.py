@@ -66,6 +66,8 @@ _suspend_timer = None
 
 application_version = "0.0" # application version (set at runtime)
 
+abort = False # global abort flag - used to mark a profile start should abort - used along with the abort signal
+
 # key of the global mode used internally for some global mappings
 # global_mode = "__internal_global__"
 

@@ -865,6 +865,7 @@ class SimconnectMonitor():
         el= gremlin.event_handler.EventListener()
         el.profile_started.connect(self._profile_start) # trap profile start
         el.profile_stop.connect(self.stop) # trap profile stop
+        el.abort.connect(self.stop)
         el.shutdown.connect(self._shutdown) # trap application shutdown
         el.mode_changed.connect(self._mode_changed) # trap runtime mode changes - these occur post validation
 
@@ -927,6 +928,10 @@ class SimconnectMonitor():
         if self._started:
             return
         
+        # trap abort
+        eh = gremlin.event_handler.EventListener()
+        eh.abort.connect(self.stop)
+        
         # start the reconnect thread
         self._auto_reconnect_thread = threading.Thread(target = self._auto_reconnect_loop)
         self._auto_reconnect_thread.setName("SCMONITOR: auto-reconnect")
@@ -941,21 +946,7 @@ class SimconnectMonitor():
                 self._get_aircraft()
         
         
-    def _get_aircraft(self):
-        ''' updates the current aircraft '''
-
-        # this is the primary key for mode matching because it works using streamed or local content
-        # SimconnectManager keeps tabs on the current aircraft
-        sim_name =  self._manager.current_aircraft_sim_name 
-        title =  self._manager.current_aircraft_title
-        folder = self._manager.current_aircraft_folder
-        if sim_name:
-            # aircraft found 
-            self._sim_aircraft_loaded(folder, sim_name, title)
-        else:
-            # no aicraft yet - ask for what's currently loaded
-            self._manager.request_loaded_aircraft()
-
+    
     
     def stop(self):
         ''' stop monitoring aircraft changes  '''
@@ -979,7 +970,21 @@ class SimconnectMonitor():
             time.sleep(1)
 
 
-    
+    def _get_aircraft(self):
+        ''' updates the current aircraft '''
+
+        # this is the primary key for mode matching because it works using streamed or local content
+        # SimconnectManager keeps tabs on the current aircraft
+        sim_name =  self._manager.current_aircraft_sim_name 
+        title =  self._manager.current_aircraft_title
+        folder = self._manager.current_aircraft_folder
+        if sim_name:
+            # aircraft found 
+            self._sim_aircraft_loaded(folder, sim_name, title)
+        else:
+            # no aicraft yet - ask for what's currently loaded
+            self._manager.request_loaded_aircraft()
+
 
 
     def _shutdown(self):
@@ -3002,12 +3007,17 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         self.value = action.value # the value to send (None if no data to send)
         self.manager : SimConnectManager = SimConnectManager()
         self.valid = False
+        
+        self.reconnect_timeout = 5
+        self.last_reconnect_time = None
 
         # self.action_data.gate_data.process_callback = self.process_gated_event
         if self.action_data.block is None or not self.action_data.block.command_type != SimConnectCommandType.NotSet:
             syslog.error(f"Simconnect: invalid block: {self.command}")
             self.valid = False
             return
+        
+
         
         self.valid = True
 
@@ -3048,6 +3058,10 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
     
     def process_event(self, event, action_value : gremlin.actions.Value):
         ''' runs when a joystick event occurs like a button press or axis movement when a profile is running '''
+
+        if not gremlin.shared_state.is_running or gremlin.shared_state.abort:
+            return
+    
 
         block = self.action_data.block
         if block:

@@ -372,6 +372,9 @@ class EventListener(QtCore.QObject):
 	# request profile activate/deactivate
 	request_activate = QtCore.Signal(bool)  # param - flag - true to activate, false to deactivate
 
+	# abort load
+	abort = QtCore.Signal() # tells loops/thread at active time to stop - called when a profile needs to stop due to a start error
+
 	# request OSC start/stop
 	request_osc = QtCore.Signal(bool) # param - flag - true to start, false to stop
 
@@ -1157,6 +1160,7 @@ class EventHandler(QtCore.QObject):
 			self.plugins[plugin.keyword] = plugin
 
 	def dump_exectree(self, device_guid, mode, event):
+		''' outputs the execution tree to the log '''
 		from types import FunctionType, MethodType
 
 		verbose = gremlin.config.Configuration().verbose
@@ -1694,8 +1698,7 @@ class EventHandler(QtCore.QObject):
 
 	@QtCore.Slot(Event)
 	def process_event(self, event : Event):
-		"""Processes a single event by passing it to all callbacks
-		registered for this event.
+		"""Processes a single event by passing it to all callbacks registered for this event.
 
 		:param event the event to process
 		"""

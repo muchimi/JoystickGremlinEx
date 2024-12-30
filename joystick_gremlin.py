@@ -120,7 +120,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_BASE = "m52"
+APPLICATION_BASE = "m54"
 APPLICATION_VERSION = f"13.40.16ex ({APPLICATION_BASE})"
 
 
@@ -213,6 +213,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         self._last_highlight_key = None    # last event processed for input highlights
         el.toggle_highlight.connect(self._handle_highlight_state) # input highlighting states
         el.ui_ready.connect(self._ui_ready)
+        gremlin.shared_state.aborted = False
+        el.request_profile_stop.connect(lambda x: self.abort(x))
 
         # Process monitor
         self.process_monitor = gremlin.process_monitor.ProcessMonitor()
@@ -890,6 +892,20 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.activate(activate)
 
 
+    def abort(self, message = None):
+        ''' aborts profile execution on error '''
+        if gremlin.shared_state.aborted:
+            return
+        
+        gremlin.shared_state.aborted = True # mark aborting globally
+        el = gremlin.event_handler.EventListener()
+        el.abort.emit()
+        self.ui.actionActivate.setChecked(False)
+        self.activate(False)
+        if message:
+            gremlin.ui.ui_common.MessageBox(prompt = message)
+
+
     def activate(self, activate):
         """Activates and deactivates the code runner.
 
@@ -930,6 +946,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                 self._profile_auto_activated = False
                 ec = gremlin.execution_graph.ExecutionContext()
                 ec.reset()
+                gremlin.shared_state.aborted = False # reset abort flag
 
 
                 # start the profile with the specified runtime mode
@@ -941,6 +958,9 @@ class GremlinUi(QtWidgets.QMainWindow):
                 )
                 #print ("set icon ACTIVE")
                 self.ui.tray_icon.setIcon(load_icon("gfx/icon_active.ico"))
+
+                with QtCore.QSignalBlocker(self.ui.actionActivate):
+                    self.ui.actionActivate.setChecked(True) # toolbar icon "on"
 
                 if verbose_mode_exec:
                     ec.dumpActive()
@@ -964,7 +984,6 @@ class GremlinUi(QtWidgets.QMainWindow):
                 # tell modules the profile is stopping
                 el.profile_stop.emit()
 
-
                 self.runner.stop()
                 self._update_status_bar_active(False)
                 self._profile_auto_activated = False
@@ -979,6 +998,11 @@ class GremlinUi(QtWidgets.QMainWindow):
                     TabDeviceType.Osc,
                     TabDeviceType.Midi):
                         widget.refresh()
+
+                # toolbar icon
+                with QtCore.QSignalBlocker(self.ui.actionActivate):
+                    self.ui.actionActivate.setChecked(False) # toolbar icon "off"
+
                 try:
                     if self.ui.tray_icon is not None:
                         self.ui.tray_icon.setIcon(load_icon("gfx/icon.ico"))
@@ -1295,7 +1319,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.ui.action_tray_show = \
             QtGui.QAction("Show / Hide", self)
         self.ui.action_tray_enable = \
-            QtGui.QAction("Enable / Disable", self)
+            QtGui.QAction("Start/Stop profile", self)
         self.ui.action_tray_quit = QtGui.QAction("Quit", self)
         self.ui.tray_menu.addAction(self.ui.action_tray_show)
         self.ui.tray_menu.addAction(self.ui.action_tray_enable)
