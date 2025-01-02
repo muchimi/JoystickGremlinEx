@@ -748,6 +748,7 @@ class JoystickAction(MacroAbstractAction):
         self.input_id = input_id
         self.value = value
         self.axis_type = axis_type
+        
 
     def __call__(self, is_local = None, is_remote = None, force_remote = None):
         """Emits an Event instance through the EventListener system."""

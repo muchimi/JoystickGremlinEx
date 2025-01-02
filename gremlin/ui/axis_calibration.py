@@ -916,7 +916,7 @@ class CalibrationDialogEx(gremlin.ui.ui_common.QRememberDialog):
         
         with QtCore.QSignalBlocker(self._deadzone_widget):
             self._deadzone_widget.isCentered = is_centered
-            self._deadzone_widget.set_values(self.action_data.deadzone)
+            self._deadzone_widget.setValues(self.action_data.deadzone)
             
 
         self._update_axis_widget(raw_value,

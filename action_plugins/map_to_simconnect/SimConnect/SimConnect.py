@@ -145,6 +145,7 @@ class Request(object):
 	def Register(self):
 		''' ensures the request is registered with SimConnect '''
 		self._ensure_def()
+		
 
 	def _ensure_def(self):
 		if not self._sm.ok:
@@ -308,7 +309,6 @@ class SimConnect():
 		'''
 		
 		
-		
 		self.Requests = {}
 		self.Facilities = []
 		self.verbose = gremlin.config.Configuration().verbose_mode_simconnect
@@ -329,7 +329,10 @@ class SimConnect():
 		self._aircraft_loaded_event = threading.Event() # locks the aircraft process thread in case we get multiple concurrent calls
 
 		self.handler : SimConnectEventHandler = handler # used to trigger various events
+		self.client_data_handlers = [] # client data handlers - for when client data is received
 
+		self._dll = SimConnectDll(self._library_path)
+		self._my_dispatch_proc_rd = self._dll.DispatchProc(self.simconnect_dispatch_proc)
 	
 		if auto_connect:
 			self.connect()
@@ -338,6 +341,26 @@ class SimConnect():
 	@property
 	def handle(self):
 		return self._hSimConnect
+	
+	def register_client_data_handler(self, handler):
+		''' registers a client data area handler '''
+		if not handler in self.client_data_handlers:
+			verbose = gremlin.config.Configuration().verbose_mode_simconnect
+			if verbose:
+				syslog = logging.getLogger("system")
+				syslog.info("Simconnect: register new client data handler")
+			self.client_data_handlers.append(handler)
+
+
+	def unregister_client_data_handler(self, handler):
+		''' unregisters a client data area handler '''
+		if handler in self.client_data_handlers:
+			verbose = gremlin.config.Configuration().verbose_mode_simconnect
+			if verbose:
+				syslog = logging.getLogger("system")
+				syslog.info("Simconnect: un register new client data handler")
+			self.client_data_handlers.remove(handler)
+
 		
 				
 	@QtCore.Slot()
@@ -507,12 +530,21 @@ class SimConnect():
 				''' run the request callback '''
 				_request.callback()
 			
-		else:
-			syslog = logging.getLogger("system")
-			syslog.warning(f"SimConnect: Event ID: {dwRequestID} is not handled")
+			return True
+		
+		# not one of ours
+		return False
+		# syslog = logging.getLogger("system")
+		# syslog.warning(f"SimConnect: Event ID: {dwRequestID} is not handled")
 
-	def handle_clientdata_event(self, ObjData):
-		self.handle_simobject_event(ObjData)
+	def handle_clientdata_event(self, pData):
+		''' handles client data receipt '''
+		# pObjData = cast(pData, POINTER(SIMCONNECT_RECV_CLIENT_DATA)).contents
+		# if not self.handle_simobject_event(pObjData):
+		# 	# handle non requests
+		for handle in self.client_data_handlers:
+			handle(pData)
+		
 			
 
 
@@ -564,17 +596,24 @@ class SimConnect():
 	# TODO: update callbackfunction to expand functions.
 	def simconnect_dispatch_proc(self, pData, cbData, pContext):
 		# print("my_dispatch_proc")
-		syslog = logging.getLogger("system")
+		verbose = True
 		dwID = pData.contents.dwID
-		if dwID == SIMCONNECT_RECV_ID.SIMCONNECT_RECV_ID_EVENT.value:
+		syslog = logging.getLogger("system")
+		# if dwID == 16:
+		# 	syslog.info(f"dispatch: client data ")
+		
+		if dwID == SIMCONNECT_RECV_ID.SIMCONNECT_RECV_ID_EVENT:
+			syslog.info("dispatch: receive event")
 			evt = cast(pData, POINTER(SIMCONNECT_RECV_EVENT)).contents
 			self.handle_id_event(evt)
 
-		elif dwID == SIMCONNECT_RECV_ID.SIMCONNECT_RECV_ID_SYSTEM_STATE.value:
+
+		elif dwID == SIMCONNECT_RECV_ID.SIMCONNECT_RECV_ID_SYSTEM_STATE:
+			syslog.info("dispatch: receive state")
 			data = cast(pData, POINTER(SIMCONNECT_RECV_SYSTEM_STATE)).contents
 			self.handle_state_event(data)
 
-		elif dwID == SIMCONNECT_RECV_ID.SIMCONNECT_RECV_ID_SIMOBJECT_DATA_BYTYPE.value:
+		elif dwID == SIMCONNECT_RECV_ID.SIMCONNECT_RECV_ID_SIMOBJECT_DATA_BYTYPE:
 			pObjData = cast(
 				pData, POINTER(SIMCONNECT_RECV_SIMOBJECT_DATA_BYTYPE)
 			).contents
@@ -604,6 +643,7 @@ class SimConnect():
 				pData, POINTER(SIMCONNECT_RECV_FACILITIES_LIST)
 			).contents
 			dwRequestID = pObjData.dwRequestID
+			syslog.info("dispatch: receive facility")
 			for _facility in self.Facilities:
 				if dwRequestID == _facility.REQUEST_ID.value:
 					_facility.parent.dump(pData)
@@ -613,6 +653,7 @@ class SimConnect():
 			self._quit = 1
 		elif dwID == SIMCONNECT_RECV_ID.SIMCONNECT_RECV_ID_EVENT_FILENAME:
 			# file name
+			syslog.info("dispatch: receive filename")
 			pObjData = cast(pData, POINTER(SIMCONNECT_RECV_EVENT_FILENAME)).contents
 			file = pObjData.zFileName.decode()
 			folder = os.path.dirname(file)
@@ -621,16 +662,19 @@ class SimConnect():
 			
 		elif dwID == SIMCONNECT_RECV_ID.SIMCONNECT_RECV_ID_SIMOBJECT_DATA:
 			# data
+			syslog.info("dispatch: receive simobject data")
 			pObjData = cast(pData, POINTER(SIMCONNECT_RECV_SIMOBJECT_DATA)).contents
 			self.handle_simobject_event(pObjData)
 		elif dwID == SIMCONNECT_RECV_ID.SIMCONNECT_RECV_ID_CLIENT_DATA:
 			# client data
+			#syslog.info("dispatch: received client data")
 			pObjData = cast(pData, POINTER(SIMCONNECT_RECV_CLIENT_DATA)).contents
-			self.handle_clientdata_event(pObjData)
+			#syslog.info(f"received client data: request ID: {pObjData.dwRequestID} define ID: {pObjData.dwDefineID} ")
+			self.handle_clientdata_event(pData)
 
 
 		else:
-			if self.verbose:
+			if verbose:
 				syslog = logging.getLogger("system")
 				syslog.debug(f"Simconnect: Received: {SIMCONNECT_RECV_ID(dwID)}")
 		return
@@ -649,8 +693,7 @@ class SimConnect():
 
 			self._is_loop_running = False
 			self._quit = 0
-			self._dll = SimConnectDll(self._library_path)
-			self._my_dispatch_proc_rd = self._dll.DispatchProc(self.simconnect_dispatch_proc)
+
 			err = self._dll.Open(
 				byref(self._hSimConnect), LPCSTR(b"GremlinEx"), None, 0, 0, 0
 			)
@@ -702,7 +745,6 @@ class SimConnect():
 		except Exception as err:
 			gremlin.shared_state.abort = True
 			self._abort = True
-			self._dll = None
 			msg = "Simconnect: Did not find Flight Simulator running."
 			syslog.error(msg)
 			eh = gremlin.event_handler.EventListener()
@@ -749,15 +791,15 @@ class SimConnect():
 		# close the connection
 		try:
 			self._dll.Close(self._hSimConnect)
-			self._dll = None
-			self._is_connected = False	
-			
-			self.handler.simconnect_disconnected.emit()
-			syslog.info("Simconnect: Close connection")
 		except:
 			pass
-
-		
+		try:
+			self.handler.simconnect_disconnected.emit()
+		except:
+			pass
+		self._dll = None
+		self._is_connected = False	
+		syslog.info("Simconnect: Close connection")
 		self._is_loop_running = False
 
 	def disconnect(self):
@@ -793,11 +835,11 @@ class SimConnect():
 
 
 	def map_to_sim_event(self, name):
+		syslog = logging.getLogger("system")
 		if self._dll is not None:
 			for m in self._dll.EventID:
 				if name.decode() == m.name:
 					if self.verbose_details:
-						syslog = logging.getLogger("system")
 						syslog.debug(f"Simconnect: Already have event: {name} {m}")
 					return m
 
@@ -809,9 +851,11 @@ class SimConnect():
 				if self.IsHR(err, 0):
 					return evnt
 			except:
+				syslog.error(f"Simconnect: Error: MapToSimEvent error: event: {err}")
 				pass			
 		
-		syslog.error(f"Simconnect: Error: MapToSimEvent: event: {name}")
+
+		syslog.error(f"Simconnect: Error: MapToSimEvent: not connected event: {name}")
 		return None
 
 	def add_to_notification_group(self, group, event, maskable : bool =False):
@@ -908,6 +952,9 @@ class SimConnect():
 
 	def set_data(self, request : Request):
 		if self._dll is None:
+			self.connect()
+		if self._dll is None:
+			logging.getLogger("system").warning(f"Simconnect: Setdata: not connected - request : {request.definitions}")
 			return False
 		if request.buffer is None:
 			return False
@@ -976,11 +1023,11 @@ class SimConnect():
 			return False
 		
 
-	def new_client_data_id(self):
+	def new_client_data_definition_id(self):
 		if self._dll is None:
 			return None
 		
-		_name = "ClientData" + str(len(list(self._dll.CLIENT_DATA_DEFINITION_ID)))
+		_name = "ClientDataDef_" + str(len(list(self._dll.CLIENT_DATA_DEFINITION_ID)))
 		names = [m.name for m in self._dll.CLIENT_DATA_DEFINITION_ID] + [_name]
 
 		self._dll.CLIENT_DATA_DEFINITION_ID = Enum(self._dll.CLIENT_DATA_DEFINITION_ID.__name__, names)
@@ -991,18 +1038,30 @@ class SimConnect():
 		if self._dll is None:
 			return None
 		
-		_name = "Definition" + str(len(list(self._dll.DATA_DEFINITION_ID)))
+		_name = "Definition_" + str(len(list(self._dll.DATA_DEFINITION_ID)))
 		names = [m.name for m in self._dll.DATA_DEFINITION_ID] + [_name]
 
 		self._dll.DATA_DEFINITION_ID = Enum(self._dll.DATA_DEFINITION_ID.__name__, names)
 		DEFINITION_ID = list(self._dll.DATA_DEFINITION_ID)[-1]
 		return DEFINITION_ID
+	
+	def new_client_data_id(self):
+		if self._dll is None:
+			return None
+		
+		_name = "ClientData_" + str(len(list(self._dll.CLIENT_DATA_ID)))
+		names = [m.name for m in self._dll.CLIENT_DATA_ID] + [_name]
+
+		self._dll.CLIENT_DATA_ID = Enum(self._dll.CLIENT_DATA_ID.__name__, names)
+		CLIENT_ID = list(self._dll.CLIENT_DATA_ID)[-1]
+		return CLIENT_ID
+
 
 	def new_request_id(self):
 		if self._dll is None:
 			return None
 		
-		name = "Request" + str(len(self._dll.DATA_REQUEST_ID))
+		name = "Request_" + str(len(self._dll.DATA_REQUEST_ID))
 		names = [m.name for m in self._dll.DATA_REQUEST_ID] + [name]
 		self._dll.DATA_REQUEST_ID = Enum(self._dll.DATA_REQUEST_ID.__name__, names)
 		REQUEST_ID = list(self._dll.DATA_REQUEST_ID)[-1]
@@ -1218,8 +1277,6 @@ class SimConnect():
 			return False
 		return True
 	
-	def getNextClientDataDefinitionId(self):
-		return self._dll.CLIENT_DATA_DEFINITION_ID
 	
 	def addToClientDataDefinition(self, definition_id, offset, size):
 		''' adds to the client data definition, returns true on success '''

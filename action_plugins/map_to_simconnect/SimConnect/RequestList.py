@@ -1,9 +1,9 @@
 from .SimConnect import *
 from .Enum import *
 from .Constants import *
+from gremlin.singleton_decorator import SingletonDecorator
 
-
-
+@SingletonDecorator
 class AircraftRequests():
 	def find(self, key):
 		index = None
@@ -27,7 +27,6 @@ class AircraftRequests():
 			return _request
 		return None
 
-
 	def get(self, key):
 		''' gets the value of the current request '''
 		request = self.request(key)
@@ -40,8 +39,9 @@ class AircraftRequests():
 		''' sets the value of the current request '''
 		request = self.request(key)
 		if request is None:
+			logging.getLogger("system").warning(f"Simconnect: Request: key {key} not found in request list")
 			return False
-		request.value = _value
+		
 		self.sm.set_data(request)
 			
 		return True
@@ -89,6 +89,7 @@ class AircraftRequests():
 		self.list.append(self.EnvironmentData)
 		self.SlingsandHoists = self.__SlingsandHoists(sm, time, attempts, on_change)
 		self.list.append(self.SlingsandHoists)
+
 
 	class __AircraftEngineData(RequestHelper):
 		list = {

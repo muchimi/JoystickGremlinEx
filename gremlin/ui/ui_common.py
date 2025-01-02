@@ -151,9 +151,11 @@ class StateTracker():
         if not input_type in self._button_cache[device_guid]:
             self._button_cache[device_guid][input_type] = {}
         key = self._key(input_id)
-        assert key
-        # print (f"Add button {key}")
-        self._button_cache[device_guid][input_type][key] = widget
+        if key:
+            # print (f"Add button {key}")
+            self._button_cache[device_guid][input_type][key] = widget
+        else:
+            pass
 
     def unregisterButtonState(self, device_guid, input_type, input_id):
         if not isinstance(device_guid, str):

@@ -4,6 +4,21 @@ from ctypes import *
 from ctypes.wintypes import *
 
 
+# class Sequence():
+# 	def __init__(self, start = 0):
+# 		self._value = start
+
+# 	def nextValue(self):
+# 		value = self._value
+# 		self._value +=1
+# 		return value
+
+# 	@property
+# 	def value(self):
+# 		return self._value
+	
+
+
 class SimConnectDll(object):
 
 	def __init__(self, library_path):
@@ -811,11 +826,7 @@ class SimConnectDll(object):
 		#   SIMCONNECT_CLIENT_DATA_ID ClientDataID);
 		self.MapClientDataNameToID = self.SimConnect.SimConnect_MapClientDataNameToID
 		self.MapClientDataNameToID.restype = HRESULT
-		self.MapClientDataNameToID.argtypes = [
-			HANDLE, 
-			c_char_p, 
-			SIMCONNECT_CLIENT_DATA_ID
-		]
+		self.MapClientDataNameToID.argtypes = [HANDLE, c_char_p, SIMCONNECT_CLIENT_DATA_ID]
 
 		# SIMCONNECTAPI SimConnect_CreateClientData(
 		#   HANDLE hSimConnect,
@@ -883,6 +894,7 @@ class SimConnectDll(object):
 			DWORD,
 		]
 
+		# https://docs.flightsimulator.com/html/Programming_Tools/SimConnect/API_Reference/Events_And_Data/SimConnect_SetClientData.htm
 		# SIMCONNECTAPI SimConnect_SetClientData(
 		#   HANDLE hSimConnect,
 		#   SIMCONNECT_CLIENT_DATA_ID ClientDataID

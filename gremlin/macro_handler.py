@@ -217,7 +217,7 @@ class MacroActionEditor(QtWidgets.QWidget):
                 self.index.row()
             )
         elif value == "Remote Control":
-            self.mode.set_entry(gremlin.macro.RemoteControlAction(), self.index.row)
+            self.model.set_entry(gremlin.macro.RemoteControlAction(), self.index.row())
 
 
         # Update the UI elements
@@ -434,15 +434,20 @@ class MacroActionEditor(QtWidgets.QWidget):
             if action.input_type == InputType.JoystickAxis:
                 if not "axis_type_layout" in self.ui_elements.keys():
                     self.ui_elements["axis_type_layout"] = QtWidgets.QHBoxLayout()
+                    self.ui_elements["axis_value_layout"] = QtWidgets.QHBoxLayout()
                     self.ui_elements["axis_reverse"] = QtWidgets.QCheckBox("Reverse")
                     self.ui_elements["axis_absolute"] = QtWidgets.QRadioButton("Absolute")
                     self.ui_elements["axis_relative"] = QtWidgets.QRadioButton("Relative")
+                    self.ui_elements["axis_value"] = gremlin.ui.ui_common.QFloatLineEdit()
+                    
+
                     if action.axis_type == "absolute":
                         self.ui_elements["axis_absolute"].setChecked(True)
                         self.ui_elements["axis_relative"].setChecked(False)
                     elif action.axis_type == "relative":
                         self.ui_elements["axis_absolute"].setChecked(False)
                         self.ui_elements["axis_relative"].setChecked(True)
+                    
                     self.ui_elements["axis_absolute"].clicked.connect(
                         self._modify_vjoy_axis
                     )
@@ -450,13 +455,17 @@ class MacroActionEditor(QtWidgets.QWidget):
                         self._modify_vjoy_axis
                     )
 
+
+                    
+
                     self.ui_elements["axis_type_layout"].addWidget(self.ui_elements["axis_reverse"])
                     self.ui_elements["axis_type_layout"].addWidget(self.ui_elements["axis_absolute"])
                     self.ui_elements["axis_type_layout"].addWidget(self.ui_elements["axis_relative"])
+                    self.ui_elements["axis_type_layout"].addWidget(self.ui_elements["axis_value"])
+                    self.ui_elements["axis_type_layout"].addStretch()
                     
                     self.action_layout.addLayout(self.ui_elements["axis_type_layout"])
                     
-
                 
 
             self._create_joystick_inputs_ui(action)
@@ -468,15 +477,11 @@ class MacroActionEditor(QtWidgets.QWidget):
         # Handle display of value based on the actual input type
         if action.input_type == InputType.JoystickAxis:
             if "axis_value" in self.ui_elements.keys():
-                self.ui_elements["axis_value"] = \
-                    gremlin.ui.ui_common.DynamicDoubleSpinBox()
-                self.ui_elements["axis_value"].setRange(-1.0, 1.0)
-                self.ui_elements["axis_value"].setSingleStep(0.1)
-                self.ui_elements["axis_value"].setDecimals(3)
+                # self.ui_elements["axis_value"].setRange(-1.0, 1.0)
+                # self.ui_elements["axis_value"].setSingleStep(0.1)
+                # self.ui_elements["axis_value"].setDecimals(3)
                 self.ui_elements["axis_value"].setValue(action.value)
-                self.ui_elements["axis_value"].valueChanged.connect(
-                    self._modify_axis_state
-                )
+                self.ui_elements["axis_value"].valueChanged.connect(self._modify_axis_state)
 
                 self.action_layout.addWidget(self.ui_elements["axis_value"])
 
@@ -702,11 +707,18 @@ class MacroActionEditor(QtWidgets.QWidget):
         self.ui_elements = {}
         self._vjoy_ui()
 
+    @QtCore.Slot(object)
     def _modify_vjoy_axis(self, data):
         action = self.model.get_entry(self.index.row())
         action.axis_type = "absolute"
         if self.ui_elements["axis_relative"].isChecked():
             action.axis_type = "relative"
+        self._update_model()
+
+    @QtCore.Slot()
+    def _modify_vjoy_value(self):
+        action = self.model.get_entry(self.index.row())
+        action.value = self.ui_elements["axis_value"]
         self._update_model()
 
 

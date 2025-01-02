@@ -154,7 +154,7 @@ class TextToSpeech:
         while not self._tts_thread.stopped():
             time.sleep(0.1)
             self.engine.iterate()
-            continue
+            
         self.engine.endLoop()
 
 

@@ -33,6 +33,8 @@ class CtypesFlagEnum(IntFlag):
 class AutoName(CtypesEnum):
 	def _generate_next_value_(name, start, count, last_values):
 		return count
+	
+
 
 
 # Receive data types
@@ -477,6 +479,19 @@ class SIMCONNECT_RECV_SIMOBJECT_DATA(SIMCONNECT_RECV):
 		("dwDefineCount", DWORD),
 		("dwData", DWORD * 8192),
 	]
+
+class SIMCONNECT_RECV_CLIENT_BYTE_DATA(SIMCONNECT_RECV):
+	_fields_ = [
+		("dwRequestID", DWORD),
+		("dwObjectID", DWORD),
+		("dwDefineID", DWORD),
+		("dwFlags", DWORD),
+		("dwentrynumber", DWORD),
+		("dwoutof", DWORD),
+		("dwDefineCount", DWORD),
+		("dwData", BYTE * 8192),
+	]
+
 
 
 class SIMCONNECT_RECV_SIMOBJECT_DATA_BYTYPE(SIMCONNECT_RECV_SIMOBJECT_DATA):
