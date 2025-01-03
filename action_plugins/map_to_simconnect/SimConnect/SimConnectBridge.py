@@ -87,6 +87,7 @@ class SimConnectBridge(QtCore.QObject):
         self._id = 0 
         self._lvars = [] # list of received lvars 
         self._state = None # response state
+        self._wait_event = threading.Event() # wait event
 
     def start(self):
         if self._started:
@@ -174,22 +175,33 @@ class SimConnectBridge(QtCore.QObject):
                     thread.start()
                     self._state = None
                     
-                
-              
+            elif packet.code == BridgeCommands.ExecuteCalculatorCode:
+                # mark done executing the command
+                self._wait_event.set()  
 
             
             # find the terminating zero
 
             data = packet.data
             syslog.info(f"Bridge: received mobiflight data: {data}")
+            
+
 
                 
     def execute_calculator_code(self, command):
         ''' executes an RPN expression '''
+        syslog = logging.getLogger("system")
+        if self._wait_event.is_set():
+            # currently executing another command - ignore
+            syslog.info("execute: already executing")
+            return
         id = self._get_next_id() # id is sequential so it's unique for each call and will roundrobin
         data = command.encode("ascii")
         packet = BRIDGE_PACKET(id, BridgeCommands.ExecuteCalculatorCode, data)
         packet_pointer = cast(pointer(packet), c_void_p)
+        
+        syslog.info("execute: start")
+        self._wait_event.clear()
         self.sm._dll.SetClientData(
             self.sm._hSimConnect,
             kPublicUplinkArea, 
@@ -201,7 +213,10 @@ class SimConnectBridge(QtCore.QObject):
         
         syslog = logging.getLogger("system")
         syslog.info(f"Bridge: send calculator: {command}")
-
+        # wait for the event
+        self._wait_event.wait(0.5)
+        syslog.info("execute: completed")
+        self._wait_event.clear()
 
     def get_variable(self, command):
         ''' gets a named variables '''

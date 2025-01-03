@@ -474,6 +474,8 @@ class MidiListener(AbortableThread):
         self.port_number = port_number
         self.port_name = port_name
         self.callback = callback
+        el = gremlin.event_handler.EventListener()
+        el.shutdown.connect(self.stop)
 
     def run(self):
         verbose = gremlin.config.Configuration().verbose_mode_midi

@@ -125,6 +125,7 @@ class GatedAxis(gremlin.base_profile.AbstractAction):
         if not gate_node is None:
             for child in gate_node:
                 gate_data = gremlin.gated_handler.GateData(self, action_data = self)
+                
                 gate_data.from_xml(child)
                 gates.append(gate_data)
 

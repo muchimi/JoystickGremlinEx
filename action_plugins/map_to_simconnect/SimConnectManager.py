@@ -704,10 +704,6 @@ class SimConnectManager(QtCore.QObject):
         syslog.error(f"Simconnect: event not found: {command}")
 
 
-    # def sendExpression(self, command):
-    #     ''' sends an expression to calculate '''
-    #     if self.mobi.connected:
-    #         self.mobi.set(command, self.mobi.client)
 
     def calculate(self, command):
         if self.bridge.connected:

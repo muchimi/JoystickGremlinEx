@@ -292,3 +292,21 @@ class AbstractInputItem(QtCore.QObject):
         self._button_value = value
 
 
+    @property
+    def message_key(self):
+        assert False,"message_key property must be implemented by subclasses"
+
+
+class SpecialInputItem(AbstractInputItem):
+    ''' specialized input item '''
+    def __init__(self, name):
+        super().__init__()
+        self._display_name = name
+        self._description = "Special Virtual Input"
+
+    @property
+    def message_key(self):
+        return self.display_name
+    
+    def __str__(self):
+        return "special"

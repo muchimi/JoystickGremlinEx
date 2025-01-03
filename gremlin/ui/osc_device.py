@@ -1762,15 +1762,18 @@ class OscInterface(QtCore.QObject):
 
 
         # find our current IP address
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.settimeout(0)
-        try:
-            s.connect(('10.254.254.254', 1)) # dummy address
-            self._host_ip = s.getsockname()[0]
-        except Exception:
-            self._host_ip= '127.0.0.1'
-        finally:
-            s.close()
+        self._host_ip = gremlin.util.getHostIp()
+        # s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # s.settimeout(0)
+        # try:
+            
+
+        #     s.connect(('10.254.254.254', 1)) # dummy address
+        #     self._host_ip = s.getsockname()[0]
+        # except Exception:
+        #     self._host_ip= '127.0.0.1'
+        # finally:
+        #     s.close()
 
         #self._host_ip = "192.168.1.59"
         # host OSC listen port (UDP) - make sure the host's firewall allows that port in

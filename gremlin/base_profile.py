@@ -27,6 +27,9 @@ import time
 
 import gremlin.actions
 import gremlin.base_buttons
+#import gremlin.base_classes
+import gremlin.base_classes
+import gremlin.base_profile
 import gremlin.config
 import gremlin.curve_handler
 import gremlin.event_handler
@@ -1289,6 +1292,11 @@ class InputItem():
 
 
     @property
+    def message_key(self):
+        # joystick inputs only - returns id of axis or button
+        return self._input_id
+
+    @property
     def hasCalibration(self):
         ''' for axis input devices, returns True if the device has an active calibration '''
         return self._calibration is not None and self._calibration.hasData
@@ -1417,6 +1425,8 @@ class InputItem():
         return self._input_id
     @input_id.setter
     def input_id(self, value):
+        from gremlin.base_classes import AbstractInputItem
+        assert value == None or isinstance(value, int) or isinstance(value, AbstractInputItem)
         self._input_id = value
         self._update_input()
 
@@ -1575,12 +1585,6 @@ class InputItem():
         container_plugins = ContainerPlugins()
         container_tag_map = container_plugins.tag_map
         self.input_type = InputType.to_enum(node.tag)
-        if "id" in node.attrib.keys():
-            s_id = node.get("id")
-            if s_id.isnumeric():
-                self.input_id = safe_read(node, "id", int)
-            else:
-                self.input_id = s_id
         self._description = safe_read(node, "description", str)
         self.always_execute = read_bool(node, "always-execute", False)
 
@@ -1636,6 +1640,8 @@ class InputItem():
         elif self.input_type == InputType.ModeControl:
             # mode control entries - input id is the only item we need
             self.is_axis = False
+            if "id" in node.attrib:
+                self.input_id = safe_read(node,"id",int,0)
             
 
 
@@ -1647,7 +1653,22 @@ class InputItem():
                     self.curve_data._parse_xml(child)
                     self.curve_data.calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(self.device_guid, self.input_id)
                     break
+            if "id" in node.attrib:
+                str_id = node.get("id")
+                if not str_id.isnumeric():
+                    self.input_id = gremlin.base_classes.SpecialInputItem(str_id)
+                else:
+                    self.input_id = safe_read(node,"id",int,0)
             self.is_axis = True
+
+        elif self.input_type in (InputType.JoystickButton, InputType.JoystickHat):
+            if "id" in node.attrib:
+                str_id = node.get("id")
+                if not str_id.isnumeric():
+                    self.input_id = gremlin.base_classes.SpecialInputItem(str_id)
+                else:
+                    self.input_id = safe_read(node,"id",int,0)
+        
 
         assert self.input_id is not None,"Error processing input - check types"
             

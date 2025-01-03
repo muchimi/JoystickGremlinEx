@@ -1222,9 +1222,14 @@ class GateData():
             # ignore if a different input device
             return
             
-        if self._action_data.hardware_input_id != event.identifier:
-            # ignore if a different input axis on the input device
+        if hasattr(self._action_data.hardware_input_id, "message_key"):
+            if self._action_data.hardware_input_id.message_key != event.identifier.message_key:
+                # ignore if a different input axis on the input device
+                return
+            
+        elif self._action_data.hardware_input_id != event.identifier:
             return
+        
 
         # process curved intput
         if not event.is_virtual:

@@ -2325,7 +2325,30 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._calculator_container_layout.addWidget(QtWidgets.QLabel("RPN Expression:"))
         self._calculator_container_layout.addWidget(self._calculator_entry_widget)
         
+        self._autorepeat_container_widget = QtWidgets.QWidget()
+        self._autorepeat_container_layout = QtWidgets.QHBoxLayout(self._autorepeat_container_widget)
 
+
+        self._autorepeat_widget = QtWidgets.QCheckBox("Autorepeat")
+        self._autorepeat_widget.setChecked(self.action_data.auto_repeat)
+        self._autorepeat_widget.clicked.connect(self._auto_repeat_state_changed)
+        self._autorepeat_widget.setToolTip("When enabled, the command will repeat at set interval while the input is pressed")
+        self._autorepeat_delay_label = QtWidgets.QLabel("Repeat Interval (ms)")
+        self._autorepeat_delay_widget = gremlin.ui.ui_common.QIntLineEdit()
+        self._autorepeat_delay_widget.setRange(0, 20000)
+        width = gremlin.ui.ui_common.get_char_width(8)
+        self._autorepeat_delay_widget.setMaximumWidth(width)
+        self._autorepeat_delay_widget.setValue(self.action_data.auto_repeat_interval)
+        self._autorepeat_delay_widget.valueChanged.connect(self._auto_repeat_delay_changed)
+
+        self._autorepeat_container_layout.addWidget(self._autorepeat_widget)
+        self._autorepeat_container_layout.addWidget(self._autorepeat_delay_label)
+        self._autorepeat_container_layout.addWidget(self._autorepeat_delay_widget)
+        self._autorepeat_container_layout.addStretch()
+
+
+
+        self._calculator_container_layout.addWidget(self._autorepeat_container_widget)
         
 
         #self.action_selector_layout.addWidget(self.category_widget)
@@ -2658,6 +2681,14 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.curve_button_widget.setIcon(self.curve_icon_inactive)
             self.curve_clear_widget.setEnabled(False)
 
+
+    @QtCore.Slot(bool)
+    def _auto_repeat_state_changed(self, checked):
+        self.action_data.auto_repeat = checked
+
+    @QtCore.Slot()
+    def _auto_repeat_delay_changed(self):
+        self.action_data.auto_repeat_interval = self._autorepeat_delay_widget.value()
 
     @QtCore.Slot()
     def _command_mode_changed_cb(self):
@@ -3268,7 +3299,9 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
             self.valid = False
             return
         
-
+        self._auto_repeat_thread = None
+        self._auto_repeat_event = threading.Event()
+        self._auto_repeat_thread = threading.Thread(target = self._auto_repeat_command)
         
         self.valid = True
 
@@ -3297,9 +3330,16 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
 
     def profile_stop(self):
         ''' occurs wen the profile stops'''
+        self._auto_repeat_event.set()
+        if self._auto_repeat_thread:
+            # clear any running autorepeat
+            if self._auto_repeat_thread.is_alive():
+                self._auto_repeat_thread.join()
+            
 
         eh = SimConnectEventHandler()
         eh.request_disconnect.emit()
+
         
         
 
@@ -3345,16 +3385,37 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         if not self.manager.is_running:
             # sim is not running
             return
-        
+        syslog = logging.getLogger("system")
         block = self.action_data.block
         output_mode = self.action_data.mode
         command_mode = self.action_data.command_mode
 
-        if "L:" in self.action_data.command:
-            pass
-        if command_mode == SimconnectCommandMode.Calculator and event.is_pressed:
-            # calculator expression
-            self.manager.calculate(self.action_data.command) # run RPN script
+
+        if command_mode == SimconnectCommandMode.Calculator:
+            if not self.action_data.command:
+                # nothing to calculate
+                return True
+            if self.action_data.auto_repeat:
+                if event.is_pressed:
+                    # calculator expression
+                    if not self._auto_repeat_thread.is_alive():
+                        # command auto repeats while pressed - not started
+                        syslog.info("auto repeat start")
+                        self._auto_repeat_thread.start()
+                        return True
+            
+            if event.is_pressed:
+                # regular calculate
+                self.manager.calculate(self.action_data.command) # run RPN script
+            else:
+                # release calculate auto repeat
+                if self.action_data.auto_repeat and self._auto_repeat_thread:
+                    # released
+                    syslog.info("auto repeat stopping...")
+                    self._auto_repeat_event.set()
+                    self._auto_repeat_thread.join()
+                    syslog.info("auto repeat stopped")
+
             return True
 
         if not block or not block.valid:
@@ -3405,6 +3466,15 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
             # trigger action 
             block.execute(action_value.value)
         return True
+    
+    def _auto_repeat_command(self):
+        while not self._auto_repeat_event.is_set():
+            self.manager.calculate(self.action_data.command)
+            time.sleep(self.action_data.auto_repeat_interval)
+
+        syslog = logging.getLogger("system")
+        syslog.info("autorepeat: thread stop")
+
     
 
 class MapToSimConnectHelper(QtCore.QObject):
@@ -3475,7 +3545,8 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         self._command = None
         self._command_mode = SimconnectCommandMode.Simvar # simvar mode
 
-        #self._is_manual_entry = False # true if this is a manual entry 
+        self.auto_repeat = False
+        self.auto_repeat_interval = 250 # how often to repeat the command while pressed in ms
 
         # the value to output if any
         self.value = 0.0
@@ -3486,9 +3557,6 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
 
         self.trigger_on_release = False # true if this is triggered on release when the action is tied to a button or hat intput
         
-        #gate_data = GateData(profile_mode = gremlin.shared_state.current_mode, action_data=self)
-        # self.gates = [gate_data] # list of GateData objects
-        # self.gate_data = gate_data
 
         # curve data applied to a simconnect axis output
         self.curve_data = None # present if curve data is needed
@@ -3682,6 +3750,12 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
 
         if "data_type" in node.attrib:
             self.data_type= safe_read(node,"data_type",str,"int")
+
+        if "delay" in node.attrib:
+            self.auto_repeat_interval = safe_read(node, "delay", int, 250)
+
+        if "autorepeat" in node.attrib:
+            self.auto_repeat = safe_read(node,"autorepeat", bool, False)
         
         self.trigger_on_release = safe_read(node,"trigger_on_release", bool, False)
 
@@ -3740,6 +3814,9 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
             node.set("max_range", safe_format(self.max_range, float)) # normalized
             node.set("inverted", safe_format(self.inverted, bool))
             node.set("trigger", SimConnectTriggerMode.to_string(self.trigger_mode))
+
+            node.set("autorepeat", safe_format(self.auto_repeat, bool))
+            node.set("delay", safe_format(self.auto_repeat_interval, int))
 
         if self.curve_data is not None:
             curve_node =  self.curve_data._generate_xml()
