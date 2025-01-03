@@ -2955,9 +2955,9 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
             self._trigger_on_release_widget.setChecked(self.action_data.trigger_on_release)
 
 
-        enabled = self.action_data.block is not None
-        self._action_selector_widget.setEnabled(enabled)
-        self._output_mode_container_widget.setEnabled(enabled)
+        # enabled = self.action_data._command_type == SimConnectCommandType.SimVar
+        # self._action_selector_widget.setEnabled(enabled)
+        # self._output_mode_container_widget.setEnabled(enabled)
         
         output_mode = self.action_data.mode
         min_range = self.action_data.min_range
@@ -2981,31 +2981,29 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         with QtCore.QSignalBlocker(self._type_units_widget):
             self._type_units_widget.setText(self.action_data.units)
 
+    
 
-        if enabled:
+        match output_mode:
 
- 
+            case SimConnectActionMode.Ranged:
+                with QtCore.QSignalBlocker(self._output_mode_ranged_widget):
+                    self._output_mode_ranged_widget.setChecked(True)
+                self._output_min_normalized_range_widget.setValue(min_range)
+                self._output_max_normalized_range_widget.setValue(max_range)
 
-            match output_mode:
+                with QtCore.QSignalBlocker(self._output_invert_axis_widget):
+                    self._output_invert_axis_widget.setChecked(inverted)
+            case SimConnectActionMode.SetValue:
+                with QtCore.QSignalBlocker(self._output_mode_set_value_widget):
+                    self._output_mode_set_value_widget.setChecked(True)
+                self._output_value_normalized_widget.setValue(value)
+                
+            case SimConnectActionMode.Trigger:
 
-                case SimConnectActionMode.Ranged:
-                    with QtCore.QSignalBlocker(self._output_mode_ranged_widget):
-                        self._output_mode_ranged_widget.setChecked(True)
-                    self._output_min_normalized_range_widget.setValue(min_range)
-                    self._output_max_normalized_range_widget.setValue(max_range)
+                with QtCore.QSignalBlocker(self._output_mode_trigger_widget):
+                    self._output_mode_trigger_widget.setChecked(True)
 
-                    with QtCore.QSignalBlocker(self._output_invert_axis_widget):
-                        self._output_invert_axis_widget.setChecked(inverted)
-                case SimConnectActionMode.SetValue:
-                    with QtCore.QSignalBlocker(self._output_mode_set_value_widget):
-                        self._output_mode_set_value_widget.setChecked(True)
-                    self._output_value_normalized_widget.setValue(value)
-                    
-                case SimConnectActionMode.Trigger:
-                    with QtCore.QSignalBlocker(self._output_mode_trigger_widget):
-                        self._output_mode_trigger_widget.setChecked(True)
-
-                    self.action_data.block.trigger_mode = trigger_mode
+                self.action_data.trigger_mode = trigger_mode
                     
         # trigger mode options
         match trigger_mode:
@@ -3074,37 +3072,34 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 
         
-        if enabled:
             self._output_container_widget.setVisible(True)
-            self._output_mode_readonly_widget.setVisible(block.is_readonly)
-            self.output_readonly_status_widget.setText("Block: read/only" if block.is_readonly else "Block: read/write")
+            self._output_mode_readonly_widget.setVisible(self.action_data.is_readonly)
+            self.output_readonly_status_widget.setText("Block: read/only" if self.action_data.is_readonly else "Block: read/write")
 
             # display range information if the command is a ranged command
-            self._output_range_container_widget.setVisible(block.is_ranged)
+            self._output_range_container_widget.setVisible(self.action_data.is_ranged)
 
             # hook block events
             eh = SimConnectEventHandler()
             eh.range_changed.connect(self._range_changed_cb)
 
             # command description
-            self.command_text_widget.setText(block.command)
-            self.description_text_widget.setText(block.description)
+            with QtCore.QSignalBlocker(self.command_text_widget):
+                self.command_text_widget.setText(self.action_data.command)
+            self.description_text_widget.setText(self.action_data.command_description)
 
             # update UI based on block information ``
-            self._output_data_type_label_widget.setText(block.display_block_type)
+            self._output_data_type_label_widget.setText(self.action_data.data_type)
          
             self._update_visible()
 
-            return
-        
-        # clear the data
-        self._output_container_widget.setVisible(False)
-        self.status_text_widget.setText("Please select a command")
+        if not self.action_data.command:
+            
+            # clear the data
+            self._output_container_widget.setVisible(False)
+            self.status_text_widget.setText("Please select a command")
 
-        
-
-        
-
+    
 
     def _update_visible(self):
         ''' updates the UI based on the output mode selected '''
@@ -3115,7 +3110,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         
 
         self._command_selector_widget.setVisible(simvar_visible)
-        self._lvar_selector_widget.setVisible(calc_visible)
+        self._lvar_lookup_container_widget.setVisible(calc_visible)
         self._calculator_container_widget.setVisible(calc_visible)
         self._type_container_widget.setVisible(False) # disable for now as it doesn't serve a value until we have an edit / entry mode
         self._command_container_widget.setVisible(simvar_visible)
@@ -3152,7 +3147,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         if input_type == InputType.JoystickAxis:
             invert_visible = True
             with QtCore.QSignalBlocker(self._output_invert_axis_widget):
-                self._output_invert_axis_widget.setChecked(self.action_data.block.invert_axis)
+                self._output_invert_axis_widget.setChecked(self.action_data.inverted)
 
 
         self._output_invert_axis_widget.setVisible(invert_visible)
@@ -3170,32 +3165,32 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
     @QtCore.Slot(bool)
     def _trigger_noop_changed_cb(self, checked):
         if checked:
-            self.action_data.block.trigger_mode = SimConnectTriggerMode.NoOp
-            self.action_data.trigger_mode = self.action_data.block.trigger_mode
+            self.action_data.trigger_mode = SimConnectTriggerMode.NoOp
+            
 
     @QtCore.Slot(bool)
     def _trigger_toggle_changed_cb(self, checked):
         if checked:
-            self.action_data.block.trigger_mode = SimConnectTriggerMode.Toggle
-            self.action_data.trigger_mode = self.action_data.block.trigger_mode
+            self.action_data.trigger_mode = SimConnectTriggerMode.Toggle
+            
 
     @QtCore.Slot(bool)
     def _trigger_turnon_cb(self, checked):
         if checked:
-            self.action_data.block.trigger_mode = SimConnectTriggerMode.TurnOn
-            self.action_data.trigger_mode = self.action_data.block.trigger_mode
+            self.action_data.trigger_mode = SimConnectTriggerMode.TurnOn
+            
 
     @QtCore.Slot(bool)
     def _trigger_turnoff_cb(self, checked):
         if checked:
-            self.action_data.block.trigger_mode = SimConnectTriggerMode.TurnOff
-            self.action_data.trigger_mode = self.action_data.block.trigger_mode
+            self.action_data.trigger_mode = SimConnectTriggerMode.TurnOff
+            
 
     @QtCore.Slot(bool)
     def _trigger_input_value_cb(self, checked):
         if checked:
-            self.action_data.block.trigger_mode = SimConnectTriggerMode.InputValue
-            self.action_data.trigger_mode = self.action_data.block.trigger_mode
+            self.action_data.trigger_mode = SimConnectTriggerMode.InputValue
+            
 
 
     @QtCore.Slot(object, object)
@@ -3211,7 +3206,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
     @QtCore.Slot(bool)
     def _mode_ranged_cb(self, value):
         if value:
-            self.action_data.block.output_mode = SimConnectActionMode.Ranged
+            self.action_data.output_mode = SimConnectActionMode.Ranged
             self.action_data.mode = SimConnectActionMode.Ranged
             self._update_visible()
 
@@ -3471,6 +3466,7 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         self._command_type = SimConnectCommandType.SimVar
         self.units = "Number"
         self.data_type = "int"
+        self.is_ranged = False # true if ranged data
 
         # the current command category if the command is an event
         self.category = SimConnectEventCategory.NotSet
@@ -3517,8 +3513,6 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
     
     @command_mode.setter
     def command_mode(self, value : SimconnectCommandMode):
-        if self._command_mode == SimconnectCommandMode.Calculator:
-            pass
         self._command_mode = value
 
     @property
@@ -3541,6 +3535,13 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
             
             self._command = value
             self.update_block()        
+
+    @property
+    def command_description(self) -> str:
+        if self.block:
+            return self.block.display_block_type
+        return ""
+
 
     def get_filtered_axis_value(self, value : float = None) -> float:
         ''' computes the output value for the current configuration  '''
@@ -3583,7 +3584,17 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         ''' updates the data block with the current command '''
         if self._command is None:
             self._command = self._default_command()
-        self._block = self._manager.block(self._command)
+        block : SimConnectBlock = self._manager.block(self._command)
+        self._block = block
+        if block:
+            # set data
+            self.command = block.command
+            self.min_range = block.min_range
+            self.max_range = block.max_range
+            self.category = block.category
+            self.units = block.units
+            self.is_ranged = block.is_ranged
+            self._is_axis = block.is_axis
 
    
     

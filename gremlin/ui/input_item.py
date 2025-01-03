@@ -1260,6 +1260,17 @@ class InputItemWidget(QtWidgets.QFrame):
         if hasattr(identifier.input_id,"message_key_changed"):
             identifier.input_id.message_key_changed.connect(self._message_key_changed)
 
+    def _cleanup_ui(self):
+        ''' called when widget is removed '''
+        el = gremlin.event_handler.EventListener()
+        el.action_created.disconnect(self._action_changed_cb)
+        el.action_delete.disconnect(self._action_deleted_cb)
+        el.icon_changed.disconnect(self._icon_changed_cb)
+        el.mapping_changed.disconnect(self._mapping_changed_cb)
+        el.update_input_icons.disconnect(self._update_icons)
+        el.input_enabled_changed.disconnect(self._update_enabled_state)
+
+
     def _update_repeater(self):
         ''' updates the repeaters based on the type of widget '''
         
@@ -1341,26 +1352,32 @@ class InputItemWidget(QtWidgets.QFrame):
     @QtCore.Slot()
     def _update_icons(self):
         ''' update icons'''
-
         curve_visible = self.data.input_type == InputType.JoystickAxis
-        
-        if self.data.is_curve:
-            self._curve_button_widget.setIcon(self._curve_icon_active)
-            self.clear_curve_widget.setEnabled(True)
+        try:
             
-        else:
-            self._curve_button_widget.setIcon(self._curve_icon_inactive)
-            self.clear_curve_widget.setEnabled(False)
-
-        if curve_visible:
-            has_calibration = self.data.hasCalibration
-            if has_calibration:
-                self._calibration_button_widget.setIcon(self._calibration_icon_active)
+            if self.data.is_curve:
+                self._curve_button_widget.setIcon(self._curve_icon_active)
+                self.clear_curve_widget.setEnabled(True)
+                
             else:
-                self._calibration_button_widget.setIcon(self._calibration_icon_inactive)
+                self._curve_button_widget.setIcon(self._curve_icon_inactive)
+                self.clear_curve_widget.setEnabled(False)
 
-        self._curve_container_widget.setVisible(curve_visible)
-        self._calibration_button_widget.setVisible(curve_visible)
+
+            self._curve_container_widget.setVisible(curve_visible)
+            self._calibration_button_widget.setVisible(curve_visible)
+
+
+            if curve_visible:
+                has_calibration = self.data.hasCalibration
+                if has_calibration:
+                    self._calibration_button_widget.setIcon(self._calibration_icon_active)
+                else:
+                    self._calibration_button_widget.setIcon(self._calibration_icon_inactive)
+
+        except:
+            # c++ exception if the item was garbage collected by QT alredy
+            pass
 
 
 
