@@ -34,7 +34,8 @@ import gremlin.util
 from .SimConnect import *
 from .SimConnect.SimConnect import *
 from .SimConnect.Enum import *
-from .SimConnect.MobiFlight import *
+#from .SimConnect.MobiFlight import *
+from .SimConnect.SimConnectBridge import *
 from gremlin.singleton_decorator import SingletonDecorator
 import enum
 import time
@@ -245,42 +246,41 @@ _trigger_mode_to_enum = {
 
 
 
-
-
-class OutputType(enum.Enum):
-    ''' output data type '''
-    NotSet = 0
-    FloatNumber = 1
-    IntNumber = 2
-
-
-
 class SimConnectCommandType(enum.Enum):
     NotSet = 0
     Event = 1 # request event
     Request = 2 # request data
-    LVar = 3 # set lvar
-    AVar = 4 # set avar
-    SimVar = 5 # set simvar
+    SimVar = 3 # set simvar
+    Calculator = 4 # RPN expression
 
     @staticmethod
-    def from_string(value):
-        value = value.lower()
+    def to_string(value : SimConnectCommandType) -> str:
         if value in _command_type_to_string_map.keys():
             return _command_type_to_string_map[value]
         return None
-
-
+    @staticmethod
+    def to_enum(value : str) -> SimConnectCommandType:
+        if value in _command_type_to_enum_map:
+            return _command_type_to_enum_map[value]
+        return None
 
 _command_type_to_string_map = {
+    SimConnectCommandType.NotSet : "notset", 
+    SimConnectCommandType.Event : "event",
+    SimConnectCommandType.Request: "request",
+    SimConnectCommandType.SimVar : "simvar",
+    SimConnectCommandType.Calculator: "rpn",
+}
+
+_command_type_to_enum_map = {
     "notset": SimConnectCommandType.NotSet,
     "event": SimConnectCommandType.Event,
     "request" : SimConnectCommandType.Request,
-    "lvar": SimConnectCommandType.LVar,
-    "avar": SimConnectCommandType.AVar,
+    "lvar": SimConnectCommandType.Calculator,
+    "rpn" : SimConnectCommandType.Calculator,
+    "avar": SimConnectCommandType.Calculator,
     "simvar" : SimConnectCommandType.SimVar
 }
-
 
 
 
@@ -403,6 +403,35 @@ _simconnect_event_category_to_enum_lookup = {
 }
 
 
+# https://docs.flightsimulator.com/html/Programming_Tools/SimVars/Simulation_Variable_Units.htm
+# class SimConnectUnitType(Enum):
+#     ''' simconnect units '''
+
+#     # select length
+#     meter = auto()
+#     meter_scaled_256 = auto()
+#     millimeter = auto()
+#     centimeter = auto()
+#     kilometer = auto()
+#     nautical_mile = auto()
+#     inches = auto()
+#     feet = auto()
+#     yard = auto()
+#     miles = auto()
+#     # select temperature 
+#     celcius = auto()
+#     fahrenheit = auto()
+#     # selected angle
+#     radians = auto()
+#     degrees = auto()
+#     # selected speed
+#     meter_per_second = auto()
+#     mile_per_hour = auto()
+#     knots = auto()
+#     mach = auto()
+
+
+
 
 
 
@@ -417,7 +446,6 @@ class SimConnectManager(QtCore.QObject):
     sim_stop = QtCore.Signal() # fires when the sim stops
     sim_running = QtCore.Signal(bool) # fires when the sim is running
     sim_paused = QtCore.Signal(bool) # fires when sim is paused or unpaused (state = pause state)
-
     lvars_updated = QtCore.Signal(object) # triggers when LVARs are updated (after the request to get LVARs)
     
     
@@ -450,9 +478,13 @@ class SimConnectManager(QtCore.QObject):
         sm = SimConnect(handler, auto_connect = False)
         self._sm : SimConnect = sm
 
-        # mobiflight interface
-        self.mobi = MobiFlightManager(sm)
-        self.mobi.lvars_updated.connect(self._lvars_updated_cb)
+        # # mobiflight interface
+        # self._mobi_connected = False # not connected yet
+        # self.mobi = MobiFlightManager(sm)
+        # self.mobi.lvars_updated.connect(self._lvars_updated_cb)
+        # self.mobi.mobiflight_connected.connect(self._mobiflight_connected_cb)
+
+        self.bridge = SimConnectBridge(sm)
 
         self._lvars = [] # list of lvars
 
@@ -483,6 +515,8 @@ class SimConnectManager(QtCore.QObject):
         self._lvars_xml = os.path.join(gremlin.util.userprofile_path(), "simconnect_lvars.xml")
 
 
+
+
         self._connect_attempts = 3 # number of connection attempts before giving up
 
 
@@ -508,10 +542,12 @@ class SimConnectManager(QtCore.QObject):
     @QtCore.Slot()
     def _shutdown(self):
         ''' application shutdown '''
+
+        self.bridge.stop()
+
         syslog.info("SIMCONNECT: shutdown")
         self.sim_disconnect()
         self._abort = True
-
 
 
 
@@ -527,11 +563,6 @@ class SimConnectManager(QtCore.QObject):
 
         # list of command blocks
         self._block_map = {}
-
-        
-
-
-
                 
         if force_update and os.path.isfile(self._simvars_xml):
             os.unlink(self._simvars_xml)
@@ -565,7 +596,18 @@ class SimConnectManager(QtCore.QObject):
             except:
                 syslog.warning(f"Unable to write sample LVAR file to {self._lvars_xml}")
         if os.path.isfile(self._lvars_xml):
-            self._load_xml(self._lvars_xml)
+            self._lvars.clear()
+            parser = etree.XMLParser(remove_blank_text=True)
+            tree = etree.parse(self._lvars_xml, parser)
+            root = tree.getroot()
+            for node in root.xpath("//command"):
+                if "value" in node.attrib:
+                    lvar = node.get("value")
+                    self._lvars.append(lvar)
+
+
+
+            
 
 
 
@@ -645,6 +687,7 @@ class SimConnectManager(QtCore.QObject):
 
     def setSimvar(self, command, datatype, value):
         ''' sets a simvar without using a data block '''
+        self.reconnect()
         request = self.registerRequest(command, datatype, True)
         request.value = value
         request.transmit()
@@ -654,15 +697,31 @@ class SimConnectManager(QtCore.QObject):
     def sendEvent(self, command):
         ''' sends an event to Simconnect '''
         if command in self._block_map:
+            self.reconnect()
             block = self._block_map[command]
             syslog.info(f"Simconnect: send Event {command}")
             return block.execute(1)
         syslog.error(f"Simconnect: event not found: {command}")
 
+
+    # def sendExpression(self, command):
+    #     ''' sends an expression to calculate '''
+    #     if self.mobi.connected:
+    #         self.mobi.set(command, self.mobi.client)
+
+    def calculate(self, command):
+        if self.bridge.connected:
+            self.bridge.execute_calculator_code(command)
+
     def refreshLvars(self):
         ''' refreshes the list of lvars from the sim '''
-        self.reconnect()
-        self.mobi.requestLvars()
+        if self.bridge.connected:
+            self.bridge.get_lvars()
+
+    # @QtCore.Slot(str)
+    # def _mobiflight_connected_cb(self):
+    #     # indicate mobi is connected
+    #     self._mobi_connected = True
 
     @QtCore.Slot(object)
     def _lvars_updated_cb(self, lvars):
@@ -679,34 +738,47 @@ class SimConnectManager(QtCore.QObject):
             else:
                 root = etree.Element("commands")
 
+            # delete old block nodes if any
+            for node in root.xpath("//block"):
+                root.remove(node)
+
+            for node in root.xpath("//command"):
+                if not "value" in node.attrib:
+                    root.remove(node)
+
+
             for lvar in self._lvars:
                 lvar_name = lvar
                 nodes = root.xpath(f"//command[@value='{lvar_name}']")
                 if nodes is not None and len(nodes) > 0:
                     node = nodes[0]
-                    block = SimConnectBlock()
-                    block.from_xml(node)
-                    continue # already in the list
+                else:
+                    node = etree.Element("command") # rpn
 
-                block = SimConnectBlock()
-                block.is_lvar = True
-                block.command = lvar_name
-                block.units = "Number"
-                block.is_readonly = False
-                node = block.to_xml()
+                node.set("value", lvar)
+                node.set("type", SimConnectCommandType.to_string(SimConnectCommandType.Calculator))
+                node.set("datatype", "float")
+                node.set("units", "Number")
+                node.set("category","none")
+                node.set("settable", str(True))
+                node.set("axis", str(False))
+                node.set("indexed", str(False))
+
+                
                 root.append(node)
 
 
             tree = etree.ElementTree(root)
             tree.write(xml_source, pretty_print=True,xml_declaration=True,encoding="utf-8")
 
-            
+        
 
         except Exception as err:
             syslog.error(f"SimconnectData: XML simvars read error: {xml_source}: {err}")
             return False
 
-
+        # indicate new data is available
+        self.lvars_updated.emit(self._lvars)
 
 
 
@@ -785,6 +857,10 @@ class SimConnectManager(QtCore.QObject):
     @property
     def is_connected(self):
         return self._is_connected
+    
+    @property
+    def is_mobi_connected(self):
+        return self.mobi.connected
 
     @property
     def is_started(self):
@@ -930,9 +1006,12 @@ class SimConnectManager(QtCore.QObject):
             else:
                 syslog.info("Simconnect: connected to simulator")
 
-                # initialize mobi
-                self.mobi.start()
 
+        # initialize mobi
+        # if self.mobi.installed and not self.mobi.connected:
+        #     self.mobi.start()                
+
+        self.bridge.start()
 
         return True # connected  
 
@@ -944,6 +1023,14 @@ class SimConnectManager(QtCore.QObject):
         return self.reconnect()
 
     def sim_disconnect(self):
+        ''' disconnect request '''
+        # if self.mobi.connected:
+        #     self.mobi.stop()
+
+        if self.bridge.connect:
+            self.bridge.stop()
+
+
         if self._sm.ok:
             for request in self._registered_requests.values():
                 self._sm.clear(request)
@@ -1224,25 +1311,23 @@ class SimConnectManager(QtCore.QObject):
                 max_range = 0
                 min_range = 0
                 is_toggle = False
-                value = get_attribute(node,"datatype")
-                if value == "int":
-                    data_type = OutputType.IntNumber
-                elif value == "float":
-                    data_type = OutputType.FloatNumber
+                if "datatype" in node.attrib:
+                    data_type = node.get("datatype")
                 else:
-                    data_type == OutputType.NotSet
+                    data_type = "Number"
                 is_lvar = False
                 if "type" in node.attrib:
                     node_type = node.get("type")
                     is_lvar = node_type.casefold() == "lvar"
-                simvar = get_attribute(node,"value",throw_on_missing=True)
+               
+                simvar = get_attribute(node,"value")
                 simvar_type = get_attribute(node,"type",throw_on_missing=True)
                 units = get_attribute(node,"units",throw_on_missing=True)
                 category = get_attribute(node,"category")
-                settable = get_bool_attribute(node,"settable",throw_on_missing=True)
-                axis = get_bool_attribute(node,"axis",throw_on_missing=True)
-                indexed = get_bool_attribute(node,"indexed",throw_on_missing=True)
-                invert =get_bool_attribute(node,"invert",throw_on_missing=False)
+                settable = get_bool_attribute(node,"settable")
+                axis = get_bool_attribute(node,"axis")
+                indexed = get_bool_attribute(node,"indexed")
+                invert =get_bool_attribute(node,"invert")
 
                 description = ""
                 for child in node.getchildren():
@@ -1449,9 +1534,9 @@ class SimConnectBlock():
 
         self._command_type = SimConnectCommandType.NotSet
         self._description = None
-        self._value_type = OutputType.NotSet
+        self._value_type = "Number"
         self._category = SimConnectEventCategory.NotSet
-        self._output_data_type = OutputType.NotSet
+        self._output_data_type = "Number"
         self._output_mode = SimConnectActionMode.NotSet
         self._command = None # the command text
         self._is_set_value = False # true if the item can set a value
@@ -1560,7 +1645,7 @@ class SimConnectBlock():
     @command_type.setter
     def command_type(self, value : SimConnectCommandType):
         if isinstance(value, str):
-            value = SimConnectCommandType.from_string(value)
+            value = SimConnectCommandType.to_string(value)
         elif isinstance(value, int):
             value = SimConnectCommandType(value)
         self._command_type = value
@@ -1587,7 +1672,7 @@ class SimConnectBlock():
         self._output_mode = value
 
     @property
-    def output_data_type(self):
+    def output_data_type(self) -> str:
         ''' block output data type'''
         return self._output_data_type
 
@@ -1624,11 +1709,11 @@ class SimConnectBlock():
     @property
     def is_indexed(self) -> bool:
         ''' true if readonly - based on the command type '''
-        return self._indexed
+        return self._is_indexed
 
     @is_indexed.setter
     def is_indexed(self, value):
-        self._indexed = value
+        self._is_indexed = value
 
     @property
     def units(self) -> str:
@@ -1640,12 +1725,8 @@ class SimConnectBlock():
 
     @property
     def display_data_type(self) -> str:
-        ''' returns a displayable data type even if none is set '''
-        if self._value_type == OutputType.IntNumber:
-            return "Number (int)"
-        elif self._value_type == OutputType.FloatNumber:
-            return "Number (float)"
-        return "N/A"
+        return self._value_type
+        
 
     @property
     def invert_axis(self):
@@ -1892,7 +1973,7 @@ class SimConnectBlock():
                     return True
                 else:
                     syslog.error(f"Simconnect: event: '{self._command}' not found")
-            elif self._command_type in (SimConnectCommandType.SimVar, SimConnectCommandType.LVar):
+            elif self._command_type in (SimConnectCommandType.SimVar, SimConnectCommandType.Calculator):
                 # set simvar
                 
                 ar = AircraftRequests()
@@ -1996,41 +2077,72 @@ class SimConnectBlock():
 
     def to_xml(self):
         ''' writes to an xml node block '''
-        node = etree.Element("block")
 
-        node.set("command",self.command)
-        node.set("trigger", SimConnectTriggerMode.to_string(self.trigger_mode))
-        node.set("mode", SimConnectActionMode.to_string(self.output_mode))
-        node.set("invert", str(self.invert_axis))
-        value = self.value if self.value else 0.0
-        node.set("value", gremlin.util.safe_format(value, float))
-        node.set("min_range", gremlin.util.safe_format(self.min_range, float))
-        node.set("max_range", gremlin.util.safe_format(self.max_range, float))
+        if self.is_lvar:
+            # LVAR format (anything that is handled internally by the sim via calculator code)
+
+            node = etree.Element("command") # rpn
+            node.set("type", SimConnectCommandType.to_string(self.command_type))
+            if self.output_data_type:
+                node.set("datatype", self.output_data_type)
+            node.set("units", self.units)
+            node.set("category","none")
+            node.set("settable", str(not self._readonly))
+            node.set("axis", str(self.is_axis))
+            node.set("indexed", str(self.is_indexed))
+
+        else:
+
+            node = etree.Element("block")
+
+            node.set("command", gremlin.util.safe_format(self.command, str))
+            node.set("trigger", SimConnectTriggerMode.to_string(self.trigger_mode))
+            node.set("mode", SimConnectActionMode.to_string(self.output_mode))
+            node.set("invert", str(self.invert_axis))
+            value = self.value if self.value else 0.0
+            node.set("value", gremlin.util.safe_format(value, float))
+            node.set("min_range", gremlin.util.safe_format(self.min_range, float))
+            node.set("max_range", gremlin.util.safe_format(self.max_range, float))
 
         return node
 
     def from_xml(self, node):
-        ''' reads from an xml node block '''
-        command = gremlin.util.safe_read(node,"command", str)
-        if not command:
-            command = SimConnectManager().get_default_command()
-        self.command = command
-        self.value = gremlin.util.safe_read(node,"value", float, 0)
-        mode = gremlin.util.safe_read(node,"mode", str, "none")
-        output_mode = SimConnectActionMode.to_enum(mode)
-        if output_mode is None:
-            output_mode = SimConnectActionMode.NotSet
-        self.output_mode = output_mode
+        ''' reads from an xml node block or command '''
 
-        # trigger mode for singleton vars
-        trigger_mode = gremlin.util.safe_read(node,"trigger", str, "none")
-        self.trigger_mode = SimConnectTriggerMode.to_enum(trigger_mode)
+        if node.tag == "command":
+            # lvar type
+            self.command = gremlin.util.safe_read(node,"command", str)
+            self.type = SimConnectCommandType.to_enum(node.get("type"))
+            if "datatype" in node.attrib:
+                self.output_data_type = node.get("datatype")
+            self.units = node.get("units")
+            self.category = node.get("category")
+            self.is_readonly = not gremlin.util.safe_read(node,"settable", bool, True)
+            self.axis = gremlin.util.safe_read(node,"axis", bool, False)
+            self.is_indexed = gremlin.util.safe_read(node,"indexed", bool, False)
+            
+        elif node.tag == "block":
 
-        # axis inversion
-        self.invert_axis = gremlin.util.safe_read(node,"invert", bool, False)
+            command = gremlin.util.safe_read(node,"command", str)
+            if not command:
+                command = SimConnectManager().get_default_command()
+            self.command = command
+            self.value = gremlin.util.safe_read(node,"value", float, 0)
+            mode = gremlin.util.safe_read(node,"mode", str, "none")
+            output_mode = SimConnectActionMode.to_enum(mode)
+            if output_mode is None:
+                output_mode = SimConnectActionMode.NotSet
+            self.output_mode = output_mode
 
-        self.min_range = gremlin.util.safe_read(node,"min_range", float, -16383)
-        self.max_range = gremlin.util.safe_read(node,"max_range", float, 16383)
+            # trigger mode for singleton vars
+            trigger_mode = gremlin.util.safe_read(node,"trigger", str, "none")
+            self.trigger_mode = SimConnectTriggerMode.to_enum(trigger_mode)
+
+            # axis inversion
+            self.invert_axis = gremlin.util.safe_read(node,"invert", bool, False)
+
+            self.min_range = gremlin.util.safe_read(node,"min_range", float, -16383)
+            self.max_range = gremlin.util.safe_read(node,"max_range", float, 16383)
         
 
 

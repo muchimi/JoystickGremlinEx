@@ -33,8 +33,7 @@ import os
 import threading
 from PySide6 import QtCore
 import gremlin.event_handler
-import gremlin.singleton_decorator
-
+from gremlin.singleton_decorator import SingletonDecorator
 
 
 _library_path = os.path.splitext(os.path.abspath(__file__))[0] + '.dll'
@@ -280,7 +279,7 @@ class SimConnectEvent:
 
 
 
-@gremlin.singleton_decorator.SingletonDecorator
+@SingletonDecorator
 class SimConnectEventHandler(QtCore.QObject):
 	''' handles events related to simconnect '''	
 	range_changed = QtCore.Signal(object, RangeEvent) # fires when the block range values change (block, event)
@@ -297,6 +296,8 @@ class SimConnectEventHandler(QtCore.QObject):
 	simconnect_event = QtCore.Signal(SimConnectEvent) # fires when we get a Simconnect data value notice
 	simconnect_state_changed = QtCore.Signal(int, float, str) # state change data (int, float, str)	
 
+
+@SingletonDecorator
 class SimConnect():
 	''' MSFS simconnect interface '''
 
@@ -316,7 +317,7 @@ class SimConnect():
 		self._library_path = library_path
 		self._hSimConnect = HANDLE()
 		self._quit = 0
-		self.ok = False
+		self._ok = False
 		self._abort = False # true if we're aborting and should stop running
 		self.running = False
 		self._is_loop_running = False  # true if the DLL event listen loop is running
@@ -331,13 +332,17 @@ class SimConnect():
 		self.handler : SimConnectEventHandler = handler # used to trigger various events
 		self.client_data_handlers = [] # client data handlers - for when client data is received
 
-		self._dll = SimConnectDll(self._library_path)
-		self._my_dispatch_proc_rd = self._dll.DispatchProc(self.simconnect_dispatch_proc)
+		self._dll = None
+		self._runThread = None
+		
 	
 		if auto_connect:
 			self.connect()
 
-					
+	@property
+	def ok(self) -> bool:
+		return self._ok and self._dll is not None
+
 	@property
 	def handle(self):
 		return self._hSimConnect
@@ -622,7 +627,7 @@ class SimConnect():
 		elif dwID == SIMCONNECT_RECV_ID.SIMCONNECT_RECV_ID_OPEN.value:
 
 			syslog.info("Simconnect: SIM OPEN")
-			self.ok = True
+			self._ok = True
 
 		elif dwID == SIMCONNECT_RECV_ID.SIMCONNECT_RECV_ID_EXCEPTION:
 			exc = cast(pData, POINTER(SIMCONNECT_RECV_EXCEPTION)).contents
@@ -693,7 +698,9 @@ class SimConnect():
 
 			self._is_loop_running = False
 			self._quit = 0
-
+			if not self._dll:
+				self._dll = SimConnectDll(self._library_path)
+				self._my_dispatch_proc_rd = self._dll.DispatchProc(self.simconnect_dispatch_proc)
 			err = self._dll.Open(
 				byref(self._hSimConnect), LPCSTR(b"GremlinEx"), None, 0, 0, 0
 			)
@@ -755,21 +762,13 @@ class SimConnect():
 	
 		
 	def run(self):
-		if not self._is_loop_running:
+		if not self._is_loop_running and self._runThread is None:
 			self._runThread = threading.Thread(target=self._run)
 			self._runThread.setName("Simconnect Run")
 			self._runThread.daemon = True
 			self._runThread.start()
 			while self.ok is False:
 				pass
-
-	def requestAircraftLoaded(self):
-		''' makes a request for the current loaded aircraft '''
-		if self._dll:
-			self._dll.RequestSystemState(self._hSimConnect,
-									 self._dll.EventID.EVENT_SIM_REQUEST_AIRCRAFT.value,
-									 b"AircraftLoaded"
-                                         )        
 
 
 
@@ -790,17 +789,21 @@ class SimConnect():
 					self._quit = True
 		# close the connection
 		try:
-			self._dll.Close(self._hSimConnect)
+			if self._dll:
+				self._dll.Close(self._hSimConnect)
 		except:
 			pass
+		self._dll = None
+		self._my_dispatch_proc_rd = None
 		try:
 			self.handler.simconnect_disconnected.emit()
 		except:
 			pass
-		self._dll = None
+		
 		self._is_connected = False	
 		syslog.info("Simconnect: Close connection")
 		self._is_loop_running = False
+
 
 	def disconnect(self):
 		''' disconnects from the sim '''
@@ -812,6 +815,9 @@ class SimConnect():
 			self._quit = 1 # kill the thread loop
 			self._runThread.join()
 			# this also resets the flags
+			self._runThread = None
+			self._is_loop_running = False
+
 
 	def is_connected(self, auto_connect = True):
 		''' determines if connected and optionally starts the connection '''
@@ -863,6 +869,17 @@ class SimConnect():
 			self._dll.AddClientEventToNotificationGroup(
 				self._hSimConnect, group, event, maskable
 			)
+
+	def requestAircraftLoaded(self):
+		''' makes a request for the current loaded aircraft '''
+		if self._dll:
+			self._dll.RequestSystemState(self._hSimConnect,
+									 self._dll.EventID.EVENT_SIM_REQUEST_AIRCRAFT.value,
+									 b"AircraftLoaded"
+                                         )        
+
+
+
 
 	def _request_data(self, request : Request):
 		if self._dll is not None:

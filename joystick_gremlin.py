@@ -375,6 +375,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
 
         device_name = gremlin.shared_state.get_device_name(device_guid)
+ 
 
         # update tracking data
         syslog = logging.getLogger("system")
@@ -1494,6 +1495,9 @@ class GremlinUi(QtWidgets.QMainWindow):
             # list of tab headers
             headers = []
 
+            midi_enabled = self.config.midi_enabled
+            osc_enabled = self.config.osc_enabled
+
             self._reset_tab_data()
             # reload device list in case it changed
             gremlin.shared_state.reload_device_map()
@@ -1645,8 +1649,10 @@ class GremlinUi(QtWidgets.QMainWindow):
             )
 
             # Create MIDI tab
-            if self.config.midi_enabled:
-                device_guid = str(gremlin.ui.midi_device.MidiDeviceTabWidget.device_guid)
+            device_guid = str(gremlin.ui.midi_device.MidiDeviceTabWidget.device_guid)
+            midi_device_guid = device_guid
+            if midi_enabled:
+                
                 widget = self.getWidget(device_guid)
                 if not widget:
                     widget = gremlin.ui.midi_device.MidiDeviceTabWidget(
@@ -1677,8 +1683,10 @@ class GremlinUi(QtWidgets.QMainWindow):
                 )
 
             # Create OSC tab
-            if self.config.osc_enabled:
-                device_guid = str(gremlin.ui.osc_device.OscDeviceTabWidget.device_guid)
+            device_guid = str(gremlin.ui.osc_device.OscDeviceTabWidget.device_guid)
+            osc_device_guid = device_guid
+            if osc_enabled:
+                
                 widget = self.getWidget(device_guid)
                 if not widget:
                     widget = gremlin.ui.osc_device.OscDeviceTabWidget(
@@ -1811,13 +1819,33 @@ class GremlinUi(QtWidgets.QMainWindow):
 
             config_tab_map = self.config.tab_list
             if config_tab_map:
-
                 current_tab_map = self._get_tab_map()
+
+                remove_index = []
+                if not midi_enabled or not osc_enabled:
+                    for index, pairs in config_tab_map.items():
+                        device_guid = pairs[0]
+                        if not midi_enabled and device_guid == midi_device_guid:
+                            remove_index.append(index)
+                        if not osc_enabled and device_guid == osc_device_guid:
+                            remove_index.append(index)
+
+                if remove_index:
+                    for index in remove_index:
+                        del config_tab_map[index]
+                    
+
                 current_tab_guids = [device_guid for device_guid, _, _, _ in current_tab_map.values()]
                 
                 config_tab_guids = [device_guid for device_guid, _, _, _ in config_tab_map.values()] if config_tab_map else []
                 missing_tab_guids = [device_guid for device_guid in current_tab_guids if device_guid not in config_tab_guids]
                 missing_data = []
+
+                # remove MIDI tab if not enabled
+                if not midi_enabled and midi_device_guid in missing_tab_guids:
+                    missing_tab_guids.remove(midi_device_guid)
+                if not osc_enabled and osc_device_guid in missing_tab_guids:
+                    missing_tab_guids.remove(osc_device_guid)
 
                 reordered_data = list(config_tab_map.values())
                 # list of (device_guid, device_name, data.tab_type, index)

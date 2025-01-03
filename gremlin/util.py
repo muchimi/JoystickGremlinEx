@@ -587,6 +587,8 @@ def find_files(root_folder, source_pattern = "*") -> list:
     return []
 
 
+
+
 def find_folders(root_folder, source_pattern = "*") -> list:
     ''' looks for a subfolder off the root folder '''
     import subprocess
@@ -883,12 +885,18 @@ def safe_read(node, key, type_cast=None, default_value=None):
     if type_cast is not None:
         try:
             if type_cast == bool and isinstance(value,str):
-                    value = value.strip().lower()
+                    value = value.strip().casefold()
                     value = value == "true"
             else:
                 if value == "none":
                     value = None
                 else:
+                    # if type_cast == str:
+                    #     from xml.sax.saxutils import unescape
+                    #     value = unescape(str(value))
+                    # else:
+                    #     value = type_cast(value)
+                        
                     value = type_cast(value)
         except ValueError:
             msg = f"Failed casting '{value}' to type '{str(type_cast)}'"
@@ -916,6 +924,9 @@ def safe_format(value, data_type, formatter=str):
     elif data_type is float:
         value = float(value)
         return f"{value:0.8f}"
+    # elif data_type is str:
+    #     from xml.sax.saxutils import escape, quoteattr
+    #     return escape(value)
     if isinstance(value, data_type):
         return formatter(value)
     else:

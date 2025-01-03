@@ -2166,6 +2166,10 @@ def deadzone(value, low, low_center, high_center, high):
     :param high high deadzone limit
     :return corrected value
     """
+    if low_center is None or high_center is None or low is None or high is None:
+        pass
+        
+
     if value >= 0:
         return min(1, max(0, (value - high_center) / abs(high - high_center)))
     else:

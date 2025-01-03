@@ -210,6 +210,11 @@ Joystick Gremlin EX
 
 <!-- TOC --><a name="134016ex-pre-release"></a>
 ## 13.40.16ex (pre-release)
+### (m54)
+- Fix: disabling MIDI or OSC device in options was not necessarily updating the device tabs correctly.
+- Fix: resolved one issue with curve funtion getting confused with no center deadzone values if the curve doesn't have a center deadzone.  
+- New: GremlinEx has a new WASM module for MSFS to help it interface with the simulator and access LVARS and other variables that can only be read or set via WASM.  This is still experimental and in development so does not have all the UI features yet (barebones to test) but functional with MSFS 2024. The WASM module is in the "msfs wasm module" folder.  The gremlinex-module folder should be copied as-is to the MSFS Community folder.  Currently GremlinEx does not check for this module to be installed (yet) so using these features will do nothing if the WASM module is not there.
+
 ### (m53)
 - Fix: For profiles using Simconnect, a failure to connect on profile start (such as, simulator is not running or not "ready") is now handled more gracefully.  The profile will automatically stop when this happens and display a message box on connection  failures.  A profile using Simconnect should only start when the simulator is fully loaded and available, which can take significant time.  The rule of thumb is Simconnect is available when the Simulator's user interface becomes available.
 - Fix: Toolbar icon updates when GremlinEx is activated via the system tray menu.

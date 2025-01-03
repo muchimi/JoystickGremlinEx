@@ -1396,12 +1396,18 @@ class ResponseCurveFunctor(gremlin.base_profile.AbstractFunctor):
 
     def __init__(self, action, parent = None):
         super().__init__(action, parent)
+
+        v1,v2,v3,v4 = action.deadzone
+        if v2 is None:
+            v2 = 0.0
+        if v3 is None:
+            v3 = 0.0
         self.deadzone_fn = lambda value: gremlin.input_devices.deadzone(
             value,
-            action.deadzone[0],
-            action.deadzone[1],
-            action.deadzone[2],
-            action.deadzone[3]
+            v1,
+            v2,
+            v3,
+            v4
         )
         if action.mapping_type == "cubic-spline":
             self.response_fn = gremlin.spline.CubicSpline(action.control_points)
