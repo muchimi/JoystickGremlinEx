@@ -719,6 +719,27 @@ class VJoyUsageState():
                     self._button_usage[dev_id][button] = False
                     self._button_usage_map[dev_id][button] = []
 
+    def _ensure_maps(self, device_guid, input_id):
+        ''' automatically registers new inputs if needed '''
+        if not device_guid in self._axis_invert_map:
+             self._axis_invert_map[device_guid] = {}
+        if not input_id in self._axis_invert_map[device_guid]:
+            self._axis_invert_map[device_guid][input_id] = False
+
+        if not device_guid in self._axis_range_map:
+             self._axis_range_map[device_guid] = {}
+        if not input_id in self._axis_range_map[device_guid]:
+            self._axis_range_map[device_guid][input_id] =  [-1.0, 1.0]
+
+        if not device_guid in self._button_usage:
+             self._button_usage[device_guid] = {}
+             self._button_usage_map[device_guid] = {}
+
+        if not input_id in self._button_usage[device_guid]:
+            self._button_usage[device_guid][input_id] = False
+            self._button_usage_map[device_guid][input_id] = []
+            
+
 
     def set_inverted(self, device_id, input_id, inverted):
         ''' sets the inversion flag for a given vjoy device '''
@@ -726,32 +747,48 @@ class VJoyUsageState():
             vjoy = self._axis_invert_map[device_id]
             if input_id in vjoy:
                 vjoy[input_id] = inverted
+                return
+        self._ensure_maps(device_id, input_id)
         
     def is_inverted(self, device_id, input_id):
         ''' returns true if the specified device/axis is inverted '''
-        return self._axis_invert_map[device_id][input_id]
+        if device_id in self._axis_invert_map:
+            if input_id in self._axis_invert_map[device_id]:
+                return self._axis_invert_map[device_id][input_id]
+        self._ensure_maps(device_id, input_id)
+        return False
     
     def toggle_inverted(self, device_id, input_id):
         ''' toggles inversion state of specified device/axis is inverted '''
         sylog = logging.getLogger("system")
-        if input_id in self._axis_invert_map[device_id]:
-            self._axis_invert_map[device_id][input_id] = not self._axis_invert_map[device_id][input_id]
-            sylog.info(f"Vjoy Axis {device_id} {input_id} inverted state: {self._axis_invert_map[device_id][input_id]}")
-        else:
-            logging.getLogger("system").error(f"Vjoy Axis invert: {device_id} - axis {input_id} is not a valid output axis.")
+        if device_id in self._axis_invert_map:
+            if input_id in self._axis_invert_map[device_id]:
+                self._axis_invert_map[device_id][input_id] = not self._axis_invert_map[device_id][input_id]
+                sylog.info(f"Vjoy Axis {device_id} {input_id} inverted state: {self._axis_invert_map[device_id][input_id]}")
+                return
+            
+        self._ensure_maps(device_id, input_id)
+        self._axis_invert_map[device_id][input_id] = True # toggle
 
     def set_range(self, device_id, input_id, min_range = -1.0, max_range = 1.0):
         ''' sets the axis min/max range for the active range computation '''
         if min_range > max_range:
-            r = min_range
-            min_range = max_range
-            max_range = r
-        if input_id in self._axis_invert_map[device_id]:
-            self._axis_range_map[device_id][input_id] = [min_range, max_range]
+            min_range, max_range = max_range, min_range
+        if device_id in self._axis_range_map:
+            if input_id in self._axis_invert_map[device_id]:
+                self._axis_range_map[device_id][input_id] = [min_range, max_range]
+                return
+        self._ensure_maps(device_id, input_id)
+        self._axis_range_map[device_id][input_id] = [min_range, max_range] # new entry
+
 
     def get_range(self, device_id, input_id):
         ''' gets the current range for an axis (min,max)'''
-        return self._axis_range_map[device_id][input_id]
+        if device_id in self._axis_range_map:
+            if input_id in self._axis_range_map[device_id]:
+                return self._axis_range_map[device_id][input_id]
+        self._ensure_maps(device_id, input_id)
+        return [-1.0, 1.0]
     
 
 

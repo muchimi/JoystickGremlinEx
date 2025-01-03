@@ -151,9 +151,6 @@ def system_time_to_ntp_epoch(seconds: float) -> float:
 
 
 
-    """Functions to get OSC types from datagrams and vice versa"""
-
-
 MidiPacket = Tuple[int, int, int, int]
 
 
@@ -2410,7 +2407,7 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         self._pulse_delay = data._autorelease_delay
         
 
-        # midi message
+        # OSC message
         self._command = None # OSC command text
         self._command_data = [] # OSC arguments
 
@@ -2610,7 +2607,7 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
                 for index in range(model.rows()):
                     widget = parent_widget.itemAt(index)
                     if index == self.index : continue # ignore self
-                    # grab the input's configured midi message
+                    # grab the input's configured osc message
                     other_input = widget.identifier.input_id
                     other_message = other_input.message
                     if other_message is None:
@@ -2741,7 +2738,7 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
                 self._mode_axis_widget.setChecked(True)
             
         elif self._mode == OscInputItem.InputMode.OnChange:
-            self._container_mode_description_widget.setText(f"The input will trigger a button press on any value change<br>Use this mode to trigger a button or action whenever the MIDI command value changes.")
+            self._container_mode_description_widget.setText(f"The input will trigger a button press on any value change<br>Use this mode to trigger a button or action whenever the OSC command value changes.")
             with QtCore.QSignalBlocker(self._mode_on_change_widget):
                 self._mode_on_change_widget.setChecked(True)      
 
@@ -2890,6 +2887,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         # Store parameters
         self.device_profile = device_profile
+        #assert self.device_profile.device_guid == gremlin.shared_state.osc_tab_guid
         self.current_mode = current_mode
 
         self.device_profile.ensure_mode_exists(self.current_mode)
@@ -3315,7 +3313,7 @@ class InputOscClient(QtCore.QObject):
     def unregisterInput(self, input_item):
         ''' unregisters an OSC input item '''
         syslog = logging.getLogger("system")
-        verbose = gremlin.config.Configuration().verbose_mode_midi
+        verbose = gremlin.config.Configuration().verbose_mode_osc
         if isinstance(input_item, OscInputItem):
             message_key = input_item.message_key
             if message_key in self._osc_map:
@@ -3330,7 +3328,7 @@ class InputOscClient(QtCore.QObject):
         # build a list of messages configured for input
 
 
-        # build a list of input items to midi messages
+        # build a list of input items to OSC messages
         self._update_messages()
        
         

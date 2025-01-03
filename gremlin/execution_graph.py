@@ -180,7 +180,11 @@ class ExecutionContext():
     def searchModeTree(self, mode : str) -> ExecutionModeNode:
         ''' find the node for a mode in the mode tree '''
         syslog = logging.getLogger("system")
-        nodes = anytree.search.findall_by_attr(self._mode_tree, mode, name="mode")
+        try:
+            nodes = anytree.search.findall_by_attr(self._mode_tree, mode, name="mode")
+        except Exception as err:
+            syslog.warning(f"SearchModeTree: tree exception: {err}")
+            nodes = None
         if nodes:
             if len(nodes) > 1:
                 syslog.warning(f"CONTEXT: More than one mode named {mode} detected - returning the first one")
@@ -231,7 +235,7 @@ class ExecutionContext():
     def getModeHierarchy(self, mode):
         ''' gets a list of parent modes for the given mode '''
         modes = []
-        node = anytree.search.find_by_attr(self.modeTree,mode, "mode")
+        node = anytree.search.find_by_attr(self.modeTree, mode, "mode")
         while node.mode:
             modes.append(node.mode)
             node = node.parent

@@ -1077,12 +1077,13 @@ class GremlinUi(QtWidgets.QMainWindow):
 
 
 
-
         self.ui.actionActivate.setChecked(False)
         self.activate(False)
 
         if not self._save_changes_request():
             return
+        
+        self.clearWidgets()
 
         gremlin.shared_state.resetState()
         eh = gremlin.event_handler.EventHandler()
@@ -1370,9 +1371,11 @@ class GremlinUi(QtWidgets.QMainWindow):
                 widget._cleanup_ui()
             del self._widget_cache[device_guid]
 
+
     def clearWidgets(self):
         ''' clears the device cache'''
         self._widget_cache.clear()
+        gremlin.util.clear_layout(self.ui.tab_content_layout)
 
     def getTabIndexForDevice(self, device_guid):
         if not isinstance(device_guid, str):
@@ -1497,8 +1500,10 @@ class GremlinUi(QtWidgets.QMainWindow):
 
             midi_enabled = self.config.midi_enabled
             osc_enabled = self.config.osc_enabled
-
+            
             self._reset_tab_data()
+            self.clearWidgets()
+
             # reload device list in case it changed
             gremlin.shared_state.reload_device_map()
 
@@ -1513,8 +1518,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
             self.push_highlighting()
 
-            # widget cleanup
-            self.clearRegisteredWidgets()
+
 
             # clear the widget map as it's recreated here
             gremlin.shared_state.device_widget_map.clear()
@@ -1642,17 +1646,15 @@ class GremlinUi(QtWidgets.QMainWindow):
             index+=1
             
 
-            device_profile = self.profile.get_device_modes(
-                gremlin.ui.midi_device.MidiDeviceTabWidget.device_guid,
-                DeviceType.Midi,
-                DeviceType.to_string(DeviceType.Midi)
-            )
-
             # Create MIDI tab
             device_guid = str(gremlin.ui.midi_device.MidiDeviceTabWidget.device_guid)
             midi_device_guid = device_guid
             if midi_enabled:
-                
+                device_profile = self.profile.get_device_modes(
+                    gremlin.ui.midi_device.MidiDeviceTabWidget.device_guid,
+                    DeviceType.Midi,
+                    DeviceType.to_string(DeviceType.Midi)
+                )                
                 widget = self.getWidget(device_guid)
                 if not widget:
                     widget = gremlin.ui.midi_device.MidiDeviceTabWidget(
@@ -1676,17 +1678,17 @@ class GremlinUi(QtWidgets.QMainWindow):
                 
                 
 
-                device_profile = self.profile.get_device_modes(
-                    gremlin.ui.osc_device.OscDeviceTabWidget.device_guid,
-                    DeviceType.Osc,
-                    DeviceType.to_string(DeviceType.Osc)
-                )
+
 
             # Create OSC tab
             device_guid = str(gremlin.ui.osc_device.OscDeviceTabWidget.device_guid)
             osc_device_guid = device_guid
             if osc_enabled:
-                
+                device_profile = self.profile.get_device_modes(
+                    gremlin.ui.osc_device.OscDeviceTabWidget.device_guid,
+                    DeviceType.Osc,
+                    DeviceType.to_string(DeviceType.Osc)
+                )                
                 widget = self.getWidget(device_guid)
                 if not widget:
                     widget = gremlin.ui.osc_device.OscDeviceTabWidget(
@@ -2930,7 +2932,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         el.push_input_selection() # suspend input selection
 
-        # Attempt to load the new profile
+           # Attempt to load the new profile
         try:
             new_profile = gremlin.base_profile.Profile()
             if gremlin.shared_state.current_profile:

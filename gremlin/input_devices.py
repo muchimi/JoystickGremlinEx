@@ -2166,8 +2166,16 @@ def deadzone(value, low, low_center, high_center, high):
     :param high high deadzone limit
     :return corrected value
     """
-    if low_center is None or high_center is None or low is None or high is None:
-        pass
+
+    # suitable defaults for legacy data
+    if low is None:
+        low = -1.0
+    if low_center is None:
+        low_center = 0.0
+    if high_center is None:
+        high_center = 0.0
+    if high is None:
+        high = 1.0
         
 
     if value >= 0:
