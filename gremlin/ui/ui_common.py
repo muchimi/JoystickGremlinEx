@@ -117,7 +117,7 @@ class DeviceWidgetTracker():
                 if input_id in self._widget_cache[device_guid][input_type]:
                     if key in self._widget_cache[device_guid][input_type][input_id]: 
                         return self._widget_cache[device_guid][input_type][input_id][key]
-        return None
+        
 
     def getCache(self, device_guid, input_type):
         if not isinstance(device_guid, str):
@@ -125,6 +125,10 @@ class DeviceWidgetTracker():
         if device_guid in self._widget_cache:
             if input_type in self._widget_cache[device_guid]:
                 return self._widget_cache[device_guid][input_type]
+        self._widget_cache[device_guid] = {}
+        self._widget_cache[device_guid][input_type] = {}
+        return self._widget_cache[device_guid][input_type]
+            
 
 
 @SingletonDecorator
