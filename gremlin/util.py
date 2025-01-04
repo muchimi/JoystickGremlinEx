@@ -1469,21 +1469,25 @@ def getHostIp():
     import socket
 
     # get the local, non VPN, non loopback address
-    hostname = socket.getfqdn()
-    return socket.gethostbyname_ex(hostname)[2][1]
+    
+    try:
+        # this can blow up on some systems
+        hostname = socket.getfqdn()
+        return socket.gethostbyname_ex(hostname)[2][1]
+    except:
+        pass
+    # use the old method
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.settimeout(0)
+    try:
+        s.connect(('10.254.254.254', 1)) # dummy address
+        host_ip = s.getsockname()[0]
+    except Exception:
+        host_ip= '127.0.0.1'
+    finally:
+        s.close()
 
-
-    # s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    # s.settimeout(0)
-    # try:
-    #     s.connect(('10.254.254.254', 1)) # dummy address
-    #     host_ip = s.getsockname()[0]
-    # except Exception:
-    #     host_ip= '127.0.0.1'
-    # finally:
-    #     s.close()
-
-    #return host_ip
+    return host_ip
 
 
 def to_byte_string(source) -> tuple:
