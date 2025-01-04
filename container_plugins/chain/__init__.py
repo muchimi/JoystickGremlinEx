@@ -53,7 +53,7 @@ class ChainContainerWidget(AbstractContainerWidget):
         self.action_selector.action_added.connect(self._add_action)
         self.action_selector.add_button.setText("Add Step")
         self.action_selector.action_paste.connect(self._paste_action)
-        self.action_selector.container = self.profile_data
+        
 
         self.widget_layout.addWidget(self.action_selector)
 
