@@ -20,12 +20,13 @@ import threading
 import sys
 import uuid
 
-import gremlin.event_handler
+
 import gremlin.joystick_handling
 from gremlin.input_types import InputType
+import gremlin.shared_state
 from gremlin.types import DeviceType
 import logging
-
+from PySide6 import QtWidgets, QtCore, QtGui
 
 def module_property(func):
     """Decorator to turn module functions into properties.
@@ -147,6 +148,21 @@ def get_device_name(device_guid):
         logging.getLogger("system").error(f"Unable to find device name for id: {device_guid}")
         pass
     return device_name
+
+
+_simconnect_enabled = None
+
+def getSimConnectEnabled():
+    ''' gets the simconnect enabled flag '''
+    global _simconnect_enabled
+    if _simconnect_enabled is None:
+        from action_plugins.map_to_simconnect import MapToSimConnect
+        ec = gremlin.execution_graph.ExecutionContext()
+        enabled = ec.findActionPlugin(MapToSimConnect.name)
+        syslog = logging.getLogger("system")
+        syslog.info(f"State: SimConnect usage {'is' if enabled else 'not'} detected.  SimConnect is {'enabled' if enabled else 'disabled'}.")
+        _simconnect_enabled = enabled
+    return _simconnect_enabled
 
 # map of device type to hardware GUID (DeviceType enum)
 device_type_map = {}
@@ -370,6 +386,26 @@ def _get_root_path():
     global root_path
     root_path = application_path
     return application_path
+
+class ProfileStateMonitor():
+    ''' monitors various state related settings '''
+    def __init__(self):
+        import gremlin.event_handler
+        el = gremlin.event_handler.EventListener()
+        el.profile_start.connect(self._profile_start)
+        el.profile_stop.connect(self._profile_stop)
+
+    @QtCore.Slot()
+    def _profile_start(self):
+        gremlin.shared_state._simconnect_enabled = None # force an update
+
+
+    @QtCore.Slot()
+    def _profile_stop(self):
+        gremlin.shared_state._simconnect_enabled = None # force an udpate
+
+
+
 
 _get_root_path()
 

@@ -120,7 +120,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_BASE = "m55"
+APPLICATION_BASE = "m56"
 APPLICATION_VERSION = f"13.40.16ex ({APPLICATION_BASE})"
 
 
@@ -1500,6 +1500,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
             midi_enabled = self.config.midi_enabled
             osc_enabled = self.config.osc_enabled
+
             
             self._reset_tab_data()
             self.clearWidgets()
@@ -3686,7 +3687,12 @@ if __name__ == "__main__":
     if args.start_minimized:
         ui.setHidden(True)
 
+
+    # state monitoring
+    profile_state_monitor = gremlin.shared_state.ProfileStateMonitor()   
+
     # automatic process monitoring check
+        
     pmgr = gremlin.process_monitor.ProcessMonitor()
     el = gremlin.event_handler.EventListener()
     el.process_monitor_changed.emit()

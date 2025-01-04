@@ -974,6 +974,13 @@ class SimConnectManager(QtCore.QObject):
 
     def reconnect(self, force_retry = False):
         # not connected
+
+        
+        enabled = gremlin.shared_state.getSimConnectEnabled()
+        if not enabled:
+            # simconnect is not enabled
+            return False
+
         self._abort = False
         if not self.connected:
             try:

@@ -210,6 +210,12 @@ Joystick Gremlin EX
 
 <!-- TOC --><a name="134016ex-pre-release"></a>
 ## 13.40.16ex (pre-release)
+### (m56)
+- Fix: GremlinEx will no longer attempt to connect to SimConnect if no SimConnect action is detected (side effect of some features added to m53/m54).
+- New: Experimental - Simconnect Action includes an auto-repeat feature to send RPN expressions to MSFS while the input is pressed (similar to Keyboard auto-repeat).  This is added because some expressions in RPN don't have the notion of "do while...".
+- New: Experimental - Simconnect Action issue an optional RPN expression on release which is different from the RPN expression on press.  This is helpful for toggle type situations, or to for "while pressed" situations without having to code another separate action on release.
+### (m55)
+- Fix: Highlighting for OSC/MIDI inputs if highlighting is enabled while in edit mode.
 ### (m54)
 - Fix: disabling MIDI or OSC device in options was not necessarily updating the device tabs correctly.
 - Fix: UI not updating correctly on some refresh functions (new profile, options window).
@@ -2218,6 +2224,15 @@ The GremlinEx concept for working with MSFS is to setup a (single) profile for M
 GremlinEx provides an automatic mechanism to switch profile modes for each aircraft based on what it has detected is the active aircraft.  This is dynamic so when a new aicraft is loaded, the mode, if defined in options, will be activated if it exists in the profile.
 
 As of this version, GremlinEx must run on the same computer running MSFS.  This is a MSFS requirement.
+
+## WASM module
+
+GremlinEx includes a custom MSFS WASM module written in C++ that gives GremlinEx the ability to use gauge API (WASM) expressions, get a list of simulator variables defined by add-ons, and get values from internal variables via SimConnect.  This functionality gives GremlinEx the ability to control add-on cockpits that are not controllable with the base SimConnect API functionality. This functionality does not currently exist in the current SimConnect SDK.
+
+
+The module must be installed in the Community folder in MSFS.  The location of the Community folder varies with the version of MSFS and the method of purchase.  Here is [a helpful article](https://flightsim.to/help/microsoft-flight-simulator/locating-the-community-folder-of-microsoft-flight-simulator) on how to locate this folder on FlightSim.to.
+
+The WASM module is included in GremlinEx as a zip file containing a single folder called **gremlinex-module**.  To install the module, ensure MSFS is not running, and they just copy the folder ** gremlinex-module** in its entirety the Community folder.  Restart the simulator.
 
 ## Configuration
 

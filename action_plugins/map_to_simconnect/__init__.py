@@ -29,6 +29,7 @@ import gremlin.macro
 import gremlin.shared_state
 
 import gremlin.shared_state
+import gremlin.shared_state
 import gremlin.singleton_decorator
 import gremlin.ui.ui_common
 import gremlin.ui.input_item
@@ -244,6 +245,7 @@ class SimconnectOptions(QtCore.QObject):
         el.profile_loaded.connect(self._profile_loaded) # trap profile load to update modes
         el.profile_start.connect(self._profile_modes_changed) # trap profile start to update modes
         el.modes_changed.connect(self._profile_modes_changed) # trap edit mode mode changes to update modes
+        el.shutdown.connect(self.save) # save configuration on shutdown
 
 
         # configuration file stored in the user's GremlinEx profile
@@ -260,7 +262,8 @@ class SimconnectOptions(QtCore.QObject):
 
         self._community_folder = gremlin.shared_state.community_folder
 
-        
+        # last command mode for the UI
+        self._last_command_mode = SimconnectCommandMode.Simvar
 
         self._sort_mode = SimconnectSortMode.NotSet
 
@@ -310,6 +313,12 @@ class SimconnectOptions(QtCore.QObject):
             self._community_folder = value
             gremlin.shared_state.community_folder = value
         
+    @property
+    def last_command_mode(self) -> SimconnectCommandMode:
+        return self._last_command_mode
+    @last_command_mode.setter
+    def last_command_mode(self, value: SimconnectCommandMode):
+        self._last_command_mode = value
 
     def validate(self):
         ''' validates options are ok '''
@@ -469,6 +478,8 @@ class SimconnectOptions(QtCore.QObject):
                     except:
                         self._sort_mode = SimconnectSortMode.NotSet
                         pass
+                if "last_command_mode" in node.attrib:
+                    self._last_command_mode = SimconnectCommandMode.to_enum(node.get("last_command_mode"))
                 break
 
             # reference items scanned from MSFS
@@ -569,6 +580,8 @@ class SimconnectOptions(QtCore.QObject):
             # save valid community folder
             node_options.set("community_folder", self._community_folder)
         node_options.set("sort", str(self._sort_mode.value))
+
+        node_options.set("last_command_mode", SimconnectCommandMode.to_string(self._last_command_mode))
 
         # scanned aicraft titles (local content)
         if self._aircraft_definitions:
@@ -976,9 +989,8 @@ class SimconnectMonitor():
     @QtCore.Slot()
     def _profile_start(self):
         ''' occurs when a profile starts '''
-        import gremlin.execution_graph
-        ec = gremlin.execution_graph.ExecutionContext()
-        if ec.findActionPlugin(MapToSimConnect.name):
+        enabled = gremlin.shared_state.getSimConnectEnabled()
+        if enabled:
             logging.getLogger("system").info(f"SCMONITOR: Start")
 
             eh = gremlin.event_handler.EventHandler()
@@ -2259,7 +2271,11 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._calculator_container_layout = QtWidgets.QVBoxLayout(self._calculator_container_widget)
         self._calculator_container_layout.setContentsMargins(0,0,0,0)
 
-
+        # calculator release selector
+        self._calculator_release_container_widget = QtWidgets.QWidget()
+        self._calculator_release_container_widget.setContentsMargins(0,0,0,0)
+        self._calculator_release_container_layout = QtWidgets.QVBoxLayout(self._calculator_release_container_widget)
+        self._calculator_release_container_layout.setContentsMargins(0,0,0,0)
 
         # list of possible events to trigger
         self._command_selector_widget = gremlin.ui.ui_common.QComboBox()
@@ -2322,8 +2338,20 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._calculator_entry_widget.setPlainText(self.action_data.command)
         self._calculator_entry_widget.textChanged.connect(self._expression_changed_cb)
 
+
+        self._calculator_release_entry_widget = QtWidgets.QTextEdit()
+        self._calculator_release_entry_widget.setToolTip("RPN calculator expression sent to MSFS on input release")
+        self._calculator_release_entry_widget.setMinimumWidth(200)
+        self._calculator_release_entry_widget.setPlainText(self.action_data.command_release)
+        self._calculator_release_entry_widget.textChanged.connect(self._expression_release_changed_cb)
+
         self._calculator_container_layout.addWidget(QtWidgets.QLabel("RPN Expression:"))
         self._calculator_container_layout.addWidget(self._calculator_entry_widget)
+
+
+        self._calculator_release_container_layout.addWidget(QtWidgets.QLabel("RPN Expression on release:"))
+        self._calculator_release_container_layout.addWidget(self._calculator_release_entry_widget)
+
         
         self._autorepeat_container_widget = QtWidgets.QWidget()
         self._autorepeat_container_layout = QtWidgets.QHBoxLayout(self._autorepeat_container_widget)
@@ -2333,6 +2361,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._autorepeat_widget.setChecked(self.action_data.auto_repeat)
         self._autorepeat_widget.clicked.connect(self._auto_repeat_state_changed)
         self._autorepeat_widget.setToolTip("When enabled, the command will repeat at set interval while the input is pressed")
+
         self._autorepeat_delay_label = QtWidgets.QLabel("Repeat Interval (ms)")
         self._autorepeat_delay_widget = gremlin.ui.ui_common.QIntLineEdit()
         self._autorepeat_delay_widget.setRange(0, 20000)
@@ -2341,6 +2370,14 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._autorepeat_delay_widget.setValue(self.action_data.auto_repeat_interval)
         self._autorepeat_delay_widget.valueChanged.connect(self._auto_repeat_delay_changed)
 
+
+        self._release_command_widget = QtWidgets.QCheckBox("Separate Release Expression")
+        self._release_command_widget.setToolTip("If enabled, a separate expression will be sent on input release")
+        self._release_command_widget.setChecked(self.action_data.is_release_command)
+        self._release_command_widget.clicked.connect(self._is_release_command_changed)
+
+
+        self._autorepeat_container_layout.addWidget(self._release_command_widget)
         self._autorepeat_container_layout.addWidget(self._autorepeat_widget)
         self._autorepeat_container_layout.addWidget(self._autorepeat_delay_label)
         self._autorepeat_container_layout.addWidget(self._autorepeat_delay_widget)
@@ -2648,6 +2685,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.main_layout.addWidget(self._mode_container_widget)
         self.main_layout.addWidget(self._command_container_widget)
         self.main_layout.addWidget(self._calculator_container_widget)
+        self.main_layout.addWidget(self._calculator_release_container_widget)
         self.main_layout.addWidget(self._lvar_lookup_container_widget)
         self.main_layout.addWidget(self._type_container_widget)
         self.main_layout.addWidget(self._output_container_widget)
@@ -2686,6 +2724,12 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _auto_repeat_state_changed(self, checked):
         self.action_data.auto_repeat = checked
 
+    @QtCore.Slot(bool)
+    def _is_release_command_changed(self, checked):
+        self.action_data.is_release_command = checked
+        self._update_visible()
+
+
     @QtCore.Slot()
     def _auto_repeat_delay_changed(self):
         self.action_data.auto_repeat_interval = self._autorepeat_delay_widget.value()
@@ -2695,6 +2739,9 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         widget = self.sender()
         mode = widget.data
         self.action_data.command_mode = mode
+        SimconnectOptions().last_command_mode = mode # remember for next time
+        
+        
         self._update_visible()
     
     @QtCore.Slot()
@@ -2707,6 +2754,11 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _expression_changed_cb(self):
         ''' expression changed '''
         self.action_data.command = self._calculator_entry_widget.toPlainText()
+
+    @QtCore.Slot()
+    def _expression_release_changed_cb(self):
+        ''' expression changed '''
+        self.action_data.command_release = self._calculator_release_entry_widget.toPlainText()
 
     QtCore.Slot()            
     def _reset_range(self):
@@ -3138,6 +3190,8 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         mode = self.action_data.command_mode
         calc_visible = mode != SimconnectCommandMode.Simvar
         simvar_visible = not calc_visible
+
+        release_command_visible = self.action_data.is_release_command
         
 
         self._command_selector_widget.setVisible(simvar_visible)
@@ -3145,6 +3199,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._calculator_container_widget.setVisible(calc_visible)
         self._type_container_widget.setVisible(False) # disable for now as it doesn't serve a value until we have an edit / entry mode
         self._command_container_widget.setVisible(simvar_visible)
+        self._calculator_release_container_widget.setVisible(release_command_visible)
 
         self._output_container_widget.setVisible(simvar_visible)
         self._button_mode_container_widget.setVisible(simvar_visible)
@@ -3378,8 +3433,9 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
 
         # execute the nested functors for this action
         super().process_event(event, action_value)
-
-        verbose = gremlin.config.Configuration().verbose_mode_simconnect
+        config = gremlin.config.Configuration()
+        verbose = config.verbose_mode_simconnect
+        verbose_details = config.verbose_mode_details
         #verbose = True
 
         if not self.manager.is_running:
@@ -3400,21 +3456,31 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                     # calculator expression
                     if not self._auto_repeat_thread.is_alive():
                         # command auto repeats while pressed - not started
-                        syslog.info("auto repeat start")
+                        if verbose_details: syslog.info("auto repeat start")
                         self._auto_repeat_thread.start()
                         return True
             
             if event.is_pressed:
                 # regular calculate
-                self.manager.calculate(self.action_data.command) # run RPN script
+                command = self.action_data.command
+                if verbose: syslog.info(f"Simconnect: calc: execute press command: {command}")
+                self.manager.calculate(command) # run RPN script
             else:
                 # release calculate auto repeat
                 if self.action_data.auto_repeat and self._auto_repeat_thread:
                     # released
-                    syslog.info("auto repeat stopping...")
+                    if verbose_details: syslog.info("auto repeat stopping...")
                     self._auto_repeat_event.set()
                     self._auto_repeat_thread.join()
-                    syslog.info("auto repeat stopped")
+                    if verbose_details: syslog.info("auto repeat stopped")
+
+                if self.action_data.is_release_command:
+                    # execute release command
+                    command = self.action_data.command_release
+                    if command:
+                        if verbose: syslog.info(f"Simconnect: calc: execute release command: {command}")
+                        self.manager.calculate(command) # run RPN script
+
 
             return True
 
@@ -3530,6 +3596,7 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         from .SimConnectManager import SimConnectManager
         self._manager = SimConnectManager()
 
+        options = SimconnectOptions()
 
         self.input_type = self.get_input_type()
 
@@ -3543,7 +3610,9 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
 
         # the current command name
         self._command = None
-        self._command_mode = SimconnectCommandMode.Simvar # simvar mode
+        self._command_release = None # command on release if any provided
+        self._command_mode = options.last_command_mode
+        self.is_release_command = False # true if the action has a command to execute on release
 
         self.auto_repeat = False
         self.auto_repeat_interval = 250 # how often to repeat the command while pressed in ms
@@ -3603,6 +3672,16 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
             
             self._command = value
             self.update_block()        
+
+    @property
+    def command_release(self):
+        ''' active simconnect command for this action '''
+        return self._command_release
+    
+    @command_release.setter
+    def command_release(self, value):
+        self._command_release = value
+                             
 
     @property
     def command_description(self) -> str:
@@ -3726,6 +3805,8 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
 
         default_command = self._default_command()
         self._command = safe_read(node,"command",str, default_command)
+        self._command_release = safe_read(node,"command_release",str, "")
+        self.is_release_command = safe_read(node,"has_release", bool, False)
         self._block = SimConnectManager().block(self._command)
         self.value = safe_read(node,"value", float, 0.0) # normalized
         self.min_range = safe_read(node,"min_range", float, -1.0) # normalized
@@ -3790,10 +3871,13 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
             node_block = self.block.to_xml()
             node.append(node_block)
 
-        command = self.command if self.command else ""
+        command = self._command if self._command else ""
+        command_release = self._command_release if self._command_release else ""
 
         if self.command_mode == SimconnectCommandMode.Calculator:
             node.set("command",safe_format(command, str))
+            node.set("command_release",safe_format(command_release, str))
+            node.set("has_release", safe_format(self.is_release_command, bool))
             node.set("mode", SimConnectActionMode.to_string(self.mode))
             node.set("command_mode", SimconnectCommandMode.to_string(self._command_mode))
             node.set("type", SimConnectCommandType.to_string(self._command_type))
@@ -3804,6 +3888,8 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
             # simconnect command
             
             node.set("command",safe_format(command, str))
+            node.set("command_release",safe_format(command_release, str))
+            node.set("has_release", safe_format(self.is_release_command, bool))
             node.set("value", safe_format(self.value, float)) # normalized
             node.set("mode", SimConnectActionMode.to_string(self.mode))
             node.set("command_mode", SimconnectCommandMode.to_string(self._command_mode))

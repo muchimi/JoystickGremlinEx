@@ -1116,6 +1116,7 @@ class Configuration:
         self._data["midi_enabled"] = value
         self.save()
 
+
     @property
     def osc_enabled(self):
         ''' true if osc module is enabled '''
@@ -1484,8 +1485,11 @@ class Configuration:
 
         syslog = logging.getLogger("system")
 
+
         if device_guid is None:
             # get the last profile device guid
+            if not self._profile_config_fname:
+                self.ensure_profile(gremlin.shared_state.current_profile)
             device_guid = self._profile_data.get("last_device_guid", None)
             if not device_guid:
                 return (None, None, None)
