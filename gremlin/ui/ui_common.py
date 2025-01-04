@@ -204,11 +204,13 @@ class StateTracker():
                     widget = self._button_cache[device_guid][input_type][key]
                     if widget.enabled:
                         widget._update_value(is_pressed)
-                # else:
-                #     if not gremlin.shared_state.is_running:
-                #         # display only at edit mode
-                #         syslog = logging.getLogger("system")
-                #         syslog.debug (f"Button not found: {key} - choices: {list(self._button_cache[device_guid][input_type].keys())}")
+                
+                    # if not gremlin.shared_state.is_running:
+                    #     # select it
+                    #     if gremlin.config.Configuration().highlight_input_buttons:
+                    #         el = gremlin.event_handler.EventListener()
+                    #         el.select_input.emit(device_guid, input_type, input_id, False, False)
+                
                     
 
     
@@ -222,11 +224,11 @@ class StateTracker():
                     widget = self._axis_cache[device_guid][input_type][key]
                     if widget.enabled:
                         widget._update_value(value)
-                # else:
-                #     if not gremlin.shared_state.is_running:
-                #         # display only at edit mode
-                #         syslog = logging.getLogger("system")
-                #         syslog.debug (f"axis not found: {key} - choices: {list(self._axis_cache[device_guid][input_type].keys())}")
+                # if not gremlin.shared_state.is_running:
+                #         # select it
+                #         if gremlin.config.Configuration().highlight_input_axis:
+                #             el = gremlin.event_handler.EventListener()
+                #             el.select_input.emit(device_guid, input_type, input_id, False, False)
                     
                         
     

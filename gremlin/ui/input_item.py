@@ -622,7 +622,11 @@ class InputItemListView(ui_common.AbstractView):
             data = self.model.data(index)
             if input_type is not None and data.input_type != input_type:
                 continue
-            if data.input_id == identifier:
+            if hasattr(data.input_id, "message_key"):
+                if data.input_id.message_key == identifier.message_key:
+                    self.select_item(index, emit, force_update)    
+            
+            elif data.input_id == identifier:
                 self.select_item(index, emit, force_update)
                 return
 
