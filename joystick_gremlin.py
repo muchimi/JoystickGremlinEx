@@ -120,7 +120,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_BASE = "m56b"
+APPLICATION_BASE = "m57"
 APPLICATION_VERSION = f"13.40.16ex ({APPLICATION_BASE})"
 
 
@@ -176,6 +176,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.device_change_locked = False
         self._device_change_queue = 0 # count of device updates while the UI is already updating
         self._runtime_mode_map = {} # map of runtime processes to their last runtime mode
+        self.widget_tracker = gremlin.ui.ui_common.DeviceWidgetTracker() # caches the  InputConfigurationItem for this item
 
         self._resize_count = 0
 
@@ -1372,9 +1373,18 @@ class GremlinUi(QtWidgets.QMainWindow):
             del self._widget_cache[device_guid]
 
 
+    def unregisterAllWidgets(self):
+        ''' clears the widgets '''
+        for widget in self._widget_cache.values():
+            # cleanup widgets
+            if hasattr(widget, "_cleanup_ui"):
+                widget._cleanup_ui()
+        self._widget_cache.clear()
+
+
     def clearWidgets(self):
         ''' clears the device cache'''
-        self._widget_cache.clear()
+        self.unregisterAllWidgets()
         gremlin.util.clear_layout(self.ui.tab_content_layout)
 
     def getTabIndexForDevice(self, device_guid):
@@ -1495,13 +1505,12 @@ class GremlinUi(QtWidgets.QMainWindow):
         try:
 
             device_guid = None
-            # list of tab headers
-            headers = []
 
             midi_enabled = self.config.midi_enabled
             osc_enabled = self.config.osc_enabled
 
             
+            self.widget_tracker.clear() # force content to rebuild
             self._reset_tab_data()
             self.clearWidgets()
 
@@ -1902,19 +1911,20 @@ class GremlinUi(QtWidgets.QMainWindow):
         finally:
             try:
                 el.pop_input_selection(reset = True) # allow selections
-
+                selected = False
                 # if not selected, select a default
                 device_guid = self.config.last_device_guid
-                if not device_guid in self._tab_device_map:
-                    # the last selected device is no longer in the device list
-                    device_guid = self.ui.devices.tabData(0).device_guid
-
                 if device_guid is not None:
+                    if not device_guid in self._tab_device_map:
+                        # the last selected device is no longer in the device list
+                        device_guid = self.ui.devices.tabData(0).device_guid
+                        selected = True
+                        self._select_input(device_guid, force_switch=True)
+                        
+
+                if device_guid is not None and not selected:
                     _, restore_input_type, restore_input_id = self.config.get_last_input(device_guid)
                     self._select_input(device_guid, restore_input_type, restore_input_id, force_switch=True)
-
-                
-                
                 
             except Exception as err:
                 pass
@@ -2130,7 +2140,7 @@ class GremlinUi(QtWidgets.QMainWindow):
       
 
         verbose = gremlin.config.Configuration().verbose_mode_inputs
-        verbose = True
+        #verbose = True
 
 
         el = gremlin.event_handler.EventListener()
@@ -2180,7 +2190,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
             # make the content visible
             self.selectTabWidget(device_guid)
-            
+
             # see if the request input is found
             input_item = self._find_input_item(device_guid, input_type, input_id)
             if input_item is None:
@@ -2235,9 +2245,14 @@ class GremlinUi(QtWidgets.QMainWindow):
                 widget = self.getWidget(device_guid)
                 if widget:
                     if verbose: syslog.info(f"Select input: select widget {input_type} {input_id}")
-                    widget.input_item_list_view.select_input(input_type, input_id, force_update = force_update)
+                    widget.input_item_list_view.select_input(input_type, input_id, force_update = False)
                     index = widget.input_item_list_view.current_index
                     widget.input_item_list_view.redraw_index(index)
+
+                    # should have contents now
+                    has_content = widget.hasRightContent()
+                    assert has_content,"Device widget has no content to display"
+
                     if verbose: syslog.info(f"Select input: selected widget {input_type} {input_id}")
 
                 # remember the last input id
@@ -2850,10 +2865,6 @@ class GremlinUi(QtWidgets.QMainWindow):
         self._set_joystick_input_buttons_highlighting(self.config.highlight_input_buttons)
         if not ignore_minimize:
             self.setHidden(self.config.start_minimized)
-        # if self.config.autoload_profiles:
-        #     self.process_monitor.start()
-        # else:
-        #     self.process_monitor.stop()
 
         if self.config.activate_on_launch:
             self.ui.actionActivate.setChecked(True)
@@ -3049,7 +3060,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
 
         # refresh current device tab
-        self._refresh_tab()
+        #self._refresh_tab()
 
 
     def _force_close(self):

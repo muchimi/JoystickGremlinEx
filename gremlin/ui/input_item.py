@@ -1074,6 +1074,7 @@ class InputItemWidget(QtWidgets.QFrame):
         
 
         self.data = data
+        self._deleted = False
         self._selected = False
         self._enabled = True # this determines if the input is active 
         self._index = None # assigned widget index
@@ -1273,6 +1274,12 @@ class InputItemWidget(QtWidgets.QFrame):
         el.mapping_changed.disconnect(self._mapping_changed_cb)
         el.update_input_icons.disconnect(self._update_icons)
         el.input_enabled_changed.disconnect(self._update_enabled_state)
+        self._deleted = True
+    
+    @property
+    def deleted(self):
+        # true if the cleanup function was found and the widget should be deleted
+        return self._deleted
 
 
     def _update_repeater(self):

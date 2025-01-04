@@ -4441,14 +4441,10 @@ class QSplitTabWidget(QDataWidget):
     def setRightPanelWidget(self, widget : QtWidgets.QWidget):
         ''' sets the right panel widget '''
         #print ("set right panel")
-        gremlin.util.clear_layout(self._right_container_layout)
-        if widget is not None:
-            # test_widget = QtWidgets.QWidget()
-            # test_layout = QtWidgets.QVBoxLayout(test_widget)
-            # test_layout.addWidget(QtWidgets.QLabel("test"))
-            #test_layout.addWidget(widget)
-            #self._right_container_layout.addWidget(test_widget)
-            self._right_container_layout.addWidget(widget)
+        widgets = self.getRightPanelWidgets()
+        for widget in widgets:
+            widget.setVisible(False)
+        self.addRightPanelWidget(widget)
 
     def addRightPanelWidget(self, widget : QtWidgets.QWidget):
         ''' sets the left panel widget '''
@@ -4456,16 +4452,29 @@ class QSplitTabWidget(QDataWidget):
         if widget is not None:
             self._right_container_layout.addWidget(widget)
 
+    def removeRightPanelWidget(self, widget : QtWidgets.QWidget):
+        ''' removes a widget from the right panel '''
+        widgets = gremlin.util.get_layout_widgets(self._right_container_layout)
+        if widget and widget in widgets:
+            self._right_container_layout.removeWidget(widget)
+
     def clearLeftPanel(self):
         ''' removes all widgets from the left panel '''
         gremlin.util.clear_layout(self._left_container_layout)
 
-    def clearRighttPanel(self):
+    def clearRightPanel(self):
         ''' removes all widgets from the right panel '''
         #print ("clear right panel")
         gremlin.util.clear_layout(self._right_container_layout)
 
+    def getRightPanelWidgets(self):
+        ''' gets the widgets in the right panel'''
+        return gremlin.util.get_layout_widgets(self._right_container_layout)
 
+    def hasRightContent(self):
+        ''' true if the widget has contents on the right '''
+        widgets = gremlin.util.get_layout_widgets(self._right_container_layout)
+        return len(widgets) > 0
 
 class QRememberDialog(QtWidgets.QDialog):
     ''' a dialog window that remembers its size and location '''
@@ -4612,7 +4621,7 @@ class QTabHeader(QtWidgets.QTabBar):
     
     @QtCore.Slot(int)
     def _tab_selected(self, index):
-        print (f"internal tab selected {index}")
+        # print (f"internal tab selected {index}")
         self._current_index = index
         if not (self._move_in_progress or self._mouse_down):
             self.tabChanged.emit(index)
@@ -4622,7 +4631,7 @@ class QTabHeader(QtWidgets.QTabBar):
         self._move_in_progress = True
         self._from_index = from_index
         self._to_index = to_index
-        print (f"internal tab move {from_index} {to_index}")
+        # print (f"internal tab move {from_index} {to_index}")
 
 
     def eventFilter(self, widget, event):
@@ -4630,7 +4639,7 @@ class QTabHeader(QtWidgets.QTabBar):
         if t == QtCore.QEvent.Type.MouseButtonPress:
             self._mouse_down = True
             self._mouse_down_index = self.currentIndex()
-            print (f"mouse down - {self._mouse_down_index}")
+            #print (f"mouse down - {self._mouse_down_index}")
         elif t == QtCore.QEvent.Type.MouseButtonRelease:
             self._mouse_down = False
             index = self.currentIndex()
