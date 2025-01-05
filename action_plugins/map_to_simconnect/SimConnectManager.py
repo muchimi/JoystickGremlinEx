@@ -927,7 +927,11 @@ class SimConnectManager(QtCore.QObject):
         ''' gets the current aircraft data '''
         if self._aircraft_name:
             return self._aircraft_name
-        self._sm.requestAircraftLoaded()
+        try:
+            if self._sm.ok:
+                self._sm.requestAircraftLoaded()
+        except:
+            pass
 
 
 
