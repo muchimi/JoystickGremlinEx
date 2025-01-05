@@ -4445,6 +4445,9 @@ class QSplitTabWidget(QDataWidget):
     def setRightPanelWidget(self, widget : QtWidgets.QWidget):
         ''' sets the right panel widget '''
         #print ("set right panel")
+        widgets = gremlin.util.get_layout_widgets(self._right_container_layout)
+        if widget in widgets:
+            return
         self.clearRightPanel()
         self.addRightPanelWidget(widget)
 

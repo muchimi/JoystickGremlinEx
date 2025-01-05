@@ -1040,22 +1040,22 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             # self._empty_widget.hide()
 
 
-            widget = self.widget_tracker.getWidget(self.device_guid, item_data.input_type, item_data.input_id, item_data.id)
-            if widget is not None:
-                try:
-                    parent = widget.parent() # causes an exception if QT deleted it
-                    if widget.deleted:
-                        if verbose: syslog.info("Widget marked as deleted - remove")
-                        widget.deleteLater()
-                        widget = None
-                    self.widget_tracker.unregisterWidget(self.device_guid, item_data.input_type, item_data.input_id, item_data.id)
-                except:
-                    if verbose: syslog.info("Widget was deleted by QT - recreate")
-                    widget = None    
-                    self.widget_tracker.unregisterWidget(self.device_guid, item_data.input_type, item_data.input_id, item_data.id)
+            # widget = self.widget_tracker.getWidget(self.device_guid, item_data.input_type, item_data.input_id, item_data.id)
+            # if widget is not None:
+            #     try:
+            #         parent = widget.parent() # causes an exception if QT deleted it
+            #         if widget.deleted:
+            #             if verbose: syslog.info("Widget marked as deleted - remove")
+            #             widget.deleteLater()
+            #             widget = None
+            #         self.widget_tracker.unregisterWidget(self.device_guid, item_data.input_type, item_data.input_id, item_data.id)
+            #     except:
+            #         if verbose: syslog.info("Widget was deleted by QT - recreate")
+            #         widget = None    
+            #         self.widget_tracker.unregisterWidget(self.device_guid, item_data.input_type, item_data.input_id, item_data.id)
                 
-
-            
+            self.clearRightPanel()
+            widget = None            
             if not widget:
                 # not in cache, create it and add to cache for this device/input combination
                 if verbose: syslog.info(f"create and store in cache content widget for index: {index}  device: {self.device_guid}")
@@ -1070,7 +1070,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 input_id = item_data.input_id
                 self.inputChanged.emit(device_guid, input_type, input_id)
                 self.addRightPanelWidget(widget)
-                self.widget_tracker.registerWidget(widget, self.device_guid, item_data.input_type, item_data.input_id, item_data.id)
+                #self.widget_tracker.registerWidget(widget, self.device_guid, item_data.input_type, item_data.input_id, item_data.id)
             else:
                 if verbose: syslog.info("widget cached: cached")
             
@@ -1094,13 +1094,13 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             self._debug_widget.setText(f"Contents for : N/A")
             self._right_container_layout.insertWidget(0,QtWidgets.QLabel("Please select an input to configure"))
 
-
+        
+            #widget.update()
         self.setUpdatesEnabled(True)
-        self.update()
         if widget:
-            
             widget.setVisible(True)
-            widget.update()
+        self.update()
+        
 
     
     def _description_changed_cb(self, index, text):
