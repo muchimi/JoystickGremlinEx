@@ -28,6 +28,7 @@ from typing import Callable
 
 
 
+import gremlin.base_classes
 import gremlin.joystick_handling
 import gremlin.shared_state
 import gremlin.threading
@@ -99,8 +100,9 @@ class Event:
 		:param action_id the ID of the action to execute or that generated the event
 			is pressed
 		"""
+		self._id = gremlin.util.get_guid() # unique ID for this event
 		self.event_type = event_type
-		self.identifier = identifier
+		self._identifier = identifier
 		self.device_guid = device_guid
 		self.is_pressed = is_pressed
 		self.value = value
@@ -123,12 +125,26 @@ class Event:
 		:return cloned copy of this event
 		"""
 		import copy
-		return copy.deepcopy(self)
+		if not isinstance(self.identifier, int):
+			self.identifier = gremlin.base_classes.PickleTarget(self.identifier)
+		dup = copy.deepcopy(self)
+		dup._id = gremlin.util.get_guid() # unique ID for this event
+		return dup
 	
 	@property
 	def device_id(self) -> str:
 		''' id as a string '''
 		return str(self.device_guid)
+	
+	@property
+	def identifier(self):
+		if isinstance(self._identifier, gremlin.base_classes.PickleTarget):
+			self._identifier = self._identifier.item
+		return self._identifier
+	
+	@identifier.setter
+	def identifier(self, value):
+		self._identifier = value
 
 
 	def __eq__(self, other):
@@ -139,29 +155,27 @@ class Event:
 
 	def __hash__(self):
 		"""Computes the hash value of this event.
-
-		The hash is comprised of the events type, identifier of the
-		event source and the id of the event device. Events from the same
-		input, e.g. axis, button, hat, key, with different values / states
-		shall have the same hash.
+		new in m58: use the unique ID of this event to uniquely identify it
 
 		:return integer hash value of this event
 		"""
-		if self.event_type == InputType.Keyboard:
-			data = (self.identifier.scan_code, self.identifier.is_extended) if isinstance(self.identifier, gremlin.keyboard.Key) else self.identifier
-			return hash((
-				self.device_guid,
-				self.event_type.value,
-				data,
-				1 if data[1] else 0
-			))
-		else:
-			return hash((
-				self.device_guid,
-				self.event_type.value,
-				self.identifier,
-				0
-			))
+		# if self.event_type == InputType.Keyboard:
+		# 	data = (self.identifier.scan_code, self.identifier.is_extended) if isinstance(self.identifier, gremlin.keyboard.Key) else self.identifier
+		# 	return hash((
+		# 		self.device_guid,
+		# 		self.event_type.value,
+		# 		data,
+		# 		1 if data[1] else 0
+		# 	))
+		# else:
+		# 	return hash((
+		# 		self.device_guid,
+		# 		self.event_type.value,
+		# 		self.identifier,
+		# 		0
+		# 	))
+	
+		return hash(self._id)
 
 	@property	
 	def hardwareKey(self):

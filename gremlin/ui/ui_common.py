@@ -4445,10 +4445,9 @@ class QSplitTabWidget(QDataWidget):
     def setRightPanelWidget(self, widget : QtWidgets.QWidget):
         ''' sets the right panel widget '''
         #print ("set right panel")
-        widgets = self.getRightPanelWidgets()
-        for widget in widgets:
-            widget.setVisible(False)
+        self.clearRightPanel()
         self.addRightPanelWidget(widget)
+
 
     def addRightPanelWidget(self, widget : QtWidgets.QWidget):
         ''' sets the left panel widget '''

@@ -120,7 +120,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_BASE = "m57a"
+APPLICATION_BASE = "m57c"
 APPLICATION_VERSION = f"13.40.16ex ({APPLICATION_BASE})"
 
 
@@ -2140,7 +2140,7 @@ class GremlinUi(QtWidgets.QMainWindow):
       
 
         verbose = gremlin.config.Configuration().verbose_mode_inputs
-        #verbose = True
+        verbose = True
 
 
         el = gremlin.event_handler.EventListener()

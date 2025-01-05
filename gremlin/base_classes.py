@@ -310,3 +310,50 @@ class SpecialInputItem(AbstractInputItem):
     
     def __str__(self):
         return "special"
+    
+
+pickle_targets = {}
+
+class PickleTarget():
+    ''' helper class to pickle objects that don't want to be pickled
+     
+    The way this works is we store the object to pickle in a local cache, give it a unique ID, and use that as the pickled value because the ID does pickle.
+    When the object is unpickled, we retrieve the object from the cache, remove it from the cache and return the original.
+
+    Pickling is automatic and occurs when cloning objects for example.
+
+    '''
+
+    def __init__(self, item):
+        self._item = item
+
+    def __getstate__(self):
+        ''' pickle '''
+        from gremlin.util import get_guid
+        id = get_guid()
+        pickle_targets[id] = self.item
+        self.id = id
+        #print (f"pickled to id: {id}")
+        return self.id
+    
+    def __setstate__(self, id):
+        ''' unpickle '''
+        #print (f"pickled from id: {id}")
+        if id in pickle_targets:
+            #print ("target found")
+            self.item = pickle_targets[id]
+            del pickle_targets[id]
+        return self
+    
+    @property
+    def item(self):
+        return self._item
+    
+    @item.setter
+    def item(self, value):
+        self._item = value
+
+
+
+            
+    

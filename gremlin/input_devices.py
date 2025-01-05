@@ -28,6 +28,7 @@ from typing import Callable
 from PySide6 import QtCore
 
 
+import gremlin.base_classes
 import gremlin.config
 import gremlin.gamepad_handling
 import gremlin.joystick_handling

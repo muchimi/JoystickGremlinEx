@@ -22,6 +22,7 @@ import logging
 
 from PySide6 import QtWidgets, QtCore, QtGui
 import threading
+import gremlin.base_classes
 import gremlin.config
 import gremlin.event_handler
 import gremlin.input_devices
@@ -3021,8 +3022,10 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         input_data : gremlin.base_profile.InputItem = self.input_item_list_model.data(index)
         
-        self._item_data = gremlin.ui.device_tab.InputItemConfiguration(input_data)
-        self.setRightPanelWidget(self._item_data)
+        widget = gremlin.ui.device_tab.InputItemConfiguration(input_data, parent = self)
+        self._item_data = widget
+        self.setRightPanelWidget(widget)
+        widget.setVisible(True)
 
         # remember the last input
         config = gremlin.config.Configuration()
@@ -3040,6 +3043,8 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             change_cb = self._create_change_cb(index)
             self._item_data.action_model.data_changed.connect(change_cb)
             self._item_data.description_changed.connect(change_cb)
+
+
     
 
     def _close_item_cb(self, widget, index, data):

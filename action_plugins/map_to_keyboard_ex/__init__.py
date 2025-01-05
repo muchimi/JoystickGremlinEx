@@ -479,7 +479,7 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
                             logging.getLogger("system").info(f"MapToKeyboardEx: hold")
                         id = gremlin.macro.MacroManager().queue_macro(self.press)
                         self.registerMacro(id)
-                    if auto_release:
+                    if auto_release: 
                         callback = lambda : gremlin.macro.MacroManager().queue_macro(self.release)
                         ButtonReleaseActions().register_callback(callback, event)
             elif self.mode == KeyboardOutputMode.AutoRepeat:
