@@ -50,7 +50,7 @@ class ControlWidget(gremlin.ui.input_item.AbstractActionWidget):
         ''' initialization '''
         self.profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
         el = gremlin.event_handler.EventListener()
-        el.modes_changed.connect(self._profile_modes_changed)
+        el.edit_mode_changed.connect(self._profile_edit_mode_changed)
         
     def _create_ui(self):
         """Creates the UI components."""
@@ -240,7 +240,7 @@ class ControlWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._update_input_list()
 
     @QtCore.Slot()
-    def _profile_modes_changed(self):
+    def _profile_edit_mode_changed(self):
         ''' called when the list of modes changes in the profile '''
         modes = self.profile.get_modes()
         if self.action_data.mode in modes:

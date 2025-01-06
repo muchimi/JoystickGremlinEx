@@ -1226,6 +1226,15 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         box.addWidget(self.chkb_paired)
 
 
+        self.chkb_auto_release_widget = QtWidgets.QCheckBox("Auto Release")
+        self.chkb_auto_release_widget.setToolTip("Autorelease will trigger a release action when the input is released if the input does not issue one and that is the desired behavior.")
+        self.chkb_auto_release_widget.setChecked(self.action_data.auto_release)
+
+
+        box.addWidget(self.chkb_auto_release_widget)
+
+        
+
         grid.addWidget(source, row, 1)
 
         # selector hooks
@@ -1342,6 +1351,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self.chkb_exec_on_release.clicked.connect(self._exec_on_release_changed)
         self.chkb_paired.clicked.connect(self._paired_changed)
+        self.chkb_auto_release_widget.clicked.connect(self._autorelease_changed)
         
         self.pulse_spin_widget.valueChanged.connect(self._pulse_value_changed)
         self.start_button_group.buttonClicked.connect(self._start_changed)
@@ -1522,6 +1532,8 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         paired_visible = False
         merge_visible =  False
         repeater_visible = False
+
+        self.chkb_auto_release_widget.setVisible(input_type in (InputType.KeyboardLatched, InputType.Keyboard, InputType.Midi, InputType.OpenSoundControl))
 
         axis_repeater_visible = self.action_data.input_is_axis() #input_type == InputType.JoystickAxis
 
@@ -1961,73 +1973,96 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             )
             logging.getLogger("system").error(str(e))
 
-
+    @QtCore.Slot()
     def _axis_reverse_changed(self):
         self.action_data.reverse = self.reverse_checkbox.isChecked()
 
+    @QtCore.Slot()
     def _axis_mode_changed(self):
         self.action_data.axis_mode = 'absolute' if self.absolute_checkbox.isChecked() else "relative"
 
+    @QtCore.Slot()
     def _axis_scaling_changed(self):
         self.action_data.axis_scaling = self.relative_scaling_widget.value()
 
+    @QtCore.Slot()
     def _axis_range_low_changed(self):
         self.action_data.range_low = self.sb_axis_range_low_widget.value()
 
+    @QtCore.Slot()
     def _axis_range_high_changed(self):
         self.action_data.range_high = self.sb_axis_range_high_widget.value()
 
+    @QtCore.Slot()
     def _axis_start_value_changed(self):
         self.action_data.axis_start_value = self.sb_start_value.value()
 
+    @QtCore.Slot()
     def _button_range_low_changed(self):
         self.action_data.range_low = self.sb_button_range_low.value()
 
+    @QtCore.Slot()
     def _button_range_high_changed(self):
         self.action_data.range_high = self.sb_button_range_high.value()
 
+    @QtCore.Slot()
     def _button_to_axis_value_changed(self):
         self.action_data.target_value = self.sb_button_to_axis_value.value()
-
+    
+    @QtCore.Slot()
     def _b_range_reset_clicked(self, value):
         self.sb_button_range_low.setValue(-1.0)
         self.sb_button_range_high.setValue(1.0)
 
+    @QtCore.Slot()
     def _b_range_half_clicked(self, value):
         self.sb_button_range_low.setValue(-0.5)
         self.sb_button_range_high.setValue(0.5)
 
+    @QtCore.Slot()
     def _b_range_lhalf_clicked(self, value):
         self.sb_button_range_low.setValue(-1.0)
         self.sb_button_range_high.setValue(0.0)
 
+    @QtCore.Slot()
     def _b_range_hhalf_clicked(self, value):
         self.sb_button_range_low.setValue(0.0)
         self.sb_button_range_high.setValue(1.0)
 
-    def _b_range_bot_clicked(self, value):
+    @QtCore.Slot()
+    def _b_range_bot_clicked(self):
         self.sb_button_range_low.setValue(-1.0)
         self.sb_button_range_high.setValue(-0.75)
 
-    def _b_range_top_clicked(self, value):
+    @QtCore.Slot()
+    def _b_range_top_clicked(self):
         self.sb_button_range_low.setValue(0.75)
         self.sb_button_range_high.setValue(1.0)
 
-
-    def _b_min_start_value_clicked(self, value):
+    @QtCore.Slot()
+    def _b_min_start_value_clicked(self):
         self.sb_start_value.setValue(-1.0)
 
-    def _b_center_start_value_clicked(self, value):
+    @QtCore.Slot()
+    def _b_center_start_value_clicked(self):
         self.sb_start_value.setValue(0.0)
 
-    def _b_max_start_value_clicked(self, value):
+    @QtCore.Slot()
+    def _b_max_start_value_clicked(self):
         self.sb_start_value.setValue(1.0)
 
-    def _exec_on_release_changed(self, value):
-        self.action_data.exec_on_release = self.chkb_exec_on_release.isChecked()
+    @QtCore.Slot(bool)
+    def _exec_on_release_changed(self, checked):
+        self.action_data.exec_on_release = checked # self.chkb_exec_on_release.isChecked()
 
-    def _paired_changed(self, value):
-        self.action_data.paired = self.chkb_paired.isChecked()
+    @QtCore.Slot(bool)
+    def _paired_changed(self, checked):
+        self.action_data.paired = checked # self.chkb_paired.isChecked()
+
+    @QtCore.Slot(bool)
+    def _autorelease_changed(self, checked):
+        self.action_data.auto_release = checked
+
 
     def _populate_grid(self, device_id, button_id):
         ''' updates the usage grid based on current VJOY mappings '''
@@ -2087,6 +2122,8 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         self.paired = action_data.paired
 
         self.needs_auto_release = self._check_for_auto_release(action_data)
+        if self.action_data.hardware_input_type in (InputType.Keyboard, InputType.KeyboardLatched, InputType.Midi, InputType.OpenSoundControl):
+            self.action_data.auto_release = self.action_data.auto_release or self.action_data.auto_release
         self.thread_running = False
         self.should_stop_thread = False
         self.thread_last_update = time.time()
@@ -2475,13 +2512,15 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                             self.remote_client.send_button(self.vjoy_device_id, self.vjoy_input_id, True, force_remote = force_remote )
                 else:
 
-                    if event.event_type in [InputType.JoystickButton, InputType.Keyboard] and event.is_pressed and self.needs_auto_release:
+                    if event.event_type in [InputType.JoystickButton, InputType.Keyboard, InputType.KeyboardLatched, InputType.Midi, InputType.OpenSoundControl] and event.is_pressed and self.needs_auto_release:
+                        print (f"remap setup autorelease for {str(event)}")
                         input_devices.ButtonReleaseActions().register_button_release(
                             (self.vjoy_device_id, self.vjoy_input_id),
                             event,
                             is_local = is_local,
                             is_remote = is_remote,
-                            force_remote = force_remote
+                            force_remote = force_remote,
+                            activate_on = False # released
                         )
 
                     #if event.is_pressed:
@@ -2669,6 +2708,8 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
 
         self._exec_on_release : bool = False
         self._paired : bool = False
+
+        self.auto_release = False # true if we should do an auto-release (only means anything on momentary inputs)
 
         self._merge_device_id : str = None # input guid (str) of the merged device
         self._merge_device_guid : dinput.GUID = None # input guid for the merge device
@@ -3138,6 +3179,9 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
             if "grid_visible" in node.attrib:
                 self.grid_visible = safe_read(node,"grid_visible", bool, True)
 
+            if "auto_release" in node.attrib:
+                self.auto_release = safe_read(node,"auto_release",bool, False)
+
             # curve data
             curve_node = util.get_xml_child(node,"curve-data")
             if not curve_node:
@@ -3248,6 +3292,8 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
                     write_node_input = False
 
                 node.set("hat_sticky", safe_format(self.hat_sticky, bool))
+
+        node.set("auto_release", safe_format(self.auto_release,bool))
 
         if self.curve_data is not None:
             curve_node =  self.curve_data._generate_xml()

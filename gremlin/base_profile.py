@@ -1894,7 +1894,7 @@ class Profile():
         self._simconnect_modes = {} # map of simconnect startup modes to aicraft - the key is the SimconnectAicraftDefinition key which is unique per aicraft that can be loaded by MSFS
 
         el = gremlin.event_handler.EventListener()
-        el.modes_changed.connect(self._modes_changed_cb)
+        el.edit_mode_changed.connect(self._edit_mode_changed_cb)
         
         self.initialize_regular_devices() # non joystick devices
 
@@ -1910,7 +1910,7 @@ class Profile():
 
 
     @QtCore.Slot()        
-    def _modes_changed_cb(self):
+    def _edit_mode_changed_cb(self):
         ''' available mode list has changed - check data '''
 
         # remove any merged axis data using a missing mode
@@ -2194,7 +2194,7 @@ class Profile():
 
         if emit:
             eh = gremlin.event_handler.EventListener()
-            eh.modes_changed.emit()
+            eh.edit_mode_changed.emit()
         return True
     
 
@@ -2207,7 +2207,7 @@ class Profile():
                     device.modes[name].inherit = inherited_name
             if emit:
                 eh = gremlin.event_handler.EventListener()
-                eh.modes_changed.emit()
+                eh.edit_mode_changed.emit()
             return True
         return False
     
@@ -2248,7 +2248,7 @@ class Profile():
             del device.modes[name]
 
         eh = gremlin.event_handler.EventListener()
-        eh.modes_changed.emit()
+        eh.edit_mode_changed.emit()
 
     def get_root_modes(self) -> list[str]:
         """Returns a list of root modes.

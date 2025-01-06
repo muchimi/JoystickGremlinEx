@@ -1911,6 +1911,7 @@ class ModeManagerUi(ui_common.BaseDialogUi):
         self.mode_delete = {}
         self.mode_callbacks = {}
         self.is_modified = False # true if the modes were modified
+        self.selected_mode = mode
 
         self._create_ui()
 
@@ -1925,7 +1926,7 @@ class ModeManagerUi(ui_common.BaseDialogUi):
         """
         # Re-enable keyboard event handler
         el = gremlin.event_handler.EventListener()
-        el.modes_changed.emit()
+        el.edit_mode_changed.emit(self.selected_mode)
         el.keyboard_hook.start()
         super().closeEvent(event)
 
@@ -2180,7 +2181,7 @@ The setting can be overriden by the global mode reload option set in Options for
                 device.modes[mode].inherit = inherit
 
         # eh = gremlin.event_handler.EventListener()
-        # eh.modes_changed.emit()
+        # eh.edit_mode_changed.emit()
 
     def _rename_mode(self, mode_name):
         """Asks the user for the new name for the given mode.
@@ -2234,11 +2235,15 @@ The setting can be overriden by the global mode reload option set in Options for
                 
 
             self._populate_mode_layout()
-            self._fire_mode_change()
+            self._fire_mode_change(new_name)
+            
 
-    def _fire_mode_change(self):
+    def _fire_mode_change(self, mode : str):
+        assert isinstance(mode, str)
+        self.selected_mode = mode
         eh = gremlin.event_handler.EventListener()
-        eh.modes_changed.emit()
+        assert mode, "Mode cannot be blank"
+        eh.edit_mode_changed.emit(mode)
 
     def _delete_mode(self, mode_name):
         message_box = QtWidgets.QMessageBox()
@@ -2303,7 +2308,7 @@ The setting can be overriden by the global mode reload option set in Options for
 
         # Update the ui
         self._populate_mode_layout()
-        self._fire_mode_change()
+        self._fire_mode_change(gremlin.shared_state.edit_mode)
 
 
     @QtCore.Slot()
@@ -2330,7 +2335,7 @@ The setting can be overriden by the global mode reload option set in Options for
                 
 
             self._populate_mode_layout()
-            self._fire_mode_change()
+            self._fire_mode_change(new_mode.name)
 
     @QtCore.Slot(int)
     def _change_default_mode_cb(self, index):

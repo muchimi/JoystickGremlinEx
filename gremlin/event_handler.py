@@ -152,6 +152,27 @@ class Event:
 
 	def __ne__(self, other):
 		return not (self == other)
+	
+	@property
+	def callbackKey(self):
+		''' unique key to use to identify the specific callback '''
+		if self.event_type == InputType.Keyboard:
+			data = (self.identifier.scan_code, self.identifier.is_extended) if isinstance(self.identifier, gremlin.keyboard.Key) else self.identifier
+			return (
+				self.device_guid,
+				self.event_type.value,
+				data,
+				1 if data[1] else 0
+			)
+		else:
+			return (
+				self.device_guid,
+				self.event_type.value,
+				self.identifier,
+				0
+			)
+
+
 
 	def __hash__(self):
 		"""Computes the hash value of this event.
@@ -159,21 +180,7 @@ class Event:
 
 		:return integer hash value of this event
 		"""
-		# if self.event_type == InputType.Keyboard:
-		# 	data = (self.identifier.scan_code, self.identifier.is_extended) if isinstance(self.identifier, gremlin.keyboard.Key) else self.identifier
-		# 	return hash((
-		# 		self.device_guid,
-		# 		self.event_type.value,
-		# 		data,
-		# 		1 if data[1] else 0
-		# 	))
-		# else:
-		# 	return hash((
-		# 		self.device_guid,
-		# 		self.event_type.value,
-		# 		self.identifier,
-		# 		0
-		# 	))
+		
 	
 		return hash(self._id)
 
@@ -328,11 +335,11 @@ class EventListener(QtCore.QObject):
 	broadcast_changed = QtCore.Signal(StateChangeEvent)
 
 	# occurs on mode edit/update/delete of modes (edit time only)
-	modes_changed = QtCore.Signal()
+	edit_mode_changed = QtCore.Signal(str) # param: the mode that was changed to
 
-	mode_name_changed = QtCore.Signal(str) # runs when a mode name change occurs for the UI to update
+	mode_name_changed = QtCore.Signal(str) # runs when a mode name change occurs for the UI to update - param - the name change
 
-	mode_changed = QtCore.Signal(str) # runs when the rungime profile mode changes (runtime mode only, when a profile has been started)
+	runtime_mode_changed = QtCore.Signal(str) # runs when the rungime profile mode changes (runtime mode only, when a profile has been started) - param - the mode changed to
 
 	# functor enable flag changed
 	action_created = QtCore.Signal(object) # runs when an action is created - object = the object that triggered the event 
@@ -341,7 +348,7 @@ class EventListener(QtCore.QObject):
 	action_delete = QtCore.Signal(object, object, object) # fires when an action is about to be deleted, passes the inputItem, container, action as a parameters
 
 	# selection event - tells the UI to show a different input
-	select_input = QtCore.Signal(object, object, object, bool, bool) # selects a particular input (device_guid, input_type, input_id, force_update, force_switch)
+	select_input = QtCore.Signal(object, object, object, bool, bool, bool) # selects a particular input (device_guid, input_type, input_id, force_update, force_switch, tab_changed)
 
 	input_selected = QtCore.Signal(object) # widget item was selected, parameter = InputItemWidget
 	input_item_selected = QtCore.Signal(object, int) # widget item was selected, parameter = InputItem, index of input item in the listview
@@ -907,21 +914,16 @@ class EventListener(QtCore.QObject):
 			if not self._key_listener_started:
 				return True
 			
-			# Only process the key if it's pressed the first time
-			# released but not when it's being held down
-			#if virtual_code > 0:
-			# 	self._keyboard_queue.put((virtual_code, is_pressed))
-			# else:
+
 			self._keyboard_queue.put((key_id, is_pressed))
 			
 			# add to the processing queue
 			if verbose:
-				# key = gremlin.keyboard.KeyMap.find_virtual(virtual_code) if virtual_code > 0 else gremlin.keyboard.KeyMap.find(key_id[0],key_id[1])
 				syslog.info(f"QUEUE KEY {gremlin.keyboard.KeyMap.keyid_tostring(key_id)} vk 0x{virtual_code:X} pressed {is_pressed}")
 
 		else:
 			# DESIGN mode - straight
-			# print (f"FIRE KEY {key_id} {key.name} pressed {is_pressed}")
+			#print (f"FIRE KEY {key_id} pressed {is_pressed}")
 			self.keyboard_event.emit(
 				Event(	event_type= InputType.Keyboard,
 						device_guid=dinput.GUID_Keyboard,
@@ -1063,9 +1065,7 @@ class EventHandler(QtCore.QObject):
 
 	"""Listens to the inputs from multiple different input devices."""
 
-	
-	mode_changed = QtCore.Signal(str) # Signal emitted when the mode is changed at design time
-	runtime_mode_changed = QtCore.Signal(str)  # mode change specific to runtime
+
 	mode_status_update = QtCore.Signal() # tell the UI to update the mode status bar
 
 	# signal emitted when the profile is changed
@@ -1118,6 +1118,7 @@ class EventHandler(QtCore.QObject):
 			
 		self.process_callbacks = True
 		self.callbacks = {}
+		self.callback_key_map = {} # map of event callbackKey to event
 		self.input_item_map = {} # map of input items keyed by device_guid, mode, input_type, input_id
 		self.latched_events = {}
 		self.latched_callbacks = {}
@@ -1182,18 +1183,19 @@ class EventHandler(QtCore.QObject):
 			return
 		
 		get_device_name = gremlin.shared_state.get_device_name
+		device_name = gremlin.shared_state.get_device_name(device_guid)
 		
-		for callbacks in self.callbacks[device_guid][mode][event]:
+		for callbacks in self.callbacks[device_guid][mode][event.callbackKey]:
 			for callback in callbacks:
 				if not hasattr(callback,"execution_graph"):
-					syslog.debug(f"\tDevice ID: {device_guid} ({get_device_name(device_guid)}) mode: {mode} event: {event} - skip callback - missing execution graph - don't know how to handle {type(callback)} *********")
+					syslog.debug(f"\tDevice ID: {device_name}  mode: {mode} event: {event} - skip callback - missing execution graph - don't know how to handle {type(callback)} *********")
 					continue
 				
 				for callback_functor in callback.execution_graph.functors:
 					if hasattr(callback_functor,"action_set"):
 						for functor in callback_functor.action_set.functors:
 							action_data = functor.action_data if hasattr(functor, "action_data") else None
-							syslog.debug(f"\tDevice ID: {device_guid} ({get_device_name(device_guid)}) mode: {mode} event: {event} hash: {hash(event):X} type: {type(functor)}")
+							syslog.debug(f"\tDevice ID: {device_name} mode: {mode} event: {event} hash: {hash(event):X} type: {type(functor)}")
 							if action_data:
 								# dump member variables only
 								syslog.debug("\t\tData block:")
@@ -1221,6 +1223,7 @@ class EventHandler(QtCore.QObject):
 		
 		syslog.debug("------------ Latched Events ----------------")
 		for device_guid in self.latched_events.keys():
+			device_name = gremlin.shared_state.get_device_name(device_guid)
 			for mode in self.latched_events[device_guid].keys():
 				for key_pair in self.latched_events[device_guid][mode]:
 					identifier = self.latched_events[device_guid][mode][key_pair]
@@ -1230,12 +1233,13 @@ class EventHandler(QtCore.QObject):
 							key_data = f"scan code: 0x{scan_code:X}  extended: {is_extended}"
 						else:
 							key_data = str(key_pair)
-						syslog.debug(f"\tDevice ID: {device_guid} ({get_device_name(device_guid)}) mode: {mode} pair: {key_data} data: {identifier.to_string()}")
+						syslog.debug(f"\tDevice ID: {device_name} mode: {mode} pair: {key_data} data: {identifier.to_string()}")
 
 		syslog.debug("------------ Execution callbacks ----------------")
 		for device_guid in self.callbacks.keys():
 			for mode in self.callbacks[device_guid].keys():
-				for event in self.callbacks[device_guid][mode]:
+				for key in self.callbacks[device_guid][mode]:
+					event = self.callback_key_map[key]
 					self.dump_exectree(device_guid, mode, event)
 
 
@@ -1319,6 +1323,8 @@ class EventHandler(QtCore.QObject):
 		import gremlin.config
 		import gremlin.ui.keyboard_device
 		import gremlin.keyboard
+
+		assert callable(callback)
 		
 		if event:
 			if event.event_type in (InputType.Keyboard, InputType.KeyboardLatched):
@@ -1400,14 +1406,16 @@ class EventHandler(QtCore.QObject):
 				data.append((self._install_plugins(callback),permanent))
 
 			else:
-				# regular event
+				# regular event - events are stored by the event key
 				if device_guid not in self.callbacks:
 					self.callbacks[device_guid] = {}
 				if mode not in self.callbacks[device_guid]:
 					self.callbacks[device_guid][mode] = {}
-				if event not in self.callbacks[device_guid][mode]:
-					self.callbacks[device_guid][mode][event] = []
-				self.callbacks[device_guid][mode][event].append((
+				key = event.callbackKey
+				if key not in self.callbacks[device_guid][mode]:
+					self.callbacks[device_guid][mode][key] = []
+					self.callback_key_map[key] = event
+				self.callbacks[device_guid][mode][key].append((
 					self._install_plugins(callback),
 					permanent
 				))
@@ -1497,7 +1505,7 @@ class EventHandler(QtCore.QObject):
 								device_cb[child] = {}
 							for event, callbacks in parent_cb.items():
 								if event not in device_cb[child]:
-									device_cb[child][event] = callbacks
+									device_cb[child][event.callbackKey] = callbacks
 
 			# Recurse until we've dealt with all modes
 			self.build_event_lookup(children)
@@ -1643,11 +1651,11 @@ class EventHandler(QtCore.QObject):
 				self.runtime_mode = new_mode
 				if verbose: syslog.info(f"Profile: {current_profile.name} - Runtime Mode switch to: {new_mode}")
 				if emit:
-					self.runtime_mode_changed.emit(new_mode)
+					el.runtime_mode_changed.emit(new_mode)
 
 				# tell other internal components the mode is changing (runtime only)
 				el = EventListener()
-				el.mode_changed.emit(new_mode)
+				el.runtime_mode_changed.emit(new_mode)
 				
 				if config.initial_load_mode_tts:
 					# output verbal notification if requested
@@ -1669,7 +1677,7 @@ class EventHandler(QtCore.QObject):
 				self.edit_mode = new_mode
 				syslog.debug(f"Profile: {current_profile.name} - Design time Mode switch to: {new_mode}")
 				if emit:
-					self.mode_changed.emit(self.edit_mode)
+					el.edit_mode_changed.emit(self.edit_mode)
 					
 
 
@@ -1681,7 +1689,7 @@ class EventHandler(QtCore.QObject):
 		# update the selection
 		device_guid, input_type, input_id = gremlin.config.Configuration().get_last_input()
 		if input_type and input_id:
-			el.select_input.emit(device_guid, input_type, input_id, False, True)
+			el.select_input.emit(device_guid, input_type, input_id, False, True, False)
 		
 
 
@@ -1705,6 +1713,7 @@ class EventHandler(QtCore.QObject):
 	def clear(self):
 		"""Removes all attached callbacks."""
 		self.callbacks = {}
+		self.callback_key_map.clear()
 		self.latched_callbacks = {}
 		self.midi_callbacks = {}
 		self.osc_callbacks = {}
@@ -1969,13 +1978,15 @@ class EventHandler(QtCore.QObject):
 
 		# Obtain callbacks matching the event
 		callback_list = []
+		key = event.callbackKey
 		device_guid = event.device_guid
 		if device_guid in self.callbacks:
 			mode = self.runtime_mode
-			if mode in self.callbacks[device_guid].keys():
-				if event in self.callbacks[device_guid][mode].keys():
-					callback_list = self.callbacks[device_guid][mode][event]
+			if mode in self.callbacks[device_guid]:
+				if key in self.callbacks[device_guid][mode]:
+					callback_list = self.callbacks[device_guid][mode][key]
 					if verbose:
+						event = self.callback_key_map[key]
 						self.dump_exectree(device_guid, mode, event)
 
 		if verbose:

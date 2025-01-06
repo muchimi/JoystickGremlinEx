@@ -32,7 +32,7 @@ import gremlin.joystick_handling
 import gremlin.shared_state
 import gremlin.macro
 from gremlin.ui import ui_common
-import gremlin.ui.device_tab
+import gremlin.ui.joystick_device
 import gremlin.ui.input_item
 import gremlin.ui.ui_common
 from gremlin.ui.qsliderwidget import QSliderWidget

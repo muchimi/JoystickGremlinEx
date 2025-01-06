@@ -60,7 +60,7 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
         
-        from gremlin.ui.device_tab import InputItemConfiguration
+        from gremlin.ui.joystick_device import InputItemConfiguration
         self.container_widget = InputItemConfiguration(action_data.item_data)
         self.main_layout.addWidget(self.container_widget)
 

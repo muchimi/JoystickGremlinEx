@@ -161,7 +161,7 @@ class CycleModesWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.main_layout.setContentsMargins(0, 0, 0, 0)
 
         eh = gremlin.event_handler.EventListener()
-        eh.modes_changed.connect(self._modes_changed)
+        eh.edit_mode_changed.connect(self._edit_mode_changed)
 
 
 
@@ -205,7 +205,7 @@ class CycleModesWidget(gremlin.ui.input_item.AbstractActionWidget):
             
 
     @QtCore.Slot()
-    def _modes_changed(self):
+    def _edit_mode_changed(self):
         ''' occurs when the modes are edited or changed '''
         self._update_mode_list()
 

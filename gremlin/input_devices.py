@@ -659,13 +659,13 @@ class ModeChangeRegistry():
                 callback = plugin.install(callback, partial_fn)
         return callback
 
-    def mode_changed(self, mode_name):
+    def runtime_mode_changed(self, mode : str):
         ''' calls all registered callbacks when the GremlinEx mode changes '''
         if len(self._registry) == 0:
             return
         for item in self._registry.values():
             plugin_cb = self._install_plugins(item)
-            plugin_cb(mode_name)
+            plugin_cb(mode)
 
 
 
@@ -1720,14 +1720,14 @@ class ButtonReleaseActions(QtCore.QObject):
         QtCore.QObject.__init__(self)
 
         self._registry = {}
+        #self._registry_key_map = {} # map of event callback keys to the events
         el = gremlin.event_handler.EventListener()
         el.joystick_event.connect(self._input_event_cb)
         el.keyboard_event.connect(self._input_event_cb)
         el.virtual_event.connect(self._input_event_cb)
         self._current_mode = gremlin.shared_state.runtime_mode
 
-        eh = gremlin.event_handler.EventHandler()
-        eh.runtime_mode_changed.connect(self._mode_changed_cb)
+        el.runtime_mode_changed.connect(self._mode_changed_cb)
 
     def register_callback(
         self,
@@ -1780,10 +1780,15 @@ class ButtonReleaseActions(QtCore.QObject):
         release_evt = physical_event.clone()
         release_evt.is_pressed = activate_on
 
+        key = release_evt.callbackKey
+
+        print (f"add autorelease release trigger: key: {key} {str(release_evt)}")
         if release_evt not in self._registry:
-            self._registry[release_evt] = []
+            self._registry[key] = []
+            #self._registry_key_map[key] = release_evt
+
         # Record current mode so we only release if we've changed mode
-        self._registry[release_evt].append(ButtonReleaseEntry(
+        self._registry[key].append(ButtonReleaseEntry(
             lambda: self._release_callback_prototype(vjoy_input, is_local, is_remote, force_remote),
             release_evt,
             self._current_mode
@@ -1817,18 +1822,25 @@ class ButtonReleaseActions(QtCore.QObject):
         Args:
             event: the event to process
         """
+        if not event.is_axis:
+            print (f"received event: {str(event)}")
+
+        key = event.callbackKey
         #if evt in [e for e in self._registry if e.is_pressed != evt.is_pressed]:
-        if event in self._registry:
+        if key in self._registry:
+            print (f"release trigger found: {key}")
             new_list = []
-            for entry in self._registry[event]:
+            for entry in self._registry[key]:
+
                 if entry.event.is_pressed == event.is_pressed:
                     try:
+                        print ("trigger release event")
                         entry.callback()
                     except:
                         pass
                 else:
                     new_list.append(entry)
-            self._registry[event] = new_list
+            self._registry[key] = new_list
 
     def _mode_changed_cb(self, mode):
         """Updates the current mode variable.

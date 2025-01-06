@@ -562,6 +562,18 @@ def get_guid(strip=True,no_brackets = False) -> str:
     if no_brackets:
         guid = guid.replace("{",'').replace("}",'')
     return guid
+
+def compare_guid(first, other):
+    ''' compares GUIDs DINPUT or str - True if equal'''
+    if first is None and other is None:
+        return True
+    if first is None:
+        return False
+    if other is None:
+        return False
+    first = str(first).casefold()
+    other = str(other).casefold()
+    return first == other
     
 def find_files(root_folder, source_pattern = "*") -> list:
     ''' runs native file search to find files without blowing up on borked sym links in windows unlike rglob - returns full paths to the found file pattern '''

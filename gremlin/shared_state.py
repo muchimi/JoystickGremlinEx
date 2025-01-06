@@ -100,6 +100,18 @@ keyboard_tab_guid = gremlin.util.parse_guid('6f1d2b61-d5a0-11cf-bfc7-44455354000
 # UUID of the mode tab
 mode_tab_guid = gremlin.util.parse_guid('b3b159a0-4d06-4bd6-93f9-7583ec08b877')
 
+# holds the current selected device guid (string) for a tab
+current_tab_device_guid = None
+
+def isDeviceTabActive(device_guid):
+    ''' compares the given device and returns True if it's the current selected tab 
+    :param device_guid: what to look for, GUID or str
+    
+    '''
+    global current_tab_device_guid
+    return gremlin.util.compare_guid(device_guid, current_tab_device_guid)
+
+
 # map of virtual devics to their input types
 virtual_device_guid_type_map = [
     (plugins_tab_guid, DeviceType.NotSet),
@@ -188,6 +200,7 @@ device_widget_map = {}
 
 # Holds the currently active profile
 current_profile = None
+
 
 # holds the active (runtime) mode
 runtime_mode = None

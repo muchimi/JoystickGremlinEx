@@ -168,7 +168,7 @@ class MapperModeWidget(QtWidgets.QWidget):
             rb.setChecked(True)
 
         if emit:
-            self.mode_changed.emit(mode)        
+            self.runtime_mode_changed.emit(mode)        
 
 
 class DeviceInfoWidget(QtWidgets.QWidget):
@@ -584,7 +584,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
         self.rollover_widget = MapperModeWidget()
         
 
-        self.rollover_widget.mode_changed.connect(self._rollover_mode_changed)
+        self.rollover_widget.runtime_mode_changed.connect(self._rollover_mode_changed)
         self.mode : MapperMode = self.rollover_widget.mode
 
         # mapping container
@@ -2460,7 +2460,7 @@ class Mapper():
             self.container_options_layout.addStretch()
 
             self.rollover_widget = MapperModeWidget()
-            self.rollover_widget.mode_changed.connect(self._rollover_mode_changed)
+            self.rollover_widget.runtime_mode_changed.connect(self._rollover_mode_changed)
             self.mode : MapperMode = self.rollover_widget.mode
 
             self.execute_button = QtWidgets.QPushButton("Map 1:1")

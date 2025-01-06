@@ -560,12 +560,13 @@ class InputItemListView(ui_common.AbstractView):
         item = self.scroll_layout.itemAt(index)
         if item is not None:
             widget = item.widget()
-            if self.custom_widget_handler:
-                widget.update_display()
-            elif widget is not None:
-                widget.create_action_icons(data)
-                widget.setDescription(data.description)
-                widget.setInputDescription(data.display_name)
+            if widget is not None:
+                if self.custom_widget_handler:
+                    widget.update_display()
+                else:
+                    widget.create_action_icons(data)
+                    widget.setDescription(data.description)
+                    widget.setInputDescription(data.display_name)
             
                         
 

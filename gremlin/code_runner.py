@@ -151,6 +151,9 @@ class CodeRunner:
         gremlin.input_devices.mode_registry.clear()
 
         config = gremlin.config.Configuration()
+        verbose_detailed = config.verbose_mode_details
+        verbose = config.verbose
+
 
         # store the startup mode in the UI so it can be restored later
         self._startup_profile = gremlin.shared_state.current_profile
@@ -281,6 +284,8 @@ class CodeRunner:
                                 identifier=input_item.input_id
                             )
 
+                       
+
                             # Create possibly several callbacks depending
                             # on the input item's content
                             callbacks = []
@@ -311,7 +316,7 @@ class CodeRunner:
                                         input_item.always_execute
                                     )
 
-                            verbose = config.verbose_mode_details
+                            
                             if verbose:
                                 self.event_handler.dump_callbacks()
                                 
@@ -363,6 +368,9 @@ class CodeRunner:
                 vjoy_proxy = gremlin.joystick_handling.VJoyProxy()[vid]
                 for aid, value in data.items():
                     vjoy_proxy.axis(linear_index=aid).set_absolute_value(value)
+
+            if verbose:
+                self.event_handler.dump_callbacks()
 
 
             # Connect signals
@@ -430,19 +438,11 @@ class CodeRunner:
             if config.osc_enabled:
                 evt_listener.request_osc.emit(True)
             
-            #evt_listener.remote_event.connect(self.event_handler.process_event)
-
-
             # hook mode change callbacks
-            self.event_handler.runtime_mode_changed.connect(
-                gremlin.input_devices.mode_registry.mode_changed
-            )
+            evt_listener.runtime_mode_changed.connect(gremlin.input_devices.mode_registry.runtime_mode_changed)
 
             # hook state change callbacks
-            evt_listener.broadcast_changed.connect(
-                gremlin.input_devices.state_registry.state_changed
-            )
-
+            evt_listener.broadcast_changed.connect(gremlin.input_devices.state_registry.state_changed)
 
             # call start functions
             gremlin.input_devices.start_registry.start()
@@ -547,7 +547,7 @@ class CodeRunner:
         el.keyboard_event.disconnect(kb.keyboard_event)
         el.gremlin_active = False
         # self.event_handler.runtime_mode_changed.disconnect(
-        #     self._vjoy_curves.mode_changed
+        #     self._vjoy_curves.runtime_mode_changed
         # )
         
 

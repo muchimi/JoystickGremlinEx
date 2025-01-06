@@ -32,7 +32,7 @@ import gremlin.joystick_handling
 import gremlin.shared_state
 import gremlin.macro
 from gremlin.ui import ui_common
-import gremlin.ui.device_tab
+import gremlin.ui.joystick_device
 import gremlin.ui.input_item
 import gremlin.ui.ui_common
 from gremlin.ui.qsliderwidget import QSliderWidget
@@ -1143,7 +1143,7 @@ class GateData():
             el.joystick_event.connect(self._joystick_event_handler)
 
 
-        item_data: gremlin.ui.device_tab.InputItemConfiguration
+        item_data: gremlin.ui.joystick_device.InputItemConfiguration
 
         # gate crossings
         for gate in gates:
@@ -4368,7 +4368,7 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
         
         '''
 
-        from gremlin.ui.device_tab import InputConfigurationWidgetCache
+        from gremlin.ui.joystick_device import InputConfigurationWidgetCache
         
         super().__init__(self.__class__.__name__, parent)
 
@@ -4679,7 +4679,7 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
 
     def _update_ui(self):
         ''' updates controls based on the options '''
-        from gremlin.ui.device_tab import InputItemConfiguration
+        from gremlin.ui.joystick_device import InputItemConfiguration
         if self._is_range:
             # range conditions
             fixed_visible = self._range_info.mode == GateRangeOutputMode.Fixed
@@ -4704,7 +4704,7 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
 
 
         with QtCore.QSignalBlocker(self._condition_tab):     
-            from gremlin.ui.device_tab import InputItemConfiguration
+            from gremlin.ui.joystick_device import InputItemConfiguration
             self._condition_tab.clear()
             for condition in conditions:
                 condition_container_widget = ui_common.QDataWidget()
@@ -4748,8 +4748,8 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
             has_condition = self._range_info.hasContainers(condition) if self._is_range else self._gate.hasContainers(condition)
             self._condition_tab.setTabIcon(index, self._icon_enabled if has_condition else self._icon_disabled)
                 
-    QtCore.Slot(gremlin.ui.device_tab.InputItemConfiguration)
-    def _mapping_changed_cb(self, item_data : gremlin.ui.device_tab.InputItemConfiguration):
+    QtCore.Slot(gremlin.ui.joystick_device.InputItemConfiguration)
+    def _mapping_changed_cb(self, item_data : gremlin.ui.joystick_device.InputItemConfiguration):
         ''' hooks a mapping change '''
         item_data_map = self._range_info.item_data_map if self._is_range else self._gate.item_data_map
         if item_data in item_data_map.values():

@@ -28,7 +28,7 @@ from gremlin.types import DeviceType
 from gremlin.input_types import InputType
 import gremlin.shared_state
 from gremlin.keyboard import Key
-import gremlin.ui.device_tab
+import gremlin.ui.joystick_device
 import uuid
 from gremlin.singleton_decorator import SingletonDecorator
 import collections
@@ -98,9 +98,7 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         # Store parameters
         self.device_profile = device_profile
-        self.current_mode = current_mode
-
-        self.device_profile.ensure_mode_exists(self.current_mode)
+        self.device_profile.ensure_mode_exists(current_mode)
         self.widget_storage = {}
 
         # List of inputs
@@ -128,31 +126,49 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         self.addLeftPanelWidget(self.input_item_list_view)
 
-        self._item_data = gremlin.ui.device_tab.InputItemConfiguration()
+        # default entry
+        self._item_data = gremlin.ui.joystick_device.InputItemConfiguration()
         self.setRightPanelWidget(self._item_data)
 
         
         self.input_item_list_model.refresh()
         self.input_item_list_view.redraw()
 
-        # handle mode change inputs
-        eh = gremlin.event_handler.EventHandler()
-        eh.mode_changed.connect(self._mode_changed_cb)
+        
 
         el = gremlin.event_handler.EventListener()
         el.mode_name_changed.connect(self._mode_name_changed)
-
+        el.edit_mode_changed.connect(self._edit_mode_changed_cb) # edit mode changed or mode added/removed
         
+
+        # last index selected, -1 means none
+        self._last_selected_index = -1 
         
         # Select default entry
         selected_index = self.input_item_list_view.current_index
-        if selected_index is not None:
-            self._select_item_cb(selected_index)
+        if selected_index is None:
+            selected_index = -1
+        self._select_item_cb(selected_index)
+
+
+
+    @QtCore.Slot(str)
+    def _edit_mode_changed_cb(self, mode : str):
+        ''' occurs when a new mode is selected '''
+        self.ensureInputItems()
+        if gremlin.shared_state.isDeviceTabActive(self.device_guid):
+            self._select_item_cb(self._last_selected_index)        
 
     @QtCore.Slot(str)
     def _mode_name_changed(self, name):
         ''' occurs when there's a mode name change '''
         self.input_item_list_view.redraw()
+
+
+    def _config_changed_cb(self):
+        ''' called when configuraition has changed '''
+        self.refresh()      
+
 
     def _custom_name_handler(self, input_item):
         ''' gets the custom name for the input item '''
@@ -167,19 +183,20 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             case ModeInputModeType.ModeGlobalExit:
                 return f"Mode Deactivate (any)"
             
-        return f"Mode [{gremlin.shared_state.edit_mod}] Unknown id: {input_item.input_id}"
+        return f"Mode [{gremlin.shared_state.edit_mode}] Unknown id: {input_item.input_id}"
+            
             
 
-    @QtCore.Slot(str)
-    def _mode_changed_cb(self, mode):
-        ''' occurs when a new mode is selected '''
-        self.ensureInputItems() # ensure the control inputs exist for this mode
+    def ensureInputItems(self, refresh = False):
+        ''' ensures we have input items for the current mode 
+        :param refresh: True if list view should be updated if changes are made
+        :returns: True if changes were made 
 
-    def ensureInputItems(self):
-        ''' ensures we have input items for the current mode '''
-
-        config = self.device_profile.modes[self.current_mode].config
-        # global_config = self.device_profile.modes[gremlin.shared_state.global_mode].config
+        '''
+        current_mode = gremlin.shared_state.edit_mode
+        config = self.device_profile.modes[current_mode].config
+        
+        changed = False
 
         if not ModeInputModeType.ModeEnter in config[InputType.ModeControl]:
             modeEnter = gremlin.base_profile.InputItem(self._custom_name_handler)
@@ -189,6 +206,7 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             modeEnter.device_guid = gremlin.shared_state.mode_tab_guid
             modeEnter.description="Enter mode actions"
             config[InputType.ModeControl][ModeInputModeType.ModeEnter] = modeEnter
+            changed = True
         config[InputType.ModeControl][ModeInputModeType.ModeEnter].descriptionReadOnly = True
 
         
@@ -201,12 +219,14 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             modeExit.description="Exit mode actions"
             modeExit.descriptionReadonly = True
             config[InputType.ModeControl][ModeInputModeType.ModeExit] = modeExit
+            changed = True
         config[InputType.ModeControl][ModeInputModeType.ModeExit].descriptionReadOnly = True
 
 
-        
+        if changed or refresh:
+            self.input_item_list_model.refresh()    
 
-        
+        return changed 
 
     def itemAt(self, index):
         ''' returns the input widget at the given index '''
@@ -219,8 +239,9 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def _index_for_key(self, input_id):
         ''' returns the index of the selected input id'''
-        mode = self.device_profile.modes[self.current_mode]
-        sorted_keys = list(mode.config[InputType.OpenSoundControl].keys())
+        current_mode = gremlin.shared_state.edit_mode
+        mode = self.device_profile.modes[current_mode]
+        sorted_keys = list(mode.config[InputType.ModeControl].keys())
         return sorted_keys.index(input_id)
     
 
@@ -230,19 +251,28 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         :param index the index of the selected item
         """
 
+
+        self.ensureInputItems(True) # ensure the control inputs exist for this mode
+
         if index == -1:
-            # nothing to select
-            return 
-        
+            index = self._last_selected_index
+
+        if index == -1:
+            # select the first item
+            if self.input_item_list_model.rows():
+                index = 0
+            else:
+                return 
         
         with QtCore.QSignalBlocker(self.input_item_list_view):
             self.input_item_list_view.select_item(index, False)
         
-
+        
         input_data : gremlin.base_profile.InputItem = self.input_item_list_model.data(index)
         
-        self._item_data = gremlin.ui.device_tab.InputItemConfiguration(input_data)
-        self.setRightPanelWidget(self._item_data)
+        widget = gremlin.ui.joystick_device.InputItemConfiguration(input_data)
+        self._item_data = widget
+        self.setRightPanelWidget(widget)
 
         # remember the last input
         config = gremlin.config.Configuration()
@@ -260,6 +290,11 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             change_cb = self._create_change_cb(index)
             self._item_data.action_model.data_changed.connect(change_cb)
             self._item_data.description_changed.connect(change_cb)
+
+            self.input_item_list_view.select_item(index,False)
+
+
+        self._last_selected_index = index
     
 
     def _custom_widget_handler(self, list_view, index : int, identifier, data, parent = None):
@@ -358,4 +393,5 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def refresh(self):
         """Refreshes the current selection, ensuring proper synchronization."""
-        self._select_item_cb(self.input_item_list_view.current_index)
+        self.set_mode(gremlin.shared_state.edit_mode) # force a model and reload
+        #self._select_item_cb(self.input_item_list_view.current_index)

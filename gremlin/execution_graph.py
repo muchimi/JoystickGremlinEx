@@ -143,7 +143,7 @@ class ExecutionContext():
     def __init__(self):
        
        el = gremlin.event_handler.EventListener()
-       el.modes_changed.connect(self.reset) # reload data on mode changes
+       el.edit_mode_changed.connect(self.reset) # reload data on mode changes
        el.profile_start.connect(self.reset) # reload data on profile start
        el.profile_changed.connect(self.reset) # reload data on profile change
        self.reset()

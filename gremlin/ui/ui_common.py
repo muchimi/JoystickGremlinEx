@@ -1363,8 +1363,21 @@ class ModeWidget(QtWidgets.QWidget):
     def _profile_stop_cb(self):
         self.setEnabled(True)
 
+    def select_mode(self, mode: str):
+        ''' selects the mode without firing a change event - ignored if the mode doesn't exist '''
+        syslog = logging.getLogger("system")
+        syslog.info(f"Mode: set edit selector mode to [{mode}]")
+        index =  self.edit_mode_selector.findData(mode)
+        if index >= 0:
+            syslog.info(f"Mode: mode exists")
+            with QtCore.QSignalBlocker(self.edit_mode_selector):
+                self.edit_mode_selector.setCurrentIndex(index)
+        else:
+            # not found, update the selector
+            syslog.info(f"Mode: mode does not exist, repopulating")
+            self.populate_selector(gremlin.shared_state.current_profile, mode)
 
-    def populate_selector(self, profile_data, current_mode=None, emit = False):
+    def populate_selector(self, profile, mode_to_select : str = None, emit : bool = False):
         """Adds entries for every mode present in the profile.
 
         :param profile_data the device for which the mode selection is generated
@@ -1373,13 +1386,13 @@ class ModeWidget(QtWidgets.QWidget):
         # To prevent emitting lots of change events the slot is first
         # disconnected and then at the end reconnected again.
         with QtCore.QSignalBlocker(self.edit_mode_selector):
-            self.profile = profile_data
+            self.profile = profile
 
             modes = gremlin.shared_state.current_profile.get_modes()
             while self.edit_mode_selector.count() > 0:
                     self.edit_mode_selector.removeItem(0)
 
-            mode_list = get_mode_list(profile_data)
+            mode_list = get_mode_list(profile)
             self.mode_list = [x[1] for x in mode_list]
             # Create mode name labels visualizing the tree structure
             inheritance_tree = self.profile.build_inheritance_tree()
@@ -1402,15 +1415,10 @@ class ModeWidget(QtWidgets.QWidget):
                     mode_names.append(entry[0])
                     display_names.append(entry[1])
 
-            # # Select currently active mode
-            # if len(mode_names) > 0:
-            #     if current_mode is None or current_mode not in self.mode_list:
-            #         # pick the first one
-            #         current_mode = mode_names[0]
-
             # Add properly arranged mode names to the drop down list
             index = 0
             current_index = 0
+            select_index = None
             last_edit_mode = gremlin.config.Configuration().get_profile_last_edit_mode()
 
             if not last_edit_mode in modes:
@@ -1418,11 +1426,16 @@ class ModeWidget(QtWidgets.QWidget):
             for display_name, mode_name in zip(display_names, mode_names):
                 self.edit_mode_selector.addItem(display_name, mode_name)
                 self.mode_list.append(mode_name)
+                if mode_to_select and select_index is None and mode_to_select == mode_name:
+                    select_index = index
                 if mode_name == last_edit_mode:
                     current_index = index
                 index += 1
 
-            self.edit_mode_selector.setCurrentIndex(current_index)
+            if select_index:
+                self.edit_mode_selector.setCurrentIndex(select_index)    
+            else:
+                self.edit_mode_selector.setCurrentIndex(current_index)
             if emit:
                 self._edit_mode_changed_cb(current_index)
 
@@ -1433,8 +1446,10 @@ class ModeWidget(QtWidgets.QWidget):
 
         :param idx id of the now selected entry
         """
-        # save the setup
+        # tell the UI about the mode change
         new_mode = self.mode_list[idx]
+        syslog = logging.getLogger("system")
+        syslog.info(f"Mode: edit selector request change to [{new_mode}]")
         self.edit_mode_changed.emit(new_mode)
 
 
@@ -4649,9 +4664,9 @@ class QTabHeader(QtWidgets.QTabBar):
         elif t == QtCore.QEvent.Type.MouseButtonRelease:
             self._mouse_down = False
             index = self.currentIndex()
-            print (f"mouse up {index}")
+            # print (f"mouse up {index}")
             if self._move_in_progress:
-                print (f"move completed: {self._from_index} to {self._to_index}")
+                # print (f"move completed: {self._from_index} to {self._to_index}")
                 self._move_in_progress = False
                 self.tabMoveCompleted.emit(self._from_index, self._to_index)
             elif index != self._mouse_down_index:

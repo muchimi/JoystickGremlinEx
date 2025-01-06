@@ -243,8 +243,8 @@ class SimconnectOptions(QtCore.QObject):
 
         el = gremlin.event_handler.EventListener()
         el.profile_loaded.connect(self._profile_loaded) # trap profile load to update modes
-        el.profile_start.connect(self._profile_modes_changed) # trap profile start to update modes
-        el.modes_changed.connect(self._profile_modes_changed) # trap edit mode mode changes to update modes
+        el.profile_start.connect(self._profile_edit_mode_changed) # trap profile start to update modes
+        el.edit_mode_changed.connect(self._profile_edit_mode_changed) # trap edit mode mode changes to update modes
         el.shutdown.connect(self.save) # save configuration on shutdown
 
 
@@ -267,7 +267,6 @@ class SimconnectOptions(QtCore.QObject):
 
         self._sort_mode = SimconnectSortMode.NotSet
 
-        self._profile = None
         self._mode_list = []
 
         self._simconnect = manager.simconnect
@@ -287,14 +286,16 @@ class SimconnectOptions(QtCore.QObject):
     @QtCore.Slot()
     def _profile_loaded(self):
         ''' profile is loaded '''
-        self._profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
-        self._mode_list = self._profile.get_modes()
+        self._mode_list = self.profile.get_modes()
 
     @QtCore.Slot()
-    def _profile_modes_changed(self):
+    def _profile_edit_mode_changed(self):
         ''' profile modes changed '''
-        self._mode_list = self._profile.get_modes()
+        self._mode_list = self.profile.get_modes()
 
+    @property
+    def profile(self) -> gremlin.base_profile.Profile:
+        return gremlin.shared_state.current_profile
 
     @property
     def current_aircraft_folder(self):
@@ -947,7 +948,7 @@ class SimconnectMonitor():
         el.profile_stop.connect(self.stop) # trap profile stop
         el.abort.connect(self.stop)
         el.shutdown.connect(self._shutdown) # trap application shutdown
-        el.mode_changed.connect(self._mode_changed) # trap runtime mode changes - these occur post validation
+        el.runtime_mode_changed.connect(self._mode_changed) # trap runtime mode changes - these occur post validation
 
         self._auto_reconnect_event = threading.Event() # controls reconnect thread exit
 
@@ -1423,12 +1424,12 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
         # hook mode changes
         el = gremlin.event_handler.EventListener()
-        el.modes_changed.connect(self._profile_modes_changed)
+        el.edit_mode_changed.connect(self._profile_edit_mode_changed)
         
         self._populate_ui()
 
     @QtCore.Slot()
-    def _profile_modes_changed(self):
+    def _profile_edit_mode_changed(self):
         ''' called when profile modes have been edited or changed '''
         self.mode_pair_list = gremlin.ui.ui_common.get_mode_list(self.profile)
         self._populate_ui()
@@ -2701,7 +2702,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         el.profile_start.connect(self._profile_start)
         el.profile_stop.connect(self._profile_stop)
         # refresh the UI on profile mode changes
-        el.modes_changed.connect(self._populate_ui) 
+        el.edit_mode_changed.connect(self._populate_ui) 
 
 
     

@@ -37,9 +37,10 @@ import gremlin.event_handler
 import gremlin.config 
 from gremlin.base_classes import AbstractInputItem
 import gremlin.ui.ui_common
-import gremlin.ui.device_tab
+import gremlin.ui.joystick_device
 import gremlin.base_profile
 import gremlin.util
+
 
 ''' these MIDI objects are based on the MIDO and python-rtMIDI libraries '''
 
@@ -1453,12 +1454,15 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.input_item_list_view.item_edit.connect(self._edit_item_cb)
         self.input_item_list_view.item_closed.connect(self._close_item_cb)
         
-        
+        self._last_selected_index = -1 # last index selected, -1 = none
+
+
         self.addLeftPanelWidget(self.input_item_list_view)
 
 
-        widget = gremlin.ui.device_tab.InputItemConfiguration()     
+        widget = gremlin.ui.joystick_device.InputItemConfiguration()     
         self.setRightPanelWidget(widget)
+        self._item_data = widget
 
         button_container_widget = QtWidgets.QWidget()
         button_container_layout = QtWidgets.QHBoxLayout(button_container_widget)
@@ -1478,6 +1482,10 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         add_input_button.setIcon(icon)
         add_input_button.clicked.connect(self._add_input_cb)
 
+        
+        el = gremlin.event_handler.EventListener()
+        el.edit_mode_changed.connect(self._edit_mode_changed_cb) # edit mode changed or mode added/removed
+
         button_container_layout.addWidget(add_input_button)
 
         self.addLeftPanelWidget(button_container_widget)
@@ -1487,6 +1495,13 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             selected_index = self.input_item_list_view.current_index
             if selected_index is not None:
                 self._select_item_cb(selected_index)
+
+    @QtCore.Slot(str)
+    def _edit_mode_changed_cb(self, mode : str):
+        ''' occurs when a new mode is selected '''
+        if gremlin.shared_state.isDeviceTabActive(self.device_guid):
+            self._select_item_cb(self._last_selected_index)
+
 
     def display_name(self, input_id):
         ''' returns the name for the given input ID '''
@@ -1503,7 +1518,7 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         
         # add a blank input configuration if nothing is selected - the configuration widget is always the second widget of the main layout
         
-        widget = gremlin.ui.device_tab.InputItemConfiguration()     
+        widget = gremlin.ui.joystick_device.InputItemConfiguration()     
         self.setRightPanelWidget(widget)
 
 
@@ -1517,29 +1532,79 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         :param index the index of the selected item
         """
 
-        input_data : gremlin.base_profile.InputItem = self.input_item_list_model.data(index)
 
-        # remember the last input
-        config = gremlin.config.Configuration()
-        device_guid = self.device_guid
-        input_type = InputType.Midi
-        input_id = input_data.input_id if input_data else None
-        config.set_last_input(device_guid, input_type, input_id)
-
-        self._item_data = gremlin.ui.device_tab.InputItemConfiguration(input_data)
-        self.setRightPanelWidget(self._item_data)           
-
-        if input_data:
-            
-            # Create new configuration widget
-            input_data.is_axis = input_id.is_axis
-            change_cb = self._create_change_cb(index)
-            self._item_data.action_model.data_changed.connect(change_cb)
-            self._item_data.description_changed.connect(change_cb)
-
-
+        # if index == -1:
+        #     # select the first item
+        #     if self.input_item_list_model.rows():
+        #         index = 0
+        #     else:
+        #         return 
     
 
+        # input_data : gremlin.base_profile.InputItem = self.input_item_list_model.data(index)
+
+        # # remember the last input
+        # config = gremlin.config.Configuration()
+        # device_guid = self.device_guid
+        # input_type = InputType.Midi
+        # input_id = input_data.input_id if input_data else None
+        # config.set_last_input(device_guid, input_type, input_id)
+
+        # self._item_data = gremlin.ui.joystick_device.InputItemConfiguration(input_data)
+        # self.setRightPanelWidget(self._item_data)           
+
+        # if input_data:
+            
+        #     # Create new configuration widget
+        #     input_data.is_axis = input_id.is_axis
+        #     change_cb = self._create_change_cb(index)
+        #     self._item_data.action_model.data_changed.connect(change_cb)
+        #     self._item_data.description_changed.connect(change_cb)
+
+        # self._last_selected_index = index
+
+        if index == -1:
+            index = self._last_selected_index
+
+        if index == -1:
+            if self.input_item_list_model.rows() > 0:
+                item_data = self.input_item_list_model.data(0)
+                index = 0
+            else:
+                # no input to select
+                widget = gremlin.ui.joystick_device.InputItemConfiguration()     
+                self.setRightPanelWidget(widget)
+            return
+        else:
+            item_data = self.input_item_list_model.data(index)
+
+        if item_data:
+            
+            config = gremlin.config.Configuration()
+            device_guid = self.device_guid
+            input_type = InputType.Midi
+
+
+            input_id = item_data.input_id if item_data else None
+            config.set_last_input(device_guid, input_type, input_id)
+
+            widget = gremlin.ui.joystick_device.InputItemConfiguration(item_data)
+            self.setRightPanelWidget(widget)
+            
+            # Create new configuration widget
+            
+            change_cb = self._create_change_cb(index)
+            widget.action_model.data_changed.connect(change_cb)
+            widget.description_changed.connect(change_cb)
+
+            self.input_item_list_view.select_item(index, False)
+
+        else:
+            widget = gremlin.ui.joystick_device.InputItemConfiguration()     
+            self.setRightPanelWidget(widget)
+
+        self._last_selected_index = index            
+        self._item_data = widget
 
 
   
@@ -1583,11 +1648,15 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.current_mode = mode
         self.device_profile.ensure_mode_exists(self.current_mode)
         self.input_item_list_model.mode = mode
-        self.input_item_list_model.refresh()
-        self.input_item_list_view.redraw()
-        self.input_item_list_view.select_item(-1)
+        
+        
+        #self.input_item_list_view.select_item(-1)
+        if gremlin.shared_state.isDeviceTabActive(self.device_guid):
+            self.input_item_list_model.refresh()
+            self.input_item_list_view.redraw()
+            self._select_item_cb(self._last_selected_index)
 
-    def mode_changed_cb(self, mode):
+    def _edit_mode_changed_cb(self, mode):
         """Handles mode change.
 
         :param mode the new mode
@@ -1597,7 +1666,7 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def refresh(self):
         """Refreshes the current selection, ensuring proper synchronization."""
-        pass
+        self.set_mode(gremlin.shared_state.edit_mode) # force a model and reload
         # self.input_item_selected_cb(self.input_item_list_view.current_index)
 
 
@@ -1657,7 +1726,7 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         input_item : MidiInputItem = identifier.input_id
         input_item.port_name = port_name
         input_item.message = message
-        input_item.mode = mode
+        input_item._mode = mode
 
         is_axis = mode == MidiInputItem.InputMode.Axis
         self._item_data.is_axis = is_axis
@@ -1730,7 +1799,9 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def _update_input_widget(self, input_widget, container_widget):
         ''' called when the widget has to update itself on a data change '''
+        
         input_item : MidiInputItem = input_widget.identifier.input_id 
+        input_item._update_display_name()
         input_widget.setTitle(input_item.title_name)
         input_widget.setInputDescription(input_item.display_name)
         input_widget.setToolTip(input_item.display_tooltip)

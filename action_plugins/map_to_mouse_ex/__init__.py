@@ -112,6 +112,7 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.options_layout.addWidget(self.chkb_force_remote_output)
         self.options_layout.addWidget(self.chkb_force_remote_output_only)
         
+        
         self.options_layout.addStretch()
 
         # self.button_group = QtWidgets.QButtonGroup()

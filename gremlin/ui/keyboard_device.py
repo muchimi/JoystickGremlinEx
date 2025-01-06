@@ -31,7 +31,7 @@ import gremlin.shared_state
 import gremlin.util
 from . import input_item, ui_common
 from gremlin.keyboard import Key
-from .device_tab import InputItemConfiguration
+from .joystick_device import InputItemConfiguration
 from .input_item import InputItemWidget, InputIdentifier, InputItemListView
 import uuid
 from gremlin.util import *
@@ -324,25 +324,21 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         # Store parameters
         self.device_profile = device_profile
-        self.current_mode = current_mode
 
-        self.device_profile.ensure_mode_exists(self.current_mode)
+        self.device_profile.ensure_mode_exists(current_mode)
         self.widget_storage = {}
 
         # List of inputs
-        self.input_item_list_model = input_item.InputItemListModel(
-            device_profile,
-            current_mode,
-            [InputType.Keyboard, InputType.KeyboardLatched]
-        )
+        self.input_item_list_model = None
 
 
+        # last index selected, -1 means none
+        self._last_selected_index = -1 
 
         self.input_item_list_view = input_item.InputItemListView(custom_widget_handler=self._custom_widget_handler, parent=self)
         self.input_item_list_view.setMinimumWidth(350)
 
-        # Input type specific setups
-        self.input_item_list_view.set_model(self.input_item_list_model)
+        self._reload_model()
 
         # Handle user interaction
         self.input_item_list_view.item_selected.connect(self._select_item_cb)
@@ -388,11 +384,36 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         # refresh on configuration change
         el = gremlin.event_handler.EventListener()
+        # update on an edit mode change so we update the display
+        el.edit_mode_changed.connect(self._edit_mode_changed_cb)
         el.config_changed.connect(self._config_changed_cb)
 
 
         self.update()
 
+    def _reload_model(self, mode = None):
+        ''' reloads the data for the current device/mode '''
+        current_mode = mode if mode else gremlin.shared_state.edit_mode
+        self.device_profile.ensure_mode_exists(current_mode)
+        self.input_item_list_model = input_item.InputItemListModel(
+            self.device_profile,
+            current_mode,
+            [InputType.Keyboard, InputType.KeyboardLatched]
+        )
+        self.input_item_list_view.set_model(self.input_item_list_model)
+        self.input_item_list_view.redraw()
+        self._select_item_cb(self._last_selected_index)
+
+
+    @QtCore.Slot(str)
+    def _edit_mode_changed_cb(self, mode : str):
+        ''' occurs when a new mode is selected '''
+
+        # List of inputs
+        self._reload_model()
+        
+        if gremlin.shared_state.isDeviceTabActive(self.device_guid):
+            self._select_item_cb(self._last_selected_index)
 
     def _config_changed_cb(self):
         self.input_item_list_view.redraw()
@@ -460,6 +481,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         # reload on new index
         reload = index == -1
+        current_mode = gremlin.shared_state.edit_mode
 
         # figure out the root key
         if root_key is None:
@@ -484,7 +506,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
 
         # creates the item in the profile if needed
-        self.device_profile.modes[self.current_mode].get_data(input_type,input_id)
+        self.device_profile.modes[current_mode].get_data(input_type,input_id)
 
         if reload:
             # refreshes the model from the profile
@@ -511,11 +533,17 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         ''' called when a key has been selected - refreshes the view panel '''
 
         if index == -1:
+            index = self._last_selected_index
+
+        if index == -1:
             if self.input_item_list_model.rows() > 0:
                 item_data = self.input_item_list_model.data(0)
+                index = 0
             else:
                 # no input to select
-                return
+                widget = InputItemConfiguration()
+                self.setRightPanelWidget(widget)
+            return
         else:
             item_data = self.input_item_list_model.data(index)
 
@@ -538,6 +566,14 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             widget.action_model.data_changed.connect(change_cb)
             widget.description_changed.connect(change_cb)
 
+            self.input_item_list_view.select_item(index, False)
+        else:
+            widget = InputItemConfiguration()
+            self.setRightPanelWidget(widget)
+
+        self._last_selected_index = index           
+
+
 
     def _index_for_key(self, key_or_index):
         """Returns the index into the key list based on the key itself.
@@ -545,8 +581,8 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         :param key the keyboard key being queried
         :return index of the provided key
         """
-
-        mode = self.device_profile.modes[self.current_mode]
+        current_mode = gremlin.shared_state.edit_mode
+        mode = self.device_profile.modes[current_mode]
         if isinstance(key_or_index, Key):
             key = key_or_index
             if key.is_latched:
@@ -567,8 +603,8 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     def set_mode(self, mode):
         ''' changes the mode of the tab '''
         self.current_mode = mode
-        self.device_profile.ensure_mode_exists(self.current_mode)
-        self.input_item_list_model.mode = mode
+        self._reload_model(mode)
+
         self.input_item_list_model.refresh()
         self.input_item_list_view.redraw()
         self.input_item_list_view.select_item(-1)
@@ -585,7 +621,8 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def refresh(self):
         """Refreshes the current selection, ensuring proper synchronization."""
-        self._select_item_cb(self.input_item_list_view.current_index)
+        self._reload_model()
+        #self._select_item_cb(self.input_item_list_view.current_index)
 
     def _custom_widget_handler(self, list_view : InputItemListView, index : int, identifier : InputIdentifier, data, parent = None):
         ''' creates a widget for the input

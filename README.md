@@ -210,7 +210,11 @@ Joystick Gremlin EX
 
 <!-- TOC --><a name="134016ex-pre-release"></a>
 ## 13.40.16ex (pre-release)
-### (m56)
+### (m58)
+- Fix: GremlinEx triggers not functional due to event serialization changes to support the auto-release functionality on more complex inputs introduced in m57.  The serialization changes would cause the logic to miss the events because they are coded differently to allow serialization, so there are now two keys, one for serialization, and one for triggers.
+- Fix: More UI work to keep device and modes in sync with the display with the new UI logic and replacement of the problematic UI component introduced in m50.  This caused issues with blank screens on mode changes and general display of information not always in sync with UI navigation. This continues to be a bit of whack-a-mole as the navigation logic is quite complex as some inputs are fixed, some are user-defined, and others are application driven.  To this end, much of the legacy device logic was redone to be consistent for all input types so all devices respond similarly to UI actions and thus can refresh/update more appropriately. There is probably more work here to be done and this gets us closer to the resolution of this issue.  I knew yanking a core component out of the UI would be complicated and painful - not disappointed - however the choices were continued random race condition and crashes or a gut/replace of the UI management system.
+- New: Map to VJOY has a new option to do automatic button releases on Keyboard, OSC and MIDI inputs. This was not possible before due to the serialization issues on complex inputs.  This means keyboard inputs, when mapped to a VJOY button, will release when that button is released (it will remain "on" if not selected which is the prior behavior).
+### (m56/m57)
 - Fix: GremlinEx will no longer attempt to connect to SimConnect if no SimConnect action is detected (side effect of some features added to m53/m54).
 - New: Experimental - Simconnect Action includes an auto-repeat feature to send RPN expressions to MSFS while the input is pressed (similar to Keyboard auto-repeat).  This is added because some expressions in RPN don't have the notion of "do while...".
 - New: Experimental - Simconnect Action issue an optional RPN expression on release which is different from the RPN expression on press.  This is helpful for toggle type situations, or to for "while pressed" situations without having to code another separate action on release.
