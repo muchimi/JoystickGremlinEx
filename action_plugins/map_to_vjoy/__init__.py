@@ -1223,6 +1223,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         box.addWidget(self.chkb_exec_on_release)
 
         self.chkb_paired = QtWidgets.QCheckBox("Paired Group Member")
+        self.chkb_paired.setToolTip("Paired groups with a remote client - when enabled - sends a remote signal and a local signal (this is seldom used).")
         box.addWidget(self.chkb_paired)
 
 

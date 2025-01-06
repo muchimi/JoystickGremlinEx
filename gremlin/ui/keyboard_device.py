@@ -377,10 +377,6 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         # Select default entry
         self.input_item_list_view.redraw()
 
-        selected_index = self.input_item_list_view.current_index
-
-        if selected_index != -1:
-            self._select_item_cb(selected_index)
 
         # refresh on configuration change
         el = gremlin.event_handler.EventListener()
@@ -389,7 +385,11 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         el.config_changed.connect(self._config_changed_cb)
 
 
-        self.update()
+        # Select default entry
+        selected_index = self.input_item_list_view.current_index
+        if selected_index is not None:
+            self._select_item_cb(selected_index)
+
 
     def _reload_model(self, mode = None):
         ''' reloads the data for the current device/mode '''
@@ -408,12 +408,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     @QtCore.Slot(str)
     def _edit_mode_changed_cb(self, mode : str):
         ''' occurs when a new mode is selected '''
-
-        # List of inputs
-        self._reload_model()
-        
-        if gremlin.shared_state.isDeviceTabActive(self.device_guid):
-            self._select_item_cb(self._last_selected_index)
+        self.set_mode(mode)
 
     def _config_changed_cb(self):
         self.input_item_list_view.redraw()
@@ -601,28 +596,24 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         return lambda: self.input_item_list_view.redraw_index(index)
 
     def set_mode(self, mode):
-        ''' changes the mode of the tab '''
+        ''' changes the mode of the tab '''        
         self.current_mode = mode
-        self._reload_model(mode)
-
-        self.input_item_list_model.refresh()
-        self.input_item_list_view.redraw()
-        self.input_item_list_view.select_item(-1)
-
+        #self._reload_model(mode)
+        self.device_profile.ensure_mode_exists(self.current_mode)
+        self.input_item_list_model.mode = mode
         
+        #self.input_item_list_view.select_item(-1)
+        if gremlin.shared_state.isDeviceTabActive(self.device_guid):
+            self.input_item_list_model.refresh()
+            self.input_item_list_view.redraw()        
+            self._select_item_cb(self._last_selected_index)
 
-    def mode_changed_cb(self, mode):
-        """Handles mode change.
-
-        :param mode the new mode
-        """
-        self.set_mode(mode)
 
 
     def refresh(self):
         """Refreshes the current selection, ensuring proper synchronization."""
-        self._reload_model()
-        #self._select_item_cb(self.input_item_list_view.current_index)
+        self._select_item_cb(self.input_item_list_view.current_index)
+
 
     def _custom_widget_handler(self, list_view : InputItemListView, index : int, identifier : InputIdentifier, data, parent = None):
         ''' creates a widget for the input
