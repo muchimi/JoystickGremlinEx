@@ -29,6 +29,7 @@ from typing import Callable
 
 
 import gremlin.base_classes
+import gremlin.event_handler
 import gremlin.joystick_handling
 import gremlin.shared_state
 import gremlin.threading
@@ -1504,8 +1505,12 @@ class EventHandler(QtCore.QObject):
 							if child not in device_cb:
 								device_cb[child] = {}
 							for event, callbacks in parent_cb.items():
-								if event not in device_cb[child]:
-									device_cb[child][event.callbackKey] = callbacks
+								if isinstance(event, gremlin.event_handler.Event):
+									key = event.callbackKey
+								else:
+									key = event
+								if key not in device_cb[child]:
+									device_cb[child][key] = callbacks
 
 			# Recurse until we've dealt with all modes
 			self.build_event_lookup(children)

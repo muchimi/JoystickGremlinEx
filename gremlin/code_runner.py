@@ -152,7 +152,7 @@ class CodeRunner:
 
         config = gremlin.config.Configuration()
         verbose_detailed = config.verbose_mode_details
-        verbose = config.verbose
+        verbose =  config.verbose_mode_details
 
 
         # store the startup mode in the UI so it can be restored later
@@ -317,7 +317,7 @@ class CodeRunner:
                                     )
 
                             
-                            if verbose:
+                            if verbose_detailed:
                                 self.event_handler.dump_callbacks()
                                 
 
@@ -369,7 +369,7 @@ class CodeRunner:
                 for aid, value in data.items():
                     vjoy_proxy.axis(linear_index=aid).set_absolute_value(value)
 
-            if verbose:
+            if verbose_detailed:
                 self.event_handler.dump_callbacks()
 
 
