@@ -1523,6 +1523,7 @@ class EventHandler(QtCore.QObject):
 
 	def set_mode(self, new_mode):
 		''' sets the edit or runtime mode based on the state  '''
+		assert new_mode,"Mode cannot be blank"
 		if gremlin.shared_state.is_running:
 			gremlin.shared_state.runtime_mode = new_mode
 		else:
@@ -1530,10 +1531,12 @@ class EventHandler(QtCore.QObject):
 
 	def set_runtime_mode(self, new_mode):
 		''' sets the active runtime mode '''
+		assert new_mode,"Mode cannot be blank"
 		gremlin.shared_state.runtime_mode = new_mode
 
 	def set_edit_mode(self, new_mode):
 		''' sets the active edit mode '''
+		assert new_mode,"Mode cannot be blank"
 		gremlin.shared_state.edit_mode = new_mode
 
 
@@ -1675,7 +1678,7 @@ class EventHandler(QtCore.QObject):
 
 		else:
 			# non-runtime
-
+			assert new_mode,"new mode cannot be blank"
 			if self.edit_mode != new_mode or force_update:
 				gremlin.config.Configuration().set_profile_last_edit_mode(new_mode)
 				gremlin.shared_state.edit_mode = new_mode

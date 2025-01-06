@@ -1743,14 +1743,15 @@ class ButtonReleaseActions(QtCore.QObject):
         """
         release_evt = physical_event.clone()
         release_evt.is_pressed = False
+        key = release_evt.callbackKey
 
         assert callable(callback)
 
         if release_evt not in self._registry:
-            self._registry[release_evt] = []
+            self._registry[key] = []
         # Do not record the mode since we may want to run the release action
         # independent of a mode
-        self._registry[release_evt].append(
+        self._registry[key].append(
             ButtonReleaseEntry(callback, release_evt, None)
         )
 

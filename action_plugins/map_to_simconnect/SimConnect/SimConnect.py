@@ -302,19 +302,18 @@ class SimConnect():
 	''' MSFS simconnect interface '''
 
 
-	def __init__(self, handler : SimConnectEventHandler, auto_connect=True, library_path=_library_path):
+	def __init__(self, handler : SimConnectEventHandler, auto_connect=True):
 		''' initializes sim connect 
 		
 		:param handler: SimConnectEventHandler - the handler to signals
 		
 		'''
-		
-		
+
 		self.Requests = {}
 		self.Facilities = []
 		self.verbose = gremlin.config.Configuration().verbose_mode_simconnect
 		self.verbose_details = False
-		self._library_path = library_path
+
 		self._hSimConnect = HANDLE()
 		self._quit = 0
 		self._ok = False
@@ -334,7 +333,10 @@ class SimConnect():
 
 		self._dll = None
 		self._runThread = None
-		
+		self._library_path = None
+		self._connect_warning_issued = False
+		self._critical = False
+
 	
 		if auto_connect:
 			self.connect()
@@ -686,6 +688,9 @@ class SimConnect():
 
 
 	def connect(self):
+		from pathlib import Path
+		from gremlin.util import display_error, get_dll_version
+		
 		if self._is_connected:
 			# already connected
 			return True
@@ -695,63 +700,91 @@ class SimConnect():
 		syslog = logging.getLogger("system")
 		try:
 
-
-			self._is_loop_running = False
-			self._quit = 0
 			if not self._dll:
+
+				if not self._library_path:
+					# locate the simconnect dll file based on the distro
+					dll_folder = os.path.dirname(__file__)
+					dll_file = "SimConnect.dll"
+					_dll_path = os.path.join(dll_folder, dll_file )
+					if not os.path.isfile(_dll_path):
+
+						# look one level up for packaging in 3.12
+						parent = Path(dll_folder).parent
+						_dll_path = os.path.join(parent, dll_file)
+						if not os.path.isfile(_dll_path):
+							msg = f"Unable to continue - missing dll: {_dll_path}"
+							display_error(msg)
+							syslog.critical(msg)
+							os._exit(1)
+
+					syslog.info(f"Simconnect: Using dll : {_dll_path}")
+					self._library_path = _dll_path
+					
+
+
+				self._is_loop_running = False
+				self._quit = 0
+			
 				self._dll = SimConnectDll(self._library_path)
 				self._my_dispatch_proc_rd = self._dll.DispatchProc(self.simconnect_dispatch_proc)
-			err = self._dll.Open(
-				byref(self._hSimConnect), LPCSTR(b"GremlinEx"), None, 0, 0, 0
-			)
-			if self.IsHR(err, 0):
-				syslog.info("Simconnect: Connected to Flight Simulator!")
-				# Request an event when the simulation starts
+				err = self._dll.Open(byref(self._hSimConnect), LPCSTR(b"GremlinEx"), None, 0, 0, 0)
+				if self.IsHR(err, 0):
+					syslog.info("Simconnect: Connected to Flight Simulator!")
+					# Request an event when the simulation starts
 
-				# The user is in control of the aircraft
-				self._dll.SubscribeToSystemEvent(
-					self._hSimConnect, self._dll.EventID.EVENT_SIM_START.value, b"SimStart"
-				)
-				self._dll.SetSystemEventState(self._hSimConnect, self._dll.EventID.EVENT_SIM_START, SIMCONNECT_STATE.SIMCONNECT_STATE_ON)
+					# The user is in control of the aircraft
+					self._dll.SubscribeToSystemEvent(
+						self._hSimConnect, self._dll.EventID.EVENT_SIM_START.value, b"SimStart"
+					)
+					self._dll.SetSystemEventState(self._hSimConnect, self._dll.EventID.EVENT_SIM_START, SIMCONNECT_STATE.SIMCONNECT_STATE_ON)
 
-				# The user is navigating the UI.
-				self._dll.SubscribeToSystemEvent(
-					self._hSimConnect, self._dll.EventID.EVENT_SIM_STOP.value, b"SimStop"
-				)
-				self._dll.SetSystemEventState(self._hSimConnect, self._dll.EventID.EVENT_SIM_STOP.value, SIMCONNECT_STATE.SIMCONNECT_STATE_ON)
+					# The user is navigating the UI.
+					self._dll.SubscribeToSystemEvent(
+						self._hSimConnect, self._dll.EventID.EVENT_SIM_STOP.value, b"SimStop"
+					)
+					self._dll.SetSystemEventState(self._hSimConnect, self._dll.EventID.EVENT_SIM_STOP.value, SIMCONNECT_STATE.SIMCONNECT_STATE_ON)
 
-				# Request a notification when the flight is paused
-				self._dll.SubscribeToSystemEvent(
-					self._hSimConnect, self._dll.EventID.EVENT_SIM_PAUSE_STATE.value, b"Pause"
-				)
-				self._dll.SetSystemEventState(self._hSimConnect, self._dll.EventID.EVENT_SIM_PAUSE_STATE.value, SIMCONNECT_STATE.SIMCONNECT_STATE_ON)
-				# # Request a notification when the flight is paused
-				# self._dll.SubscribeToSystemEvent(
-				# 	self._hSimConnect, self._dll.EventID.EVENT_SIM_PAUSED.value, b"Paused"
-				# )
-				# # Request a notification when the flight is un-paused.
-				# self._dll.SubscribeToSystemEvent(
-				# 	self._hSimConnect, self._dll.EventID.EVENT_SIM_UNPAUSED.value, b"Unpaused"
-				# )
-				# Request a notification when the flight is un-paused.
-				self._dll.SubscribeToSystemEvent(
-					self._hSimConnect, self._dll.EventID.EVENT_SIM_RUNNING.value, b"Sim"
-				)
-				# aircraft loaded data
-				self._dll.SubscribeToSystemEvent(
-					self._hSimConnect, self._dll.EventID.EVENT_SIM_REQUEST_AIRCRAFT.value, b"AircraftLoaded"
-				)
+					# Request a notification when the flight is paused
+					self._dll.SubscribeToSystemEvent(
+						self._hSimConnect, self._dll.EventID.EVENT_SIM_PAUSE_STATE.value, b"Pause"
+					)
+					self._dll.SetSystemEventState(self._hSimConnect, self._dll.EventID.EVENT_SIM_PAUSE_STATE.value, SIMCONNECT_STATE.SIMCONNECT_STATE_ON)
+					# # Request a notification when the flight is paused
+					# self._dll.SubscribeToSystemEvent(
+					# 	self._hSimConnect, self._dll.EventID.EVENT_SIM_PAUSED.value, b"Paused"
+					# )
+					# # Request a notification when the flight is un-paused.
+					# self._dll.SubscribeToSystemEvent(
+					# 	self._hSimConnect, self._dll.EventID.EVENT_SIM_UNPAUSED.value, b"Unpaused"
+					# )
+					# Request a notification when the flight is un-paused.
+					self._dll.SubscribeToSystemEvent(
+						self._hSimConnect, self._dll.EventID.EVENT_SIM_RUNNING.value, b"Sim"
+					)
+					# aircraft loaded data
+					self._dll.SubscribeToSystemEvent(
+						self._hSimConnect, self._dll.EventID.EVENT_SIM_REQUEST_AIRCRAFT.value, b"AircraftLoaded"
+					)
 
-			syslog = logging.getLogger("system")
-			syslog.info(f"Simconnect: interface connected")
-			self._is_connected = True
+					
+					syslog.info(f"Simconnect: interface connected")
+					self._is_connected = True
 
-			self.run()
+					self.run()
+
+
+				else:
+					syslog.error(f"Simconnect: Failed to connect: return code: {err}")
+
+
+
 
 				
 		except Exception as err:
 			gremlin.shared_state.abort = True
 			self._abort = True
+			syslog.error(f"Simconnect: DLL load error: {err}")
 			msg = "Simconnect: Did not find Flight Simulator running."
 			syslog.error(msg)
 			eh = gremlin.event_handler.EventListener()

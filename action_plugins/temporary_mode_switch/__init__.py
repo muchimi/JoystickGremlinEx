@@ -21,11 +21,15 @@ from PySide6 import QtWidgets
 from lxml import etree as ElementTree
 
 import gremlin.base_profile
+import gremlin.config
+import gremlin.config
 from gremlin.input_types import InputType
 import gremlin.profile
 import gremlin.shared_state
 import gremlin.ui.input_item
 import gremlin.ui.ui_common
+import logging
+
 
 class TemporaryModeSwitchWidget(gremlin.ui.input_item.AbstractActionWidget):
 
@@ -60,28 +64,22 @@ class TemporaryModeSwitchFunctor(gremlin.base_profile.AbstractFunctor):
 
     def process_event(self, event, value):
         import gremlin.control_action
+        import gremlin.shared_state
+        verbose = gremlin.config.Configuration().verbose
+        if verbose:
+            syslog = logging.getLogger("system")
+
         if event.is_pressed:
             next_mode = self.action_data.mode_name
-            current_mode = gremlin.shared_state.current_mode
+            current_mode = gremlin.shared_state.runtime_mode
             if next_mode != current_mode:
                 self.action_data.restore_mode = current_mode
+                if verbose: syslog.info(f"Temporary mode change: [{current_mode}] -> [{next_mode}]")
                 gremlin.event_handler.EventHandler().change_mode(next_mode)
-                gremlin.input_devices.ButtonReleaseActions().register_callback(
-                    lambda : gremlin.event_handler.EventHandler().change_mode(current_mode),
-                    event
-                )
-
+                gremlin.input_devices.ButtonReleaseActions().register_callback(lambda : gremlin.event_handler.EventHandler().change_mode(current_mode),event)
             else:
                 # nothing to come back to
                 self.action_data.restore_mode = None
-
-
-        # gremlin.input_devices.ButtonReleaseActions().register_callback(
-        #     gremlin.control_action.switch_to_previous_mode,
-        #     event
-        # )
-        # gremlin.control_action.switch_mode(self.mode_name)
-
         return True
 
 

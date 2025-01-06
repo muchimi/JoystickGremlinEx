@@ -120,7 +120,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_BASE = "m58a"
+APPLICATION_BASE = "m58c"
 APPLICATION_VERSION = f"13.40.16ex ({APPLICATION_BASE})"
 
 
@@ -3269,8 +3269,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         # update the mode selector to the correct edit mode
         self.mode_selector.select_mode(mode)
-        gremlin.shared_state.edit_mode = mode
-        #self.mode_selector.populate_selector(gremlin.shared_state.current_profile, mode)
+        gremlin.event_handler.EventHandler().set_edit_mode(mode)
         self._update_mode_status_bar()
 
     def _runtime_mode_changed(self, mode : str):

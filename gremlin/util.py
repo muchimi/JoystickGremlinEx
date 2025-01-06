@@ -482,18 +482,23 @@ def get_dll_version(path, as_string = True):
             return None
         return (0,0,0,0)
    
-    info = GetFileVersionInfo (path, "\\")
-    ms = info['FileVersionMS']
-    ls = info['FileVersionLS']
+    try:
+        info = GetFileVersionInfo (path, "\\")
+        ms = info['FileVersionMS']
+        ls = info['FileVersionLS']
 
-    f_major = HIWORD (ms)
-    f_minor = LOWORD (ms)
-    p_major = HIWORD (ls)
-    p_minor = LOWORD (ls)
-    
-    if as_string:
-        return f"{f_major}.{f_minor}.{p_major}.{p_minor}"
-    return (f_major, f_minor, p_major, p_minor)
+        f_major = HIWORD (ms)
+        f_minor = LOWORD (ms)
+        p_major = HIWORD (ls)
+        p_minor = LOWORD (ls)
+        
+        if as_string:
+            return f"{f_major}.{f_minor}.{p_major}.{p_minor}"
+        return (f_major, f_minor, p_major, p_minor)
+    except:
+        syslog = logging.getLogger("system")
+        syslog.warning(f"Unable to get file version information due to an OS error for: {path} ")
+        return None
 
 
 # def get_vjoy_driver_version() -> str:

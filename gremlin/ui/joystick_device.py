@@ -726,11 +726,12 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         #self.widget_tracker = gremlin.ui.ui_common.DeviceWidgetTracker() # caches the  InputConfigurationItem for this item
         self.last_item_data_key = None
-        self.last_item_index = 0
+        self.last_selected_index = index = 0
         self.device_guid = device.device_guid
         self.device_name = device.name
         self._debug_widget = None
-     
+        
+        self._last_selected_index = -1 # last selected index in the list
         
 
         # List of inputs
@@ -758,7 +759,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     
 
         # Handle user interaction
-        self.input_item_list_view.item_selected.connect(self.input_item_selected_cb)
+        self.input_item_list_view.item_selected.connect(self._select_item_cb)
 
         # Add modifiable device label
         label_widget = QtWidgets.QWidget()
@@ -814,7 +815,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         # update the selection if nothing is selected
         selected_index = self.input_item_list_view.current_index
         if selected_index is not None and selected_index != -1:
-            self.input_item_selected_cb(selected_index)
+            self._select_item_cb(selected_index)
 
         
 
@@ -827,7 +828,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         self.input_item_list_view.item_edit_curve.disconnect(self._edit_curve_item_cb)
         self.input_item_list_view.item_delete_curve.disconnect(self._delete_curve_item_cb)
-        self.input_item_list_view.item_selected.disconnect(self.input_item_selected_cb)
+        self.input_item_list_view.item_selected.disconnect(self._select_item_cb)
 
         el = gremlin.event_handler.EventListener()
         
@@ -835,13 +836,6 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         el.config_changed.disconnect(self._config_changed_cb)
         
 
-    # def clear_layout(self):
-    #     ''' clear data references '''
-    #     self.input_item_list_model = None
-    #     self.input_item_list_view = None
-    #     gremlin.util.clear_layout(self.main_layout)
-        
-        
     def _edit_curve_item_cb(self, widget, index, data):
         ''' edit curve request '''
         import gremlin.curve_handler
@@ -904,6 +898,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     @QtCore.Slot(str)
     def _edit_mode_changed_cb(self, mode : str):
         ''' called on edit mode change '''
+        self.set_mode(mode)
         syslog = logging.getLogger("system")
         syslog.info(f"DeviceWidget: {self.device_name} change mode: [{mode}]")
         self.update_curve_icons()
@@ -996,115 +991,124 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     
 
     @QtCore.Slot(int)
-    def input_item_selected_cb(self, index, force_update = False):
+    def _select_item_cb(self, index, force_update = False):
         """ Handles the loading of mappings for a given input item - handler for select_input event
 
         :param index the index of the selected item
         """
 
+        try:
         
-        self.setUpdatesEnabled(False)
-
-        config = gremlin.config.Configuration()
-        verbose = config.verbose_mode_details
-        #verbose = True
-        syslog = logging.getLogger("system")
-        widget = None
-        current_mode = gremlin.shared_state.edit_mode
-        if index == -1:
-            index = self.last_item_index
-
-        if index == -1:
-            if self.input_item_list_model.rows() > 0:
-                item_data = self.input_item_list_model.data(0)
-                index = 0
-            else:
-                # no input to select
-                widget = InputItemConfiguration()     
-                self.setRightPanelWidget(widget)
-            return
-        else:
-            item_data = self.input_item_list_model.data(index)
+            self.setUpdatesEnabled(False)
 
 
+            
 
-        
-        if not item_data:
-            syslog.warning(f"JoystickDevice: Device [{device_name}] has no inputs for mode {current_mode} - this is not normal.")
+            config = gremlin.config.Configuration()
+            verbose = config.verbose_mode_details
+            #verbose = True
+            syslog = logging.getLogger("system")
+            widget = None
+            current_mode = gremlin.shared_state.edit_mode
+            #self.device_profile.ensure_mode_exists(current_mode, self.device)
+            #print (f"joystick device input select: current edit mode is {current_mode} ======================================")
+            if index == -1:
+                index = self.last_selected_index
 
-        if verbose:
-            device_name = gremlin.joystick_handling.device_name_from_guid(self.device_guid)
-            if item_data:
-                syslog.info(f"Selecting input config item for {device_name} input index [{index}] mode: {current_mode}: {item_data.debug_display}")
-            else:
-                syslog.info(f"Selecting input config item for {device_name} input index [{index}] mode: {current_mode}: Empty content")
-
-        new_key = None
-        if item_data is not None:
-            new_key = item_data.id
-
-            if new_key == self.last_item_data_key and not force_update:
-                # same input - nothing to do
+            if index == -1:
+                if self.input_item_list_model.rows() > 0:
+                    item_data = self.input_item_list_model.data(0)
+                    index = 0
+                else:
+                    # no input to select
+                    widget = InputItemConfiguration()     
+                    self.setRightPanelWidget(widget)
                 return
+            else:
+                item_data = self.input_item_list_model.data(index)
 
 
 
             
-        self.last_item_data_key = new_key
-        self.last_item_index = index
-
-        if item_data is not None:
- 
-                
-            self.clearRightPanel()
-            
-            # not in cache, create it and add to cache for this device/input combination
-            if verbose: syslog.info(f"create and store in cache content widget for index: {index}  device: {self.device_guid}")
-            widget = InputItemConfiguration(item_data, parent = self)
-            widget.action_model.data_changed.connect(self._create_change_cb(index))
-            widget.description_changed.connect(lambda x: self._description_changed_cb(index, x))
-            widget.description_clear.connect(lambda: self._description_clear_cb(index,widget))
-
-            # indicate the input changed
-            device_guid = str(item_data.device_guid)
-            input_type = item_data.input_type
-            input_id = item_data.input_id
-            self.inputChanged.emit(device_guid, input_type, input_id)
-            self.addRightPanelWidget(widget)
-            #self.widget_tracker.registerWidget(widget, self.device_guid, item_data.input_type, item_data.input_id, item_data.id)
-
-
-            print (f"select joystick input {index} ===========================================")
-            self.input_item_list_view.select_item(index, False)
-
-            if force_update:
-                # update the container to reflect the data change
-                widget.setItemData(item_data)
-
-
-            #assert widget.item_data == item_data,"cache mismatch"
+            if not item_data:
+                syslog.warning(f"JoystickDevice: Device [{device_name}] has no inputs for mode {current_mode} - this is not normal.")
 
             if verbose:
-                syslog.info(f"Show widget:  {widget.id} {item_data.debug_display}")
+                device_name = gremlin.joystick_handling.device_name_from_guid(self.device_guid)
+                if item_data:
+                    syslog.info(f"Selecting input config item for {device_name} input index [{index}] mode: {current_mode}: {item_data.debug_display}")
+                else:
+                    syslog.info(f"Selecting input config item for {device_name} input index [{index}] mode: {current_mode}: Empty content")
+
+            new_key = None
+            if item_data is not None:
+                new_key = item_data.id
+
+                if new_key == self.last_item_data_key and not force_update:
+                    # same input - nothing to do
+                    return
+
+
+
+                
+            self.last_item_data_key = new_key
+
             
-            if config.debug_ui:
-                self._debug_widget.setText(f"Contents for : {item_data.debug_display}")
+
+            if item_data is not None:
+    
+                    
+                self.clearRightPanel()
+                
+                # not in cache, create it and add to cache for this device/input combination
+                if verbose: syslog.info(f"create and store in cache content widget for index: {index}  device: {self.device_guid}")
+                widget = InputItemConfiguration(item_data, parent = self)
+                widget.action_model.data_changed.connect(self._create_change_cb(index))
+                widget.description_changed.connect(lambda x: self._description_changed_cb(index, x))
+                widget.description_clear.connect(lambda: self._description_clear_cb(index,widget))
+
+                # indicate the input changed
+                device_guid = str(item_data.device_guid)
+                input_type = item_data.input_type
+                input_id = item_data.input_id
+                self.inputChanged.emit(device_guid, input_type, input_id)
+                self.addRightPanelWidget(widget)
+                #self.widget_tracker.registerWidget(widget, self.device_guid, item_data.input_type, item_data.input_id, item_data.id)
+
+                
+                self.input_item_list_view.select_item(index, False)
+
+                if force_update:
+                    # update the container to reflect the data change
+                    widget.setItemData(item_data)
 
 
-        else:
-            # show the empty widget
-            if self._debug_widget:
-                self._debug_widget.setText(f"Contents for : N/A")
-            widget = InputItemConfiguration()
-            self.addRightPanelWidget(widget)
-            
+                #assert widget.item_data == item_data,"cache mismatch"
 
-        
+                if verbose:
+                    syslog.info(f"Show widget:  {widget.id} {item_data.debug_display}")
+                
+                if config.debug_ui:
+                    self._debug_widget.setText(f"Contents for : {item_data.debug_display}")
+
+
+            else:
+                # show the empty widget
+                if self._debug_widget:
+                    self._debug_widget.setText(f"Contents for : N/A")
+                widget = InputItemConfiguration()
+                self.addRightPanelWidget(widget)
+                
+
+
+            self.last_selected_index = index
+
+        finally:    
             #widget.update()
-        self.setUpdatesEnabled(True)
-        # if widget:
-        #     widget.setVisible(True)
-        self.update()
+            self.setUpdatesEnabled(True)
+            # if widget:
+            #     widget.setVisible(True)
+            self.update()
         
 
     
@@ -1137,19 +1141,23 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             
         self.device_profile.ensure_mode_exists(mode, self.device)
 
-        index = self.last_item_index
+        # index = self.last_item_index
+        # self.input_item_list_model.mode = mode
+        # self.input_item_list_view.redraw()
+        # self.input_item_list_view.select_item(index, emit=False)
+        # self.input_item_selected_cb(index)
+
         self.input_item_list_model.mode = mode
-        self.input_item_list_view.redraw()
-        self.input_item_list_view.select_item(index, emit=False)
-        self.input_item_selected_cb(index)
+
+        #self.input_item_list_view.select_item(-1)
+        if gremlin.shared_state.isDeviceTabActive(self.device_guid):
+            self.input_item_list_model.refresh()
+            self.input_item_list_view.redraw()        
+            self._select_item_cb(self._last_selected_index)
 
 
-    def mode_changed_cb(self, mode):
-        """Handles mode change.
 
-        :param mode the new mode
-        """
-        self.set_mode(mode)
+
 
     def redraw(self):
         ''' updates the list widget '''
@@ -1157,10 +1165,12 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         
     def refresh(self):
         """Refreshes the current selection, ensuring proper synchronization."""
-        self.redraw()
+        self._select_item_cb(self.input_item_list_view.current_index, force_update = True)
+
+        # self.redraw()
         
-        if self.input_item_list_view.current_index is not None:
-            self.input_item_selected_cb(self.input_item_list_view.current_index, force_update = True)
+        # if self.input_item_list_view.current_index is not None:
+        #     self._select_item_cb(self.input_item_list_view.current_index, force_update = True)
 
 
     def _create_change_cb(self, index):

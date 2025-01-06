@@ -979,7 +979,6 @@ class SimConnectManager(QtCore.QObject):
     def reconnect(self, force_retry = False):
         # not connected
 
-        
         enabled = gremlin.shared_state.getSimConnectEnabled()
         if not enabled:
             # simconnect is not enabled
@@ -1003,11 +1002,13 @@ class SimConnectManager(QtCore.QObject):
 
             if not self._sm.ok:
                 if self._connect_attempts == 0 and gremlin.shared_state.is_running:
-                    msg = "Simconnect: failed to connect to simulator - terminating profile"
-                    syslog.error(msg)
-                    # request the profile to stop
-                    eh = gremlin.event_handler.EventListener()
-                    eh.request_profile_stop.emit(msg)
+                    if not self._connect_warning_issued:
+                        msg = "Simconnect: failed to connect to simulator - terminating profile"
+                        syslog.error(msg)
+                        self._connect_warning_issued = True
+                        # request the profile to stop
+                        eh = gremlin.event_handler.EventListener()
+                        eh.request_profile_stop.emit(msg)
                 return False
             
             else:

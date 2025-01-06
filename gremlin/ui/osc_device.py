@@ -2149,7 +2149,7 @@ class OscInputItem(AbstractInputItem):
 
                 osc_input.registerInput(self)
 
-                print (f"OSC update message key from {self._message_key} to {value}")
+                # print (f"OSC update message key from {self._message_key} to {value}")
                 
                 self._message_key = value
                 tracker.registerWidget(self, self._device_guid, self._input_type, self._message_key, self._guid)
@@ -3030,12 +3030,6 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         :param index the index of the selected item
         """
 
-     
-        
-        
-      
-
-
         # self._last_selected_index = index
         item_data = None
 
@@ -3389,7 +3383,7 @@ class InputOscClient(QtCore.QObject):
         self._interface.start() # ensure started
         self._interface.osc_message.connect(self._osc_message_cb)
 
-        self._verbose = gremlin.config.Configuration().verbose
+        self._verbose = gremlin.config.Configuration().verbose_mode_osc
         self._started = True
 
 
