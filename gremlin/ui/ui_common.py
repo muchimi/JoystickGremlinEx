@@ -84,50 +84,65 @@ class WidgetTracker():
 class DeviceWidgetTracker():
     def __init__(self):
         self._widget_cache = {}
+        self.any_mode = "[any]"
 
-    def registerWidget(self, widget, device_guid, input_type, input_id, key):
+    def registerWidget(self, widget, device_guid, mode, input_type, input_id, key):
+        if not mode:
+            mode = self.any_mode
         if not isinstance(device_guid, str):
             device_guid = str(device_guid)
         if not device_guid in self._widget_cache:
             self._widget_cache[device_guid] = {}
-        if not input_type in self._widget_cache[device_guid]:
-            self._widget_cache[device_guid][input_type] = {}
-        if not input_id in self._widget_cache[device_guid][input_type]:
-            self._widget_cache[device_guid][input_type][input_id] = {}
+        if not mode in self._widget_cache[device_guid]:
+            self._widget_cache[device_guid][mode] = {}
+        if not input_type in self._widget_cache[device_guid][mode]:
+            self._widget_cache[device_guid][mode][input_type] = {}
+        if not input_id in self._widget_cache[device_guid][mode][input_type]:
+            self._widget_cache[device_guid][mode][input_type][input_id] = {}
 
-        self._widget_cache[device_guid][input_type][input_id][key] = widget
+        self._widget_cache[device_guid][mode][input_type][input_id][key] = widget
 
-    def unregisterWidget(self, device_guid, input_type, input_id, key):
+    def unregisterWidget(self, device_guid, mode, input_type, input_id, key):
+        if not mode:
+            mode = self.any_mode
         if not isinstance(device_guid, str):
             device_guid = str(device_guid)
         if device_guid in self._widget_cache:
-            if input_type in self._widget_cache[device_guid]:
-                if input_id in self._widget_cache[device_guid][input_type]:
-                    if key in self._widget_cache[device_guid][input_type][input_id]:
-                        del self._widget_cache[device_guid][input_type][input_id]
+            for mode in self._widget_cache[device_guid]:
+                if input_type in self._widget_cache[device_guid][mode]:
+                    if input_id in self._widget_cache[device_guid][mode][input_type]:
+                        if key in self._widget_cache[device_guid][mode][input_type][input_id]:
+                            del self._widget_cache[device_guid][mode][input_type][input_id]
 
     def clear(self):
         self._widget_cache.clear()
 
-    def getWidget(self, device_guid, input_type, input_id, key):
+    def getWidget(self, device_guid, mode, input_type, input_id, key):
+        if not mode:
+            mode = self.any_mode
         if not isinstance(device_guid, str):
             device_guid = str(device_guid)
         if device_guid in self._widget_cache:
-            if input_type in self._widget_cache[device_guid]:
-                if input_id in self._widget_cache[device_guid][input_type]:
-                    if key in self._widget_cache[device_guid][input_type][input_id]: 
-                        return self._widget_cache[device_guid][input_type][input_id][key]
-        
+            for mode in self._widget_cache[device_guid]:
+                if input_type in self._widget_cache[device_guid][mode]:
+                    if input_id in self._widget_cache[device_guid][mode][input_type]:
+                        if key in self._widget_cache[device_guid][mode][input_type][input_id]: 
+                            return self._widget_cache[device_guid][mode][input_type][input_id][key]
+            
 
-    def getCache(self, device_guid, input_type):
+    def getCache(self, device_guid, mode, input_type):
+        if not mode:
+            mode = self.any_mode
         if not isinstance(device_guid, str):
             device_guid = str(device_guid)
         if device_guid in self._widget_cache:
-            if input_type in self._widget_cache[device_guid]:
-                return self._widget_cache[device_guid][input_type]
+            for mode in self._widget_cache[device_guid]:
+                if input_type in self._widget_cache[device_guid][mode]:
+                    return self._widget_cache[device_guid][mode][input_type]
         self._widget_cache[device_guid] = {}
-        self._widget_cache[device_guid][input_type] = {}
-        return self._widget_cache[device_guid][input_type]
+        self._widget_cache[device_guid][mode] = {}
+        self._widget_cache[device_guid][mode][input_type] = {}
+        return self._widget_cache[device_guid][mode][input_type]
             
 
 
@@ -206,14 +221,12 @@ class StateTracker():
                 key = self._key(input_id)
                 if key in self._button_cache[device_guid][input_type]:
                     widget = self._button_cache[device_guid][input_type][key]
-                    if widget.enabled:
-                        widget._update_value(is_pressed)
-                
-                    # if not gremlin.shared_state.is_running:
-                    #     # select it
-                    #     if gremlin.config.Configuration().highlight_input_buttons:
-                    #         el = gremlin.event_handler.EventListener()
-                    #         el.select_input.emit(device_guid, input_type, input_id, False, False)
+                    try:
+                        if widget.enabled:
+                            widget._update_value(is_pressed)
+                    except:
+                        # discarded by QT - ignore
+                        pass
                 
                     
 
@@ -226,13 +239,13 @@ class StateTracker():
                 key = self._key(input_id)
                 if key in self._axis_cache[device_guid][input_type]:
                     widget = self._axis_cache[device_guid][input_type][key]
-                    if widget.enabled:
-                        widget._update_value(value)
-                # if not gremlin.shared_state.is_running:
-                #         # select it
-                #         if gremlin.config.Configuration().highlight_input_axis:
-                #             el = gremlin.event_handler.EventListener()
-                #             el.select_input.emit(device_guid, input_type, input_id, False, False)
+                    try:
+                        if widget.enabled:
+                            widget._update_value(value)
+                    except:
+                        # discarded by QT - ignore
+                        pass
+                
                     
                         
     
@@ -4431,6 +4444,12 @@ class QSplitTabWidget(QDataWidget):
             _tabsplitter_tracker.unregisterWidget(self)
             self._lock = False
 
+    def _select_item_cb(self, index):
+        assert False,"Must be implemented by subclass"
+
+    def select_item(self, index):
+        # implemented by a subclass
+        self._select_item_cb(index)
 
 
 

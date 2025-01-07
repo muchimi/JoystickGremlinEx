@@ -1966,9 +1966,9 @@ class OscInputItem(AbstractInputItem):
         self._autorelease = False # true if auto-release
         self._autorelease_delay = 250 # default release delay
         self._axis_value = 0.0 # current axis value when the input is in axis mode
-
+        current_mode = gremlin.shared_state.current_mode
         tracker = gremlin.ui.ui_common.DeviceWidgetTracker()
-        tracker.registerWidget(self, self._device_guid, self._input_type, self._message_key, self._guid)
+        tracker.registerWidget(self, self._device_guid, current_mode, self._input_type, self._message_key, self._guid)
         client = InputOscClient()
         client.registerInput(self)
 
@@ -2136,7 +2136,8 @@ class OscInputItem(AbstractInputItem):
             if self._message_key != value:
 
                 tracker = gremlin.ui.ui_common.DeviceWidgetTracker()
-                tracker.unregisterWidget(self._device_guid, self._input_type, self._message_key, self._guid)
+                current_mode = gremlin.shared_state.current_mode
+                tracker.unregisterWidget(self._device_guid, current_mode, self._input_type, self._message_key, self._guid)
                 client = InputOscClient()
                 client.unregisterInput(self)
 
@@ -2152,7 +2153,7 @@ class OscInputItem(AbstractInputItem):
                 # print (f"OSC update message key from {self._message_key} to {value}")
                 
                 self._message_key = value
-                tracker.registerWidget(self, self._device_guid, self._input_type, self._message_key, self._guid)
+                tracker.registerWidget(self, self._device_guid, current_mode, self._input_type, self._message_key, self._guid)
                 client.registerInput(self)
             
             
@@ -2181,12 +2182,7 @@ class OscInputItem(AbstractInputItem):
         ''' updates the message key based on the current config '''
         message_key =  OscInputItem.toMessageKey(self._command_mode, self.message, None)
         self.setMessageKey(message_key)
-        # if self._command_mode == OscInputItem.CommandMode.Data:
-        #     self.setMessageKey(f"{self.message} {self._data_to_string(self._message_data)}")
-        # elif self._command_mode == OscInputItem.CommandMode.Message:
-        #     self.setMessageKey(self.message)
-        # else:
-        #     raise ValueError(f"_update(): don't know how to handle {self._command_mode}")
+
         
         # update data string from the raw data
         self._message_data_string = list_to_csv(self._message_data)
@@ -2949,8 +2945,6 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         self.addLeftPanelWidget(button_container_widget)
 
-        # self._is_axis = False # true if the widget's input item should be an axis item
-        
 
         el = gremlin.event_handler.EventListener()
         # update on an edit mode change so we update the display
@@ -3261,12 +3255,6 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             self.input_item_list_view.redraw()        
             self._select_item_cb(self._last_selected_index)
 
-    def mode_changed_cb(self, mode):
-        """Handles mode change.
-
-        :param mode the new mode
-        """
-        self.set_mode(mode)
 
 
     def refresh(self):
@@ -3415,7 +3403,8 @@ class InputOscClient(QtCore.QObject):
         from gremlin.input_types import InputType
         # get the input items behind this message
         tracker = gremlin.ui.ui_common.DeviceWidgetTracker()
-        cache = tracker.getCache(OscDeviceTabWidget.device_guid, InputType.OpenSoundControl)
+        current_mode = gremlin.shared_state.current_mode
+        cache = tracker.getCache(OscDeviceTabWidget.device_guid, current_mode, InputType.OpenSoundControl)
         command = OscInputItem.CommandMode.Message
         # look for the the message
         message_key = OscInputItem.toMessageKey(command, message, args)

@@ -155,9 +155,7 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     @QtCore.Slot(str)
     def _edit_mode_changed_cb(self, mode : str):
         ''' occurs when a new mode is selected '''
-        self.ensureInputItems()
-        if gremlin.shared_state.isDeviceTabActive(self.device_guid):
-            self._select_item_cb(self._last_selected_index)        
+        self.set_mode(mode)
 
     @QtCore.Slot(str)
     def _mode_name_changed(self, name):
@@ -194,6 +192,7 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         '''
         current_mode = gremlin.shared_state.edit_mode
+        self.device_profile.ensure_mode_exists(current_mode)
         config = self.device_profile.modes[current_mode].config
         
         changed = False
@@ -377,19 +376,16 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     def set_mode(self, mode):
         ''' changes the mode of the tab '''        
         self.current_mode = mode
-        self.device_profile.ensure_mode_exists(self.current_mode)
+        self.ensureInputItems()
         self.input_item_list_model.mode = mode
-        self.input_item_list_model.refresh()
-        self.input_item_list_view.redraw()        
-        self.input_item_list_view.select_item(-1)
+        
+        #self.input_item_list_view.select_item(-1)
+        if gremlin.shared_state.isDeviceTabActive(self.device_guid):
+            self.input_item_list_model.refresh()
+            self.input_item_list_view.redraw()        
+            self._select_item_cb(self._last_selected_index)
 
-    def mode_changed_cb(self, mode):
-        """Handles mode change.
-
-        :param mode the new mode
-        """
-        self.set_mode(mode)
-
+ 
 
     def refresh(self):
         """Refreshes the current selection, ensuring proper synchronization."""

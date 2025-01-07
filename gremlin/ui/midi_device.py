@@ -204,6 +204,9 @@ class MidiInputItem(AbstractInputItem):
         self._mode = MidiInputItem.InputMode.Button  # mode is button or axis 
         self._device_guid = MidiDeviceTabWidget.device_guid
         self._input_type = InputType.Midi
+        current_mode = gremlin.shared_state.current_mode
+        tracker = gremlin.ui.ui_common.DeviceWidgetTracker()
+        tracker.registerWidget(self, self._device_guid, current_mode, self._input_type, self._message_key, self._guid)
 
 
     
@@ -1532,37 +1535,6 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         :param index the index of the selected item
         """
 
-
-        # if index == -1:
-        #     # select the first item
-        #     if self.input_item_list_model.rows():
-        #         index = 0
-        #     else:
-        #         return 
-    
-
-        # input_data : gremlin.base_profile.InputItem = self.input_item_list_model.data(index)
-
-        # # remember the last input
-        # config = gremlin.config.Configuration()
-        # device_guid = self.device_guid
-        # input_type = InputType.Midi
-        # input_id = input_data.input_id if input_data else None
-        # config.set_last_input(device_guid, input_type, input_id)
-
-        # self._item_data = gremlin.ui.joystick_device.InputItemConfiguration(input_data)
-        # self.setRightPanelWidget(self._item_data)           
-
-        # if input_data:
-            
-        #     # Create new configuration widget
-        #     input_data.is_axis = input_id.is_axis
-        #     change_cb = self._create_change_cb(index)
-        #     self._item_data.action_model.data_changed.connect(change_cb)
-        #     self._item_data.description_changed.connect(change_cb)
-
-        # self._last_selected_index = index
-
         if index == -1:
             index = self._last_selected_index
 
@@ -1856,7 +1828,7 @@ class MidiClient(QtCore.QObject):
         self._event_handler = gremlin.event_handler.EventHandler()
         self._event_listener = gremlin.event_handler.EventListener()
         self._midi_map = {}  # list of message keys
-
+        tracker = gremlin.ui.ui_common.DeviceWidgetTracker()
         self._event_listener.request_midi.connect(self._request_midi_state)
         #self._event_listener.profile_loaded.connect(self._update_messages)
         self._event_listener.profile_start.connect(self._profile_start)
@@ -1879,12 +1851,12 @@ class MidiClient(QtCore.QObject):
         verbose = config.verbose_mode_osc
         syslog = logging.getLogger("system")
         # self._update_messages()
-
-        if self._midi_map:
+        current_mode = gremlin.shared_state.current_mode
+        if self._midi_map and current_mode in self._midi_map:
             if verbose:
                 # dump the mappings to the log file
                 syslog.info("MIDI: Listening for commands:")
-                for items in self._midi_map.values():
+                for items in self._midi_map[current_mode].values():
                     for input_item in items:
                         item_mode = "axis" if input_item.is_axis else "momentary"
                         syslog.info(f"\t{input_item.display_name}  key: [{input_item.message_key}] input mode: [{item_mode}]")
@@ -1903,30 +1875,36 @@ class MidiClient(QtCore.QObject):
         ''' registers a MIDI input item '''
         syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_midi
+        current_mode = gremlin.shared_state.current_mode
         if isinstance(input_item, MidiInputItem):
             if not self._started:
                 # ensure MIDI is listening
                 self._start()
 
             message_key = input_item.message_key
-            if not message_key in self._midi_map:
-                self._midi_map[message_key] = []
+            if not current_mode in self._midi_map:
+                self._midi_map[current_mode] = {}
+            if not message_key in self._midi_map[current_mode]:
+                self._midi_map[current_mode][message_key] = []
         
-            self._midi_map[message_key].append(input_item)
+            self._midi_map[current_mode][message_key].append(input_item)
             if verbose:
               syslog.info(f"MIDI: register trigger on: {input_item.display_name} mode: {input_item.mode_string} key: {message_key}")
+
 
     def unregisterInput(self, input_item):
         ''' unregister a MIDI input item '''
         syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_midi
         if isinstance(input_item, MidiInputItem):
+            current_mode = gremlin.shared_state.current_mode
             message_key = input_item.message_key
-            if message_key in self._midi_map:
-                if input_item in self._midi_map[message_key]:
-                    self._midi_map[message_key].remove(input_item)
-                    if verbose:
-                        syslog.info(f"MIDI: unregister trigger on: {input_item.display_name} mode: {input_item.mode_string} key: {message_key}")
+            if current_mode in self._midi_map:
+                if message_key in self._midi_map[current_mode]:
+                    if input_item in self._midi_map[current_mode][message_key]:
+                        self._midi_map[current_mode][message_key].remove(input_item)
+                        if verbose:
+                            syslog.info(f"MIDI: unregister trigger on: {input_item.display_name} mode: {input_item.mode_string} key: {message_key}")
                  
 
     def _update_messages(self):
@@ -1937,6 +1915,9 @@ class MidiClient(QtCore.QObject):
         syslog = logging.getLogger("system")
         if profile:
             self._midi_map = {}  # list of message keys
+            current_mode = gremlin.shared_state.current_mode
+            if not current_mode in self._midi_map:
+                self._midi_map[current_mode] = {}
             if verbose: syslog.info("MIDI: reload map")
             for device in profile.devices.values():
                 if device.name == "midi":
@@ -1945,15 +1926,13 @@ class MidiClient(QtCore.QObject):
                             for input_item in input_items:
                                 if isinstance(input_item, MidiInputItem):
                                     message_key = input_item.message_key
-                                    if not message_key in self._midi_map.keys():
-                                        self._midi_map[message_key] = []
+                                    if not message_key in self._midi_map[current_mode]:
+                                        self._midi_map[current_mode][message_key] = []
                                     if input_item.port_valid:
-                                        self._midi_map[message_key].append(input_item)
+                                        self._midi_map[current_mode][message_key].append(input_item)
                                         if verbose:
-                                            logging.getLogger("system").info(f"MIDI: register trigger on: {input_item.display_name} mode: {input_item.mode_string} key: {message_key}")
+                                            logging.getLogger("system").info(f"MIDI: profile mode: [{current_mode}] register trigger on: {input_item.display_name} mode: {input_item.mode_string} key: {message_key}")
             if verbose: syslog.info(f"MIDI: Map loaded: found {len(self._midi_map)} items")
-            if not self._midi_map:
-                pass
 
 
     def start(self):
@@ -1991,10 +1970,11 @@ class MidiClient(QtCore.QObject):
         message_key = self._interface.buildMessageKey(command, port_name, message)
         input_type = InputType.Midi
         device_guid = MidiDeviceTabWidget.device_guid
+        current_mode = gremlin.shared_state.current_mode
 
-        if message_key in self._midi_map:
+        if current_mode in self._midi_map and message_key in self._midi_map[current_mode]:
             # logging.getLogger("system").info(f"MIDI: runtime: processing {message_key}")
-            for input_item in self._midi_map[message_key]:
+            for input_item in self._midi_map[current_mode][message_key]:
                 # send the value over if the message is a value type message
                 range = 128
                 raw_value = None
@@ -2061,7 +2041,12 @@ class MidiClient(QtCore.QObject):
                         is_axis = True)
 
                     self._event_listener.joystick_event.emit(event)
-
+                    self._event_listener.axis_state_change.emit(
+                        event.device_guid,
+                        event.event_type,
+                        input_item,               
+                        event.value
+                    )
 
 
                 elif input_item.is_button:
