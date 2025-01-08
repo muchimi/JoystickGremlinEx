@@ -25,6 +25,7 @@ from time import sleep
 from ctypes import *
 from ctypes.wintypes import FLOAT
 
+import gremlin.event_handler
 import gremlin.shared_state
 from .Enum import *
 import gremlin.config
@@ -88,17 +89,21 @@ class SimConnectBridge(QtCore.QObject):
         self._lvars = [] # list of received lvars 
         self._state = None # response state
         self._wait_event = threading.Event() # wait event
+        el = gremlin.event_handler.EventListener()
+        el.shutdown.connect(self._shutdown)
 
     def start(self):
         if self._started:
             return
-        self.sm.register_client_data_handler(self.client_data_callback_handler)
         
-        self.sm._dll.AddToClientDataDefinition(self.sm._hSimConnect, kPacketDefinition, 0, kPacketSize, 0.0, SIMCONNECT_UNUSED)
-        self.sm._dll.MapClientDataNameToID(self.sm._hSimConnect, kPublicDownlinkChannel, kPublicDownlinkArea)
-        self.sm._dll.MapClientDataNameToID(self.sm._hSimConnect, kPublicUplinkChannel, kPublicUplinkArea)    
-        self.sm._dll.RequestClientData(self.sm._hSimConnect,
-                                       kPublicDownlinkArea,
+        try:
+            self.sm.register_client_data_handler(self.client_data_callback_handler)
+            
+            self.sm._dll.AddToClientDataDefinition(self.sm._hSimConnect, kPacketDefinition, 0, kPacketSize, 0.0, SIMCONNECT_UNUSED)
+            self.sm._dll.MapClientDataNameToID(self.sm._hSimConnect, kPublicDownlinkChannel, kPublicDownlinkArea)
+            self.sm._dll.MapClientDataNameToID(self.sm._hSimConnect, kPublicUplinkChannel, kPublicUplinkArea)    
+            self.sm._dll.RequestClientData(self.sm._hSimConnect,
+                                        kPublicDownlinkArea,
                                        kDownlinkRequest,
                                        kPacketDefinition,
                                        SIMCONNECT_CLIENT_DATA_PERIOD.SIMCONNECT_CLIENT_DATA_PERIOD_ON_SET,
@@ -106,20 +111,26 @@ class SimConnectBridge(QtCore.QObject):
                                        0,
                                        0,
                                        0)
-        syslog = logging.getLogger("system")
-        syslog.info(f"Bridge: data areas registered...")
-        self._started = True
+            syslog = logging.getLogger("system")
+            syslog.info(f"Bridge: data areas registered...")
+            self._started = True
+        except:
+            pass
 
 
     def stop(self):
         if not self._started:
             return
-        syslog = logging.getLogger("system")
-        syslog.info("Bridge: stop")
-        self.sm.unregister_client_data_handler(self.client_data_callback_handler)
-        self.sm._dll.RequestClientData(self.sm._hSimConnect, kPublicDownlinkArea, kDownlinkRequest, kPacketDefinition,
-                                  SIMCONNECT_CLIENT_DATA_PERIOD.SIMCONNECT_CLIENT_DATA_PERIOD_NEVER,
-                                  SIMCONNECT_CLIENT_DATA_REQUEST_FLAG.SIMCONNECT_CLIENT_DATA_REQUEST_FLAG_DEFAULT, 0,0,0)
+        if self.sm.is_connected:
+            syslog = logging.getLogger("system")
+            syslog.info("Bridge: stop")
+            try:
+                self.sm.unregister_client_data_handler(self.client_data_callback_handler)
+                self.sm._dll.RequestClientData(self.sm._hSimConnect, kPublicDownlinkArea, kDownlinkRequest, kPacketDefinition,
+                                    SIMCONNECT_CLIENT_DATA_PERIOD.SIMCONNECT_CLIENT_DATA_PERIOD_NEVER,
+                                    SIMCONNECT_CLIENT_DATA_REQUEST_FLAG.SIMCONNECT_CLIENT_DATA_REQUEST_FLAG_DEFAULT, 0,0,0)
+            except:
+                pass
         
         self._started = False
 
@@ -131,7 +142,10 @@ class SimConnectBridge(QtCore.QObject):
             self._id = 0
         return id
 
-
+    @QtCore.Slot()
+    def _shutdown(self):
+        ''' terminate issued '''
+        self.stop()
 
         
 

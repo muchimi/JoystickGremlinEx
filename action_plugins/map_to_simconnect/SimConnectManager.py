@@ -474,7 +474,7 @@ class SimConnectManager(QtCore.QObject):
         handler = SimConnectEventHandler()
 
 
-        
+        self._connect_warning_issued = False
         sm = SimConnect(handler, auto_connect = False)
         self._sm : SimConnect = sm
 
@@ -950,10 +950,10 @@ class SimConnectManager(QtCore.QObject):
 
     def reset(self):
         ''' resets the connection '''
-        if self._sm.ok:
-            if self._sm.is_connected():
-                self.disconnect()
-            
+        if self._sm.is_connected:
+            return
+        
+        self._sm.reset()
         self._connect_attempts = 3
 
 

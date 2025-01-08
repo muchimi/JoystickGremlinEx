@@ -37,7 +37,7 @@ added_binaries = [
     ("vjoy/vJoyInterface.dll", "."),
     ("dill.dll", "."),
     ("vigem/ViGEmClient.dll", "."),
-    ("action_plugins/map_to_simconnect/SimConnect/SimConnect.dll","."),
+    ("SimConnect.dll","."),
 	
 ]
 

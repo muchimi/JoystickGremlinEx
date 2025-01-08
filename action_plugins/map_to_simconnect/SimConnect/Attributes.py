@@ -21,7 +21,7 @@ from ctypes.wintypes import *
 
 class SimConnectDll(object):
 
-	def __init__(self, library_path):
+	def __init__(self, simconnect_dll):
 		self.EventID = SIMCONNECT_CLIENT_EVENT_ID
 		self.DATA_DEFINITION_ID = SIMCONNECT_DATA_DEFINITION_ID
 		self.DATA_REQUEST_ID = SIMCONNECT_DATA_REQUEST_ID
@@ -30,7 +30,8 @@ class SimConnectDll(object):
 		self.CLIENT_DATA_ID = SIMCONNECT_CLIENT_DATA_ID
 		self.CLIENT_DATA_DEFINITION_ID = SIMCONNECT_CLIENT_DATA_DEFINITION_ID
 
-		self.SimConnect = windll.LoadLibrary(library_path)
+		self.SimConnect = simconnect_dll
+
 		# SIMCONNECTAPI SimConnect_Open(
 		# 	HANDLE * phSimConnect,
 		# 	LPCSTR szName,
