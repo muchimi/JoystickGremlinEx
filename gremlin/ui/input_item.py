@@ -20,6 +20,9 @@ from PySide6 import QtWidgets, QtCore, QtGui
 import lxml.etree
 
 import gremlin
+import gremlin.base_conditions
+import gremlin.base_profile
+import gremlin.base_profile
 import gremlin.config
 
 import gremlin.event_handler
@@ -1845,7 +1848,8 @@ class ConditionTrackerInfo:
 @SingletonDecorator
 class ConditionStateTracker():
     def __init__(self):
-        self.tracker = {} # maps input to condition tab
+        self._cache = {} # maps input to condition tab
+        self._widget_cache = {} # tracks the dock tab widget for the registered input_item for this mode
         el = gremlin.event_handler.EventListener()
         el.condition_state_changed.connect(self._condition_state_changed)
         el.container_delete.connect(self._container_delete)
@@ -1854,43 +1858,59 @@ class ConditionStateTracker():
 
     def register(self, input_item, container, dock_tab : QtWidgets.QTabWidget):
         ''' registers a condition tracker '''
+        if not isinstance(container, gremlin.base_profile.AbstractContainer):
+            return
+
         device_guid = input_item.device_guid
+        mode = gremlin.shared_state.current_mode
         input_id = input_item.input_id
-        if not device_guid in self.tracker:
-            self.tracker[device_guid] = {}
-        if not input_id in self.tracker[device_guid]:
-            self.tracker[device_guid][input_id] = {}
-        
+        if not device_guid in self._cache:
+            self._cache[device_guid] = {}
+        if not mode in self._cache[device_guid]:
+            self._cache[device_guid][mode] = {}
+        if not input_id in self._cache[device_guid][mode]:
+            self._cache[device_guid][mode][input_id] = {}
         info = ConditionTrackerInfo(input_item, device_guid, input_id, container, dock_tab)
-        self.tracker[device_guid][input_id][container] = info
+        self._cache[device_guid][mode][input_id][container.id] = info
+
         enabled = info.input_item.hasConditions()
         self.set_condition_tab_state(dock_tab, enabled)
 
     def unregister(self, input_item, container):
         ''' unregisters a condition tracker '''
+        if not isinstance(container, gremlin.base_profile.AbstractContainer):
+            return
+        assert isinstance(container, gremlin.base_profile.AbstractContainer)
         device_guid = input_item.device_guid
+        mode = gremlin.shared_state.current_mode
         input_id = input_item.input_id
-        if device_guid in self.tracker:
-            if input_id in self.tracker[device_guid]:
-                if container in self.tracker[device_guid][input_id]:
-                        del self.tracker[device_guid][input_id][container]
-
+        if device_guid in self._cache:
+            if mode in self._cache[device_guid]:
+                if input_id in self._cache[device_guid][mode]:
+                    if container.id in self._cache[device_guid][mode][input_id]:
+                            del self._cache[device_guid][mode][input_id][container.id]
 
 
     @QtCore.Slot(object)
     def _condition_state_changed(self, container):
+        if not isinstance(container, gremlin.base_profile.AbstractContainer):
+            return
         device_guid = container.hardware_device_guid
         input_id = container.hardware_input_id
-        if device_guid in self.tracker:
-            if input_id in self.tracker[device_guid]:
-                if container in self.tracker[device_guid][input_id]:
-                    info = self.tracker[device_guid][input_id][container]
-                    enabled = info.input_item.hasConditions()
-                    dock_tabs = info.dock_tabs
-                    self.set_condition_tab_state(dock_tabs, enabled)
+        mode = gremlin.shared_state.current_mode
+        if device_guid in self._cache:
+            if mode in self._cache[device_guid]:
+                if input_id in self._cache[device_guid][mode]:
+                    if container.id in self._cache[device_guid][mode][input_id]:
+                        info = self._cache[device_guid][mode][input_id][container.id]
+                        enabled = info.input_item.hasConditions()
+                        dock_tabs = info.dock_tabs
+                        self.set_condition_tab_state(dock_tabs, enabled)
 
     @QtCore.Slot(object, object)
     def _container_delete(self, input_item, container):
+        if not isinstance(container, gremlin.base_profile.AbstractContainer):
+            return
         self.unregister(input_item, container)
                     
         
@@ -1945,12 +1965,20 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
         import gremlin.hints
         import gremlin.event_handler
+        import gremlin.base_profile
+        import gremlin.ui.ui_common
         assert isinstance(profile_data, gremlin.base_profile.AbstractContainer)
         super().__init__(parent)
 
         el = gremlin.event_handler.EventListener()
         el.condition_redraw.connect(self._condition_redraw)
+        self._icon_enabled = gremlin.util.load_icon("mdi.record", qta_color="green")
+        self._icon_disabled = gremlin.util.load_icon("mdi.record", qta_color="lightgray")
 
+        if isinstance(profile_data, gremlin.base_profile.AbstractContainer):
+            self.container = profile_data
+        else:
+            self.container = None
         self.profile_data = profile_data
         self.action_widgets = []
 
@@ -1962,10 +1990,10 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         ))
 
         # Create tab widget to display various UI controls in
-        self.dock_tabs = QtWidgets.QTabWidget()
+        self.dock_tabs =  gremlin.ui.ui_common.QDataTab()
         self.dock_tabs.setTabPosition(QtWidgets.QTabWidget.East)
         self.setWidget(self.dock_tabs)
-
+        self.dock_tabs.data = self.container # associated the data tab with the container
         
         # Create the individual tabs
         self._create_action_tab()
@@ -1982,6 +2010,31 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
         tracker = ConditionStateTracker()
         tracker.register(self.profile_data.input_item, self.profile_data, self.dock_tabs)
+
+        # this is for CONTAINER CONDITIONS only (Action conditions are handled elsewhere) - this hooks the condition state tab to the conditions added to the container
+        el = gremlin.event_handler.EventListener()
+        el.condition_state_changed.connect(self._update_tab_condition)
+
+
+    @QtCore.Slot(object)
+    def _update_tab_condition(self, container):
+        dock_tabs = self.dock_tabs
+        if dock_tabs.data == container:
+            tracker = gremlin.base_conditions.ConditionTracker()
+            enabled = tracker.getContainerConditionCount(container) > 0
+            try:
+                
+                for i in range(dock_tabs.count()):
+                    if dock_tabs.tabText(i) == "Conditions":
+                        tb = dock_tabs.tabBar()
+                        icon = self._icon_enabled if enabled else self._icon_disabled
+                        tb.setTabIcon(i, icon)
+                        break
+            except:
+                pass
+
+
+
 
     def _condition_redraw(self, data):
         ''' occurs when a condition redraws '''

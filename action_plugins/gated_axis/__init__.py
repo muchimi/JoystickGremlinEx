@@ -118,7 +118,7 @@ class GatedAxis(gremlin.base_profile.AbstractAction):
     def requires_virtual_button(self):
         return False
 
-    def _parse_xml(self, node):
+    def _parse_xml(self, node, data = None):
         # load gate data
         gates = []
         gate_node = gremlin.util.get_xml_child(node,"gates")
@@ -126,7 +126,7 @@ class GatedAxis(gremlin.base_profile.AbstractAction):
             for child in gate_node:
                 gate_data = gremlin.gated_handler.GateData(self, action_data = self)
                 
-                gate_data.from_xml(child)
+                gate_data.from_xml(child, data)
                 gates.append(gate_data)
 
         if gates:

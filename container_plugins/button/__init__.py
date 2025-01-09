@@ -257,13 +257,13 @@ class ButtonContainer(AbstractContainer):
         self.delay = 0.5
         self.activate_on = "release"
 
-    def _parse_xml(self, node):
+    def _parse_xml(self, node, data = None):
         """Populates the container with the XML node's contents.
 
         :param node the XML node with which to populate the container
         """
         self.action_sets = []
-        super()._parse_xml(node)
+        super()._parse_xml(node, data)
 
     def _generate_xml(self):
         """Returns an XML node representing this container's data.

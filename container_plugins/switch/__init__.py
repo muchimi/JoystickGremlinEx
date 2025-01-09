@@ -568,7 +568,7 @@ class SwitchData():
 
         return node
     
-    def _parse_xml(self, node):
+    def _parse_xml(self, node, data = None):
         ''' read xml data '''
         if node.tag == "switch":
             if "index" in node.attrib:
@@ -633,7 +633,7 @@ class SwitchContainer(AbstractContainer):
     def position_count(self) -> int:
         return len(self.position_data)
 
-    def _parse_xml(self, node):
+    def _parse_xml(self, node, data = None):
         """Populates the container with the XML node's contents.
 
         :param node the XML node with which to populate the container

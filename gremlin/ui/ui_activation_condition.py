@@ -19,9 +19,12 @@
 from PySide6 import QtCore, QtGui, QtWidgets
 
 import logging
+import gremlin.base_profile
 import gremlin.config
+import gremlin.event_handler
 from gremlin.input_types import InputType
 from gremlin import hints, input_devices, macro, util
+import gremlin.shared_state
 from gremlin.util import load_icon
 import gremlin.base_classes as bc
 from . import ui_common
@@ -765,6 +768,24 @@ class ConditionModel(ui_common.AbstractModel):
         super().__init__(parent)
         self.condition_data = condition_data
         self.action_data = action_data
+        self.input_item = action_data.input_item
+        self.container = None
+        if isinstance(action_data, gremlin.base_profile.AbstractContainer):
+            self.container = action_data
+        elif isinstance(action_data, gremlin.base_profile.AbstractAction):
+            # find the container for the given action 
+            self.container = action_data.get_container()
+            # input_item = action_data.input_item
+            # for container in input_item.containers:
+            #     for action_sets in container.action_sets:
+            #         for action in action_sets:
+            #             if action == action_data:
+            #                 self.container = container
+            #                 return
+                        
+        if not self.container:
+            pass
+        
 
     def rows(self):
         """Returns the number of rows in the model.
@@ -781,25 +802,40 @@ class ConditionModel(ui_common.AbstractModel):
         """
         return self.condition_data.conditions[index]
 
-    def add_condition(self, condition_data):
+    def add_condition(self, condition):
         """Adds a condition to to the model.
 
         :param condition_data the condition data to add
         """
-        self.condition_data.conditions.append(condition_data)
-        self.data_changed.emit()
 
-    def delete_condition(self, condition_data):
+        self.condition_data.conditions.append(condition)
+        tracker = ConditionTracker()
+        mode = gremlin.shared_state.current_mode
+        container = self.container
+        input_item = self.input_item
+        data = ConditionTrackerData(mode, input_item, container, condition)
+        tracker.registerCondition(data)
+        self.data_changed.emit()
+        el = gremlin.event_handler.EventListener()
+        el.condition_state_changed.emit(container)
+
+    def delete_condition(self, condition):
         """Deletes a condition from the model.
 
         Attempts to locate the provided condition and deletes it, if it is
         present.
 
-        :param condition_data the condition to remove.
+        :param condition the condition to remove.
         """
-        idx = self.condition_data.conditions.index(condition_data)
+        idx = self.condition_data.conditions.index(condition)
         if idx != -1:
             del self.condition_data.conditions[idx]
+        tracker = ConditionTracker()
+        tracker.unregisterCondition(condition)
+        container = self.container
+        
+        el = gremlin.event_handler.EventListener()
+        el.condition_state_changed.emit(container)
         self.data_changed.emit()
 
     @property

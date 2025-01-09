@@ -182,7 +182,7 @@ class ContainerPlugins:
         container_tag_map = self.tag_map
 
         new_container = container_tag_map[container_type](input_item)
-        new_container.from_xml(node)
+        new_container.from_xml(node, input_item)
 
         #new_container = copy.deepcopy(container)
 
@@ -332,9 +332,8 @@ class ActionPlugins:
         node = action.to_xml()
         action_tag = node.tag
         action_tag_map = self.tag_map
-
         new_action = action_tag_map[action_tag](container)
-        new_action.from_xml(node)
+        new_action.from_xml(node, input_item)
         new_action.action_id = get_guid()
 
         return new_action

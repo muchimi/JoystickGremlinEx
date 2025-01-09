@@ -316,7 +316,7 @@ class MapToGamepad(gremlin.base_profile.AbstractAction):
         #     return True
         return False
 
-    def _parse_xml(self, node):
+    def _parse_xml(self, node, data = None):
         """Reads the contents of an XML node to populate this instance.
 
         :param node the node whose content should be used to populate this

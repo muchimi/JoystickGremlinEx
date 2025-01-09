@@ -1077,7 +1077,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                             entries = self.source_profile.devices[import_item.device_guid].modes[mode].config[InputType.KeyboardLatched]
                             input_id = entries[keyboard_index].id
                         keyboard_index += 1                        
-                        keyboard_input_item.parse_xml(child_input_node)
+                        keyboard_input_item.parse_xml(child_input_node, data)
                         keyboard_input_item.id = input_id
                         if verbose:
                             syslog.info(f"Import: read KeyboardLatched node {input_id}")
@@ -1106,7 +1106,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                             entries = self.source_profile.devices[import_item.device_guid].modes[mode].config[InputType.Midi]
                             input_id = entries[midi_index].id
                         midi_index += 1
-                        midi_input_item.parse_xml(child_input_node)
+                        midi_input_item.parse_xml(child_input_node, data)
                         midi_input_item.id = input_id
                         if verbose:
                             syslog.info(f"Import: read MIDI node {input_id}")
@@ -1134,7 +1134,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                             entries = self.source_profile.devices[import_item.device_guid].modes[mode].config[InputType.OpenSoundControl]
                             input_id = entries[osc_index].id
                         osc_index += 1
-                        osc_input_item.parse_xml(child_input_node)
+                        osc_input_item.parse_xml(child_input_node, data)
                         osc_input_item.id = input_id
                         description = None
                         if "description" in child_input_node.attrib:                            
@@ -1248,7 +1248,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
 
 
                 container = container_tag_map[container_type](profile_input_item)
-                container.from_xml(node)
+                container.from_xml(node, profile_input_item)
 
                 # check for old profile format without container IDs - if not set - we need to find it from the profile so the generated IDs are in sync
                 # the logical question is: why don't we just use that "loaded" profile to start with - the answer is - malformed XML profiles that have double entries and other old stuff in them a new profile would not load
@@ -2275,7 +2275,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                                     # create a new container
                                     new_container = container_tag_map[container.tag](profile_target_input_item)
                                     # configure the container from the serialized data
-                                    new_container.from_xml(node)
+                                    new_container.from_xml(node, profile_target_input_item)
                                     # generate a new container ID 
                                     new_container.id = gremlin.util.get_guid(no_brackets=True)
                                     if verbose:

@@ -2567,7 +2567,7 @@ class GateData():
 
 
 
-    def from_xml(self, node):
+    def from_xml(self, node, data = None):
         if not node.tag == "gate":
             syslog.error(f"GateData: Invalid node type {node.tag} {node}")
             return
@@ -2648,7 +2648,7 @@ class GateData():
                         condition_str = item_node.get("condition")
                         condition = GateCondition.to_enum(condition_str)
                     item_node.tag = item_node.get("type")
-                    item_data.from_xml(item_node)
+                    item_data.from_xml(item_node, data)
                     gate_info.item_data_map[condition] = item_data
 
 
@@ -2750,7 +2750,7 @@ class GateData():
                     # use ranged containers/actions for range conditions, buttons for the others
                     input_type = InputType.JoystickAxis if condition in (GateCondition.InRange, GateCondition.OutsideRange) else InputType.JoystickButton
                     item_data.input_type = input_type
-                    item_data.from_xml(item_node)
+                    item_data.from_xml(item_node, data)
                     range_info.item_data_map[condition] = item_data
                 
             

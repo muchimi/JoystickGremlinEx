@@ -2189,7 +2189,7 @@ class OscInputItem(AbstractInputItem):
         
         self._update_display_name()
 
-    def parse_xml(self, node):
+    def parse_xml(self, node, data = None):
         ''' reads an input item from xml '''
         if node.tag == "input":
             self.id = read_guid(node, "guid")

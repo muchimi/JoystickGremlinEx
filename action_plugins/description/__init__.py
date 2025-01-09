@@ -91,7 +91,7 @@ class DescriptionAction(gremlin.base_profile.AbstractAction):
     def requires_virtual_button(self):
         return False
 
-    def _parse_xml(self, node):
+    def _parse_xml(self, node, data = None):
         self.description = gremlin.profile.safe_read(
             node, "description", str, ""
         )

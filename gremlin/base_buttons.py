@@ -17,7 +17,7 @@ class AbstractVirtualButton(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def from_xml(self, node):
+    def from_xml(self, node, data = None):
         """Populates the virtual button based on the node's data.
 
         :param node the node containing data for this instance
@@ -49,7 +49,7 @@ class VirtualAxisButton(AbstractVirtualButton):
         self.upper_limit = upper_limit
         self.direction = AxisButtonDirection.Anywhere
 
-    def from_xml(self, node):
+    def from_xml(self, node, data = None):
         """Populates the virtual button based on the node's data.
 
         :param node the node containing data for this instance
@@ -115,7 +115,7 @@ class VirtualHatButton(AbstractVirtualButton):
         super().__init__()
         self.directions = list(set(directions))
 
-    def from_xml(self, node):
+    def from_xml(self, node, data = None):
         """Populates the activation condition based on the node's data.
 
         :param node the node containing data for this instance

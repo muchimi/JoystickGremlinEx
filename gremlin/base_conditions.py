@@ -28,8 +28,18 @@ class AbstractCondition(metaclass=ABCMeta):
 
     def __init__(self):
         """Creates a new condition."""
+        import gremlin.util
+        self._id = gremlin.util.get_guid()
         self._comparison = ""
-
+        self._id = None # unique ID of this condition
+        
+    @property
+    def id(self):
+        ''' unique ID for this condition, persisted '''
+        if not self._id:
+            import gremlin.util
+            self._id = gremlin.util.get_guid()
+        return self._id
 
     @property
     def comparison(self):
@@ -39,21 +49,29 @@ class AbstractCondition(metaclass=ABCMeta):
     def comparison(self, value):
         self._comparison = value
 
-    @abstractmethod
-    def from_xml(self, node):
+    
+    def from_xml(self, node, data = None):
         """Populates the object with data from an XML node.
 
         :param node the XML node to parse for data
         """
-        pass
+        if "condition_id" in node.attrib:
+            str_id = node.get("condition_id")
+            if str_id:
+                self._id = str_id
 
-    @abstractmethod
+        
+
+    
     def to_xml(self):
         """Returns an XML node containing the objects data.
 
         :return XML node containing the object's data
         """
-        pass
+        node = ElementTree.Element("condition")
+        node.set("condition_id", self._id)
+        return node
+        
 
     def is_valid(self):
         """Returns whether or not a condition is fully specified.
@@ -78,11 +96,13 @@ class KeyboardCondition(AbstractCondition):
         self.scan_code = None
         self.is_extended = None
 
-    def from_xml(self, node):
+    def from_xml(self, node, data = None):
         """Populates the object with data from an XML node.
 
         :param node the XML node to parse for data
         """
+
+        super().from_xml(node, data)
         self.comparison = safe_read(node, "comparison")
         self.scan_code = safe_read(node, "scan-code", int)
         self.is_extended = parse_bool(safe_read(node, "extended"))
@@ -92,7 +112,7 @@ class KeyboardCondition(AbstractCondition):
                 from gremlin.keyboard import Key
                 from gremlin.ui.keyboard_device import KeyboardInputItem
                 input_item = KeyboardInputItem()
-                input_item.parse_xml(child)
+                input_item.parse_xml(child, data)
 
         
         self.input_item = input_item
@@ -104,7 +124,7 @@ class KeyboardCondition(AbstractCondition):
 
         :return XML node containing the object's data
         """
-        node = ElementTree.Element("condition")
+        node = super().to_xml() #ElementTree.Element("condition")
         node.set("condition-type", "keyboard")
         node.set("input", "keyboard")
         node.set("comparison", str(self.comparison))
@@ -146,12 +166,14 @@ class JoystickCondition(AbstractCondition):
         self.range = [0.0, 0.0]
         self.device_name = ""
 
-    def from_xml(self, node):
+    def from_xml(self, node, data = None):
         """Populates the object with data from an XML node.
 
         :param node the XML node to parse for data
         """
         self.comparison = safe_read(node, "comparison")
+
+        super().from_xml(node, data)
 
         self.input_type = InputType.to_enum(safe_read(node, "input"))
         self.input_id = safe_read(node, "id", int)
@@ -168,7 +190,8 @@ class JoystickCondition(AbstractCondition):
 
         :return XML node containing the object's data
         """
-        node = ElementTree.Element("condition")
+        #node = ElementTree.Element("condition")
+        node = super().to_xml() 
         node.set("comparison", str(self.comparison))
         node.set("condition-type", "joystick")
         node.set("input", InputType.to_string(self.input_type))
@@ -213,7 +236,7 @@ class VJoyCondition(AbstractCondition):
         self.input_id = 0
         self.range = [0.0, 0.0]
 
-    def from_xml(self, node):
+    def from_xml(self, node, data = None):
         """Populates the object with data from an XML node.
 
         Parameters
@@ -221,6 +244,8 @@ class VJoyCondition(AbstractCondition):
         node : ElementTree.Element
             XML node to parse for data
         """
+
+        super().from_xml(node, data)
         self.comparison = safe_read(node, "comparison")
 
         self.input_type = InputType.to_enum(safe_read(node, "input"))
@@ -240,7 +265,8 @@ class VJoyCondition(AbstractCondition):
         ElementTree.Element
             XML node containing the object's data
         """
-        node = ElementTree.Element("condition")
+        #node = ElementTree.Element("condition")
+        node = super().to_xml() 
         node.set("comparison", str(self.comparison))
         node.set("condition-type", "vjoy")
         node.set("input", InputType.to_string(self.input_type))
@@ -273,11 +299,12 @@ class InputActionCondition(AbstractCondition):
         """Creates a new instance."""
         super().__init__()
 
-    def from_xml(self, node):
+    def from_xml(self, node, data = None):
         """Populates the object with data from an XML node.
 
         :param node the XML node to parse for data
         """
+        super().from_xml(node, data)
         self.comparison = safe_read(node, "comparison")
         
 
@@ -286,7 +313,8 @@ class InputActionCondition(AbstractCondition):
 
         :return XML node containing the object's data
         """
-        node = ElementTree.Element("condition")
+        #node = ElementTree.Element("condition")
+        node = super().to_xml() 
         node.set("condition-type", "action")
         node.set("input", "action")
         node.set("comparison", str(self.comparison))
@@ -412,6 +440,114 @@ class AbstractContainerActionFunctor(AbstractFunctor):
         return result
     
 
+class ConditionTrackerData():
+    def __init__(self, mode, input_item, container, condition):
+        self.condition = condition
+        self.container = container
+        self.input_item = input_item
+        self.mode = mode
+    
+@SingletonDecorator
+class ConditionTracker():
+    ''' tracks conditions '''
+    def __init__(self):
+        import gremlin.event_handler
+        self._cache = {} # map of known conditions keyed by mode and condition ID
+        self._owner_map = {} # map of condition ID to its input item owner so we know which input item has which condition
+        self._el = gremlin.event_handler.EventListener()
+        self._el.shutdown.connect(self.reset)
+        self._el.profile_unloaded.connect(self.reset)
+        
+    @QtCore.Slot()
+    def reset(self):
+        ''' triggered on app exit or profile unload '''
+        self._cache.clear()
+        self._owner_map.clear()
+
+
+
+    def registerCondition(self, data : ConditionTrackerData):
+        ''' registers a condition and its owner - owner is an input_item'''
+        mode = data.mode
+        condition = data.condition
+        input_item = data.input_item
+        if not mode in self._cache:
+            self._cache[mode] = {}
+        self._cache[mode][condition.id] = data
+        self._owner_map[condition.id] = input_item
+        self._el.condition_added.emit(input_item, mode, condition)
+        self._el.condition_state_changed.emit(data.container)
+        syslog = logging.getLogger("system")
+        syslog.info(f"creating condition: {condition.id} for input: {data.input_item.display_name} mode: {data.mode}")
+        
+
+    def unregisterCondition(self, condition : AbstractCondition):
+        ''' unregisters a condition '''
+        syslog = logging.getLogger("system")
+        syslog.info(f"delete condition: {condition.id}")
+        id = condition.id
+        for mode in self._cache:
+            if id in self._cache[mode]:
+                data = self._cache[mode][id]
+                del self._cache[mode][id]
+                del self._owner_map[id]
+                # (input_item, mode, condition)
+                self._el.condition_removed.emit(data.input_item, data.mode, data.condition)
+                self._el.condition_state_changed.emit(data.container)
+                return
+            
+
+    def count(self):
+        ''' gets a count of registered conditions '''
+        return len(self._cache)
+    
+    def getInputItemConditionCount(self, input_item, mode : str = None):
+        ''' gets a count of registered condition for a specific owner - owner is an input_item'''
+        import gremlin.shared_state
+        if not mode:
+            mode = gremlin.shared_state.current_mode
+        id_list = [item.condition.id for item in self._cache[mode].values() if item.input_item == input_item]
+        return len(id_list)
+    
+    def getContainerConditionCount(self, container, mode : str = None):
+        ''' gets a count of registered condition for a specific owner - owner is an input_item'''
+        import gremlin.shared_state
+        if not mode:
+            mode = gremlin.shared_state.current_mode
+        id_list = [item.condition.id for item in self._cache[mode].values() if item.container == container]
+        return len(id_list)
+
+    
+    def getConditionInputItem(self, condition : AbstractCondition):
+        ''' gets the input item attached to a condition '''
+        id = condition.id
+        if id in self._owner_map:
+            return self._owner_map[id]
+        return None
+    
+    def getConditionsForInputItem(self, input_item, mode : str): 
+        ''' checks to see if conditions are defined for this input item'''
+        import gremlin.shared_state
+        if not mode:
+            mode = gremlin.shared_state.current_mode
+        id_list = [id for id, item in self._owner_map[mode].items() if item == input_item]
+        conditions = [self._cache[mode][id] for id in id_list]
+        return conditions
+
+
+
+
+
+    
+    def owner(self, condition : AbstractCondition):
+        ''' what input item owns the condition '''
+        if condition.id in self._cache:
+            return self._owner_map[condition.id]
+        return None
+
+        
+        
+
 
 class ActivationCondition:
 
@@ -438,17 +574,29 @@ class ActivationCondition:
         self.rule = rule
         self.conditions = conditions
 
-    def from_xml(self, node):
+    def from_xml(self, node, data = None):
         """Extracts activation condition data from an XML node.
 
-        :param node the XML node to parse
+        :param node: the XML node to parse
+        :param data: tuple containing (input_item, container) associated with this condition
         """
+        import gremlin.base_profile
         self.rule = ActivationCondition.rule_lookup[safe_read(node, "rule")]
+        tracker = ConditionTracker()
+        mode_node = node
+        while mode_node is not None and mode_node.tag != "mode":
+            mode_node = mode_node.getparent()
+        mode = mode_node.get("name")
+        input_item, container = data
         for cond_node in node.findall("condition"):
             condition_type = safe_read(cond_node, "condition-type")
             condition = ActivationCondition.condition_lookup[condition_type]()
-            condition.from_xml(cond_node)
+            condition.from_xml(cond_node, data)
             self.conditions.append(condition)
+            item = ConditionTrackerData(mode, input_item, container, condition)
+            tracker.registerCondition(item)
+            
+            
 
     def to_xml(self):
         """Returns an XML node containing the activation condition information.

@@ -374,7 +374,9 @@ class EventListener(QtCore.QObject):
 
 	# called when a condition state changes - used to update the UI
 	condition_redraw = QtCore.Signal(object) # fires when a condition is redrawing
-	condition_state_changed = QtCore.Signal(object) # passes along the action data
+	condition_state_changed = QtCore.Signal(object) # passes along the container
+	condition_added = QtCore.Signal(object, str, object) # fires when a condition is added - params (input_item, mode, condition)
+	condition_removed = QtCore.Signal(object, str, object) # fires when a condition is removed - params (input_item, mode, condition)
 
 	# container deleted 
 	container_delete = QtCore.Signal(object, object) # fires when a container is about to be deleted, passes the input item, container as parameters

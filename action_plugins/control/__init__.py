@@ -355,7 +355,7 @@ class Control(gremlin.base_profile.AbstractAction):
     
   
     
-    def _parse_xml(self, node):
+    def _parse_xml(self, node, data = None):
         self.mode = None
         self.device_guid = None
         self.target_input_item = None
@@ -369,7 +369,7 @@ class Control(gremlin.base_profile.AbstractAction):
             #device_type = gremlin.types.DeviceType.to_enum(node.get("device_type"))
         for node_target in node:
             input_item = gremlin.base_profile.InputItem()
-            input_item.from_xml(node_target)
+            input_item.from_xml(node_target, data)
             self.target_input_item = input_item
             break
 

@@ -367,18 +367,26 @@ class AbstractView(QtWidgets.QWidget):
         :param parent the parent of this view widget
         """
         super().__init__(parent)
-        self.model = None
+        self._model = None
+
+    @property
+    def model(self):
+        return self._model
+    @model.setter
+    def model(self, value):
+        if value != self._model:
+            if self._model is not None:
+                self._model.data_changed.disconnect(self.redraw)
+            self._model = value
+            self._model_changed()
+            self._model.data_changed.connect(self.redraw)
 
     def set_model(self, model):
         """Sets the model to display with this view.
 
         :param model the model to visualize
         """
-        if self.model is not None:
-            self.model.data_changed.disconnect(self.redraw)
         self.model = model
-        self._model_changed()
-        self.model.data_changed.connect(self.redraw)
 
     def select_item(self, index):
         """Selects the item at the provided index
@@ -445,7 +453,7 @@ class NoKeyboardPushButton(QtWidgets.QPushButton):
         return self._data
     @data.setter
     def data(self, value):
-        self.data = value
+        self._data = value
 
 
 class QFloatLineEdit(QtWidgets.QLineEdit):
@@ -664,7 +672,7 @@ class QIntLineEdit(QtWidgets.QLineEdit):
         return self._data
     @data.setter
     def data(self, value):
-        self.data = value
+        self._data = value
 
     def eventFilter(self, widget, event):
         t = event.type()
@@ -795,7 +803,7 @@ class DynamicDoubleSpinBox_legacy(QtWidgets.QDoubleSpinBox):
         return self._data
     @data.setter
     def data(self, value):
-        self.data = value
+        self._data = value
 
     def validate(self, text, pos):
         """Validates the provided string.
@@ -4634,6 +4642,21 @@ class BaseDialogUi(QRememberDialog):
             self.confirmClose(event)
         if event.isAccepted():
             self.closed.emit()
+
+class QDataTab(QtWidgets.QTabWidget):
+    ''' tab header with a data field '''
+    def __init__(self, data = None, parent = None):
+        super().__init__(parent)
+        self._data = data
+
+
+    @property
+    def data(self):
+        return self._data
+    @data.setter
+    def data(self, value):
+        self._data = value
+  
 
 
 

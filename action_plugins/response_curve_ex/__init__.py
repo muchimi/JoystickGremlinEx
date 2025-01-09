@@ -163,7 +163,7 @@ class ResponseCurveEx(gremlin.base_profile.AbstractAction):
         """
         return False
 
-    def _parse_xml(self, node):
+    def _parse_xml(self, node, data = None):
         """Parses the XML corresponding to a response curve.
 
         :param node the XML node to parse

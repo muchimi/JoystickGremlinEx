@@ -309,7 +309,7 @@ class MidiInputItem(AbstractInputItem):
         interface = MidiInterface()
         return interface.port_valid(self._port_name)
 
-    def parse_xml(self, node):
+    def parse_xml(self, node, data = None):
         ''' reads an input item from xml '''
         if node.tag == "input":
             self.id = read_guid(node, "guid")

@@ -88,7 +88,7 @@ class PreviousMode(gremlin.base_profile.AbstractAction):
             InputType.JoystickHat
         ]
 
-    def _parse_xml(self, node):
+    def _parse_xml(self, node, data = None):
         pass
 
     def _generate_xml(self):

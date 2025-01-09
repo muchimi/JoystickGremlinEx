@@ -448,7 +448,7 @@ class SimconnectOptions(QtCore.QObject):
         ''' saves the configuration data '''
         self.to_xml()
 
-    def parse_xml(self):
+    def parse_xml(self, data = None):
         xml_source = self._xml_source
         if not os.path.isfile(xml_source):
             # options not saved yet - ignore
@@ -3795,7 +3795,7 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         """
         return False
 
-    def _parse_xml(self, node):
+    def _parse_xml(self, node, data = None):
         """Reads the contents of an XML node to populate this instance.
 
         :param node the node whose content should be used to populate this
@@ -3847,7 +3847,7 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         if node_block is not None:
             if not self._block:
                 self._block = SimConnectBlock()    
-            self._block.from_xml(node_block)
+            self._block.from_xml(node_block, data)
             self._block.update()
 
         # curve data

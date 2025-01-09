@@ -254,12 +254,12 @@ class SmartToggleContainer(AbstractContainer):
         self.action_sets = [[]]
         self.delay = 0.5
 
-    def _parse_xml(self, node):
+    def _parse_xml(self, node, data = None):
         """Populates the container with the XML node's contents.
 
         :param node the XML node with which to populate the container
         """
-        super()._parse_xml(node)
+        super()._parse_xml(node, data)
         self.delay = gremlin.profile.safe_read(node, "delay", float, 0.5)
 
     def _generate_xml(self):

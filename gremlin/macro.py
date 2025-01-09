@@ -1045,7 +1045,7 @@ class AbstractRepeat:
             "AbstractRepeat.to_xml not implemented in subclass."
         )
 
-    def from_xml(self, node):
+    def from_xml(self, node, data = None):
         """Populates the instance's data from the provided XML node.
 
         :param node XML node containing data with which to populate the instance
@@ -1079,7 +1079,7 @@ class CountRepeat(AbstractRepeat):
         node.set("delay", str(self.delay))
         return node
 
-    def from_xml(self, node):
+    def from_xml(self, node, data = None):
         """Populates the instance's data from the provided XML node.
 
         :param node XML node containing data with which to populate the instance
@@ -1110,7 +1110,7 @@ class ToggleRepeat(AbstractRepeat):
         node.set("delay", str(self.delay))
         return node
 
-    def from_xml(self, node):
+    def from_xml(self, node, data = None):
         """Populates the instance's data from the provided XML node.
 
         :param node XML node containing data with which to populate the instance
@@ -1140,7 +1140,7 @@ class HoldRepeat(AbstractRepeat):
         node.set("delay", str(self.delay))
         return node
 
-    def from_xml(self, node):
+    def from_xml(self, node, data = None):
         """Populates the instance's data from the provided XML node.
 
         :param node XML node containing data with which to populate the instance

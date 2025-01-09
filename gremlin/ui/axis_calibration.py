@@ -452,7 +452,7 @@ class CalibrationData:
         
     
 
-    def from_xml(self, node):
+    def from_xml(self, node, data = None):
         ''' reads data from XML'''
 
         if not "device-guid" in node.attrib:

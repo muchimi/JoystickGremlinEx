@@ -225,7 +225,7 @@ class SplitAxis(gremlin.base_profile.AbstractAction):
     def requires_virtual_button(self):
         return False
 
-    def _parse_xml(self, node):
+    def _parse_xml(self, node, data = None):
         self.center_point = float(node.get("center-point"))
         self.device_low_vjoy_id = safe_read(node, "device-low-vjoy-id", int)
         self.device_high_vjoy_id = safe_read(node, "device-high-vjoy-id", int)

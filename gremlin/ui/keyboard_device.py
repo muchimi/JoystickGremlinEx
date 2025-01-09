@@ -142,7 +142,7 @@ class KeyboardInputItem(AbstractInputItem):
                 
         return False
 
-    def parse_xml(self, node):
+    def parse_xml(self, node, data = None):
         ''' loads itself from xml '''
         from gremlin.keyboard import key_from_code
         self._suspend_update = True

@@ -2147,6 +2147,10 @@ class GremlinUi(QtWidgets.QMainWindow):
         if el.input_selection_suspended:
             # ignore selection requests if selection is suspended
             return
+        
+        if not device_guid:
+            # no device selected - ignore
+            return
 
         if self._selection_locked:
             return
