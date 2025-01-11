@@ -86,7 +86,7 @@ class Event:
 			data = None,
 			is_axis = False, # true if the input should be considered an axis (variable) input
 			is_virtual = False, # true if the input is a virtual input (vjoy),
-			mode = None # mode to fire the event on - leave null for current mode
+			mode = None # mode to fire the event on - leave null for current mode,
 	):
 		"""Creates a new Event object.
 
@@ -118,6 +118,7 @@ class Event:
 		self.is_virtual_button = False # true if a virtual button
 		self.is_custom = False # true if a custom event (should be processed)
 		self.mode = mode # mode to act on, should be null for default
+		
 
 
 	def clone(self):

@@ -24,8 +24,11 @@ import gremlin.config
 import gremlin.event_handler
 from gremlin.input_types import InputType
 from gremlin import hints, input_devices, macro, util
+import gremlin.joystick_handling
 import gremlin.shared_state
+import gremlin.ui
 from gremlin.util import load_icon
+import gremlin.util
 import gremlin.base_classes as bc
 from . import ui_common
 from gremlin.base_conditions import *
@@ -134,11 +137,7 @@ class AbstractConditionWidget(QtWidgets.QGroupBox):
         super().__init__(parent)
         self.condition_data = condition_data
 
-        self.main_layout = QtWidgets.QGridLayout(self)
-        self.main_layout.setColumnMinimumWidth(0, 75)
-        self.main_layout.setColumnMinimumWidth(1, 150)
-        self.main_layout.setColumnMinimumWidth(2, 20)
-        self.main_layout.setColumnStretch(3, 1)
+        self.main_layout = QtWidgets.QVBoxLayout(self)
         self._create_ui()
 
     def _create_ui(self):
@@ -169,24 +168,25 @@ class KeyboardConditionWidget(AbstractConditionWidget):
         try:
             KeyboardConditionWidget.locked = True
 
+            ui_common.clear_layout(self.main_layout)
+
+            self.grid_widget =  QtWidgets.QWidget()
+            self.grid_layout =  QtWidgets.QGridLayout(self.grid_widget)
+
+            self.ui_container_widget = QtWidgets.QWidget()
+            self.ui_container_layout = QtWidgets.QGridLayout(self.ui_container_widget)
+
+
             self.key_label = QtWidgets.QLabel("")
             if self.condition_data.input_item:
                 self.key_label.setText(f"<b>{self.condition_data.input_item.display_name}</b>")
-            # if self.condition_data.scan_code is not None:
-            #     self.key_label.setText(
-            #         f"<b>{macro.key_from_code(
-            #             self.condition_data.scan_code,
-            #             self.condition_data.is_extended
-            #         ).name}</b>"
-            #         )
-            self.record_button = ui_common.NoKeyboardPushButton(
-                load_icon("gfx/button_edit.png"), ""
-            )
-            self.record_button.clicked.connect(self._request_user_input)
-            self.delete_button = QtWidgets.QPushButton(
+            
+            self.record_button_widget = ui_common.NoKeyboardPushButton(load_icon("gfx/button_edit.png"), "Select Keys")
+            self.record_button_widget.clicked.connect(self._request_user_input)
+            self.delete_button_widget = QtWidgets.QPushButton(
                 load_icon("gfx/button_delete.png"), ""
             )
-            self.delete_button.clicked.connect(
+            self.delete_button_widget.clicked.connect(
                 lambda: self.deleted.emit(self.condition_data)
             )
 
@@ -201,17 +201,24 @@ class KeyboardConditionWidget(AbstractConditionWidget):
                 self._comparison_changed_cb
             )
 
-            self.main_layout.addWidget(QtWidgets.QLabel("Activate if"), 0, 0)
-            self.main_layout.addWidget(self.key_label, 0, 1)
-            self.main_layout.addWidget(QtWidgets.QLabel("is"), 0, 2)
-            self.main_layout.addWidget(
-                self.comparison_dropdown, 0, 3, alignment=QtCore.Qt.AlignLeft
-            )
-            self.main_layout.addWidget(self.record_button, 0, 4)
-            self.main_layout.addWidget(self.delete_button, 0, 5)
+
+
+            self.grid_layout.addWidget(QtWidgets.QLabel("Activate if"), 0, 0)
+            self.grid_layout.addWidget(self.key_label, 0, 1)
+            self.grid_layout.addWidget(QtWidgets.QLabel("is"), 0, 2)
+            self.grid_layout.addWidget(self.comparison_dropdown, 0, 3, alignment=QtCore.Qt.AlignLeft)
+            self.grid_layout.addWidget(QtWidgets.QWidget(), 0, 4)
+            self.grid_layout.addWidget(self.record_button_widget, 0, 5)
+            self.grid_layout.addWidget(self.delete_button_widget, 0, 6)
+            self.grid_layout.setColumnStretch(4,2)
+
+            self.main_layout.addWidget(self.grid_widget)
+            self.main_layout.addWidget(self.ui_container_widget)
+
         finally:
             KeyboardConditionWidget.locked = False
 
+    @QtCore.Slot(object)
     def _key_pressed_cb(self, key):
         """Updates the UI and model with the newly pressed key information.
 
@@ -227,6 +234,7 @@ class KeyboardConditionWidget(AbstractConditionWidget):
             self.comparison_dropdown.currentText().lower()
         self.key_label.setText(f"<b>{input_item.display_name}</b>")
 
+    @QtCore.Slot(str)
     def _comparison_changed_cb(self, text):
         """Updates the comparison operation to use.
 
@@ -234,6 +242,8 @@ class KeyboardConditionWidget(AbstractConditionWidget):
         """
         self.condition_data.comparison = text.lower()
 
+
+    @QtCore.Slot()
     def _request_user_input(self):
         """Prompts the user for the input to bind to this item."""
 
@@ -246,6 +256,7 @@ class KeyboardConditionWidget(AbstractConditionWidget):
         self._keyboard_dialog.accepted.connect(self._dialog_ok_cb)
         self._keyboard_dialog.showNormal()  
 
+    @QtCore.Slot()
     def _dialog_ok_cb(self):
         ''' callled when the dialog completes '''
 
@@ -274,108 +285,259 @@ class JoystickConditionWidget(AbstractConditionWidget):
     def _create_ui(self):
         """Creates the configuration UI for this widget."""
 
-
-        if JoystickConditionWidget.locked:
-            return
         
-        try:
 
-            JoystickConditionWidget.locked = True
+        ui_common.clear_layout(self.main_layout)
 
-            ui_common.clear_layout(self.main_layout)
+        self.record_button = QtWidgets.QPushButton(load_icon("gfx/button_edit.png"), "Listen")
+        self.record_button.clicked.connect(self._request_user_input)
+        self.delete_button = QtWidgets.QPushButton(
+            load_icon("gfx/button_delete.png"), "")
+        
+        self.delete_button.clicked.connect(
+            lambda: self.deleted.emit(self.condition_data)
+        )
 
-            self.record_button = QtWidgets.QPushButton(
-                load_icon("gfx/button_edit.png"), ""
-            )
-            self.record_button.clicked.connect(self._request_user_input)
-            self.delete_button = QtWidgets.QPushButton(
-                load_icon("gfx/button_delete.png"), "")
-            
-            self.delete_button.clicked.connect(
-                lambda: self.deleted.emit(self.condition_data)
-            )
+        self.main_layout.addWidget(QtWidgets.QLabel("Activate if:"))
 
-            self.main_layout.addWidget(QtWidgets.QLabel("Activate if"), 0, 0)
-            if self.condition_data.input_type == InputType.JoystickAxis:
+
+        self.device_selector_widget = ui_common.QLimitedComboBox()
+        self.device_selector_widget.currentIndexChanged.connect(self._device_selected)
+        self.input_selector_widget = ui_common.QLimitedComboBox()
+        self.input_selector_widget.currentIndexChanged.connect(self._input_selected)
+        self.axis_repeater_widget = ui_common.AxisStateWidget(orientation=QtCore.Qt.Orientation.Horizontal, show_percentage=False)
+        self.axis_repeater_widget.valueChanged.connect(self._axis_value_changed)
+
+        self.selector_container_widget = QtWidgets.QWidget()
+        self.selector_container_layout = QtWidgets.QGridLayout(self.selector_container_widget)
+        self.selector_container_layout.addWidget(QtWidgets.QLabel("Device:"), 0, 0)
+        self.selector_container_layout.addWidget(self.device_selector_widget, 0, 1) 
+        self.selector_container_layout.addWidget(QtWidgets.QLabel("Input:"), 1, 0)
+        self.selector_container_layout.addWidget(self.input_selector_widget, 1, 1) 
+        self.selector_container_layout.addWidget(self.axis_repeater_widget, 2, 1)
+
+        self.selector_container_layout.addWidget(QtWidgets.QWidget(), 0, 2) # spacer column
+        self.selector_container_layout.addWidget(self.record_button, 0, 3) 
+        self.selector_container_layout.addWidget(self.delete_button, 0, 4) 
+        self.selector_container_layout.setColumnStretch(2,2)
+
+        self.range_status_widget = None
+
+        self.ui_container_widget = QtWidgets.QWidget()
+        self.ui_container_layout = QtWidgets.QGridLayout(self.ui_container_widget)
+
+        self.main_layout.addWidget(self.selector_container_widget)
+        self.main_layout.addWidget(self.ui_container_widget)
+
+        self._populate_device_selector()
+        self._populate_input_selector()
+
+
+
+    @QtCore.Slot()
+    def _device_selected(self):
+        ''' device changed, update input list'''
+        device = self.device_selector_widget.currentData()
+        self.condition_data.device_guid = device.device_guid
+        self._populate_input_selector()
+
+    @QtCore.Slot()
+    def _input_selected(self):
+
+        device : gremlin.joystick_handling.DeviceSummary = self.device_selector_widget.currentData()
+        input_type,  input_id = self.input_selector_widget.currentData()
+        self.condition_data.device_guid = device.device_guid
+        self.condition_data.input_type = input_type
+        self.condition_data.input_id =  input_id
+        self.condition_data.device_name = device.name
+
+        
+        # update the other UI based on input type
+        match input_type:
+            case InputType.JoystickAxis:
                 self._axis_ui()
-            elif self.condition_data.input_type == InputType.JoystickButton:
+            case InputType.JoystickButton:
                 self._button_ui()
-            elif self.condition_data.input_type == InputType.JoystickHat:
+            case InputType.JoystickHat:
                 self._hat_ui()
-            self.main_layout.addWidget(self.record_button, 0, 4)
-            self.main_layout.addWidget(self.delete_button, 0, 5)
-        finally:
-            JoystickConditionWidget.locked = False
+
+
+    def _populate_device_selector(self):
+        device_guid = self.condition_data.device_guid
+        current_index = None
+        with QtCore.QSignalBlocker(self.device_selector_widget):
+            self.device_selector_widget.clear()
+            index = 0
+            for device in gremlin.joystick_handling.physical_devices():
+                self.device_selector_widget.addItem(device.name, device)
+                if current_index is None and device_guid and device.device_guid == device_guid:
+                    current_index = index
+                index +=1
+
+            if current_index is not None:
+                self.device_selector_widget.setCurrentIndex(current_index)
+    
+    def _populate_input_selector(self):
+        import gremlin.util
+        input_id = self.condition_data.input_id
+        input_type = self.condition_data.input_type
+        device : gremlin.joystick_handling.DeviceSummary = self.device_selector_widget.currentData()
+        
+
+        
+        with QtCore.QSignalBlocker(self.input_selector_widget):
+            self.input_selector_widget.clear()
+            
+
+            index = 0 # index of the entry
+            current_index = None # index of the input to select
+
+            # axes
+            for i in range(device.axis_count):
+                axis_name = device.get_axis_name(i + 1)
+                self.input_selector_widget.addItem(axis_name, (InputType.JoystickAxis, i + 1))
+                if current_index is None and input_id == i + 1 and input_type == InputType.JoystickAxis:
+                    current_index = index
+                index += 1
+
+            
+
+            # buttons
+            for i in range(device.button_count):
+                button_name = device.get_button_name(i + 1)
+                self.input_selector_widget.addItem(button_name, (InputType.JoystickButton, i + 1))
+                if current_index is None and input_id == i + 1  and input_type == InputType.JoystickButton:
+                    current_index = index
+                index += 1
+
+
+          
+            # hats
+            for i in range(device.hat_count):
+                hat_name = f"Hat {i+1}"
+                self.input_selector_widget.addItem(hat_name, (InputType.JoystickHat, i + 1))
+                if current_index is None and input_id == i + 1 and input_type == InputType.JoystickHat:
+                    current_index = index
+                index+=1
+
+
+            if current_index is not None:
+                self.input_selector_widget.setCurrentIndex(current_index)
+
+            input_type, input_id = self.input_selector_widget.currentData()
+            self.condition_data.input_type = input_type
+            self.condition_data.input_id = input_id
+
+
+            # update the other UI based on input type
+            match input_type:
+                case InputType.JoystickAxis:
+                    self.axis_repeater_widget.setVisible(True)
+                    self.axis_repeater_widget.hookDevice(self.condition_data.device_guid, self.condition_data.input_type, self.condition_data.input_id)
+                    self._axis_ui()
+                case InputType.JoystickButton:
+                    self.axis_repeater_widget.unhookDevice()
+                    self.axis_repeater_widget.setVisible(False)
+                    self._button_ui()
+                case InputType.JoystickHat:
+                    self.axis_repeater_widget.unhookDevice()
+                    self.axis_repeater_widget.setVisible(False)
+                    self._hat_ui()
+        
 
     def _axis_ui(self):
         """Creates the UI needed to configure an axis based condition."""
-        self.lower = ui_common.DynamicDoubleSpinBox()
-        self.lower.setMinimum(-1.0)
-        self.lower.setMaximum(1.0)
-        self.lower.setSingleStep(0.05)
-        self.lower.setDecimals(3)
-        self.lower.setValue(self.condition_data.range[0])
-        self.lower.valueChanged.connect(self._range_lower_changed_cb)
-        self.upper = ui_common.DynamicDoubleSpinBox()
-        self.upper.setMinimum(-1.0)
-        self.upper.setMaximum(1.0)
-        self.upper.setDecimals(3)
-        self.upper.setSingleStep(0.05)
-        self.upper.setValue(self.condition_data.range[1])
-        self.upper.valueChanged.connect(self._range_upper_changed_cb)
+        
+        gremlin.util.clear_layout(self.ui_container_layout)
+        self.lower_widget = ui_common.QFloatLineEdit()
+        self.lower_widget.setMinimum(-1.0)
+        self.lower_widget.setMaximum(1.0)
+
+        self.grab_low_widget = ui_common.QDataPushButton()
+        self.grab_low_widget.setIcon(load_icon("mdi.record-rec",qta_color = "red"))
+        self.grab_low_widget.setMaximumWidth(20)
+        self.grab_low_widget.clicked.connect(self._grab_low)
+        self.grab_low_widget.setToolTip("Grab axis value")
+
+
+        #self.lower.setSingleStep(0.05)
+        self.lower_widget.setDecimals(3)
+        self.lower_widget.setValue(self.condition_data.range[0])
+        self.lower_widget.valueChanged.connect(self._range_lower_changed_cb)
+
+
+        self.upper_widget = ui_common.QFloatLineEdit()
+        self.upper_widget.setMinimum(-1.0)
+        self.upper_widget.setMaximum(1.0)
+        self.upper_widget.setDecimals(3)
+        #self.upper.setSingleStep(0.05)
+        self.upper_widget.setValue(self.condition_data.range[1])
+        self.upper_widget.valueChanged.connect(self._range_upper_changed_cb)
+
+        self.grab_high_widget = ui_common.QDataPushButton()
+        self.grab_high_widget.setIcon(load_icon("mdi.record-rec",qta_color = "red"))
+        self.grab_high_widget.setMaximumWidth(20)
+        self.grab_high_widget.clicked.connect(self._grab_high)
+        self.grab_high_widget.setToolTip("Grab axis value")
+        
 
         self.comparison_dropdown = ui_common.QComboBox()
         self.comparison_dropdown.addItem("Inside")
         self.comparison_dropdown.addItem("Outside")
-        self.comparison_dropdown.setCurrentText(
-            self.condition_data.comparison.capitalize()
-        )
-        self.comparison_dropdown.currentTextChanged.connect(
-            self._comparison_changed_cb
-        )
+        self.comparison_dropdown.setCurrentText(self.condition_data.comparison.capitalize())
+        self.comparison_dropdown.currentTextChanged.connect(self._comparison_changed_cb)
+
+        self.range_status_widget = ui_common.QIconLabel()
+        self.range_status_widget.setIcon("fa.check", color="green")
+        
 
         range_layout = QtWidgets.QHBoxLayout()
         range_layout.addWidget(self.comparison_dropdown)
-        range_layout.addWidget(self.lower)
+        range_layout.addWidget(self.lower_widget)
+        range_layout.addWidget(self.grab_low_widget)
         range_layout.addWidget(QtWidgets.QLabel("and"))
-        range_layout.addWidget(self.upper)
+        range_layout.addWidget(self.upper_widget)
+        range_layout.addWidget(self.grab_high_widget)
+        range_layout.addWidget(self.range_status_widget)
+        range_layout.addStretch()
 
-        input_label = QtWidgets.QLabel(
-            f"<b>{self.condition_data.device_name} Axis {self.condition_data.input_id:d}</b>"
-            )
+        input_label = QtWidgets.QLabel(f"<b>{self.condition_data.device_name} Axis {self.condition_data.input_id:d}</b>")
         input_label.setWordWrap(True)
-        self.main_layout.addWidget(input_label, 0, 1)
-        self.main_layout.addWidget(QtWidgets.QLabel("is"), 0, 2)
-        self.main_layout.addLayout(
-            range_layout, 0, 3, alignment=QtCore.Qt.AlignLeft
-        )
+        self.ui_container_layout.addWidget(input_label, 0, 1)
+        self.ui_container_layout.addWidget(QtWidgets.QLabel("is"), 0, 2)
+        self.ui_container_layout.addLayout(range_layout, 0, 3, alignment=QtCore.Qt.AlignLeft)
+        self.ui_container_layout.addWidget(QtWidgets.QWidget(), 0, 4)
+        self.ui_container_layout.setColumnStretch(4,2)
+
+        value = gremlin.joystick_handling.get_axis(self.condition_data.device_guid, self.condition_data.input_id)
+        self._update_range_state(value)
 
     def _button_ui(self):
         """Creates the UI needed to configure a button based condition."""
+        gremlin.util.clear_layout(self.ui_container_layout)
         self.comparison_dropdown = ui_common.QComboBox()
         self.comparison_dropdown.addItem("Pressed")
         self.comparison_dropdown.addItem("Released")
         self.comparison_dropdown.setCurrentText(
             self.condition_data.comparison.capitalize()
         )
-        self.comparison_dropdown.currentTextChanged.connect(
-            self._comparison_changed_cb
-        )
+        self.comparison_dropdown.currentTextChanged.connect(self._comparison_changed_cb)
 
-        self.main_layout.addWidget(
+        self.ui_container_layout.addWidget(
             QtWidgets.QLabel(
                 f"<b>{self.condition_data.device_name} Button {self.condition_data.input_id:d}</b>"
                 ),
             0,
             1
         )
-        self.main_layout.addWidget(QtWidgets.QLabel("is"), 0, 2)
-        self.main_layout.addWidget(
-            self.comparison_dropdown, 0, 3, alignment=QtCore.Qt.AlignLeft
-        )
+        self.ui_container_layout.addWidget(QtWidgets.QLabel("is"), 0, 2)
+        self.ui_container_layout.addWidget(self.comparison_dropdown, 0, 3, alignment=QtCore.Qt.AlignLeft)
+        self.ui_container_layout.addWidget(QtWidgets.QWidget(), 0, 4)
+        self.ui_container_layout.setColumnStretch(4,2)
 
     def _hat_ui(self):
         """Creates the UI needed to configure a hat based condition."""
+        gremlin.util.clear_layout(self.ui_container_layout)
         directions = [
             "Center", "North", "North East", "East", "South East",
             "South", "South West", "West", "North West"
@@ -386,21 +548,14 @@ class JoystickConditionWidget(AbstractConditionWidget):
         self.comparison_dropdown.setCurrentText(
             self.condition_data.comparison.replace("-", " ").title()
         )
-        self.comparison_dropdown.currentTextChanged.connect(
-            self._comparison_changed_cb
-        )
+        self.comparison_dropdown.currentTextChanged.connect(self._comparison_changed_cb)
+        input_name = f"<b>{self.condition_data.device_name} Hat {self.condition_data.input_id}</b>"
 
-        self.main_layout.addWidget(
-            QtWidgets.QLabel(
-                f"<b>{self.condition_data.device_name} Hat {self.condition_data.input_id:d}</b>"
-                ),
-            0,
-            1
-        )
-        self.main_layout.addWidget(QtWidgets.QLabel("is"), 0, 2)
-        self.main_layout.addWidget(
-            self.comparison_dropdown, 0, 3, alignment=QtCore.Qt.AlignLeft
-        )
+        self.ui_container_layout.addWidget(QtWidgets.QLabel(input_name),0,1)
+        self.ui_container_layout.addWidget(QtWidgets.QLabel("is"), 0, 2)
+        self.ui_container_layout.addWidget(self.comparison_dropdown, 0, 3, alignment=QtCore.Qt.AlignLeft)
+        self.ui_container_layout.addWidget(QtWidgets.QWidget(), 0, 4)
+        self.ui_container_layout.setColumnStretch(4,2)
 
     def _input_pressed_cb(self, event):
         """Processes input events to update the UI and model.
@@ -410,15 +565,14 @@ class JoystickConditionWidget(AbstractConditionWidget):
         self.condition_data.device_guid = event.device_guid
         self.condition_data.input_type = event.event_type
         self.condition_data.input_id = event.identifier
-        self.condition_data.device_name = \
-            input_devices.JoystickProxy()[event.device_guid].name
+
+        self.condition_data.device_name = gremlin.joystick_handling.device_name_from_guid(event.device_guid) # input_devices.JoystickProxy()[event.device_guid].name
         if event.event_type == InputType.JoystickAxis:
             self.condition_data.comparison = "inside"
         elif event.event_type == InputType.JoystickButton:
             self.condition_data.comparison = "pressed"
         elif event.event_type == InputType.JoystickHat:
-            self.condition_data.comparison = \
-                util.hat_tuple_to_direction(event.value)
+            self.condition_data.comparison =  util.hat_tuple_to_direction(event.value)
         self._create_ui()
 
     def _request_user_input(self):
@@ -448,6 +602,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
         )
         self.input_dialog.show()
 
+    @QtCore.Slot(float)
     def _range_lower_changed_cb(self, value):
         """Updates the lower part of an axis range.
 
@@ -455,6 +610,8 @@ class JoystickConditionWidget(AbstractConditionWidget):
         """
         self.condition_data.range[0] = value
 
+
+    @QtCore.Slot(float)
     def _range_upper_changed_cb(self, value):
         """Updates the upper part of an axis range.
 
@@ -462,6 +619,41 @@ class JoystickConditionWidget(AbstractConditionWidget):
         """
         self.condition_data.range[1] = value
 
+    @QtCore.Slot()
+    def _grab_low(self):
+        value = self.axis_repeater_widget.value()
+        self.lower_widget.setValue(value) # also updates condition_data
+        
+
+    @QtCore.Slot()
+    def _grab_high(self):
+        value = self.axis_repeater_widget.value()
+        self.upper_widget.setValue(value) # also updates condition_data
+
+    @QtCore.Slot(float, float)
+    def _axis_value_changed(self, value : float, curved_value : float):
+        self._update_range_state(value)
+
+    def _update_range_state(self, value):
+        if self.range_status_widget:
+            v1, v2 = self.condition_data.range
+            match self.condition_data.comparison:
+                case "inside":
+                    if value >= v1 and value <= v2:
+                        self.range_status_widget.setText("in range")
+                        self.range_status_widget.setVisible(True)
+                    else:
+                        self.range_status_widget.setVisible(False)
+                    
+                case "outside":
+                    if value < v1 or value > v2:
+                        self.range_status_widget.setText("outside of range")
+                        self.range_status_widget.setVisible(True)
+                    else:
+                        self.range_status_widget.setVisible(False)
+
+
+    @QtCore.Slot(str)
     def _comparison_changed_cb(self, text):
         """Updates the comparison operation to use.
 
@@ -514,6 +706,9 @@ class VJoyConditionWidget(AbstractConditionWidget):
 
             ui_common.clear_layout(self.main_layout)
 
+            self.grid_widget =  QtWidgets.QWidget()
+            self.grid_layout =  QtWidgets.QGridLayout(self.grid_widget)
+
             self.vjoy_selector = ui_common.VJoySelector(
                 self._modify_vjoy,
                 [
@@ -533,15 +728,34 @@ class VJoyConditionWidget(AbstractConditionWidget):
                 lambda: self.deleted.emit(self.condition_data)
             )
 
-            self.main_layout.addWidget(QtWidgets.QLabel("Activate if"), 0, 0)
+            self.grid_layout.addWidget(QtWidgets.QLabel("Activate if"), 0, 0)
             if self.condition_data.input_type == InputType.JoystickAxis:
                 self._axis_ui()
             elif self.condition_data.input_type == InputType.JoystickButton:
                 self._button_ui()
             elif self.condition_data.input_type == InputType.JoystickHat:
                 self._hat_ui()
-            self.main_layout.addWidget(self.vjoy_selector, 0, 4)
-            self.main_layout.addWidget(self.delete_button, 0, 5)
+
+            self.grid_layout.addWidget(QtWidgets.QWidget(), 0, 4)
+            self.grid_layout.addWidget(self.vjoy_selector, 0, 5)
+            self.grid_layout.addWidget(self.delete_button, 0, 6)
+            self.grid_layout.setColumnStretch(4,2)
+
+            self.ui_container_widget = QtWidgets.QWidget()
+            self.ui_container_layout = QtWidgets.QGridLayout(self.ui_container_widget)
+
+            self.main_layout.addWidget(self.grid_widget)
+            self.main_layout.addWidget(self.ui_container_widget)
+
+            input_type = self.condition_data.input_type
+            match input_type:
+                case InputType.JoystickAxis:
+                    self._axis_ui()
+                case InputType.JoystickButton:
+                    self._button_ui()
+                case InputType.JoystickHat:
+                    self._hat_ui()
+
 
         finally:
             VJoyConditionWidget.locked = False
@@ -583,9 +797,9 @@ class VJoyConditionWidget(AbstractConditionWidget):
             f"<b>vJoy {self.condition_data.vjoy_id:d} Axis {self.condition_data.input_id:d}</b>"
             )
         input_label.setWordWrap(True)
-        self.main_layout.addWidget(input_label, 0, 1)
-        self.main_layout.addWidget(QtWidgets.QLabel("is"), 0, 2)
-        self.main_layout.addLayout(
+        self.ui_container_layout.addWidget(input_label, 0, 1)
+        self.ui_container_layout.addWidget(QtWidgets.QLabel("is"), 0, 2)
+        self.ui_container_layout.addLayout(
             range_layout, 0, 3, alignment=QtCore.Qt.AlignLeft
         )
 
@@ -608,8 +822,8 @@ class VJoyConditionWidget(AbstractConditionWidget):
             0,
             1
         )
-        self.main_layout.addWidget(QtWidgets.QLabel("is"), 0, 2)
-        self.main_layout.addWidget(
+        self.ui_container_layout.addWidget(QtWidgets.QLabel("is"), 0, 2)
+        self.ui_container_layout.addWidget(
             self.comparison_dropdown, 0, 3, alignment=QtCore.Qt.AlignLeft
         )
 
@@ -629,15 +843,15 @@ class VJoyConditionWidget(AbstractConditionWidget):
             self._comparison_changed_cb
         )
 
-        self.main_layout.addWidget(
+        self.ui_container_layout.addWidget(
             QtWidgets.QLabel(
                 f"<b>vJoy {self.condition_data.vjoy_id:d} Hat {self.condition_data.input_id:d}</b>"
                 ),
             0,
             1
         )
-        self.main_layout.addWidget(QtWidgets.QLabel("is"), 0, 2)
-        self.main_layout.addWidget(
+        self.ui_container_layout.addWidget(QtWidgets.QLabel("is"), 0, 2)
+        self.ui_container_layout.addWidget(
             self.comparison_dropdown, 0, 3, alignment=QtCore.Qt.AlignLeft
         )
 
@@ -714,6 +928,11 @@ class InputActionConditionWidget(AbstractConditionWidget):
         try:
             InputActionConditionWidget.locked = True
 
+
+            ui_common.clear_layout(self.main_layout)
+            self.grid_widget =  QtWidgets.QWidget()
+            self.grid_layout =  QtWidgets.QGridLayout(self.grid_widget)
+
             self.state_dropdown = ui_common.QComboBox()
             self.state_dropdown.addItem("Pressed")
             self.state_dropdown.addItem("Released")
@@ -733,17 +952,23 @@ class InputActionConditionWidget(AbstractConditionWidget):
                 lambda: self.deleted.emit(self.condition_data)
             )
 
-            self.main_layout.addWidget(QtWidgets.QLabel("Activate when"), 0, 0)
-            self.main_layout.addWidget(
+            self.grid_layout.addWidget(QtWidgets.QLabel("Activate when"), 0, 0)
+            self.grid_layout.addWidget(
                 QtWidgets.QLabel("<b>this (virtual) button</b>"),
                 0,
                 1
             )
-            self.main_layout.addWidget(QtWidgets.QLabel("is"), 0, 2)
-            self.main_layout.addWidget(
+            self.grid_layout.addWidget(QtWidgets.QLabel("is"), 0, 2)
+            self.grid_layout.addWidget(
                 self.state_dropdown, 0, 3, alignment=QtCore.Qt.AlignLeft
             )
-            self.main_layout.addWidget(self.delete_button, 0, 5)
+
+
+            self.grid_layout.addWidget(QtWidgets.QWidget(), 0, 4)
+            self.grid_layout.addWidget(self.delete_button, 0, 6)
+            self.grid_layout.setColumnStretch(4,2)
+            self.main_layout.addWidget(self.grid_widget)
+
         finally:
             InputActionConditionWidget.locked = False
 

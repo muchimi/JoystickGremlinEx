@@ -2978,7 +2978,6 @@ class GateWidgetInfo(ui_common.QDataWidget):
         self.value_widget.valueChanged.connect(self._value_changed_cb) # hook manual changes made to the widget
 
         self.grab_widget = ui_common.QDataPushButton()
-        
         self.grab_widget.setIcon(load_icon("mdi.record-rec",qta_color = "red"))
         self.grab_widget.setMaximumWidth(20)
         self.grab_widget.clicked.connect(grab_handler)

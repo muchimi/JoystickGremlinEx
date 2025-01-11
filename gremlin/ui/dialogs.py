@@ -1926,7 +1926,8 @@ class ModeManagerUi(ui_common.BaseDialogUi):
         """
         # Re-enable keyboard event handler
         el = gremlin.event_handler.EventListener()
-        el.edit_mode_changed.emit(self.selected_mode)
+        if self.selected_mode:
+            el.edit_mode_changed.emit(self.selected_mode)
         el.keyboard_hook.start()
         super().closeEvent(event)
 

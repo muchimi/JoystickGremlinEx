@@ -1913,28 +1913,28 @@ class JoystickInputSignificant:
         Returns:
             True if it should be processed, False otherwise
         """
-
-        if event in self._event_registry:
+        key = event.callbackKey
+        if key in self._event_registry:
             # Reset everything if we have no recent data (10 seconds)
-            if self._time_registry[event] + 10.0 < time.time():
-                self._event_registry[event] = event
-                self._time_registry[event] = time.time()
+            if self._time_registry[key] + 10.0 < time.time():
+                self._event_registry[key] = event
+                self._time_registry[key] = time.time()
                 return True
             # Update state
             else:
-                self._time_registry[event] = time.time()
+                self._time_registry[key] = time.time()
                 
-                if abs(self._event_registry[event].value - event.value) > deviation:
-                    self._event_registry[event] = event
-                    self._time_registry[event] = time.time()
-                    # print (f"axis move: {abs(self._event_registry[event].value - event.value)} deviation: {deviation} TRUE")
+                if abs(self._event_registry[key].value - event.value) > deviation:
+                    self._event_registry[key] = event
+                    self._time_registry[key] = time.time()
+                    #print (f"axis move: {abs(self._event_registry[key].value - event.value)} deviation: {deviation} TRUE")
                     return True
                 else:
-                    #print (f"axis move: {abs(self._event_registry[event].value - event.value)} deviation: {deviation} FALSE")
+                    #print (f"axis move: {abs(self._event_registry[key].value - event.value)} deviation: {deviation} FALSE")
                     return False
         else:
-            self._event_registry[event] = event
-            self._time_registry[event] = time.time()
+            self._event_registry[key] = event
+            self._time_registry[key] = time.time()
             return False
 
     def _process_button(self, event) -> bool:

@@ -461,6 +461,7 @@ class DeviceSummary:
             self.is_input_enabled = False # do not allow usage as an input device
             self.vjoy_id = -1
         
+
     @property
     def is_virtual(self):
         """ determins if a device is virtual.
@@ -490,6 +491,41 @@ class DeviceSummary:
         assert self.is_virtual is True
         self.vjoy_id = vjoy_id
         self.name = f"VJoy {self.axis_count}/{self.button_count}/{self.hat_count} ({vjoy_id:d})"
+
+    def get_axis_name(self, input_id):
+        ''' gets the axis name based on the input # '''
+        if input_id == 1:
+            axis_name = "X"
+        elif input_id == 2:
+            axis_name = "Y"
+        elif input_id == 3:
+            axis_name = "Z"
+        elif input_id == 4:
+            axis_name = "RX"
+        elif input_id == 5:
+            axis_name = "RY"
+        elif input_id == 6:
+            axis_name = "RZ"
+        elif input_id == 7:
+            axis_name = "S1"
+        elif input_id == 8:
+            axis_name = "S2"
+        else:
+            axis_name = f"(unknown [{input_id}])"
+        return f"Axis {input_id} ({axis_name})"
+
+    def get_button_name(self, input_id):
+        return f"Button {input_id}"
+    
+    def get_hat_name(self, input_id):
+        import gremlin.util
+        if isinstance(input_id, int):
+            data = gremlin.util.hat_index_to_tuple(input_id)
+        else:
+            data = input_id # tuple
+        return gremlin.util.hat_tuple_to_direction(data)
+
+    
 
     @property
     def hashkey(self):

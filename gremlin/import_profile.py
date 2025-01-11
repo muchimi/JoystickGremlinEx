@@ -584,7 +584,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
         self.rollover_widget = MapperModeWidget()
         
 
-        self.rollover_widget.runtime_mode_changed.connect(self._rollover_mode_changed)
+        self.rollover_widget.mode_changed.connect(self._rollover_mode_changed)
         self.mode : MapperMode = self.rollover_widget.mode
 
         # mapping container
@@ -2460,7 +2460,7 @@ class Mapper():
             self.container_options_layout.addStretch()
 
             self.rollover_widget = MapperModeWidget()
-            self.rollover_widget.runtime_mode_changed.connect(self._rollover_mode_changed)
+            self.rollover_widget.mode_changed.connect(self._rollover_mode_changed)
             self.mode : MapperMode = self.rollover_widget.mode
 
             self.execute_button = QtWidgets.QPushButton("Map 1:1")
@@ -2544,13 +2544,14 @@ class Mapper():
                 syslog = logging.getLogger("system")
                 tab_device_type : TabDeviceType
                 gremlin_ui = gremlin.shared_state.ui
-                ui = gremlin_ui.ui
-                tab_device_type, _ = ui.devices.currentWidget().data
+                
+                tab_device_type = gremlin_ui.getActiveTabType()
                 if not tab_device_type in (TabDeviceType.Joystick, TabDeviceType.VjoyInput):
                     gremlin.ui.ui_common.MessageBox("Information","1:1 mapping is only available on input joysticks")
                     return
 
-                device_profile = ui.devices.currentWidget().device_profile
+
+                device_profile =  gremlin_ui.getActiveTabWidget().device_profile
                 # Don't create mappings for non joystick devices
                 if device_profile.type != DeviceType.Joystick:
                     return
@@ -2692,9 +2693,7 @@ class Mapper():
 
                 # refresh the input tabs
 
-                devices : QtWidgets.QTabWidget = ui.devices
-                tab_index = gremlin_ui._active_tab_index()
-                tab_widget =  devices.widget(tab_index)
+                tab_widget = gremlin_ui.getActiveTabWidget()
                 tab_widget.refresh()
 
                 # update the selection
@@ -2702,7 +2701,7 @@ class Mapper():
                 device_guid, input_type, input_id = gremlin.config.Configuration().get_last_input()
                 if input_type and input_id:
                     eh = gremlin.event_handler.EventListener()
-                    eh.select_input.emit(device_guid, input_type, input_id, True, False)
+                    eh.select_input.emit(device_guid, input_type, input_id, True, False, False)
             finally:
                 gremlin.util.popCursor()
 

@@ -33,6 +33,7 @@ import gremlin.config
 import gremlin.error
 import qtawesome as qta
 import gremlin.event_handler
+import gremlin.event_handler
 from gremlin.input_types import InputType
 from  gremlin.clipboard import Clipboard
 import gremlin.input_types
@@ -1526,7 +1527,7 @@ class ModeWidget(QtWidgets.QWidget):
         ''' calls up the mode change dialog '''
         
         if not self.profile.profile_file or not os.path.isfile(self.profile.profile_file):
-            gremlin.ui.ui_common.MessageBox(prompt = "Please save the profile before configuring modes.")
+            MessageBox(prompt = "Please save the profile before configuring modes.")
             return
 
         import gremlin.shared_state
@@ -2180,6 +2181,14 @@ class QDataComboBox(QComboBox):
         self._data = value
 
 
+class QLimitedComboBox(QDataComboBox):
+    ''' a row limited combo box '''
+    def __init__(self, data = None, parent = None):
+        super().__init__(data, parent)
+        self.setMaxVisibleItems(20)
+        self.setStyleSheet("QComboBox { combobox-popup: 0; }")
+
+
 class QPathLineItem(QtWidgets.QWidget):
     ''' An editable text input line with a file selector button '''
 
@@ -2474,7 +2483,7 @@ class AxisStateWidget(QtWidgets.QWidget):
         """
         super().__init__(parent)
 
-
+        self._joystick_hooked = False # true if joystick input is directly hooked to this widget 
         self._scale_factor = 1000
         if orientation == QtCore.Qt.Orientation.Vertical:
             self.main_layout = QtWidgets.QVBoxLayout(self)
@@ -2699,6 +2708,7 @@ class AxisStateWidget(QtWidgets.QWidget):
     def hookDevice(self, device_guid, input_type, input_id):
         ''' hooks an axis (manual)'''
         import gremlin.joystick_handling
+        import gremlin.event_handler
         self._device_guid = device_guid
         self._input_id = input_id
         self._input_type = input_type
@@ -2708,16 +2718,33 @@ class AxisStateWidget(QtWidgets.QWidget):
         
         self._is_hardware_input = gremlin.joystick_handling.is_hardware_device(device_guid)
         if self._input_type in (InputType.OpenSoundControl, InputType.Midi):
-            raw_value = input_id.axis_value
+            value = input_id.axis_value
         elif self._is_hardware_input:
-            raw_value = gremlin.joystick_handling.dinput.DILL().get_axis(device_guid, input_id)
-        self._update_value(raw_value)
+            value = gremlin.joystick_handling.get_axis(device_guid, input_id)
+            el = gremlin.event_handler.EventListener()
+            el.joystick_event.connect(self._joystick_event)
+            self._joystick_hooked = True
+        self._update_value(value)
 
         self._handler_connected = False
+        
         self._tab_selected(device_guid)
 
+    @QtCore.Slot(object)
+    def _joystick_event(self, event):
+        if self._device_guid != event.device_guid:
+            return
+        if self._input_type != event.event_type:
+            return
+        if self._input_id != event.identifier:
+            return
+        self._update_value(event.value)
 
     def unhookDevice(self):
+        import gremlin.event_handler
+        if self._joystick_hooked:
+            el = gremlin.event_handler.EventListener()
+            el.joystick_event.disconnect(self._joystick_event)
         self._tab_unselected(self._device_guid)
         
 

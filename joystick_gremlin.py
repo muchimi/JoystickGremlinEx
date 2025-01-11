@@ -595,10 +595,11 @@ class GremlinUi(QtWidgets.QMainWindow):
         if tab_index == -1:
             return
         self._context_menu_tab_index = tab_index
-        widget = self.ui.devices.widget(self._context_menu_tab_index)
-        device_type, device_guid = widget.data
+        data : TabData = self.ui.devices.tabData(tab_index)
+        tab_type = data.tab_type
+        #device_guid = data.device_guid
         # substitution is only available if the profile has been saved (a new profile matches the current devices by definition)
-        is_enabled = device_type == TabDeviceType.Joystick \
+        is_enabled = tab_type == TabDeviceType.Joystick \
             and self.profile is not None\
             and self.profile.profile_file is not None\
             and os.path.isfile(self.profile.profile_file)
@@ -657,10 +658,8 @@ class GremlinUi(QtWidgets.QMainWindow):
             return
 
         # verify we have hardware to substitute with
-
-
-        widget = self.ui.devices.widget(self._context_menu_tab_index)
-        _, device_guid = widget.data
+        data : TabData = self.ui.devices.tabData(self._context_menu_tab_index)
+        device_guid = data.device_guid
 
         device_name = self.ui.devices.tabText(self._context_menu_tab_index)
         dialog = gremlin.ui.dialogs.SubstituteDialog(device_guid=device_guid, device_name=device_name, parent = self)
@@ -1496,7 +1495,19 @@ class GremlinUi(QtWidgets.QMainWindow):
             if verbose: syslog.info(f"TAB SELECT: {device_name}")
             el.tab_selected.emit(device_guid)
 
+    def getActiveTabWidget(self) -> gremlin.ui.ui_common.QSplitTabWidget:
+        ''' gets the current tab widget '''
+        return self._current_tab_widget
+    
+    def getActiveTabIndex(self) -> int:
+        ''' gets the current tab index '''
+        return self.ui.devices.currentIndex()
 
+    def getActiveTabType(self) -> TabDeviceType:
+        index = self.ui.devices.currentIndex()
+        data : TabData = self.ui.devices.tabData(index)
+        return  TabDeviceType(data.tab_type)
+        
 
     def _create_tabs(self, activate_tab=None):
         """Creates the tabs of the configuration dialog representing
@@ -2032,7 +2043,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         # print (f"select last tab: {self.config.last_tab_guid}")
         device_guid, input_type, input_id = self.config.get_last_input()
         eh = gremlin.event_handler.EventListener()
-        eh.select_input.emit(device_guid, input_type, input_id, False, True)
+        eh.select_input.emit(device_guid, input_type, input_id, False, True, False)
 
     @QtCore.Slot()
     def _ui_ready(self):
@@ -2060,7 +2071,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         device_guid, input_type, input_id = self.config.get_last_input()
         if input_type and input_id:
             eh = gremlin.event_handler.EventListener()
-            eh.select_input.emit(device_guid, input_type, input_id, False, True)
+            eh.select_input.emit(device_guid, input_type, input_id, False, True, False)
 
     def _get_device_name(self, device_guid):
         ''' gets the name of the specified device '''
@@ -2302,8 +2313,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
     def _active_input_item(self) -> gremlin.base_profile.InputItem:
         ''' gets the current selected input item '''
-        index = self.ui.devices.currentIndex()
-        widget = self.ui.devices.widget(index)
+        widget = self._current_tab_widget
         if hasattr(widget, "input_item_list_view"):
             item_index = widget.input_item_list_view.current_index
             data = widget.input_item_list_view.model.data(item_index)

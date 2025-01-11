@@ -209,17 +209,6 @@ class JoystickCondition(AbstractCondition):
         :return True if the condition is properly specified, False otherwise
         """
         return super().is_valid() and self.input_type is not None
-    
-    # def execute(self) -> bool:
-    #     ''' executes the action 
-    #     :returns: True if the condition is valid (met), false if not
-
-    #     '''
-    #     import gremlin.joystick_handling
-    #     if self.is_valid():
-    #         if self.InputType
-    #         value = gremlin.joystick_handling.get_axis()
-
 
 class VJoyCondition(AbstractCondition):
 
@@ -506,16 +495,20 @@ class ConditionTracker():
         import gremlin.shared_state
         if not mode:
             mode = gremlin.shared_state.current_mode
-        id_list = [item.condition.id for item in self._cache[mode].values() if item.input_item == input_item]
-        return len(id_list)
+        if mode in self._cache:
+            id_list = [item.condition.id for item in self._cache[mode].values() if item.input_item == input_item]
+            return len(id_list)
+        return 0
     
     def getContainerConditionCount(self, container, mode : str = None):
         ''' gets a count of registered condition for a specific owner - owner is an input_item'''
         import gremlin.shared_state
         if not mode:
             mode = gremlin.shared_state.current_mode
-        id_list = [item.condition.id for item in self._cache[mode].values() if item.container == container]
-        return len(id_list)
+        if mode in self._cache:
+            id_list = [item.condition.id for item in self._cache[mode].values() if item.container == container]
+            return len(id_list)
+        return 0
 
     
     def getConditionInputItem(self, condition : AbstractCondition):
@@ -530,9 +523,11 @@ class ConditionTracker():
         import gremlin.shared_state
         if not mode:
             mode = gremlin.shared_state.current_mode
-        id_list = [id for id, item in self._owner_map[mode].items() if item == input_item]
-        conditions = [self._cache[mode][id] for id in id_list]
-        return conditions
+        if mode in self._cache:
+            id_list = [id for id, item in self._owner_map[mode].items() if item == input_item]
+            conditions = [self._cache[mode][id] for id in id_list]
+            return conditions
+        return None
 
 
 

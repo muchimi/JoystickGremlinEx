@@ -237,9 +237,8 @@ class DeviceType(IntEnum):
     @staticmethod
     def to_display_name(value):
         return _DeviceType_to_display_name[value]
-
-
-
+    
+  
 
 _DeviceType_to_display_name = {
     DeviceType.NotSet: "(invalid)",

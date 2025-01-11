@@ -210,6 +210,10 @@ Joystick Gremlin EX
 
 <!-- TOC --><a name="134016ex-pre-release"></a>
 ## 13.40.16ex (pre-release)
+### (m61)
+- Fix: input listener not detecting some axis changes
+- Improved: Joystick condition UI has manual selectors for condition input selection
+- 
 ### (m59/m60)
 - Fix: Special mode device not always creating entries for a new mode causing a key exception.
 - Improved: hourglass now more consistently displayed for operations that can take a while to refresh.

@@ -255,6 +255,8 @@ class JoystickCondition(AbstractCondition):
         self.device_guid = condition.device_guid
         self.input_type = condition.input_type
         self.input_id = condition.input_id
+        # hat number or 0 for axis and buttons
+        self.input_index = condition.input_index if hasattr(condition,"input_index") else 0
         self.condition = condition
 
     def __call__(self, event, value):
@@ -344,6 +346,9 @@ class VJoyCondition(AbstractCondition):
                 break
         self.input_type = condition.input_type
         self.input_id = condition.input_id
+        
+        self.input_index = condition.input_index if hasattr(condition,"input_index") else 0
+        
         self.condition = condition
 
     def __call__(self, event, value):

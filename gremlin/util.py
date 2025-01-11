@@ -330,6 +330,39 @@ def hat_tuple_to_direction(value):
     }
     return lookup[value]
 
+def hat_index_to_tuple(index):
+    lookup = {
+        "center": (0, 0),
+        "north": (0, 1),
+        "north-east": (1, 1),
+        "east": (1, 0),
+        "south-east": (1, -1),
+        "south": (0, -1),
+        "south-west": (-1, -1),
+        "west": (-1, 0),
+        "north-west": (-1, 1)
+    }
+    keys = list(lookup.keys())
+    if index < len(keys):
+        return lookup[keys[index]]
+    return None
+
+def hat_tuples():
+    lookup = {
+        ( 0,  0): "center",
+        ( 0,  1): "north",
+        ( 1,  1): "north-east",
+        ( 1,  0): "east",
+        ( 1, -1): "south-east",
+        ( 0, -1): "south",
+        (-1, -1): "south-west",
+        (-1,  0): "west",
+        (-1,  1): "north-west",
+    }
+    return list(lookup.keys())
+
+
+
 
 def hat_direction_to_tuple(value):
     """Converts a direction string to a tuple value.

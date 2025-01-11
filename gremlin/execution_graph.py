@@ -335,22 +335,31 @@ class ExecutionContext():
         profile = gremlin.shared_state.current_profile
         mode_source = gremlin.shared_state.current_profile.traverse_mode()
         mode_source.sort(key = lambda x: x[0]) # sort parent to child
-        mode_list = [mode for (_,mode) in mode_source] # parent mode first
-
+        mode_list = [mode for (_,mode) in mode_source if mode] # parent mode first
+        syslog = logging.getLogger("system")
         mode_nodes = {}
         for mode in mode_list:
+            if not mode:
+                
+                syslog.error("Execution Tree: error: found a blank mode.")
+                continue
             mode_item = gremlin.execution_graph.ExecutionGraphNode(gremlin.execution_graph.ExecutionGraphNodeType.Mode)
             mode_item.parent = self.root
             mode_item.mode = mode
             mode_nodes[mode] = mode_item
+
 
         for device in profile.devices.values():
             device_node = ExecutionGraphNode(ExecutionGraphNodeType.Device)
             device_node.device = device
             device_node.parent = root
             for mode in device.modes.values():
+                if not mode.name in mode_nodes:
+                    syslog.error(f"Execution Tree: error: mode: {mode.name} is not found in the device node: {device_node.name}")
+                    continue
                 mode_item = mode_nodes[mode.name]
                 mode_node = ExecutionGraphNode(ExecutionGraphNodeType.Mode)
+                
                 mode_node.mode = mode.name
                 mode_node.parent = device_node
                 for input_items in mode.config.values():

@@ -547,14 +547,15 @@ class MacroManager(QtCore.QObject):
 
     def _preprocess_macro(self, macro):
         """Inserts pauses as necessary into the macro."""
-        new_sequence = [macro.sequence[0]]
-        for a1, a2 in zip(macro.sequence[:-1], macro.sequence[1:]):
-            if isinstance(a1, PauseAction) or isinstance(a2, PauseAction):
-                new_sequence.append(a2)
-            else:
-                new_sequence.append(PauseAction(self.default_delay))
-                new_sequence.append(a2)
-        macro._sequence = new_sequence
+        if macro._sequence:
+            new_sequence = [macro._sequence[0]]
+            for a1, a2 in zip(macro._sequence[:-1], macro._sequence[1:]):
+                if isinstance(a1, PauseAction) or isinstance(a2, PauseAction):
+                    new_sequence.append(a2)
+                else:
+                    new_sequence.append(PauseAction(self.default_delay))
+                    new_sequence.append(a2)
+            macro._sequence = new_sequence
 
 
 class Macro:
