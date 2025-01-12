@@ -984,11 +984,17 @@ class GremlinUi(QtWidgets.QMainWindow):
                 el.profile_stop.emit()
 
                 self.runner.stop()
+
+                if gremlin.shared_state.terminating:
+                    # terminate faster
+                    return
+
                 self._update_status_bar_active(False)
                 self._profile_auto_activated = False
                 current_index = self.ui.devices.currentIndex()
                 device_guid = self.getDeviceGuidForTabIndex(current_index)
                 widget = self.getWidget(device_guid)
+
                 if widget:
                     tab_type = widget.data[0]
                     if tab_type in (
@@ -2512,7 +2518,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         if not self.device_change_locked:
             self.device_change_locked = True
             while self._device_change_queue > 0:
-                verbose = gremlin.config.Configuration().verbose
+                verbose = gremlin.config.Configuration().verbose_mode_device
                 try:
                     syslog =logging.getLogger("system")
                     if verbose:

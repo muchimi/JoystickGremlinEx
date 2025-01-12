@@ -21,7 +21,9 @@ from PySide6 import QtWidgets, QtCore, QtGui
 import gremlin
 import gremlin.types
 from gremlin.util import load_icon
+from gremlin.ui import ui_common
 import gremlin.ui.ui_common
+
 
 class AbstractVirtualButtonWidget(QtWidgets.QGroupBox):
 
@@ -67,8 +69,6 @@ class VirtualAxisButtonWidget(AbstractVirtualButtonWidget):
 
     """Condition widget for axis, turning an axis area into a button."""
 
-    locked = False
-
     def __init__(self, condition_data, parent=None):
         """Creates a new axis activation condition widget.
 
@@ -79,53 +79,115 @@ class VirtualAxisButtonWidget(AbstractVirtualButtonWidget):
 
     def _create_ui(self):
         """Creates all required UI elements."""
-        if VirtualAxisButtonWidget.locked:
-            return
+        VirtualAxisButtonWidget.locked = True
+        self.axis_repeater_widget = ui_common.AxisStateWidget(orientation=QtCore.Qt.Orientation.Horizontal, show_percentage=False)
+        self.axis_repeater_widget.valueChanged.connect(self._axis_value_changed)
+
+        self.range_status_widget = ui_common.QIconLabel()
+        self.range_status_widget.setIcon("fa.check", color="green")
+
+        self.grab_low_widget = ui_common.QDataPushButton()
+        self.grab_low_widget.setIcon(load_icon("mdi.record-rec",qta_color = "red"))
+        self.grab_low_widget.setMaximumWidth(20)
+        self.grab_low_widget.clicked.connect(self._grab_low)
+        self.grab_low_widget.setToolTip("Grab axis value")
+
+        self.grab_high_widget = ui_common.QDataPushButton()
+        self.grab_high_widget.setIcon(load_icon("mdi.record-rec",qta_color = "red"))
+        self.grab_high_widget.setMaximumWidth(20)
+        self.grab_high_widget.clicked.connect(self._grab_high)
+        self.grab_high_widget.setToolTip("Grab axis value")
+
+
+        self.range_layout = QtWidgets.QHBoxLayout()
+        self.lower_limit = ui_common.DynamicDoubleSpinBox()
+        self.lower_limit.setRange(-1.0, 1.0)
+        self.lower_limit.setSingleStep(0.05)
+        self.upper_limit = ui_common.DynamicDoubleSpinBox()
+        self.upper_limit.setRange(-1.0, 1.0)
+        self.upper_limit.setSingleStep(0.05)
+        self.direction = ui_common.QComboBox()
+        self.direction.addItem("Anywhere")
+        self.direction.addItem("Above")
+        self.direction.addItem("Below")
+
+        self.setTitle("Virtual Button")
+        self.range_layout.addWidget(
+            QtWidgets.QLabel("Activate when axis is between: ")
+        )
+        self.range_layout.addWidget(self.lower_limit)
+        self.range_layout.addWidget(self.grab_low_widget)
+        self.range_layout.addWidget(QtWidgets.QLabel("and"))
+        self.range_layout.addWidget(self.upper_limit)
+        self.range_layout.addWidget(self.grab_high_widget)
+        self.range_layout.addWidget(QtWidgets.QLabel("when entering the range from"))
+        self.range_layout.addWidget(self.direction)
+        self.range_layout.addWidget(self.range_status_widget)
+        self.range_layout.addStretch()
+
+        self.help_button = QtWidgets.QPushButton(load_icon("gfx/help.png"), "")
+        self.help_button.clicked.connect(self._show_hint)
+        self.range_layout.addWidget(self.help_button)
+
+        self.main_layout.addWidget(self.axis_repeater_widget)
+        self.main_layout.addLayout(self.range_layout)
+
+        self.lower_limit.valueChanged.connect(self._lower_limit_cb)
+        self.upper_limit.valueChanged.connect(self._upper_limit_cb)
+        self.direction.currentTextChanged.connect(self._direction_changed_cb)
+
+        self.last_value = None
+
+    @QtCore.Slot()
+    def _grab_low(self):
+        value = self.axis_repeater_widget.value()
+        self.lower_limit.setValue(value) # also updates condition_data
         
-        try:
-            VirtualAxisButtonWidget.locked = True
-            self.range_layout = QtWidgets.QHBoxLayout()
-            self.lower_limit = gremlin.ui.ui_common.DynamicDoubleSpinBox()
-            self.lower_limit.setRange(-1.0, 1.0)
-            self.lower_limit.setSingleStep(0.05)
-            self.upper_limit = gremlin.ui.ui_common.DynamicDoubleSpinBox()
-            self.upper_limit.setRange(-1.0, 1.0)
-            self.upper_limit.setSingleStep(0.05)
-            self.direction = gremlin.ui.ui_common.QComboBox()
-            self.direction.addItem("Anywhere")
-            self.direction.addItem("Above")
-            self.direction.addItem("Below")
 
-            self.setTitle("Virtual Button")
-            self.range_layout.addWidget(
-                QtWidgets.QLabel("Activate when axis is between: ")
-            )
-            self.range_layout.addWidget(self.lower_limit)
-            self.range_layout.addWidget(QtWidgets.QLabel("and"))
-            self.range_layout.addWidget(self.upper_limit)
-            self.range_layout.addWidget(
-                QtWidgets.QLabel("when entering the range from")
-            )
-            self.range_layout.addWidget(self.direction)
+    @QtCore.Slot()
+    def _grab_high(self):
+        value = self.axis_repeater_widget.value()
+        self.upper_limit.setValue(value) # also updates condition_data            
 
-            self.range_layout.addStretch(1)
+    @QtCore.Slot(float, float)
+    def _axis_value_changed(self, value : float, curved_value : float):
+        self._update_range_state(value)            
 
-            self.help_button = QtWidgets.QPushButton(load_icon("gfx/help.png"), "")
-            self.help_button.clicked.connect(self._show_hint)
-            self.range_layout.addWidget(self.help_button)
+    def _update_range_state(self, value):
+        if self.range_status_widget:
+            visible = False
+            
+            v1, v2 = self.condition_data.range
+            if self.last_value is None:
+                self.last_value = value
+            
+            match self.condition_data.direction:
+                case gremlin.types.AxisButtonDirection.Anywhere:
+                    if value >= v1 and value <= v2:
+                        self.range_status_widget.setText("(in range)")
+                        visible = True
 
-            self.main_layout.addLayout(self.range_layout)
+                case gremlin.types.AxisButtonDirection.Below:
+                    if value < self.last_value:   
+                        self.range_status_widget.setText(f"(below)")
+                        visible = True
+                case gremlin.types.AxisButtonDirection.Above:
+                    if value > self.last_value:   
+                        self.range_status_widget.setText(f"(below)")
+                        visible = True
 
-            self.lower_limit.valueChanged.connect(self._lower_limit_cb)
-            self.upper_limit.valueChanged.connect(self._upper_limit_cb)
-            self.direction.currentTextChanged.connect(self._direction_changed_cb)
-        finally:
-            VirtualAxisButtonWidget.locked = False
+
+            self.range_status_widget.setVisible(visible)
+            self.last_value = value
+
 
     def _populate_ui(self):
         """Populates the UI elements with data."""
         self.lower_limit.setValue(self.condition_data.lower_limit)
         self.upper_limit.setValue(self.condition_data.upper_limit)
+        self.axis_repeater_widget.hookDevice(self.condition_data.device_guid,
+                                             self.condition_data.input_type,
+                                             self.condition_data.input_id)
         self.direction.setCurrentText(
             gremlin.types.AxisButtonDirection.to_string(
                 self.condition_data.direction

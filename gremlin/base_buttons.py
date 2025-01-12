@@ -37,7 +37,7 @@ class VirtualAxisButton(AbstractVirtualButton):
 
     """Virtual button which turns an axis range into a button."""
 
-    def __init__(self, lower_limit=0.0, upper_limit=0.0):
+    def __init__(self, lower_limit=0.0, upper_limit=1.0, device_guid = None, input_type = None, input_id = None, mode = None):
         """Creates a new instance.
 
         :param lower_limit the lower limit of the virtual button
@@ -48,12 +48,29 @@ class VirtualAxisButton(AbstractVirtualButton):
         self.lower_limit = lower_limit
         self.upper_limit = upper_limit
         self.direction = AxisButtonDirection.Anywhere
+        self.device_guid = device_guid # associated device
+        self.input_id = input_id # associated axis
+        self.mode = mode # associated mode
+        self.input_type = input_type
 
+    @property
+    def range(self):
+        return [self.lower_limit, self.upper_limit]
+    
     def from_xml(self, node, data = None):
         """Populates the virtual button based on the node's data.
 
         :param node the node containing data for this instance
         """
+
+        # grab the device GUID this applies to
+        device_guid, input_type, input_id, mode = get_xml_input_data(node)
+        self.device_guid = device_guid
+        self.input_type = input_type
+        self.mode = mode
+        self.input_id = input_id
+
+
         from gremlin.types import AxisButtonDirection
         self.lower_limit = safe_read(node, "lower-limit", float)
         self.upper_limit = safe_read(node, "upper-limit", float)
@@ -70,10 +87,7 @@ class VirtualAxisButton(AbstractVirtualButton):
         node = ElementTree.Element("virtual-button")
         node.set("lower-limit", str(self.lower_limit))
         node.set("upper-limit", str(self.upper_limit))
-        node.set(
-            "direction",
-            AxisButtonDirection.to_string(self.direction)
-        )
+        node.set("direction",AxisButtonDirection.to_string(self.direction))
         return node
 
 
@@ -107,19 +121,31 @@ class VirtualHatButton(AbstractVirtualButton):
         "north-west": (-1, 1)
     }
 
-    def __init__(self, directions=()):
+    def __init__(self, directions=(), device_guid = None, input_type = None, input_id = None, mode = None):
         """Creates a instance.
 
         :param directions list of direction that form the virtual button
         """
         super().__init__()
         self.directions = list(set(directions))
+        self.device_guid = device_guid
+        self.input_type = InputType.JoystickHat
+        self.input_id = input_id
+        self.mode = mode
+        self.input_type = input_type
 
     def from_xml(self, node, data = None):
         """Populates the activation condition based on the node's data.
 
         :param node the node containing data for this instance
         """
+
+        device_guid, input_type, input_id, mode = get_xml_input_data(node)
+        self.device_guid = device_guid
+        self.input_type = input_type
+        self.mode = mode
+        self.input_id = input_id
+
         for key, value in node.items():
             if key in VirtualHatButton.name_to_direction and \
                             parse_bool(value):

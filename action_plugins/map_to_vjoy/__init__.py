@@ -995,6 +995,8 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         if not event.is_axis:
             return
+        
+        value = event.value
 
         if self.action_data.action_mode == VjoyAction.VJoyMergeAxis:
             # merge - check two sets
@@ -1009,6 +1011,9 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
                 if event.device_guid == self.action_data.merge_device_guid and event.identifier != self.action_data.merge_input_id:
                     return
 
+            # compute the merged value    
+            value = self.action_data.get_filtered_axis_value(value)
+
 
         else:
             if event.device_guid != self.action_data.hardware_device_guid:
@@ -1016,8 +1021,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             if event.identifier != self.action_data.hardware_input_id:
                 return
 
-        
-        value = event.value
+  
 
         self._update_axis_widget(value)
 
@@ -1047,9 +1051,11 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
                 curved_value = self.action_data.curve_data.curve_value(value)
                 self._axis_repeater_widget.show_curved = True
                 self._axis_repeater_widget.setValue(value, curved_value)
+                # print (f"merge value + curve: {value}")
             else:
                 self._axis_repeater_widget.show_curved = False
                 self._axis_repeater_widget.setValue(value)
+                # print (f"merge value: {value}")
 
             # update the curved window if displayed
             if self.curve_update_handler is not None:

@@ -4,8 +4,10 @@ import enum
 import logging
 from lxml import etree as ElementTree
 from gremlin.input_types import InputType
-from gremlin.util import *
-
+import gremlin.util
+from gremlin.util import safe_format, safe_read, parse_bool, parse_guid, write_guid
+from PySide6 import QtWidgets, QtCore, QtGui
+from gremlin.singleton_decorator import SingletonDecorator
 
 class ActivationRule(enum.Enum):
 
@@ -160,7 +162,7 @@ class JoystickCondition(AbstractCondition):
     def __init__(self):
         """Creates a new instance."""
         super().__init__()
-        self.device_guid = 0
+        self.device_guid = 0 # use this as the invalid GUID
         self.input_type = None
         self.input_id = 0
         self.range = [0.0, 0.0]
@@ -566,8 +568,19 @@ class ActivationCondition:
 
     def __init__(self, conditions, rule):
         """Creates a new instance."""
+
         self.rule = rule
         self.conditions = conditions
+        self._id = gremlin.util.get_guid()
+
+    @property
+    def id(self):
+        ''' unique ID for this condition, persisted '''
+        if not self._id:
+            import gremlin.util
+            self._id = gremlin.util.get_guid()
+        return self._id
+
 
     def from_xml(self, node, data = None):
         """Extracts activation condition data from an XML node.
@@ -576,6 +589,13 @@ class ActivationCondition:
         :param data: tuple containing (input_item, container) associated with this condition
         """
         import gremlin.base_profile
+
+        if "condition_id" in node.attrib:
+            str_id = node.get("condition_id")
+            if str_id:
+                self._id = str_id
+
+
         self.rule = ActivationCondition.rule_lookup[safe_read(node, "rule")]
         tracker = ConditionTracker()
         mode_node = node
@@ -600,6 +620,7 @@ class ActivationCondition:
         """
         node = ElementTree.Element("activation-condition")
         node.set("rule", ActivationCondition.rule_lookup[self.rule])
+        node.set("condition_id", self._id)
 
         for condition in self.conditions:
             if condition.is_valid():

@@ -169,7 +169,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
         for i, action_set in enumerate(self.profile_data.short_action_sets):
             widget = self._create_action_set_widget(
                 action_set if action_set is not None else [],
-                f"Chain Short Action {i:d}",
+                f"Chain Short Action {i+1:d}",
                 gremlin.ui.ui_common.ContainerViewTypes.Action
             )
             self.short_layout.addWidget(widget)
@@ -196,7 +196,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
     
 
     def _create_condition_ui(self):
-        if self.profile_data.has_action_conditions:
+        if self.profile_data.action_sets:
             if self.profile_data.short_action_sets:
                 action_set = self.profile_data.short_action_sets[0]
                 if action_set is not None:
@@ -611,12 +611,12 @@ class TempoExContainer(AbstractContainer):
         for as_node in node:
             if as_node.tag == "short-action-set":
                 action_set = []
-                self._parse_action_xml(as_node, action_set)
+                self._parse_action_xml(as_node, action_set, data)
                 self.short_action_sets.append(action_set)
                 self.action_sets.append(action_set)
             if as_node.tag == "long-action-set":
                 action_set = []
-                self._parse_action_xml(as_node, action_set)
+                self._parse_action_xml(as_node, action_set, data)
                 self.long_action_sets.append(action_set)
                 self.action_sets.append(action_set)
 

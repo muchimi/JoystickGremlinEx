@@ -211,9 +211,17 @@ Joystick Gremlin EX
 <!-- TOC --><a name="134016ex-pre-release"></a>
 ## 13.40.16ex (pre-release)
 ### (m61)
+- Fix: general stabilization patch resolves several UI exceptions and navigation/visualization issues linked to prior changes and API changes/refactors.
 - Fix: input listener not detecting some axis changes
-- Improved: Joystick condition UI has manual selectors for condition input selection
-- 
+- Improved: Joystick condition UI has manual device input selectors for condition latching in addition to the listen button.
+- Fix: multiple references to properties of the removed tab widget impacting UI functions such as 1:1, device substitution
+- Fix: calibration icon not changing state correctly
+- Fix: some containers are missing their action condition entries for each action in the container
+- Fix: condition counts in the condition tab does not always update as conditions are added or removed
+- Fix: map to vjoy merged value repeater not updating correctly
+- Fix: virtual button on axis input not triggering action (note: if a virtual button condition is used, any other joystick condition is ignored)
+
+
 ### (m59/m60)
 - Fix: Special mode device not always creating entries for a new mode causing a key exception.
 - Improved: hourglass now more consistently displayed for operations that can take a while to refresh.

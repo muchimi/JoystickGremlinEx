@@ -1303,6 +1303,7 @@ class InputItemWidget(QtWidgets.QFrame):
                 # axis
                 if not current_axis_widget:
                     widget = gremlin.ui.ui_common.AxisStateWidget(show_label = False, orientation=QtCore.Qt.Orientation.Horizontal, show_percentage=False)
+                    widget.data = self
                     self.axis_widget = widget
                 # remove button widget if we changed modes
                 if self.button_widget:
@@ -1383,12 +1384,11 @@ class InputItemWidget(QtWidgets.QFrame):
             self._calibration_button_widget.setVisible(curve_visible)
 
 
-            if curve_visible:
-                has_calibration = self.data.hasCalibration
-                if has_calibration:
-                    self._calibration_button_widget.setIcon(self._calibration_icon_active)
-                else:
-                    self._calibration_button_widget.setIcon(self._calibration_icon_inactive)
+            has_calibration = self.data.hasCalibration
+            if has_calibration:
+                self._calibration_button_widget.setIcon(self._calibration_icon_active)
+            else:
+                self._calibration_button_widget.setIcon(self._calibration_icon_inactive)
 
         except:
             # c++ exception if the item was garbage collected by QT alredy
@@ -1696,6 +1696,7 @@ class InputItemWidget(QtWidgets.QFrame):
         # open the calibration button for this input
         dialog = gremlin.ui.axis_calibration.CalibrationDialogEx(self.data.device_guid, self.data.input_id)
         dialog.exec()
+        self._update_icons()
 
     QtCore.Slot()
     def _clear_curve_cb(self):
@@ -1942,9 +1943,9 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
     # fires when the container is about to be closed
     closing = QtCore.Signal()
 
-    # Signal which is emitted whenever the widget's contents change as well as
-    # the UI tab that was active when the event was emitted
-    container_modified = QtCore.Signal()
+        
+    container_modified = QtCore.Signal()  # container contents changed
+
 
     # Palette used to render widgets
     palette = QtGui.QPalette()
@@ -2013,11 +2014,11 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
         # this is for CONTAINER CONDITIONS only (Action conditions are handled elsewhere) - this hooks the condition state tab to the conditions added to the container
         el = gremlin.event_handler.EventListener()
-        el.condition_state_changed.connect(self._update_tab_condition)
+        el.condition_state_changed.connect(self._update_ui)
 
 
     @QtCore.Slot(object)
-    def _update_tab_condition(self, container):
+    def _update_ui(self, container):
         dock_tabs = self.dock_tabs
         if dock_tabs.data == container:
             tracker = gremlin.base_conditions.ConditionTracker()
@@ -2032,6 +2033,9 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
                         break
             except:
                 pass
+
+        if self.container == container:
+            self._update_counts()
 
 
 
@@ -2086,7 +2090,8 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
         self.action_condition_frame_widget.setFrameShape(QtWidgets.QFrame.Shape.Box)
         self.activation_condition_layout = QtWidgets.QVBoxLayout(self.action_condition_frame_widget)
-        self.activation_condition_layout.addWidget(QtWidgets.QLabel(f"Action conditions ({self.profile_data.action_condition_count} found):"))
+        self.activation_count_widget = QtWidgets.QLabel()
+        self.activation_condition_layout.addWidget(self.activation_count_widget)
 
         self.activation_condition_tab_layout.addWidget(self.action_condition_frame_widget)
         
@@ -2096,7 +2101,17 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         self.activation_condition_layout.addStretch()
         self.activation_condition_tab_layout.addStretch()
 
-        
+        self._update_counts()
+
+    
+    def _update_counts(self):
+        ''' refreshes counts '''   
+        if self.container:
+            self.activation_count_widget.setText(f"Action conditions ({self.container.action_condition_count} found):")
+        else:
+            # not a container
+            self.activation_count_widget.setText(f"Action conditions (N/A):")
+
 
 
     def _create_virtual_button_tab(self):
@@ -2111,10 +2126,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         )
 
         # Create actual virtual button UI
-        self.virtual_button_widget = \
-            AbstractContainerWidget.virtual_axis_to_widget[
-                type(self.profile_data.virtual_button)
-            ](self.profile_data.virtual_button)
+        self.virtual_button_widget =  AbstractContainerWidget.virtual_axis_to_widget[type(self.profile_data.virtual_button)](self.profile_data.virtual_button)
 
         # Put everything together
         self.virtual_button_layout.addWidget(self.virtual_button_widget)

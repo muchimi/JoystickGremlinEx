@@ -217,8 +217,10 @@ class AbstractInputItem(QtCore.QObject):
     ''' base class for input items for MIDI, OSC and KEYBOARD items '''
 
     def __init__(self):
+        
         super().__init__()
-        self._id = uuid.uuid4() # GUID (unique) if loaded from XML - will reload that one
+        import uuid
+        self._id =  uuid.uuid4() # GUID (unique) if loaded from XML - will reload that one
         self._guid = str(self.id).replace("-","")
         self._display_name = None
         self._description = None

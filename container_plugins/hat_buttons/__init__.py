@@ -131,7 +131,7 @@ class HatButtonsContainerWidget(AbstractContainerWidget):
         self.action_layout.addStretch()
 
     def _create_condition_ui(self):
-        if not self.profile_data.has_action_conditions:
+        if not self.profile_data.action_sets:
             return
 
         lookup = _four_lookup

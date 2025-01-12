@@ -408,6 +408,7 @@ class MacroManager(QtCore.QObject):
 
     def _run_scheduler(self):
         """Dispatches macros as required."""
+
         while self._is_running:
             # Wake up when the event triggers and reset it
             # while not self._queue or not self._schedule_event.is_set():
@@ -487,6 +488,8 @@ class MacroManager(QtCore.QObject):
 
         :param macro the macro object to be executed
         """
+        syslog = logging.getLogger("system")
+        verbose = gremlin.config.Configuration().verbose_mode_keyboard
         (state_is_local, state_is_remote) = gremlin.input_devices.remote_state.state
         if not is_remote:
             is_remote = state_is_remote
@@ -524,6 +527,7 @@ class MacroManager(QtCore.QObject):
         # Handle simple one shot macros
         else:
             for action in macro.sequence:
+                # if verbose: syslog.info(f"MACRO: send key: ({'press' if action.is_pressed else 'release'}) {action.key}")
                 action(is_local, is_remote, macro.force_remote)
             # indicate the macro is done
             if macro.completed_callback:
@@ -803,10 +807,14 @@ class KeyAction(MacroAbstractAction):
 
     def __call__(self, is_local = None, is_remote = None, force_remote = None):
         # ignore passed local/remote states
+        syslog = logging.getLogger("system")
+        verbose = gremlin.config.Configuration().verbose_mode_keyboard        
         is_local, is_remote = self._update_flags(is_local, is_remote, force_remote)
         if self.is_pressed:
+            if verbose: syslog.info(f"MACRO: send key make: {self.key}")
             _send_key_down(self.key, is_local, is_remote, force_remote)
         else:
+            if verbose: syslog.info(f"MACRO: send key break: {self.key}")
             _send_key_up(self.key, is_local, is_remote, force_remote)
         
 
@@ -829,23 +837,29 @@ class MouseButtonAction(MacroAbstractAction):
 
     def __call__(self, is_local = None, is_remote = None, force_remote = None):
         # ignore passed local/remote states
+        syslog = logging.getLogger("system")
+        verbose = gremlin.config.Configuration().verbose_mode_keyboard        
         is_local, is_remote = self._update_flags(is_local, is_remote, force_remote)
         if self.button == gremlin.types.MouseButton.WheelDown:
             if is_local:
+                if verbose: syslog.info(f"MACRO: mouse wheel up")
                 gremlin.sendinput.mouse_wheel(1)
             if is_remote:
                 gremlin.input_devices.remote_client.send_mouse_wheel(1, force_remote)
 
         elif self.button == gremlin.types.MouseButton.WheelUp:
             if is_local:
+                if verbose: syslog.info(f"MACRO: mouse wheel down")
                 gremlin.sendinput.mouse_wheel(-1)
             if is_remote:
                 gremlin.input_devices.remote_client.send_mouse_wheel(-1, force_remote)
         else:
             if is_local:
                 if self.is_pressed:
+                    if verbose: syslog.info(f"MACRO: mouse press {self.button}")
                     gremlin.sendinput.mouse_press(self.button)
                 else:
+                    if verbose: syslog.info(f"MACRO: mouse release {self.button}")
                     gremlin.sendinput.mouse_release(self.button)
             if is_remote:
                 gremlin.input_devices.remote_client.send_mouse_button(self.button, self.is_pressed, force_remote)
@@ -866,8 +880,11 @@ class MouseMotionAction(MacroAbstractAction):
 
     def __call__(self, is_local = None, is_remote = None, force_remote = None):
         # ignore passed local/remote states
+        syslog = logging.getLogger("system")
+        verbose = gremlin.config.Configuration().verbose_mode_keyboard        
         is_local, is_remote = self._update_flags(is_local, is_remote, force_remote)
         if is_local:
+            if verbose: syslog.info(f"MACRO: mouse motion {self.dx}, {self.dy}")
             gremlin.sendinput.mouse_relative_motion(self.dx, self.dy)
         if is_remote:
             gremlin.input_devices.remote_client.send_mouse_motion(self.dx, self.dy, force_remote)
@@ -888,6 +905,8 @@ class PauseAction(MacroAbstractAction):
 
     def __call__(self, is_local = None, is_remote = None, force_remote = None):
         import random
+        syslog = logging.getLogger("system")
+        verbose = gremlin.config.Configuration().verbose_mode_keyboard        
         # is_local, is_remote = self._update_flags(is_local, is_remote, force_remote)
         if self.is_random:
             # random pause
@@ -901,7 +920,7 @@ class PauseAction(MacroAbstractAction):
                 duration = random.uniform(0, duration_min)
         else:
             duration = self.duration
-
+        if verbose: syslog.info(f"MACRO: Pause action for {duration}")
         time.sleep(duration)
 
 class GraphAction(MacroAbstractAction):

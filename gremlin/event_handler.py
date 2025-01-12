@@ -105,6 +105,7 @@ class Event:
 		self.event_type = event_type
 		self._identifier = identifier
 		self.device_guid = device_guid
+		#self._is_pressed = is_pressed
 		self.is_pressed = is_pressed
 		self.value = value
 		self.raw_value = raw_value
@@ -147,6 +148,16 @@ class Event:
 	@identifier.setter
 	def identifier(self, value):
 		self._identifier = value
+
+	# @property
+	# def is_pressed(self):
+	# 	return self._is_pressed
+	
+	# @is_pressed.setter
+	# def is_pressed(self, value):
+	# 	if value:
+	# 		pass
+	# 	self._is_pressed = value
 
 
 	def __eq__(self, other):
@@ -578,7 +589,7 @@ class EventListener(QtCore.QObject):
 	def _process_queue(self):
 		''' processes an item the keyboard buffer queue '''
 		item, is_pressed = self._keyboard_queue.get()
-		verbose = gremlin.config.Configuration().verbose_mode_keyboard
+		verbose = gremlin.config.Configuration().verbose_mode_detailed
 		is_error = False
 		if verbose:
 			syslog.info(f"process_queue: found item: {item} is presseD: {is_pressed}")
@@ -681,6 +692,7 @@ class EventListener(QtCore.QObject):
 
 		syslog = logging.getLogger("system")
 		syslog.info("EVENT: shutdown requested")
+		gremlin.shared_state.terminating = True # tell UI we're terminating to avoid uncessary updates if we're shutting down
 		self._running = False
 		self.keyboard_hook.stop()
 		if self.mouse_hook:
@@ -890,7 +902,7 @@ class EventListener(QtCore.QObject):
 
 		:param event the keyboard event
 		"""
-		verbose = gremlin.config.Configuration().verbose_mode_keyboard
+		verbose = gremlin.config.Configuration().verbose_mode_detailed
 
 		# verbose = True
 		virtual_code = event.virtual_code
@@ -1444,11 +1456,10 @@ class EventHandler(QtCore.QObject):
 			if verbose:
 				syslog.info(f"matching mouse event {event.identifier} to {gremlin.keyboard.KeyMap.keyid_tostring(index)}")
 		else:
-			verbose = gremlin.config.Configuration().verbose_mode_keyboard
+			verbose = gremlin.config.Configuration().verbose_mode_detailed
 			device_guid = event.device_guid
 			# index = event.virtual_code if event.virtual_code > 0 else event.identifier  # this is (scan_code, is_extended)
 			index, _ = gremlin.keyboard.KeyMap.translate(event.identifier)
-			verbose = gremlin.config.Configuration().verbose_mode_keyboard
 			if verbose:
 				syslog.info(f"matching key event {event.identifier} to {gremlin.keyboard.KeyMap.keyid_tostring(index)}")
 
@@ -1749,11 +1760,13 @@ class EventHandler(QtCore.QObject):
 
 		# mode to act on
 		mode = event.mode if event.mode else self.runtime_mode  
+
 		
 		verbose = gremlin.config.Configuration().verbose_mode_inputs
 
 		if verbose and event.event_type != InputType.JoystickAxis:
 			syslog.info(f"process event - mode [{mode}] event: {str(event)}")
+
 
 
 		input_item = self._matching_input_item(mode, event)
@@ -1764,7 +1777,7 @@ class EventHandler(QtCore.QObject):
 
 		# filter latched keyboard or mouse events
 		if event.event_type in (InputType.Keyboard, InputType.KeyboardLatched, InputType.Mouse):
-			verbose = gremlin.config.Configuration().verbose_mode_keyboard
+			verbose = gremlin.config.Configuration().verbose_mode_detailed
 			data = event.data # holds keyboard state info
 			if event.event_type == InputType.Mouse:
 				verbose = gremlin.config.Configuration().verbose_mode_mouse

@@ -52,7 +52,7 @@ from gremlin.util import load_pixmap, load_icon
 import gremlin.util
 import gremlin.ui.ui_common
 from gremlin.singleton_decorator import SingletonDecorator
-
+from gremlin.types import HatDirection
 
 
 class WidgetTracker():
@@ -188,6 +188,8 @@ class StateTracker():
                     del self._button_cache[device_guid][input_type][key]
 
     def registerAxisState(self, widget, device_guid, input_type, input_id):
+        if hasattr(widget,"deleted"):
+            widget.deleted.connect(self._widget_deleted)
         if not isinstance(device_guid, str):
             device_guid = str(device_guid)
         if not device_guid in self._axis_cache:
@@ -195,9 +197,23 @@ class StateTracker():
         if not input_type in self._axis_cache[device_guid]:
             self._axis_cache[device_guid][input_type] = {}
         key = self._key(input_id)
-        assert key
         # print (f"Add axis {key}")
         self._axis_cache[device_guid][input_type][key] = widget
+
+    @QtCore.Slot(object)
+    def _widget_deleted(self, widget):
+        widget.deleted.disconnect(self._widget_deleted)
+        self._delete_widget(widget)
+        
+        
+    def _delete_widget(self, widget):
+        ''' deletes a widget '''
+        for device_guid in self._axis_cache:
+            for input_type in self._axis_cache[device_guid]:
+                for key in self._axis_cache[device_guid][input_type]:
+                    if self._axis_cache[device_guid][input_type][key] == widget:
+                        del self._axis_cache[device_guid][input_type][key]
+                        break
         
 
     def clear(self):
@@ -1300,7 +1316,7 @@ def _inheritance_tree_to_labels(labels, tree, level):
     """
     for mode, children in sorted(tree.items()):
         labels.append((mode,
-            f"{"  " * level}{"" if level == 0 else " "}{mode}"))
+            f"{"  " * level}{"" if level == 0 else "└"}{mode}"))
         _inheritance_tree_to_labels(labels, children, level+1)
 
 def get_mode_list(profile_data):
@@ -1549,8 +1565,8 @@ class ModeWidget(QtWidgets.QWidget):
         return self.edit_mode_selector.currentIndex()
 
     def currentMode(self) -> str:
-        ''' current selection text '''
-        return self.edit_mode_selector.currentText()
+        ''' gets the current mode '''
+        return self.edit_mode_selector.currentData()
 
 
     def setCurrentIndex(self, index):
@@ -1974,6 +1990,7 @@ class QIconLabel(QtWidgets.QWidget):
     def __init__(self, icon_path = None, text = None, stretch=True, use_qta = False, icon_color = None, use_wrap = True, icon_size = 16, parent = None):
         super().__init__(parent)
 
+        
         container_widget = QtWidgets.QWidget()
         container_widget.setContentsMargins(0, 0, 0, 0)
         container_layout = QtWidgets.QHBoxLayout(container_widget)
@@ -1995,7 +2012,10 @@ class QIconLabel(QtWidgets.QWidget):
             container_layout.addStretch()
 
         layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(0,0,0,0)
         layout.addWidget(container_widget)
+
+        self.setContentsMargins(0,0,0,0)
 
     def setIcon(self, icon_path = None, use_qta = True, color = None):
         ''' sets the icon of the label, pass a blank or None path to clear the icon'''
@@ -2180,13 +2200,76 @@ class QDataComboBox(QComboBox):
     def data(self, value):
         self._data = value
 
-
 class QLimitedComboBox(QDataComboBox):
     ''' a row limited combo box '''
     def __init__(self, data = None, parent = None):
         super().__init__(data, parent)
         self.setMaxVisibleItems(20)
         self.setStyleSheet("QComboBox { combobox-popup: 0; }")
+
+class QHatSelectorComboBox(QDataComboBox):
+    ''' a combo box for hat directions '''
+
+    valueChanged = QtCore.Signal(HatDirection) # fires when a value is selected 
+
+    def __init__(self, data = None, parent = None):
+
+        super().__init__(data, parent)
+
+        self._direction = HatDirection.Center
+
+        for position in HatDirection:
+            match position:
+                case HatDirection.Center:
+                    png = "hat_ctr.png"
+                case HatDirection.North:
+                    png = "hat_n.png"
+                case HatDirection.NorthEast:
+                    png = "hat_ne.png"
+                case HatDirection.NorthWest:
+                    png = "hat_nw.png"
+                case HatDirection.East:
+                    png = "hat_e.png"
+                case HatDirection.South:
+                    png = "hat_s.png"
+                case HatDirection.SouthEast:
+                    png = "hat_se.png"
+                case HatDirection.SouthWest:
+                    png = "hat_sw.png"      
+                case HatDirection.West:
+                    png = "hat_w.png"  
+            icon = load_icon(png)                  
+            self.addItem(icon, HatDirection.to_display_name(position), HatDirection.to_enum(position))
+            
+        self.currentIndexChanged.connect(self._update_value)
+
+    @property
+    def direction(self) -> str:
+        ''' direction selected '''
+        return self.currentData(self.currentIndex())
+    
+    @property
+    def value(self):
+        ''' direction as a tuple '''
+        direction = HatDirection.to_enum(self.currentData(self.currentIndex()))
+        return direction.value
+    
+    def setValue(self, value, emit = False):
+        ''' sets the value as a tuple '''
+        with QtCore.QSignalBlocker(self):
+            if isinstance(value, tuple):
+                value = HatDirection(value)
+            index = self.findData(value)
+            if index != -1:
+                self.setCurrentIndex(index)
+        if emit:
+            self._update_value()
+
+    @QtCore.Slot()
+    def _update_value(self):
+        ''' index changed '''
+        self.valueChanged.emit(self.currentData())
+
 
 
 class QPathLineItem(QtWidgets.QWidget):
@@ -2389,6 +2472,7 @@ class ButtonStateWidget(QtWidgets.QWidget):
 
 
     def unhookDevice(self):
+
         self._tab_unselected(self._device_guid)
 
     @QtCore.Slot(str)
@@ -2473,7 +2557,7 @@ class AxisStateWidget(QtWidgets.QWidget):
     css_horizontal = r"QProgressBar::chunk {background: QLinearGradient( x1: 0, y1: 0, x2: 0, y2: 1,stop: 0 #77a ,stop: 0.4999 #477,stop: 0.5 #45a,stop: 1 #238 ); border-radius: 7px; border: 1px solid black;}"
 
     valueChanged = QtCore.Signal(float, float) # (input_value, curved_value)
-    deleted = QtCore.Signal() # indicates the item is being deleted
+    deleted = QtCore.Signal(object) # indicates the item is being deleted
 
     def __init__(self, axis_id = None, show_percentage = True, show_value = True, show_label = True, show_curve = True, orientation = QtCore.Qt.Orientation.Vertical, parent=None):
         """Creates a new instance.
@@ -2494,11 +2578,11 @@ class AxisStateWidget(QtWidgets.QWidget):
         self.main_layout.setSpacing(0)
         self.main_layout.setContentsMargins(0,0,0,0)
         
+        self._data = None
 
-        self._progress_widget = QtWidgets.QProgressBar(parent = self)
-        self._progress_widget.setContentsMargins(0,0,0,0)
-        self._progress_widget.setOrientation(orientation)
-        self._progress_widget.setTextVisible(False)
+        self._progress_widget = QtWidgets.QProgressBar()
+
+
 
         self._orientation = orientation
         self._show_percentage = show_percentage
@@ -2518,7 +2602,9 @@ class AxisStateWidget(QtWidgets.QWidget):
         self.main_layout.addWidget(self._progress_widget)
         self.main_layout.addWidget(self._readout_widget)
         self.main_layout.addWidget(self._readout_curved_widget)
-        
+
+
+
         self._min_range = -1.0
         self._max_range = 1.0
         self._device_guid = None
@@ -2542,13 +2628,22 @@ class AxisStateWidget(QtWidgets.QWidget):
         if orientation == QtCore.Qt.Orientation.Horizontal:
             self.main_layout.addStretch()
             
+        self._progress_widget.setContentsMargins(0,0,0,0)
+        self._progress_widget.setOrientation(orientation)
+        self._progress_widget.setTextVisible(False)
         
 
     def _cleanup_ui(self):
         ''' item is being deleted '''
         self.unhookDevice()
-        self.deleted.emit()
-        
+        self.deleted.emit(self)
+
+    @property
+    def data(self):
+        return self._data
+    @data.setter
+    def data(self, value):
+        self._data = value        
 
     @property
     def show_curved(self) -> bool:
@@ -2558,7 +2653,7 @@ class AxisStateWidget(QtWidgets.QWidget):
     def show_curved(self, value: bool):
         if value != self._show_curved:
             self._show_curved = value
-            self.setValue(self._value, self._curve_value)
+            self._setValue(self._value, self._curve_value)
 
 
 
@@ -2608,9 +2703,13 @@ class AxisStateWidget(QtWidgets.QWidget):
 
     def setValue(self, value, curve_value = None, percent_value = None, other_value = None):
         """Sets the value shown by the widget.
-
         :param value new value to show
         """
+        assert not self._joystick_hooked,"Cannot set value on a hooked input"
+        self._setValue(value, curve_value, percent_value, other_value)
+
+    def _setValue(self, value, curve_value = None, percent_value = None, other_value = None):
+        ''' internal set value '''
         if value < self._min_range:
             value = self._min_range
         if value > self._max_range:
@@ -2687,7 +2786,7 @@ class AxisStateWidget(QtWidgets.QWidget):
             self._scale_factor * self._min_range,
             self._scale_factor * self._max_range
         )
-        self.setValue(self._value)
+        self._setValue(self._value)
 
     def setMaximum(self, value):
         ''' sets the upper range value '''
@@ -2699,7 +2798,7 @@ class AxisStateWidget(QtWidgets.QWidget):
 
     def setReverse(self, value):
         self._reverse = value
-        self.setValue(self._value)
+        self._setValue(self._value)
 
     def reverse(self):
         ''' reverse flag '''
@@ -2709,6 +2808,10 @@ class AxisStateWidget(QtWidgets.QWidget):
         ''' hooks an axis (manual)'''
         import gremlin.joystick_handling
         import gremlin.event_handler
+        if device_guid is None: 
+            # not a valid device to hook
+            return
+  
         self._device_guid = device_guid
         self._input_id = input_id
         self._input_type = input_type
@@ -2716,22 +2819,29 @@ class AxisStateWidget(QtWidgets.QWidget):
         self._value = -1
         self.setRange(-1, 1)
         
+        
         self._is_hardware_input = gremlin.joystick_handling.is_hardware_device(device_guid)
         if self._input_type in (InputType.OpenSoundControl, InputType.Midi):
-            value = input_id.axis_value
+            self._value = input_id.axis_value
         elif self._is_hardware_input:
-            value = gremlin.joystick_handling.get_axis(device_guid, input_id)
+            self._value = gremlin.joystick_handling.get_axis(device_guid, input_id)
             el = gremlin.event_handler.EventListener()
             el.joystick_event.connect(self._joystick_event)
             self._joystick_hooked = True
-        self._update_value(value)
+        self._update_value(self._value)
 
         self._handler_connected = False
         
-        self._tab_selected(device_guid)
+        #self._tab_selected(device_guid)
 
     @QtCore.Slot(object)
     def _joystick_event(self, event):
+        if self.data:
+            pass
+        if self._device_guid is None:
+            return 
+        if not event.is_axis:
+            return 
         if self._device_guid != event.device_guid:
             return
         if self._input_type != event.event_type:
@@ -2746,6 +2856,7 @@ class AxisStateWidget(QtWidgets.QWidget):
             el = gremlin.event_handler.EventListener()
             el.joystick_event.disconnect(self._joystick_event)
         self._tab_unselected(self._device_guid)
+        self._device_guid = None
         
 
     @property
@@ -2817,9 +2928,9 @@ class AxisStateWidget(QtWidgets.QWidget):
             # curve_value = eh._apply_curve_ex(self._device_guid, self._input_id, value)
             #print (f"raw: {raw_value:0.3f} calibrated: {value:0.3f} curved: {curve_value:0.3f}")
             #self.setValue(value, curve_value)
-            self.setValue(value)
+            self._setValue(value)
         else:
-            self.setValue(value)
+            self._setValue(value)
             #self.setValue(raw_value)
 
 

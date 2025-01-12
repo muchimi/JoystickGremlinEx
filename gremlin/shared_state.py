@@ -205,6 +205,9 @@ current_profile = None
 # holds the active (runtime) mode
 runtime_mode = None
 
+# terminating flag - set when the application is terminating
+terminating = False
+
 # holds the edit mode
 edit_mode = "Default"
 

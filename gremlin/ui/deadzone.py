@@ -293,14 +293,6 @@ class DeadzoneWidget(QtWidgets.QWidget):
             self._centered = value
             self._update()
 
-    # def setValues(self, values):
-    #     v1,v2,v3,v4 = values
-    #     self.left_lower.setValue(v1),
-    #     self.left_upper.setValue(v2),
-    #     self.right_lower.setValue(v3),
-    #     self.right_upper.setValue(v4)
-
-
     def setValues(self, values):
         """Sets the deadzone values.
 
@@ -312,7 +304,13 @@ class DeadzoneWidget(QtWidgets.QWidget):
             # no change
             return
 
-        v1,v2,v3,v4 = values
+        if len(values) == 2:
+            # has enpoints only
+            v1,v4 = values
+            v2 = v3 = 0.0
+        else:
+            # has enpoints and centering
+            v1,v2,v3,v4 = values
 
         with QtCore.QSignalBlocker(self.left_slider):
             self.left_slider.setValue((v1,v2))

@@ -1010,6 +1010,72 @@ def get_xml_child(node, tag : str, multiple = False):
     return None
 
 
+def get_xml_input_data(node):
+    ''' for a given XML node, find in the parent hierarchy of a profile the device_guid, mode, input_type and input_id 
+    
+    :param node: the child node
+    :returns: (device_guid, input_type, input_id, mode)
+    
+    '''
+    from gremlin.input_types import InputType
+
+    device_guid = None
+    input_id = None
+    mode = None
+    input_type = None
+
+    device_node = node
+    while device_node is not None and device_node.tag != "device":
+        device_node = device_node.getparent()
+
+    if device_node is not None:
+        device_guid = parse_guid(device_node.get("device-guid"))
+
+    # grab the mode
+    mode_node = node
+    while mode_node is not None and mode_node.tag != "mode":
+        mode_node = mode_node.getparent()
+
+    if mode_node is not None:
+        mode = mode_node.get("name")
+
+    # grab the input type and input id this applies to
+    input_node = node
+    tags = ["axis","button","hat","osc","midi"]
+
+    while input_node is not None and not input_node.tag in tags:
+        input_node = input_node.getparent()
+
+
+    if input_node is not None:
+        match input_node.tag:
+            case "axis":
+                input_type = InputType.JoystickAxis
+                input_id = safe_read(input_node,"id",int, 0)
+            case "button":
+                input_type = InputType.JoystickButton
+                input_id = safe_read(input_node,"id",int, 0)
+            case "hat":
+                input_type = InputType.JoystickHat
+                input_id = safe_read(input_node,"id",int, 0)
+            case "osc":
+                child = get_xml_child(input_node, "input")
+                input_type = InputType.OpenSoundControl
+                input_id = str(parse_guid(child.get("guid")))
+            case "midi":
+                child = get_xml_child(input_node, "input")
+                input_type = InputType.Midi
+                input_id = str(parse_guid(child.get("guid")))
+            
+
+
+    
+
+
+
+    return (device_guid, input_type, input_id, mode)
+
+
 def parse_guid(value):
     """Reads a string GUID representation into the internal data format.
 

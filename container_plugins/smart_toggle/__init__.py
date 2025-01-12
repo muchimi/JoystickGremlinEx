@@ -85,7 +85,7 @@ class SmartToggleContainerWidget(AbstractContainerWidget):
             self.action_layout.addWidget(action_selector)
 
     def _create_condition_ui(self):
-        if self.profile_data.has_action_conditions:
+        if self.profile_data.action_sets:
 
             widget = self._create_action_set_widget(
                 self.profile_data.action_sets[0],

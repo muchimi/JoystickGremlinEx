@@ -1823,8 +1823,8 @@ class ButtonReleaseActions(QtCore.QObject):
         Args:
             event: the event to process
         """
-        if not event.is_axis:
-            print (f"received event: {str(event)}")
+        # if not event.is_axis:
+        #     print (f"received event: {str(event)}")
 
         key = event.callbackKey
         #if evt in [e for e in self._registry if e.is_pressed != evt.is_pressed]:
@@ -1835,7 +1835,7 @@ class ButtonReleaseActions(QtCore.QObject):
 
                 if entry.event.is_pressed == event.is_pressed:
                     try:
-                        print ("trigger release event")
+                        #print ("trigger release event")
                         entry.callback()
                     except:
                         pass

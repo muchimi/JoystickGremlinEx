@@ -105,7 +105,7 @@ class TempoContainerWidget(AbstractContainerWidget):
             )
 
     def _create_condition_ui(self):
-        if self.profile_data.has_action_conditions:
+        if self.profile_data.action_sets:
             if self.profile_data.action_sets[0] is not None:
                 self._create_action_widget(
                     0,

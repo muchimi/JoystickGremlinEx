@@ -280,9 +280,9 @@ class JoystickCondition(AbstractCondition):
 
         if self.input_type == InputType.JoystickAxis:
             retval = False
-            in_range = self.condition.range[0] <= \
-                       joy.axis(self.input_id).value <= \
-                       self.condition.range[1]
+            value = joy.axis(self.input_id).value
+            print (f"condition input value: {value}")
+            in_range = self.condition.range[0] <= value <= self.condition.range[1]
 
             if self.comparison in ["inside", "outside"]:
                 retval = in_range if self.comparison == "inside" else not in_range
@@ -574,18 +574,23 @@ class AxisButton(VirtualButton):
         else:
             # Check if we moved over the activation region between two
             # consecutive measurements
+            if self._last_value < self._lower_limit or self._last_value > self._upper_limit:
+                self.forced_activation = True
             if self._last_value < self._lower_limit and \
                     event.value > self._upper_limit:
                 self.forced_activation = True
             elif self._last_value > self._upper_limit and \
                     event.value < self._lower_limit:
                 self.forced_activation = True
+            
+
 
             # Determine direction in which the axis is moving
             if self._last_value < event.value:
                 direction = AxisButtonDirection.Below
             elif self._last_value > event.value:
                 direction = AxisButtonDirection.Above
+            
 
         inside_range = self._lower_limit <= event.value <= self._upper_limit
         self._last_value = event.value
@@ -614,8 +619,8 @@ class AxisButton(VirtualButton):
                 return self._fsm.perform("press")
             else:
                 return self._fsm.perform("release")
-        else:
-            return self._fsm.perform("press")
+        # else:
+        #     return self._fsm.perform("press")
 
 
 class HatButton(VirtualButton):

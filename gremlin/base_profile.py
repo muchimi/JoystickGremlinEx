@@ -131,7 +131,7 @@ class ProfileData(metaclass=ABCMeta):
 
         :param node the XML node to use to populate this instance
         """
-        self._parse_xml(node)
+        self._parse_xml(node, data)
 
     def to_xml(self):
         """Returns the XML representation of this instance.
@@ -424,15 +424,12 @@ class AbstractContainer(ProfileData):
     def action_condition_count(self) -> int:
         ''' gets the count of action conditions currently defined '''
         count = 0
-        if self.activation_condition is not None:
-            # check each action set for conditions
-
-            for action_set in self.action_sets:
-                action : AbstractAction
-                if action_set:
-                    for action in action_set:
-                        if action.activation_condition:
-                            count += len(action.activation_condition.conditions)
+        for action_set in self.action_sets:
+            action : AbstractAction
+            if action_set:
+                for action in action_set:
+                    if action.activation_condition:
+                        count += len(action.activation_condition.conditions)
         return count                            
 
     @property
@@ -498,12 +495,18 @@ class AbstractContainer(ProfileData):
             need_virtual_button = need_virtual_button or \
                 any([a.requires_virtual_button() for a in actions if a is not None])
 
+
         if need_virtual_button:
             if self.virtual_button is None:
                 input_type = self.parent.input_type
                 vb = AbstractContainer.virtual_button_lut.get(input_type, None)
                 if vb:
-                    self.virtual_button = vb()
+                    self.virtual_button = vb(
+                        device_guid = self.device_guid,
+                        input_type = self.get_input_type(),
+                        input_id = self.get_input_id(),
+                        mode = gremlin.shared_state.current_mode)
+                    
             elif not isinstance(self.virtual_button,AbstractContainer.virtual_button_lut[self.parent.input_type]):
                 self.virtual_button = \
                     AbstractContainer.virtual_button_lut[self.parent.input_type]()
@@ -635,12 +638,17 @@ class AbstractContainer(ProfileData):
         :param node the XML node to process
         """
         vb_node = node.find("virtual-button")
+        device_guid, input_type, input_id, mode = get_xml_input_data(node)
 
         self.virtual_button = None
         if vb_node is not None:
             item = AbstractContainer.virtual_button_lut[self.get_input_type()]
             if item is not None:
-                self.virtual_button = item()
+                self.virtual_button = item(
+                    device_guid = device_guid,
+                    input_type = input_type,
+                    input_id = input_id, 
+                    mode = gremlin.shared_state.current_mode)
                 self.virtual_button.from_xml(vb_node, data)
 
     def _parse_activation_condition_xml(self, node, data):

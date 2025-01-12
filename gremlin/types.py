@@ -118,8 +118,8 @@ class AxisButtonDirection(Enum):
 
     Anywhere = 1
     Below = 2
-    Above = 3
-
+    Above = 3,
+    
     @staticmethod
     def to_string(value: AxisButtonDirection) -> str:
         try:
@@ -142,12 +142,14 @@ class AxisButtonDirection(Enum):
 _AxisButtonDirection_to_string_lookup = {
     AxisButtonDirection.Anywhere: "anywhere",
     AxisButtonDirection.Above: "above",
-    AxisButtonDirection.Below: "below"
+    AxisButtonDirection.Below: "below",
+    
+
 }
 _AxisButtonDirection_to_enum_lookup = {
     "anywhere": AxisButtonDirection.Anywhere,
     "above": AxisButtonDirection.Above,
-    "below": AxisButtonDirection.Below
+    "below": AxisButtonDirection.Below,
 }
 
 
@@ -509,7 +511,9 @@ class HatDirection(Enum):
     @staticmethod
     def to_enum(value: Union[str, Tuple[int, int]]) -> HatDirection:
         try:
-            if isinstance(value, str):
+            if isinstance(value, HatDirection):
+                return value
+            elif isinstance(value, str):
                 return _HatDirection_to_enum_lookup[value.lower()]
             else:
                 return _HatDirection_to_enum_lookup[value]
@@ -517,6 +521,10 @@ class HatDirection(Enum):
             raise gremlin.error.GremlinError(
                 "Invalid HatDirection in lookup"
             )
+        
+    @staticmethod
+    def to_display_name(value: HatDirection) -> str:
+        return value.name
 
 _HatDirection_to_string_lookup = {
     HatDirection.Center: "center",
@@ -552,6 +560,7 @@ _HatDirection_to_enum_lookup = {
     (-1, 0): HatDirection.West,
     (-1, 1): HatDirection.NorthWest,
 }
+
 
 
 class LogicalOperator(Enum):
@@ -906,7 +915,8 @@ class VerboseMode(IntFlag):
     Process = auto() # process changes
     Exec = auto() # execution trees
     Midi = auto() # midi mode
-    All = Keyboard | Joystick | Inputs | Mouse | Details | SimConnect | Condition | Process | Exec | Midi
+    Device = auto() # device change modes
+    All = Keyboard | Joystick | Inputs | Mouse | Details | SimConnect | Condition | Process | Exec | Midi | Device
 
     def __contains__(self, item):
         return  (self.value & item.value) == item.value

@@ -346,6 +346,9 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
         self._ar_running = False
         self._ar_event = threading.Event()
         self.has_keys = bool(action.keys)
+        self.use_macros = False # true to use macros, false to send direct keys
+        self._press_keys = []
+        self._release_keys = []
 
         if self.delay < 0:
             self.delay = 0
@@ -356,12 +359,14 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
         key: Key
         for key in action.keys:
             self.press.press(key)
+            self._press_keys.append(key)
 
         self.release = gremlin.macro.Macro()
 
         # Execute release in reverse order
         for key in reversed(action.keys):
             self.release.release(key)
+            self._release_keys.append(key)
 
         self.delay_press_release = gremlin.macro.Macro()
 
@@ -429,10 +434,10 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
 
 
     def process_event(self, event, value):
-        
-        if event.is_axis or value.current:
+        syslog = logging.getLogger("system")
+        verbose = gremlin.config.Configuration().verbose_mode_keyboard
+        if event.is_axis or value.current or event.is_pressed:
             # joystick values or virtual button
-            verbose = gremlin.config.Configuration().verbose_mode_keyboard
             # verbose = True
             
             if self.mode == KeyboardOutputMode.Release:
@@ -471,15 +476,24 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
             elif self.mode == KeyboardOutputMode.Hold:
                 if self.has_keys:
                     auto_release = self.needs_auto_release
-                    # if event.is_virtual_button:
-                    #     auto_release = False
-                    if event.is_pressed:
+                    if event.is_virtual_button:
+                        # if using a virtual button to trigger - disable the auto-release
+                        auto_release = False
+                    if event.is_pressed and not auto_release:
                         # press event
                         if verbose:
-                            logging.getLogger("system").info(f"MapToKeyboardEx: hold")
-                        id = gremlin.macro.MacroManager().queue_macro(self.press)
-                        self.registerMacro(id)
-                    if auto_release: 
+                            logging.getLogger("system").info(f"MapToKeyboardEx: hold (press)")
+
+                        if self.use_macros:
+                            id = gremlin.macro.MacroManager().queue_macro(self.press)
+                            self.registerMacro(id)
+                        else:
+                            # send direct
+                            for key in self._press_keys:
+                                if verbose: syslog.info(f"send key press: {key}")
+                                gremlin.macro._send_key_down(key)
+
+                    if event.is_pressed and auto_release: 
                         callback = lambda : gremlin.macro.MacroManager().queue_macro(self.release)
                         ButtonReleaseActions().register_callback(callback, event)
             elif self.mode == KeyboardOutputMode.AutoRepeat:
@@ -496,8 +510,16 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
         else:
             # release
             if self.has_keys:
-                if self.mode == KeyboardOutputMode.Hold:
-                    gremlin.macro.MacroManager().queue_macro(self.release)
+                    if self.mode == KeyboardOutputMode.Hold:
+                        # release keys
+                        if self.use_macros:
+                            gremlin.macro.MacroManager().queue_macro(self.release)
+                        else:
+                            # not using macros
+                            for key in self._release_keys:
+                                if verbose: syslog.info(f"send key release: {key}")
+                                gremlin.macro._send_key_up(key)
+
             self._ar_running = False
             self._ar_event.set()
             if self._ar_thread is not None:

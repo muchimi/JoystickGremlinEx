@@ -168,6 +168,9 @@ class ExecutionContext():
     def _walk_mode_tree(self, node, branch):
         ''' walks a mode tree manually to build the mode hierarchy (recursive)'''
         for mode, sub_branch in branch.items():
+            if not mode:
+                # most but be valid
+                continue
             child = ExecutionModeNode(mode)
             child.parent = node
             self._walk_mode_tree(child, sub_branch)
@@ -235,10 +238,13 @@ class ExecutionContext():
     def getModeHierarchy(self, mode):
         ''' gets a list of parent modes for the given mode '''
         modes = []
-        node = anytree.search.find_by_attr(self.modeTree, mode, "mode")
-        while node.mode:
-            modes.append(node.mode)
-            node = node.parent
+
+        nodes = anytree.search.findall_by_attr(self.modeTree, mode, "mode")
+        for node in nodes:
+            while node.mode:
+                modes.add(node.mode)
+                node = node.parent
+            break # use only the first node returned by the search
 
         return modes
 
@@ -528,6 +534,10 @@ class VirtualButtonCallback:
         """
         if value is None:
             value = gremlin.actions.Value(event.is_pressed)
+
+        event.is_virtual_button = True # tell the functors this is a virtual button
+        event.is_axis = False
+        print (f"Send virtual button {event.is_pressed} ---------------------------------------------------------------------------")
         self._execution_graph.process_event(
             event,
             value
@@ -622,6 +632,8 @@ class AbstractExecutionGraph(QtCore.QObject):
         
         verbose = gremlin.config.Configuration().verbose_mode_condition
         syslog = logging.getLogger("system")
+
+        print (str(event))
         
         if verbose: syslog.info (f"Execution plan:")
         functor_names = []
