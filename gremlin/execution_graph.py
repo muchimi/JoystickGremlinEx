@@ -557,15 +557,9 @@ class VirtualButtonProcess:
         self.virtual_button = None
 
         if isinstance(data, gremlin.base_buttons.VirtualAxisButton):
-            self.virtual_button = gremlin.actions.AxisButton(
-                data.lower_limit,
-                data.upper_limit,
-                data.direction
-            )
+            self.virtual_button = gremlin.actions.AxisButton(data.lower_limit, data.upper_limit, data.direction)
         elif isinstance(data, gremlin.base_buttons.VirtualHatButton):
-            self.virtual_button = gremlin.actions.HatButton(
-                data.directions
-            )
+            self.virtual_button = gremlin.actions.HatButton(data.directions)
         else:
             raise gremlin.error.GremlinError("Invalid virtual button data provided")
 

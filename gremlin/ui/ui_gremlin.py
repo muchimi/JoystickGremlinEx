@@ -26,8 +26,6 @@ class Ui_Gremlin(object):
         self.tab_bar_layout.setContentsMargins(0,0,0,0)
         self.tab_bar_widget.setMaximumHeight(30)
         
-
-        #self.devices = QtWidgets.QTabWidget()
         self.devices = gremlin.ui.ui_common.QTabHeader(parent = self.tab_bar_widget)
         self.devices.setMovable(True)
         self.devices.setUsesScrollButtons(True)

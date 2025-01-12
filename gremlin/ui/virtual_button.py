@@ -80,6 +80,12 @@ class VirtualAxisButtonWidget(AbstractVirtualButtonWidget):
     def _create_ui(self):
         """Creates all required UI elements."""
         VirtualAxisButtonWidget.locked = True
+
+        self.enabled_widget = QtWidgets.QCheckBox("Enable virtual button")
+        self.enabled_widget.setToolTip("When enabled, the virtual button will take precedence over any other conditions set for the container or its actions.")
+        self.enabled_widget.setChecked(self.condition_data.enabled)
+        self.enabled_widget.clicked.connect(self._enabled_changed)
+
         self.axis_repeater_widget = ui_common.AxisStateWidget(orientation=QtCore.Qt.Orientation.Horizontal, show_percentage=False)
         self.axis_repeater_widget.valueChanged.connect(self._axis_value_changed)
 
@@ -100,54 +106,63 @@ class VirtualAxisButtonWidget(AbstractVirtualButtonWidget):
 
 
         self.range_layout = QtWidgets.QHBoxLayout()
-        self.lower_limit = ui_common.DynamicDoubleSpinBox()
-        self.lower_limit.setRange(-1.0, 1.0)
-        self.lower_limit.setSingleStep(0.05)
-        self.upper_limit = ui_common.DynamicDoubleSpinBox()
-        self.upper_limit.setRange(-1.0, 1.0)
-        self.upper_limit.setSingleStep(0.05)
-        self.direction = ui_common.QComboBox()
-        self.direction.addItem("Anywhere")
-        self.direction.addItem("Above")
-        self.direction.addItem("Below")
+        self.lower_limit_widget = ui_common.DynamicDoubleSpinBox()
+        self.lower_limit_widget.setRange(-1.0, 1.0)
+        self.lower_limit_widget.setSingleStep(0.05)
+        self.upper_limit_widget = ui_common.DynamicDoubleSpinBox()
+        self.upper_limit_widget.setRange(-1.0, 1.0)
+        self.upper_limit_widget.setSingleStep(0.05)
+        self.direction_widget = ui_common.QComboBox()
+        self.direction_widget.addItem("Anywhere")
+        self.direction_widget.addItem("Above")
+        self.direction_widget.addItem("Below")
 
         self.setTitle("Virtual Button")
         self.range_layout.addWidget(
             QtWidgets.QLabel("Activate when axis is between: ")
         )
-        self.range_layout.addWidget(self.lower_limit)
+        self.range_layout.addWidget(self.lower_limit_widget)
         self.range_layout.addWidget(self.grab_low_widget)
         self.range_layout.addWidget(QtWidgets.QLabel("and"))
-        self.range_layout.addWidget(self.upper_limit)
+        self.range_layout.addWidget(self.upper_limit_widget)
         self.range_layout.addWidget(self.grab_high_widget)
         self.range_layout.addWidget(QtWidgets.QLabel("when entering the range from"))
-        self.range_layout.addWidget(self.direction)
+        self.range_layout.addWidget(self.direction_widget)
         self.range_layout.addWidget(self.range_status_widget)
         self.range_layout.addStretch()
 
-        self.help_button = QtWidgets.QPushButton(load_icon("gfx/help.png"), "")
-        self.help_button.clicked.connect(self._show_hint)
-        self.range_layout.addWidget(self.help_button)
+        self.help_button_widget = QtWidgets.QPushButton(load_icon("gfx/help.png"), "")
+        self.help_button_widget.clicked.connect(self._show_hint)
+        self.range_layout.addWidget(self.help_button_widget)
 
-        self.main_layout.addWidget(self.axis_repeater_widget)
+        layout = QtWidgets.QHBoxLayout()
+        layout.addWidget(self.enabled_widget)
+        layout.addWidget(self.axis_repeater_widget)
+        layout.addStretch()
+
+        self.main_layout.addLayout(layout)
         self.main_layout.addLayout(self.range_layout)
 
-        self.lower_limit.valueChanged.connect(self._lower_limit_cb)
-        self.upper_limit.valueChanged.connect(self._upper_limit_cb)
-        self.direction.currentTextChanged.connect(self._direction_changed_cb)
+        self.lower_limit_widget.valueChanged.connect(self._lower_limit_cb)
+        self.upper_limit_widget.valueChanged.connect(self._upper_limit_cb)
+        self.direction_widget.currentTextChanged.connect(self._direction_changed_cb)
 
         self.last_value = None
+
+    @QtCore.Slot(bool)
+    def _enabled_changed(self, checked):
+        self.condition_data.enabled = checked
 
     @QtCore.Slot()
     def _grab_low(self):
         value = self.axis_repeater_widget.value()
-        self.lower_limit.setValue(value) # also updates condition_data
+        self.lower_limit_widget.setValue(value) # also updates condition_data
         
 
     @QtCore.Slot()
     def _grab_high(self):
         value = self.axis_repeater_widget.value()
-        self.upper_limit.setValue(value) # also updates condition_data            
+        self.upper_limit_widget.setValue(value) # also updates condition_data            
 
     @QtCore.Slot(float, float)
     def _axis_value_changed(self, value : float, curved_value : float):
@@ -183,12 +198,12 @@ class VirtualAxisButtonWidget(AbstractVirtualButtonWidget):
 
     def _populate_ui(self):
         """Populates the UI elements with data."""
-        self.lower_limit.setValue(self.condition_data.lower_limit)
-        self.upper_limit.setValue(self.condition_data.upper_limit)
+        self.lower_limit_widget.setValue(self.condition_data.lower_limit)
+        self.upper_limit_widget.setValue(self.condition_data.upper_limit)
         self.axis_repeater_widget.hookDevice(self.condition_data.device_guid,
                                              self.condition_data.input_type,
                                              self.condition_data.input_id)
-        self.direction.setCurrentText(
+        self.direction_widget.setCurrentText(
             gremlin.types.AxisButtonDirection.to_string(
                 self.condition_data.direction
             ).capitalize()
@@ -218,7 +233,7 @@ class VirtualAxisButtonWidget(AbstractVirtualButtonWidget):
     def _show_hint(self):
         """Displays a hint explaining the activation condition."""
         QtWidgets.QWhatsThis.showText(
-            self.help_button.mapToGlobal(QtCore.QPoint(0, 10)),
+            self.help_button_widget.mapToGlobal(QtCore.QPoint(0, 10)),
             gremlin.hints.hint.get("axis-condition", "")
         )
 

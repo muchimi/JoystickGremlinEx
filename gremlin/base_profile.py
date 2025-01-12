@@ -346,7 +346,8 @@ class AbstractContainer(ProfileData):
         self.action_model = None # set at creation by the parent of this container
         self.custom_action_sets = False # true if the container uses custom action sets (need a converter to product action_sets)
         self._condition_enabled = True
-        self._virtual_button_enabled = True # determines if the callbacks can be virtualized or not - if not - the callback is "raw" to the functor
+        self._virtual_button_enabled = True # determines if the callbacks can be virtualized or not - if not - the callback is "raw" to the functor - action / container set
+        self._virtual_button_user_enabled = False # determins if callbacks use the virtual button function - user set 
         self.activation_container_condition = ActivationCondition([],ActivationRule.All) # activation condition that applies to the container
         self.activation_condition = ActivationCondition([],ActivationRule.All) # activation condition that applies to the actions
         self.virtual_button = None
@@ -450,14 +451,21 @@ class AbstractContainer(ProfileData):
         self._condition_enabled = value
 
     @property
-    def virtual_button_enabled(self):
+    def virtual_button_enabled(self) -> bool:
         ''' determines if virtual button tab is enabled and virtual buttons is enabled for functor callbacks'''
-        return self._virtual_button_enabled
+        return self._virtual_button_enabled 
     @virtual_button_enabled.setter
-    def virtual_button_enabled(self, value):
+    def virtual_button_enabled(self, value : bool):
         ''' determines if virtual button tab is enabled and virtual buttons is enabled for functor callbacks'''
         self._virtual_button_enabled = value
 
+    @property
+    def virtual_button_user_enabled(self) -> bool:
+        ''' flag for user enable of the virtual button functionality so the user can decide to use it or not '''
+        return self._virtual_button_user_enabled
+    @virtual_button_user_enabled.setter
+    def virtual_button_user_enabled(self, value : bool):
+        self._virtual_button_user_enabled = value
 
   
     @property
@@ -501,15 +509,11 @@ class AbstractContainer(ProfileData):
                 input_type = self.parent.input_type
                 vb = AbstractContainer.virtual_button_lut.get(input_type, None)
                 if vb:
-                    self.virtual_button = vb(
-                        device_guid = self.device_guid,
-                        input_type = self.get_input_type(),
-                        input_id = self.get_input_id(),
-                        mode = gremlin.shared_state.current_mode)
+                    self.virtual_button = vb(self)
                     
             elif not isinstance(self.virtual_button,AbstractContainer.virtual_button_lut[self.parent.input_type]):
                 self.virtual_button = \
-                    AbstractContainer.virtual_button_lut[self.parent.input_type]()
+                    AbstractContainer.virtual_button_lut[self.parent.input_type](self)
         else:
             self.virtual_button = None
 
@@ -525,7 +529,8 @@ class AbstractContainer(ProfileData):
         # like a button would.
         from gremlin.event_handler import Event
 
-        if self._virtual_button_enabled and self.virtual_button is not None:
+        if self._virtual_button_enabled  and self._virtual_button_user_enabled and self.virtual_button is not None:
+            # virtual callback requires both the container/action to enable it, and the user to enable it as well
             callbacks.append(CallbackData(
                 gremlin.execution_graph.VirtualButtonProcess(self.virtual_button),
                 None
@@ -541,7 +546,7 @@ class AbstractContainer(ProfileData):
                 )
             ))
         else:
-           
+            # regular callback with conditions
             callbacks.append(CallbackData(gremlin.execution_graph.ContainerCallback(self, parent),None))
 
 
@@ -644,11 +649,7 @@ class AbstractContainer(ProfileData):
         if vb_node is not None:
             item = AbstractContainer.virtual_button_lut[self.get_input_type()]
             if item is not None:
-                self.virtual_button = item(
-                    device_guid = device_guid,
-                    input_type = input_type,
-                    input_id = input_id, 
-                    mode = gremlin.shared_state.current_mode)
+                self.virtual_button = item(self)
                 self.virtual_button.from_xml(vb_node, data)
 
     def _parse_activation_condition_xml(self, node, data):

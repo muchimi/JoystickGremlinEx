@@ -2016,6 +2016,8 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         el = gremlin.event_handler.EventListener()
         el.condition_state_changed.connect(self._update_ui)
 
+        self._update_ui(self.container)
+        
 
     @QtCore.Slot(object)
     def _update_ui(self, container):
@@ -2023,6 +2025,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         if dock_tabs.data == container:
             tracker = gremlin.base_conditions.ConditionTracker()
             enabled = tracker.getContainerConditionCount(container) > 0
+            virtual_enabled = self.profile_data.virtual_button_user_enabled
             try:
                 
                 for i in range(dock_tabs.count()):
@@ -2030,7 +2033,12 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
                         tb = dock_tabs.tabBar()
                         icon = self._icon_enabled if enabled else self._icon_disabled
                         tb.setTabIcon(i, icon)
-                        break
+                        
+                    if dock_tabs.tabText(i) == "Virtual Button":
+                        tb = dock_tabs.tabBar()
+                        icon = self._icon_enabled if virtual_enabled else self._icon_disabled
+                        tb.setTabIcon(i, icon)
+                        
             except:
                 pass
 
@@ -2131,6 +2139,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         # Put everything together
         self.virtual_button_layout.addWidget(self.virtual_button_widget)
         self.dock_tabs.addTab(self.virtual_button_tab_widget, "Virtual Button")
+
         self.virtual_button_layout.addStretch(10)
 
     def _select_tab(self, view_type):

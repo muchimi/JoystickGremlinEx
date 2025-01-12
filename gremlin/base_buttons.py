@@ -37,21 +37,35 @@ class VirtualAxisButton(AbstractVirtualButton):
 
     """Virtual button which turns an axis range into a button."""
 
-    def __init__(self, lower_limit=0.0, upper_limit=1.0, device_guid = None, input_type = None, input_id = None, mode = None):
+    def __init__(self, container = None): #, lower_limit=-1.0, upper_limit=1.0, device_guid = None, input_type = None, input_id = None, mode = None, enabled = False):
         """Creates a new instance.
 
         :param lower_limit the lower limit of the virtual button
         :param upper_limit the upper limit of the virtual button
         """
         from gremlin.types import AxisButtonDirection
+        from gremlin.base_profile import AbstractContainer
+        import gremlin.shared_state
+        container: AbstractContainer = container
         super().__init__()
-        self.lower_limit = lower_limit
-        self.upper_limit = upper_limit
+        self.lower_limit = -1
+        self.upper_limit = 1
         self.direction = AxisButtonDirection.Anywhere
-        self.device_guid = device_guid # associated device
-        self.input_id = input_id # associated axis
-        self.mode = mode # associated mode
-        self.input_type = input_type
+        self.device_guid = container.device_guid # associated device
+        self.input_id = container.get_input_id()
+        self.mode = gremlin.shared_state.current_mode
+        self.input_type = container.get_input_type()
+        self.container = container
+
+    @property
+    def enabled(self) -> bool:
+        return self.container.virtual_button_enabled
+    @enabled.setter
+    def enabled(self, value : bool):
+        import gremlin.event_handler
+        self.container.virtual_button_user_enabled = value
+        el = gremlin.event_handler.EventListener()
+        el.condition_state_changed.emit(self.container) # updates the UI status flags
 
     @property
     def range(self):
@@ -72,11 +86,12 @@ class VirtualAxisButton(AbstractVirtualButton):
 
 
         from gremlin.types import AxisButtonDirection
-        self.lower_limit = safe_read(node, "lower-limit", float)
-        self.upper_limit = safe_read(node, "upper-limit", float)
+        self.lower_limit = safe_read(node, "lower-limit", float, -1.0)
+        self.upper_limit = safe_read(node, "upper-limit", float, 1.0)
         self.direction = AxisButtonDirection.to_enum(
             safe_read(node, "direction", default_value="anywhere")
         )
+        self.enabled = safe_read(node,"enabled", bool, False)
 
     def to_xml(self):
         """Returns an XML node representing the data of this instance.
@@ -88,6 +103,7 @@ class VirtualAxisButton(AbstractVirtualButton):
         node.set("lower-limit", str(self.lower_limit))
         node.set("upper-limit", str(self.upper_limit))
         node.set("direction",AxisButtonDirection.to_string(self.direction))
+        node.set("enabled", str(self.enabled))
         return node
 
 
@@ -121,18 +137,22 @@ class VirtualHatButton(AbstractVirtualButton):
         "north-west": (-1, 1)
     }
 
-    def __init__(self, directions=(), device_guid = None, input_type = None, input_id = None, mode = None):
+    def __init__(self, container,  directions=()): #, device_guid = None, input_type = None, input_id = None, mode = None):
         """Creates a instance.
 
         :param directions list of direction that form the virtual button
         """
         super().__init__()
+        from gremlin.base_profile import AbstractContainer
+        import gremlin.shared_state
+        container: AbstractContainer = container
         self.directions = list(set(directions))
-        self.device_guid = device_guid
+        self.device_guid =  container.device_guid
         self.input_type = InputType.JoystickHat
-        self.input_id = input_id
-        self.mode = mode
-        self.input_type = input_type
+        self.input_id = container.get_input_id()
+        self.mode = gremlin.shared_state.current_mode
+        self.input_type = container.get_input_type()
+        self.container = container
 
     def from_xml(self, node, data = None):
         """Populates the activation condition based on the node's data.

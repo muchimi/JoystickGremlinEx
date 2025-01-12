@@ -263,7 +263,6 @@ class CalibrationData:
         self._deadzone_center_min = 0.0 # deadzone center left
         self._deadzone_center_max = 0.0 # deadzone center right
         self._inverted = False # true if inverted
-        self._has_data = False # true if the calibration is non default (modifies the output value)
         
         
 
@@ -282,21 +281,18 @@ class CalibrationData:
     @property
     def hasData(self) -> bool:
         ''' True if the calibration data is non default '''
-        return self._has_data
+        return self._calibrated_min != -1.0 or \
+               self._calibrated_max != 1.0 or \
+               self._calibrated_center != 0.0 or \
+               self._deadzone_min != -1.0 or \
+               self._deadzone_max != 1.0 or \
+               self._deadzone_center_min != 0.0 or \
+               self._deadzone_center_max != 0.0 or \
+               self._inverted 
         
     
     def _update(self):
         ''' updates data flag '''
-        self._has_data = not self._is_centered or \
-            self._inverted or \
-            self._calibrated_min != -1.0 or \
-            self._calibrated_max != 1.0 or \
-            self.calibrated_center != 0.0 or \
-            self._deadzone_min != -1.0 or \
-            self._deadzone_max  != 1.0 or \
-            self._deadzone_center_min != 0.0 or \
-            self._deadzone_center_max != 0.0 
-        
         # let the UI know the data changed
         el = gremlin.event_handler.EventListener()
         el.calibration_changed.emit(self)

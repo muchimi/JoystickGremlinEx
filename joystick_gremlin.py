@@ -905,6 +905,43 @@ class GremlinUi(QtWidgets.QMainWindow):
             gremlin.ui.ui_common.MessageBox(prompt = message)
 
 
+    def setUiMode(self):
+        ''' enables or disables the UI based on the runtime mode and options 
+        
+        this can lock the UI while a profile is running to prevent inadvertent changes 
+
+        '''
+        enabled = True
+        if gremlin.shared_state.is_running:
+            enabled = self.config.runtime_ui_update
+            
+        self.ui.tab_bar_widget.setEnabled(enabled)
+        self.ui.tab_content_widget.setEnabled(enabled)
+        self.ui.menuTools.setEnabled(enabled)
+        self.ui.actionNewProfile.setEnabled(enabled)
+        self.ui.actionSaveProfile.setEnabled(enabled)
+        self.ui.actionSaveProfileAs.setEnabled(enabled)
+        self.ui.actionManageCustomModules.setEnabled(enabled)
+
+        self.ui.actionOptions.setEnabled(enabled)
+        self.ui.actionCreate1to1Mapping.setEnabled(enabled)
+        self.ui.actionModifyProfile.setEnabled(enabled)
+        self.ui.menuRecent.setEnabled(enabled)
+        self.ui.actionSwapDevices.setEnabled(enabled)
+        self.ui.actionMergeAxis.setEnabled(enabled)
+
+        self.ui.actionManageModes.setEnabled(enabled)
+
+        self.ui.actionInputRepeater.setEnabled(enabled)
+        self.ui.actionGenerate.setEnabled(enabled)
+        self.ui.actionImportProfile.setEnabled(enabled)
+        self.ui.actionLoadProfile.setEnabled(enabled)
+
+
+
+        
+        
+
     def activate(self, activate):
         """Activates and deactivates the code runner.
 
@@ -1020,6 +1057,8 @@ class GremlinUi(QtWidgets.QMainWindow):
 
             #logging.getLogger("system").info("Activate: completed")
             self.activate_locked = False
+
+            self.setUiMode()
 
     def input_repeater(self):
         """Enables or disables the forwarding of events to the repeater."""

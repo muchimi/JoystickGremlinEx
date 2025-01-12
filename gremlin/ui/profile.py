@@ -128,6 +128,7 @@ class VirtualButtonModel(QtCore.QObject):
     upperLimitChanged = Signal()
     directionChanged = Signal()
     hatDirectionChanged = Signal()
+    enabledChanged = Signal()
 
     def __init__(
         self,
@@ -151,6 +152,14 @@ class VirtualButtonModel(QtCore.QObject):
         if value != self.virtual_button.lower_limit:
             self.virtual_button.lower_limit = util.clamp(value, -1.0, 1.0)
             self.lowerLimitChanged.emit()
+
+    def _set_enabled(self, value: bool):
+        if value != self.virtual_button.enabled:
+            self.virtual_button.enabled = value
+            self.enabledChanged.emit()
+
+    def _get_enabled(self) -> bool:
+        return self.virtual_button.enabled
 
     def _get_upper_limit(self) -> float:
         return self.virtual_button.upper_limit
@@ -200,6 +209,13 @@ class VirtualButtonModel(QtCore.QObject):
         fget=_get_direction,
         fset=_set_direction,
         notify=directionChanged
+    )
+
+    enabled = Property(
+        bool,
+        fget=_get_enabled,
+        fset=_set_enabled,
+        notify=enabledChanged
     )
 
     hatNorth = Property(
