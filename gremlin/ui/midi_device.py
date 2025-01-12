@@ -1546,7 +1546,7 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 # no input to select
                 widget = gremlin.ui.joystick_device.InputItemConfiguration()     
                 self.setRightPanelWidget(widget)
-            return
+                return
         else:
             item_data = self.input_item_list_model.data(index)
 
@@ -1682,6 +1682,7 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         ''' called when the edit button is clicked  '''
         self._edit_dialog = MidiInputConfigDialog(self.current_mode, index, data, self)
         self._edit_dialog.accepted.connect(self._dialog_ok_cb)
+        gremlin.util.centerDialog(self._edit_dialog)
         self._edit_dialog.showNormal()
         self._index = index
 
@@ -1791,14 +1792,13 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 status_text += " "
             status_text += f"Invalid port '{input_item.port_name}'"
         
-        
-        if is_warning:
-            self._status_widget.setIcon("fa.warning", use_qta=True, color="red")
-        else:
-            self._status_widget.setIcon() # clear it
 
-        self._status_widget.setText(status_text)
-        self._status_widget.setVisible(len(status_text)>0)
+        icon = None
+        if is_warning:
+            icon = gremlin.util.load_icon("fa.warning", use_qta=True, qta_color="red")
+
+
+        input_widget.setStatus(status_text, icon)
   
 
     def _populate_input_widget_ui(self, input_widget, container_widget, data):

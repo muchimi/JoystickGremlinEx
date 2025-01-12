@@ -211,19 +211,20 @@ Joystick Gremlin EX
 <!-- TOC --><a name="134016ex-pre-release"></a>
 ## 13.40.16ex (pre-release)
 ### (m61)
-m61 is a general stabilization patch focused on cleaning up remaining issues linked to new features introduced and module refactors in this version .  
+m61 is a **general stabilization** patch focused on cleaning up remaining issues linked to new features introduced and module refactors in this version.
 
 - Fix: input listener not detecting some axis changes
 - Improved: Joystick condition UI now has manual device input selectors so select the hardware latching condition latching.
 - Improved: range selectors in conditions include a repeater that shows current input values and in line with the gated axis, includes record buttons to set the values from the live input.
-- Fix: multiple references to properties of the removed tab widget impacting UI functions such as 1:1, device substitution
+- Fix: multiple references to older properties of the removed tab widget impacting UI functions such as 1:1, device substitution causing exeptions
 - Fix: calibration icon not showing correct state
 - Fix: some containers are missing their action condition entries for each action in the container
 - Fix: condition counts in the condition tab does not always update as conditions are added or removed
 - Fix: map to vjoy merged value repeater not updating correctly
 - Fix: virtual button on axis input not triggering action (note: if a virtual button condition is used, any other joystick condition is ignored)
-- Fix: Certain UI functions are locked when running a profile if UI is disabled at runtime in options (default) - this is to prevent inadvertent changes at runtime
-- New: Virtual button option is now user controllable - so even if a container/action supports the use of a virtual button (usually when mapping to a linear input), the feature must be enabled by the user.  This is needed because virtual buttons override any other conditions.  A new indicator of enabled state is also visible on the virtual button tab.
+- Fix: UI not disabling at runtime with the option selected to prevent inadvertent interactions/changes.
+- New: Virtual button condition is now user controllable via a checkbox on the virtual button tab. This was added because virtual buttons override any other conditions, which is not always the desired behavior for some use-cases.  The enabled state is also visible on the virtual button tab.
+
 
 
 ### (m59/m60)

@@ -624,10 +624,12 @@ class AbstractExecutionGraph(QtCore.QObject):
         process_again = False
         self.run_event.clear()
         
-        verbose = gremlin.config.Configuration().verbose_mode_condition
+        config = gremlin.config.Configuration()
+        verbose = config.verbose_mode_condition
+        verbose_input = config.verbose_mode_inputs
         syslog = logging.getLogger("system")
 
-        print (str(event))
+        if verbose_input: syslog.info(str(event))
         
         if verbose: syslog.info (f"Execution plan:")
         functor_names = []

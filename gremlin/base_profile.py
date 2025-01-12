@@ -1828,11 +1828,11 @@ class InputItem():
         elif self._input_type == InputType.JoystickHat:
             return f"Hat {self._input_id}"
         elif self._input_type in (InputType.Keyboard, InputType.KeyboardLatched):
-            return f"Key {self._input_id}"
+            return f"Key {self._input_id.display_name}"
         elif self._input_type == InputType.OpenSoundControl:
-            return f"OSC {self._input_id}"
+            return f"OSC {self._input_id.message if self._input_id.message else '(undefined)'}"
         elif self._input_type == InputType.Midi:
-            return f"Midi {self._input_id}"
+            return f"Midi {self._input_id.display_name}"
         elif self._input_type == InputType.ModeControl:
             return f"{gremlin.ui.mode_device.ModeInputModeType.to_display_name(self._input_id)}"
         return f"Unknown input: {self._input_type}"

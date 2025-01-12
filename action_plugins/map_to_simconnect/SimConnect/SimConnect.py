@@ -626,20 +626,20 @@ class SimConnect():
 	# TODO: update callbackfunction to expand functions.
 	def simconnect_dispatch_proc(self, pData, cbData, pContext):
 		# print("my_dispatch_proc")
-		verbose = True
+		verbose = gremlin.config.Configuration().verbose_mode_simconnect
 		dwID = pData.contents.dwID
 		syslog = logging.getLogger("system")
 		# if dwID == 16:
 		# 	syslog.info(f"dispatch: client data ")
 		
 		if dwID == SIMCONNECT_RECV_ID.SIMCONNECT_RECV_ID_EVENT:
-			syslog.info("dispatch: receive event")
+			if verbose: syslog.info("dispatch: receive event")
 			evt = cast(pData, POINTER(SIMCONNECT_RECV_EVENT)).contents
 			self.handle_id_event(evt)
 
 
 		elif dwID == SIMCONNECT_RECV_ID.SIMCONNECT_RECV_ID_SYSTEM_STATE:
-			syslog.info("dispatch: receive state")
+			if verbose: syslog.info("dispatch: receive state")
 			data = cast(pData, POINTER(SIMCONNECT_RECV_SYSTEM_STATE)).contents
 			self.handle_state_event(data)
 
@@ -651,7 +651,7 @@ class SimConnect():
 
 		elif dwID == SIMCONNECT_RECV_ID.SIMCONNECT_RECV_ID_OPEN.value:
 
-			syslog.info("Simconnect: SIM OPEN")
+			if verbose: syslog.info("Simconnect: SIM OPEN")
 			self._ok = True
 
 		elif dwID == SIMCONNECT_RECV_ID.SIMCONNECT_RECV_ID_EXCEPTION:
@@ -673,7 +673,7 @@ class SimConnect():
 				pData, POINTER(SIMCONNECT_RECV_FACILITIES_LIST)
 			).contents
 			dwRequestID = pObjData.dwRequestID
-			syslog.info("dispatch: receive facility")
+			if verbose: syslog.info("dispatch: receive facility")
 			for _facility in self.Facilities:
 				if dwRequestID == _facility.REQUEST_ID.value:
 					_facility.parent.dump(pData)
@@ -683,16 +683,17 @@ class SimConnect():
 			self._quit = 1
 		elif dwID == SIMCONNECT_RECV_ID.SIMCONNECT_RECV_ID_EVENT_FILENAME:
 			# file name
-			syslog.info("dispatch: receive filename")
+			
 			pObjData = cast(pData, POINTER(SIMCONNECT_RECV_EVENT_FILENAME)).contents
 			file = pObjData.zFileName.decode()
 			folder = os.path.dirname(file)
+			if verbose: syslog.info(f"dispatch: receive filename: {folder}")
 			# example: c:\users\XXX\appdata\local\packages\microsoft.limitless_8wekyb3d8bbwe\localstate\streamedpackages\asobo-aircraft-h125\content\simobjects\airplanes\asobo_h125\presets\asobo\h125_rescue\config
 			self.handle_folder_event(folder)
 			
 		elif dwID == SIMCONNECT_RECV_ID.SIMCONNECT_RECV_ID_SIMOBJECT_DATA:
 			# data
-			syslog.info("dispatch: receive simobject data")
+			if verbose: syslog.info("dispatch: receive simobject data")
 			pObjData = cast(pData, POINTER(SIMCONNECT_RECV_SIMOBJECT_DATA)).contents
 			self.handle_simobject_event(pObjData)
 		elif dwID == SIMCONNECT_RECV_ID.SIMCONNECT_RECV_ID_CLIENT_DATA:

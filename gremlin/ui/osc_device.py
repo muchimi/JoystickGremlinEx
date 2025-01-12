@@ -3168,15 +3168,11 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             is_warning = True
             status_text = "Not configured"
        
-
-        status_widget = container_widget.findChild(gremlin.ui.ui_common.QIconLabel, "status")
+        icon = None
         if is_warning:
-            status_widget.setIcon("fa.warning", use_qta=True, color="red")
-        else:
-            status_widget.setIcon() # clear it
+            icon = gremlin.util.load_icon("fa.warning", use_qta=True, qta_color="red")
 
-        status_widget.setText(status_text)
- 
+        input_widget.setStatus(status_text, icon)
 
     def _populate_input_widget_ui(self, input_widget, container_widget, data):
         ''' called when a button is created for custom content '''
@@ -3191,6 +3187,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         ''' called when the edit button is clicked  '''
         self._edit_dialog = OscInputConfigDialog(self.current_mode, index, data, self)
         self._edit_dialog.accepted.connect(self._dialog_ok_cb)
+        gremlin.util.centerDialog(self._edit_dialog)
         self._edit_dialog.showNormal()
         self._index = index
 

@@ -198,7 +198,7 @@ class Ui_Gremlin(object):
         self.actionSaveProfile.setText(_translate("GremlinEx", "&Save Profile"))
         self.actionSaveProfileAs.setText(_translate("GremlinEx", "&Save Profile As"))
         self.actionRevealProfile.setText(_translate("GremlinEx", "&Reveal Profile in Explorer..."))
-        self.actionOpenXmlProfile.setText(_translate("GremlinEx","&View Profile XML..."))
+        self.actionOpenXmlProfile.setText(_translate("GremlinEx","&Open profile XML in editor..."))
         self.actionGenerate.setText(_translate("GremlinEx", "Generate"))
         self.actionDeviceInformation.setText(_translate("GremlinEx", "Device Information"))
         self.actionAbout.setText(_translate("GremlinEx", "&About"))

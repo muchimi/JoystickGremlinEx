@@ -116,6 +116,20 @@ class KeyboardInputItem(AbstractInputItem):
             return self._key.latched_keys
         return []
         
+    @property
+    def keynames(self) -> list:
+        key_list = [self._key.name]
+        key_list.extend([key.name for key in self.latched_keys])
+        return key_list
+    
+    def getKeyList(self) -> list:
+        ''' gets keys as a list, including any latched keys '''
+        key_list = [self._key]
+        key_list.extend([key for key in self.latched_keys])
+        return key_list
+
+        
+            
 
     @property
     def message_key(self):
@@ -256,6 +270,10 @@ class KeyboardInputItem(AbstractInputItem):
     
     @property
     def display_name_scan(self) -> str:
+        return f"{self._display_name} {self.message_key}"
+    
+    @property
+    def display_name(self) -> str:
         return f"{self._display_name} {self.message_key}"
     
     def duplicate(self) -> KeyboardInputItem:
@@ -451,6 +469,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self._keyboard_dialog.accepted.connect(self._dialog_ok_cb)
         self._keyboard_dialog.closed.connect(self._dialog_close_cb)
         self._keyboard_dialog.setModal(True)
+        gremlin.util.centerDialog(self._keyboard_dialog)
         self._keyboard_dialog.showNormal()
         
 
@@ -538,7 +557,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 # no input to select
                 widget = InputItemConfiguration()
                 self.setRightPanelWidget(widget)
-            return
+                return
         else:
             item_data = self.input_item_list_model.data(index)
 
@@ -644,7 +663,9 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         ''' called when the keyboard input widget has to update itself on a data change '''
         data = input_widget.identifier.input_id
         input_widget.setTitle(data.title_name)
-        input_widget.setInputDescription(data.display_name_scan)
+        values = data.getKeyList()
+        input_widget.setInputDescription(values)
+        #input_widget.setInputDescription(data.display_name_scan)
         input_widget.display_name = data.display_name_scan
         
         input_widget.setToolTip(data.display_tooltip)
@@ -660,27 +681,22 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             status_text = "Not configured"
         elif gremlin.config.Configuration().show_scancodes:
             status_text = data.key.latched_code
- 
+
+        icon = None
         if is_warning:
-            self._status_widget.setIcon("fa.warning", use_qta=True, color="red")
-        else:
-            self._status_widget.setIcon() # clear it
-        self._status_widget.setText(status_text)
-        self._status_widget.setVisible(len(status_text)>0)
+            icon = gremlin.util.load_icon("fa.warning", use_qta=True, qta_color="red")
+                
+        input_widget.setStatus(status_text, icon)
+
+ 
    
 
 
     def _populate_input_widget_ui(self, input_widget, container_widget, data):
         ''' called when a button is created for custom content '''
 
-        layout = QtWidgets.QVBoxLayout(container_widget)
-        self._status_widget = gremlin.ui.ui_common.QIconLabel(parent=container_widget)
-        self._status_widget.setContentsMargins(0,0,0,0)
-        self._status_widget.setVisible(False)
-        self._status_widget.setObjectName("status")
-        layout.setSpacing(0)
-        layout.setContentsMargins(0,0,0,0)
-        layout.addWidget(self._status_widget)
+        
+        
         self._update_input_widget(input_widget, container_widget)
                 
   

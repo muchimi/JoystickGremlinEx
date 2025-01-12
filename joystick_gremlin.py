@@ -2196,8 +2196,7 @@ class GremlinUi(QtWidgets.QMainWindow):
       
 
         verbose = gremlin.config.Configuration().verbose_mode_inputs
-        verbose = True
-
+        
 
         el = gremlin.event_handler.EventListener()
         if el.input_selection_suspended:

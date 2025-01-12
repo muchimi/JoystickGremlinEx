@@ -27,6 +27,7 @@ import gremlin.config
 
 import gremlin.event_handler
 import gremlin.event_handler
+import gremlin.keyboard
 import gremlin.shared_state
 import gremlin.ui.axis_calibration
 import gremlin.ui.midi_device
@@ -1064,7 +1065,7 @@ class InputItemWidget(QtWidgets.QFrame):
         self._title_container_widget = QtWidgets.QWidget()
         self._title_container_layout = QtWidgets.QGridLayout(self._title_container_widget)
         #self._title_container_widget.setStyleSheet("background: red;")
-        self._title_container_widget.setContentsMargins(0,0,0,0)
+        self._title_container_widget.setContentsMargins(0,2,0,2)
         self._title_container_layout.setContentsMargins(0,0,0,0)
         self._title_container_layout.setSpacing(0)
 
@@ -1202,7 +1203,8 @@ class InputItemWidget(QtWidgets.QFrame):
 
         self._input_description_widget =gremlin.ui.ui_common.QIconLabel(use_wrap = False)
         self._input_description_widget.setObjectName("input_description")
-        #self._input_description_widget.setTextMinWidth(280)
+        self._status_widget =gremlin.ui.ui_common.QIconLabel(use_wrap = False)
+        
 
         self.main_layout.addWidget(self._title_container_widget)
 
@@ -1227,6 +1229,7 @@ class InputItemWidget(QtWidgets.QFrame):
 
         self._container_input_axis_layout.addWidget(self._curve_container_widget)
         self.main_layout.addWidget(self._container_input_axis_widget)
+        self.main_layout.addWidget(self._status_widget)
 
         
         if self._multi_row:
@@ -1487,9 +1490,73 @@ class InputItemWidget(QtWidgets.QFrame):
 
     def setInputDescription(self, value):
         ''' sets the title of the input widget '''
+        gremlin.util.clear_layout(self._container_layout)
         if value is not None:
-            self._input_description_widget.setText(value)
-            self._container_layout.addWidget(self._input_description_widget, self._row_input_description,0)
+            if isinstance(value, str):
+                self._input_description_widget = QtWidgets.QLabel(value)
+                self._container_layout.addWidget(self._input_description_widget, self._row_input_description,0)
+
+            else:
+
+                if isinstance(value[0], gremlin.keyboard.Key):
+
+                    # list of individual keys
+                    container_widget = QtWidgets.QWidget()
+                    container_widget.setContentsMargins(8,2,2,2)
+                    container_layout = QtWidgets.QHBoxLayout(container_widget)
+                    container_layout.setContentsMargins(0,0,0,0)
+                
+                    if len(value) < 8:
+                        # display as keys if there enough width
+                        max_width = 32
+                        
+                        h = gremlin.ui.ui_common.get_text_height()
+                        max_height = h + 4
+                        key : gremlin.keyboard.Key
+                        for key in value:
+                            name = key.name
+                            lbl = QtWidgets.QLabel(name)
+                            w = gremlin.ui.ui_common.get_text_width(name)
+                            
+                            
+                            # center text if needed as cscc text align isn't supported by QT labels
+                            css_pad = ""
+                            if w < max_width:
+                                delta = (max_width - w) // 2
+                                css_pad = f" padding-left: {delta}px; padding-right:{delta}px;"  
+
+                            key_widget = QtWidgets.QWidget()
+                            key_widget.setContentsMargins(0,0,0,0)
+                            key_widget.setMinimumHeight(max_height)
+                            key_widget.setMaximumHeight(max_height)
+                            key_layout = QtWidgets.QHBoxLayout(key_widget)
+                            key_layout.setContentsMargins(0,0,0,0)
+
+                            lbl.setStyleSheet(f"background-color:white; border: 2px solid black; border-radius: 4px 8px;{css_pad}")
+                            lbl.setMinimumHeight(max_height)
+                            lbl.setMaximumHeight(max_height)
+                            lbl.setMinimumWidth(32)
+                            lbl.setToolTip(f"{key.name} Scan:  {key.scan_code:000}/0x{key.scan_code:X} Ext: {'yes' if key.is_extended else 'no'}")
+                            key_layout.addWidget(lbl)
+                            container_layout.addWidget(key_widget)
+                    else:
+                        # output as text that can wrap
+                        keys = "".join(key.name + " " for key in value)
+                        lbl = QtWidgets.QLabel(keys)
+                        lbl.setWordWrap(True)
+                        container_layout.addWidget(lbl)    
+                elif isinstance(value[0], str):
+                    # output as text that can wrap
+                    keys = "".join(name + " " for name in value)
+                    lbl = QtWidgets.QLabel(keys)
+                    lbl.setWordWrap(True)
+                    container_layout.addWidget(lbl)
+                else:
+                    container_layout.addWidget(QtWidgets.QLabel("[Don't know how to handle input data format]"))
+                container_layout.addStretch()
+                
+                self._container_layout.addWidget(container_widget, self._row_input_description,0)
+
         else:
             self._input_description_widget.setText("")
             layout_remove(self._container_layout, self._input_description_widget)
@@ -1498,13 +1565,56 @@ class InputItemWidget(QtWidgets.QFrame):
 
     def setInputDescriptionIcon(self, icon_path, use_qta = True):
         ''' sets the icon for the input description line '''
-        self._input_description_widget.setIcon(icon_path, use_qta)        
+        self._input_description_widget.setIcon(icon_path, use_qta)  
+
+    def setStatus(self, status: str, icon = None):
+        ''' sets the status'''
+        if status:
+            self._status_widget.setText(status)
+            if icon:
+                self._status_widget.setIcon(icon)
+            self._status_widget.setVisible(True)
+        else:
+            self._status_widget.setVisible(False)
+
+
 
     def setDescription(self, value):
-        ''' sets the description of the input widget '''
+        ''' sets the description of the input widget
+        :param value: string or tuple/list of strings  
+          
+           
+        '''
         if value:
-            self._description_widget.setText(f"<i>{value}</i>")
-            self._container_layout.addWidget(self._description_widget, self._row_description,0)
+
+            if isinstance(value, str):
+                self._description_widget.setText(f"<i>{value}</i>")
+                self._container_layout.addWidget(self._description_widget, self._row_description,0)
+
+            else:
+                # list of individual keys
+                container_widget = QtWidgets.QWidget()
+                container_widget.setContentsMargins(0,0,0,0)
+                container_layout = QtWidgets.QHBoxLayout(container_widget)
+                container_layout.setContentsMargins(0,0,0,0)
+                max_width = 32
+                for name in value:
+                    lbl = QtWidgets.QLabel(name)
+                    w = gremlin.ui.ui_common.get_text_width(name)
+                    # center text if needed as cscc text align isn't supported by QT labels
+                    css_pad = ""
+                    if w < max_width:
+                        delta = (max_width - w) // 2
+                        css_pad = f" padding-left: {delta}px; padding-right:{delta}px;"  
+                    
+                    lbl.setStyleSheet(f"background-color:white; border: 2px solid black; border-radius: 4px 8px;{css_pad}")
+                    lbl.setMinimumHeight(24)
+                    lbl.setMinimumWidth(32)
+                    container_layout.addWidget(lbl)
+                
+                self._container_layout.addWidget(container_widget, self._row_input_description,0)
+
+
         else:
             self._description_widget.setText('')
             layout_remove(self._container_layout, self._description_widget)
@@ -1531,7 +1641,11 @@ class InputItemWidget(QtWidgets.QFrame):
     def setIcon(self, icon_path, use_qta = True):
         ''' sets the widget's icon '''
         self._title_widget.setIcon(icon_path, use_qta)
+        
 
+    def addWidget(self, widget):
+        ''' adds a widget to the contents '''
+        self._container_layout.addWidget(widget,self._row_custom_content,0) # custom container            
 
     def update_display(self):
         ''' updates the display text for the button '''
@@ -1541,6 +1655,9 @@ class InputItemWidget(QtWidgets.QFrame):
         self._input_button_widget.setVisible(power_visible)
 
         if self._update_callback:
+            self.custom_container_widget = QtWidgets.QWidget() 
+            self.custom_container_widget.setContentsMargins(0,0,0,0)
+            self.addWidget(self.custom_container_widget)
             self._update_callback(self, self.custom_container_widget)
             return
         
@@ -1971,6 +2088,8 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         assert isinstance(profile_data, gremlin.base_profile.AbstractContainer)
         super().__init__(parent)
 
+        
+
         el = gremlin.event_handler.EventListener()
         el.condition_redraw.connect(self._condition_redraw)
         self._icon_enabled = gremlin.util.load_icon("mdi.record", qta_color="green")
@@ -2016,6 +2135,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         el = gremlin.event_handler.EventListener()
         el.condition_state_changed.connect(self._update_ui)
 
+        self.activation_count_widget = None
         self._update_ui(self.container)
         
 
@@ -2114,11 +2234,12 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
     
     def _update_counts(self):
         ''' refreshes counts '''   
-        if self.container:
-            self.activation_count_widget.setText(f"Action conditions ({self.container.action_condition_count} found):")
-        else:
-            # not a container
-            self.activation_count_widget.setText(f"Action conditions (N/A):")
+        if self.activation_count_widget:  # can get called before all is loaded
+            if self.container:
+                self.activation_count_widget.setText(f"Action conditions ({self.container.action_condition_count} found):")
+            else:
+                # not a container
+                self.activation_count_widget.setText(f"Action conditions (N/A):")
 
 
 

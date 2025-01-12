@@ -667,7 +667,7 @@ class ActionContainerView(gremlin.ui.ui_common.AbstractView):
                         
                 else:
                     input_type = self.model.input_type # InputType.JoystickAxis
-                    label = QtWidgets.QLabel(f"Please add an action or container for {self.model.item_data.display_name} ({InputType.to_display_name(input_type)})")
+                    label = QtWidgets.QLabel(f"Please add an action or container for {self.model.item_data.display_name}") # ({InputType.to_display_name(input_type)})")
                     label.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop | QtCore.Qt.AlignmentFlag.AlignLeft)
                     self.scroll_layout.addWidget(label)
                 self.scroll_layout.addStretch(1)
@@ -1023,7 +1023,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                     # no input to select
                     widget = InputItemConfiguration()     
                     self.setRightPanelWidget(widget)
-                return
+                    return
             else:
                 item_data = self.input_item_list_model.data(index)
 

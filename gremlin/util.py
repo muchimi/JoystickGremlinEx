@@ -940,6 +940,8 @@ def safe_read(node, key, type_cast=None, default_value=None):
             else:
                 if value == "none":
                     value = None
+                elif value == "special":
+                    value = 0
                 else:
                     # if type_cast == str:
                     #     from xml.sax.saxutils import unescape

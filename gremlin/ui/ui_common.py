@@ -1990,7 +1990,9 @@ class QIconLabel(QtWidgets.QWidget):
     def __init__(self, icon_path = None, text = None, stretch=True, use_qta = False, icon_color = None, use_wrap = True, icon_size = 16, parent = None):
         super().__init__(parent)
 
-        
+        if text is None:
+            text = icon_path
+            icon_path = None
         container_widget = QtWidgets.QWidget()
         container_widget.setContentsMargins(0, 0, 0, 0)
         container_layout = QtWidgets.QHBoxLayout(container_widget)
@@ -2017,16 +2019,21 @@ class QIconLabel(QtWidgets.QWidget):
 
         self.setContentsMargins(0,0,0,0)
 
-    def setIcon(self, icon_path = None, use_qta = True, color = None):
+
+
+    def setIcon(self, icon_or_path = None, use_qta = True, color = None):
         ''' sets the icon of the label, pass a blank or None path to clear the icon'''
-        if icon_path:
+        if isinstance(icon_or_path, QtGui.QIcon):
+            pixmap = icon_or_path.pixmap(self._icon_size)
+
+        elif isinstance(icon_or_path, str):
             if use_qta:
                 if color:
-                    pixmap = qta.icon(icon_path, color=color).pixmap(self._icon_size)
+                    pixmap = qta.icon(icon_or_path, color=color).pixmap(self._icon_size)
                 else:
-                    pixmap = qta.icon(icon_path).pixmap(self._icon_size)
+                    pixmap = qta.icon(icon_or_path).pixmap(self._icon_size)
             else:
-                pixmap = load_pixmap(icon_path) if icon_path else None
+                pixmap = load_pixmap(icon_or_path) if icon_or_path else None
         else:
             pixmap = None
         if pixmap:
@@ -3535,6 +3542,15 @@ def get_text_width(text):
     lbl = QtWidgets.QLabel("w")
     char_width = lbl.fontMetrics().averageCharWidth()
     return char_width * len(text)
+
+def get_text_height(text = None):
+    ''' gets the average text width '''
+    lbl = QtWidgets.QLabel(text if text else "M")
+    fm = lbl.fontMetrics()
+    rect = fm.boundingRect(QtCore.QRect(0,0,100,100), QtCore.Qt.TextWordWrap, lbl.text())
+    return rect.height()
+    
+
 
 def get_char_width(count = 1):
     return get_text_width("w") * count
