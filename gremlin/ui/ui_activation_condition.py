@@ -740,9 +740,9 @@ class VJoyConditionWidget(AbstractConditionWidget):
         elif self.condition_data.input_type == InputType.JoystickHat:
             self._hat_ui()
 
+        self.grid_layout.addWidget(self.vjoy_selector, 0, 1)
         self.grid_layout.addWidget(QtWidgets.QWidget(), 0, 4)
-        self.grid_layout.addWidget(self.vjoy_selector, 0, 5)
-        self.grid_layout.addWidget(self.delete_button, 0, 6)
+        self.grid_layout.addWidget(self.delete_button, 0, 5)
         self.grid_layout.setColumnStretch(4,2)
 
         self.ui_container_widget = QtWidgets.QWidget()
@@ -799,9 +799,7 @@ class VJoyConditionWidget(AbstractConditionWidget):
         input_label.setWordWrap(True)
         self.ui_container_layout.addWidget(input_label, 0, 1)
         self.ui_container_layout.addWidget(QtWidgets.QLabel("is"), 0, 2)
-        self.ui_container_layout.addLayout(
-            range_layout, 0, 3, alignment=QtCore.Qt.AlignLeft
-        )
+        self.ui_container_layout.addLayout(range_layout, 0, 3, alignment=QtCore.Qt.AlignLeft)
 
     def _button_ui(self):
         """Creates the UI needed to configure a button based condition."""
@@ -815,17 +813,10 @@ class VJoyConditionWidget(AbstractConditionWidget):
             self._comparison_changed_cb
         )
 
-        self.main_layout.addWidget(
-            QtWidgets.QLabel(
-                f"<b>vJoy {self.condition_data.vjoy_id:d} Button {self.condition_data.input_id:d}</b>"
-                ),
-            0,
-            1
-        )
+        self.ui_container_layout.addWidget(QtWidgets.QLabel(f"<b>vJoy {self.condition_data.vjoy_id:d} Button {self.condition_data.input_id:d}</b>"),0,1)
         self.ui_container_layout.addWidget(QtWidgets.QLabel("is"), 0, 2)
-        self.ui_container_layout.addWidget(
-            self.comparison_dropdown, 0, 3, alignment=QtCore.Qt.AlignLeft
-        )
+        self.ui_container_layout.addWidget(self.comparison_dropdown, 0, 3, alignment=QtCore.Qt.AlignLeft)
+
 
     def _hat_ui(self):
         """Creates the UI needed to configure a hat based condition."""
