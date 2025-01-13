@@ -2266,6 +2266,8 @@ class QHatSelectorComboBox(QDataComboBox):
         with QtCore.QSignalBlocker(self):
             if isinstance(value, tuple):
                 value = HatDirection(value)
+            elif isinstance(value, str):
+                value = HatDirection.to_enum(value)
             index = self.findData(value)
             if index != -1:
                 self.setCurrentIndex(index)

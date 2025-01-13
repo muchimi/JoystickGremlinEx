@@ -2381,6 +2381,8 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         ''' runs when a joystick even occurs like a button press or axis movement when a profile is running '''
         (is_local, is_remote) = input_devices.remote_state.state
         usage_data = gremlin.joystick_handling.VJoyUsageState()
+        verbose = gremlin.config.Configuration().verbose_mode_inputs
+        syslog = logging.getLogger("system")
         if event.force_remote:
             # force remote mode on if specified in the event
             is_remote = True
@@ -2520,7 +2522,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                 else:
 
                     if event.event_type in [InputType.JoystickButton, InputType.Keyboard, InputType.KeyboardLatched, InputType.Midi, InputType.OpenSoundControl] and event.is_pressed and self.needs_auto_release:
-                        print (f"remap setup autorelease for {str(event)}")
+                        if verbose: syslog.info(f"VjoyRemap: remap setup autorelease for {str(event)}")
                         input_devices.ButtonReleaseActions().register_button_release(
                             (self.vjoy_device_id, self.vjoy_input_id),
                             event,

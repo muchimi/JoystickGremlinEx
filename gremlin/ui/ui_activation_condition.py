@@ -476,9 +476,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
         self.grab_low_widget.clicked.connect(self._grab_low)
         self.grab_low_widget.setToolTip("Grab axis value")
 
-
-        #self.lower.setSingleStep(0.05)
-        self.lower_widget.setDecimals(3)
+        
         self.lower_widget.setValue(self.condition_data.range[0])
         self.lower_widget.valueChanged.connect(self._range_lower_changed_cb)
 
@@ -486,8 +484,8 @@ class JoystickConditionWidget(AbstractConditionWidget):
         self.upper_widget = ui_common.QFloatLineEdit()
         self.upper_widget.setMinimum(-1.0)
         self.upper_widget.setMaximum(1.0)
-        self.upper_widget.setDecimals(3)
-        #self.upper.setSingleStep(0.05)
+        
+        
         self.upper_widget.setValue(self.condition_data.range[1])
         self.upper_widget.valueChanged.connect(self._range_upper_changed_cb)
 
@@ -561,7 +559,9 @@ class JoystickConditionWidget(AbstractConditionWidget):
         ]
 
         self.comparison_dropdown = ui_common.QHatSelectorComboBox()
+        self.comparison_dropdown.setValue(self.condition_data.comparison)
         self.comparison_dropdown.valueChanged.connect(self._comparison_changed_cb)
+        
         input_name = f"<b>{self.condition_data.device_name} Hat {self.condition_data.input_id}</b>"
 
         self.ui_container_layout.addWidget(QtWidgets.QLabel(input_name),0,1)
@@ -673,11 +673,11 @@ class JoystickConditionWidget(AbstractConditionWidget):
         :param text the new comparison operation name
         """
         if self.condition_data.input_type == InputType.JoystickButton:
-            self.condition_data.comparison = data.lower()
+            self.condition_data.comparison = data.casefold()
         elif self.condition_data.input_type == InputType.JoystickHat:
             self.condition_data.comparison = gremlin.types.HatDirection.to_string(data)
         elif self.condition_data.input_type == InputType.JoystickAxis:
-            self.condition_data.comparison = data.lower()
+            self.condition_data.comparison = data.casefold()
         else:
             logging.getLogger("system").warning(
                 f"Invalid input type encountered: {self.condition_data.input_type}"
@@ -713,6 +713,8 @@ class VJoyConditionWidget(AbstractConditionWidget):
         self.grid_widget =  QtWidgets.QWidget()
         self.grid_layout =  QtWidgets.QGridLayout(self.grid_widget)
 
+
+
         self.vjoy_selector = ui_common.VJoySelector(
             self._modify_vjoy,
             [
@@ -732,6 +734,11 @@ class VJoyConditionWidget(AbstractConditionWidget):
             lambda: self.deleted.emit(self.condition_data)
         )
 
+
+        self.ui_container_widget = QtWidgets.QWidget()
+        self.ui_container_layout = QtWidgets.QGridLayout(self.ui_container_widget)
+
+
         self.grid_layout.addWidget(QtWidgets.QLabel("Activate if"), 0, 0)
         if self.condition_data.input_type == InputType.JoystickAxis:
             self._axis_ui()
@@ -744,9 +751,6 @@ class VJoyConditionWidget(AbstractConditionWidget):
         self.grid_layout.addWidget(QtWidgets.QWidget(), 0, 4)
         self.grid_layout.addWidget(self.delete_button, 0, 5)
         self.grid_layout.setColumnStretch(4,2)
-
-        self.ui_container_widget = QtWidgets.QWidget()
-        self.ui_container_layout = QtWidgets.QGridLayout(self.ui_container_widget)
 
         self.main_layout.addWidget(self.grid_widget)
         self.main_layout.addWidget(self.ui_container_widget)
@@ -762,61 +766,71 @@ class VJoyConditionWidget(AbstractConditionWidget):
 
     def _axis_ui(self):
         """Creates the UI needed to configure an axis based condition."""
-        self.lower = ui_common.DynamicDoubleSpinBox()
-        self.lower.setMinimum(-1.0)
-        self.lower.setMaximum(1.0)
-        self.lower.setSingleStep(0.05)
-        self.lower.setDecimals(3)
-        self.lower.setValue(self.condition_data.range[0])
-        self.lower.valueChanged.connect(self._range_lower_changed_cb)
-        self.upper = ui_common.DynamicDoubleSpinBox()
-        self.upper.setMinimum(-1.0)
-        self.upper.setMaximum(1.0)
-        self.upper.setDecimals(3)
-        self.upper.setSingleStep(0.05)
-        self.upper.setValue(self.condition_data.range[1])
-        self.upper.valueChanged.connect(self._range_upper_changed_cb)
+        self.lower_widget = ui_common.QFloatLineEdit()
+        self.lower_widget.setMinimum(-1.0)
+        self.lower_widget.setMaximum(1.0)
+        
+        
+        self.lower_widget.setValue(self.condition_data.range[0])
+        self.lower_widget.valueChanged.connect(self._range_lower_changed_cb)
+        self.upper_widget = ui_common.QFloatLineEdit()
+        self.upper_widget.setMinimum(-1.0)
+        self.upper_widget.setMaximum(1.0)
 
-        self.comparison_dropdown = ui_common.QComboBox()
-        self.comparison_dropdown.addItem("Inside")
-        self.comparison_dropdown.addItem("Outside")
-        self.comparison_dropdown.setCurrentText(
+        self.upper_widget.setValue(self.condition_data.range[1])
+        self.upper_widget.valueChanged.connect(self._range_upper_changed_cb)
+
+        self.comparison_widget = ui_common.QComboBox()
+        self.comparison_widget.addItem("Inside")
+        self.comparison_widget.addItem("Outside")
+        self.comparison_widget.setCurrentText(
             self.condition_data.comparison.capitalize()
         )
-        self.comparison_dropdown.currentTextChanged.connect(
+        self.comparison_widget.currentTextChanged.connect(
             self._comparison_changed_cb
         )
 
         range_layout = QtWidgets.QHBoxLayout()
-        range_layout.addWidget(self.comparison_dropdown)
-        range_layout.addWidget(self.lower)
+        range_layout.addWidget(self.comparison_widget)
+        range_layout.addWidget(self.lower_widget)
         range_layout.addWidget(QtWidgets.QLabel("and"))
-        range_layout.addWidget(self.upper)
+        range_layout.addWidget(self.upper_widget)
+        range_layout.addStretch()
 
         input_label = QtWidgets.QLabel(
             f"<b>vJoy {self.condition_data.vjoy_id:d} Axis {self.condition_data.input_id:d}</b>"
             )
         input_label.setWordWrap(True)
-        self.ui_container_layout.addWidget(input_label, 0, 1)
-        self.ui_container_layout.addWidget(QtWidgets.QLabel("is"), 0, 2)
-        self.ui_container_layout.addLayout(range_layout, 0, 3, alignment=QtCore.Qt.AlignLeft)
+
+        layout = QtWidgets.QHBoxLayout()
+        layout.addWidget(input_label)
+        layout.addWidget(QtWidgets.QLabel("is"))
+        layout.addLayout(range_layout)
+        layout.addStretch()
+        self.ui_container_layout.addLayout(layout, 0, 1)
+        
+        
 
     def _button_ui(self):
         """Creates the UI needed to configure a button based condition."""
-        self.comparison_dropdown = ui_common.QComboBox()
-        self.comparison_dropdown.addItem("Pressed")
-        self.comparison_dropdown.addItem("Released")
-        self.comparison_dropdown.setCurrentText(
+        self.comparison_widget = ui_common.QComboBox()
+        self.comparison_widget.addItem("Pressed")
+        self.comparison_widget.addItem("Released")
+        self.comparison_widget.setCurrentText(
             self.condition_data.comparison.capitalize()
         )
-        self.comparison_dropdown.currentTextChanged.connect(
+        self.comparison_widget.currentTextChanged.connect(
             self._comparison_changed_cb
         )
 
-        self.ui_container_layout.addWidget(QtWidgets.QLabel(f"<b>vJoy {self.condition_data.vjoy_id:d} Button {self.condition_data.input_id:d}</b>"),0,1)
-        self.ui_container_layout.addWidget(QtWidgets.QLabel("is"), 0, 2)
-        self.ui_container_layout.addWidget(self.comparison_dropdown, 0, 3, alignment=QtCore.Qt.AlignLeft)
+        layout = QtWidgets.QHBoxLayout()
+        layout.addWidget(QtWidgets.QLabel(f"<b>vJoy {self.condition_data.vjoy_id:d} Button {self.condition_data.input_id:d}</b>"))
+        layout.addWidget(QtWidgets.QLabel("is"))
+        layout.addWidget(self.comparison_widget)
+        layout.addStretch()
 
+        self.ui_container_layout.addLayout(layout, 0, 1)
+        
 
     def _hat_ui(self):
         """Creates the UI needed to configure a hat based condition."""
@@ -824,27 +838,18 @@ class VJoyConditionWidget(AbstractConditionWidget):
             "Center", "North", "North East", "East", "South East",
             "South", "South West", "West", "North West"
         ]
-        self.comparison_dropdown = ui_common.QComboBox()
-        for entry in directions:
-            self.comparison_dropdown.addItem(entry)
-        self.comparison_dropdown.setCurrentText(
-            self.condition_data.comparison.replace("-", " ").title()
-        )
-        self.comparison_dropdown.currentTextChanged.connect(
-            self._comparison_changed_cb
-        )
+        self.comparison_widget = ui_common.QHatSelectorComboBox()
+        self.comparison_widget.setValue(self.condition_data.comparison)
+        self.comparison_widget.valueChanged.connect(self._comparison_changed_cb)
+        
+        layout = QtWidgets.QHBoxLayout()
 
-        self.ui_container_layout.addWidget(
-            QtWidgets.QLabel(
-                f"<b>vJoy {self.condition_data.vjoy_id:d} Hat {self.condition_data.input_id:d}</b>"
-                ),
-            0,
-            1
-        )
-        self.ui_container_layout.addWidget(QtWidgets.QLabel("is"), 0, 2)
-        self.ui_container_layout.addWidget(
-            self.comparison_dropdown, 0, 3, alignment=QtCore.Qt.AlignLeft
-        )
+        layout.addWidget(QtWidgets.QLabel(f"<b>vJoy {self.condition_data.vjoy_id:d} Hat {self.condition_data.input_id:d}</b>"))
+        layout.addWidget(QtWidgets.QLabel("is"))
+        layout.addWidget(self.comparison_widget)
+        layout.addStretch()
+
+        self.ui_container_layout.addLayout(layout, 0, 1)
 
     def _modify_vjoy(self, data):
         # fix: 5/29/24 EMCS don't override prior value if already a valid value to prevent a condition reset
@@ -878,17 +883,17 @@ class VJoyConditionWidget(AbstractConditionWidget):
         """
         self.condition_data.range[1] = value
 
-    def _comparison_changed_cb(self, text):
+    def _comparison_changed_cb(self, data):
         """Updates the comparison operation to use.
 
         :param text the new comparison operation name
         """
         if self.condition_data.input_type == InputType.JoystickButton:
-            self.condition_data.comparison = text.lower()
+            self.condition_data.comparison = data.casefold()
         elif self.condition_data.input_type == InputType.JoystickHat:
-            self.condition_data.comparison = text.replace(" ", "-").lower()
+            self.condition_data.comparison = gremlin.types.HatDirection.to_string(data)
         elif self.condition_data.input_type == InputType.JoystickAxis:
-            self.condition_data.comparison = text.lower()
+            self.condition_data.comparison = data.casefold()
         else:
             logging.getLogger("system").warning(
                 f"Invalid input type encountered: {self.condition_data.input_type}"
