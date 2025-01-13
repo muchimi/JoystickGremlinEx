@@ -907,22 +907,25 @@ As such, the code may have some bugs and other things I'm missed in my own testi
 <!-- TOC --><a name="support"></a>
 ## Support
 
-As this is on my free time, support is on a best effort basis.  To help that, please create and/or update an existing GitHub issue and do include screenshots, describe what you're trying to do, any steps to reproduce, and attach an example  profile as that will help a lot.   
+As this is on my free time, support is on a best effort basis.  To help that, please create and/or update an existing GitHub issue and do include screenshots, describe what you're trying to do, any steps to reproduce, and attach an example  profile as that will help a lot.  It is often difficult to duplicate an issue without the reproduction step. 
 
  
-I am using this tool daily for all my flight sims so I know the parts I'm using are working - but Gremlin's premise is to be very flexible and that will definitely lead to situations I haven't tried yet, or that the code just blows up on because it never came up.  My goal however is to get it fixed.
+I am using this tool daily for all my flight sims meaning that I know the parts I'm using are working - but Gremlin's premise is to be very flexible and that will definitely lead to situations I haven't tried yet, or that the code just blows up on because it never came up.  My goal however is to fix it.
 
 
 
 <!-- TOC --><a name="history"></a>
 ## History
 
+While GremlinEx is based on Joystick Gremlin, it's important to note that it is not Joystick Gremlin and may behave differently.
 
-The core Gremlin repository was substantially modified in some areas to support remote control, including some new events, adding improved support for user plugin  scripts (so they are aware of state information for example). Some UI elements were also modified a bit to improve the visuals and to simplify certain aspects of Gremlin. For example, all buttons support a release action without going through more complex conditions, as in my book a check box is simpler to setup in this use-case than to go through an additional three screens. This made it much simpler for me to map physical switches on throttles that have a single state to multi-state and do what used to be complex mappings essentially a checkbox affair.
+The legacy Gremlin repository was forked, and then substantially modified in the last few years to achieve the goals of GremlinEx. The base concept was preserved, however there were substantial changes to the internal API, logic, flows and classes to support GremlinEx's needs and feature set that did not exist.
 
-I have attempted to use the base project as much as possible, and I am grateful to WhiteMagic and his excellent ideas and structure as Gremlin is simply the best mapping utility I have ever seen or used in decades of simulation and hardware input mapping to games.  The architecture is also excellent and made my modifications very simple.
+I have attempted to model GremlinEx after the original project as much as possible, and I am grateful to WhiteMagic and his excellent ideas and concept as Gremlin is simply the best mapping utility I have ever seen or used in decades of simulation and hardware input mapping to games.  The architecture is elegant and served as a launchpad for GremlinEx.
 
-I am using this code daily for my simulation needs but that's not a guarantee everything works as expected.  Feedback welcome!  
+GremlinEx is in active development and thus may include bugs and issues.  Rather than releasing new features and fixes sporadically, I have adopted an open development model where pre-releases are posted to the dev branch for you to use as the features become online.  I think the benefits of open development outweigh the drawbacks of bugs, and I also think it encourages feedback from the community, and I appreciate the patience as not everything will work in every pre-release patch as expected.  
+  
+Older releases and patches may be more stable, but do not have the features or enhancements you may want to use.
 
 <!-- TOC --><a name="installation"></a>
 # Installation
@@ -934,12 +937,14 @@ On first run, starting with 13.40.13x, GremlinEx will create a profile folder ca
 
 The profile path is *%userprofile%\Joystick Gremlin Ex*
 
+This path is where all the configuration files, log files and profiles are kept.
+
 
 
 <!-- TOC --><a name="automatic-input-detection"></a>
 # Automatic Input detection
 
-GremlinEx can auto-highlight hardware joystick input devices by clicking a button or moving an axis on them.   This eliminates the guesswork on how the hardware maps to buttons or axes.
+GremlinEx can usually detect at edit time and auto-highlight hardware joystick input devices by clicking a button or moving an axis on them.   This eliminates the guesswork on how the hardware maps to buttons or axes, and what the state of the input is.
 
 Automatic detection is only active when a profile is not running.
 
@@ -958,6 +963,8 @@ There are three options that control this behavior in the GremlinEx options pane
 | Highlight swaps device tabs | Changes input tabs automatically (this is a recommended) |
 
 As of 13.40.14ex, GremlinEx also has an option to display input repeaters as well for all joystick hardware inputs showing live axis position as well as button state.
+
+As of 13.40.16ex, GremlinEx has an input options bar at the bottom right of the main window to easily toggle highlighting options without going to the options dialog or using the hotkeys.
 
 
 <!-- TOC --><a name="button-detect-only-overrides"></a>

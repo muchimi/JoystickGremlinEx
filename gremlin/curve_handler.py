@@ -2281,10 +2281,29 @@ class AxisCurveData():
 
         # Deadzone settings
         deadzone_node = ElementTree.Element("deadzone")
-        deadzone_node.set("low", float_to_xml(self.deadzone[0]))
-        deadzone_node.set("center-low", float_to_xml(self.deadzone[1]))
-        deadzone_node.set("center-high", float_to_xml(self.deadzone[2]))
-        deadzone_node.set("high", float_to_xml(self.deadzone[3]))
+
+        # provide suitable defaults        
+        if self.deadzone:
+            if len(self.deadzone) == 2:
+                # enpoints only
+                v1, v4 = self.deadzone    
+                v2 = v3 = 0
+            else: # 4 members
+                v1, v2, v3, v4 = self.deadzone
+            if v1 is None: v1 = -1
+            if v2 is None: v2 = 0
+            if v3 is None: v3 = 0
+            if v4 is None: v4 = 1
+        else:
+            v1 = -1
+            v2 = 0
+            v3 = 0
+            v4 = +1
+
+        deadzone_node.set("low", float_to_xml(v1))
+        deadzone_node.set("center-low", float_to_xml(v2))
+        deadzone_node.set("center-high", float_to_xml(v3))
+        deadzone_node.set("high", float_to_xml(v4))
         node.append(deadzone_node)
 
         return node
