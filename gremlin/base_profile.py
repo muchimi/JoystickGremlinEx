@@ -1611,24 +1611,31 @@ class InputItem():
             from gremlin.keyboard import Key
             input_item = KeyboardInputItem()
 
-            # see if old style keyboard entry
-            if "extended" in node.attrib:
-                scan_code = self.input_id
-                is_extended = read_bool(node, "extended", False)
-                is_mouse = safe_read(node,"mouse", bool, False)
-                key = Key(scan_code=scan_code, is_extended=is_extended, is_mouse = is_mouse)
+            if "id" in node.attrib and node.tag == "key":
+                # legacy format
+                scan_code = safe_read(node, "id", int, 0)
+                description = safe_read(node, "description", str, "")
+                key = Key(scan_code=scan_code, is_extended=False, is_mouse = False)
                 input_item.key = key
-                for child in node:
-                    if child.tag == "latched":
-                        latched_key = Key(scan_code=safe_read(child,"id",int), is_extended= read_bool(child,"extended"))
-                        if not latched_key in key.latched_keys:
-                            key.latched_keys.append(latched_key)
             else:
-                # new style
-                for child in node:
-                    if child.tag == "input":
-                        input_item.parse_xml(child, data)
-                        break
+                # see if old style keyboard entry
+                if "extended" in node.attrib:
+                    scan_code = self.input_id
+                    is_extended = read_bool(node, "extended", False)
+                    is_mouse = safe_read(node,"mouse", bool, False)
+                    key = Key(scan_code=scan_code, is_extended=is_extended, is_mouse = is_mouse)
+                    input_item.key = key
+                    for child in node:
+                        if child.tag == "latched":
+                            latched_key = Key(scan_code=safe_read(child,"id",int), is_extended= read_bool(child,"extended"))
+                            if not latched_key in key.latched_keys:
+                                key.latched_keys.append(latched_key)
+                else:
+                    # new style
+                    for child in node:
+                        if child.tag == "input":
+                            input_item.parse_xml(child, data)
+                            break
             self.input_type = InputType.KeyboardLatched # force new input type
             #logging.getLogger("system").info(f"Loaded key input: {input_item.display_name}")
             self.input_id = input_item

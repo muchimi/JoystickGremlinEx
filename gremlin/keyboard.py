@@ -139,6 +139,7 @@ class Key():
 
         if not name:
             self._load(scan_code, is_extended, virtual_code, is_mouse)
+            name = self._name
         
         else:
             self._key_id = (scan_code, is_extended)   
