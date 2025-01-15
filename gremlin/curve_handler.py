@@ -1690,6 +1690,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
         self.paste_button_widget.setIcon(icon)
         self.paste_button_widget.setMaximumWidth(24)
         self.paste_button_widget.setToolTip("Paste curve")
+        self._update_clipboard()
         self.paste_button_widget.clicked.connect(self._paste_curve_cb)
 
 
@@ -1908,7 +1909,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
                 if root is None or root.tag != "curve_preset":
                     gremlin.ui.ui_common.MessageBox(prompt = f"File {base_name} does not appear to be a valid preset file.")    
                     return
-                node = gremlin.util.get_xml_child(root,"response-curve")
+                node = gremlin.util.get_xml_child(root,"curve-data")
                 if node is None:
                     gremlin.ui.ui_common.MessageBox(prompt = f"File {base_name} does not appear to be a valid preset file.")    
                     return
@@ -1927,7 +1928,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
         data = clipboard.data
         if gremlin.util.is_binary_string(data):
             data = data.decode("utf-8")
-        return isinstance(data, str) and "</response-curve>" in data
+        return isinstance(data, str) and "</curve-data>" in data
 
             
     @QtCore.Slot()
@@ -1937,6 +1938,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
         xml = etree.tostring(node)
         clipboard = gremlin.clipboard.Clipboard()
         clipboard.data = xml
+        self._update_clipboard()
 
 
     @QtCore.Slot()
@@ -1958,8 +1960,10 @@ class AxisCurveWidget(QtWidgets.QWidget):
             
 
 
-    def _update_clipboard(self, clipboard):
+    def _update_clipboard(self, clipboard = None):
         ''' updates the state of the clipboard buttons '''
+        if clipboard is None:
+            clipboard = gremlin.clipboard.Clipboard()
         self.paste_button_widget.setEnabled(self._clipboard_valid(clipboard))
     
 
