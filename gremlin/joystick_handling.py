@@ -380,58 +380,12 @@ def joystick_devices_initialization():
     syslog.info(f"INIT: Found {real_count} hardware devices and {virtual_count} virtual devices")
 
 
-    # Process all devices again to detect those that have been added and those
-    # that have been removed since the last time this function ran.
-
-    # Compare existing versus observed devices and only proceed if there
-    # is a change to avoid unnecessary work.
-    # device_added = False
-    # device_removed = False
-    # for new_dev in devices:
-    #     if new_dev not in _joystick_devices:
-    #         device_added = True
-    #         if verbose:
-    #             syslog.debug(f"Added: name={new_dev.name} guid={new_dev.device_guid}")
-                
-    # for old_dev in _joystick_devices:
-    #     if old_dev not in devices:
-    #         device_removed = True
-    #         if verbose:
-    #             syslog.debug(f"Removed: name={old_dev.name} guid={old_dev.device_guid}")
-
-    # # Terminate if no change occurred
-    # if not force_refresh and not device_added and not device_removed:
-    #     _joystick_init_lock.release()
-    #     return
-
-    # In order to associate vJoy devices and their ids correctly with SDL
-    # device ids a hash is constructed from the number of axes, buttons, and
-    # hats. This information is used to attempt to find unambiguous mappings
-    # between vJoy and SDL devices. If this is not possible Gremlin will
-    # terminate as this is a non-recoverable error.
-
+ 
     vjoy_lookup = {}
     vjoy_wheel_lookup = {}
     
     should_terminate = False
 
-    # get the vjoy device list from direct input
-    # for dev in [dev for dev in devices if dev.is_virtual]:
-    #     hash_value = (dev.axis_count, dev.button_count, dev.hat_count)
-    #     hash_value_wheel = (dev.axis_count+1, dev.button_count, dev.hat_count)
-    #     syslog.info("Virtual VJOY device summary:")
-    #     syslog.debug(f"\tHash: {hash_value} {str(dev)}")
-
-    #     # Only unique combinations of axes, buttons, and hats are allowed
-    #     # for vJoy devices
-    #     if hash_value in vjoy_lookup:
-    #         syslog.error("\tFATAL: A VJOY device with the same axis, button and hat count was already found. ")
-    #         should_terminate = True
-    #         continue
-
-    #     vjoy_lookup[hash_value] = dev
-    #     vjoy_wheel_lookup[hash_value_wheel] = dev
-        
 
 
     # Query all vJoy devices in sequence until all have been processed and

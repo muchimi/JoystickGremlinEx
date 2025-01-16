@@ -121,6 +121,11 @@ class InputIdentifier(QtCore.QObject):
         ''' true if this item is setup as an button input (momentary) '''
         return not self.is_axis
     
+    @property
+    def is_hat(self) -> bool:
+        ''' true if the item is a hat '''
+        return self._input_type == InputType.JoystickHat
+    
 class InputItemListModel(ui_common.AbstractModel):
 
     """Model storing a device's input item list."""
@@ -1300,7 +1305,7 @@ class InputItemWidget(QtWidgets.QFrame):
         
         widget = None # widget created for the repeater
 
-        if config.show_input_axis and (self.identifier.is_axis or self.identifier.is_button or self.identifier.input_type in (InputType.JoystickAxis, InputType.JoystickButton)):
+        if config.show_input_axis and (self.identifier.is_axis or self.identifier.is_button or self.identifier.is_hat or self.identifier.input_type in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat)):
             
             if self.identifier.is_axis:
                 # axis

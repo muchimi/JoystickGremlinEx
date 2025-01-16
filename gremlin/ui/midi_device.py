@@ -2062,12 +2062,7 @@ class MidiClient(QtCore.QObject):
                         is_axis = False)
 
                     self._event_listener.joystick_event.emit(event)
-                    self._event_listener.button_state_change.emit(
-                            device_guid,
-                            input_type,
-                            input_item,
-                            is_pressed
-                    )
+                    self._event_listener.button_state_change.emit(event)
 
 
 

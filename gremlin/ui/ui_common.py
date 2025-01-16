@@ -230,9 +230,15 @@ class StateTracker():
                     del self._axis_cache[device_guid][input_type][key]
 
 
-    def _button_state_change(self, device_guid, input_type, input_id, is_pressed):
+    def _button_state_change(self, event: gremlin.event_handler.Event):
+        device_guid = event.device_guid
+        input_type = event.event_type
+        input_id = event.identifier
+        
         if not isinstance(device_guid, str):
             device_guid = str(device_guid)
+        syslog = logging.getLogger("system")
+        device_name = gremlin.shared_state.get_device_name(device_guid)
         if device_guid in self._button_cache:
             if input_type in self._button_cache[device_guid]:
                 key = self._key(input_id)
@@ -240,15 +246,28 @@ class StateTracker():
                     widget = self._button_cache[device_guid][input_type][key]
                     try:
                         if widget.enabled:
-                            widget._update_value(is_pressed)
+                            match input_type:
+                                case InputType.JoystickButton:
+                                    if hasattr(widget, "_update_value"):
+                                        widget._update_value(event.is_pressed)
+                                case InputType.JoystickHat:
+                                    if hasattr(widget, "_update_hat"):
+                                        widget._update_hat(event.value)
+                            
                     except:
                         # discarded by QT - ignore
                         pass
+                # else:
+                #     syslog.info(f"ButtonState: {device_name} type {InputType.to_display_name(event.event_type)} input {event.identifier} connect")              
                 
                     
 
     
-    def _axis_state_change(self, device_guid, input_type, input_id, value):
+    def _axis_state_change(self, event : gremlin.event_handler.Event):
+        device_guid = event.device_guid
+        input_type = event.event_type
+        input_id = event.identifier
+        value = event.value
         if not isinstance(device_guid, str):
             device_guid = str(device_guid)
         if device_guid in self._axis_cache:
@@ -2245,7 +2264,8 @@ class QHatSelectorComboBox(QDataComboBox):
                     png = "hat_sw.png"      
                 case HatDirection.West:
                     png = "hat_w.png"  
-            icon = load_icon(png)                  
+            icon = load_icon(png)   
+            #icon_active = load_icon(png_active)        
             self.addItem(icon, HatDirection.to_display_name(position), HatDirection.to_enum(position))
             
         self.currentIndexChanged.connect(self._update_value)
@@ -2437,17 +2457,21 @@ class ButtonStateWidget(QtWidgets.QWidget):
         self.main_layout.setSpacing(0)
         self.main_layout.setContentsMargins(0,0,0,0)
 
-        icon_size = QtCore.QSize(16,16)
+        self._icon_size = QtCore.QSize(16,16)
         self._device_guid = None
         self._input_id = None
         self._input_type = None
         self._button_widget = QtWidgets.QLabel()
         self._button_widget.setContentsMargins(0,0,0,0)
         on_icon = load_icon("mdi.record",use_qta=True,qta_color="red")
-        self._on_pixmap = on_icon.pixmap(icon_size)
+        self._on_pixmap = on_icon.pixmap(self._icon_size)
         off_icon = load_icon("mdi.record",use_qta=True,qta_color="#979EA8")
-        self._off_pixmap = off_icon.pixmap(icon_size)
-        self._button_widget.setMaximumHeight(icon_size.height())
+        self._off_pixmap = off_icon.pixmap(self._icon_size)
+        height = self._icon_size.height()+2
+        self._button_widget.setMinimumHeight(height)
+        self._button_widget.setMaximumHeight(height)
+
+        self._hat_icons = {} # icon hats, keyed by position
         
         self.main_layout.addWidget(self._button_widget)
 
@@ -2473,8 +2497,17 @@ class ButtonStateWidget(QtWidgets.QWidget):
             is_pressed = input_id.button_value
         elif gremlin.joystick_handling.is_hardware_device(device_guid):
             # read the current value
-            is_pressed = gremlin.joystick_handling.dinput.DILL().get_button(device_guid, input_id)
-        self._update_value(is_pressed)
+            if self._input_type == InputType.JoystickHat:
+                value = gremlin.joystick_handling.dinput.DILL().get_hat(device_guid, input_id)
+                import vjoy
+                if value in vjoy.vjoy.Hat.to_continuous_position: 
+                    position = vjoy.vjoy.Hat.to_continuous_position[value]
+                else:
+                    position = (0,0)
+                self._update_hat(position)
+            else:
+                is_pressed = gremlin.joystick_handling.dinput.DILL().get_button(device_guid, input_id)
+                self._update_value(is_pressed)
 
         self._tab_selected(device_guid)
 
@@ -2499,11 +2532,11 @@ class ButtonStateWidget(QtWidgets.QWidget):
             device_name = gremlin.shared_state.get_device_name(device_guid)
             if isinstance(device_guid, str):
                 device_guid = gremlin.util.parse_guid(device_guid)
-            el = gremlin.event_handler.EventListener()
+            #el = gremlin.event_handler.EventListener()
             if self._device_guid == device_guid:
                 # connect the handler
-                input_id = self._input_id
-                # syslog.info(f"ButtonState: {device_name} button {input_id} connect")
+                #input_id = self._input_id
+                #syslog.info(f"ButtonState: {device_name} type {InputType.to_display_name(self._input_type)} input {self._input_id} connect")
                 _state_tracker.registerButtonState(self, self._device_guid, self._input_type, self._input_id)
                 self._handler_connected = True
 
@@ -2524,25 +2557,26 @@ class ButtonStateWidget(QtWidgets.QWidget):
         if not self._handler_connected:
             # not connected
             return 
-        syslog = logging.getLogger("system")
-        el = gremlin.event_handler.EventListener()
+        # syslog = logging.getLogger("system")
+        # el = gremlin.event_handler.EventListener()
         if device_guid:
             if isinstance(device_guid, str):
                 device_guid = gremlin.util.parse_guid(device_guid)
             disconnect = self._device_guid == device_guid
-            device_name = gremlin.shared_state.get_device_name(device_guid)
+            #device_name = gremlin.shared_state.get_device_name(device_guid)
         else:
             disconnect = True
-            device_name = 'reset'
+            #device_name = 'reset'
             
         if disconnect:
-            input_id = self._input_id
+            #input_id = self._input_id
             # syslog.info(f"ButtonState: (unselect) {device_name} button {input_id} disconnect")
             _state_tracker.unregisterButtonState(self._device_guid, self._input_type, self._input_id)
             self._handler_connected = False
 
 
     def _update_value(self, is_pressed):
+        ''' updates a button position '''
         if is_pressed:
             self._button_widget.setPixmap(self._on_pixmap)
             #self._button_widget.setText("pressed")
@@ -2550,9 +2584,54 @@ class ButtonStateWidget(QtWidgets.QWidget):
             self._button_widget.setPixmap(self._off_pixmap)
             #self._button_widget.setText(" ")
 
+    def _update_hat(self, position):
+        ''' updates a hat position '''
+        position = HatDirection.to_enum(position) 
+        if not position in self._hat_icons:
+            match position:
+                case HatDirection.Center:
+                    png = "hat_ctr_inactive.png"
+                    png_active = "hat_ctr_active.png"
+                case HatDirection.North:
+                    png = "hat_n.png"
+                    png_active = "hat_n_active.png"
+                case HatDirection.NorthEast:
+                    png = "hat_ne.png"
+                    png_active = "hat_ne_active.png"
+                case HatDirection.NorthWest:
+                    png = "hat_nw.png"
+                    png_active = "hat_nw_active.png"
+                case HatDirection.East:
+                    png = "hat_e.png"
+                    png_active = "hat_e_active.png"
+                case HatDirection.South:
+                    png = "hat_s.png"
+                    png_active = "hat_s_active.png"
+                case HatDirection.SouthEast:
+                    png = "hat_se.png"
+                    png_active = "hat_se_active.png"
+                case HatDirection.SouthWest:
+                    png = "hat_sw.png"      
+                    png_active = "hat_sw_active.png"
+                case HatDirection.West:
+                    png = "hat_w.png"  
+                    png_active = "hat_w_active.png"
+            on_pixmap = load_icon(png_active).pixmap(self._icon_size)
+            off_pixmap = load_icon(png).pixmap(self._icon_size)
+            self._hat_icons[position] = (off_pixmap, on_pixmap)
+
+        off_pixmap, on_pixmap = self._hat_icons[position]
+        if position != HatDirection.Center:
+            self._button_widget.setPixmap(on_pixmap)
+        else:
+            self._button_widget.setPixmap(off_pixmap)
+
+
     def setValue(self, is_pressed):
         ''' value '''
         self._update_value(is_pressed)
+
+
 
 
 _axis_widget_cache = []

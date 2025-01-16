@@ -1133,12 +1133,12 @@ class Configuration:
         self.save()
 
     @property
-    def osc_port(self):
+    def osc_input_port(self):
         ''' OSC listen port '''
         port = self._data.get("osc_port", 8000)
         return port
-    @osc_port.setter
-    def osc_port(self, value):
+    @osc_input_port.setter
+    def osc_input_port(self, value):
         self._data["osc_port"] = value
         self.save()
 

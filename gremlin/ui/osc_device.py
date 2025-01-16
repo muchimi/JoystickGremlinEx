@@ -1780,7 +1780,7 @@ class OscInterface(QtCore.QObject):
         # host OSC listen port (UDP) - make sure the host's firewall allows that port in
         config = gremlin.config.Configuration()
         self._started = False
-        self._input_port = config.osc_port
+        self._input_port = config.osc_input_port
         self._output_port = config.osc_output_port # self._input_port + 1
         self._target_ip = config.osc_host
         self._target_port = config.osc_output_port
@@ -3484,12 +3484,7 @@ class InputOscClient(QtCore.QObject):
                     self._event_listener.joystick_event.emit(event)
                     if widget:
                         # there is a widget to notify
-                        self._event_listener.button_state_change.emit(
-                            OscDeviceTabWidget.device_guid,
-                            InputType.OpenSoundControl,
-                            widget,
-                            is_pressed
-                        )
+                        self._event_listener.button_state_change.emit(event)
                     return
                 
 

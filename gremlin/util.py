@@ -853,6 +853,27 @@ def load_icon(*paths, use_qta = False, qta_color = None):
             logging.getLogger("system").info(f"LoadIcon() found icon: {paths}")
     return icon
 
+
+def recolor_icon_pixmap(image_path, color = "red"):
+    ''' recolors non-transparent pixels in an icon image 
+    :Returns: pixmap of the recolored item
+    '''
+    the_path = get_icon_path(image_path)
+    if the_path:
+        tmp = QtGui.QImage(the_path)
+        tmp = tmp.convertToFormat(QtGui.QImage.Format.Format_ARGB32)
+        c = QtGui.QColor(color)
+        for y in range(tmp.height()):
+            for x in range (tmp.width()):
+                c.setAlpha(tmp.pixelColor(x,y).alpha())
+                tmp.setPixelColor(x,y,color)
+
+        pixmap = QtGui.QPixmap.fromImage(tmp)    
+        return pixmap
+    return None
+
+            
+
 def load_image(*paths):
     ''' loads an image '''
     from gremlin.config import Configuration

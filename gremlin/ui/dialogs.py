@@ -451,19 +451,19 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.osc_enabled.setChecked(self.config.osc_enabled)
         self.osc_enabled.setToolTip("When set, Joystick Gremlin Ex will listen to OSC network traffic on the specified port when a profile is activated.")
 
-        self.osc_port = QtWidgets.QSpinBox()
-        self.osc_port.setRange(4096,65535)
-        self.osc_port.setEnabled(self.config.osc_enabled)
-        port = self.config.osc_port
-        self.osc_port.setValue(port)
-        self.osc_port.valueChanged.connect(self._osc_port)
+        self.osc_input_port = ui_common.QIntLineEdit()
+        self.osc_input_port.setRange(4096,65535)
+        self.osc_input_port.setEnabled(self.config.osc_enabled)
+        port = self.config.osc_input_port
+        self.osc_input_port.setValue(port)
+        self.osc_input_port.valueChanged.connect(self._osc_port)
 
-        self.osc_ouput_port = QtWidgets.QSpinBox()
-        self.osc_ouput_port.setRange(4096,65535)
-        self.osc_ouput_port.setEnabled(self.config.osc_enabled)
+        self.osc_output_port = ui_common.QIntLineEdit()
+        self.osc_output_port.setRange(4096,65535)
+        self.osc_output_port.setEnabled(self.config.osc_enabled)
         port = self.config.osc_output_port
-        self.osc_ouput_port.setValue(port)
-        self.osc_ouput_port.valueChanged.connect(self._osc_output_port)
+        self.osc_output_port.setValue(port)
+        self.osc_output_port.valueChanged.connect(self._osc_output_port)
 
         self.osc_host = ui_common.QDataIPLineEdit()
         self.osc_host.setText(self.config.osc_host)
@@ -696,9 +696,9 @@ class OptionsUi(ui_common.BaseDialogUi):
         layout.setContentsMargins(0,0,0,0)
 
         layout.addWidget(QtWidgets.QLabel("OSC Input port:"))
-        layout.addWidget(self.osc_port)
+        layout.addWidget(self.osc_input_port)
         layout.addWidget(QtWidgets.QLabel("Output port:"))
-        layout.addWidget(self.osc_ouput_port)
+        layout.addWidget(self.osc_output_port)
         layout.addWidget(QtWidgets.QLabel("Output host IP:"))
         layout.addWidget(self.osc_host)
         self.osc_host.setMaximumWidth(w)
@@ -1138,17 +1138,17 @@ This setting is also available on a profile by profile basis on the profile tab,
     @QtCore.Slot(bool)
     def _osc_enabled(self, checked):
         self.config.osc_enabled = checked
-        self.osc_port.setEnabled(checked)
+        self.osc_input_port.setEnabled(checked)
         self._reload_needed = True
 
 
     @QtCore.Slot()
     def _osc_port(self):
-        self.config.osc_port = self.osc_port.value()
+        self.config.osc_input_port = self.osc_input_port.value()
 
     @QtCore.Slot()
     def _osc_output_port(self):
-        self.config.osc_output_port = self.osc_port.value()
+        self.config.osc_output_port = self.osc_output_port.value()
 
     @QtCore.Slot()
     def _osc_host(self):

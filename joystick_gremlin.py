@@ -120,7 +120,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_BASE = "m61e"
+APPLICATION_BASE = "m62"
 APPLICATION_VERSION = f"13.40.16ex ({APPLICATION_BASE})"
 
 
@@ -451,9 +451,6 @@ class GremlinUi(QtWidgets.QMainWindow):
             if verbose: 
                 syslog.info(f"\t[{index}] {device_name} {device_guid}")
 
-            
-         
-
     def _tabswitch_needed(self, device_guid) -> bool:
         ''' checks to see if the device tab is the current tab or not '''
         
@@ -472,10 +469,15 @@ class GremlinUi(QtWidgets.QMainWindow):
         return tab_device_guid != device_guid or tab_input_id != input_id
 
 
-    def _button_state_change(self, device_guid, input_type, input_id, is_pressed):
+    def _button_state_change(self, event):
         ''' button changed - triggered only at design time '''
 
         is_tabswitch_enabled = self.config.highlight_autoswitch
+        device_guid = event.device_guid
+        input_type = event.event_type
+        input_id = event.identifier
+        is_pressed = event.is_pressed
+
         if not is_pressed:
             # trigger only on presses
             return
@@ -503,12 +505,17 @@ class GremlinUi(QtWidgets.QMainWindow):
         self._select_input_handler(device_guid, input_type, input_id)
         
 
-    def _axis_state_change(self, device_guid, input_type, input_id, value):
+    def _axis_state_change(self, event):
         ''' axis changed - triggered only at design time '''
+
+
         # avoid input spamming
         if self._last_input_timestamp + self._input_delay > time.time():
             # delay not occured yet
             return
+        
+
+
         self._last_input_timestamp = time.time()
         if self._input_highlight_stack > 0:
             # highlighting disabled
@@ -517,6 +524,11 @@ class GremlinUi(QtWidgets.QMainWindow):
         if not is_axis:
             # highlight disabled
             return
+        device_guid = event.device_guid
+        input_type = event.event_type
+        input_id = event.identifier
+        value = event.value
+        
         tab_switch_needed = self._tabswitch_needed(device_guid)
         is_tabswitch_enabled = self.config.highlight_autoswitch
         input_switch_needed = tab_switch_needed or self._inputswitch_needed(device_guid, input_id)

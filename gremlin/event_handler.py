@@ -371,9 +371,9 @@ class EventListener(QtCore.QObject):
 	tab_unselected = QtCore.Signal(str) # tab unselected, the device_guid (str) is passed as the parameter - this is triggered when a device tab is selected and made visible
 
 
-	button_state_change = QtCore.Signal(object, object, object, bool) # indicates a change in button state params: (device_guid, input_type, input_id, is_pressed)
+	button_state_change = QtCore.Signal(Event) # indicates a change in button state params: (device_guid, input_type, input_id, is_pressed)
 
-	axis_state_change = QtCore.Signal(object, object, object, float) # indicates a change in axis state params: (device_guid, input_type, input_id, is_pressed)
+	axis_state_change = QtCore.Signal(Event) # indicates a change in axis state params: (device_guid, input_type, input_id, is_pressed)
 
 	# mapping changed - either container or action added -
 	mapping_changed = QtCore.Signal(object) # fires when a container or action changes on an InputItem - passes the InputItem as the parameter
@@ -771,7 +771,6 @@ class EventListener(QtCore.QObject):
 		from gremlin.util import dill_hat_lookup
 		verbose = config.Configuration().verbose_mode_joystick
 		
-		
 		event = dinput.InputEvent(data)
 		
 		#breakpoint()
@@ -789,8 +788,7 @@ class EventListener(QtCore.QObject):
 			raw_value = event.value
 			value = self._apply_calibration(event)
 			curved_value = self._apply_curve_ex(event.device_guid, event.input_index, value)
-			
-			self.joystick_event.emit(Event(
+			event = Event(
 				event_type= InputType.JoystickAxis,
 				device_guid=event.device_guid,
 				identifier=event.input_index,
@@ -799,29 +797,28 @@ class EventListener(QtCore.QObject):
 				raw_value= raw_value,
 				is_axis = True,
 				is_virtual = is_virtual
-			))
+			)
+			self.joystick_event.emit(event)
 
 			# notify axis change for tab switches
 			if not gremlin.shared_state.is_running:
-				self.axis_state_change.emit(event.device_guid, InputType.JoystickAxis, event.input_index, value)
+				self.axis_state_change.emit(event)
 
 		elif event.input_type == dinput.InputType.Button:
-			self.joystick_event.emit(Event(
+			event = Event(
 				event_type= InputType.JoystickButton,
 				device_guid=event.device_guid,
 				identifier=event.input_index,
 				is_pressed=event.value == 1,
 				is_virtual = is_virtual
-			))
+			)
+			self.joystick_event.emit(event)
 			if not gremlin.shared_state.is_running:
-				self.button_state_change.emit(event.device_guid, 
-								 InputType.JoystickButton,
-								 event.input_index, 
-								 event.value == 1)
+				self.button_state_change.emit(event)
 			
 		elif event.input_type == dinput.InputType.Hat:
 			value = dill_hat_lookup[event.value]
-			self.joystick_event.emit(Event(
+			event = Event(
 				event_type= InputType.JoystickHat,
 				device_guid=event.device_guid,
 				identifier=event.input_index,
@@ -829,12 +826,10 @@ class EventListener(QtCore.QObject):
 				is_virtual = is_virtual,
 				value = value,
 				raw_value= value
-			))
+			)
+			self.joystick_event.emit(event)
 			if not gremlin.shared_state.is_running:
-				self.button_state_change.emit(event.device_guid,
-								 		  InputType.JoystickHat,
-										  event.input_index,
-										  value)
+				self.button_state_change.emit(event)
 
 
 	def _joystick_device_handler(self, data, action):
@@ -1763,6 +1758,7 @@ class EventHandler(QtCore.QObject):
 
 		
 		verbose = gremlin.config.Configuration().verbose_mode_inputs
+		#verbose = True
 
 		if verbose and event.event_type != InputType.JoystickAxis:
 			syslog.info(f"process event - mode [{mode}] event: {str(event)}")

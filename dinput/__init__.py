@@ -524,6 +524,12 @@ class DeviceSummary:
         else:
             data = input_id # tuple
         return gremlin.util.hat_tuple_to_direction(data)
+    
+    def axis_index_list(self) -> list:
+        ''' returns the list of valid axis indices '''
+        index_list = [data.axis_index for data in self.axis_map if data.axis_index > 0]
+        return index_list
+        
 
     
 
@@ -760,6 +766,7 @@ class DILL:
         return DeviceSummary(
             DILL._dll.get_device_information_by_guid(guid.ctypes)
         )
+    
 
     @staticmethod
     def get_axis(guid, index):

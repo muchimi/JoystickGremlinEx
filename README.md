@@ -210,6 +210,10 @@ Joystick Gremlin EX
 
 <!-- TOC --><a name="134016ex-pre-release"></a>
 ## 13.40.16ex (pre-release)
+### (m62)
+- Improved: hat button repeater enabled - now shows the direction of the hat "live".
+- Fix: OSC output port value will update the correct port.
+- Fix: Joystick conditions will now correctly skip axes (the dropdown previously assumed axes were sequential - depends on the hardware).
 ### (m61)
 m61 is a **general stabilization** patch focused on cleaning up remaining issues linked to new features introduced and module refactors in this version.
 

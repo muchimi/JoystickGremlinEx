@@ -396,11 +396,11 @@ class JoystickConditionWidget(AbstractConditionWidget):
             index = 0 # index of the entry
             current_index = None # index of the input to select
 
-            # axes
-            for i in range(device.axis_count):
-                axis_name = device.get_axis_name(i + 1)
-                self.input_selector_widget.addItem(axis_name, (InputType.JoystickAxis, i + 1))
-                if current_index is None and input_id == i + 1 and input_type == InputType.JoystickAxis:
+            # axes - axes are not necessarily sequential
+            for i in device.axis_index_list():
+                axis_name = device.get_axis_name(i)
+                self.input_selector_widget.addItem(axis_name, (InputType.JoystickAxis, i))
+                if current_index is None and input_id == i and input_type == InputType.JoystickAxis:
                     current_index = index
                 index += 1
 
