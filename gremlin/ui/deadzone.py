@@ -293,16 +293,11 @@ class DeadzoneWidget(QtWidgets.QWidget):
             self._centered = value
             self._update()
 
-    def setValues(self, values):
+    def setValues(self, values, emit = False):
         """Sets the deadzone values.
 
         :param values the new deadzone values [min, min center, max center, max]
         """
-
-        current = self.values()
-        if current == values:
-            # no change
-            return
 
         if len(values) == 2:
             # has enpoints only
@@ -314,6 +309,7 @@ class DeadzoneWidget(QtWidgets.QWidget):
 
         with QtCore.QSignalBlocker(self.left_slider):
             self.left_slider.setValue((v1,v2))
+            # print (f"left slider: {v1} {v2}   values: {self.left_slider.values}")
         with QtCore.QSignalBlocker(self.left_lower):
             self.left_lower.setValue(v1)
         with QtCore.QSignalBlocker(self.left_upper):            
@@ -330,7 +326,8 @@ class DeadzoneWidget(QtWidgets.QWidget):
         self._update()
        
 
-        self.changed.emit()
+        if emit:
+            self.changed.emit()
 
 
     def values(self):
@@ -413,19 +410,18 @@ class DeadzoneWidget(QtWidgets.QWidget):
         """Updates the slider position.
 
         :param value the new value
-        :param handle the handle to move
+        :param handle the handle to move 0 to 3
         :param widget which slider widget to update
         """
 
         values = self.values()
-        if index > len(values):
-            # two handle situation
-            index = 1
+        if len(values) == 2:
+            v1, v4 = values
+            values = [v1, 0.0, 0.0, v4]
 
-        current = values[index]
-        if current != value:
-            values[index] = value
-            self.setValues(values)
+        values[index] = value
+        self.setValues(values)
+        # print (f"index {index} value: {value} Values: {values}  left range: {self.left_slider.values} {self.left_slider.range()}  right range: {self.right_slider.values} {self.right_slider.range()}")
 
         
 
@@ -433,6 +429,9 @@ class DeadzoneWidget(QtWidgets.QWidget):
 
     def _update_deadzone(self, data : list):
         ''' updates the deadzone text values '''
+        if len(data) == 2:
+            v1, v4 = data
+            data = [v1, 0.0, 0.0, v4]
         self.setValues(data)
         self.profile_data.deadzone = data
         self.changed.emit() # notify we changed

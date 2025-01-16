@@ -2150,7 +2150,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
         ''' called when deadzones are modified '''
         self.action_data.curve_update()
         values = self.deadzone_widget.values()
-        print (f"deadzone: {values}")
+        #print (f"deadzone: {values}")
         for index, value in enumerate(values):
             self.action_data.deadzone[index] = value
 

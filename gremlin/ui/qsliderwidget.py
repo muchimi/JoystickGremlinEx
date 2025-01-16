@@ -250,8 +250,10 @@ class QSliderWidget(QtWidgets.QWidget):
         if values:
             values.sort() # sort by value so the values are always in smallest to greatest
             self._values = values # [max(min(1.0, n), -1.0) for n in values]
-            self._update_offsets()
-            self.update()
+        self._update_offsets()
+        self.update()
+        
+            
 
     def value(self) -> list:
         ''' gets the list of values in the slider - a single value is returned as a list of one'''
@@ -862,6 +864,7 @@ class QSliderWidget(QtWidgets.QWidget):
             if not self._drag_active and self._mouse_down and abs(self._drag_x - x) > 2: # move at least 3 pixels
                 # drag started
                 self._drag_active = True
+                self._drag_handle_index
                 #print ("mouse drag starting")
                 
 
