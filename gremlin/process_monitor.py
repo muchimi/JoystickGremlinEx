@@ -106,6 +106,7 @@ class ProcessMonitor(QtCore.QObject):
                 self._running = True
                 self._update_thread = threading.Thread(target=self._update)
                 self._update_thread.start()
+            
 
     def stop(self):
         """Stops monitoring the current process."""

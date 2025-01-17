@@ -59,7 +59,7 @@ class VirtualAxisButton(AbstractVirtualButton):
 
     @property
     def enabled(self) -> bool:
-        return self.container.virtual_button_enabled
+        return self.container.virtual_button_user_enabled
     @enabled.setter
     def enabled(self, value : bool):
         import gremlin.event_handler

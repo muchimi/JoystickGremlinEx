@@ -210,6 +210,12 @@ Joystick Gremlin EX
 
 <!-- TOC --><a name="134016ex-pre-release"></a>
 ## 13.40.16ex (pre-release)
+### (m64)
+- New: Run Process action: allows GremlinEx to execute an arbitrary process based on an input press or release.  Note: The ability for GremlinEx to spawn processes depends on the permissions given to GremlinEx.
+- Fix: Virtual button enabled user setting (Virtual Button Tab) now loads the correct saved option.
+- New: Open GremlinEx folder option in file menu
+- Fix: Additional logic to track modes associated with specific processes and profiles so that when a process is given focus, the profile and the mode last associated with the process is restored.  This is still a work in progress.
+
 ### (m63)
 - Improved: Input Viewer remembers last selection
 - Fix: Input viewer has correct axis number for non-sequential inputs

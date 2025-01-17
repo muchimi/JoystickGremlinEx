@@ -242,7 +242,7 @@ class ExecutionContext():
         nodes = anytree.search.findall_by_attr(self.modeTree, mode, "mode")
         for node in nodes:
             while node.mode:
-                modes.add(node.mode)
+                modes.append(node.mode)
                 node = node.parent
             break # use only the first node returned by the search
 

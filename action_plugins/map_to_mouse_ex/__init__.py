@@ -359,15 +359,17 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.action_data.action_mode = action
             self._change_mode()
 
-    
-    def _exec_on_release_changed(self, value):
-        self.action_data.exec_on_release = self.chkb_exec_on_release.isChecked()
+    @QtCore.Slot(bool)
+    def _exec_on_release_changed(self, checked):
+        self.action_data.exec_on_release = checked
 
-    def _force_remote_output_changed(self, value):
-        self.action_data.force_remote_output = self.chkb_force_remote_output.isChecked()
+    @QtCore.Slot(bool)
+    def _force_remote_output_changed(self, checked):
+        self.action_data.force_remote_output = checked
         
-    def _force_remote_output_only_changed(self, value):
-        self.action_data.force_remote_output_only = self.chkb_force_remote_output_only.isChecked()
+    @QtCore.Slot(bool)
+    def _force_remote_output_only_changed(self, checked):
+        self.action_data.force_remote_output_only = checked
                         
 
     def _update_axis(self):
