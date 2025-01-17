@@ -352,7 +352,7 @@ class EventListener(QtCore.QObject):
 
 	mode_name_changed = QtCore.Signal(str) # runs when a mode name change occurs for the UI to update - param - the name change
 
-	runtime_mode_changed = QtCore.Signal(str) # runs when the rungime profile mode changes (runtime mode only, when a profile has been started) - param - the mode changed to
+	runtime_mode_changed = QtCore.Signal(str) # runs when the runtime profile mode changes (runtime mode only, when a profile has been started) - param - the mode changed to
 
 	# functor enable flag changed
 	action_created = QtCore.Signal(object) # runs when an action is created - object = the object that triggered the event 

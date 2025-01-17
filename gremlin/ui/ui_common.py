@@ -156,6 +156,7 @@ class StateTracker():
         el.button_state_change.connect(self._button_state_change)
         el.axis_state_change.connect(self._axis_state_change)
 
+
     def _key(self, input_id):
         if hasattr(input_id, "message_key"):
             # item has a special key to use for indexing input ID
@@ -231,6 +232,10 @@ class StateTracker():
 
 
     def _button_state_change(self, event: gremlin.event_handler.Event):
+        if gremlin.shared_state.is_running:
+            # do not update while profile is running
+            return 
+        
         device_guid = event.device_guid
         input_type = event.event_type
         input_id = event.identifier
@@ -264,6 +269,10 @@ class StateTracker():
 
     
     def _axis_state_change(self, event : gremlin.event_handler.Event):
+        if gremlin.shared_state.is_running:
+            # do not update while profile is running
+            return 
+        
         device_guid = event.device_guid
         input_type = event.event_type
         input_id = event.identifier
@@ -2514,8 +2523,8 @@ class ButtonStateWidget(QtWidgets.QWidget):
 
 
     def unhookDevice(self):
-
         self._tab_unselected(self._device_guid)
+ 
 
     @QtCore.Slot(str)
     def _tab_selected(self, device_guid):
@@ -2915,6 +2924,8 @@ class AxisStateWidget(QtWidgets.QWidget):
             self._value = gremlin.joystick_handling.get_axis(device_guid, input_id)
             el = gremlin.event_handler.EventListener()
             el.joystick_event.connect(self._joystick_event)
+            el.profile_start.connect(self._profile_start)
+            el.profile_stop.connect(self._profile_stop)
             self._joystick_hooked = True
         self._update_value(self._value)
 
@@ -2922,10 +2933,29 @@ class AxisStateWidget(QtWidgets.QWidget):
         
         #self._tab_selected(device_guid)
 
+    @QtCore.Slot()
+    def _profile_start(self):
+        # de-attach when profile stops
+        if self._joystick_hooked:
+            el = gremlin.event_handler.EventListener()
+            el.joystick_event.disconnect(self._joystick_event)
+            
+    
+    @QtCore.Slot()
+    def _profile_stop(self):
+        # re-attach when profile stops
+        if self._joystick_hooked:
+            el = gremlin.event_handler.EventListener()
+            el.joystick_event.connect(self._joystick_event)
+            self._value = gremlin.joystick_handling.get_axis(self._device_guid, self._input_id)
+
+
+
     @QtCore.Slot(object)
     def _joystick_event(self, event):
-        if self.data:
-            pass
+        if gremlin.shared_state.is_running:
+            # do not update while profile is running
+            return
         if self._device_guid is None:
             return 
         if not event.is_axis:
