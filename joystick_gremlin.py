@@ -3711,6 +3711,12 @@ if __name__ == "__main__":
     os.environ["QT_QPA_PLATFORM"] = "windows:darkmode=0"
 
     app = QtWidgets.QApplication(sys.argv)
+
+    # for now force localization to use US English until we have proper localization support
+    locale = QtCore.QLocale("UnitedStates")
+    QtCore.QLocale.setDefault(locale)
+
+
     app.setWindowIcon(load_icon("gfx/icon.png"))
     app.setApplicationDisplayName(APPLICATION_NAME + " " + APPLICATION_VERSION)
     app.setApplicationVersion(APPLICATION_VERSION)

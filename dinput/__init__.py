@@ -531,8 +531,6 @@ class DeviceSummary:
         return index_list
         
 
-    
-
     @property
     def hashkey(self):
         ''' gets the hash key for virtual devices '''

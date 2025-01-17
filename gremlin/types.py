@@ -27,7 +27,7 @@ import gremlin.error
 import logging
 
 
-class VisualizationType(Enum):
+class VisualizationType(IntEnum):
 
     """Enumeration of possible visualization types."""
 

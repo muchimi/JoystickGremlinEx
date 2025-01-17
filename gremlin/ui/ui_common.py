@@ -2682,7 +2682,7 @@ class AxisStateWidget(QtWidgets.QWidget):
         self._readout_curved_widget = QtWidgets.QLabel()
 
         self._label_widget = QtWidgets.QLabel()
-
+        
         if axis_id:
             self.setLabel(f"Axis {axis_id}")
 
@@ -3044,8 +3044,8 @@ class AxesCurrentState(QtWidgets.QGroupBox):
 
         self.axes = [None]
         axes_layout = QtWidgets.QHBoxLayout()
-        for i in range(device.axis_count):
-            axis = AxisStateWidget(i+1)
+        for i in device.axis_index_list(): #range(device.axis_count):
+            axis = AxisStateWidget(i)
             axis.setValue(0.0)
             self.axes.append(axis)
             axes_layout.addWidget(axis)

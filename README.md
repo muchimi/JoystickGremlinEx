@@ -210,6 +210,9 @@ Joystick Gremlin EX
 
 <!-- TOC --><a name="134016ex-pre-release"></a>
 ## 13.40.16ex (pre-release)
+### (m63)
+- Improved: Input Viewer remembers last selection
+- Fix: Input viewer has correct axis number for non-sequential inputs
 ### (m62)
 - Improved: hat button repeater enabled - now shows the direction of the hat "live".
 - Fix: OSC output port value will update the correct port.

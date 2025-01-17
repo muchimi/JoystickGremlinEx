@@ -1895,7 +1895,9 @@ class JoystickInputSignificant:
         Returns:
             Latest event instance corresponding to the specified event
         """
-        return self._mre_registry[event]
+        if event in self._mre_registry:
+            return self._mre_registry[event]
+        return None
 
     def reset(self) -> None:
         """Resets the detector to a clean state for subsequent uses."""

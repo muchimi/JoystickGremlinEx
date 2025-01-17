@@ -20,6 +20,7 @@ import enum
 import time
 
 from PySide6 import QtCore, QtGui, QtWidgets
+import lxml.etree
 import dinput
 
 import gremlin
@@ -27,12 +28,83 @@ import gremlin.shared_state
 from . import ui_common
 from gremlin.input_types import InputType
 from gremlin.types import VisualizationType
+import os
+from lxml import etree
+import gremlin.singleton_decorator
+@gremlin.singleton_decorator.SingletonDecorator
+class VisualizationConfig():
+    ''' stores data '''
+    def __init__(self):
+        self._config = {}  # map of device guid, input_type, input_id - selected flag
+        self.reload()
+
+    def getValue(self, device_guid, input_type : VisualizationType) -> bool:
+        if not isinstance(device_guid, str):
+            device_guid = str(device_guid)
+        if device_guid in self._config:
+            id = int(input_type)
+            if id in self._config[device_guid]:
+                return self._config[device_guid][id]
+        return False
+    
+    def setValue(self, device_guid, input_type : VisualizationType, value):
+        if not isinstance(device_guid, str):
+            device_guid = str(device_guid)
+        if not device_guid in self._config:
+            self._config[device_guid] = {}
+        id = int(input_type)
+        self._config[device_guid][id] = value
+
+    def save(self):
+        ''' saves to the config file '''
+        fname = self.get_config()
+
+        root = etree.Element("config")
+        for device_guid in self._config:
+            for id in self._config[device_guid]:
+                value = self._config[device_guid][id]
+                node = etree.Element("data")
+                node.set("device-guid", device_guid)
+                node.set("id",str(id))
+                node.set("value", str(value))
+                root.append(node)
+
+        try:
+            tree = etree.ElementTree(root)
+            tree.write(fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
+        except:
+            pass
+
+
+    def reload(self):
+        fname = self.get_config()
+        load_successful = False
+        if os.path.isfile(fname):
+            try:
+                parser = etree.XMLParser(remove_comments=True, remove_blank_text=True)
+                t = etree.parse(fname, parser=parser)
+                for node in t.findall(".//data"):
+                    device_guid = node.get("device-guid")
+                    id = int(node.get("id"))
+                    value = bool(node.get("value"))
+                    self.setValue(device_guid, id, value)
+                load_successful = True
+            except ValueError:
+                pass
+
+        if not load_successful:
+            self._config = {}
 
 
 
+    def get_config(sef):
+        fname = os.path.join(gremlin.util.userprofile_path(), "inputViewer.xml")
+        return fname
+    
+    
 class VisualizationSelector(QtWidgets.QWidget):
 
-    """Presents a list of possibly device and visualization widgets."""
+    """Presents a list of devices and visualization widgets."""
 
     # Event emitted when the visualization configuration changes
     changed = QtCore.Signal(
@@ -41,7 +113,7 @@ class VisualizationSelector(QtWidgets.QWidget):
         bool
     )
 
-    def __init__(self, parent=None):
+    def __init__(self, callback, parent=None):
         """Creates a new instance.
 
         :param parent the parent of this widget
@@ -67,6 +139,8 @@ class VisualizationSelector(QtWidgets.QWidget):
         d_list.sort(key=lambda x: (x[0], x[1].vjoy_id, x[1].name))
         devices = [dev for _, dev in d_list]
 
+        config = VisualizationConfig()
+
         self.main_layout = QtWidgets.QVBoxLayout(self)
         for dev in devices: # sorted(devices, key=lambda x: (x.name, x.vjoy_id)):
             # if dev.is_virtual:
@@ -76,15 +150,19 @@ class VisualizationSelector(QtWidgets.QWidget):
             box = QtWidgets.QGroupBox(dev.name)
 
             at_cb = QtWidgets.QCheckBox("Axes - Temporal")
+
             at_cb.clicked.connect(
                 self._create_callback(dev, VisualizationType.AxisTemporal, at_cb)
             )
+            
 
             ac_cb = QtWidgets.QCheckBox("Axes - Current")
+            
             ac_cb.clicked.connect(
                 self._create_callback(dev, VisualizationType.AxisCurrent, ac_cb)
             )
             bh_cb = QtWidgets.QCheckBox("Buttons + Hats")
+            
             bh_cb.clicked.connect(
                 self._create_callback(dev, VisualizationType.ButtonHat, bh_cb)
             )
@@ -98,18 +176,39 @@ class VisualizationSelector(QtWidgets.QWidget):
 
             self.main_layout.addWidget(box)
 
+            # update based on settings
+            device_guid = dev.device_guid
+            checked = config.getValue(device_guid, VisualizationType.AxisTemporal)
+            at_cb.setChecked(checked)
+            if checked: callback(dev, VisualizationType.AxisTemporal,True)
+
+            checked = config.getValue(device_guid, VisualizationType.AxisCurrent)
+            ac_cb.setChecked(checked)
+            if checked: callback(dev, VisualizationType.AxisCurrent, True)
+
+            checked = config.getValue(device_guid, VisualizationType.ButtonHat)
+            bh_cb.setChecked(checked)
+            if checked: callback(dev, VisualizationType.ButtonHat, True)
+
+
     def _create_callback(self, device, vis_type, cb):
         """Creates the callback to trigger visualization updates.
 
         :param device the device being updated
         :param vis_type visualization type being updated
         """
-        return lambda state: self.changed.emit(
+        return lambda : self._callback(device,vis_type,cb)
+    
+    def _callback(self, device, vis_type, cb):
+
+        checked = cb.isChecked()
+        config = VisualizationConfig()
+        config.setValue(device.device_guid, vis_type, checked)
+        self.changed.emit(
                 device,
                 vis_type,
-                cb.isChecked() #state == QtCore.Qt.Checked
+                checked
             )
-
 
 class InputViewerUi(ui_common.BaseDialogUi):
 
@@ -125,13 +224,15 @@ class InputViewerUi(ui_common.BaseDialogUi):
         self._widget_storage = {}
         self.setMinimumHeight(800)
 
+        self.setWindowTitle("GremlinEx Input Viewer")
+        self.setWindowFlag(QtCore.Qt.WindowMaximizeButtonHint, True)
+        self.setWindowFlag(QtCore.Qt.WindowMinimizeButtonHint, True)
+
         self.devices = gremlin.joystick_handling.joystick_devices()
         self.main_layout = QtWidgets.QHBoxLayout()
         self.setLayout(self.main_layout)
 
-        self.vis_selector = VisualizationSelector()
-        self.vis_selector.changed.connect(self._add_remove_visualization_widget)
-
+        
         self.views = InputViewerArea()
 
         # configure the scroll area for the selectors
@@ -149,16 +250,29 @@ class InputViewerUi(ui_common.BaseDialogUi):
         self.scroll_selector_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
 
         
-        #self.scroll_selector_area.setMinimumWidth(300)
+        self.scroll_selector_area.setMinimumWidth(200)
         self.scroll_selector_area.setWidgetResizable(True)
         self.scroll_selector_area.setWidget(self.scroll_selector_widget)
-
-        self.scroll_selector_layout.addWidget(self.vis_selector)
 
         # Add the scroll area to the main layout
         self.main_layout.addWidget(self.scroll_selector_area)
         self.main_layout.addWidget(self.views)
+        
 
+
+        self.vis_selector = VisualizationSelector(self._add_remove_visualization_widget)
+        self.vis_selector.changed.connect(self._add_remove_visualization_widget)
+
+        self.scroll_selector_layout.addWidget(self.vis_selector)
+
+
+        self.closed.connect(self._closed)
+
+    @QtCore.Slot()
+    def _closed(self):
+        ''' save the config on close'''
+        config = VisualizationConfig()
+        config.save()
 
     def _add_remove_visualization_widget(self, device, vis_type, is_active):
         """Adds or removes a visualization widget.
