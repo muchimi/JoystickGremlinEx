@@ -335,6 +335,11 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
 
     def __init__(self, action, parent = None):
         super().__init__(action, parent)
+
+        syslog = logging.getLogger("system")
+        verbose = gremlin.config.Configuration().verbose_mode_keyboard
+        verbose = True
+
         self.press = gremlin.macro.Macro()
         self.needs_auto_release = True
         self.action_data = action
@@ -370,12 +375,17 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
 
         self.delay_press_release = gremlin.macro.Macro()
 
-        # execute press/release with a delay before releasing
+        # execute press/release with a delay before releasing (pulse)
+        if verbose:
+            syslog.info(f"DelayPressMacro:")
         for key in action.keys:
+            syslog.info(f"\tPress: {key}")
             self.delay_press_release.press(key)
         if self.delay > 0:
+            syslog.info(f"\tPause: {self.delay}")
             self.delay_press_release.pause(self.delay)
         for key in reversed(action.keys):
+            syslog.info(f"\tRelease: {key}")
             self.delay_press_release.release(key)
 
         # tell the time delay or release macros to inform us when they are done running
@@ -468,7 +478,7 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
                 if self.has_keys:
                     if not self.is_pressed:
                         if verbose:
-                            logging.getLogger("system").info(f"MapToKeyboardEx: both")
+                            logging.getLogger("system").info(f"MapToKeyboardEx: both/pulse")
                         id = gremlin.macro.MacroManager().queue_macro(self.delay_press_release)
                         self.is_pressed = True
                         self.registerMacro(id)
@@ -494,6 +504,8 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
                                 gremlin.macro._send_key_down(key)
 
                     if event.is_pressed and auto_release: 
+                        id = gremlin.macro.MacroManager().queue_macro(self.press)
+                        self.registerMacro(id)
                         callback = lambda : gremlin.macro.MacroManager().queue_macro(self.release)
                         ButtonReleaseActions().register_callback(callback, event)
             elif self.mode == KeyboardOutputMode.AutoRepeat:
@@ -582,7 +594,8 @@ class MapToKeyboardEx(gremlin.base_profile.AbstractAction):
         super().__init__(parent)
         self.parent = parent
         self.keys = []
-        self.mode = KeyboardOutputMode.Both
+        self.mode = KeyboardOutputMode.Both # pulse by default
+        #self._mode = KeyboardOutputMode.Both # pulse by default
         config = gremlin.config.Configuration()
         self._delay = config.last_keyboard_mapper_pulse_value # delay between make/break in milliseconds
         self._autorepeat_delay = config.last_keyboard_mapper_interval_value # delay between autorepeats in milliseconds
@@ -596,6 +609,15 @@ class MapToKeyboardEx(gremlin.base_profile.AbstractAction):
             value = 0
         self._delay = value
         gremlin.config.Configuration().last_keyboard_mapper_pulse_value = value
+
+    # @property
+    # def mode(self) -> KeyboardOutputMode:
+    #     return self._mode
+    # @mode.setter
+    # def mode(self, value : KeyboardOutputMode):
+    #     if value == KeyboardOutputMode.Hold:
+    #         pass
+    #     self._mode = value
 
     @property
     def autorepeat_delay(self):

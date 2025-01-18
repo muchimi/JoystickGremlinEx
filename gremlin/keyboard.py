@@ -348,6 +348,10 @@ class Key():
     @property
     def message_key(self):
         return {self._scan_code, self._is_extended}
+    
+    @property
+    def debug_name(self):
+        return f"{self.name} (0x{self._scan_code:X}/{self._scan_code}/{self._is_extended}]"
 
 
     def __eq__(self, other):

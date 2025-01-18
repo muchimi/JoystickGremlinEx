@@ -39,7 +39,7 @@ class KeyboardOutputMode(Enum):
     Both = 0 # keyboard make and break (press/release) (pulse mode)
     Press = 1 # keyboard make only
     Release = 2 # keyboard release only
-    Hold = 3 # press while held (default Gremlin behavior)
+    Hold = 3 # press while held (default GremlinEx behavior)
     AutoRepeat = 4 # repeated pulse mode - key pulses while the input is held
 
     
@@ -916,7 +916,8 @@ class VerboseMode(IntFlag):
     Exec = auto() # execution trees
     Midi = auto() # midi mode
     Device = auto() # device change modes
-    All = Keyboard | Joystick | Inputs | Mouse | Details | SimConnect | Condition | Process | Exec | Midi | Device
+    Macro = auto() # macro 
+    All = Keyboard | Joystick | Inputs | Mouse | Details | SimConnect | Condition | Process | Exec | Midi | Device | Macro
 
     def __contains__(self, item):
         return  (self.value & item.value) == item.value
