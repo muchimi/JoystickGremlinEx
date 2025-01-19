@@ -673,19 +673,59 @@ class QIntLineEdit(QtWidgets.QLineEdit):
 
     '''
 
+    class IntValidator(QtGui.QValidator):
+        def __init__(self, bottom : int, top : int):
+            super().__init__()
+            self._bottom = bottom
+            self._top = top
+
+        @property
+        def bottom(self):
+            return self._bottom
+        @bottom.setter
+        def bottom(self, value):
+            self._bottom = value
+        @property
+        def top(self):
+            return self._top
+        @top.setter
+        def top(self, value):
+            self._top = value
+
+        def setBottom(self, value):
+            self._bottom = value
+
+        def setTop(self, value):
+            self._top = value
+        
+
+        def validate(self, text, pos):
+            if text:
+                try:
+                    value = int(text)
+                    if value >= self._bottom and value <= self._top:
+                        return QtGui.QValidator.Acceptable
+                    return QtGui.QValidator.Intermediate, text, pos
+                except:
+                    pass
+            return QtGui.QValidator.Invalid, text, pos
+
     valueChanged = QtCore.Signal(float) # fires when the value changes
 
-    def __init__(self, data = None, min_range = -1.0, max_range = 1.0, step = 1, value = 0, chars = 8, parent = None):
+    def __init__(self, data = None, min_range = -16383, max_range = 16384, step = 1, value = 0, chars = 8, parent = None):
         super().__init__(parent)
+        if min_range > max_range:
+            max_range, min_range = min_range, max_range
         self._min_range = min_range
         self._max_range = max_range
         self._step = step
 
 
-        self._validator = QtGui.QIntValidator(bottom=min_range, top=max_range)
+        self._validator = QIntLineEdit.IntValidator(min_range, max_range) # QtGui.QIntValidator(bottom=min_range, top=max_range)
         self._validator.setLocale(self.locale()) # handle correct floating point separator
-        self.setValidator(self._validator)
+        #self._validator.setNotation(QtGui.QDoubleValidator.Notation.StandardNotation)
         self.textChanged.connect(self._validate)
+        self.setValidator(self._validator)
         self.installEventFilter(self)
         self.setValue(value)
         self._data = data
@@ -723,14 +763,19 @@ class QIntLineEdit(QtWidgets.QLineEdit):
         t = event.type()
         if t == QtCore.QEvent.Type.Wheel:
             # handle wheel up/down change
+            if self.isReadOnly():
+                return True # cannot change the value if readonly
             v = self.value()
             if v is not None:
+                eh = gremlin.event_handler.EventListener()
+                is_shifted = eh.get_shifted_state()
+                factor = 2 if is_shifted else 1
                 if event.angleDelta().y() > 0:
                     # up
-                    v += self._step
+                    v += self._step * factor
                 else:
                     # down
-                    v -= self._step
+                    v -= self._step * factor
                 v = gremlin.util.clamp(v, self._min_range, self._max_range)
                 self.setValue(v)
 
@@ -746,8 +791,9 @@ class QIntLineEdit(QtWidgets.QLineEdit):
         return False
 
 
-    def _update_value(self, value):
+    def _update_value(self, value : int):
         other = self.value()
+
         if value is None and other is None:
             return
         s_value = str(value)
@@ -766,7 +812,7 @@ class QIntLineEdit(QtWidgets.QLineEdit):
 
     def setValue(self, value : int):
         ''' sets the value '''
-        self._update_value(value)
+        self._update_value(int(value))
 
     def value(self) -> int:
         ''' current value, None if not a valid input'''
@@ -795,7 +841,9 @@ class QIntLineEdit(QtWidgets.QLineEdit):
         self._max_range = top
         self._validator.setBottom(bottom)
         self._validator.setTop(top)
-        self._update_value(self.value())
+        value = int(self.text())
+        value = int(gremlin.util.clamp(value, bottom, top))
+        self._update_value(value)
 
     def setMaximum(self, top):
         self._max_range = top

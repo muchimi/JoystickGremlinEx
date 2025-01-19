@@ -1582,6 +1582,10 @@ class AxisCurveWidget(QtWidgets.QWidget):
     @QtCore.Slot(float)
     def update_value(self, value):
         ''' updates dot on the curve based on the value -1 to +1 '''
+        if value < -1 or value > 1:
+            syslog = logging.getLogger("system")
+            syslog.warning(f"CurveInput: Error: value {value:0.3f} is our of range -1 to +1 - check input")
+            value = gremlin.util.clamp(value,-1,1)
 
         if self.action_data.show_input_axis:
             

@@ -433,6 +433,10 @@ class EventListener(QtCore.QObject):
 	# autorepeat abort flag
 	autorepeat_clear =  QtCore.Signal() # fire this to abort any keyboard autorepeat actions
 
+	# module status state notices
+	module_state_change = QtCore.Signal(str, object) # send a module state update, (key, state)
+	module_state_register = QtCore.Signal(str, str, object) # registers a module state
+
 
 	def __init__(self):
 		"""Creates a new instance."""

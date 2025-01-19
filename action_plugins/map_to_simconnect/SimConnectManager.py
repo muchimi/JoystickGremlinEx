@@ -553,6 +553,7 @@ class SimConnectManager(QtCore.QObject):
 
     def load_internal(self):
         ''' loads GremlinEx simconnect internal commands '''
+        self.reload()
 
 
     def reload(self, force_update = False):
@@ -1460,10 +1461,18 @@ class SimConnectManager(QtCore.QObject):
 
     def get_command_category(self, command):
         ''' for a given command, find the category of that command '''
+
         if self.valid and command in self._block_map.keys():
             block = self._block_map[command]
             return block.category
         return SimConnectEventCategory.NotSet
+    
+    def get_command_block(self, command):
+        if self.valid:
+            command = command.casefold()
+            if command in self._block_map:
+                return self._block_map[command]
+        return None
     
 
     def sendReadbackEvent(self, command, value, readback_command, readback_value, timeout = 4):
@@ -1841,7 +1850,7 @@ class SimConnectBlock():
 
     @property
     def valid(self) -> bool:
-        return self._command is not None
+        return self._command is not None and self._command_type is not None
 
     @property
     def display_name(self) -> str:
@@ -1963,16 +1972,18 @@ class SimConnectBlock():
         if not self.sm.is_connected():
             # not connected
             return False
+        
+        mgr = SimConnectManager()
 
         if self._command:
-            if self._command_type ==  SimConnectCommandType.Event:
+            if self._command_type == SimConnectCommandType.Event:
                 ae = AircraftEvents(self.sm)
                 trigger = ae.find(self._command)
                 if trigger:
                     if self.is_readonly:
                         # no param to set
                         if self.verbose:
-                            syslog.info(f"Simconnect: trigger vent (single): {self._command}")
+                            syslog.info(f"Simconnect: trigger event (single): {self._command}")
                         trigger()
                     else:
                         if self.verbose:
@@ -1984,18 +1995,36 @@ class SimConnectBlock():
             elif self._command_type in (SimConnectCommandType.SimVar, SimConnectCommandType.Calculator):
                 # set simvar
                 
-                ar = AircraftRequests()
+                ae = AircraftEvents(self.sm)
                 request = mgr.findRequest(self._command)
-                if not request and self.is_lvar:
+                if not request:
+                    # check if the request is actually a trigger
+                    
+                    trigger = ae.find(self._command)
+                    if trigger:
+                        if self.is_readonly:
+                            # no param to set
+                            if self.verbose:
+                                syslog.info(f"Simconnect: trigger event (single): {self._command}")
+                            trigger()
+                        else:
+                            if self.verbose:
+                                syslog.info(f"Simconnect: trigger event value: {self._command} {value}")
+                            trigger(value)
+                        return True
+                
+                if not request:
                     # register it
                     request = mgr.registerRequest(self._command, self._units, self._value)
                 if not request:
                     syslog.error(f"Simconnect: request: '{self._command}' not found or could not be registered.")
+                    return False
 
                 if self.verbose:
                     syslog.info(f"Simconnect: set simvar: '{self._command}' mode: {self.output_mode}")
                 if mode is None:
                     mode = self.output_mode
+                ar = AircraftRequests()
                 if mode == SimConnectActionMode.Trigger:
                     trigger_mode = self.trigger_mode
                     match trigger_mode:
@@ -2025,13 +2054,9 @@ class SimConnectBlock():
                                 value = 1 if value else 0
                             if self.verbose:
                                 syslog.info(f"\tTrigger InputValue: {value}")
-                    if self.is_lvar:
-                        # lvar values are not in ar
-                        mgr = SimConnectManager()
-                        mgr.setSimvar(self.command, self.units, value)
-                    elif request:
-                        # regular request
-                        ar.set(self.command, value)
+                    
+                    # regular request
+                    request.set(value)
 
                 elif mode == SimConnectActionMode.SetValue:
                     ar.set(self._command, value)

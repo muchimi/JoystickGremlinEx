@@ -126,7 +126,8 @@ class SimConnectBridge(QtCore.QObject):
             syslog.info("Bridge: stop")
             try:
                 self.sm.unregister_client_data_handler(self.client_data_callback_handler)
-                self.sm._dll.RequestClientData(self.sm._hSimConnect, kPublicDownlinkArea, kDownlinkRequest, kPacketDefinition,
+                if self.sm._dll:
+                    self.sm._dll.RequestClientData(self.sm._hSimConnect, kPublicDownlinkArea, kDownlinkRequest, kPacketDefinition,
                                     SIMCONNECT_CLIENT_DATA_PERIOD.SIMCONNECT_CLIENT_DATA_PERIOD_NEVER,
                                     SIMCONNECT_CLIENT_DATA_REQUEST_FLAG.SIMCONNECT_CLIENT_DATA_REQUEST_FLAG_DEFAULT, 0,0,0)
             except:

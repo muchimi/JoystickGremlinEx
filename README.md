@@ -210,6 +210,9 @@ Joystick Gremlin EX
 
 <!-- TOC --><a name="134016ex-pre-release"></a>
 ## 13.40.16ex (pre-release)
+### (m65)
+- New: Macro verbose option to handle verbose diagnostics mode for macros specifically
+- Fix: Keyboard Mapper Ex wasn't sending "press" events in certain option combinations with the new "direct" mode
 ### (m64)
 - New: Run Process action: allows GremlinEx to execute an arbitrary process based on an input press or release.  Note: The ability for GremlinEx to spawn processes depends on the permissions given to GremlinEx.
 - Fix: Virtual button enabled user setting (Virtual Button Tab) now loads the correct saved option.

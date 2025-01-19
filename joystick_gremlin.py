@@ -120,7 +120,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_BASE = "m65b"
+APPLICATION_BASE = "m66"
 APPLICATION_VERSION = f"13.40.16ex ({APPLICATION_BASE})"
 
 
@@ -1347,15 +1347,80 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.status_bar_highlight_button_widget.clicked.connect(self._toggle_button_highlight)
         self.status_bar_highlight_button_widget.setToolTip("Enable button input highlighting")
 
-        self.ui.statusbar_widget.addWidget(self.status_bar_is_active_widget, 0)
-        self.ui.statusbar_widget.addWidget(self.status_bar_mode_widget, 3)
-        self.ui.statusbar_widget.addWidget(self.status_bar_repeater_widget, 1)
-        self.ui.statusbar_widget.addWidget(QtWidgets.QLabel("<b>Highlight</b> Device:"))
-        self.ui.statusbar_widget.addWidget(self.status_bar_highlight_tabswitch_widget, 0)
-        self.ui.statusbar_widget.addWidget(QtWidgets.QLabel("Axis"), 0)                                                     
-        self.ui.statusbar_widget.addWidget(self.status_bar_highlight_axis_widget, 0)
-        self.ui.statusbar_widget.addWidget(QtWidgets.QLabel("Button"), 0)
-        self.ui.statusbar_widget.addWidget(self.status_bar_highlight_button_widget, 0)
+        self.status_bar_module_container_widget = QtWidgets.QWidget()
+        self.status_bar_module_container_widget.setContentsMargins(0,0,0,0)
+        self.status_bar_module_container_layout = QtWidgets.QHBoxLayout(self.status_bar_module_container_widget)
+        self.status_bar_module_container_layout.setContentsMargins(0,0,0,0)
+
+        self._status_bar_module_states = {}
+        el = gremlin.event_handler.EventListener()
+        el.module_state_change.connect(self._module_state_changed)
+        el.module_state_register.connect(self.registerStatusModule)
+        el.profile_start.connect(self._profile_start)
+        el.profile_stop.connect(self._profile_start)
+
+        self.ui.statusbar_widget.addWidget(self.status_bar_is_active_widget)
+        self.ui.statusbar_widget.addWidget(self.status_bar_repeater_widget)
+        self.ui.statusbar_widget.addWidget(self.status_bar_mode_widget)
+        self.ui.statusbar_widget.addWidget(QtWidgets.QLabel(" "))
+        self.ui.statusbar_widget.addWidget(self.status_bar_module_container_widget)
+
+        self.ui.statusbar_widget.addPermanentWidget(QtWidgets.QLabel("<b>Highlight</b> Device:"))
+        self.ui.statusbar_widget.addPermanentWidget(self.status_bar_highlight_tabswitch_widget)
+        self.ui.statusbar_widget.addPermanentWidget(QtWidgets.QLabel("Axis"))                                                     
+        self.ui.statusbar_widget.addPermanentWidget(self.status_bar_highlight_axis_widget)
+        self.ui.statusbar_widget.addPermanentWidget(QtWidgets.QLabel("Button"))
+        self.ui.statusbar_widget.addPermanentWidget(self.status_bar_highlight_button_widget)
+
+        icon_size = QtCore.QSize(16,16)
+        icon = gremlin.util.load_icon("mdi.record", use_qta=True,qta_color="red")
+        self._status_red = icon.pixmap(icon_size)
+        icon = gremlin.util.load_icon("mdi.record", use_qta=True,qta_color="green")
+        self._status_green = icon.pixmap(icon_size)
+        icon = gremlin.util.load_icon("mdi.record", use_qta=True,qta_color="lightgray")
+        self._status_gray = icon.pixmap(icon_size)
+
+    @QtCore.Slot()
+    def _profile_start(self):
+        self.status_bar_module_container_widget.setVisible(True)
+        self._update_status_bar_modules_ui()
+    
+    @QtCore.Slot()
+    def _profile_stop(self):
+        self.status_bar_module_container_widget.setVisible(False)        
+
+    @QtCore.Slot(str, str, object)
+    def registerStatusModule(self, key, label : str, state : object):
+        ''' registers a module with a state '''
+        if not key in self._status_bar_module_states:
+            self._status_bar_module_states[key] = (label, state)
+            self._update_status_bar_modules_ui()
+
+    
+    @QtCore.Slot(str, object)
+    def _module_state_changed(self, key, state : object):
+        syslog = logging.getLogger("system")
+        syslog.info(f"module state: {key} state: {state}")
+        if key in self._status_bar_module_states:
+            label, value = self._status_bar_module_states[key]
+            if value != state:
+                self._status_bar_module_states[key] = (label, state)
+                self._update_status_bar_modules_ui()
+
+    def _update_status_bar_modules_ui(self):
+        ''' recreates the module status bar UI based on current status'''
+        gremlin.ui.ui_common.clear_layout(self.status_bar_module_container_layout)
+        for label, state in self._status_bar_module_states.values():
+            if state is None:
+                pixmap = self._status_gray
+            else:
+                pixmap = self._status_green if state else self._status_red
+            widget = QtWidgets.QLabel()
+            widget.setPixmap(pixmap)
+            self.status_bar_module_container_layout.addWidget(QtWidgets.QLabel(label))
+            self.status_bar_module_container_layout.addWidget(widget)
+            self.status_bar_module_container_layout.addWidget(QtWidgets.QLabel(" "))
+        self.status_bar_module_container_layout.addStretch()
 
 
     @QtCore.Slot()
@@ -2886,17 +2951,19 @@ class GremlinUi(QtWidgets.QMainWindow):
                 edit_mode = self.mode_selector.currentMode()
 
 
-            msg = f"<b>Runtime Mode:</b> {runtime_mode if runtime_mode else "n/a"}"
+            
             if not is_running:
-                msg += f" <b>Edit Mode:</b> {edit_mode if edit_mode else "n/a"}"
+                msg = f" <b>Edit Mode:</b> {edit_mode if edit_mode else "n/a"}"
                 if self._status_bar_last_edit_mode != edit_mode:
                     syslog.info(f"Mode: New edit mode: [{edit_mode}] (last mode [{self._status_bar_last_edit_mode}])")
                     self._status_bar_last_edit_mode = edit_mode
 
             else:
+                msg = f"<b>Runtime Mode:</b> {runtime_mode if runtime_mode else "n/a"}"
                 if self._status_bar_last_runtime_mode != runtime_mode:
                     syslog.info(f"Mode: New runtime mode: [{runtime_mode}] (last mode [{self._status_bar_last_runtime_mode}])")
                     self._status_bar_last_runtime_mode = runtime_mode
+
 
 
             self.status_bar_mode_widget.setText(msg)

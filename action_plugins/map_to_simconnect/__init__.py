@@ -1759,20 +1759,6 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
             type_widget.setText(item.icao_type)
             type_widget.installEventFilter(self)
 
-            # # community folder
-            # community_widget = gremlin.ui.ui_common.QDataLineEdit(data = (item, selected_widget))
-            # community_widget.setReadOnly(True)
-            # community_widget.setText(item.community_path)
-            # community_widget.installEventFilter(self)
-
-            # # aircraft folder
-            # aircraft_widget = gremlin.ui.ui_common.QDataLineEdit(data = (item, selected_widget))
-            # aircraft_widget.setReadOnly(True)
-            # aircraft_widget.setText(item.aircraft_path)
-            # aircraft_widget.installEventFilter(self)
-
-            
-       
 
             # mode drop down
             mode_selector = gremlin.ui.ui_common.QDataComboBox(data = (item, selected_widget))
@@ -2185,7 +2171,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
     @QtCore.Slot()
     def _action_range_changed(self):
         ''' occurs when the range update to the action data caused another update '''
-        self._update_block_ui()
+        self._update_ui()
 
     def _create_ui(self):
         """Creates the UI components."""
@@ -2486,29 +2472,57 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._output_range_ref_text_widget = QtWidgets.QLabel()
         self._output_range_container_layout.addWidget(self._output_range_ref_text_widget)
 
+        w = gremlin.ui.ui_common.get_text_width("0000000.0000")
+
         output_data_entry_widget = QtWidgets.QWidget()
-        output_data_entry_layout = QtWidgets.QHBoxLayout(output_data_entry_widget)
-                
-        self._output_min_range_widget = gremlin.ui.ui_common.QIntLineEdit()
-        self._output_min_range_widget.setRange(-16383,16383)
-        self._output_min_range_widget.valueChanged.connect(self._min_range_changed_cb)
+        output_data_entry_layout = QtWidgets.QGridLayout(output_data_entry_widget)
+
+        # output range                 
+        self._command_min_range_widget = gremlin.ui.ui_common.QIntLineEdit()
+        self._command_min_range_widget.setRange(-16383,16384)
+        self._command_min_range_widget.valueChanged.connect(self._command_min_range_changed_cb)
+        self._command_min_range_widget.setMinimumWidth(w)
 
         self._output_max_range_widget = gremlin.ui.ui_common.QIntLineEdit()
-        self._output_max_range_widget.setRange(-16383,16383)
+        self._output_max_range_widget.setRange(-16383,16384)
         self._output_max_range_widget.valueChanged.connect(self._max_range_changed_cb)
+        self._output_max_range_widget.setMinimumWidth(w)        
 
-        self._output_min_normalized_range_widget = gremlin.ui.ui_common.QFloatLineEdit()
+        # output range                 
+        self._command_max_range_widget = gremlin.ui.ui_common.QIntLineEdit()
+        self._command_max_range_widget.setRange(-16383,16384)
+        self._command_max_range_widget.valueChanged.connect(self._command_min_range_changed_cb)
+        self._command_max_range_widget.setMinimumWidth(w)
+
+
+        self._output_min_range_widget = gremlin.ui.ui_common.QFloatLineEdit()
+        self._output_min_range_widget.setRange(-1,1)
+        self._output_min_range_widget.valueChanged.connect(self._min_range_changed_cb)
+        self._output_min_range_widget.setMinimumWidth(w)
+
+        self._output_max_range_widget = gremlin.ui.ui_common.QFloatLineEdit()
+        self._output_max_range_widget.setRange(-1,1)
+        self._output_max_range_widget.valueChanged.connect(self._max_range_changed_cb)
+        self._output_max_range_widget.setMinimumWidth(w)
+        
+
+        # normalized is -1 to + 1
+        self._output_min_normalized_range_widget = gremlin.ui.ui_common.QIntLineEdit()
         self._output_min_normalized_range_widget.valueChanged.connect(self._min_normalized_range_changed_cb)
-
-        self._output_max_normalized_range_widget = gremlin.ui.ui_common.QFloatLineEdit()
+        self._output_min_normalized_range_widget.setMinimumWidth(w)
+        
+        self._output_max_normalized_range_widget = gremlin.ui.ui_common.QIntLineEdit()
         self._output_max_normalized_range_widget.valueChanged.connect(self._max_normalized_range_changed_cb)
+        self._output_max_normalized_range_widget.setMinimumWidth(w)
 
 
         self._output_min_percent_range_widget = gremlin.ui.ui_common.QFloatLineEdit(decimals=2)
         self._output_min_percent_range_widget.setReadOnly(True)
+        self._output_min_percent_range_widget.setMinimumWidth(w)
 
         self._output_max_percent_range_widget = gremlin.ui.ui_common.QFloatLineEdit(decimals=2)
         self._output_max_percent_range_widget.setReadOnly(True)
+        self._output_max_percent_range_widget.setMinimumWidth(w)
 
 
         self._reset_range_widget = QtWidgets.QPushButton("Reset")
@@ -2535,11 +2549,16 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.curve_clear_widget.clicked.connect(self._curve_delete_button_cb)
 
         self._axis_repeater_widget = gremlin.ui.ui_common.AxisStateWidget(show_percentage=True,orientation=QtCore.Qt.Orientation.Horizontal)
-
+        self._axis_value_widget = gremlin.ui.ui_common.QFloatLineEdit()
+        self._axis_value_widget.setReadOnly(True)
+        self._axis_value_widget.setMinimumWidth(w)
+        self._axis_value_widget.setDecimals(0)
 
         self.container_repeater_layout.addWidget(self.curve_button_widget)
         self.container_repeater_layout.addWidget(self.curve_clear_widget)
         self.container_repeater_layout.addWidget(self._axis_repeater_widget)
+        self.container_repeater_layout.addWidget(QtWidgets.QLabel("SimConnect Output:"))
+        self.container_repeater_layout.addWidget(self._axis_value_widget)
         self.container_repeater_layout.addStretch()
         self._update_curve_icon()
 
@@ -2547,27 +2566,41 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         if self.action_data.input_type == InputType.JoystickAxis:
             self._update_axis_widget()
 
+        row = 0
+        # input data 
+        output_data_entry_layout.addWidget(self._output_invert_axis_widget,row,0)
+        output_data_entry_layout.addWidget(QtWidgets.QLabel("Input min:"),row,1)
+        output_data_entry_layout.addWidget(self._output_min_range_widget,row,2)
+        output_data_entry_layout.addWidget(QtWidgets.QLabel("Max:"),row,3)
+        output_data_entry_layout.addWidget(self._output_max_range_widget,row,4)
+        output_data_entry_layout.addWidget(self._reset_range_widget,row,5)
 
-        output_data_entry_layout.addWidget(self._output_invert_axis_widget)
-        output_data_entry_layout.addWidget(QtWidgets.QLabel("Range min:"))
-        output_data_entry_layout.addWidget(self._output_min_range_widget)
-        output_data_entry_layout.addWidget(QtWidgets.QLabel("Max:"))
-        output_data_entry_layout.addWidget(self._output_max_range_widget)
-
-        output_data_entry_layout.addWidget(QtWidgets.QLabel("Norm. min:"))
-        output_data_entry_layout.addWidget(self._output_min_normalized_range_widget)
-        output_data_entry_layout.addWidget(QtWidgets.QLabel("Max:"))
-        output_data_entry_layout.addWidget(self._output_max_normalized_range_widget)
-        output_data_entry_layout.addWidget(self._reset_range_widget)
+        # normalized data
+        row += 1
+        output_data_entry_layout.addWidget(QtWidgets.QLabel("Normalized min:"),row,1)
+        output_data_entry_layout.addWidget(self._output_min_normalized_range_widget,row,2)
+        output_data_entry_layout.addWidget(QtWidgets.QLabel("Max:"),row,3)
+        output_data_entry_layout.addWidget(self._output_max_normalized_range_widget,row,4)
+        
         
         # percent output
-        output_data_entry_layout.addWidget(QtWidgets.QLabel("%Min:"))
-        output_data_entry_layout.addWidget(self._output_min_percent_range_widget)
-        output_data_entry_layout.addWidget(QtWidgets.QLabel("%Max:"))
-        output_data_entry_layout.addWidget(self._output_max_percent_range_widget)
+        row += 1
+        output_data_entry_layout.addWidget(QtWidgets.QLabel("Percent Min:"),row,1)
+        output_data_entry_layout.addWidget(self._output_min_percent_range_widget,row,2)
+        output_data_entry_layout.addWidget(QtWidgets.QLabel("%Max:"),row,3)
+        output_data_entry_layout.addWidget(self._output_max_percent_range_widget,row,4)
+
+        # command range (command min / max range )        
+        row +=1
+        output_data_entry_layout.addWidget(QtWidgets.QLabel("Command Min:"),row,1)
+        output_data_entry_layout.addWidget(self._command_min_range_widget,row,2)
+        output_data_entry_layout.addWidget(QtWidgets.QLabel("Max:"),row,3)
+        output_data_entry_layout.addWidget(self._command_max_range_widget,row,4)
         
-        output_data_entry_layout.addStretch()
+
         
+        output_data_entry_layout.addWidget(QtWidgets.QLabel(" "),0,6)
+        output_data_entry_layout.setColumnStretch(6,2)
 
         self._output_range_container_layout.addWidget(output_data_entry_widget)
 
@@ -2708,7 +2741,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
     
 
         # update from ui
-        self._update_block_ui()
+        self._update_ui()
         self._update_visible()
 
 
@@ -2766,7 +2799,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         with QtCore.QSignalBlocker(self.action_data.events):
             self.action_data.min_range = -1.0
             self.action_data.max_range = 1.0
-        self._update_block_ui()
+        self._update_ui()
 
     QtCore.Slot()
     def _curve_button_cb(self):
@@ -2862,10 +2895,14 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _update_axis_widget(self, value : float = None):
         ''' updates the axis output repeater with the value 
         
-        :param value: the floating point input value, if None uses the cached value
+        :param value: the floating point input value, if None uses the cached value -1 to +1 range
         
         '''
         # always read the current input as the value could be from another device for merged inputs
+
+
+        verbose = gremlin.config.Configuration().verbose_mode_simconnect
+        syslog = logging.getLogger("system")
         if self.input_type == InputType.JoystickAxis:
             
             raw_value = self.action_data.get_raw_axis_value()
@@ -2882,24 +2919,27 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
             if self.action_data.mode == SimConnectActionMode.Ranged:
                 # scale up to apply the block range
                 raw = value # -1 to +1
-                normalized = gremlin.util.scale_to_range(raw, target_min=self.action_data.min_range, target_max = self.action_data.max_range, invert = self.action_data.inverted) # scale to mapped range
-                percent = gremlin.util.scale_to_range(normalized,target_min=0, target_max=100)
-                value = int(gremlin.util.scale_to_range(normalized, source_min = -16368, source_max = 16367))
-                #print (f"raw {raw:0.3f} scaled {value} normalized {normalized:0.3f} percent: {percent:0.3f}")
+                normalized = gremlin.util.scale_to_range(raw, target_min=self.action_data.min_range, target_max = self.action_data.max_range, invert = self.action_data.inverted) # scale -1 +1 to min/max range
+                curved_value = self.action_data.get_local_curve_value(normalized)
+                # update the curved window if displayed
+                percent = gremlin.util.scale_to_range(curved_value, target_min=0, target_max=100) # convert to percent
+                output_value = int(gremlin.util.scale_to_range(curved_value, target_min = self.action_data.command_min_range, target_max = self.action_data.command_max_range)) # conver to output range
+                if verbose: syslog.info(f"Simconnect: {raw:0.3f} normalized {normalized:0.3f} curved {curved_value:0.3f} percent: {percent:0.3f} output: {output_value}")
 
             if self.action_data.curve_data is not None:
                 # curve the data 
-                curved_value = self.action_data.curve_data.curve_value(normalized)
                 self._axis_repeater_widget.show_curved = True
-
-                self._axis_repeater_widget.setValue(normalized, curved_value, percent)
             else:
                 self._axis_repeater_widget.show_curved = False
-                self._axis_repeater_widget.setValue(normalized, percent_value=percent)
+            
+            self._axis_repeater_widget.setValue(curved_value, percent_value=percent)
+            self._axis_value_widget.setValue(output_value)
 
-            # update the curved window if displayed
             if self.curve_update_handler is not None:
+                # update curve dialog if it's open
                 self.curve_update_handler(normalized)
+
+            
 
     @QtCore.Slot()
     def _show_options_dialog_cb(self):
@@ -2958,21 +2998,34 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _min_normalized_range_changed_cb(self):
         normalized = self._output_min_normalized_range_widget.value()
         if normalized is not None:
-            value = gremlin.util.scale_to_range(normalized, target_min= -16368, target_max = +16367)
-            value = int(value)
+            value = gremlin.util.scale_to_range(normalized,
+                                                self.action_data.command_min_range, 
+                                                self.action_data.command_max_range)  # scale from -1 +1
             with QtCore.QSignalBlocker(self._output_min_range_widget):
                 self._output_min_range_widget.setValue(value)
-            self._update_min_range(normalized)
+            self._update_min_range(value)
+
+    
+
+    def _command_min_range_changed_cb(self):
+        ''' command min range changed '''
+        self.action_data.command_min_range = self._command_min_range_widget.value()
+        self._update_ui()
+
+    def _command_max_range_changed_cb(self):
+        ''' command max range changed '''
+        self.action_data.command_max_range = self._command_max_range_widget.value()
+        self._update_ui()
 
     def _min_range_changed_cb(self):
         value = self._output_min_range_widget.value()
         if value is not None:
-            normalized = gremlin.util.scale_to_range(value, -16368, +16367)  # scale to -1 +1
+            normalized = gremlin.util.scale_to_range(value, 
+                                                     self.action_data.command_min_range, 
+                                                     self.action_data.command_max_range)  # scale from -1 +1
             with QtCore.QSignalBlocker(self._output_min_normalized_range_widget):
                 self._output_min_normalized_range_widget.setValue(normalized)
             self._update_min_range(normalized)
-
-        
 
     def _update_min_range(self, value):
         # store to profile
@@ -2986,16 +3039,19 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _max_normalized_range_changed_cb(self):
         normalized = self._output_max_normalized_range_widget.value()
         if normalized is not None:
-            value = gremlin.util.scale_to_range(normalized, target_min= -16368, target_max = +16367)
-            value = int(value)
+            value = gremlin.util.scale_to_range(normalized, 
+                                                target_min = self.action_data.command_min_range,
+                                                target_max = self.action_data.command_max_range) # to -1 + 1
             with QtCore.QSignalBlocker(self._output_max_range_widget):
                 self._output_max_range_widget.setValue(value)
-            self._update_max_range(normalized)
+            self._update_max_range(value)
 
     def _max_range_changed_cb(self):
         value = self._output_max_range_widget.value()
         if value is not None:
-            normalized = gremlin.util.scale_to_range(value, -16368, +16367) # scale to -1 +1
+            normalized = gremlin.util.scale_to_range(value, 
+                                                     self.action_data.command_min_range, 
+                                                     self.action_data.command_max_range) # to -1 + 1
             with QtCore.QSignalBlocker(self._output_max_normalized_range_widget):
                 self._output_max_normalized_range_widget.setValue(normalized)
             self._update_max_range(normalized)
@@ -3022,12 +3078,15 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _command_changed_cb(self, index):
         ''' called when selected command changes '''
+        syslog = logging.getLogger("system")
         command = self._command_selector_widget.currentText()
-        self.action_data.command = command
-        self._update_block_ui()
+        syslog.info(f"Command changed to: {command}")
+        if command:
+            self.action_data.command = command
+            self._update_ui()
         
 
-    def _update_block_ui(self):
+    def _update_ui(self):
         ''' updates the UI with a data block '''
 
         self._update_visible()
@@ -3042,14 +3101,36 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         # enabled = self.action_data._command_type == SimConnectCommandType.SimVar
         # self._action_selector_widget.setEnabled(enabled)
         # self._output_mode_container_widget.setEnabled(enabled)
+
+        command = self.action_data.command
+        block = self.manager.block(command)
+        self.command_text_widget.setText(command)
+        if block:
+            self.action_data.command_min_range = block.command_min_range
+            self.action_data.command_max_range = block.command_max_range
+            self.description_text_widget.setText(block.description)
+            
+        else:
+            
+            self.description_text_widget.setText("No description found")
+            self.action_data.command_min_range = 0
+            self.action_data.command_max_range = 0
+            
+ 
+
         
         output_mode = self.action_data.mode
-        min_range = self.action_data.min_range
-        max_range = self.action_data.max_range
+        min_range = gremlin.util.clamp(self.action_data.min_range, -1, 1) # value -1 to +1
+        max_range = gremlin.util.clamp(self.action_data.max_range, -1, 1)  # value -1 to +1
+        normalized_min_range = self.action_data.scale_output(min_range)
+        normalized_max_range =  self.action_data.scale_output(max_range)
+
         value = self.action_data.value
         inverted = self.action_data.inverted
         trigger_mode = self.action_data.trigger_mode
-        block = self.action_data.block
+
+    
+    
     
         # calculator mode
         with QtCore.QSignalBlocker(self._type_is_calculator_widget):
@@ -3072,8 +3153,20 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
             case SimConnectActionMode.Ranged:
                 with QtCore.QSignalBlocker(self._output_mode_ranged_widget):
                     self._output_mode_ranged_widget.setChecked(True)
-                self._output_min_normalized_range_widget.setValue(min_range)
-                self._output_max_normalized_range_widget.setValue(max_range)
+                with QtCore.QSignalBlocker(self._output_min_range_widget):
+                    self._output_min_range_widget.setValue(min_range) # -1 to +1 - updates the normalized range
+                with QtCore.QSignalBlocker(self._output_max_range_widget):
+                    self._output_max_range_widget.setValue(max_range) # -1 to +1 - updates the normalized range
+                with QtCore.QSignalBlocker(self._output_min_normalized_range_widget):
+                    self._output_min_normalized_range_widget.setValue(normalized_min_range) # -1 to +1 - updates the normalized range
+                with QtCore.QSignalBlocker(self._output_max_normalized_range_widget):
+                    self._output_max_normalized_range_widget.setValue(normalized_max_range) # -1 to +1 - updates the normalized range
+                with QtCore.QSignalBlocker(self._command_min_range_widget):
+                    self._command_min_range_widget.setValue(self.action_data.command_min_range)
+                with QtCore.QSignalBlocker(self._command_max_range_widget):
+                    self._command_max_range_widget.setValue(self.action_data.command_max_range)
+
+
 
                 with QtCore.QSignalBlocker(self._output_invert_axis_widget):
                     self._output_invert_axis_widget.setChecked(inverted)
@@ -3142,6 +3235,10 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self._output_mode_description_widget.setText(desc)
 
+        # command description
+        with QtCore.QSignalBlocker(self.command_text_widget):
+            self.command_text_widget.setText(self.action_data.command)
+       
         if input_type == InputType.JoystickAxis:
             # input drives the outputs
             self._output_mode_trigger_widget.setVisible(False)
@@ -3167,10 +3264,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
             eh = SimConnectEventHandler()
             eh.range_changed.connect(self._range_changed_cb)
 
-            # command description
-            with QtCore.QSignalBlocker(self.command_text_widget):
-                self.command_text_widget.setText(self.action_data.command)
-            self.description_text_widget.setText(self.action_data.command_description)
+
 
             # update UI based on block information ``
             self._output_data_type_label_widget.setText(self.action_data.data_type)
@@ -3183,6 +3277,9 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
             self._output_container_widget.setVisible(False)
             self.status_text_widget.setText("Please select a command")
 
+        if self.action_data.input_type == InputType.JoystickAxis:
+            value = gremlin.joystick_handling.get_axis(self.action_data.hardware_device_guid, self.action_data.hardware_input_id)
+            self._update_axis_widget(value)
     
 
     def _update_visible(self):
@@ -3396,12 +3493,8 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         eh = SimConnectEventHandler()
         eh.request_disconnect.emit()
 
-        
-        
-
-    def scale_output(self, value):
-        ''' scales an output value for the output range -1 to 1 to action range  '''
-        return gremlin.util.scale_to_range(value, target_min = self.action_data.min_range, target_max = self.action_data.max_range, invert=self.action_data.inverted)
+    
+    
     
     def process_event(self, event, action_value : gremlin.actions.Value):
         ''' runs when a joystick event occurs like a button press or axis movement when a profile is running '''
@@ -3487,6 +3580,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
 
         if not block or not block.valid:
             # invalid command
+            syslog.warning(f"Error: invalid block: {block.command} type: {block.command_type}")
             return True        
         if event.is_axis and output_mode in (SimConnectActionMode.Ranged, SimConnectActionMode.Gated):
             # value = self.action_data.get_filtered_axis_value(action_value.current)
@@ -3494,16 +3588,21 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
             filtered_value = self.action_data.get_filtered_axis_value(action_value.current)
             action_value = gremlin.actions.Value(filtered_value)
 
-
             raw = filtered_value # -1 to +1
-            ranged = gremlin.util.scale_to_range(raw, target_min=self.action_data.min_range, target_max = self.action_data.max_range, invert= self.action_data.inverted) # scale to mapped range
+            # scale to any range specified in the options -1 to +1
+            normalized = gremlin.util.scale_to_range(raw, target_min=self.action_data.min_range, target_max = self.action_data.max_range, invert = self.action_data.inverted) # scale -1 +1 to min/max range
 
-            # apply local curve to the range
-            curved = self.action_data.get_local_curve_value(ranged)
+            # apply local curve to the range -1 to + 1
+            curved = self.action_data.get_local_curve_value(normalized)
 
+            # convert to output range for simconnect
+            output_value = int(gremlin.util.scale_to_range(curved, target_min = self.action_data.command_min_range, target_max = self.action_data.command_max_range)) # conver to output range
 
-            scaled = int(gremlin.util.scale_to_range(curved, target_min= -16368, target_max = 16367)) # scale up to full range
-            block.execute(scaled)
+            
+
+            if verbose: syslog.info(f"Simconnect: send: command: {block.command} input: {action_value.current:0.3f} scaled: {normalized:0.3f} curved: {curved:0.3f} -> scaled: {output_value}")
+            block.execute(output_value)
+
         elif output_mode == SimConnectActionMode.Trigger:
             if not event.is_axis:
                 if self.action_data.trigger_mode != SimConnectTriggerMode.InputValue:
@@ -3622,6 +3721,9 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         self.value = 0.0
         self._min_range = -1.0 # min range for ranged output
         self._max_range = 1.0 # max range for ranged output 
+        self.command_min_range = -16383
+        self.command_max_range = 16383
+
         self.inverted = False # inversion flag
         self.trigger_mode = SimConnectTriggerMode.NoOp # trigger only
 
@@ -3689,6 +3791,12 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         if self.block:
             return self.block.display_block_type
         return ""
+    
+
+    def scale_output(self, value):
+        ''' scales a NORMALIZED output value from a value -1 to +1 '''
+        return gremlin.util.scale_to_range(value, target_min = self.command_min_range, target_max = self.command_max_range, invert=self.inverted)
+    
 
 
     def get_filtered_axis_value(self, value : float = None) -> float:
@@ -3733,12 +3841,14 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         if self._command is None:
             self._command = self._default_command()
         block : SimConnectBlock = self._manager.block(self._command)
+        if block and not block.command_type:
+            block.command_type = self.command_type # SimConnectCommandType.Event
         self._block = block
         if block:
             # set data
             self.command = block.command
-            self.min_range = block.min_range
-            self.max_range = block.max_range
+            self.command_min_range = block.min_range
+            self.command_max_range = block.max_range
             self.category = block.category
             self.units = block.units
             self.is_ranged = block.is_ranged
@@ -3810,8 +3920,10 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         self.is_release_command = safe_read(node,"has_release", bool, False)
         self._block = SimConnectManager().block(self._command)
         self.value = safe_read(node,"value", float, 0.0) # normalized
-        self.min_range = safe_read(node,"min_range", float, -1.0) # normalized
-        self.max_range = safe_read(node,"max_range", float, 1.0) # normalized
+        self.min_range = gremlin.util.clamp(safe_read(node,"min_range", float, -1.0), -1, +1) 
+        self.max_range = gremlin.util.clamp(safe_read(node,"max_range", float, 1.0), -1, 1)
+        self.command_min_range = int(gremlin.util.clamp(safe_read(node,"command_min_range", float,  -16383), -16383, 16384))
+        self.command_max_range = int(gremlin.util.clamp(safe_read(node,"command_max_range", float,  16384), -16383, 16384))
         s_mode = safe_read(node, "mode", str, "")
         if s_mode:
             self.mode = SimConnectActionMode.to_enum(s_mode)
@@ -3841,7 +3953,6 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         
         self.trigger_on_release = safe_read(node,"trigger_on_release", bool, False)
 
-        
 
         node_block =gremlin.util.get_xml_child(node,"block")
         if node_block is not None:
@@ -3849,6 +3960,8 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
                 self._block = SimConnectBlock()    
             self._block.from_xml(node_block, data)
             self._block.update()
+        
+        self.update_block()
 
         # curve data
         curve_node = gremlin.util.get_xml_child(node,"response-curve-ex")
@@ -3897,8 +4010,10 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
             if self.action_type:
                 node.set("type", SimConnectCommandType.to_string(self.action_type))
             node.set("trigger_on_release", safe_format(self.trigger_on_release, bool))
-            node.set("min_range", safe_format(self.min_range, float)) # normalized
-            node.set("max_range", safe_format(self.max_range, float)) # normalized
+            node.set("min_range", safe_format(self.min_range, float)) 
+            node.set("max_range", safe_format(self.max_range, float)) 
+            node.set("command_min_range", safe_format(self.command_min_range, int)) 
+            node.set("command_max_range", safe_format(self.command_max_range, int)) 
             node.set("inverted", safe_format(self.inverted, bool))
             node.set("trigger", SimConnectTriggerMode.to_string(self.trigger_mode))
 
@@ -3919,7 +4034,7 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         :return True if the action is configured correctly, False otherwise
         """
         return True
-
+    
 
     def __getstate__(self):
         ''' serialization override '''
@@ -3934,6 +4049,9 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         # sm is not serialized, add it
         eh = SimConnectEventHandler()
         self._manager = eh.manager
+
+
+
 
 version = 1
 name = "map-to-simconnect"

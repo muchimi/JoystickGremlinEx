@@ -4,6 +4,8 @@ import enum
 import logging
 from lxml import etree as ElementTree
 from gremlin.input_types import InputType
+import gremlin.shared_state
+import gremlin.shared_state
 import gremlin.util
 from gremlin.util import safe_format, safe_read, parse_bool, parse_guid, write_guid
 from PySide6 import QtWidgets, QtCore, QtGui
@@ -601,7 +603,11 @@ class ActivationCondition:
         mode_node = node
         while mode_node is not None and mode_node.tag != "mode":
             mode_node = mode_node.getparent()
-        mode = mode_node.get("name")
+        if mode_node is not None:
+            mode = mode_node.get("name")
+        else:
+            import gremlin.shared_state
+            mode = gremlin.shared_state.edit_mode
         input_item, container = data
         for cond_node in node.findall("condition"):
             condition_type = safe_read(cond_node, "condition-type")
