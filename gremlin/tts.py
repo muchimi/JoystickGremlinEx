@@ -46,6 +46,7 @@ class TextToSpeech:
         self.valid = False
         el = gremlin.event_handler.EventListener()
         el.shutdown.connect(self.end)
+        self._lock = threading.Lock()
 
         try:
             self.engine = pyttsx3.init()
@@ -54,6 +55,9 @@ class TextToSpeech:
             self._started = False
             self.valid = True
             self._tts_thread = None
+            self._queue_thread = None
+            self._queue = []
+
             verbose = gremlin.config.Configuration().verbose
             if verbose:
                 syslog.info(f"TTS voice listing:")
@@ -90,18 +94,20 @@ class TextToSpeech:
                     syslog.error(f"TTS: unable to activate TTS: {err}")
 
 
-    def speak(self, text, threaded = True):        
-        if threaded:
-            t = threading.Thread(target= self._speak, args=[text])
-            t.start()
-        else:
-            self._speak(text)
+    def speak(self, text, threaded = True):     
+        if not self.valid:
+            return
+        syslog = logging.getLogger("system")
+        syslog.info(f"TTS: SPEAK add to queue: {text}")
 
+        self._lock.acquire_lock()
+        self._queue.clear()
+        self._queue.append(lambda : self._speak(text))
+        self._lock.release_lock()
 
     def _speak(self, text):        
         ''' speaks the text'''
-        if not self.valid:
-            return
+        
         try:
             text = self.text_substitution(text)
             self.engine.say(text)
@@ -110,22 +116,27 @@ class TextToSpeech:
             logging.getLogger(f"system").error(f"Error in TTS: {err}")
 
     def speak_single(self, text, threaded = True):        
-        if threaded:
-            t = threading.Thread(target= self._speak_single, args=[text])
-            t.start()
-        else:
-            self._speak_single(text)
+        if text:
+            syslog = logging.getLogger("system")
+            syslog.info(f"TTS: SPEAK SINGLE add to queue: {text}")
+            self._lock.acquire_lock()
+            self._queue.clear()
+            self._queue.append(lambda : self._speak_single(text))
+            self._lock.release_lock()
+
 
     def _speak_single(self, text):
         ''' speaks the test as a single event (don't use this inside an event loop)'''
         if not self.valid:
             return
         try:
+            self.engine.stop()
             text = self.text_substitution(text)
             self.engine.say(text)
             self.engine.runAndWait()
+
         except Exception as err:
-            logging.getLogger(f"system").error(f"Error in TTS: {err}")
+            logging.getLogger("system").error(f"Error in TTS: {err}")
 
 
     def stop(self):
@@ -134,6 +145,10 @@ class TextToSpeech:
             return
         try:
             self.engine.stop()
+            self._lock.acquire_lock()
+            self._queue.clear()
+            self._lock.release_lock()
+
         except Exception as err:
             logging.getLogger(f"system").error(f"Error in TTS: {err}")
 
@@ -144,8 +159,10 @@ class TextToSpeech:
         if not self._started:
             self._tts_thread = gremlin.threading.AbortableThread(target = self._tts_runner)
             self._tts_thread.start()
+            self._queue_thread = gremlin.threading.AbortableThread(target= self._queue_runner)
+            self._queue_thread.start()
             self._started = True
-            
+
     def _tts_runner(self):
         ''' runner thread for the TTS engine '''
         if not self.valid:
@@ -158,15 +175,36 @@ class TextToSpeech:
         self.engine.endLoop()
 
 
+    def _queue_runner(self):
+        ''' processes the speech queue '''
+        syslog = logging.getLogger("system")
+        while not self._queue_thread.stopped():
+            if self._queue:
+                self._lock.acquire_lock()
+                functor = self._queue.pop(0)
+                self._lock.release_lock()
+                syslog.info("TTS: POP queue")
+                functor()
+            time.sleep(0.1)
+
+        # terminate any remaining queue items
+        self._queue.clear()
+
+
     @QtCore.Slot()
     def end(self):
         ''' ends the loop '''
         
         if not self.valid:
             return
+        
         if self._started:
             syslog = logging.getLogger("system")
             syslog.info("TTS: shutdown")
+
+            self._queue_thread.stop()
+            self._queue_thread.join()
+
             self._tts_thread.stop()
             self._tts_thread.join()
             try:
