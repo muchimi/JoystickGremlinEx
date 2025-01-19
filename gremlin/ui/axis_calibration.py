@@ -419,18 +419,13 @@ class CalibrationData:
             normalized_value = gremlin.util.scale_to_range(raw_value, invert = self.inverted) # just handle the inversion
         else:
             normalized_value = raw_value
+
         if self._is_centered:
             # account for center calibration left/right
             value = gremlin.util.axis_calibration(normalized_value, self._calibrated_min, self.calibrated_center, self._calibrated_max)
-        
         else:
             value = gremlin.util.slider_calibration(normalized_value, self._calibrated_min, self._calibrated_max)
 
-        # apply deadzone data
-        if value < self.deadzone_min:
-            value = -1.0
-        elif value > self.deadzone_max:
-            value = 1.0
         if self._is_centered:
             if value > self.deadzone_center_min and value < self.deadzone_center_max:
                 value = 0.0
@@ -439,6 +434,8 @@ class CalibrationData:
                 value = gremlin.util.scale_to_range(value, source_min = self.deadzone_min, source_max = self.deadzone_center_min, target_max = 0)
             elif value >= self.deadzone_center_max:
                 value = gremlin.util.scale_to_range(value, source_min = self.deadzone_center_max, source_max = self.deadzone_max, target_min = 0)
+        else:
+            value = gremlin.util.scale_to_range(value, source_min=self.deadzone_min, source_max=self.deadzone_max)
             
             
 

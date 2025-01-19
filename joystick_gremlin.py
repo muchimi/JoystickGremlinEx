@@ -287,8 +287,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         el.broadcast_changed.connect(self._update_status_bar)
         el.keyboard_event.connect(self._kb_event_cb)
         el.suspend_keyboard_input.connect(self._kb_suspend_cb)
-        el.profile_start.connect(lambda: self._update_status_bar_active(True))
-        el.profile_stop.connect(lambda: self._update_status_bar_active(False))
+        el.profile_start.connect(self._profile_start)
+        el.profile_stop.connect(self._profile_stop)
         #el.joystick_event.connect(self._joystick_input_handler)
         el.profile_changed.connect(self._profile_changed_cb)
         el.button_state_change.connect(self._button_state_change)
@@ -343,6 +343,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         self._profile_map = gremlin.base_profile.ProfileMap()
 
         GremlinUi.ui = self
+
+ 
 
     def _init_tab_data(self):
         self._widget_cache = {} # map of device widgets keyed by the device GUID
@@ -1017,6 +1019,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
 
                 # tell callbacks they are starting
+            
                 
                 el.profile_start.emit()
 
@@ -1356,8 +1359,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         el = gremlin.event_handler.EventListener()
         el.module_state_change.connect(self._module_state_changed)
         el.module_state_register.connect(self.registerStatusModule)
-        el.profile_start.connect(self._profile_start)
-        el.profile_stop.connect(self._profile_start)
+        
 
         self.ui.statusbar_widget.addWidget(self.status_bar_is_active_widget)
         self.ui.statusbar_widget.addWidget(self.status_bar_repeater_widget)
@@ -1382,11 +1384,15 @@ class GremlinUi(QtWidgets.QMainWindow):
 
     @QtCore.Slot()
     def _profile_start(self):
+        self.setUiMode()
+        self._update_status_bar_active(True)
         self.status_bar_module_container_widget.setVisible(True)
         self._update_status_bar_modules_ui()
     
     @QtCore.Slot()
     def _profile_stop(self):
+        self.setUiMode()
+        self._update_status_bar_active(False)
         self.status_bar_module_container_widget.setVisible(False)        
 
     @QtCore.Slot(str, str, object)

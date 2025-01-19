@@ -268,6 +268,7 @@ class JoystickCondition(AbstractCondition):
         """
 
         verbose = gremlin.config.Configuration().verbose_mode_condition
+        verbose = True
         syslog = logging.getLogger("system")
 
         joy = gremlin.input_devices.JoystickProxy()[self.device_guid]
@@ -275,18 +276,30 @@ class JoystickCondition(AbstractCondition):
             # device not found - ignore
             return False
         
+        
         if verbose:
             info = gremlin.joystick_handling.device_info_from_guid(self.device_guid)
 
         if self.input_type == InputType.JoystickAxis:
             retval = False
-            value = joy.axis(self.input_id).value
-            print (f"condition input value: {value}")
+            
+            if self.condition.use_calibrated_data:
+                # calibrated value
+                value = gremlin.joystick_handling.get_curved_axis(self.device_guid, self.input_id)
+                if verbose: 
+                    raw = gremlin.joystick_handling.get_axis(self.device_guid, self.input_id)
+                    syslog.info(f"condition input value (filtered): raw: {raw:0.3f} filtered: {value:0.3f}")
+            else:
+                # raw value
+                value = gremlin.joystick_handling.get_axis(self.device_guid, self.input_id)
+                if verbose: syslog.info(f"condition input value (raw): {value:0.3f}")
+                #value = joy.axis(self.input_id).value
+            
             in_range = self.condition.range[0] <= value <= self.condition.range[1]
 
-            if self.comparison in ["inside", "outside"]:
+            if self.condition.comparison in ["inside", "outside"]:
                 retval = in_range if self.comparison == "inside" else not in_range
-            if verbose: syslog.info(f"JoystickCondition: Axis {self.comparison}: device {info.name} input: {self.input_id} range: {self.condition.range[0]:0.3f} to {self.condition.range[1]:0.3f} value: {joy.axis(self.input_id).value:0.3f} return: {"OK" if retval else "FAILED"}")
+            if verbose: syslog.info(f"JoystickCondition: Axis range comparison: [{self.comparison}]: device {info.name} input: {self.input_id} range: {self.condition.range[0]:0.3f} to {self.condition.range[1]:0.3f} value: {joy.axis(self.input_id).value:0.3f} return: {"OK" if retval else "FAILED"}")
             return retval
         
         elif self.input_type == InputType.JoystickButton:

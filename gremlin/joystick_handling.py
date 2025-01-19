@@ -164,9 +164,8 @@ def get_axis(guid, index, normalized = True):
     
 
 def get_curved_axis(guid, index):
-    ''' returns curved data same as the event handler '''
+    ''' returns curved/calibrated data same as the event handler '''
     eh = gremlin.event_handler.EventListener()
-    gremlin.joystick_handling.axis_input_devices
     value = dinput.DILL.get_axis(guid, index)
     return eh.apply_transforms(guid, index, value)
 

@@ -911,6 +911,19 @@ class AbstractAction(ProfileData):
         
         return is_axis
     
+    def input_is_button(self):
+        ''' true if the input is a button '''
+        is_button = False
+        if hasattr(self, "hardware_input_type"):
+            input_type : InputType = self.hardware_input_type
+            return input_type == InputType.JoystickButton
+                
+        if hasattr(self.hardware_input_id, "is_axis"):
+            is_button = not self.hardware_input_id.is_axis
+        
+        return is_button
+
+    
     def input_is_hardware(self):
         ''' true if the device is a hardware input device '''
         if self._is_hardware is None:

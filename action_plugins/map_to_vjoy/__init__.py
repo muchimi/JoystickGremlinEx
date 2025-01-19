@@ -1388,7 +1388,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
                 actions = (VjoyAction.VJoyAxis, VjoyAction.VJoyAxisToButton, VjoyAction.VJoyMergeAxis)
 
 
-            elif self.action_data.input_type in VJoyWidget.input_type_buttons:
+            elif self.action_data.input_is_button():
                 # various button modes
                 actions = ( VjoyAction.VJoyButton,
                             VjoyAction.VJoyButtonRelease,
@@ -2263,7 +2263,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
     def latch_extra_inputs(self):
         ''' returns the list of extra devices to latch to this functor (device_guid, input_type, input_id) '''
-        if self.action_data.merged:
+        if self.action_data.action_mode == VjoyAction.VJoyMergeAxis:
             return [(self.action_data.merge_device_guid, self.action_data.merge_input_type, self.action_data.merge_input_id)]
         return []
 
@@ -2934,6 +2934,17 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
 
     @property
     def action_mode(self) -> VjoyAction:
+        if not self._action_mode:
+            input_type = self.get_input_type()
+            if input_type in VJoyWidget.input_type_buttons:
+                default_action_mode = VjoyAction.VJoyButton
+            elif input_type == InputType.JoystickHat:
+                default_action_mode = VjoyAction.VJoyHat
+            elif input_type == InputType.JoystickAxis:
+                default_action_mode = VjoyAction.VJoyAxis
+            else:
+                default_action_mode = VjoyAction.VJoyButton
+            self.action_mode = default_action_mode
         return self._action_mode
 
     @action_mode.setter

@@ -1265,9 +1265,10 @@ class EventHandler(QtCore.QObject):
 			self.latched_functors[device_guid] = {}
 		if mode not in self.latched_functors[device_guid]:
 			self.latched_functors[device_guid][mode] = {}
-		if event not in self.latched_functors[device_guid][mode]:
-			self.latched_functors[device_guid][mode][event] = []
-		self.latched_functors[device_guid][mode][event].append(functor)
+		key = event.callbackKey
+		if not key in self.latched_functors[device_guid][mode]:
+			self.latched_functors[device_guid][mode][key] = []
+		self.latched_functors[device_guid][mode][key].append(functor)
 
 	def _matching_input_item(self, mode, event):
 		''' gets the matching input item from the event '''
@@ -1972,8 +1973,9 @@ class EventHandler(QtCore.QObject):
 			modes = ec.getModeHierarchy(self.runtime_mode)
 			for mode in modes:
 				if mode in self.latched_functors[device_guid].keys():
-					if event in self.latched_functors[device_guid][mode].keys():
-						functors_list = self.latched_functors[device_guid][mode][event]
+					key = event.callbackKey
+					if key in self.latched_functors[device_guid][mode].keys():
+						functors_list = self.latched_functors[device_guid][mode][key]
 						if functors_list:
 							break
 		return functors_list

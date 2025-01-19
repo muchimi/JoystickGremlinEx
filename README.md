@@ -210,6 +210,20 @@ Joystick Gremlin EX
 
 <!-- TOC --><a name="134016ex-pre-release"></a>
 ## 13.40.16ex (pre-release)
+### (m66)
+Pre-release stabilization: 
+- New: "use calibrated input" on axis conditions.  When checked, the condition will use the calibrated data on the input, when unchecked, will use the raw (uncalibrated) data.  If the input is not calibrated, this setting doesn't matter.
+- Fix: Non-centered calibration scales properly based on deadzone extremities.
+- Fix: conditions deemed "invalid" weren't persisted.  Conditions are now saved regardless of validity.  Note: this also means that it's possible to save mutually exclusive conditions.  The verbose mode "condition" will output to the log file the execution tree and the result of any conditions tested, in the order of testing.
+- Fix: condition default mode was not always defaulted causing the condition to fail all the time.
+- Fix: some condition types could not be applied to some actions
+- Fix: issue pasting vjoy remap action if changing input type from axis to buttons
+- Fix: Simconnect action not populating description and range data when selecting a command in non calculator mode.
+- Fix: Center zero preset was ignored in calibration window.
+- Fix: latched functors not responding to event triggers due to the change in event processing in m58 (this was in particular impacting the axis merge functionality in vjoy remap)
+- Improved: Integer and Floating point input boxes now have a custom input validator that is a bit more forgiving for inputs than the default validator.  The default validator would prevent valid data entry due to a stricter set of rules.
+- Fix: UI disables consistently regardless of how a profile is started.
+
 ### (m65)
 - New: Macro verbose option to handle verbose diagnostics mode for macros specifically
 - Fix: Keyboard Mapper Ex wasn't sending "press" events in certain option combinations with the new "direct" mode

@@ -99,6 +99,7 @@ class KeyboardCondition(AbstractCondition):
         self.input_item = None
         self.scan_code = None
         self.is_extended = None
+        self.comparison = "pressed"
 
     def from_xml(self, node, data = None):
         """Populates the object with data from an XML node.
@@ -169,25 +170,38 @@ class JoystickCondition(AbstractCondition):
         self.input_id = 0
         self.range = [0.0, 0.0]
         self.device_name = ""
+        self.use_calibrated_data = True # true if the input should use the calibrated data if any
 
     def from_xml(self, node, data = None):
         """Populates the object with data from an XML node.
 
         :param node the XML node to parse for data
         """
-        self.comparison = safe_read(node, "comparison")
 
         super().from_xml(node, data)
 
-        self.input_type = InputType.to_enum(safe_read(node, "input"))
-        self.input_id = safe_read(node, "id", int)
+        self.input_type = InputType.to_enum(safe_read(node, "input", str, ""))
+        comparison = safe_read(node, "comparison", str, "")
+        if not comparison:
+            match self.input_type:
+                case InputType.JoystickAxis:
+                    comparison = "inside"
+                case InputType.JoystickButton:
+                    comparison = "pressed"
+                case InputType.JoystickHat:
+                    comparison = "center"
+        self.comparison = comparison
+
+
+        self.input_id = safe_read(node, "id", int, 1)
         self.device_guid = parse_guid(node.get("device-guid"))
-        self.device_name = safe_read(node, "device-name")
+        self.device_name = safe_read(node, "device-name", str, "")
         if self.input_type == InputType.JoystickAxis:
             self.range = [
-                safe_read(node, "range-low", float),
-                safe_read(node, "range-high", float)
+                safe_read(node, "range-low", float,-1),
+                safe_read(node, "range-high", float,1)
             ]
+            self.use_calibrated_data = safe_read(node,"use-calibrated",bool,False)
 
     def to_xml(self):
         """Returns an XML node containing the objects data.
@@ -196,7 +210,8 @@ class JoystickCondition(AbstractCondition):
         """
         #node = ElementTree.Element("condition")
         node = super().to_xml() 
-        node.set("comparison", str(self.comparison))
+        if not self.comparison:
+            node.set("comparison", str(self.comparison))
         node.set("condition-type", "joystick")
         node.set("input", InputType.to_string(self.input_type))
         node.set("id", str(self.input_id))
@@ -205,6 +220,7 @@ class JoystickCondition(AbstractCondition):
         if self.input_type == InputType.JoystickAxis:
             node.set("range-low", str(self.range[0]))
             node.set("range-high", str(self.range[1]))
+            node.set("use-calibrated", str(self.use_calibrated_data))
         return node
 
     def is_valid(self):
@@ -212,7 +228,7 @@ class JoystickCondition(AbstractCondition):
 
         :return True if the condition is properly specified, False otherwise
         """
-        return super().is_valid() and self.input_type is not None
+        return self.input_type is not None # super().is_valid() and self.input_type is not None
 
 class VJoyCondition(AbstractCondition):
 
@@ -629,6 +645,6 @@ class ActivationCondition:
         node.set("condition_id", self._id)
 
         for condition in self.conditions:
-            if condition.is_valid():
-                node.append(condition.to_xml())
+            # save the condition, valid or not so the data is saved
+            node.append(condition.to_xml())
         return node

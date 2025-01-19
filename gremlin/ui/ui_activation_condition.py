@@ -315,6 +315,11 @@ class JoystickConditionWidget(AbstractConditionWidget):
         self.axis_repeater_widget = ui_common.AxisStateWidget(orientation=QtCore.Qt.Orientation.Horizontal, show_percentage=False)
         self.axis_repeater_widget.valueChanged.connect(self._axis_value_changed)
 
+        self.use_calibrated_input_widget = QtWidgets.QCheckBox("Use calibrated input")
+        self.use_calibrated_input_widget.setToolTip("When enabled, the condition will use as input the calibrated data if found.  When disabled, the condition will use the raw input.")
+        self.use_calibrated_input_widget.setChecked(self.condition_data.use_calibrated_data)
+        self.use_calibrated_input_widget.clicked.connect(self._use_calibrated_input_changed)
+
         self.selector_container_widget = QtWidgets.QWidget()
         self.selector_container_layout = QtWidgets.QGridLayout(self.selector_container_widget)
         self.selector_container_layout.addWidget(QtWidgets.QLabel("Device:"), 0, 0)
@@ -333,8 +338,17 @@ class JoystickConditionWidget(AbstractConditionWidget):
         self.ui_container_widget = QtWidgets.QWidget()
         self.ui_container_layout = QtWidgets.QGridLayout(self.ui_container_widget)
 
+        self.options_container_widget = QtWidgets.QWidget()
+        self.options_container_widget.setContentsMargins(0,0,0,0)
+        self.options_container_layout = QtWidgets.QHBoxLayout(self.options_container_widget)
+        self.options_container_layout.setContentsMargins(0,0,0,0)
+
+        self.options_container_layout.addWidget(self.use_calibrated_input_widget)
+
+
         self.main_layout.addWidget(self.selector_container_widget)
         self.main_layout.addWidget(self.ui_container_widget)
+        self.main_layout.addWidget(self.options_container_widget)
 
         self._populate_device_selector()
         self._populate_input_selector()
@@ -524,8 +538,15 @@ class JoystickConditionWidget(AbstractConditionWidget):
         self.ui_container_layout.addWidget(QtWidgets.QWidget(), 0, 4)
         self.ui_container_layout.setColumnStretch(4,2)
 
-        value = gremlin.joystick_handling.get_axis(self.condition_data.device_guid, self.condition_data.input_id)
-        self._update_range_state(value)
+        
+        self._update_range_state(self._axis_value())
+
+    def _axis_value(self):
+        if self.condition_data.use_calibrated_data:
+            value = gremlin.joystick_handling.get_axis(self.condition_data.device_guid, self.condition_data.input_id)
+        else:
+            value = gremlin.joystick_handling.get_curved_axis(self.condition_data.device_guid, self.condition_data.input_id)
+        return value
 
     def _button_ui(self):
         """Creates the UI needed to configure a button based condition."""
@@ -634,20 +655,24 @@ class JoystickConditionWidget(AbstractConditionWidget):
 
     @QtCore.Slot()
     def _grab_low(self):
-        value = self.axis_repeater_widget.value()
-        self.lower_widget.setValue(value) # also updates condition_data
+        self.lower_widget.setValue(self._axis_value()) # also updates condition_data
         
 
     @QtCore.Slot()
     def _grab_high(self):
-        value = self.axis_repeater_widget.value()
-        self.upper_widget.setValue(value) # also updates condition_data
+        self.upper_widget.setValue(self._axis_value()) # also updates condition_data
+
+    @QtCore.Slot(bool)
+    def _use_calibrated_input_changed(self, checked):
+        self.condition_data.use_calibrated_data = checked
+        self._update_range_state(self._axis_value())
 
     @QtCore.Slot(float, float)
     def _axis_value_changed(self, value : float, curved_value : float):
         self._update_range_state(value)
 
     def _update_range_state(self, value):
+        ''' updates the range flag based on the input value '''
         if self.range_status_widget:
             visible = False
             
@@ -682,7 +707,8 @@ class JoystickConditionWidget(AbstractConditionWidget):
             logging.getLogger("system").warning(
                 f"Invalid input type encountered: {self.condition_data.input_type}"
             )
-
+        
+        self._update_range_state(self._axis_value())
 
 class VJoyConditionWidget(AbstractConditionWidget):
 
@@ -783,12 +809,10 @@ class VJoyConditionWidget(AbstractConditionWidget):
         self.comparison_widget = ui_common.QComboBox()
         self.comparison_widget.addItem("Inside")
         self.comparison_widget.addItem("Outside")
-        self.comparison_widget.setCurrentText(
-            self.condition_data.comparison.capitalize()
-        )
-        self.comparison_widget.currentTextChanged.connect(
-            self._comparison_changed_cb
-        )
+        if not self.condition_data.comparison in ("inside","outside"):
+            self.condition_data.comparison = "inside"
+        self.comparison_widget.setCurrentText(self.condition_data.comparison.capitalize())
+        self.comparison_widget.currentTextChanged.connect(self._comparison_changed_cb)
 
         range_layout = QtWidgets.QHBoxLayout()
         range_layout.addWidget(self.comparison_widget)
@@ -797,9 +821,7 @@ class VJoyConditionWidget(AbstractConditionWidget):
         range_layout.addWidget(self.upper_widget)
         range_layout.addStretch()
 
-        input_label = QtWidgets.QLabel(
-            f"<b>vJoy {self.condition_data.vjoy_id:d} Axis {self.condition_data.input_id:d}</b>"
-            )
+        input_label = QtWidgets.QLabel(f"<b>vJoy {self.condition_data.vjoy_id:d} Axis {self.condition_data.input_id:d}</b>")
         input_label.setWordWrap(True)
 
         layout = QtWidgets.QHBoxLayout()
@@ -816,12 +838,10 @@ class VJoyConditionWidget(AbstractConditionWidget):
         self.comparison_widget = ui_common.QComboBox()
         self.comparison_widget.addItem("Pressed")
         self.comparison_widget.addItem("Released")
-        self.comparison_widget.setCurrentText(
-            self.condition_data.comparison.capitalize()
-        )
-        self.comparison_widget.currentTextChanged.connect(
-            self._comparison_changed_cb
-        )
+        if not self.condition_data.comparison in ("pressed","released"):
+            self.condition_data.comparison = "pressed"
+        self.comparison_widget.setCurrentText(self.condition_data.comparison.capitalize())
+        self.comparison_widget.currentTextChanged.connect(self._comparison_changed_cb)
 
         layout = QtWidgets.QHBoxLayout()
         layout.addWidget(QtWidgets.QLabel(f"<b>vJoy {self.condition_data.vjoy_id:d} Button {self.condition_data.input_id:d}</b>"))
@@ -839,6 +859,8 @@ class VJoyConditionWidget(AbstractConditionWidget):
             "South", "South West", "West", "North West"
         ]
         self.comparison_widget = ui_common.QHatSelectorComboBox()
+        if not self.condition_data.comparison in directions:
+            self.condition_data.comparison = "center"
         self.comparison_widget.setValue(self.condition_data.comparison)
         self.comparison_widget.valueChanged.connect(self._comparison_changed_cb)
         
@@ -866,7 +888,7 @@ class VJoyConditionWidget(AbstractConditionWidget):
         elif data["input_type"] == InputType.JoystickHat:
             directions = ("center", "north", "north-east", "east", "south-east","south", "south-west", "west", "north-west")
             if not self.condition_data.comparison in directions:
-                self.condition_data.comparison = util.hat_tuple_to_direction((0, 0))
+                self.condition_data.comparison = "center"
         self._create_ui()
 
     def _range_lower_changed_cb(self, value):

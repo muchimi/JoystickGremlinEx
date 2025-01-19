@@ -508,6 +508,44 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
 
     '''
 
+
+    class FloatValidator(QtGui.QValidator):
+        def __init__(self, bottom : float, top : floa):
+            super().__init__()
+            self._bottom = bottom
+            self._top = top
+
+        @property
+        def bottom(self):
+            return self._bottom
+        @bottom.setter
+        def bottom(self, value):
+            self._bottom = value
+        @property
+        def top(self):
+            return self._top
+        @top.setter
+        def top(self, value):
+            self._top = value
+
+        def setBottom(self, value):
+            self._bottom = value
+
+        def setTop(self, value):
+            self._top = value
+        
+
+        def validate(self, text, pos):
+            if text:
+                try:
+                    value = float(text)
+                    if value >= self._bottom and value <= self._top:
+                        return QtGui.QValidator.Acceptable
+                    return QtGui.QValidator.Intermediate, text, pos
+                except:
+                    pass
+            return QtGui.QValidator.Invalid, text, pos
+
     valueChanged = QtCore.Signal(float) # fires when the value changes
 
     def __init__(self, data = None, min_range = -1.0, max_range = 1.0, decimals = 3, step = 0.01, value = 0.0, chars = 8, parent = None):
@@ -517,9 +555,9 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
         self._step = step
         self._decimals = decimals
 
-        self._validator = QtGui.QDoubleValidator(bottom=min_range, top=max_range)
+        self._validator = QFloatLineEdit.FloatValidator(bottom=min_range, top=max_range) # QtGui.QDoubleValidator(bottom=min_range, top=max_range)
         self._validator.setLocale(self.locale()) # handle correct floating point separator
-        self._validator.setNotation(QtGui.QDoubleValidator.Notation.StandardNotation)
+        #self._validator.setNotation(QtGui.QDoubleValidator.Notation.StandardNotation)
         self.setValidator(self._validator)
         self.textChanged.connect(self._validate)
         self.installEventFilter(self)

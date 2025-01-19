@@ -256,6 +256,9 @@ class DeadzoneWidget(QtWidgets.QWidget):
             d_right = 0
         
         match preset:
+            case DeadzonePreset.center_zero:
+                d_left = 0.0
+                d_right = 0.0
             case DeadzonePreset.center_two :
                 d_left = -0.02 * 2
                 d_right = 0.02 * 2
