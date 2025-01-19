@@ -1779,3 +1779,11 @@ class Configuration:
             value = 50
         self._data["backup_count"]= value
         self.save()
+
+
+    @property
+    def start_on_f5(self) -> bool:
+        return self._data.get("start_on_f5", False)
+    @start_on_f5.setter
+    def start_on_f5(self, value:bool):
+        self._data["start_on_f5"] = value

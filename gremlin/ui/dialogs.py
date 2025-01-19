@@ -358,7 +358,11 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.show_input_enable.setToolTip("When enabled, displays a toggle button for each input to enable or disable it in the profile")
         self.show_input_enable.setChecked(self.config.show_input_enable)
         self.show_input_enable.clicked.connect(self._show_input_enable)
-
+        
+        self.start_on_f5 = QtWidgets.QCheckBox("Start profile on F5")
+        self.start_on_f5.setToolTip("When enabled, profiles can be started using the F5 key")
+        self.start_on_f5.setChecked(self.config.start_on_f5)
+        self.start_on_f5.clicked.connect(self._start_on_f5)
 
         # Start minimized option
         self.start_minimized = QtWidgets.QCheckBox(
@@ -639,7 +643,8 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.column_layout.addWidget(self.start_with_windows, row, col)
         row+=1
         self.column_layout.addWidget(self.numlock_enabled, row, col)
-        
+        row+=1
+        self.column_layout.addWidget(self.start_on_f5, row, col)
 
 
         # column 2
@@ -1077,6 +1082,10 @@ This setting is also available on a profile by profile basis on the profile tab,
     @QtCore.Slot(bool)
     def _show_input_enable(self, checked):
         self.config.show_input_enable = checked
+
+    @QtCore.Slot(bool)
+    def _start_on_f5(self, checked):
+        self.config.start_on_f5 = checked
 
 
     @QtCore.Slot(bool)

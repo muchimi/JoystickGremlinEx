@@ -3018,7 +3018,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         if key.lookup_name == "f5":
             # activate mode on F5
-            if not self.config.is_debug:
+            if not self.config.is_debug and self.config.start_on_f5:
                self.ui.actionActivate.trigger()
 
     @property
