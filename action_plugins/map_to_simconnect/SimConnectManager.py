@@ -1054,12 +1054,13 @@ class SimConnectManager(QtCore.QObject):
         ''' gets the command block for a given Simconnect command '''
         s_command, b_command = gremlin.util.to_byte_string(command)
         key = s_command.casefold()
-        for cmd in self._commands:
-            if key in cmd.casefold():
-                block = self._block_map[key]
-                if clone:
-                    return block.clone()
-                return block
+        if key:
+            for cmd in self._commands:
+                if key in cmd.casefold():
+                    block = self._block_map[key]
+                    if clone:
+                        return block.clone()
+                    return block
             
 
         return None

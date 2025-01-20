@@ -120,7 +120,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_BASE = "m67"
+APPLICATION_BASE = "m67a"
 APPLICATION_VERSION = f"13.40.16ex ({APPLICATION_BASE})"
 
 
@@ -2792,7 +2792,9 @@ class GremlinUi(QtWidgets.QMainWindow):
                 # not the same process - change
                 
                 # deactivate any current profile
-                if verbose: syslog.info(f"PROC: process change: deactivate current profile: [{os.path.basename(self.profile.profile_file)}] - saving last used mode: [{gremlin.shared_state.runtime_mode}]")
+                if verbose:
+                    base_name = os.path.basename(self.profile.profile_file) if os.path.isfile(self.profile.profile_file) else "N/A (profile not saved or does not exist)"
+                    syslog.info(f"PROC: process change: deactivate current profile: [{base_name}] - saving last used mode: [{gremlin.shared_state.runtime_mode}]")
 
                 self.activate(False) # this saves the current profile runtime mode
                 self.ui.actionActivate.setChecked(False)
