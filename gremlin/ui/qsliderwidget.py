@@ -43,7 +43,8 @@ class QSliderWidget(QtWidgets.QWidget):
     rangeDoubleClicked = QtCore.Signal(float, int, int) # called when a range is double clicked (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
     rangeDoubleRightClicked = QtCore.Signal(float, int, int) # called when a range is double clicked with the right mouse button (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
     valueChanged = QtCore.Signal(int, float) # called when a gate value changes via dragging (index of handle, updated value)
-
+    handleDragStart = QtCore.Signal(int) # called when a handle is being dragged (handle index)
+    handleDragStop = QtCore.Signal(int) # called when a handle stops being dragged (handle index)
 
     class PixmapData():
         ''' holds a pixmap definition '''
@@ -106,6 +107,7 @@ class QSliderWidget(QtWidgets.QWidget):
         self._drag_handle_index = None # handle being dragged
         self._drag_active = False # true if a drag operation is in progress
         self._drag_x_offset = 0 # offset in pixels of the mouse position to the center of the gate
+        self._drag_emit = False # true if the drag event was emitted on drag start
 
         # hover tracking
         self._hover_handle = False # true if mouse is over a handle hotspot
@@ -843,6 +845,7 @@ class QSliderWidget(QtWidgets.QWidget):
                 self._drag_last_point = point
                 self._drag_x = point.x()
                 self._hover_lock = True # lock the current hover mode
+                
                 # print (f"handle drag index {index}  offset: {self._drag_x_offset}")
                 
 
@@ -864,7 +867,7 @@ class QSliderWidget(QtWidgets.QWidget):
             if not self._drag_active and self._mouse_down and abs(self._drag_x - x) > 2: # move at least 3 pixels
                 # drag started
                 self._drag_active = True
-                self._drag_handle_index
+                self._drag_emit = False
                 #print ("mouse drag starting")
                 
 
@@ -873,8 +876,12 @@ class QSliderWidget(QtWidgets.QWidget):
                 if self._drag_x != x:
                     # mouse moved
                     #print ("mouse drag detected")
+                    if not self._drag_emit:
+                        # only emit if there is an actual move drag happening 
+                        self.handleDragStart.emit(self._drag_handle_index) # fire the drag start event
+                        self._drag_emit = True
+
                     current_x = self._handle_positions[self._drag_handle_index]
-                    old_x = current_x
                     
                     x_offset = x - self._drag_x
                     current_x += x_offset
@@ -955,6 +962,10 @@ class QSliderWidget(QtWidgets.QWidget):
             self.update() # get the updated hotspots
             button = event.button()
             index = self._drag_handle_index
+            if self._drag_emit:
+                # drag emit was sent, emit the stop event
+                self.handleDragStop.emit(index)
+                self._drag_emit = False
             if button == Qt.MouseButton.LeftButton:
                 # if verbose:
                 #     syslog.info(f"handle {index} left clicked")

@@ -1032,6 +1032,18 @@ def get_xml_child(node, tag : str, multiple = False):
             return child
     return None
 
+def get_xml_mode(node):
+    ''' gets the mode from a parent xml node '''
+    # grab the mode
+    mode_node = node
+    while mode_node is not None and mode_node.tag != "mode":
+        mode_node = mode_node.getparent()
+
+    if mode_node is not None:
+        mode = mode_node.get("name")
+        return mode
+    
+    return None
 
 def get_xml_input_data(node):
     ''' for a given XML node, find in the parent hierarchy of a profile the device_guid, mode, input_type and input_id 

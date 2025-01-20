@@ -225,7 +225,7 @@ class SimconnectAicraftDefinition():
     
     @property
     def key(self):
-        self.aircraft_path.casefold()  # unique key is the path
+        return self.aircraft_path.casefold()  # unique key is the path
 
     @property
     def valid(self):
@@ -811,7 +811,6 @@ class SimconnectOptions(QtCore.QObject):
                                                 sim_name = sim_name
                                                 )
             
-            self._aircraft_definitions.append(item)
             return item
 
         return None            
@@ -1691,7 +1690,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
                 self.map_layout.addWidget(row_selector, 0, 0, 1, -1)
                 
                 col = 1
-                self.map_layout.addWidget(spacer, 0, col)
+                self.map_layout.addWidget(spacer, row, col)
                 col+=1
                 self.map_layout.addWidget(select_widget, 0, col)
                 col+=1

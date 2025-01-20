@@ -120,7 +120,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_BASE = "m66a"
+APPLICATION_BASE = "m67"
 APPLICATION_VERSION = f"13.40.16ex ({APPLICATION_BASE})"
 
 
@@ -202,8 +202,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         el = gremlin.event_handler.EventListener()
         el.push_input_selection()
         el.request_activate.connect(self.activate) # hook activation / deactivation requests
-        
-
+        el.refresh_devices.connect(self._create_tabs) # refresh device list
 
         # highlighing options
         self._icon_on = gremlin.util.load_icon("mdi.record", qta_color="green")
@@ -884,9 +883,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.modal_windows["swap_devices"].closed.connect(
             lambda: self._remove_modal_window("swap_devices")
         )
-        self.modal_windows["swap_devices"].closed.connect(
-            self._create_tabs
-        )
+        self.modal_windows["swap_devices"].accepted.connect(self._create_tabs)
+
 
     def _remove_modal_window(self, name):
         """Removes the modal window widget from the system.
@@ -1946,12 +1944,9 @@ class GremlinUi(QtWidgets.QMainWindow):
             device_name = gremlin.shared_state.get_device_name(device_guid)
             widget = self.getWidget(device_guid)
             if not widget:
-                widget = gremlin.ui.profile_settings.ProfileSettingsWidget(
-                    self.profile.settings
-                )
-
+                widget = gremlin.ui.profile_settings.ProfileSettingsWidget(self.profile.settings)
                 self.registerWidget(device_guid, widget)
-                #widget.changed.connect(lambda: self._create_tabs(device_name))
+                widget.changed.connect(lambda: self._create_tabs())
                 
                 self._settings_device_guid = device_guid
 

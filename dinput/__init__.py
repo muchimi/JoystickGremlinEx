@@ -620,13 +620,13 @@ class DILL:
 
         syslog = logging.getLogger("system")
 
+
         if DILL._dll is None:
 
             dll_folder = os.path.dirname(__file__)
             dll_file = "dill.dll"
             _dll_path = os.path.join(dll_folder, dll_file )
             if not os.path.isfile(_dll_path):
-
                 # look one level up for packaging in 3.12
                 parent = Path(dll_folder).parent
                 _dll_path = os.path.join(parent, dll_file)
@@ -635,6 +635,19 @@ class DILL:
                     display_error(msg)
                     syslog.critical(msg)
                     os._exit(1)
+                dll_folder = parent
+
+
+            # truncate the debug file (it gets large otherwise)
+
+            debug_file = "dill_debug.txt"
+            debug_path = os.path.join(dll_folder, debug_file)
+            if os.path.isfile(debug_path):
+                # blitz it
+                try:
+                    os.unlink(debug_path)
+                except:
+                    syslog.info("DILL: unable to truncate debug file")
 
             dll_version = get_dll_version(_dll_path)
             DILL.version = dll_version

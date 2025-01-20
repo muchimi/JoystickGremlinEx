@@ -2613,8 +2613,32 @@ class SwapDevicesUi(ui_common.BaseDialogUi):
             device_layout.addLayout(layout, i, 1)
             device_layout.addWidget(record_button, i, 2, QtCore.Qt.AlignTop)
 
+        # cancel icon
+        self.option_container_widget = QtWidgets.QWidget()
+        self.option_container_layout = QtWidgets.QHBoxLayout(self.option_container_widget)
+
+        self.ok_widget = QtWidgets.QPushButton("Ok")
+        self.ok_widget.clicked.connect(self._ok)
+        self.cancel_widget = QtWidgets.QPushButton("Cancel")
+        self.cancel_widget.clicked.connect(self._cancel)
+        self.option_container_layout.addStretch()
+        self.option_container_layout.addWidget(self.ok_widget)
+        self.option_container_layout.addWidget(self.cancel_widget)
+
         self.main_layout.addLayout(device_layout)
-        self.main_layout.addStretch()
+        self.main_layout.addWidget(self.option_container_widget)
+        
+    @QtCore.Slot()
+    def _cancel(self):
+        self.reject()
+
+                
+    @QtCore.Slot()
+    def _ok(self):
+        self.accept()
+
+    
+        
 
     def _create_request_user_input_cb(self, device_guid):
         """Creates the callback handling user device selection.

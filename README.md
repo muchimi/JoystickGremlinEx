@@ -210,6 +210,15 @@ Joystick Gremlin EX
 
 <!-- TOC --><a name="134016ex-pre-release"></a>
 ## 13.40.16ex (pre-release)
+### (m67)
+Pre-release stabilization: 
+- Fix: Resolve an exception when selecting a tab without any prior input selected.
+- Fix: Gated Axis UI rework to address some gate add/remove and movement issues.
+- New: Barebones undo for gated axis.  Ctrl-Z hotkey will undo last gated action such as adding a gate or moving a gate.  This is very rudimentary at this point and doesn't handle adding or removing actions to gates/ranges at this time.
+- Improved: swap device UI has now has an ok/cancel button pair to exit out of the dialog.
+- Fix: 1:1 mapping forces an update of action icons
+- Fix: Using VJOY as input in settings does not update device list
+
 ### (m66)
 Pre-release stabilization: 
 - New: "use calibrated input" on axis conditions.  When checked, the condition will use the calibrated data on the input, when unchecked, will use the raw (uncalibrated) data.  If the input is not calibrated, this setting doesn't matter.

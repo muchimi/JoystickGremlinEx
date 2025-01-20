@@ -1117,6 +1117,11 @@ class Configuration:
         return self.verbose and VerboseMode.Macro in self.verbose_mode
     
     @property
+    def verbose_mode_gate(self):
+        ''' true if verbose mode is in gated axis mode '''
+        return self.verbose and VerboseMode.Gate in self.verbose_mode
+    
+    @property
     def midi_enabled(self):
         ''' true if MIDI module is enabled '''
         return self._data.get("midi_enabled", True)

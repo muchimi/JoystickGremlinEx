@@ -331,6 +331,8 @@ class EventListener(QtCore.QObject):
 	# signal emitted when the UI tabs are loaded and profiles are loaded - some widgets use this for post-UI initialization update that needs to occur after the UI data is completely loaded
 	tabs_loaded = QtCore.Signal()
 
+	refresh_devices = QtCore.Signal() # used to refresh the device list going into GremlinEx
+
 	profile_reset = QtCore.Signal() # profile reset signal (when runtime for a profile needs to reset)
 	profile_start = QtCore.Signal() # profile start signal (when a profile starts)
 	profile_started = QtCore.Signal() # profile started signal (after a profile starts)
@@ -394,7 +396,8 @@ class EventListener(QtCore.QObject):
 	container_delete = QtCore.Signal(object, object) # fires when a container is about to be deleted, passes the input item, container as parameters
 
 	# update input curve icons
-	update_input_icons = QtCore.Signal() # fires when the input curve icons need to be updated
+	update_input_icons = QtCore.Signal() # fires when the UI needs to refresh input calibration and curve icons
+	update_action_icons = QtCore.Signal() # fires when the UI needs to update the action icons
 
 	# occurs when input enabled state changes
 	input_enabled_changed = QtCore.Signal(object) # param - InputItem
@@ -436,6 +439,7 @@ class EventListener(QtCore.QObject):
 	# module status state notices
 	module_state_change = QtCore.Signal(str, object) # send a module state update, (key, state)
 	module_state_register = QtCore.Signal(str, str, object) # registers a module state
+
 
 
 	def __init__(self):

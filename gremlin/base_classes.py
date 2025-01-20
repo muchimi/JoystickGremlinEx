@@ -212,8 +212,11 @@ def empty_copy(obj):
     newcopy.__class__ = obj.__class__
     return newcopy      
 
+class ABCMetaQObject(ABCMeta, type(QtCore.QObject)):
+    pass
 
-class AbstractInputItem(QtCore.QObject):
+
+class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
     ''' base class for input items for MIDI, OSC and KEYBOARD items '''
 
     def __init__(self):
@@ -297,6 +300,24 @@ class AbstractInputItem(QtCore.QObject):
     @property
     def message_key(self):
         assert False,"message_key property must be implemented by subclasses"
+
+    @abstractmethod
+    def to_xml(self):
+        ''' must implement '''
+        pass
+
+    @abstractmethod
+    def parse_xml(self):
+        ''' must implement '''
+        pass
+
+    def __getstate__(self):
+        ''' manual pickle to XML '''
+        return self.to_xml()
+    
+    def __setstate__(self, data):
+        ''' manual unpickle '''
+        self.parse_xml(data)
 
 
 class SpecialInputItem(AbstractInputItem):

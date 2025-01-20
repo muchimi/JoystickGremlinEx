@@ -1318,7 +1318,6 @@ class InputItem():
         el = gremlin.event_handler.EventListener()
         el.profile_start.connect(self._profile_start)
 
-
     @property
     def message_key(self):
         # joystick inputs only - returns id of axis or button
@@ -1334,6 +1333,10 @@ class InputItem():
         ''' for axis input devices, returns the calibration data '''
         return self.calibration
     
+    @QtCore.Slot()
+    def _refresh_icons(self):
+        ''' called when the UI wants to refresh input icons '''
+
 
     @QtCore.Slot()
     def _profile_start(self):
@@ -1938,6 +1941,7 @@ class Profile():
 
     def setSimconnectMode(self, key, mode):
         ''' sets the simconnect startup mode for a given aicraft key - the key comes from the SimconnectAicraftDefinition for the aircraft'''
+        assert len(key) == 2
         self._simconnect_modes[key] = mode
 
     def getSimconnectMode(self, key):
@@ -2576,9 +2580,12 @@ class Profile():
         # simconnect settings
         for key, mode in self._simconnect_modes.items():
             if key:
-                child = etree.Element("simconnect")
+                if len(key) != 2:
+                    # only store dual keys
+                    continue
                 key_cp, key_ap = key
-                
+
+                child = etree.Element("simconnect")
                 child.set("key_cp",key_cp)
                 child.set("key_ap",key_ap)
                 child.set("mode", mode)

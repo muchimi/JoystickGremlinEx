@@ -120,11 +120,13 @@ class GatedAxis(gremlin.base_profile.AbstractAction):
 
     def _parse_xml(self, node, data = None):
         # load gate data
+        import gremlin.util
         gates = []
         gate_node = gremlin.util.get_xml_child(node,"gates")
+        profile_mode = gremlin.util.get_xml_mode(node)
         if not gate_node is None:
             for child in gate_node:
-                gate_data = gremlin.gated_handler.GateData(self, action_data = self)
+                gate_data = gremlin.gated_handler.GateData(profile_mode, action_data = self)
                 
                 gate_data.from_xml(child, data)
                 gates.append(gate_data)

@@ -98,7 +98,8 @@ class TextToSpeech:
         if not self.valid:
             return
         syslog = logging.getLogger("system")
-        syslog.info(f"TTS: SPEAK add to queue: {text}")
+        verbose = gremlin.config.Configuration().verbose
+        if verbose: syslog.info(f"TTS: SPEAK add to queue: {text}")
 
         self._lock.acquire_lock()
         self._queue.clear()
@@ -118,7 +119,8 @@ class TextToSpeech:
     def speak_single(self, text, threaded = True):        
         if text:
             syslog = logging.getLogger("system")
-            syslog.info(f"TTS: SPEAK SINGLE add to queue: {text}")
+            verbose = gremlin.config.Configuration().verbose
+            if verbose: syslog.info(f"TTS: SPEAK SINGLE add to queue: {text}")
             self._lock.acquire_lock()
             self._queue.clear()
             self._queue.append(lambda : self._speak_single(text))
@@ -178,12 +180,13 @@ class TextToSpeech:
     def _queue_runner(self):
         ''' processes the speech queue '''
         syslog = logging.getLogger("system")
+        verbose = gremlin.config.Configuration().verbose
         while not self._queue_thread.stopped():
             if self._queue:
                 self._lock.acquire_lock()
                 functor = self._queue.pop(0)
                 self._lock.release_lock()
-                syslog.info("TTS: POP queue")
+                if verbose: syslog.info("TTS: POP queue")
                 functor()
             time.sleep(0.1)
 

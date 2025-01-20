@@ -1270,6 +1270,7 @@ class InputItemWidget(QtWidgets.QFrame):
         el.mapping_changed.connect(self._mapping_changed_cb)
         el.update_input_icons.connect(self._update_icons)
         el.input_enabled_changed.connect(self._update_enabled_state)
+        el.update_action_icons.connect(self._update_action_icons)
 
         self._curve_container_widget.setVisible(curve_visible) 
         self.update_display()
@@ -1398,12 +1399,16 @@ class InputItemWidget(QtWidgets.QFrame):
             else:
                 self._calibration_button_widget.setIcon(self._calibration_icon_inactive)
 
+
         except:
             # c++ exception if the item was garbage collected by QT alredy
             pass
 
 
-
+    @QtCore.Slot()
+    def _update_action_icons(self):
+        # update mapping icons 
+        self.create_action_icons(self.data)
 
     @QtCore.Slot(object)
     def _icon_changed_cb(self, event : gremlin.event_handler.DeviceChangeEvent):
@@ -1720,7 +1725,7 @@ class InputItemWidget(QtWidgets.QFrame):
             with this instance
         """
 
-        if self.data.id != profile_data.id:
+        if profile_data is None or self.data.id != profile_data.id:
             return
 
         ui_common.clear_layout(self._icon_layout)

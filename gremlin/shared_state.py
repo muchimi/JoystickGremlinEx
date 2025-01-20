@@ -337,14 +337,16 @@ def get_last_input_id():
     device_guid = config.get_last_device_guid()
     if device_guid:
         return gremlin.config.Configuration().get_last_input(device_guid)
-    
+    return (None, None, None)
 
 
 def last_input_id(device_guid):
     ''' retrieves the last input id for a given input guid (input_type, input_id) of the last selection for this device '''
     import gremlin.config
-    device_guid, input_type, input_id = gremlin.config.Configuration().get_last_input(device_guid)
-    return (input_type, input_id)
+    if device_guid:
+        device_guid, input_type, input_id = gremlin.config.Configuration().get_last_input(device_guid)
+        return (input_type, input_id)
+    return (None, None)
 
 
 # pickle farm - allows to pickle an object to memory and recall it without actually pickling it

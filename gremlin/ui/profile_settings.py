@@ -18,6 +18,7 @@
 
 from PySide6 import QtCore, QtWidgets
 
+import gremlin.event_handler
 import gremlin.joystick_handling
 import gremlin.shared_state
 import gremlin.ui.ui_common
@@ -71,6 +72,7 @@ class ProfileSettingsWidget(QDataWidget):
         self._create_ui()
         if emit_change:
             self.changed.emit()
+
 
     def _create_ui(self):
         """Creates the UI elements of this widget."""

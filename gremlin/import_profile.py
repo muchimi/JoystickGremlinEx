@@ -1755,6 +1755,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
             gremlin.util.popCursor()
 
 
+
     def _find_map_item(self, widget):
         ''' finds which map item has the given widget as an output map widget
 
@@ -1806,6 +1807,12 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
         return container_widget, widget
     
        
+
+    def _no_map_item(self):
+        ''' gets a new instance of nothing to map '''
+        item = ImportInputItem()
+        item.input_description = "NoOp"
+        return item
 
 
     def _create_target_input_widget(self, source_import_item : ImportItem, source_input_item : ImportInputItem, target_device_guid : dinput.GUID, target_input_id : int):
@@ -2540,6 +2547,7 @@ class Mapper():
             # widget
 
             gremlin.util.pushCursor()
+            el = gremlin.event_handler.EventListener()
             try:
                 syslog = logging.getLogger("system")
                 tab_device_type : TabDeviceType
@@ -2697,12 +2705,11 @@ class Mapper():
                 tab_widget.refresh()
 
                 # update the selection
-                eh = gremlin.event_handler.EventListener()
                 device_guid, input_type, input_id = gremlin.config.Configuration().get_last_input()
                 if input_type and input_id:
-                    eh = gremlin.event_handler.EventListener()
-                    eh.select_input.emit(device_guid, input_type, input_id, True, False, False)
+                    el.select_input.emit(device_guid, input_type, input_id, True, False, False)
             finally:
+                el.update_action_icons.emit() # asks all inputs to refresh their action icons
                 gremlin.util.popCursor()
 
             

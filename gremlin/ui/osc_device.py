@@ -2264,6 +2264,9 @@ class OscInputItem(AbstractInputItem):
         return target
         
 
+
+        
+
     def __hash__(self):
         return str(self.id).__hash__()
     
@@ -3451,13 +3454,7 @@ class InputOscClient(QtCore.QObject):
 
                         self._event_listener.joystick_event.emit(event)
 
-                        self._event_listener.axis_state_change.emit(
-                                            event.device_guid,
-                                            event.event_type,
-                                            input_item,               
-                                            event.value
-                                        )
-                        
+                        self._event_listener.axis_state_change.emit(event)
                         
 
                         return
