@@ -487,7 +487,7 @@ class ConditionTracker():
         self._el.condition_added.emit(input_item, mode, condition)
         self._el.condition_state_changed.emit(data.container)
         syslog = logging.getLogger("system")
-        syslog.info(f"creating condition: {condition.id} for input: {data.input_item.display_name} mode: {data.mode}")
+        syslog.info(f"creating condition: {condition.id} for input: {data.input_item.display_name if hasattr(data.input_item,"display_name") else data.input_item} mode: {data.mode}")
         
 
     def unregisterCondition(self, condition : AbstractCondition):

@@ -120,7 +120,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_BASE = "m67c"
+APPLICATION_BASE = "m67d"
 APPLICATION_VERSION = f"13.40.16ex ({APPLICATION_BASE})"
 
 
@@ -810,6 +810,13 @@ class GremlinUi(QtWidgets.QMainWindow):
             lambda: self._remove_modal_window("log")
         )
 
+    def log_edit(self):
+        ''' opens the log file in the editor '''
+        log_file = os.path.join(gremlin.util.userprofile_path(), "system.log")
+        if os.path.isfile(log_file):
+            gremlin.util.display_file(log_file)
+
+
     def manage_modes(self):
         """Opens the mode management window."""
         dialog = gremlin.ui.dialogs.ModeManagerUi(self.profile)
@@ -1285,9 +1292,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         )
         self.ui.actionViewInput.triggered.connect(lambda: self._view_input_map())
         self.ui.actionOptions.triggered.connect(self.options_dialog)
-        self.ui.actionLogDisplay.triggered.connect(
-            self.log_window
-        )
+        self.ui.actionLogDisplay.triggered.connect(self.log_window)
+        self.ui.actionLogEdit.triggered.connect(self.log_edit)
         # About
         self.ui.actionAbout.triggered.connect(self.about)
 
@@ -2625,6 +2631,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         icon = load_icon("gfx/logview.png")
         self.ui.actionLogDisplay.setIcon(icon)
+        self.ui.actionLogEdit.setIcon(icon)
 
         icon = load_icon("gfx/options.svg")
         self.ui.actionOptions.setIcon(icon)

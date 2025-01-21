@@ -3678,6 +3678,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
         ''' reloads gates and range repeater widgets'''
         
         self._reload_ranges()
+        self._reload_gates()
 
         #self._update_gate_icons()
         self.container_range_count_layout.update()
@@ -4525,7 +4526,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
         #self._gate_data._update_gate_index()
         self._gate_data._update_ranges()
         gwi._update_icon()
-        self._reload_ranges()
+        self._reload_widgets()
         self._update_ui()
 
   

@@ -362,6 +362,21 @@ def hat_tuples():
     return list(lookup.keys())
 
 
+def hat_direction_to_name(value):
+    lookup = {
+        ( 0,  0): "center",
+        ( 0,  1): "north",
+        ( 1,  1): "north-east",
+        ( 1,  0): "east",
+        ( 1, -1): "south-east",
+        ( 0, -1): "south",
+        (-1, -1): "south-west",
+        (-1,  0): "west",
+        (-1,  1): "north-west",
+    }
+    if value in lookup:
+        return lookup[value]
+    return None
 
 
 def hat_direction_to_tuple(value):
@@ -381,7 +396,10 @@ def hat_direction_to_tuple(value):
         "west": (-1, 0),
         "north-west": (-1, 1)
     }
-    return lookup[value]
+    value = value.casefold()
+    if value in lookup:
+        return lookup[value]
+    return None
 
 
 def setup_userprofile():
