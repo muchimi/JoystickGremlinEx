@@ -120,7 +120,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_BASE = "m67b"
+APPLICATION_BASE = "m67c"
 APPLICATION_VERSION = f"13.40.16ex ({APPLICATION_BASE})"
 
 
@@ -2749,8 +2749,8 @@ class GremlinUi(QtWidgets.QMainWindow):
             mode = self._process_runtime_map[process_path]
             if verbose: syslog.info(f"PROC MODE: using last mode [{mode}] for process {process_path}")
         else:
-            if verbose: syslog.info(f"PROC MODE: using last saved profile mode mode [{mode}]")
             mode = self.profile.get_last_runtime_mode()
+            if verbose: syslog.info(f"PROC MODE: using last saved profile mode mode [{mode}]")
         return mode
 
     def _process_changed_cb(self, new_process_path):

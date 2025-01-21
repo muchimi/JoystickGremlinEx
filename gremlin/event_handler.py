@@ -1791,7 +1791,8 @@ class EventHandler(QtCore.QObject):
 			if verbose:
 				syslog.info(f"process keyboard event: {event}")
 				syslog.info(f"\tKeyboard state data:")
-				for key in data.keys():
+				keys = list(data.keys())
+				for key in keys:
 					syslog.info(f"\t\t{gremlin.keyboard.KeyMap.keyid_tostring(key)} {data[key]}")
 
 			items = self._matching_event_keys(event)  # returns list of primary keys
