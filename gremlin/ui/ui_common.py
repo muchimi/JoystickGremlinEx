@@ -258,6 +258,15 @@ class StateTracker():
                                 case InputType.JoystickHat:
                                     if hasattr(widget, "_update_hat"):
                                         widget._update_hat(event.value)
+                                case InputType.OpenSoundControl:
+                                    is_pressed = input_id.button_value
+                                    if hasattr(widget, "_update_value"):
+                                        widget._update_value(is_pressed)
+                                case InputType.Midi:
+                                    is_pressed = input_id.button_value
+                                    if hasattr(widget, "_update_value"):
+                                        widget._update_value(is_pressed)
+
                             
                     except:
                         # discarded by QT - ignore
@@ -510,7 +519,7 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
 
 
     class FloatValidator(QtGui.QValidator):
-        def __init__(self, bottom : float, top : floa):
+        def __init__(self, bottom : float, top : float):
             super().__init__()
             self._bottom = bottom
             self._top = top
@@ -538,10 +547,11 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
         def validate(self, text, pos):
             if text:
                 try:
-                    value = float(text)
-                    if value >= self._bottom and value <= self._top:
-                        return QtGui.QValidator.Acceptable
-                    return QtGui.QValidator.Intermediate, text, pos
+                    if text.isnumeric():
+                        value = float(text)
+                        if value >= self._bottom and value <= self._top:
+                            return QtGui.QValidator.Acceptable
+                    return QtGui.QValidator.Intermediate, text, pos            
                 except:
                     pass
             return QtGui.QValidator.Invalid, text, pos
@@ -650,6 +660,11 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
         ''' current value, None if not a valid input'''
         if self.hasAcceptableInput():
             return float(self.text())
+        try:
+            v = float(self.text())
+            return v
+        except:
+            pass
         return None
 
     def isValid(self):
@@ -856,6 +871,11 @@ class QIntLineEdit(QtWidgets.QLineEdit):
         ''' current value, None if not a valid input'''
         if self.hasAcceptableInput():
             return int(float(self.text()))
+        try:
+            value = int(self.text())
+            return value
+        except:
+            pass
         return None
 
     def isValid(self):

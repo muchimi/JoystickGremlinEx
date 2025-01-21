@@ -666,9 +666,14 @@ class Configuration:
         :param value Flag indicating whether or not to enable / disable the
             feature
         """
-        if type(value) == bool:
-            self._data["highlight_device"] = value
-            self.save()
+        if value != self.highlight_enabled:
+            if type(value) == bool:
+                self._data["highlight_device"] = value
+                self.save()
+            el = gremlin.event_handler.EventListener()
+            el.config_option_changed.emit()
+
+
 
     @property
     def highlight_hotkey_autoswitch(self):

@@ -120,7 +120,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_BASE = "m67a"
+APPLICATION_BASE = "m67b"
 APPLICATION_VERSION = f"13.40.16ex ({APPLICATION_BASE})"
 
 
@@ -344,6 +344,9 @@ class GremlinUi(QtWidgets.QMainWindow):
         GremlinUi.ui = self
 
  
+
+        el.config_option_changed.connect(self._config_option_changed)
+
 
     def _init_tab_data(self):
         self._widget_cache = {} # map of device widgets keyed by the device GUID
@@ -928,6 +931,9 @@ class GremlinUi(QtWidgets.QMainWindow):
         enabled = True
         if gremlin.shared_state.is_running:
             enabled = self.config.runtime_ui_update
+            self.push_highlighting()
+        else:
+            self.pop_highlighting(True)
             
         self.ui.tab_bar_widget.setEnabled(enabled)
         self.ui.tab_content_widget.setEnabled(enabled)
@@ -952,6 +958,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.ui.actionLoadProfile.setEnabled(enabled)
 
 
+        
 
         
         
@@ -1365,12 +1372,23 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.ui.statusbar_widget.addWidget(QtWidgets.QLabel(" "))
         self.ui.statusbar_widget.addWidget(self.status_bar_module_container_widget)
 
-        self.ui.statusbar_widget.addPermanentWidget(QtWidgets.QLabel("<b>Highlight</b> Device:"))
-        self.ui.statusbar_widget.addPermanentWidget(self.status_bar_highlight_tabswitch_widget)
-        self.ui.statusbar_widget.addPermanentWidget(QtWidgets.QLabel("Axis"))                                                     
-        self.ui.statusbar_widget.addPermanentWidget(self.status_bar_highlight_axis_widget)
-        self.ui.statusbar_widget.addPermanentWidget(QtWidgets.QLabel("Button"))
-        self.ui.statusbar_widget.addPermanentWidget(self.status_bar_highlight_button_widget)
+        self.ui_statusbar_highlight_container_widget = QtWidgets.QWidget()
+        self.ui_statusbar_highlight_container_widget.setContentsMargins(0,0,0,0)
+        self.ui_statusbar_highlight_container_layout = QtWidgets.QHBoxLayout(self.ui_statusbar_highlight_container_widget)
+        self.ui_statusbar_highlight_container_layout.setContentsMargins(0,0,0,0)
+
+
+        self.ui_statusbar_highlight_container_layout.addWidget(QtWidgets.QLabel("<b>Highlight</b> Device:"))
+        self.ui_statusbar_highlight_container_layout.addWidget(self.status_bar_highlight_tabswitch_widget)
+        self.ui_statusbar_highlight_container_layout.addWidget(QtWidgets.QLabel("Axis"))                                                     
+        self.ui_statusbar_highlight_container_layout.addWidget(self.status_bar_highlight_axis_widget)
+        self.ui_statusbar_highlight_container_layout.addWidget(QtWidgets.QLabel("Button"))
+        self.ui_statusbar_highlight_container_layout.addWidget(self.status_bar_highlight_button_widget)
+
+
+        self.ui.statusbar_widget.addPermanentWidget(self.ui_statusbar_highlight_container_widget)
+
+        
 
         icon_size = QtCore.QSize(16,16)
         icon = gremlin.util.load_icon("mdi.record", use_qta=True,qta_color="red")
@@ -2269,6 +2287,10 @@ class GremlinUi(QtWidgets.QMainWindow):
         ''' called when configuraition has changed '''
         self.refresh()
 
+    def _config_option_changed(self):
+        visible = gremlin.config.Configuration().highlight_enabled and not gremlin.shared_state.is_running
+        self.ui_statusbar_highlight_container_widget.setVisible(visible)
+
     def _select_input_handler(self, device_guid : dinput.GUID, restore_input_type : gremlin.input_types.InputType = None, restore_input_id = None, force_update : bool = False, force_switch = False, tab_changed = False):
         ''' Selects a specific input on the given tab
         The tab is changed if different from the current tab.
@@ -2787,13 +2809,16 @@ class GremlinUi(QtWidgets.QMainWindow):
         if profile_path:
             # profile entry found - see if we need to change profiles
             profile_base = os.path.basename(profile_path)
+            if not self.profile.profile_file or not os.path.isfile(self.profile.profile_file):
+                syslog.error("PROC: Profile does not exist or is not saved.  Ignoring process activation as this feature requires the current profile to be saved.")
+                return
             if not compare_path(self.profile.profile_file, profile_path):
 
                 # not the same process - change
                 
                 # deactivate any current profile
                 if verbose:
-                    base_name = os.path.basename(self.profile.profile_file) if os.path.isfile(self.profile.profile_file) else "N/A (profile not saved or does not exist)"
+                    base_name = os.path.basename(self.profile.profile_file)
                     syslog.info(f"PROC: process change: deactivate current profile: [{base_name}] - saving last used mode: [{gremlin.shared_state.runtime_mode}]")
 
                 self.activate(False) # this saves the current profile runtime mode
@@ -3483,6 +3508,10 @@ class GremlinUi(QtWidgets.QMainWindow):
     @QtCore.Slot(object, object)
     def _handle_highlight_state(self, autoswitch_state, axis_state, button_state):
         
+        visible = not gremlin.shared_state.is_running
+        #self.ui_statusbar_highlight_container_widget.setVisible(visible)
+                        
+
         if autoswitch_state is not None:
             self.config.highlight_autoswitch = autoswitch_state
 

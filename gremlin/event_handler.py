@@ -343,8 +343,9 @@ class EventListener(QtCore.QObject):
 	
 	process_monitor_changed = QtCore.Signal() # process monitor options changed
 
-	# occurs on broadcast configuration change
-	config_changed =  QtCore.Signal()
+	
+	config_changed =  QtCore.Signal() # occurs on broadcast configuration change
+	config_option_changed = QtCore.Signal() # occurs on broadcast configuration change
 
 	# occurs on broadcast mode change
 	broadcast_changed = QtCore.Signal(StateChangeEvent)
@@ -440,6 +441,7 @@ class EventListener(QtCore.QObject):
 	module_state_change = QtCore.Signal(str, object) # send a module state update, (key, state)
 	module_state_register = QtCore.Signal(str, str, object) # registers a module state
 
+	
 
 
 	def __init__(self):
