@@ -661,8 +661,10 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
         if self.hasAcceptableInput():
             return float(self.text())
         try:
-            v = float(self.text())
-            return v
+            text = self.text()
+            if text:
+                v = float(text)
+                return v
         except:
             pass
         return None
@@ -872,8 +874,10 @@ class QIntLineEdit(QtWidgets.QLineEdit):
         if self.hasAcceptableInput():
             return int(float(self.text()))
         try:
-            value = int(self.text())
-            return value
+            text = self.text()
+            if text:
+                value = int(self.text())
+                return value
         except:
             pass
         return None

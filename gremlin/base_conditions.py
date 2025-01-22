@@ -201,7 +201,7 @@ class JoystickCondition(AbstractCondition):
                 safe_read(node, "range-low", float,-1),
                 safe_read(node, "range-high", float,1)
             ]
-            self.use_calibrated_data = safe_read(node,"use-calibrated",bool,False)
+        self.use_calibrated_data = safe_read(node,"use-calibrated",bool,False)
 
     def to_xml(self):
         """Returns an XML node containing the objects data.
@@ -210,8 +210,7 @@ class JoystickCondition(AbstractCondition):
         """
         #node = ElementTree.Element("condition")
         node = super().to_xml() 
-        if not self.comparison:
-            node.set("comparison", str(self.comparison))
+        node.set("comparison", str(self.comparison))
         node.set("condition-type", "joystick")
         node.set("input", InputType.to_string(self.input_type))
         node.set("id", str(self.input_id))
@@ -220,7 +219,8 @@ class JoystickCondition(AbstractCondition):
         if self.input_type == InputType.JoystickAxis:
             node.set("range-low", str(self.range[0]))
             node.set("range-high", str(self.range[1]))
-            node.set("use-calibrated", str(self.use_calibrated_data))
+        
+        node.set("use-calibrated", str(self.use_calibrated_data))
         return node
 
     def is_valid(self):
@@ -284,6 +284,7 @@ class VJoyCondition(AbstractCondition):
         if self.input_type == InputType.JoystickAxis:
             node.set("range-low", str(self.range[0]))
             node.set("range-high", str(self.range[1]))
+        
         return node
 
     def is_valid(self):
