@@ -137,8 +137,7 @@ class TextToSpeechWidget(gremlin.ui.input_item.AbstractActionWidget):
         voice = tts.getVoices()[self.action_data.voice_index]
         tts.set_voice(voice)
         tts.set_volume(self.action_data.volume)
-        tts.set_rate(self.action_data.rate)
-        tts.speak_single(self.action_data.text) 
+        tts.speak_single(self.action_data.text, self.action_data.rate) 
 
 
 class TextToSpeechFunctor(gremlin.base_profile.AbstractFunctor):
@@ -154,17 +153,16 @@ class TextToSpeechFunctor(gremlin.base_profile.AbstractFunctor):
             voice = self.tts.getVoices()[self.action_data.voice_index]
             self.tts.set_voice(voice)
             self.tts.set_volume(self.action_data.volume)
-            self.tts.set_rate(self.action_data.rate)
-            self.tts.speak(self.action_data.text)
+            self.tts.speak(self.action_data.text, self.action_data.rate)
     
     def profile_start(self):
         if self.action_data.enabled:
             self.tts.start()
         
     
-    def profile_stop(self):
-        if self.action_data.enabled:
-            self.tts.end()
+    # def profile_stop(self):
+    #     if self.action_data.enabled:
+    #         self.tts.end()
     
     def process_event(self, event, value):
         if not self.action_data.enabled:

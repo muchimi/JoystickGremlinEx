@@ -447,6 +447,7 @@ class SimConnectManager(QtCore.QObject):
     sim_running = QtCore.Signal(bool) # fires when the sim is running
     sim_paused = QtCore.Signal(bool) # fires when sim is paused or unpaused (state = pause state)
     lvars_updated = QtCore.Signal(object) # triggers when LVARs are updated (after the request to get LVARs)
+    alive = QtCore.Signal() # fires when the bridge is connected and alive
     
     
     sim_state = QtCore.Signal(int, float, str) # fires when sim state data changes (depends on the state )
@@ -469,6 +470,8 @@ class SimConnectManager(QtCore.QObject):
 
         self.verbose = gremlin.config.Configuration().verbose_mode_simconnect
 
+
+        self._connect_in_progress = False
         self._sm = None
 
         handler = SimConnectEventHandler()
@@ -484,7 +487,9 @@ class SimConnectManager(QtCore.QObject):
         # self.mobi.lvars_updated.connect(self._lvars_updated_cb)
         # self.mobi.mobiflight_connected.connect(self._mobiflight_connected_cb)
 
+        self._bridge_alive = False
         self.bridge = SimConnectBridge(sm)
+        self.bridge.alive.connect(self._bridge_alive_cb)
 
         self._lvars = [] # list of lvars
 
@@ -540,10 +545,23 @@ class SimConnectManager(QtCore.QObject):
         self.load_internal()
 
     @QtCore.Slot()
+    def _bridge_alive_cb(self):
+        # indicates the simconnect bridge is connected and responding to commands
+        syslog = logging.getLogger("system")
+        syslog.info("Simconnect Event: bridge alive")
+        self._bridge_alive = True
+        self.alive.emit()
+
+    @property
+    def is_bridge_alive(self) -> bool:
+        return self._bridge_alive
+
+    @QtCore.Slot()
     def _shutdown(self):
         ''' application shutdown '''
 
         self.bridge.stop()
+        self._bridge_alive = False
 
         syslog.info("SIMCONNECT: shutdown")
         self.sim_disconnect()
@@ -573,6 +591,7 @@ class SimConnectManager(QtCore.QObject):
 
 
         self._block_map = {}
+        
 
         # load the data - including any user modifications/additions
         if os.path.isfile(self._simvars_xml):
@@ -980,53 +999,60 @@ class SimConnectManager(QtCore.QObject):
     def reconnect(self, force_retry = False):
         # not connected
 
-        enabled = gremlin.shared_state.getSimConnectEnabled()
-        if not enabled:
-            # simconnect is not enabled
-            return False
+        if self._connect_in_progress:
+            return
+        
+        self._connect_in_progress = True
 
-        self._abort = False
-        if not self.connected:
-            try:
-                if force_retry or self._connect_attempts > 0:
-                    while self._connect_attempts > 0 and not self._abort:
-                        self._connect_attempts -= 1
-                        self._sm.connect()
-                        if self._sm.ok:
-                            break
-                        time.sleep(0.5)
-
-               
-
-            except:
-                pass
-
-            if not self._sm.ok:
-                if self._connect_attempts == 0 and gremlin.shared_state.is_running:
-                    if not self._connect_warning_issued:
-                        msg = "Simconnect: failed to connect to simulator - terminating profile"
-                        syslog.error(msg)
-                        self._connect_warning_issued = True
-                        # request the profile to stop
-                        eh = gremlin.event_handler.EventListener()
-                        eh.request_profile_stop.emit(msg)
-                return False
+        try:
             
-            else:
-                syslog.info("Simconnect: connected to simulator")
+            self._bridge_alive = False
 
+            enabled = gremlin.shared_state.getSimConnectEnabled()
+            if not enabled:
+                # simconnect is not enabled
+                return False
 
-        # initialize mobi
-        # if self.mobi.installed and not self.mobi.connected:
-        #     self.mobi.start()                
+            self._abort = False
+            if not self.connected:
+                try:
+                    if force_retry or self._connect_attempts > 0:
+                        while self._connect_attempts > 0 and not self._abort:
+                            self._connect_attempts -= 1
+                            self._sm.connect()
+                            if self._sm.ok:
+                                break
+                            time.sleep(0.5)
 
-        self.bridge.start()
+                
 
-        return True # connected  
+                except:
+                    pass
+
+                if not self._sm.ok:
+                    if self._connect_attempts == 0 and gremlin.shared_state.is_running:
+                        if not self._connect_warning_issued:
+                            msg = "Simconnect: failed to connect to simulator - terminating profile"
+                            syslog.error(msg)
+                            self._connect_warning_issued = True
+                            # request the profile to stop
+                            eh = gremlin.event_handler.EventListener()
+                            eh.request_profile_stop.emit(msg)
+                    return False
+                
+                else:
+                    syslog.info("Simconnect: connected to simulator")
+            
+
+            self.bridge.start()
+
+            return True # connected  
+        finally:
+            self._connect_in_progress = False
 
     def sim_connect(self):
         ''' connects to the sim (has to be different from connect() due to event processing )'''
-        if self._sm.is_connected():
+        if self._sm.is_connected() and self._bridge_alive:
             return True
         
         return self.reconnect()

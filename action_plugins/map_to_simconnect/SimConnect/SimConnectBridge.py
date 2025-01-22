@@ -48,6 +48,7 @@ class BridgeCommands(IntEnum):
     ExecuteCalculatorCode = 0
     GetNamedVariable = 1
     GetVariableList = 2
+    Ping = 3
 
 
 
@@ -77,6 +78,7 @@ class SimConnectBridge(QtCore.QObject):
     ''' Simconnect bridge for GremlinEx '''
 
     lvars_loaded = QtCore.Signal(object) # sent when lvars are received
+    alive = QtCore.Signal() # sent when pong is received (alive signal)
 
     def __init__(self, sm : SimConnect):
         super().__init__()
@@ -85,6 +87,7 @@ class SimConnectBridge(QtCore.QObject):
         # add our dispatch handler to simconnect
         
         self._started = False
+        self._alive = False # true if alive (pong command received)
         self._id = 0 
         self._lvars = [] # list of received lvars 
         self._state = None # response state
@@ -114,6 +117,12 @@ class SimConnectBridge(QtCore.QObject):
             syslog = logging.getLogger("system")
             syslog.info(f"Bridge: data areas registered...")
             self._started = True
+
+            # send the ping command 
+            self._alive = False
+            self.ping()
+
+
         except:
             pass
 
@@ -152,7 +161,7 @@ class SimConnectBridge(QtCore.QObject):
 
     @property
     def connected(self):
-        return self._started
+        return self._started and self._alive
 
     # simconnect library callback
     def client_data_callback_handler(self, pData):
@@ -167,14 +176,23 @@ class SimConnectBridge(QtCore.QObject):
             # mobiflight core client data received on MobiFlight client registration
             packet = cast(client_data.dwData, POINTER(BRIDGE_PACKET)).contents
 
+            if packet.code == BridgeCommands.Ping:
+                data = packet.data.decode()
+                if data == "#pong#":
+                    syslog.info(f"Bridge: received pong")
+                    self._alive = True
+                    self.alive.emit()
+
             if packet.code == BridgeCommands.GetNamedVariable:
                 # named variable
                 packet = cast(client_data.dwData, POINTER(BRIDGE_PACKET_DOUBLE)).contents
                 value = packet.data # double
-                syslog.info(f"Bridge: received mobiflight value:: {value}")
+                syslog.info(f"Bridge: received mobiflight value: {value}")
                 
             elif packet.code == BridgeCommands.GetVariableList:
                 data = packet.data.decode()
+
+
                 if data == "#lvar_begin#":
                     self._lvars.clear()
                     self._state = "loading"
@@ -199,6 +217,7 @@ class SimConnectBridge(QtCore.QObject):
 
             data = packet.data
             syslog.info(f"Bridge: received mobiflight data: {data}")
+            
             
 
 
@@ -251,6 +270,22 @@ class SimConnectBridge(QtCore.QObject):
         syslog = logging.getLogger("system")
         syslog.info(f"Bridge: get named variable: {command}")
 
+    def ping(self):
+        ''' sends the ping command '''
+        id = self._get_next_id() # id is sequential so it's unique for each call and will roundrobin
+        packet = BRIDGE_PACKET(id, BridgeCommands.Ping)
+        packet_pointer = cast(pointer(packet), c_void_p)
+        self.sm._dll.SetClientData(
+            self.sm._hSimConnect,
+            kPublicUplinkArea, 
+            kPacketDefinition,
+            SIMCONNECT_CLIENT_DATA_REQUEST_FLAG.SIMCONNECT_CLIENT_DATA_REQUEST_FLAG_DEFAULT,
+            0, # dwReserved
+            kPacketSize, 
+            packet_pointer)
+        
+        syslog = logging.getLogger("system")
+        syslog.info(f"Bridge: ping")
     
 
     def get_lvars(self):

@@ -48,6 +48,8 @@ class TextToSpeech:
         el.shutdown.connect(self.end)
         self._lock = threading.Lock()
 
+        self._current_rate  = 100 # default rate (global)
+
         try:
             self.engine = pyttsx3.init()
             self.voices = self.engine.getProperty('voices')
@@ -65,9 +67,16 @@ class TextToSpeech:
                     syslog.info(f"\t{voice.name}  (id: {voice.id})")
                 if self.default_voice:
                     syslog.info(f"TTS default voice: {self.default_voice.name}  (id: {self.default_voice.id})")
+
+
+            self.start()
+
+
         except Exception as err:
             syslog.error(f"TTS: unable to initialize TTS: {err}")
                 
+
+        
 
 
 
@@ -94,7 +103,7 @@ class TextToSpeech:
                     syslog.error(f"TTS: unable to activate TTS: {err}")
 
 
-    def speak(self, text, threaded = True):     
+    def speak(self, text, rate = 100, threaded = True):     
         if not self.valid:
             return
         syslog = logging.getLogger("system")
@@ -103,39 +112,55 @@ class TextToSpeech:
 
         self._lock.acquire_lock()
         self._queue.clear()
-        self._queue.append(lambda : self._speak(text))
+        self._queue.append(lambda : self._speak(text, rate))
         self._lock.release_lock()
 
-    def _speak(self, text):        
+    def _speak(self, text, rate = None):        
         ''' speaks the text'''
         
         try:
             text = self.text_substitution(text)
+            if rate is None:
+                rate = self._current_rate
+            new_rate = self.rate_playback + int(util.clamp(rate, self.rate_offset_min, self.rate_offset_max))
+            self.engine.setProperty('rate', new_rate)
             self.engine.say(text)
-            
+
+
         except Exception as err:
             logging.getLogger(f"system").error(f"Error in TTS: {err}")
 
-    def speak_single(self, text, threaded = True):        
+    def speak_single(self, text, rate = None, threaded = True):        
         if text:
             syslog = logging.getLogger("system")
             verbose = gremlin.config.Configuration().verbose
             if verbose: syslog.info(f"TTS: SPEAK SINGLE add to queue: {text}")
             self._lock.acquire_lock()
             self._queue.clear()
-            self._queue.append(lambda : self._speak_single(text))
+            self._queue.append(lambda : self._speak_single(text, rate))
             self._lock.release_lock()
 
 
-    def _speak_single(self, text):
+    def _speak_single(self, text, rate = None):
         ''' speaks the test as a single event (don't use this inside an event loop)'''
         if not self.valid:
             return
         try:
             self.engine.stop()
             text = self.text_substitution(text)
+            if rate is None:
+                rate = self._current_rate
+
+            new_rate = self.rate_playback + int(util.clamp(rate, self.rate_offset_min, self.rate_offset_max))
+            self.engine.setProperty('rate', new_rate)
             self.engine.say(text)
-            self.engine.runAndWait()
+
+            try:
+                if not self.engine._inLoop:
+                    self.engine.runAndWait()
+            except:
+                pass
+
 
         except Exception as err:
             logging.getLogger("system").error(f"Error in TTS: {err}")
@@ -169,6 +194,7 @@ class TextToSpeech:
         ''' runner thread for the TTS engine '''
         if not self.valid:
             return
+        threading.current_thread().reset()
         self.engine.startLoop(False)
         while not self._tts_thread.stopped():
             time.sleep(0.1)
@@ -180,6 +206,7 @@ class TextToSpeech:
     def _queue_runner(self):
         ''' processes the speech queue '''
         syslog = logging.getLogger("system")
+        threading.current_thread().reset()
         verbose = gremlin.config.Configuration().verbose
         while not self._queue_thread.stopped():
             if self._queue:
@@ -239,6 +266,7 @@ class TextToSpeech:
         if not self.valid:
             return
         rate = self.rate_playback + int(util.clamp(value, self.rate_offset_min, self.rate_offset_max))
+        self._current_rate = rate
         self.engine.setProperty('rate', rate )
         
 
@@ -249,5 +277,5 @@ class TextToSpeech:
         :param text the text to substitute parts of
         :return original text with parts substituted
         """
-        text = text.replace("${current_mode}", gremlin.shared_state.runtime_mode)
+        text = text.replace("${current_mode}", gremlin.shared_state.current_mode)
         return text

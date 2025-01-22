@@ -478,13 +478,12 @@ class MidiListener(AbortableThread):
         self.port_number = port_number
         self.port_name = port_name
         self.callback = callback
-        el = gremlin.event_handler.EventListener()
-        el.shutdown.connect(self.stop)
 
     def run(self):
         verbose = gremlin.config.Configuration().verbose_mode_midi
         
         try:
+            self.reset()
             with mido.open_input(self.port_name) as inport:
                 logging.getLogger("system").info(f"MIDI Interface: Active on port: {self.port_name} [{self.port_number}]")
                 while not self.stopped():

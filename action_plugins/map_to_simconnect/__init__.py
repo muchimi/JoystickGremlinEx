@@ -3531,10 +3531,20 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         verbose_details = config.verbose_mode_details
         #verbose = True
 
+        syslog = logging.getLogger("system")
+
+
         if not self.manager.is_running:
             # sim is not running
+            syslog.warning("Simconnect Functor: event ignored, simconnect not connected")
             return
-        syslog = logging.getLogger("system")
+        
+
+        if not self.manager.is_bridge_alive:
+            # sim is not running
+            syslog.warning("Simconnect Functor: event ignored, simconnect bridge not connected")
+            return
+        
         block = self.action_data.block
         output_mode = self.action_data.mode
         command_mode = self.action_data.command_mode

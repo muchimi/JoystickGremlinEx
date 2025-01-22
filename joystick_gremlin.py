@@ -120,7 +120,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_BASE = "m67e"
+APPLICATION_BASE = "m68"
 APPLICATION_VERSION = f"13.40.16ex ({APPLICATION_BASE})"
 
 
@@ -1361,6 +1361,14 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.status_bar_highlight_button_widget.clicked.connect(self._toggle_button_highlight)
         self.status_bar_highlight_button_widget.setToolTip("Enable button input highlighting")
 
+
+        self.status_bar_highlight_enable_widget = QtWidgets.QPushButton()
+        self.status_bar_highlight_enable_widget.setStyleSheet("border: none")
+        self.status_bar_highlight_enable_widget.setChecked(self.config.highlight_enabled)
+        self.status_bar_highlight_enable_widget.clicked.connect(self._toggle_highlight_enabled)
+        self.status_bar_highlight_enable_widget.setToolTip("Enable highlighting")
+
+
         self.status_bar_module_container_widget = QtWidgets.QWidget()
         self.status_bar_module_container_widget.setContentsMargins(0,0,0,0)
         self.status_bar_module_container_layout = QtWidgets.QHBoxLayout(self.status_bar_module_container_widget)
@@ -1383,14 +1391,25 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.ui_statusbar_highlight_container_layout = QtWidgets.QHBoxLayout(self.ui_statusbar_highlight_container_widget)
         self.ui_statusbar_highlight_container_layout.setContentsMargins(0,0,0,0)
 
+        self.ui_statusbar_highlight_state_container_widget = QtWidgets.QWidget()
+        self.ui_statusbar_highlight_state_container_widget.setContentsMargins(0,0,0,0)
+        self.ui_statusbar_highlight_state_container_layout = QtWidgets.QHBoxLayout(self.ui_statusbar_highlight_state_container_widget)
+        self.ui_statusbar_highlight_state_container_layout.setContentsMargins(0,0,0,0)
 
-        self.ui_statusbar_highlight_container_layout.addWidget(QtWidgets.QLabel("<b>Highlight</b> Device:"))
-        self.ui_statusbar_highlight_container_layout.addWidget(self.status_bar_highlight_tabswitch_widget)
-        self.ui_statusbar_highlight_container_layout.addWidget(QtWidgets.QLabel("Axis"))                                                     
-        self.ui_statusbar_highlight_container_layout.addWidget(self.status_bar_highlight_axis_widget)
-        self.ui_statusbar_highlight_container_layout.addWidget(QtWidgets.QLabel("Button"))
-        self.ui_statusbar_highlight_container_layout.addWidget(self.status_bar_highlight_button_widget)
 
+        
+
+        self.ui_statusbar_highlight_state_container_layout.addWidget(QtWidgets.QLabel("Device"))                                                     
+        self.ui_statusbar_highlight_state_container_layout.addWidget(self.status_bar_highlight_tabswitch_widget)
+        self.ui_statusbar_highlight_state_container_layout.addWidget(QtWidgets.QLabel("Axis"))                                                     
+        self.ui_statusbar_highlight_state_container_layout.addWidget(self.status_bar_highlight_axis_widget)
+        self.ui_statusbar_highlight_state_container_layout.addWidget(QtWidgets.QLabel("Button"))
+        self.ui_statusbar_highlight_state_container_layout.addWidget(self.status_bar_highlight_button_widget)
+
+        self.ui_statusbar_highlight_container_layout.addWidget(QtWidgets.QLabel("<b>Highlight</b>"))
+        self.ui_statusbar_highlight_container_layout.addWidget(self.ui_statusbar_highlight_state_container_widget)
+        self.ui_statusbar_highlight_container_layout.addWidget(QtWidgets.QLabel("Enabled"))
+        self.ui_statusbar_highlight_container_layout.addWidget(self.status_bar_highlight_enable_widget)
 
         self.ui.statusbar_widget.addPermanentWidget(self.ui_statusbar_highlight_container_widget)
 
@@ -1398,11 +1417,29 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         icon_size = QtCore.QSize(16,16)
         icon = gremlin.util.load_icon("mdi.record", use_qta=True,qta_color="red")
+        self._icon_red = icon
         self._status_red = icon.pixmap(icon_size)
         icon = gremlin.util.load_icon("mdi.record", use_qta=True,qta_color="green")
+        self._icon_green = icon
         self._status_green = icon.pixmap(icon_size)
         icon = gremlin.util.load_icon("mdi.record", use_qta=True,qta_color="lightgray")
+        self._icon_gray = icon
         self._status_gray = icon.pixmap(icon_size)
+
+
+        self._update_highlight_toolbar_enabled()
+
+
+
+    def _update_highlight_toolbar_enabled(self):
+        ''' updates the enabled status of the highlight status bar buttons based on current enabled state '''
+        enabled = self.config.highlight_enabled
+        self.ui_statusbar_highlight_state_container_widget.setVisible(enabled)
+        
+        icon = self._icon_green if enabled else self._icon_gray
+        self.status_bar_highlight_enable_widget.setIcon(icon)
+
+
 
     @QtCore.Slot()
     def _profile_start(self):
@@ -1443,12 +1480,17 @@ class GremlinUi(QtWidgets.QMainWindow):
                 pixmap = self._status_gray
             else:
                 pixmap = self._status_green if state else self._status_red
+
+            
             widget = QtWidgets.QLabel()
             widget.setPixmap(pixmap)
             self.status_bar_module_container_layout.addWidget(QtWidgets.QLabel(label))
             self.status_bar_module_container_layout.addWidget(widget)
             self.status_bar_module_container_layout.addWidget(QtWidgets.QLabel(" "))
         self.status_bar_module_container_layout.addStretch()
+
+        self.ui_statusbar_highlight_container_widget.setVisible(not gremlin.shared_state.is_running)
+        self._update_highlight_toolbar_enabled()
 
 
     @QtCore.Slot()
@@ -1471,6 +1513,14 @@ class GremlinUi(QtWidgets.QMainWindow):
         status = self.config.highlight_input_buttons
         eh.toggle_highlight.emit(None, None, not status)
 
+    @QtCore.Slot()
+    def _toggle_highlight_enabled(self, checked):
+        self.config.highlight_enabled = not self.config.highlight_enabled
+        self._update_highlight_toolbar_enabled()
+        
+
+        
+        
 
 
     def _create_system_tray(self):
@@ -2294,8 +2344,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.refresh()
 
     def _config_option_changed(self):
-        visible = gremlin.config.Configuration().highlight_enabled and not gremlin.shared_state.is_running
-        self.ui_statusbar_highlight_container_widget.setVisible(visible)
+        self._update_highlight_toolbar_enabled()
 
     def _select_input_handler(self, device_guid : dinput.GUID, restore_input_type : gremlin.input_types.InputType = None, restore_input_id = None, force_update : bool = False, force_switch = False, tab_changed = False):
         ''' Selects a specific input on the given tab
@@ -2638,6 +2687,9 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         icon = load_icon("gfx/about.svg")
         self.ui.actionAbout.setIcon(icon)
+
+        icon = load_icon("ei.adjust-alt")
+        self.ui.actionInputViewer.setIcon(icon)
 
 
         # Toolbar actions

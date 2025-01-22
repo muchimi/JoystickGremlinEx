@@ -647,6 +647,7 @@ class EventListener(QtCore.QObject):
 		syslog.info("KBD: processing start")
 		self._keyboard_buffer = {}
 		self._key_listener_started = True
+		threading.current_thread().reset()
 		while not self._keyboard_thread.stopped():
 			if self._keyboard_queue.empty():
 				time.sleep(0.01)
@@ -1106,7 +1107,24 @@ class EventHandler(QtCore.QObject):
 		QtCore.QObject.__init__(self)
 		self.plugins = {}
 		self._mode_validator_callbacks = {}  # list of validators (callbacks) that return a boolean True if the mode change can occur - signature must be callable(str)->bool
+		self._last_tts_notify = None # last mode that triggered a TTS verbal notice
+		self._last_tts_notify_time = None
+		el = gremlin.event_handler.EventListener()
+		el.profile_start.connect(self._profile_start)
+		el.profile_stop.connect(self._profile_stop)
+		el.runtime_mode_changed.connect(self._update_mode_change)
+
+		
 		self.reset()
+
+	@QtCore.Slot()
+	def _profile_start(self):
+		self._update_mode_change(gremlin.shared_state.runtime_mode)
+
+	@QtCore.Slot()
+	def _profile_stop(self):
+		self._last_tts_notify = None
+		self._last_tts_notify_time = None
 
 	def registerModeValidator(self, callback):
 		assert callable(callback)
@@ -1148,6 +1166,7 @@ class EventHandler(QtCore.QObject):
 		self._event_lookup = {}
 		self.latched_functors = {}
 		self.experimental = config.experimental
+		
 		
 
 	@property
@@ -1559,7 +1578,16 @@ class EventHandler(QtCore.QObject):
 		assert new_mode,"Mode cannot be blank"
 		gremlin.shared_state.edit_mode = new_mode
 
-
+	@QtCore.Slot(str)
+	def _update_mode_change(self, mode):
+		if gremlin.config.Configuration().initial_load_mode_tts:
+			# output verbal notification if requested
+			if not self._last_tts_notify or self._last_tts_notify != mode:
+				if self._last_tts_notify_time is None or time.time() > self._last_tts_notify_time:
+					self._last_tts_notify = mode
+					self._last_tts_notify_time = time.time() + 2 # add 2 seconds to avoid spamming 
+					tts = gremlin.tts.TextToSpeech()
+					tts.speak(f"Mode change to {mode}", 150) # default rate is 100
 	
 
 	def change_mode(self, new_mode, emit = True, force_update = False):
@@ -1690,10 +1718,8 @@ class EventHandler(QtCore.QObject):
 					el = EventListener()
 					el.runtime_mode_changed.emit(new_mode)
 					
-					if config.initial_load_mode_tts:
-						# output verbal notification if requested
-						tts = gremlin.tts.TextToSpeech()
-						tts.speak(f"Profile mode change to {new_mode}")
+				
+
 
 
 					# fire mode change for mode enter (press + release)
@@ -1724,6 +1750,8 @@ class EventHandler(QtCore.QObject):
 		finally:	
 			gremlin.util.popCursor()
 
+
+	
 
 	def resume(self):
 		"""Resumes the processing of callbacks."""

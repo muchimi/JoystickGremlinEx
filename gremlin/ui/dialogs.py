@@ -197,10 +197,36 @@ class OptionsUi(ui_common.BaseDialogUi):
 
         self.setWindowTitle("Options")
 
-        self.main_layout = QtWidgets.QGridLayout(self)
-        self.tab_container = QtWidgets.QTabWidget()
-        self.main_layout.addWidget(self.tab_container,0,0)
+        self.dialog_layout = QtWidgets.QVBoxLayout(self)
+
+        self.main_layout = QtWidgets.QGridLayout()
         
+
+        self.tab_container = QtWidgets.QTabWidget()
+
+        self.scroll_area = QtWidgets.QScrollArea()
+        self.scroll_widget = QtWidgets.QWidget()
+        self.scroll_layout = QtWidgets.QVBoxLayout()
+        self.scroll_widget.setLayout(self.scroll_layout)
+        self.scroll_widget.setSizePolicy(QtWidgets.QSizePolicy.Expanding,QtWidgets.QSizePolicy.Expanding)
+        self.scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+        self.scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+
+        # Configure the scroll area
+        #self.scroll_area.setMinimumWidth(300)
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setWidget(self.scroll_widget)        
+
+        self.dialog_layout.addWidget(self.scroll_area)
+
+
+        self.scroll_layout.addLayout(self.main_layout)
+
+        self.main_layout.addWidget(self.tab_container,0,0)
+        self.main_layout.addWidget(QtWidgets.QWidget(),0,4)
+        self.main_layout.setColumnStretch(4,2)
+
+
         self.closed.connect(self._save_on_close_cb)
         
         self._create_general_page()
@@ -222,8 +248,9 @@ class OptionsUi(ui_common.BaseDialogUi):
         options_layout.addWidget(clear_windows)
         options_layout.addStretch()
         options_layout.addWidget(close_button)
+        
 
-        self.main_layout.addWidget(options_container,1,0)
+        self.dialog_layout.addWidget(options_container)
 
         # select the last used tab
         index = self.config.last_options_tab
@@ -338,6 +365,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.debug_ui.setToolTip("Enabled additional diagnostics widgets on the UI - only use for troubleshooting/debug purposes<br>Restart required to take effect.")
         self.debug_ui.setChecked(self.config.debug_ui)
         self.debug_ui.clicked.connect(self._debug_ui)
+        self.debug_ui.setVisible(self.config.is_debug)
         
         
         # synchronize action/container drop downs
@@ -436,7 +464,7 @@ class OptionsUi(ui_common.BaseDialogUi):
             widget.clicked.connect(self._verbose_set_cb)
             self.verbose_container_layout.addWidget(widget, row, col)
             col += 1
-            if col > 2:
+            if col > 3:
                 col = 1
                 row +=1
             self._verbose_mode_widgets[mode] = widget
@@ -620,17 +648,6 @@ class OptionsUi(ui_common.BaseDialogUi):
         # column 1
         col = 0
         row = 0
-        self.column_layout.addWidget(self.highlight_enabled, row, col)
-        row+=1
-        self.column_layout.addWidget(self.highlight_autoswitch, row, col)
-        row+=1
-        self.column_layout.addWidget(self.highlight_hotkey_autoswitch, row, col)
-        row+=1
-        
-        self.column_layout.addWidget(self.highlight_input_axis, row, col)
-        row+=1
-        self.column_layout.addWidget(self.highlight_input_buttons, row, col)
-        
         row+=1
         self.column_layout.addWidget(self.sync_last_selection, row, col)
         row+=1
@@ -664,18 +681,29 @@ class OptionsUi(ui_common.BaseDialogUi):
         row+=1
         self.column_layout.addWidget(self.midi_enabled, row, col)
         row+=1
-        self.column_layout.addWidget(self.verbose_container_widget, row, col)
+        self.column_layout.addWidget(self.verbose_container_widget, row, col, 1, 2)
         row+=1
         self.column_layout.addWidget(self.runtime_ignore_device_change, row, col)
         row+=1
         self.column_layout.addWidget(self.debug_ui, row, col)
         row+=1
         self.column_layout.addWidget(self.show_input_enable, row, col)
+
+        # column 3
+        col = 2
+        row = 0
+        self.column_layout.addWidget(self.highlight_enabled, row, col)
+        row+=1
+        self.column_layout.addWidget(self.highlight_autoswitch, row, col)
+        row+=1
+        self.column_layout.addWidget(self.highlight_hotkey_autoswitch, row, col)
+        row+=1
         
+        self.column_layout.addWidget(self.highlight_input_axis, row, col)
+        row+=1
+        self.column_layout.addWidget(self.highlight_input_buttons, row, col)
 
         self.general_layout.addWidget(self.column_widget)
-
-
         self.general_layout.addWidget(self.gamepad_container_widget)
 
         

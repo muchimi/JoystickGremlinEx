@@ -872,6 +872,7 @@ class SimConnect():
 		syslog = logging.getLogger("system")
 		syslog.info("Simconnect: Open connection")
 		error_count = 10
+		self._quit = 0 # keep on running until stop
 		while self._quit == 0:
 			try:
 				self._dll.CallDispatch(self._hSimConnect, self._my_dispatch_proc_rd, None)
