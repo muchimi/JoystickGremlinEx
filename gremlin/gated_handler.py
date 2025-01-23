@@ -1419,7 +1419,9 @@ class GateData():
                                     else:
                                         # not a momentary trigger
                                         #print (f"trigger mode: {trigger.mode} sending event value: {value.current}")
-                                        functor.process_event(event, value)
+                                        result = functor.process_event(event, value)
+                                        if not result:
+                                            break
                 
                                     
                     # process user provided functor callback if set (this is used by actions that must act on the modified output of the gated axis rather than the raw hardware input - example: simconnect action)

@@ -455,6 +455,9 @@ class JoystickConditionWidget(AbstractConditionWidget):
         ''' updates UI based on input type'''
         input_type = self.condition_data.input_type
         visible = False
+
+
+
         match input_type:
             case InputType.JoystickAxis:
                 self._axis_ui()
@@ -474,7 +477,6 @@ class JoystickConditionWidget(AbstractConditionWidget):
                 
         self.axis_repeater_widget.setVisible(visible)
                 
-
 
     def _axis_ui(self):
         """Creates the UI needed to configure an axis based condition."""
@@ -513,6 +515,9 @@ class JoystickConditionWidget(AbstractConditionWidget):
         self.comparison_dropdown = ui_common.QComboBox()
         self.comparison_dropdown.addItem("Inside")
         self.comparison_dropdown.addItem("Outside")
+        if not self.condition_data.comparison in ("inside","outside"):
+            self.condition_data.comparison = "inside"
+            
         self.comparison_dropdown.setCurrentText(self.condition_data.comparison.capitalize())
         self.comparison_dropdown.currentTextChanged.connect(self._comparison_changed_cb)
 
@@ -538,6 +543,10 @@ class JoystickConditionWidget(AbstractConditionWidget):
         self.ui_container_layout.addWidget(QtWidgets.QWidget(), 0, 4)
         self.ui_container_layout.setColumnStretch(4,2)
 
+        if not self.condition_data.comparison:
+            # update the comparison
+            self.condition_data.comparison = self.comparison_dropdown.currentText()
+
         
         self._update_range_state(self._axis_value())
 
@@ -554,9 +563,9 @@ class JoystickConditionWidget(AbstractConditionWidget):
         self.comparison_dropdown = ui_common.QComboBox()
         self.comparison_dropdown.addItem("Pressed")
         self.comparison_dropdown.addItem("Released")
-        self.comparison_dropdown.setCurrentText(
-            self.condition_data.comparison.capitalize()
-        )
+        if not self.condition_data.comparison in ("pressed","released"):
+            self.condition_data.comparison = "pressed"
+        self.comparison_dropdown.setCurrentText(self.condition_data.comparison.capitalize())
         self.comparison_dropdown.currentTextChanged.connect(self._comparison_changed_cb)
 
         self.ui_container_layout.addWidget(
@@ -571,6 +580,10 @@ class JoystickConditionWidget(AbstractConditionWidget):
         self.ui_container_layout.addWidget(QtWidgets.QWidget(), 0, 4)
         self.ui_container_layout.setColumnStretch(4,2)
 
+        if not self.condition_data.comparison:
+            # update the comparison
+            self.condition_data.comparison = self.comparison_dropdown.currentText()
+
     def _hat_ui(self):
         """Creates the UI needed to configure a hat based condition."""
         gremlin.util.clear_layout(self.ui_container_layout)
@@ -580,6 +593,9 @@ class JoystickConditionWidget(AbstractConditionWidget):
         ]
 
         self.comparison_dropdown = ui_common.QHatSelectorComboBox()
+        if not self.condition_data.comparison or not self.condition_data.comparison.capitalize() in directions:
+            self.condition_data.comparison = "center"
+
         self.comparison_dropdown.setValue(self.condition_data.comparison)
         self.comparison_dropdown.valueChanged.connect(self._comparison_changed_cb)
         
@@ -590,6 +606,12 @@ class JoystickConditionWidget(AbstractConditionWidget):
         self.ui_container_layout.addWidget(self.comparison_dropdown, 0, 3, alignment=QtCore.Qt.AlignLeft)
         self.ui_container_layout.addWidget(QtWidgets.QWidget(), 0, 4)
         self.ui_container_layout.setColumnStretch(4,2)
+
+
+        if not self.condition_data.comparison:
+            # update the comparison
+            self.condition_data.comparison = self.comparison_dropdown.currentText()
+
 
     def _input_pressed_cb(self, event):
         """Processes input events to update the UI and model.
@@ -859,7 +881,7 @@ class VJoyConditionWidget(AbstractConditionWidget):
             "South", "South West", "West", "North West"
         ]
         self.comparison_widget = ui_common.QHatSelectorComboBox()
-        if not self.condition_data.comparison in directions:
+        if not self.condition_data.comparison or not self.condition_data.comparison.capitalize() in directions:
             self.condition_data.comparison = "center"
         self.comparison_widget.setValue(self.condition_data.comparison)
         self.comparison_widget.valueChanged.connect(self._comparison_changed_cb)

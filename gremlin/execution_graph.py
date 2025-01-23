@@ -659,7 +659,7 @@ class AbstractExecutionGraph(QtCore.QObject):
                 if result is None or not result:
                     # condition is not met
                     if verbose: syslog.info (f"\t\t\t{index} -> condition failed")
-                    # get the next item
+                    
             else:
                 if verbose: syslog.info(f"\t\t{index} -> executing action {functor_names[index]}")
                 result = functor.process_event(event, value)

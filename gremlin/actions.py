@@ -259,6 +259,7 @@ class JoystickCondition(AbstractCondition):
         self.input_index = condition.input_index if hasattr(condition,"input_index") else 0
         self.condition = condition
 
+
     def __call__(self, event, value):
         """Evaluates the condition using the condition and provided data.
 
@@ -311,6 +312,8 @@ class JoystickCondition(AbstractCondition):
             else: # released
                 retval = not is_pressed
             if verbose: syslog.info(f"JoystickCondition: Button {self.comparison}: device {info.name} input: {self.input_id} pressed: {is_pressed} return: {"OK" if retval else "FAILED"}")
+            if not retval and self.input_id == 3:
+                pass
             return retval
             
         elif self.input_type == InputType.JoystickHat:
