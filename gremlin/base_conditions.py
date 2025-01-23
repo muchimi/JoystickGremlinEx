@@ -196,11 +196,10 @@ class JoystickCondition(AbstractCondition):
         self.input_id = safe_read(node, "id", int, 1)
         self.device_guid = parse_guid(node.get("device-guid"))
         self.device_name = safe_read(node, "device-name", str, "")
-        if self.input_type == InputType.JoystickAxis:
-            self.range = [
-                safe_read(node, "range-low", float,-1),
-                safe_read(node, "range-high", float,1)
-            ]
+        self.range = [
+            safe_read(node, "range-low", float, 0),
+            safe_read(node, "range-high", float, 0)
+        ]
         self.use_calibrated_data = safe_read(node,"use-calibrated",bool,False)
 
     def to_xml(self):
@@ -216,9 +215,8 @@ class JoystickCondition(AbstractCondition):
         node.set("id", str(self.input_id))
         node.set("device-guid", write_guid(self.device_guid))
         node.set("device-name", str(self.device_name))
-        if self.input_type == InputType.JoystickAxis:
-            node.set("range-low", str(self.range[0]))
-            node.set("range-high", str(self.range[1]))
+        node.set("range-low", str(self.range[0]))
+        node.set("range-high", str(self.range[1]))
         
         node.set("use-calibrated", str(self.use_calibrated_data))
         return node
@@ -260,11 +258,10 @@ class VJoyCondition(AbstractCondition):
         self.input_type = InputType.to_enum(safe_read(node, "input"))
         self.input_id = safe_read(node, "id", int)
         self.vjoy_id = safe_read(node, "vjoy-id", int)
-        if self.input_type == InputType.JoystickAxis:
-            self.range = [
-                safe_read(node, "range-low", float),
-                safe_read(node, "range-high", float)
-            ]
+        self.range = [
+            safe_read(node, "range-low", float, 0),
+            safe_read(node, "range-high", float, 0)
+        ]
 
     def to_xml(self):
         """Returns an XML node containing the objects data.
@@ -281,9 +278,8 @@ class VJoyCondition(AbstractCondition):
         node.set("input", InputType.to_string(self.input_type))
         node.set("id", str(self.input_id))
         node.set("vjoy-id", write_guid(self.vjoy_id))
-        if self.input_type == InputType.JoystickAxis:
-            node.set("range-low", str(self.range[0]))
-            node.set("range-high", str(self.range[1]))
+        node.set("range-low", str(self.range[0]))
+        node.set("range-high", str(self.range[1]))
         
         return node
 
