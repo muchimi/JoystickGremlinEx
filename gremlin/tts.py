@@ -36,9 +36,9 @@ from PySide6 import QtCore
 @gremlin.singleton_decorator.SingletonDecorator
 class TextToSpeech:
 
-    rate_playback = 200 # default playback rate
-    rate_offset_min = -175 # max slow
-    rate_offset_max = 100 # max fast
+    rate_playback = 100 # default playback rate
+    rate_offset_min = 50 # max slow
+    rate_offset_max = 200 # max fast
 
     def __init__(self):
         """Creates a new instance."""

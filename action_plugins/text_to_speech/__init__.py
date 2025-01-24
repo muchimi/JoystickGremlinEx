@@ -61,7 +61,7 @@ class TextToSpeechWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.volume_widget.setRange(0, 100)
         self.volume_widget.valueChanged.connect(self._volume_changed_cb)
                                                 
-        self.rate_widget = gremlin.ui.ui_common.QDoubleClickSpinBox()
+        self.rate_widget = gremlin.ui.ui_common.QIntLineEdit()
         self.rate_widget.setRange(tts.rate_offset_min, tts.rate_offset_max)
         self.rate_widget.valueChanged.connect(self._rate_changed_cb)
         self.rate_widget.doubleClick.connect(self._rate_reset_cb)
@@ -102,7 +102,7 @@ class TextToSpeechWidget(gremlin.ui.input_item.AbstractActionWidget):
     
     @QtCore.Slot()
     def _rate_reset_cb(self):
-        self.rate_widget.setValue(0)
+        self.rate_widget.setValue(100)
     
     @QtCore.Slot()
     def _voice_change_cb(self):

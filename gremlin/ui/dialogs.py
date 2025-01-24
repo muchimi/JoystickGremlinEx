@@ -765,84 +765,110 @@ class OptionsUi(ui_common.BaseDialogUi):
         self._profile_map_mode_widgets = {}
 
         # Autoload profile option
-        self.autoload_checkbox = QtWidgets.QCheckBox("Automatically load a mapped profile based on current application (process)")
-        self.autoload_checkbox.clicked.connect(self._autoload_mapped_profile)
-        self.autoload_checkbox.setChecked(self.config.autoload_profiles)
-        self.autoload_checkbox.setToolTip("When set, GremlinEx will autoload and activate a mapped profile when in \"run\" mode")
+        self.autoload_profile_widget = QtWidgets.QCheckBox("Automatically load a mapped profile based on current active process if a profile is mapped to that process")
+        self.autoload_profile_widget.clicked.connect(self._autoload_mapped_profile)
+        self.autoload_profile_widget.setChecked(self.config.autoload_profiles)
+        self.autoload_profile_widget.setToolTip("When set, GremlinEx will autoload and activate a mapped profile when in \"run\" mode on a process focus change")
 
-        self.keep_active_on_focus_lost_checkbox = QtWidgets.QCheckBox("Keep profile active on focus loss")
-        self.keep_active_on_focus_lost_checkbox.setToolTip("""If this option is set, the last active profile
-will remain active until a different profile is loaded.""")
-        self.keep_active_on_focus_lost_checkbox.clicked.connect(self._keep_focus)
-        self.keep_active_on_focus_lost_checkbox.setChecked(self.config.keep_profile_active_on_focus_loss)
-        self.keep_active_on_focus_lost_checkbox.setEnabled(self.config.autoload_profiles)
+        self.keep_active_on_focus_lost_widget = QtWidgets.QCheckBox("Keep last profile and mode active on focus loss")
+        self.keep_active_on_focus_lost_widget.setToolTip("If this option is set, the last active profile and mode will remain active until a different profile is loaded.\nThis can also happen if a new process has focus and that process maps to a different profile.\nWhen disabled, the active profile will be deactivated if the process does not have the focus.")
+        self.keep_active_on_focus_lost_widget.clicked.connect(self._keep_focus)
+        self.keep_active_on_focus_lost_widget.setChecked(self.config.keep_profile_active_on_focus_loss)
+        
 
-        self.keep_active_on_focus_lost_checkbox.setToolTip("When set, GremlinEx will keep the profile active when the target application loses focus (such as on alt-tab)")
+        self.keep_active_on_focus_lost_widget.setToolTip("When set, GremlinEx will keep the profile active when the target application loses focus (such as on alt-tab).\nThis does not prevent a new profile from being loaded if mapped to another process.")
 
 
         # Activate profile on launch
-        self.activate_on_launch = QtWidgets.QCheckBox("Auto-Activate last profile on launch")
-        self.activate_on_launch.clicked.connect(self._activate_on_launch)
-        self.activate_on_launch.setChecked(self.config.activate_on_launch)
-        self.activate_on_launch.setToolTip("When set, the last used profile will be automatically activated when GremlinEx starts.")
+        self.activate_on_launch_widget = QtWidgets.QCheckBox("Auto-Activate last profile on launch")
+        self.activate_on_launch_widget.clicked.connect(self._activate_on_launch)
+        self.activate_on_launch_widget.setChecked(self.config.activate_on_launch)
+        self.activate_on_launch_widget.setToolTip("When set, the last used profile will be automatically activated when GremlinEx starts.\nThis option will be overriden if a mapped process calls for a different profile to load based on options selected.")
 
-        self.activate_on_process_focus = QtWidgets.QCheckBox("Auto-Activate on process focus")
-        self.activate_on_process_focus.clicked.connect(self._activate_on_process_focus)
-        self.activate_on_process_focus.setChecked(self.config.activate_on_process_focus)
-        self.activate_on_process_focus.setEnabled(self.config.autoload_profiles)
-        self.activate_on_process_focus.setToolTip("When set, Gremlin Ex will automatically load and activate a profile when a mapped profile receives the focus regardless of other options")
+        self.activate_on_process_focus_widget = QtWidgets.QCheckBox("Auto-Activate on process focus")
+        self.activate_on_process_focus_widget.clicked.connect(self._activate_on_process_focus)
+        self.activate_on_process_focus_widget.setChecked(self.config.activate_on_process_focus)
+        
+        self.activate_on_process_focus_widget.setToolTip("When set, Gremlin Ex will automatically load and activate a profile when a mapped profile receives the focus regardless of other options")
 
         # Restore last mode on profile activate
-        self.activate_restore_mode = QtWidgets.QCheckBox("Restore last used mode on profile activation (global)")
-        self.activate_restore_mode.clicked.connect(self._restore_profile_mode)
-        self.activate_restore_mode.setChecked(self.config.restore_profile_mode_on_start)
-        self.activate_restore_mode.setToolTip("""When set, activated profiles will use the last known mode the profile used. This is a global setting and overrides the per-profile option.
+        self.activate_restore_mode_widget = QtWidgets.QCheckBox("Restore last used mode on profile activation (global)")
+        self.activate_restore_mode_widget.clicked.connect(self._restore_profile_mode)
+        self.activate_restore_mode_widget.setChecked(self.config.restore_profile_mode_on_start)
+        self.activate_restore_mode_widget.setToolTip("""When set, activated profiles will use the last known mode the profile used. This is a global setting and overrides the per-profile option.
 This setting is also available on a profile by profile basis on the profile tab, or in the modes editor.""")
+        
 
-        self.initial_load_mode_tts = QtWidgets.QCheckBox("Say active mode on profile activation via TTS")
-        self.initial_load_mode_tts.setChecked(self.config.initial_load_mode_tts)
-        self.initial_load_mode_tts.clicked.connect(self._initial_load_mode_tts)
-        self.initial_load_mode_tts.setToolTip("""When set, GremlinEx will say that text-to-speech the profile mode whenever a profile is first loaded""")
+        self.initial_load_mode_tts_widget = QtWidgets.QCheckBox("Say active mode on auto-load mode changes activation via TTS")
+        self.initial_load_mode_tts_widget.setChecked(self.config.initial_load_mode_tts)
+        self.initial_load_mode_tts_widget.clicked.connect(self._initial_load_mode_tts)
+        self.initial_load_mode_tts_widget.setToolTip("""When set, GremlinEx will say that text-to-speech the profile mode whenever a profile is first loaded""")
 
-        self.reset_mode_on_process_activate = QtWidgets.QCheckBox("Reset mode on process activation")
-        self.reset_mode_on_process_activate.setChecked(self.config.reset_mode_on_process_activate)
-        self.reset_mode_on_process_activate.clicked.connect(self._reset_mode_on_process_activate)
-        self.reset_mode_on_process_activate.setToolTip("If set, the profile mode will be reset to the startup mode whenever the application has the focus")
+        tts = gremlin.tts.TextToSpeech()
+        self.rate_widget = gremlin.ui.ui_common.QIntLineEdit()
+        self.rate_widget.setRange(tts.rate_offset_min, tts.rate_offset_max)
+        self.rate_widget.setValue(self.config.initial_load_rate_tts)
+        self.rate_widget.valueChanged.connect(self._rate_changed_cb)
+        self.rate_widget.doubleClick.connect(self._rate_reset_cb)
+
+
+        self.reset_mode_on_process_activate_widget = QtWidgets.QCheckBox("Reset mode on process activation")
+        self.reset_mode_on_process_activate_widget.setChecked(self.config.reset_mode_on_process_activate)
+        self.reset_mode_on_process_activate_widget.clicked.connect(self._reset_mode_on_process_activate)
+        self.reset_mode_on_process_activate_widget.setToolTip("If set, the profile mode will be reset to the startup mode whenever the application has the focus")
 
         # convert remap
-        self.convert_vjoy_remap = QtWidgets.QCheckBox("Convert legacy Remap")
-        self.convert_vjoy_remap.clicked.connect(self._convert_vjoy_remap)
-        self.convert_vjoy_remap.setChecked(self.config.convert_vjoy_remap)
-        self.convert_vjoy_remap.setToolTip("When set, Remap actions will convert to Map To Vjoy when GremlinEx starts.")        
+        self.convert_vjoy_remap_widget = QtWidgets.QCheckBox("Convert legacy Remap")
+        self.convert_vjoy_remap_widget.clicked.connect(self._convert_vjoy_remap)
+        self.convert_vjoy_remap_widget.setChecked(self.config.convert_vjoy_remap)
+        self.convert_vjoy_remap_widget.setToolTip("When set, Remap actions will convert to Map To Vjoy when GremlinEx starts.")        
 
         # Activate profile on launch
-        self.convert_response_curve = QtWidgets.QCheckBox("Convert legacy Response Curve")
-        self.convert_response_curve.clicked.connect(self._convert_response_curve)
-        self.convert_response_curve.setChecked(self.config.convert_response_curve)
-        self.convert_response_curve.setToolTip("When set, Response Curve actions will conver to the EX version when GremlinEx starts.")
+        self.convert_response_curve_widget = QtWidgets.QCheckBox("Convert legacy Response Curve")
+        self.convert_response_curve_widget.clicked.connect(self._convert_response_curve)
+        self.convert_response_curve_widget.setChecked(self.config.convert_response_curve)
+        self.convert_response_curve_widget.setToolTip("When set, Response Curve actions will conver to the EX version when GremlinEx starts.")
 
         row = 0
-        self.profile_page_layout.addWidget(self.autoload_checkbox,row,0)
+        self.profile_page_layout.addWidget(self.autoload_profile_widget,row,0)
         row+=1
-        self.profile_page_layout.addWidget(self.keep_active_on_focus_lost_checkbox,row,0)
-        row+=1
-        self.profile_page_layout.addWidget(self.activate_on_process_focus,row,0)
-        row+=1
-        self.profile_page_layout.addWidget(self.activate_on_launch,row,0)
-        row+=1
-        self.profile_page_layout.addWidget(self.activate_restore_mode,row,0)
-        row+=1
-        self.profile_page_layout.addWidget(self.initial_load_mode_tts,row,0)
-        row+=1
-        self.profile_page_layout.addWidget(self.reset_mode_on_process_activate, row, 0)
-        row+=1
-        self.profile_page_layout.addWidget(self.convert_vjoy_remap, row, 0)
-        row+=1
-        self.profile_page_layout.addWidget(self.convert_response_curve, row, 0)
-        row+=1
+        widget, _ = ui_common.getHContainer(self.keep_active_on_focus_lost_widget, "  ")
+        
+        self.profile_page_layout.addWidget(widget,row,0)
 
+        row+=1
+        widget, _ = ui_common.getHContainer(self.activate_on_process_focus_widget, "  ")
+        self.profile_page_layout.addWidget(widget,row,0)
+
+        row+=1
+        widget, _ = ui_common.getHContainer(self.activate_restore_mode_widget, "  ")
+        self.profile_page_layout.addWidget(widget,row,0)
+
+        row+=1
+        widget, _ = ui_common.getHContainer(self.reset_mode_on_process_activate_widget, "  ")
+        self.profile_page_layout.addWidget(widget,row,0)
+
+        row+=1
+        self.profile_page_layout.addWidget(self.activate_on_launch_widget,row,0)
+
+        row+=1
+        self.profile_page_layout.addWidget(self.initial_load_mode_tts_widget,row,0)
+
+        row+=1
+        widget, _ = ui_common.getHContainer(self.rate_widget, "  TTS Playback Rate:")
+        self.profile_page_layout.addWidget(widget,row,0)
+        
+        row+=1
+        self.profile_page_layout.addWidget(self.convert_vjoy_remap_widget, row, 0)
+        row+=1
+        self.profile_page_layout.addWidget(self.convert_response_curve_widget, row, 0)
+        row+=1
+        
+
+        
 
         self.tab_container.addTab(self.profile_page, "Profiles")
+
 
 
         # profile map widgets
@@ -936,6 +962,9 @@ This setting is also available on a profile by profile basis on the profile tab,
         self._profile_mapper.load_profile_map()
         self.populate_map()
 
+        # enable/disable components
+        self._autoload_mapped_profile(self.autoload_profile_widget.isChecked())
+
 
     def _create_hidguardian_page(self):
         self.hg_page = QtWidgets.QWidget()
@@ -1027,6 +1056,15 @@ This setting is also available on a profile by profile basis on the profile tab,
         self.config.highlight_enabled = checked
         self._update_highlight_options()
 
+        
+    @QtCore.Slot()
+    def _rate_changed_cb(self, value):
+        self.config.initial_load_rate_tts = value
+
+    @QtCore.Slot()
+    def _rate_reset_cb(self):
+        self.rate_widget.setValue(100)
+
 
     @QtCore.Slot(bool)
     def _autoload_mapped_profile(self, checked):
@@ -1034,8 +1072,10 @@ This setting is also available on a profile by profile basis on the profile tab,
 
         :param clicked whether or not the checkbox is ticked
         """
-        self.keep_active_on_focus_lost_checkbox.setEnabled(checked)
-        self.activate_on_process_focus.setEnabled(checked)
+        self.keep_active_on_focus_lost_widget.setEnabled(checked)
+        self.activate_on_process_focus_widget.setEnabled(checked)
+        self.activate_restore_mode_widget.setEnabled(checked)
+        self.reset_mode_on_process_activate_widget.setEnabled(checked)
         self.config.autoload_profiles = checked
 
     @QtCore.Slot()
@@ -1783,7 +1823,10 @@ class ProcessWindow(ui_common.BaseDialogUi):
 
     def _browse(self, text = None):
         if not text and self._current_selection_qindex is not None:
-            text = self.list_model.itemData(self._current_selection_qindex)[0]
+            try:
+                text = self.list_model.itemData(self._current_selection_qindex)[0]
+            except:
+                pass
 
         if text and os.path.isfile(text):
             dir = os.path.dirname(text)

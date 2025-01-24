@@ -2749,7 +2749,9 @@ class Profile():
         self.save()
 
     def set_default_start_mode(self, value : str):
-        ''' sets the profile normal start up mode - this will only be used if the startup mode is not overwritten by the last mode - saving a default start mode also resets the last used start mode'''
+        ''' sets the profile normal start up mode - this will only be used if the startup mode is not overwritten by the last mode - saving a default start mode also resets the last used start mode
+            the mode saved here should be the mode dialog default
+        '''
         assert isinstance(value, str)
         self._default_start_mode = value
         self._start_mode = value

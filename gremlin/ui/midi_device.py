@@ -1865,9 +1865,9 @@ class MidiClient(QtCore.QObject):
                 if verbose: syslog.info(f"MIDI: Start")
                 self._start()
             else:
-                syslog.info(f"OSC: Running")
+                syslog.info(f"MIDI: Running")
         else:
-            syslog.info(f"OSC: no OSC mappings found - start skipped")    
+            syslog.info(f"MIDI: no MIDI mappings found - start skipped")    
 
                 
     def registerInput(self, input_item):

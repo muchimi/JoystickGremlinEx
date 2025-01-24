@@ -63,7 +63,7 @@ class ProcessMonitor(QtCore.QObject):
         el = gremlin.event_handler.EventListener()
         el.shutdown.connect(self.stop)
         el.profile_start.connect(self.start)
-        el.profile_stop_toolbar.connect(self.stop) # stop listener only if manual toolbar button clicked
+        #el.profile_stop_toolbar.connect(self.stop) # stop listener only if manual toolbar button clicked
         el.process_monitor_changed.connect(self._check_monitor)
 
 

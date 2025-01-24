@@ -1082,6 +1082,12 @@ class EventListener(QtCore.QObject):
 				)
 
 
+class TTSNotifyData():
+	''' holds TTS data notification '''
+	def __init__(self):
+		self.profile = None
+		self.mode = None
+
 @gremlin.singleton_decorator.SingletonDecorator
 class EventHandler(QtCore.QObject):
 
@@ -1107,8 +1113,7 @@ class EventHandler(QtCore.QObject):
 		QtCore.QObject.__init__(self)
 		self.plugins = {}
 		self._mode_validator_callbacks = {}  # list of validators (callbacks) that return a boolean True if the mode change can occur - signature must be callable(str)->bool
-		self._last_tts_notify = None # last mode that triggered a TTS verbal notice
-		self._last_tts_notify_time = None
+		self._last_tts_data = TTSNotifyData() # last mode that triggered a TTS verbal notice
 		el = gremlin.event_handler.EventListener()
 		el.profile_start.connect(self._profile_start)
 		el.profile_stop.connect(self._profile_stop)
@@ -1582,15 +1587,31 @@ class EventHandler(QtCore.QObject):
 	def _update_mode_change(self, mode):
 		if gremlin.config.Configuration().initial_load_mode_tts:
 			# output verbal notification if requested
-			if not self._last_tts_notify or self._last_tts_notify != mode:
-				if self._last_tts_notify_time is None or time.time() > self._last_tts_notify_time:
-					self._last_tts_notify = mode
-					self._last_tts_notify_time = time.time() + 2 # add 2 seconds to avoid spamming 
+			data = self._last_tts_data
+			profile = gremlin.shared_state.current_profile
+			if data.mode is None or data.profile is None or data.mode != mode or data.profile != profile:
+				self._last_tts_data.mode = mode
+				self._last_tts_data.profile = profile
+				tts = gremlin.tts.TextToSpeech()
+				rate = gremlin.config.Configuration().initial_load_rate_tts
+				tts.speak(f"Mode change to {mode}", rate) # default rate is 100
+
+	def TTSNotify(self, text):
+			''' outputs a notification only if TTS notifications are enabled and the profile/mode is different from the last message issued'''
+			config = gremlin.config.Configuration()
+			if config.initial_load_mode_tts:
+				data = self._last_tts_data
+				profile = gremlin.shared_state.current_profile
+				mode = gremlin.shared_state.current_mode
+				if data.mode is None or data.profile is None or data.mode != mode or data.profile != profile:
+					self._last_tts_data.mode = mode
+					self._last_tts_data.profile = profile
+					rate = config.initial_load_rate_tts
 					tts = gremlin.tts.TextToSpeech()
-					tts.speak(f"Mode change to {mode}", 150) # default rate is 100
+					tts.speak(text, rate) # default rate is 100
 	
 
-	def change_mode(self, new_mode, emit = True, force_update = False):
+	def change_mode(self, new_mode, emit = True, force_update = False, tts = True):
 		"""Changes the GremlinEx currently active mode.
 
 		:param new_mode the new mode to use
@@ -1611,9 +1632,9 @@ class EventHandler(QtCore.QObject):
 
 			if verbose:
 				if is_running:
-					syslog.debug(f"EVENT: (runtime) change mode to [{new_mode}] requested - active mode: [{gremlin.shared_state.runtime_mode}]  current mode: [{gremlin.shared_state.current_mode}] profile '{current_profile.name}'")	
+					syslog.debug(f"CHANGE MODE: (runtime) change mode to [{new_mode}] requested - active mode: [{gremlin.shared_state.runtime_mode}]  current mode: [{gremlin.shared_state.current_mode}] profile '{current_profile.name}'")	
 				else:
-					syslog.debug(f"EVENT: (edit time) change mode to [{new_mode}] requested - active mode: [{gremlin.shared_state.runtime_mode}]  current mode: [{gremlin.shared_state.current_mode}] profile '{current_profile.name}'")
+					syslog.debug(f"CHANGE MODE: (edit time) change mode to [{new_mode}] requested - active mode: [{gremlin.shared_state.runtime_mode}]  current mode: [{gremlin.shared_state.current_mode}] profile '{current_profile.name}'")
 			
 
 
@@ -1652,14 +1673,14 @@ class EventHandler(QtCore.QObject):
 				# verbose = gremlin.config.Configuration().verbose
 				# if verbose:
 				syslog.warning(
-					f"Mode Change Error: The mode \"{new_mode}\" does not exist or has no associated callbacks - profile '{current_profile.name}'"
+					f"CHANGE MODE: Mode Change Error: The mode \"{new_mode}\" does not exist or has no associated callbacks - profile '{current_profile.name}'"
 				)
 				return
 
 			if is_running:
 				# runtime event (prevents UI from reloading)
-				if verbose:
-					syslog.debug(f"EVENT: (runtime) change mode to [{new_mode}] requested - active mode: [{gremlin.shared_state.runtime_mode}]  current mode: [{gremlin.shared_state.current_mode}] profile '{current_profile.name}'")
+				# if verbose:
+				# 	syslog.debug(f"EVENT: (runtime) change mode to [{new_mode}] requested - active mode: [{gremlin.shared_state.runtime_mode}]  current mode: [{gremlin.shared_state.current_mode}] profile '{current_profile.name}'")
 
 
 				if self.runtime_mode != new_mode or force_update:
@@ -1699,7 +1720,7 @@ class EventHandler(QtCore.QObject):
 					
 					result = self.runModeValidator(new_mode)
 					if not result:
-						syslog.warning(f"Profile: {current_profile.name} - mode change request to {new_mode} not authorized by a module - request ignored")
+						syslog.warning(f"CHANGE MODE: {current_profile.name} - mode change request to {new_mode} not authorized by a module - request ignored")
 						return
 
 
@@ -1710,7 +1731,7 @@ class EventHandler(QtCore.QObject):
 					current_profile.set_last_runtime_mode(self.runtime_mode)
 					self.previous_runtime_mode = self.runtime_mode
 					self.runtime_mode = new_mode
-					if verbose: syslog.info(f"Profile: {current_profile.name} - Runtime Mode switch to: {new_mode}")
+					if verbose: syslog.info(f"CHANGE MODE: [{current_profile.name}] - Runtime Mode switch to: {new_mode}")
 					if emit:
 						el.runtime_mode_changed.emit(new_mode)
 

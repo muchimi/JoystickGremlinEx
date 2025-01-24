@@ -120,7 +120,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_BASE = "m68b"
+APPLICATION_BASE = "m68c"
 APPLICATION_VERSION = f"13.40.16ex ({APPLICATION_BASE})"
 
 
@@ -220,6 +220,9 @@ class GremlinUi(QtWidgets.QMainWindow):
         # Process monitor
         self.process_monitor = gremlin.process_monitor.ProcessMonitor()
         self.process_monitor.process_changed.connect(self._process_changed_cb)
+        self.current_process_path = None # current process
+        self._last_tts_notify_time = None # last autoload process change TTS time
+        self._process_change_in_progress = False
 
         # Default path variable before any runtime changes
         self._base_path = list(sys.path)
@@ -2823,148 +2826,225 @@ class GremlinUi(QtWidgets.QMainWindow):
         :param path the path to the currently active process executable
         """
 
+        if self._process_change_in_progress:
+            return
+        
+        self._process_change_in_progress = True
+
         config = gremlin.config.Configuration()
 
-        verbose = gremlin.config.Configuration().verbose_mode_process
+        verbose = config.verbose_mode_process
         syslog = logging.getLogger("system")
 
-        # check options
-        option_auto_load = config.autoload_profiles
-        option_auto_load_on_focus = config.activate_on_process_focus
+        if not self.current_process_path:
+            self.current_process_path = new_process_path
 
-        
+        #  get auto load options
+        option_auto_load = config.autoload_profiles # if true, change the profile if a process is mapped to one, do not activate unless gremlin was already activated
+        option_auto_load_on_focus = config.activate_on_process_focus  # if true, also activate the mapped profile if not activated
         process_base = os.path.basename(new_process_path)
-        if not option_auto_load:
-            if verbose:
-                syslog.info(f"PROC: Process focus change detected: {process_base}  autoload: {option_auto_load}  auto load on focus: {option_auto_load_on_focus}: change profile on process change option is disabled - skipping")
-            return # ignore if not auto loading profiles or auto activating on focus change
 
 
-        if verbose: syslog.info(f"PROC: Process focus change detected: {process_base}  autoload: {option_auto_load}  auto load on focus: {option_auto_load_on_focus} - processing change")
-
-        option_keep_focus = config.keep_profile_active_on_focus_loss
-        option_reset_mode_on_process_activate = config.reset_mode_on_process_activate
-        eh = gremlin.event_handler.EventHandler()
-
-       
-
-        # see if we have a mapping entry for this executable
-        profile_item = self._profile_map.get_map(new_process_path)
-
-        profile_path = profile_item.profile if profile_item else None
-        profile_change = False # assume no profile change
-        #print (f"Profile: {profile_item}")
-        mode = None # assume no mode change needed
+        option_keep_focus = config.keep_profile_active_on_focus_loss # if true, do not deactivate the profile on gremlinEx focus loss
+        option_reset_mode_on_process_activate = config.reset_mode_on_process_activate # if true, reset the profile to the default start mode on process focus
+        option_restore_mode = config.restore_profile_mode_on_start  # if true, restore last used profile mode on process focus (overrides the reset to default mode)
 
 
-        
         if verbose:
-            if profile_path:
-                syslog.info(f"PROC: found profile map [{os.path.basename(profile_path)}] for process {process_base} - current profile: [{self.profile.name}]  runtime mode: [{gremlin.shared_state.runtime_mode}]")
+            syslog.info("="*50)
+            syslog.info(f"PROC: Process change detected: new process: >>>>>> [{process_base}] <<<<<<<")
+            syslog.info(f"\t autoload: [{option_auto_load}]")
+            syslog.info(f"\t autoload on focus: [{option_auto_load}]")
+            syslog.info(f"\t keep focus: [{option_keep_focus}]")
+            syslog.info(f"\t reset to default mode on process activate: [{option_reset_mode_on_process_activate}]")
+            syslog.info(f"\t restore mode on profile start: [{option_restore_mode}]")
+
+        try:
+
+            if not option_auto_load or not option_auto_load_on_focus:
+                # skip if we are not auto starting or auto loading profiles
+                if verbose: syslog.info(f"PROC: Process change detected [{process_base}]: ignoring because auto-load options are disabled")    
+                return
+
+
+
+            eh = gremlin.event_handler.EventHandler()
+
+            current_profile_path = self.profile.profile_file
+        
+            is_running = gremlin.shared_state.is_running # true if gremlin is running at process change
+            if is_running :
+                current_profile_save_mode = gremlin.shared_state.current_mode
             else:
-                syslog.info(f"PROC: no profile mapping found for process [{process_base}]  [full process: {new_process_path.replace("/","\\")}] - current profile: [{self.profile.name}]  runtime mode: [{gremlin.shared_state.runtime_mode}]")
+                current_profile_save_mode = None
+
+            # see if we have a mapping entry for this executable
+            profile_item = self._profile_map.get_map(new_process_path)
+
+            new_profile_path = profile_item.profile if profile_item else None
+
+            if not current_profile_path or not os.path.isfile(current_profile_path):
+                syslog.error("PROC: current profile is not saved - auto process start is unable to function")
+                gremlin.ui.ui_common.MessageBox(prompt = f"Current profile  [{current_profile_path}] is not saved or the XML could not be found.  Process auto-start disabled.")
+                return
+            
+            current_profile_base = os.path.basename(current_profile_path)
+            
+            if not new_profile_path:
+                # no profile was found for the new process that received focus
+                if not option_keep_focus:
+                    # keep focus is off so we disable the profile
+                    if verbose: syslog.info(f"PROC: process change: unmapped process [{process_base}] - keep focus is disabled - deactivate profile")
+                    self.activate(False) # this saves the current profile runtime mode
+                    self.ui.actionActivate.setChecked(False) # this turns "on" the run icon
+                    # done
+                    return
+                if verbose: syslog.info(f"PROC: process change: unmapped process [{process_base}] - ignoring process change")
+                return
+                
+            
+            if not os.path.isfile(new_profile_path):
+                syslog.error(f"PROC: process [{new_process_path}] profile file [{new_profile_path}] not found - ignoring process change")
+                #gremlin.ui.ui_common.MessageBox(prompt = f"New profile [{new_profile_path}] profile XML could not be found.  Process auto-start disabled.")
+                return
+            
+
+            new_profile_base = os.path.basename(new_profile_path)
+            
+            if verbose:
+                    syslog.info(f"PROC: found profile map [{new_profile_base}] for process {process_base} - current profile: [{current_profile_base}]  runtime mode: [{gremlin.shared_state.runtime_mode}]")
 
 
-        if profile_path:
             # profile entry found - see if we need to change profiles
-            profile_base = os.path.basename(profile_path)
-            if not self.profile.profile_file or not os.path.isfile(self.profile.profile_file):
+            if not current_profile_path or not os.path.isfile(current_profile_path):
                 syslog.error("PROC: Profile does not exist or is not saved.  Ignoring process activation as this feature requires the current profile to be saved.")
                 return
-            if not compare_path(self.profile.profile_file, profile_path):
+            
+        
+            eh = gremlin.event_handler.EventHandler()
+            restore_mode = None # derived profile mode to change to
+            mode_changed = False # true if a mode change occured
 
-                # not the same process - change
+            if not compare_path(current_profile_path, new_profile_path):
+                # current profile and new profile are different - swap to the new profile
                 
-                # deactivate any current profile
+                # deactivate any current profile if active
                 if verbose:
-                    base_name = os.path.basename(self.profile.profile_file)
-                    syslog.info(f"PROC: process change: deactivate current profile: [{base_name}] - saving last used mode: [{gremlin.shared_state.runtime_mode}]")
+                    current_base_name = os.path.basename(current_profile_path)
+                    syslog.info(f"PROC: process change: deactivate current profile: [{current_base_name}] - saving last used mode: [{gremlin.shared_state.runtime_mode}]")
 
                 self.activate(False) # this saves the current profile runtime mode
-                self.ui.actionActivate.setChecked(False)
+                self.ui.actionActivate.setChecked(False) # this turns "on" the run icon
 
-                # remember the last mode
-                self._runtime_mode_map[self.profile.profile_file] = gremlin.shared_state.runtime_mode
+                # remember the last used mode for the profile before we change to the new - only do this if we are in runtime
+                if current_profile_save_mode:
+                    if verbose: syslog.info(f"\tSave last used mode: {current_profile_save_mode} for profile [{current_base_name}]")
+                    self._runtime_mode_map[current_profile_path] = current_profile_save_mode
+                    if self.current_process_path:
+                        if verbose: 
+                            base_process_name = os.path.basename(self.current_process_path)
+                            syslog.info(f"\tAssociate last process [{base_process_name}] with mode [{current_profile_save_mode}]")
+                        self._process_runtime_map[self.current_process_path] = current_profile_save_mode
+                else:
+                    if verbose: syslog.info(f"\tSave last used mode: no active mode found for profile [{current_base_name}]")
+
                 self._active_process_path = new_process_path
-                self._process_runtime_map[new_process_path] = gremlin.shared_state.runtime_mode
 
                 # change profile
-                if verbose: syslog.info(f"PROC: process change: determined profile switch needed from [{os.path.basename(self.profile.profile_file)}] ->  [{os.path.basename(profile_path)}]")
-
-                if verbose: syslog.info(f"PROC: process change: save runtime mode  [{gremlin.shared_state.runtime_mode}] for [{os.path.basename(self.profile.profile_file)}]")
-                
+                if verbose: syslog.info(f"PROC: process change: switch profile [{current_base_name}] ->  [{new_profile_base}]")
                 
                 # load the new profile
-                self._do_load_profile(profile_path)
+                self._do_load_profile(new_profile_path)
+
+                loaded_profile = gremlin.shared_state.current_profile
+                self.profile = loaded_profile
+
+                if verbose: syslog.info(f"PROC: process change: loaded profile [{new_profile_base}]")
+
+                if not is_running:
+                    # gremlin was not running at the time of the process change - see if we should auto-activate the profile based on the auto activate option
+                    if not option_auto_load_on_focus:
+                        # activation is not requested - load only,  we're done
+                        if verbose: syslog.info(f"PROC: Profile loaded, activation is not requested and GremlinEx wasn't running at process change.  Process change completed.")
+                        return
+
+                # activate the new profile
+                if verbose: syslog.info(f"PROC: Activate profile [{new_profile_base}]")
                 self.ui.actionActivate.setChecked(True)
                 self.activate(True) # this will also restore the profile runtime mode based on current options
+                
 
-                if verbose: syslog.info(f"PROC: process change: new profile loaded [{os.path.basename(self.profile.profile_file)}]")
+                if verbose: syslog.info(f"PROC: Profile [{new_profile_base}] activated")
+
+                # update flag if a mode should be restored
+                option_restore_mode = option_restore_mode or loaded_profile.get_restore_mode()
 
                 self._profile_auto_activated = True # remember the profile was auto activated by virtue of a process change
-                profile_change = True
+
+                restore_mode = loaded_profile.get_restore_mode()
 
                 # figure out which mode to restore mode for the new profile
-                if verbose:
-                    syslog.info(f"PROC: profile change: [{self.profile.name}] profile restore mode flag: [{self.profile.get_restore_mode()}], global restore mode flag: [{config.restore_profile_mode_on_start}]")
+                if verbose:  syslog.info(f"PROC: profile restore mode flag: [{option_restore_mode}]")
 
+                current_mode = gremlin.shared_state.current_mode # current mode of the loaded profile
 
-            else:
+                if verbose: syslog.info(f"PROC: profile load mode: {current_mode}  derived mode to restore: [{restore_mode}]")
 
-                # same process - find the mode to use
-                mode = self._get_process_mode(new_process_path)
-                if verbose: syslog.info(f"PROC: process focus: [{new_process_path}]")
+                
+                if option_reset_mode_on_process_activate:
+                    # restore only the profile default mode
+                    restore_mode = loaded_profile.get_default_mode()
+                    if verbose: syslog.info(f"PROC: Selected profile default mode [{restore_mode}] from profile mode dialog")
+                elif option_restore_mode:
+                    # restore to the mapped profile default mode defined in mappings
+                    restore_mode = self._get_process_mode(new_process_path)
+                    if verbose and restore_mode: syslog.info(f"PROC: Selected profile default mode [{restore_mode}] from runtime memory")
+                    if not restore_mode:
+                        restore_mode = gremlin.shared_state.current_profile.get_restore_mode() # saved JSON mode
+                        if verbose and restore_mode: syslog.info(f"PROC: Selected profile default mode [{restore_mode}] from profile mode dialog")
+                    if not restore_mode:
+                        restore_mode = gremlin.shared_state.current_profile.get_default_mode()
+                        if verbose: syslog.info(f"PROC: Selected profile default mode [{restore_mode}] from profile mode dialog as a fallback")
 
-            # see if we need to activate the profile
-            if option_auto_load_on_focus:
-                self._profile_auto_activated = True # remember the profile was auto activated by virtue of a process change
-                if verbose: syslog.info(f"PROC: profile focus: [{profile_base}] auto activate - mode [{mode}]")
-                # auto activate
+                # a mapping profile was found - new profile was loaded if needed - see if we need to change the mode
+                if restore_mode is not None:
+                    if restore_mode != current_mode:
+                        if not restore_mode in loaded_profile.get_modes():
+                            syslog.error(f"PROC: Unable to find mode [{restore_mode}] in profile - defaulting to default mode dialog startup mode")
+                            restore_mode = loaded_profile.get_default_mode()
+
+                        
+                        if verbose: syslog.info(f"PROC: request mode change to [{restore_mode}]")
+                        eh.change_mode(restore_mode, force_update = True) # set the selected mode - note that this may fail if mode locking is enabled
+                        mode_changed = True
+
+                # done
+
+            elif option_auto_load_on_focus and not is_running:
+                # re-activate the profile if not activated 
+                if verbose: syslog.info(f"PROC: profile auto-focus ON: profile not activated, auto-activating profile [{new_profile_base}] ")
                 self.ui.actionActivate.setChecked(True)
                 self.activate(True)
+                self._profile_auto_activated = True
 
 
-                option_restore_mode = config.restore_profile_mode_on_start or gremlin.shared_state.current_profile.get_restore_mode()
-                if option_restore_mode:
-                    # get the mode to restore
-                    mode = self._get_process_mode(new_process_path)
-                    if verbose: syslog.info(f"PROC: profile focus: [{profile_base}] restore last mode: [{mode}] ")
+            
+            if not mode_changed:
+                # if TTS is enabled and the process changed, issue a TTS message when the mode was not changed so we hear there was a change recorded in focus
+                eh.TTSNotify(f"Process focus mode {restore_mode}")
 
 
-            # a mapping profile was found - new profile was loaded if needed - see if we need to change the mode
-            reset_mode = (profile_change or option_reset_mode_on_process_activate and profile_item.default_mode)
-            # print (f"reset mode: {reset_mode}  reset on activate: {option_reset_mode_on_process_activate}  profile mode: '{profile_item.default_mode}'  current mode: '{self.current_mode}'")
-            if not mode and reset_mode:
-                # use the default mode specified in the process mapping when changing profiles
-                mode = profile_item.default_mode
-                if verbose:
-                    syslog.info(f"PROC: profile mode check: [{os.path.basename(profile_path)}] using mode: [{mode}] ")
+            # remember the last process that received focus        
+            self.current_process_path = new_process_path
+        finally:
+            if verbose: 
+                if gremlin.shared_state.current_profile.profile_file:
+                    base_profile = os.path.basename(gremlin.shared_state.current_profile.profile_file)
+                else:
+                    current_base_name= "Not Saved"
+                syslog.info(f"PROC: END Process change detected: process: >>>>>> [{process_base}] <<<<<<<  final profile: [{base_profile}] mode: [{gremlin.shared_state.current_mode}]")
 
-            # see if the profile activation has a new mapping
-            if mode is None or not mode in self.profile.get_modes():
-                # restore the profile's default mode on activation
-                default_mode = self.profile.get_default_mode()
-                if verbose:
-                    logging.getLogger("system").info(f"PROC: profile mode check: [{os.path.basename(profile_path)}]  mode [{mode}] was not found, restoring default mode: [{default_mode}] ")
-                mode = default_mode
-
-            if mode is not None:
-                eh = gremlin.event_handler.EventHandler()
-                if verbose:
-                    logging.getLogger("system").info(f"PROC: profile mode check: [{os.path.basename(profile_path)}]  change mode change to: '{mode}' ")
-                eh.change_mode(mode, force_update = True) # set the selected mode - note that this may fail if mode locking is enabled
-
-
-
-        elif self._profile_auto_activated and not option_keep_focus:
-            # deactivate the profile if it was autoloaded
-            self.ui.actionActivate.setChecked(False)
-            self.activate(False)
-            self._profile_auto_activated = False
-            if verbose:
-                current_profile = gremlin.shared_state.current_profile
-                if current_profile:
-                    logging.getLogger("system").info(f"PROC: keep focus not set - deactivated profile {current_profile.name}")
+            self._process_change_in_progress = False
 
     def _tray_icon_activated_cb(self, reason):
         """Callback triggered by clicking on the system tray icon.
@@ -3514,8 +3594,14 @@ class GremlinUi(QtWidgets.QMainWindow):
         if self._active_process_path:
             verbose = gremlin.config.Configuration().verbose_mode_process
             syslog = logging.getLogger("system")
-            if verbose: syslog.info(f"PROC: process change: save new active runtime mode [{mode}] for [{os.path.basename(self.profile.profile_file)}] process: [{self._active_process_path}]")
+            
+            if verbose:
+                base_name = os.path.basename(self._active_process_path)
+                base_profile = os.path.basename(self.profile.profile_file)
+                syslog.info(f"PROC: save runtime mode process: [{base_name}] mode [{mode}] profile [{base_profile}]")
             self._process_runtime_map[self._active_process_path] = mode
+            # save to JSON as well
+            self.profile.set_last_runtime_mode(mode)
 
         self._update_mode_status_bar()
 

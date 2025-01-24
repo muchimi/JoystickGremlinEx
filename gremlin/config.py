@@ -290,6 +290,17 @@ class Configuration:
         self._data["initial_load_mode_tts"] = value
         self.save()
 
+
+    @property
+    def initial_load_rate_tts(self):
+        ''' if set, JGEX outputs a verbal readout of the current playback rate on profile load '''
+        return self._data.get("initial_load_rate_tts", 100)
+    
+    @initial_load_rate_tts.setter
+    def initial_load_rate_tts(self, value):
+        self._data["initial_load_rate_tts"] = value
+        self.save()        
+
     @property
     def runtime_ui_update(self):
         ''' if set, JGEX will update the UI when a profile is activated '''

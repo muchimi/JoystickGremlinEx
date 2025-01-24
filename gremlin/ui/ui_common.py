@@ -518,45 +518,46 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
     '''
 
 
-    class FloatValidator(QtGui.QValidator):
-        def __init__(self, bottom : float, top : float):
-            super().__init__()
-            self._bottom = bottom
-            self._top = top
+    # class FloatValidator(QtGui.QValidator):
+    #     def __init__(self, bottom : float, top : float):
+    #         super().__init__()
+    #         self._bottom = bottom
+    #         self._top = top
 
-        @property
-        def bottom(self):
-            return self._bottom
-        @bottom.setter
-        def bottom(self, value):
-            self._bottom = value
-        @property
-        def top(self):
-            return self._top
-        @top.setter
-        def top(self, value):
-            self._top = value
+    #     @property
+    #     def bottom(self):
+    #         return self._bottom
+    #     @bottom.setter
+    #     def bottom(self, value):
+    #         self._bottom = value
+    #     @property
+    #     def top(self):
+    #         return self._top
+    #     @top.setter
+    #     def top(self, value):
+    #         self._top = value
 
-        def setBottom(self, value):
-            self._bottom = value
+    #     def setBottom(self, value):
+    #         self._bottom = value
 
-        def setTop(self, value):
-            self._top = value
+    #     def setTop(self, value):
+    #         self._top = value
         
 
-        def validate(self, text, pos):
-            if text:
-                try:
-                    if text.isnumeric():
-                        value = float(text)
-                        if value >= self._bottom and value <= self._top:
-                            return QtGui.QValidator.Acceptable
-                    return QtGui.QValidator.Intermediate, text, pos            
-                except:
-                    pass
-            return QtGui.QValidator.Invalid, text, pos
+    #     def validate(self, text, pos):
+    #         if text:
+    #             try:
+    #                 if text.isnumeric():
+    #                     value = float(text)
+    #                     if value >= self._bottom and value <= self._top:
+    #                         return QtGui.QValidator.Acceptable
+    #                 return QtGui.QValidator.Intermediate, text, pos            
+    #             except:
+    #                 pass
+    #         return QtGui.QValidator.Invalid, text, pos
 
     valueChanged = QtCore.Signal(float) # fires when the value changes
+    doubleClick = QtCore.Signal() # fires when the input is double clicked
 
     def __init__(self, data = None, min_range = -1.0, max_range = 1.0, decimals = 3, step = 0.01, value = 0.0, chars = 8, parent = None):
         super().__init__(parent)
@@ -565,9 +566,10 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
         self._step = step
         self._decimals = decimals
 
-        self._validator = QFloatLineEdit.FloatValidator(bottom=min_range, top=max_range) # QtGui.QDoubleValidator(bottom=min_range, top=max_range)
+        #self._validator = QFloatLineEdit.FloatValidator(bottom=min_range, top=max_range)
+        self._validator = QtGui.QDoubleValidator(bottom=min_range, top=max_range)
         self._validator.setLocale(self.locale()) # handle correct floating point separator
-        #self._validator.setNotation(QtGui.QDoubleValidator.Notation.StandardNotation)
+        self._validator.setNotation(QtGui.QDoubleValidator.Notation.StandardNotation)
         self.setValidator(self._validator)
         self.textChanged.connect(self._validate)
         self.installEventFilter(self)
@@ -630,6 +632,8 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
                 return True # skip the event
             # format the input to the correct decimals
             self.setValue(self.value())
+        elif t == QtCore.QEvent.Type.MouseButtonDblClick:
+            self.doubleClick.emit()
         return False
 
 
@@ -766,6 +770,7 @@ class QIntLineEdit(QtWidgets.QLineEdit):
             return QtGui.QValidator.Invalid, text, pos
 
     valueChanged = QtCore.Signal(float) # fires when the value changes
+    doubleClick = QtCore.Signal() # fires when the input is double clicked
 
     def __init__(self, data = None, min_range = -16383, max_range = 16384, step = 1, value = 0, chars = 8, parent = None):
         super().__init__(parent)
@@ -843,6 +848,8 @@ class QIntLineEdit(QtWidgets.QLineEdit):
                 return True # skip the event
             # format the input to the correct decimals
             self.setValue(self.value())
+        elif t == QtCore.QEvent.Type.MouseButtonDblClick:
+            self.doubleClick.emit()
         return False
 
 
@@ -855,7 +862,7 @@ class QIntLineEdit(QtWidgets.QLineEdit):
         if s_value != self.text():
             self.setText(s_value)
         if other is not None and other != value:
-            self.valueChanged.emit(value)
+            self.valueChanged.emit(int(value))
 
 
 
@@ -5185,4 +5192,46 @@ class QTabHeader(QtWidgets.QTabBar):
         return False # allow further processing
 
    
+def getHContainer(widget_or_list = None, label = None):
+    ''' gets a qt H container widget '''
+    widget = QtWidgets.QWidget()
+    layout = QtWidgets.QHBoxLayout(widget)
+    widget.setContentsMargins(0,0,0,0)
+    layout.setContentsMargins(0,0,0,0)
+    stretch = False
+    if label:
+        layout.addWidget(QtWidgets.QLabel(label))
+        stretch = True
+    if widget_or_list:
+        if isinstance(widget_or_list, list):
+            for item in widget_or_list:
+                layout.addWidget(item)
+        else:
+            layout.addWidget(widget_or_list)
+        stretch = True
+    if stretch:
+        layout.addStretch()
+    return (widget, layout)
+    
+
+def getVContainer(widget_or_list = None, label = None):
+    ''' gets a qt H container widget '''
+    widget = QtWidgets.QWidget()
+    layout = QtWidgets.QVBoxLayout(widget)
+    widget.setContentsMargins(0,0,0,0)
+    layout.setContentsMargins(0,0,0,0)
+    stretch = False
+    if label:
+        layout.addWidget(QtWidgets.QLabel(label))
+        stretch = True
+    if widget_or_list:
+        if isinstance(widget_or_list, list):
+            for item in widget_or_list:
+                layout.addWidget(item)
+        else:
+            layout.addWidget(widget_or_list)
+        stretch = True
+    if stretch:
+        layout.addStretch()
+    return (widget, layout)
     

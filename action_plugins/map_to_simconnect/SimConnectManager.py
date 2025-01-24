@@ -464,8 +464,8 @@ class SimConnectManager(QtCore.QObject):
 
         el = gremlin.event_handler.EventListener()
         el.shutdown.connect(self._shutdown) # trap application shutdown
-        el.abort.connect(self._shutdown) # trap abort
-        el.profile_stop.connect(self._shutdown) # trap profile stop
+        el.abort.connect(self._abort) # trap abort
+        el.profile_stop.connect(self._profile_stop) # trap profile stop
         el.profile_start.connect(self.reconnect) # trap profile start
 
         self.verbose = gremlin.config.Configuration().verbose_mode_simconnect
@@ -558,15 +558,25 @@ class SimConnectManager(QtCore.QObject):
 
     @QtCore.Slot()
     def _shutdown(self):
-        ''' application shutdown '''
+        self._stop()
+        syslog.info("SIMCONNECT: shutdown")
+        
+    @QtCore.Slot()
+    def _profile_stop(self):
+        self._stop()
+        syslog.info("SIMCONNECT: stop")
 
+    @QtCore.Slot()
+    def _abort(self):
+        self._stop()
+        syslog.info("SIMCONNECT: abort")
+                
+
+    def _stop(self):
         self.bridge.stop()
         self._bridge_alive = False
-
-        syslog.info("SIMCONNECT: shutdown")
         self.sim_disconnect()
         self._abort = True
-
 
 
     def load_internal(self):
