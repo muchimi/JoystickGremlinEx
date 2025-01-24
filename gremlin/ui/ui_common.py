@@ -799,6 +799,7 @@ class QIntLineEdit(QtWidgets.QLineEdit):
     @property
     def chars(self) -> int:
         return self._chars
+    
     @chars.setter
     def chars(self, value : int):
         if value > 0 and value != self._chars:
@@ -858,7 +859,7 @@ class QIntLineEdit(QtWidgets.QLineEdit):
 
         if value is None and other is None:
             return
-        s_value = str(value)
+        s_value = str(int(value))
         if s_value != self.text():
             self.setText(s_value)
         if other is not None and other != value:

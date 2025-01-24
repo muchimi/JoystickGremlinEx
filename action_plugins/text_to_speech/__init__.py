@@ -82,7 +82,7 @@ class TextToSpeechWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.container_layout.addWidget(QtWidgets.QLabel("Volume:"))
         self.container_layout.addWidget(self.volume_widget)
 
-        self.container_layout.addWidget(QtWidgets.QLabel("Playback rate:"))
+        self.container_layout.addWidget(QtWidgets.QLabel("Playback rate (wpm):"))
         self.container_layout.addWidget(self.rate_widget)
 
         self.container_layout.addWidget(self.play_widget)
@@ -254,11 +254,13 @@ class TextToSpeech(gremlin.base_profile.AbstractAction):
         if "volume" in node.attrib:
             self.volume = int(node.get("volume"))
         else:
-            self.volume = 50
+            self.volume = 50 # default
+        self.volume =gremlin.util.clamp(self.volume, 0, 100)    
         if "rate" in node.attrib:
             self.rate = int(node.get("rate"))
-        else:
-            self.rate = 0
+        if self.rate == 0:
+            self.rate = 100 # default
+        self.rate =gremlin.util.clamp(self.rate, tts.rate_offset_min, tts.rate_offset_max)
         if "text" in node.attrib:
             self.text = node.get("text")
             pass
@@ -269,7 +271,7 @@ class TextToSpeech(gremlin.base_profile.AbstractAction):
         node.set("voice_id", str(self.voice_index))
         node.set("text", self.text)
         node.set("volume",str(self.volume))
-        node.set("rate",str(self.rate))
+        node.set("rate",str(int(self.rate)))
         return node
 
     def _is_valid(self):

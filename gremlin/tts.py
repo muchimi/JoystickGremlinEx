@@ -38,7 +38,7 @@ class TextToSpeech:
 
     rate_playback = 100 # default playback rate
     rate_offset_min = 50 # max slow
-    rate_offset_max = 200 # max fast
+    rate_offset_max = 300 # max fast
 
     def __init__(self):
         """Creates a new instance."""
