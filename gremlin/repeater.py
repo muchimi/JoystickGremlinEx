@@ -169,8 +169,11 @@ class Repeater(QtCore.QObject):
         if event.event_type == common.InputType.JoystickButton:
             event.is_pressed = False
         elif event.event_type == common.InputType.JoystickAxis:
-            event.value = \
-                input_devices.JoystickInputSignificant().last_event(event).value
+            last_event = input_devices.JoystickInputSignificant().last_event(event)
+            if last_event:
+                event.value = last_event(event).value
+            else:
+                return
         elif event.event_type == common.InputType.JoystickHat:
             event.value = (0, 0)
         el.joystick_event.emit(event)

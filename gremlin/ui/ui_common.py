@@ -53,7 +53,7 @@ import gremlin.util
 import gremlin.ui.ui_common
 from gremlin.singleton_decorator import SingletonDecorator
 from gremlin.types import HatDirection
-
+from dinput import DeviceSummary
 
 class WidgetTracker():
 
@@ -2767,9 +2767,13 @@ class AxisStateWidget(QtWidgets.QWidget):
 
     """Visualizes the current state of an axis."""
 
-    css_vertical = r"QProgressBar::chunk {background: QLinearGradient( x1: 0, y1: 0, x2: 1, y2: 0,stop: 0 #78d,stop: 0.4999 #46a,stop: 0.5 #45a,stop: 1 #238 ); border-radius: 7px; border: 1px solid black;}"
+
+
+    #css_vertical = r"QProgressBar::chunk {background: QLinearGradient( x1: 0, y1: 0, x2: 1, y2: 0,stop: 0 #78d,stop: 0.4999 #46a,stop: 0.5 #45a,stop: 1 #238 ); border-radius: 7px; border: 1px solid black;}"
+    css_vertical = r"QProgressBar::chunk {background: QLinearGradient( x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #69e060, stop: 1 #1f8c33 ); border-radius: 7px; border: 1px solid black;}"
     #css_horizontal = r"QProgressBar::chunk {background: QLinearGradient( x1: 0, y1: 0, x2: 0, y2: 1,stop: 0 #78d,stop: 0.4999 #46a,stop: 0.5 #45a,stop: 1 #238 ); border-radius: 7px; border: 1px solid black;}"
-    css_horizontal = r"QProgressBar::chunk {background: QLinearGradient( x1: 0, y1: 0, x2: 0, y2: 1,stop: 0 #77a ,stop: 0.4999 #477,stop: 0.5 #45a,stop: 1 #238 ); border-radius: 7px; border: 1px solid black;}"
+    #css_horizontal = r"QProgressBar::chunk {background: QLinearGradient( x1: 0, y1: 0, x2: 0, y2: 1,stop: 0 #77a ,stop: 0.4999 #477,stop: 0.5 #45a,stop: 1 #238 ); border-radius: 7px; border: 1px solid black;}"
+    css_horizontal = r"QProgressBar::chunk {background: QLinearGradient( x1: 0, y1: 0, x2: 1, y2: 0,stop: 0 #69e060 stop: 1 #1f8c33 ); border-radius: 7px; border: 1px solid black;}"
 
     valueChanged = QtCore.Signal(float, float) # (input_value, curved_value)
     deleted = QtCore.Signal(object) # indicates the item is being deleted
@@ -2785,7 +2789,7 @@ class AxisStateWidget(QtWidgets.QWidget):
         self._joystick_hooked = False # true if joystick input is directly hooked to this widget 
         self._scale_factor = 1000
         if orientation == QtCore.Qt.Orientation.Vertical:
-            self.main_layout = QtWidgets.QVBoxLayout(self)
+            self.main_layout = QtWidgets.QGridLayout(self)
         else:
             self.main_layout = QtWidgets.QHBoxLayout(self)
             
@@ -2805,18 +2809,29 @@ class AxisStateWidget(QtWidgets.QWidget):
         self._show_label = show_label
         self._show_curved = show_curve
 
-        self._readout_widget = QtWidgets.QLabel()
-        self._readout_curved_widget = QtWidgets.QLabel()
+
+        # if orientation == QtCore.Qt.Orientation.Vertical:
+            
+        self._readout_widget = QtWidgets.QWidget()
+        self._readout_layout = QtWidgets.QVBoxLayout(self._readout_widget)
+
 
         self._label_widget = QtWidgets.QLabel()
         
         if axis_id:
             self.setLabel(f"Axis {axis_id}")
 
-        self.main_layout.addWidget(self._label_widget)
-        self.main_layout.addWidget(self._progress_widget)
-        self.main_layout.addWidget(self._readout_widget)
-        self.main_layout.addWidget(self._readout_curved_widget)
+
+        if orientation == QtCore.Qt.Orientation.Vertical:
+            self.main_layout.addWidget(self._label_widget,0,0, alignment=QtCore.Qt.AlignCenter)
+            self.main_layout.addWidget(self._progress_widget,1,0, alignment=QtCore.Qt.AlignCenter)
+            self.main_layout.addWidget(self._readout_widget,2,0, alignment=QtCore.Qt.AlignCenter)
+            
+        else:
+            self.main_layout.addWidget(self._label_widget)
+            self.main_layout.addWidget(self._progress_widget)
+            self.main_layout.addWidget(self._readout_widget)
+
 
 
 
@@ -2951,35 +2966,40 @@ class AxisStateWidget(QtWidgets.QWidget):
         scaled_value = self._scale_factor * display_value
         self._progress_widget.setValue(scaled_value)
         self._progress_widget.update()
-        readout = ""
-        readout_curved = ""
+        readout_list = []
         if self._show_value:
-            readout = f"{value:+0.3f}"
-            readout_curved = f"C{curve_value:+0.3f}" if curve_visible else ""
+            readout_list.append(f"{value:+0.3f}")
+            if curve_visible:
+                readout_list.append(f"C{curve_value:+0.3f}")
         if self._show_percentage:
             if percent_value is None:
                 if curve_value is None:
-                    percent = int(round(100 * value / (self._max_range - self._min_range)))
+                    percent = gremlin.util.scale_to_range(value, target_min=0, target_max = 100)
                 else:
-                    percent = int(round(100 * curve_value / (self._max_range - self._min_range)))
+                    percent = gremlin.util.scale_to_range(curve_value, target_min=0, target_max = 100)
             else:
                 percent = percent_value
-
-            if readout:
-                readout += " "
-            readout += f"{percent:0.3f} %"
+            readout_list.append(f"{int(percent)} %")
 
         if other_value is not None:
-            if readout:
-                readout += " "
-            readout += f"{other_value}"
+            readout_list.append(f"{other_value}")
 
 
-        self._readout_widget.setText(readout)
-        if curve_visible:
-            self._readout_curved_widget.setText(readout_curved)
+        clear_layout(self._readout_layout)
+
+        widget_list = [QtWidgets.QLabel(text) for text in readout_list]
+        if self._orientation == QtCore.Qt.Orientation.Vertical:
+            widget = QtWidgets.QWidget()
+            layout = QtWidgets.QGridLayout(widget)
+            widget.setMinimumWidth(80)
+            row = 0
+            for w in widget_list:
+                layout.addWidget(w, row, 0, alignment = QtCore.Qt.AlignCenter)
+                row +=1
+            self._readout_layout.addWidget(widget, alignment = QtCore.Qt.AlignCenter)
         else:
-            self._readout_curved_widget.setText("")
+            widget, _ = getHContainer(widget_list)
+            self._readout_layout.addWidget(widget)
 
         self.valueChanged.emit(self._value, self._curve_value)
 
@@ -3176,7 +3196,7 @@ class AxesCurrentState(QtWidgets.QGroupBox):
 
     """Displays the current state of all axes on a device."""
 
-    def __init__(self, device, parent=None):
+    def __init__(self, device : DeviceSummary, parent=None):
         """Creates a new instance.
 
         :param device the device of which to display the axes sate
@@ -3194,7 +3214,8 @@ class AxesCurrentState(QtWidgets.QGroupBox):
         axes_layout = QtWidgets.QHBoxLayout()
         for i in device.axis_index_list(): #range(device.axis_count):
             axis = AxisStateWidget(i)
-            axis.setValue(0.0)
+            value = gremlin.joystick_handling.get_axis(device.device_guid, i)
+            axis.setValue(value)
             self.axes.append(axis)
             axes_layout.addWidget(axis)
         axes_layout.addStretch()
@@ -3267,10 +3288,10 @@ class HatWidget(QtWidgets.QWidget):
         # Define pens and brushes
         pen_default = QtGui.QPen(QtGui.QColor("#8f8f91"))
         pen_default.setWidth(2)
-        pen_active = QtGui.QPen(QtGui.QColor("#661714"))
+        pen_active = QtGui.QPen(QtGui.QColor("#1f8c33"))
         pen_active.setWidth(2)
         brush_default = QtGui.QBrush(QtGui.QColor("#f6f7fa"))
-        brush_active = QtGui.QBrush(QtGui.QColor("#b22823"))
+        brush_active = QtGui.QBrush(QtGui.QColor("#69e060"))
 
         # Prepare painter instance
         p = QtGui.QPainter(self)
@@ -3350,7 +3371,7 @@ class AxesTimeline(QtWidgets.QGroupBox):
         3: "#4daf4a",
         4: "#984ea3",
         5: "#ff7f00",
-        6: "#8a8a2c",
+        6: "#73732f", # yellow
         7: "#a65628",
         8: "#f781bf"
     }
@@ -3400,14 +3421,14 @@ class TimeLinePlotWidget(QtWidgets.QWidget):
 
     # Pre-defined colors for eight time series
     pens = {
-        1: QtGui.QPen(QtGui.QColor("#e41a1c")),
-        2: QtGui.QPen(QtGui.QColor("#377eb8")),
-        3: QtGui.QPen(QtGui.QColor("#4daf4a")),
-        4: QtGui.QPen(QtGui.QColor("#984ea3")),
-        5: QtGui.QPen(QtGui.QColor("#ff7f00")),
-        6: QtGui.QPen(QtGui.QColor("#ffff33")),
-        7: QtGui.QPen(QtGui.QColor("#a65628")),
-        8: QtGui.QPen(QtGui.QColor("#f781bf")),
+        1: QtGui.QPen(QtGui.QColor("#e41a1c"), 2),
+        2: QtGui.QPen(QtGui.QColor("#377eb8"), 2),
+        3: QtGui.QPen(QtGui.QColor("#4daf4a"), 2),
+        4: QtGui.QPen(QtGui.QColor("#984ea3"), 2),
+        5: QtGui.QPen(QtGui.QColor("#ff7f00"), 2),
+        6: QtGui.QPen(QtGui.QColor("#ffff33"), 2),
+        7: QtGui.QPen(QtGui.QColor("#a65628"), 2),
+        8: QtGui.QPen(QtGui.QColor("#f781bf"), 2),
     }
     for pen in pens.values():
         pen.setWidth(2)
@@ -3544,7 +3565,7 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
 
     """ joystick visualization widget  """
 
-    def __init__(self, device_data, vis_type, parent=None):
+    def __init__(self, device_data : DeviceSummary, vis_type, parent=None):
         """Creates a new instance.
 
         :param device_data information about the device itself
@@ -3570,6 +3591,10 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
         elif vis_type == gremlin.types.VisualizationType.AxisTemporal:
             self._create_temporal_axis()
             el.joystick_event.connect(self._temporal_axis_update)
+            for widget in self.widgets:
+                for i in device_data.axis_index_list():
+                    value = gremlin.joystick_handling.get_axis(self.device_guid, i)
+                    widget.add_point(value, i)
         elif vis_type == gremlin.types.VisualizationType.ButtonHat:
             self._create_button_hat()
             el.joystick_event.connect(self._button_hat_update)
@@ -3658,7 +3683,7 @@ class ButtonState(QtWidgets.QGroupBox):
 
         QPushButton:pressed {
             background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
-                                              stop: 0 #e5342d, stop: 1 #b22823);
+                                              stop: 0 #b0ebb0, stop: 1 #456e45);
             border-color: #661714;
         }
 
@@ -3672,7 +3697,7 @@ class ButtonState(QtWidgets.QGroupBox):
         }
         """
 
-    def __init__(self, device, parent=None):
+    def __init__(self, device : DeviceSummary, parent=None):
         """Creates a new instance.
 
         :param device the device of which to display the button sate
@@ -3693,10 +3718,15 @@ class ButtonState(QtWidgets.QGroupBox):
             btn = QtWidgets.QPushButton(str(i+1))
             btn.setStyleSheet(ButtonState.style_sheet)
             btn.setDisabled(True)
+            # read the current state
+            is_pressed = gremlin.joystick_handling.get_button(device.device_guid, i+1)
+            btn.setDown(is_pressed)
             self.buttons.append(btn)
             button_layout.addWidget(btn, int(i / 10), int(i % 10))
         button_layout.setColumnStretch(10, 1)
         self.setLayout(button_layout)
+
+        
 
     def process_event(self, event):
         """Updates state visualization based on the given event.
@@ -5204,7 +5234,7 @@ def getHContainer(widget_or_list = None, label = None):
         layout.addWidget(QtWidgets.QLabel(label))
         stretch = True
     if widget_or_list:
-        if isinstance(widget_or_list, list):
+        if isinstance(widget_or_list, list)  or isinstance(widget_or_list, tuple):
             for item in widget_or_list:
                 layout.addWidget(item)
         else:
@@ -5215,18 +5245,21 @@ def getHContainer(widget_or_list = None, label = None):
     return (widget, layout)
     
 
-def getVContainer(widget_or_list = None, label = None):
+def getVContainer(widget_or_list = None, label = None, alignment = None):
     ''' gets a qt H container widget '''
     widget = QtWidgets.QWidget()
     layout = QtWidgets.QVBoxLayout(widget)
     widget.setContentsMargins(0,0,0,0)
     layout.setContentsMargins(0,0,0,0)
+    if alignment is not None:
+        layout.setAlignment(widget, alignment)
     stretch = False
     if label:
         layout.addWidget(QtWidgets.QLabel(label))
+        
         stretch = True
     if widget_or_list:
-        if isinstance(widget_or_list, list):
+        if isinstance(widget_or_list, list)  or isinstance(widget_or_list, tuple):
             for item in widget_or_list:
                 layout.addWidget(item)
         else:

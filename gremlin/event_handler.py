@@ -430,7 +430,7 @@ class EventListener(QtCore.QObject):
 
 	# toggle highlighting mode
 	toggle_highlight = QtCore.Signal(object, object, object) # param (axis,button)
-
+	
 	# heartbeat
 	heartbeat = QtCore.Signal() # ticks every 30 seconds
 

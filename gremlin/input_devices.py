@@ -1872,7 +1872,7 @@ class JoystickInputSignificant:
             True if the event should be processed, False otherwise
         """
         from gremlin.input_types import InputType
-        self._mre_registry[event] = event
+        self._mre_registry[event.callbackKey] = event
 
         if event.event_type == InputType.JoystickAxis:
             return self._process_axis(event, deviation)
@@ -1895,8 +1895,9 @@ class JoystickInputSignificant:
         Returns:
             Latest event instance corresponding to the specified event
         """
-        if event in self._mre_registry:
-            return self._mre_registry[event]
+        key = event.callbackKey
+        if key in self._mre_registry:
+            return self._mre_registry[key]
         return None
 
     def reset(self) -> None:

@@ -120,7 +120,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_BASE = "m68c"
+APPLICATION_BASE = "m69"
 APPLICATION_VERSION = f"13.40.16ex ({APPLICATION_BASE})"
 
 
@@ -210,7 +210,6 @@ class GremlinUi(QtWidgets.QMainWindow):
         self._button_highlighting_enabled = self.config.highlight_input_buttons # true if highlighting on buttons
         self._axis_highlighting_enabled = self.config.highlight_input_axis  # true if highligthing on axes
         self._input_highlighting_enabled = self.config.highlight_enabled  # on/off global
-        self._input_highlight_stack = 1 # push stack for enable/disable (start disabled)
         self._last_highlight_key = None    # last event processed for input highlights
         el.toggle_highlight.connect(self._handle_highlight_state) # input highlighting states
         el.ui_ready.connect(self._ui_ready)
@@ -490,7 +489,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         if not is_pressed:
             # trigger only on presses
             return
-        if self._input_highlight_stack > 0:
+        if gremlin.shared_state.is_highlighting_suspended:
             # highlighting disabled
             return
         is_button = self.is_button_highlighting
@@ -526,9 +525,9 @@ class GremlinUi(QtWidgets.QMainWindow):
 
 
         self._last_input_timestamp = time.time()
-        if self._input_highlight_stack > 0:
-            # highlighting disabled
+        if gremlin.shared_state.is_highlighting_suspended:
             return
+        
         is_axis = self.is_axis_highlighting
         if not is_axis:
             # highlight disabled
@@ -3041,7 +3040,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                 if gremlin.shared_state.current_profile.profile_file:
                     base_profile = os.path.basename(gremlin.shared_state.current_profile.profile_file)
                 else:
-                    current_base_name= "Not Saved"
+                    base_profile= "Not Saved"
                 syslog.info(f"PROC: END Process change detected: process: >>>>>> [{process_base}] <<<<<<<  final profile: [{base_profile}] mode: [{gremlin.shared_state.current_mode}]")
 
             self._process_change_in_progress = False
@@ -3629,7 +3628,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         :param is_enabled if True the input highlighting is enabled and
             disabled otherwise
         """
-        self._input_highlighting_enabled = is_enabled
+        self.config.highlight_enabled = is_enabled   
+        
 
 
     def _set_joystick_input_buttons_highlighting(self, is_enabled):
@@ -3721,11 +3721,6 @@ class GremlinUi(QtWidgets.QMainWindow):
     @property
     def is_autoswitch_highlighting(self) -> bool:
         ''' true if tab switch highlighting is enabled '''
-        if not self.config.highlight_enabled:
-            return False
-        if self._input_highlight_stack > 0:
-            # suspended
-            return False
         if gremlin.shared_state.is_highlighting_suspended():
             # skip if highlighting is currently suspended
             return False
@@ -3734,14 +3729,12 @@ class GremlinUi(QtWidgets.QMainWindow):
 
     def push_highlighting(self):
         ''' disables the highlighting of devices '''
-        self._input_highlight_stack +=1
+        gremlin.shared_state.push_suspend_highlighting()
+        
 
     def pop_highlighting(self, reset = False):
         ''' enables the highlighting of devices '''
-        if reset:
-            self._input_highlight_stack = 0
-        elif self._input_highlight_stack > 0:
-            self._input_highlight_stack -=1
+        gremlin.shared_state.pop_suspend_highlighting(reset)
 
 
 

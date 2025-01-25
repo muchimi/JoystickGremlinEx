@@ -22,9 +22,11 @@ from lxml import etree as ElementTree
 
 import gremlin.base_profile
 from gremlin.input_types import InputType
+import gremlin.shared_state
 import gremlin.ui.input_item
 import gremlin.gated_handler
 import gremlin.shared_state
+import logging
 
 class GatedAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
 
@@ -121,9 +123,13 @@ class GatedAxis(gremlin.base_profile.AbstractAction):
     def _parse_xml(self, node, data = None):
         # load gate data
         import gremlin.util
+        
         gates = []
         gate_node = gremlin.util.get_xml_child(node,"gates")
         profile_mode = gremlin.util.get_xml_mode(node)
+        if not profile_mode:
+            # paste operation
+            profile_mode = gremlin.shared_state.current_mode
         if not gate_node is None:
             for child in gate_node:
                 gate_data = gremlin.gated_handler.GateData(profile_mode, action_data = self)

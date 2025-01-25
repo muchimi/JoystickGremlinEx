@@ -267,10 +267,22 @@ class MacroActionEditor(QtWidgets.QWidget):
         self.ui_elements["key_press"].toggled.connect(self._modify_key_state)
         self.ui_elements["key_release"].toggled.connect(self._modify_key_state)
 
+        self.ui_elements["key_add_press"] = gremlin.ui.ui_common.QDataPushButton("Add Press", data = action)
+        self.ui_elements["key_add_press"].clicked.connect(self._add_key_press)
+        
+        self.ui_elements["key_add_release"] = gremlin.ui.ui_common.QDataPushButton("Add Release", data = action)
+        self.ui_elements["key_add_release"].clicked.connect(self._add_key_release)
+
         self.action_layout.addWidget(self.ui_elements["key_label"])
         self.action_layout.addWidget(self.ui_elements["key_input"])
         self.action_layout.addWidget(self.ui_elements["key_press"])
         self.action_layout.addWidget(self.ui_elements["key_release"])
+
+        widget,_ = gremlin.ui.ui_common.getHContainer((self.ui_elements["key_add_press"], self.ui_elements["key_add_release"]))
+        self.action_layout.addWidget(widget)
+
+
+
 
     def _mouse_button_ui(self):
         """Creates and populates the MouseAction editor UI."""
@@ -550,21 +562,27 @@ class MacroActionEditor(QtWidgets.QWidget):
         self.action_layout.addWidget(cb)
         self.action_layout.addWidget(self.ui_elements["remote_control_label"])
 
+    @QtCore.Slot(bool)
     def _modify_button_state(self, state):
         action = self.model.get_entry(self.index.row())
         action.value = self.ui_elements["button_press"].isChecked()
         self._update_model()
 
+    @QtCore.Slot(bool)
     def _modify_axis_state(self, state):
         action = self.model.get_entry(self.index.row())
         action.value = self.ui_elements["axis_value"].value()
         self._update_model()
 
+    @QtCore.Slot(bool)
     def _modify_hat_state(self, state):
         action = self.model.get_entry(self.index.row())
         action.value = gremlin.common.direction_tuple_lookup[state]
         self._update_model()
 
+ 
+
+    @QtCore.Slot(bool)
     def _modify_key_state(self, state):
         """Updates the key activation state, i.e. press or release of a key.
 
@@ -574,11 +592,13 @@ class MacroActionEditor(QtWidgets.QWidget):
         action.is_pressed = self.ui_elements["key_press"].isChecked()
         self._update_model()
 
+    @QtCore.Slot(bool)
     def _modify_mouse_button(self, state):
         action = self.model.get_entry(self.index.row())
         action.is_pressed = self.ui_elements["mouse_press"].isChecked()
         self._update_model()
 
+    
     def _modify_mouse_motion(self, _):
         action = self.model.get_entry(self.index.row())
         action.dx = self.ui_elements["dx_spinbox"].value()
@@ -624,6 +644,8 @@ class MacroActionEditor(QtWidgets.QWidget):
 
     def _request_user_input(self, input_types):
         """Prompts the user for the input to bind to this item."""
+        from gremlin.ui.virtual_keyboard import InputKeyboardDialog
+
         if InputType.Keyboard in input_types:
             callback = self._modify_key
         elif InputType.Mouse in input_types:
@@ -631,29 +653,64 @@ class MacroActionEditor(QtWidgets.QWidget):
         else:
             callback = self._modify_joystick
 
+        if InputType.Keyboard in input_types:
+            dialog = InputKeyboardDialog(parent = self, select_single=True, index = -1)
+            dialog.accepted.connect(self._keyboard_dialog_cb)
+            dialog.setModal(True)
+            dialog.showNormal()
+        else:
+
+            dialog = gremlin.ui.ui_common.InputListenerWidget(
+                event_types = input_types,
+                return_kb_event=True
+            )
+
+            dialog.item_selected.connect(callback)
+            self.button_press_dialog = dialog
+
+            # Display the dialog centered in the middle of the UI
+            root = self
+            while root.parent():
+                root = root.parent()
+            geom = root.geometry()
+
+            self.button_press_dialog.setGeometry(
+                int(geom.x() + geom.width() / 2 - 150),
+                int(geom.y() + geom.height() / 2 - 75),
+                300,
+                150
+            )
+            self.button_press_dialog.show()
+
+    def _keyboard_dialog_cb(self):
+        ''' callled when the dialog completes '''
+
+        # grab a new data index as this is a new entry
+        # index = self._keyboard_dialog.index
+        # keys = self._keyboard_dialog.keys
+        dialog = self.sender()
+        latched_key = dialog.latched_key
+        self.model.get_entry(self.index.row()).key = latched_key
+        self._update_model()
+        gremlin.ui.ui_common.clear_layout(self.action_layout)
+        self.ui_elements = {}
+        self._keyboard_ui()
+
+    @QtCore.Slot()
+    def _add_key_press(self):
+        key = self.model.get_entry(self.index.row()).key
+        new_key = key.duplicate()
+        entry = gremlin.macro.KeyAction(new_key,True)
+        self.model.add_entry(self.index.row(), entry)
 
 
-        dialog = gremlin.ui.ui_common.InputListenerWidget(
-            event_types = input_types,
-            return_kb_event=True
-        )
+    @QtCore.Slot()
+    def _add_key_release(self):
+        key = self.model.get_entry(self.index.row()).key
+        new_key = key.duplicate()
+        entry = gremlin.macro.KeyAction(new_key,False)
+        self.model.add_entry(self.index.row(), entry)
 
-        dialog.item_selected.connect(callback)
-        self.button_press_dialog = dialog
-
-        # Display the dialog centered in the middle of the UI
-        root = self
-        while root.parent():
-            root = root.parent()
-        geom = root.geometry()
-
-        self.button_press_dialog.setGeometry(
-            int(geom.x() + geom.width() / 2 - 150),
-            int(geom.y() + geom.height() / 2 - 75),
-            300,
-            150
-        )
-        self.button_press_dialog.show()
 
     def _modify_joystick(self, event):
         self.model.set_entry(
@@ -954,6 +1011,7 @@ class MacroListModel(QtCore.QAbstractListModel):
             return
 
         self._data[index] = entry
+
 
     def remove_entry(self, index):
         """Removes the entry at the provided index.

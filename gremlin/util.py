@@ -949,6 +949,7 @@ def safe_read(node, key, type_cast=None, default_value=None):
     """
     # Attempt to read the value and if present use the provided default value
     # in case reading fails
+    syslog = logging.getLogger("system")
     value = default_value
     if not key in node.keys():
         if default_value is None:
@@ -965,7 +966,7 @@ def safe_read(node, key, type_cast=None, default_value=None):
                     pass
         if default_value is None:
             msg = f"Attempted to read attribute '{key}' which does not exist and no default value is provided."
-            logging.getLogger("system").error(msg)
+            syslog.error(msg)
             raise error.ProfileError(msg)
     else:
         value = node.get(key)
@@ -982,15 +983,14 @@ def safe_read(node, key, type_cast=None, default_value=None):
                 elif value == "special":
                     value = 0
                 else:
-                    # if type_cast == str:
-                    #     from xml.sax.saxutils import unescape
-                    #     value = unescape(str(value))
-                    # else:
-                    #     value = type_cast(value)
-                        
-                    value = type_cast(value)
+                    try:
+                        value = type_cast(value)
+                    except:
+                        syslog.error(f"XML: safe read - unable to convert type: {type_cast} value: [{value}] - using default: {default_value}")
+                        value = default_value
+
         except ValueError:
-            msg = f"Failed casting '{value}' to type '{str(type_cast)}'"
+            msg = f"XML: Failed casting '{value}' to type '{str(type_cast)}'"
             logging.getLogger("system").error(msg)
             raise error.ProfileError(msg)
     return value
