@@ -3688,9 +3688,6 @@ class GremlinUi(QtWidgets.QMainWindow):
         ''' true if button highlighting is currently enabled '''
         if not self.config.highlight_enabled:
             return False
-        if self._input_highlight_stack > 0:
-            # suspended
-            return False
         if gremlin.shared_state.is_highlighting_suspended():
             # skip if highlighting is currently suspended
             return False
@@ -3704,9 +3701,6 @@ class GremlinUi(QtWidgets.QMainWindow):
     def is_axis_highlighting(self) -> bool:
         ''' true if button highlighting is currently enabled '''
         if not self.config.highlight_enabled:
-            return False
-        if self._input_highlight_stack > 0:
-            # suspended
             return False
         if gremlin.shared_state.is_highlighting_suspended():
             # skip if highlighting is currently suspended
