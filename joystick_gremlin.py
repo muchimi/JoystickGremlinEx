@@ -120,7 +120,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_BASE = "m69a"
+APPLICATION_BASE = "m70"
 APPLICATION_VERSION = f"13.40.16ex ({APPLICATION_BASE})"
 
 
@@ -846,14 +846,21 @@ class GremlinUi(QtWidgets.QMainWindow):
         dialog.setWindowModality(QtCore.Qt.ApplicationModal)
         dialog.ensurePolished()
         gremlin.util.centerDialog(dialog, width = dialog.width(), height=dialog.height())
-        dialog.closed.connect(
-            lambda: self.apply_user_settings(ignore_minimize=True)
+        dialog.closed.connect(lambda: self.apply_user_settings(ignore_minimize=True)
         )
-        dialog.closed.connect(
-            lambda: self._remove_modal_window("options")
-        )
-        dialog.closed.connect(lambda: self.refresh())
+        dialog.closed.connect(lambda: self._remove_modal_window("options"))
+        
+        dialog.closed.connect(self.options_closed)
         dialog.show()
+
+    def options_closed(self):
+        dialog = self.sender()
+        if dialog.reload_profile:
+            self.refresh()
+
+        # tell components of the possible changes to the options
+        el = gremlin.event_handler.EventListener()
+        el.options_changed.emit()
 
 
     def profile_creator(self):

@@ -210,6 +210,11 @@ Joystick Gremlin EX
 
 <!-- TOC --><a name="134016ex-pre-release"></a>
 ## 13.40.16ex (pre-release)
+### (m70)
+- Improved: Options button added to main toolbar.
+- Improved: Options dialog has dedicated tabs for various options
+- Improved: Options performance improvements on close.
+
 ### (m69a)
 - Fix: device sorting (sort menu)
 - Fix: input type exception when attempting to derive at type from an input that no longer exists, such as, the device is removed/disconnects.

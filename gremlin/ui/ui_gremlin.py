@@ -171,11 +171,20 @@ class Ui_Gremlin(object):
         self.menubar.addAction(self.menuActions.menuAction())
         self.menubar.addAction(self.menuTools.menuAction())
         self.menubar.addAction(self.menu_Help.menuAction())
+
+
+        # main UI toolbar setup
         self.toolBar.addAction(self.actionSave)
         self.toolBar.addAction(self.actionOpen)
         self.toolBar.addAction(self.actionActivate)
-        self.toolBar.addSeparator()
+
+        # separator widget
+        widget = QtWidgets.QWidget()
+        widget.setMinimumWidth(32)
+        #self.toolBar.addWidget(QtWidgets.QLabel(" "*5))
+        self.toolBar.addWidget(widget)
         self.toolBar.addAction(self.actionInputViewer)
+        self.toolBar.addAction(self.actionOptions)
 
 
         self.actionSimconnectOptions = QtGui.QAction(main_window, text = "Simconnect...")

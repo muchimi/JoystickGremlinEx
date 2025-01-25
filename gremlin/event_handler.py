@@ -347,6 +347,8 @@ class EventListener(QtCore.QObject):
 	config_changed =  QtCore.Signal() # occurs on broadcast configuration change
 	config_option_changed = QtCore.Signal() # occurs on broadcast configuration change
 
+	options_changed = QtCore.Signal() # occurs when the options dialog closes to have components check for any changes
+
 	# occurs on broadcast mode change
 	broadcast_changed = QtCore.Signal(StateChangeEvent)
 

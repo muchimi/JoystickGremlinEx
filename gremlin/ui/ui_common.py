@@ -517,45 +517,6 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
 
     '''
 
-
-    # class FloatValidator(QtGui.QValidator):
-    #     def __init__(self, bottom : float, top : float):
-    #         super().__init__()
-    #         self._bottom = bottom
-    #         self._top = top
-
-    #     @property
-    #     def bottom(self):
-    #         return self._bottom
-    #     @bottom.setter
-    #     def bottom(self, value):
-    #         self._bottom = value
-    #     @property
-    #     def top(self):
-    #         return self._top
-    #     @top.setter
-    #     def top(self, value):
-    #         self._top = value
-
-    #     def setBottom(self, value):
-    #         self._bottom = value
-
-    #     def setTop(self, value):
-    #         self._top = value
-        
-
-    #     def validate(self, text, pos):
-    #         if text:
-    #             try:
-    #                 if text.isnumeric():
-    #                     value = float(text)
-    #                     if value >= self._bottom and value <= self._top:
-    #                         return QtGui.QValidator.Acceptable
-    #                 return QtGui.QValidator.Intermediate, text, pos            
-    #             except:
-    #                 pass
-    #         return QtGui.QValidator.Invalid, text, pos
-
     valueChanged = QtCore.Signal(float) # fires when the value changes
     doubleClick = QtCore.Signal() # fires when the input is double clicked
 
@@ -732,43 +693,6 @@ class QIntLineEdit(QtWidgets.QLineEdit):
 
     '''
 
-    class IntValidator(QtGui.QValidator):
-        def __init__(self, bottom : int, top : int):
-            super().__init__()
-            self._bottom = bottom
-            self._top = top
-
-        @property
-        def bottom(self):
-            return self._bottom
-        @bottom.setter
-        def bottom(self, value):
-            self._bottom = value
-        @property
-        def top(self):
-            return self._top
-        @top.setter
-        def top(self, value):
-            self._top = value
-
-        def setBottom(self, value):
-            self._bottom = value
-
-        def setTop(self, value):
-            self._top = value
-        
-
-        def validate(self, text, pos):
-            if text:
-                try:
-                    value = int(text)
-                    if value >= self._bottom and value <= self._top:
-                        return QtGui.QValidator.Acceptable
-                    return QtGui.QValidator.Intermediate, text, pos
-                except:
-                    pass
-            return QtGui.QValidator.Invalid, text, pos
-
     valueChanged = QtCore.Signal(float) # fires when the value changes
     doubleClick = QtCore.Signal() # fires when the input is double clicked
 
@@ -781,9 +705,8 @@ class QIntLineEdit(QtWidgets.QLineEdit):
         self._step = step
 
 
-        self._validator = QIntLineEdit.IntValidator(min_range, max_range) # QtGui.QIntValidator(bottom=min_range, top=max_range)
+        self._validator = QtGui.QIntValidator(min_range, max_range) 
         self._validator.setLocale(self.locale()) # handle correct floating point separator
-        #self._validator.setNotation(QtGui.QDoubleValidator.Notation.StandardNotation)
         self.textChanged.connect(self._validate)
         self.setValidator(self._validator)
         self.installEventFilter(self)
@@ -871,7 +794,8 @@ class QIntLineEdit(QtWidgets.QLineEdit):
     def _validate(self):
         ''' called whenever the text changes '''
         if self.hasAcceptableInput():
-            self.valueChanged.emit(self.value())
+            value = self.value()
+            self.valueChanged.emit(value)
 
     def setValue(self, value : int):
         ''' sets the value '''
@@ -880,7 +804,7 @@ class QIntLineEdit(QtWidgets.QLineEdit):
     def value(self) -> int:
         ''' current value, None if not a valid input'''
         if self.hasAcceptableInput():
-            return int(float(self.text()))
+            return int(self.text())
         try:
             text = self.text()
             if text:
@@ -2143,15 +2067,17 @@ class QIconLabel(QtWidgets.QWidget):
         container_widget.setContentsMargins(0, 0, 0, 0)
         container_layout = QtWidgets.QHBoxLayout(container_widget)
         container_layout.setContentsMargins(0, 0, 0, 0)
+
+        w = get_text_width("M")*80
+        container_widget.setMaximumWidth(w)
+
         self._icon_size = QtCore.QSize(icon_size, icon_size)
         self._icon_widget = QtWidgets.QLabel()
         if icon_path:
             self.setIcon(icon_path, use_qta, color = icon_color)
 
-        container_layout.addWidget(self._icon_widget)
-        container_layout.addSpacing(self.HorizontalSpacing)
         if use_wrap:
-            self._label_widget =  QWrapableLabel(text)
+            self._label_widget = QWrapableLabel(text)
             self._label_widget.setWordWrap(True)
         else:
             self._label_widget = QtWidgets.QLabel(text)
@@ -2159,9 +2085,12 @@ class QIconLabel(QtWidgets.QWidget):
         if stretch:
             container_layout.addStretch()
 
-        layout = QtWidgets.QVBoxLayout(self)
+        layout = QtWidgets.QGridLayout(self)
         layout.setContentsMargins(0,0,0,0)
-        layout.addWidget(container_widget)
+        layout.addWidget(self._icon_widget,0,0,alignment= QtCore.Qt.AlignmentFlag.AlignTop)
+        layout.addWidget(container_widget, 0, 1)
+        layout.addWidget(QtWidgets.QWidget(),0,2)
+        layout.setColumnStretch(2,2)
 
         self.setContentsMargins(0,0,0,0)
 

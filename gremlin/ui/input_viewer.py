@@ -24,6 +24,7 @@ import lxml.etree
 import dinput
 
 import gremlin
+import gremlin.config
 import gremlin.shared_state
 from . import ui_common
 from gremlin.input_types import InputType
@@ -31,6 +32,9 @@ from gremlin.types import VisualizationType
 import os
 from lxml import etree
 import gremlin.singleton_decorator
+import logging
+import gremlin.ui.ui_common
+
 @gremlin.singleton_decorator.SingletonDecorator
 class VisualizationConfig():
     ''' stores data '''
@@ -55,9 +59,15 @@ class VisualizationConfig():
         id = int(input_type)
         self._config[device_guid][id] = value
 
+
     def save(self):
         ''' saves to the config file '''
         fname = self.get_config()
+
+        syslog = logging.getLogger("system")
+        verbose = gremlin.config.Configuration().verbose
+        if verbose: 
+            syslog.info("INPUT VIEWER: save configuration")
 
         root = etree.Element("config")
         for device_guid in self._config:
@@ -113,7 +123,7 @@ class VisualizationSelector(QtWidgets.QWidget):
         bool
     )
 
-    def __init__(self, callback, parent=None):
+    def __init__(self, change_callback, parent=None):
         """Creates a new instance.
 
         :param parent the parent of this widget
@@ -121,6 +131,10 @@ class VisualizationSelector(QtWidgets.QWidget):
         super().__init__(parent)
 
         devices = gremlin.joystick_handling.joystick_devices()
+
+        self._selector_widgets = []
+        self._selector_callbacks = {}
+
         
         # get the order of the devices as set by the user for the physical devices
         tab_map = gremlin.shared_state.ui._get_tab_map()
@@ -142,35 +156,37 @@ class VisualizationSelector(QtWidgets.QWidget):
         config = VisualizationConfig()
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
-        for dev in devices: # sorted(devices, key=lambda x: (x.name, x.vjoy_id)):
-            # if dev.is_virtual:
-            #     #box = QtWidgets.QGroupBox(f"{dev.name} #{dev.vjoy_id:d}")
-            # else:
+
+        
+
+        dev : dinput.DeviceSummary
+        for dev in devices:
             
             box = QtWidgets.QGroupBox(dev.name)
 
-            at_cb = QtWidgets.QCheckBox("Axes - Temporal")
+            at_cb = gremlin.ui.ui_common.QDataCheckbox("Axes - Temporal", data = (VisualizationType.AxisTemporal, dev))
+            callback = self._create_callback(dev, VisualizationType.AxisTemporal, at_cb)
+            at_cb.clicked.connect(callback)
+            self._selector_callbacks[at_cb] = callback
 
-            at_cb.clicked.connect(
-                self._create_callback(dev, VisualizationType.AxisTemporal, at_cb)
-            )
-            
+            ac_cb = gremlin.ui.ui_common.QDataCheckbox("Axes - Current",  data = (VisualizationType.AxisCurrent, dev))
+            callback = self._create_callback(dev, VisualizationType.AxisCurrent, ac_cb)
+            ac_cb.clicked.connect(callback)
+            self._selector_callbacks[ac_cb] = callback
 
-            ac_cb = QtWidgets.QCheckBox("Axes - Current")
-            
-            ac_cb.clicked.connect(
-                self._create_callback(dev, VisualizationType.AxisCurrent, ac_cb)
-            )
-            bh_cb = QtWidgets.QCheckBox("Buttons + Hats")
-            
-            bh_cb.clicked.connect(
-                self._create_callback(dev, VisualizationType.ButtonHat, bh_cb)
-            )
+            bh_cb = gremlin.ui.ui_common.QDataCheckbox("Buttons + Hats",  data = (VisualizationType.ButtonHat, dev))
+            callback = self._create_callback(dev, VisualizationType.ButtonHat, bh_cb)
+            bh_cb.clicked.connect(callback)
+            self._selector_callbacks[bh_cb] = callback
 
             layout = QtWidgets.QVBoxLayout()
             layout.addWidget(at_cb)
             layout.addWidget(ac_cb)
             layout.addWidget(bh_cb)
+
+            self._selector_widgets.append(at_cb)
+            self._selector_widgets.append(ac_cb)
+            self._selector_widgets.append(bh_cb)
 
             box.setLayout(layout)
 
@@ -180,15 +196,59 @@ class VisualizationSelector(QtWidgets.QWidget):
             device_guid = dev.device_guid
             checked = config.getValue(device_guid, VisualizationType.AxisTemporal)
             at_cb.setChecked(checked)
-            if checked: callback(dev, VisualizationType.AxisTemporal,True)
+            if checked: change_callback(dev, VisualizationType.AxisTemporal,True)
 
             checked = config.getValue(device_guid, VisualizationType.AxisCurrent)
             ac_cb.setChecked(checked)
-            if checked: callback(dev, VisualizationType.AxisCurrent, True)
+            if checked: change_callback(dev, VisualizationType.AxisCurrent, True)
 
             checked = config.getValue(device_guid, VisualizationType.ButtonHat)
             bh_cb.setChecked(checked)
-            if checked: callback(dev, VisualizationType.ButtonHat, True)
+            if checked: change_callback(dev, VisualizationType.ButtonHat, True)
+
+
+    @QtCore.Slot()
+    def _clear_selection(self):
+        ''' clears the selection of all widgets '''
+        
+        
+        for widget in self._selector_widgets:
+            with QtCore.QSignalBlocker(widget):
+                widget.setChecked(False)
+            visualisation, dev = widget.data
+            self._create_callback(dev, visualisation, widget)()
+            
+        
+
+    @QtCore.Slot()
+    def _select_real(self):
+        ''' selects all hardware inputs '''
+        for widget in self._selector_widgets:
+            visualization, dev = widget.data
+            if visualization != VisualizationType.AxisTemporal and not dev.is_virtual:
+                with QtCore.QSignalBlocker(widget):
+                    widget.setChecked(True)
+                visualisation, dev = widget.data
+            else:
+                widget.setChecked(False)
+            self._create_callback(dev, visualisation, widget)()
+
+
+                    
+        
+    @QtCore.Slot()
+    def _select_all(self):
+        ''' selects all widgets '''
+        
+        for widget in self._selector_widgets:
+            with QtCore.QSignalBlocker(widget):
+                widget.setChecked(True)
+            visualisation, dev = widget.data
+            self._create_callback(dev, visualisation, widget)()
+            
+
+
+    
 
 
     def _create_callback(self, device, vis_type, cb):
@@ -229,8 +289,11 @@ class InputViewerUi(ui_common.BaseDialogUi):
         self.setWindowFlag(QtCore.Qt.WindowMinimizeButtonHint, True)
 
         self.devices = gremlin.joystick_handling.joystick_devices()
-        self.main_layout = QtWidgets.QHBoxLayout()
+        self.main_layout = QtWidgets.QVBoxLayout()
         self.setLayout(self.main_layout)
+
+
+
 
         
         self.views = InputViewerArea()
@@ -254,9 +317,7 @@ class InputViewerUi(ui_common.BaseDialogUi):
         self.scroll_selector_area.setWidgetResizable(True)
         self.scroll_selector_area.setWidget(self.scroll_selector_widget)
 
-        # Add the scroll area to the main layout
-        self.main_layout.addWidget(self.scroll_selector_area)
-        self.main_layout.addWidget(self.views)
+
         
 
 
@@ -266,6 +327,26 @@ class InputViewerUi(ui_common.BaseDialogUi):
         self.scroll_selector_layout.addWidget(self.vis_selector)
 
 
+                
+        clear_widget = QtWidgets.QPushButton("Clear")
+        clear_widget.setToolTip("Clears the selection")
+        clear_widget.clicked.connect(self.vis_selector._clear_selection)
+
+        select_all_widget = QtWidgets.QPushButton("Select All")
+        select_all_widget.setToolTip("Selects all inputs")
+        select_all_widget.clicked.connect(self.vis_selector._select_all)
+
+        select_real_widget = QtWidgets.QPushButton("Select Hardware")
+        select_real_widget.setToolTip("Selects all hardware inputs")
+        select_real_widget.clicked.connect(self.vis_selector._select_real)
+
+        options_widget, _ = gremlin.ui.ui_common.getHContainer((clear_widget, select_real_widget, select_all_widget))
+
+        self.main_layout.addWidget(options_widget)
+
+        content_widget, _ = gremlin.ui.ui_common.getHContainer((self.scroll_selector_area, self.views))
+        # Add the scroll area to the main layout
+        self.main_layout.addWidget(content_widget)
         self.closed.connect(self._closed)
 
     @QtCore.Slot()
@@ -284,15 +365,15 @@ class InputViewerUi(ui_common.BaseDialogUi):
         """
         key = device, vis_type
         
-        widget = ui_common.JoystickDeviceWidget(device, vis_type)
         if is_active:
+            widget = ui_common.JoystickDeviceWidget(device, vis_type)
             self.views.add_widget(widget)
             self._widget_storage[key] = widget
         elif key in self._widget_storage:
             self.views.remove_widget(self._widget_storage[key])
             del self._widget_storage[key]
 
-
+        
 class InputViewerArea(QtWidgets.QScrollArea):
 
     """Holds individual input visualization widgets."""
@@ -305,6 +386,7 @@ class InputViewerArea(QtWidgets.QScrollArea):
         super().__init__(parent)
 
         self.widgets = []
+        
         self.setWidgetResizable(True)
         self.scroll_widget = QtWidgets.QWidget()
         self.scroll_layout = QtWidgets.QVBoxLayout()
@@ -344,3 +426,13 @@ class InputViewerArea(QtWidgets.QScrollArea):
         del self.widgets[self.widgets.index(widget)]
         del widget
 
+    def clear(self):
+        ''' clears all widgets '''
+        for widget in self.widget:
+            self.scroll_layout.removeWidget(widget)
+            widget.hide()
+            del self.widgets[self.widgets.index(widget)]
+            del widget
+
+
+_visualization_config = VisualizationConfig()

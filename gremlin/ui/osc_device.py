@@ -3281,8 +3281,18 @@ class InputOscClient(QtCore.QObject):
         # self._event_listener.osc_message.connect(self._osc_message_cb)
         self._event_listener.request_osc.connect(self._request_osc_state)
         self._event_listener.profile_start.connect(self._profile_start)
+        self._event_listener.options_changed.connect(self._options_changed)
         self._osc_map = {}  # map of message keys to inputs 
         self._started = False
+
+    @QtCore.Slot()            
+    def _options_changed(self):
+        config = gremlin.config.Configuration()
+        osc_enabled = config.osc_enabled
+        if osc_enabled:
+            self.start()
+        else:
+            self.stop()
 
     @QtCore.Slot()
     def _profile_start(self):

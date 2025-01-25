@@ -248,7 +248,7 @@ def push_suspend_ui_keyinput():
 
     _suspend_ui_keyinput += 1
 
-    
+
     
 
 def pop_suspend_ui_keyinput():
@@ -423,6 +423,28 @@ class ProfileStateMonitor():
         gremlin.shared_state._simconnect_enabled = None # force an udpate
 
 
+_log_nesting_level = 0
+
+
+# log nesting level management 
+def pushLog():
+    global _log_nesting_level
+    _log_nesting_level +=1
+
+def popLog(reset = False):
+    global _log_nesting_level
+    if _log_nesting_level > 0:
+        _log_nesting_level -=1
+    if reset:
+        _log_nesting_level = 0
+
+def logTabs(showLevel = False):
+    ''' gets the log prefix tab based on nesting levels '''
+    global _log_nesting_level
+    tabs ="\t" * _log_nesting_level
+    if showLevel:
+        return f"Nesting [{_log_nesting_level}]{tabs}"
+    return tabs
 
 
 _get_root_path()

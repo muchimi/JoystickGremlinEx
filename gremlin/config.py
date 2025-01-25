@@ -599,10 +599,13 @@ class Configuration:
     def highlight_autoswitch(self):
         ''' true if in design mode and tab switching is allowed on input detect change '''
         return self._data.get("highlight_switch", False)
+    
     @highlight_autoswitch.setter
     def highlight_autoswitch(self, value):
-        self._data["highlight_switch"] = value
-        self.save()
+
+        if value != self.highlight_autoswitch:
+            self._data["highlight_switch"] = value
+            self.save()
 
 
     @property
@@ -626,9 +629,10 @@ class Configuration:
         :param value Flag indicating whether or not to enable / disable the
             feature
         """
-        if type(value) == bool:
+        if value != self.highlight_input_axis:
             self._data["highlight_input_axis"] = value
             self.save()
+
 
     @property
     def highlight_input_buttons(self):
@@ -651,9 +655,11 @@ class Configuration:
         :param value Flag indicating whether or not to enable / disable the
             feature
         """
-        if type(value) == bool:
+        if value != self.highlight_input_buttons:
             self._data["highlight_input_buttons"] = value
             self.save()
+
+
 
 
     @property
@@ -678,9 +684,8 @@ class Configuration:
             feature
         """
         if value != self.highlight_enabled:
-            if type(value) == bool:
-                self._data["highlight_device"] = value
-                self.save()
+            self._data["highlight_device"] = value
+            self.save()
             el = gremlin.event_handler.EventListener()
             el.config_option_changed.emit()
 
@@ -694,6 +699,9 @@ class Configuration:
     @highlight_hotkey_autoswitch.setter
     def highlight_hotkey_autoswitch(self, value : bool):
         self._data["highlight_hotkey_autoswitch"] = value
+
+        el = gremlin.event_handler.EventListener()
+        el.config_option_changed.emit()
 
 
     @property
@@ -731,7 +739,7 @@ class Configuration:
     @enable_broadcast_speech.setter
     def enable_broadcast_speech(self, value):
 
-        if type(value) == bool and self._data.get("enable_broadcast_speech",True) != value:
+        if self.enable_broadcast_speech != value:
             self._data["enable_broadcast_speech"] = value
             self.save()
 

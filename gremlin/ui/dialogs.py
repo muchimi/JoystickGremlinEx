@@ -231,6 +231,9 @@ class OptionsUi(ui_common.BaseDialogUi):
         
         self._create_general_page()
         self._create_profile_page()
+        self._create_verbose_page()
+        self._create_osc_page()
+        self._create_vigem_page()
 
         # closing bar
         close_button = QtWidgets.QPushButton("Close")
@@ -260,6 +263,11 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.queue_refresh.connect(self.populate_map)
 
         self.tab_container.currentChanged.connect(self._tab_changed_cb)
+
+    @property
+    def reload_profile(self) -> bool:
+        ''' true if UI must refresh/profile reload after options changed '''
+        return self._reload_needed
 
     def confirmClose(self, event):
         ''' override ability to close '''
@@ -311,9 +319,9 @@ class OptionsUi(ui_common.BaseDialogUi):
 
     def _create_general_page(self):
         """Creates the general options page."""
-        self.general_page = QtWidgets.QWidget()
-        self.general_layout = QtWidgets.QVBoxLayout()
-        self.general_page.setLayout(self.general_layout)
+        page_widget = QtWidgets.QWidget()
+        page_layout = QtWidgets.QVBoxLayout()
+        page_widget.setLayout(page_layout)
 
 
         # Switch to highlighted device (master switch)
@@ -321,6 +329,8 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.highlight_enabled.clicked.connect(self._highlight_enabled_cb)
         self.highlight_enabled.setToolTip("Enable device highlighting.")
         self.highlight_enabled.setChecked(self.config.highlight_enabled)
+
+
 
 
         # highlight autoswitch
@@ -439,35 +449,6 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.partial_plugin_save.clicked.connect(self._partial_plugin_save)
 
 
-        # verbose output
-        self.verbose_container_widget = QtWidgets.QWidget()
-        self.verbose_container_widget.setContentsMargins(0,0,0,0)
-        self.verbose_container_layout = QtWidgets.QGridLayout()
-        self.verbose_container_layout.setContentsMargins(0,0,0,0)
-        self.verbose_container_widget.setLayout(self.verbose_container_layout)
-
-        self.verbose_widget = QtWidgets.QCheckBox("Verbose log")
-        verbose = self.config.verbose
-        self.verbose_widget.setChecked(verbose)
-        self.verbose_widget.clicked.connect(self._verbose_cb)
-
-        self._verbose_mode_widgets = {}
-        row = 0
-        col = 1
-        self.verbose_container_layout.addWidget(self.verbose_widget,0,0)
-        for mode in gremlin.types.VerboseMode:
-            if mode in (gremlin.types.VerboseMode.NotSet, gremlin.types.VerboseMode.All):
-                continue
-            widget = ui_common.QDataCheckbox(mode.name, mode)
-            is_checked = self.config.is_verbose_mode(mode)
-            widget.setChecked(is_checked)
-            widget.clicked.connect(self._verbose_set_cb)
-            self.verbose_container_layout.addWidget(widget, row, col)
-            col += 1
-            if col > 3:
-                col = 1
-                row +=1
-            self._verbose_mode_widgets[mode] = widget
 
 
         # global numlock
@@ -477,39 +458,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.numlock_enabled.setToolTip("When set, numlock will be turned off whenever a profile starts unless that profile has its own setting")
 
 
-        # midi enabled
-        self.osc_enabled = QtWidgets.QCheckBox("Enable OSC input")
-        self.osc_enabled.clicked.connect(self._osc_enabled)
-        self.osc_enabled.setChecked(self.config.osc_enabled)
-        self.osc_enabled.setToolTip("When set, Joystick Gremlin Ex will listen to OSC network traffic on the specified port when a profile is activated.")
-
-        self.osc_input_port = ui_common.QIntLineEdit()
-        self.osc_input_port.setRange(4096,65535)
-        self.osc_input_port.setEnabled(self.config.osc_enabled)
-        port = self.config.osc_input_port
-        self.osc_input_port.setValue(port)
-        self.osc_input_port.valueChanged.connect(self._osc_port)
-
-        self.osc_output_port = ui_common.QIntLineEdit()
-        self.osc_output_port.setRange(4096,65535)
-        self.osc_output_port.setEnabled(self.config.osc_enabled)
-        port = self.config.osc_output_port
-        self.osc_output_port.setValue(port)
-        self.osc_output_port.valueChanged.connect(self._osc_output_port)
-
-        self.osc_host = ui_common.QDataIPLineEdit()
-        self.osc_host.setText(self.config.osc_host)
-        self.osc_host.setEnabled(self.config.osc_enabled)
-        self.osc_host.textChanged.connect(self._osc_host)
-
-
-
-        # midi enabled
-        self.midi_enabled = QtWidgets.QCheckBox("Enable MIDI input")
-        self.midi_enabled.clicked.connect(self._midi_enabled)
-        self.midi_enabled.setChecked(self.config.midi_enabled)
-        self.midi_enabled.setToolTip("When set, Joystick Gremlin Ex will listen to MIDI ports when a profile is activated.")
-
+      
         # Show message on mode change
         self.show_mode_change_message = QtWidgets.QCheckBox("Show message when changing mode")
         self.show_mode_change_message.clicked.connect(
@@ -525,37 +474,37 @@ class OptionsUi(ui_common.BaseDialogUi):
 
         self.remote_control_label = QtWidgets.QLabel("Remote control")
 
-        self.enable_remote_control = QtWidgets.QCheckBox("Enable remote control")
-        self.enable_remote_control.setChecked(self.config.enable_remote_control)
-        self.enable_remote_control.clicked.connect(self._enable_remote_control)
-        self.enable_remote_control.setToolTip("When set, Joystick Gremlin Ex will enable the remote control feature.  This allows this instance of JGEX to control the master instance on another network computer.")
+        self.enable_remote_control_widget = QtWidgets.QCheckBox("Enable remote control")
+        self.enable_remote_control_widget.setChecked(self.config.enable_remote_control)
+        self.enable_remote_control_widget.clicked.connect(self._enable_remote_control)
+        self.enable_remote_control_widget.setToolTip("When set, Joystick Gremlin Ex will enable the remote control feature.  This allows this instance of JGEX to control the master instance on another network computer.")
 
 
-        self.enable_remote_broadcast = QtWidgets.QCheckBox("Enable broadcast")
-        self.enable_remote_broadcast.setChecked(self.config.enable_remote_broadcast)
-        self.enable_remote_broadcast.clicked.connect(self._enable_remote_broadcast)
-        self.enable_remote_control.setToolTip("When set, Joystick Gremlin Ex will enable the remote broadcast feature.  This allows this instance of JGEX to broadcast control messages to other instances on the network.")
+        self.enable_remote_broadcast_widget = QtWidgets.QCheckBox("Enable broadcast")
+        self.enable_remote_broadcast_widget.setChecked(self.config.enable_remote_broadcast)
+        self.enable_remote_broadcast_widget.clicked.connect(self._enable_remote_broadcast)
+        self.enable_remote_control_widget.setToolTip("When set, Joystick Gremlin Ex will enable the remote broadcast feature.  This allows this instance of JGEX to broadcast control messages to other instances on the network.")
 
 
-        self.enable_broadcast_speech = QtWidgets.QCheckBox("Enable speech on broadcast mode change")
-        self.enable_broadcast_speech.setChecked(self.config.enable_broadcast_speech)
-        self.enable_broadcast_speech.clicked.connect(self._enable_broadcast_speech)
-        self.enable_remote_control.setToolTip("When set, Joystick Gremlin Ex will voice a enable the remote control feature.  This allows JGEX to output an audio cue when the broadcast mode is changed, which can be changed by an action.")
+        self.enable_broadcast_speech_widget = QtWidgets.QCheckBox("Enable TTS cue on remote control mode changes")
+        self.enable_broadcast_speech_widget.setChecked(self.config.enable_broadcast_speech)
+        self.enable_broadcast_speech_widget.clicked.connect(self._enable_broadcast_speech)
+        self.enable_remote_control_widget.setToolTip("When set, output an audio cue via TTS when the broadcast mode is changed, which can be changed by an action.")
 
         self.remote_control_label = QtWidgets.QLabel("Port:")
 
-        self.remote_control_port = QtWidgets.QDoubleSpinBox()
-        self.remote_control_port.setRange(4096,65535)
-        self.remote_control_port.setDecimals(0)
-        self.remote_control_port.setValue(float(self.config.server_port))
-        self.remote_control_port.valueChanged.connect(self._remote_control_server_port)
-        self.remote_control_port.setToolTip("This specifies the UDP port used to communicate with other Joystick Gremlin Ex instances on the network.  The local firewall must allow the ports to broadcast.  The +1 port is used to receive messages.")
+        self.remote_control_port_widget = QtWidgets.QDoubleSpinBox()
+        self.remote_control_port_widget.setRange(4096,65535)
+        self.remote_control_port_widget.setDecimals(0)
+        self.remote_control_port_widget.setValue(float(self.config.server_port))
+        self.remote_control_port_widget.valueChanged.connect(self._remote_control_server_port)
+        self.remote_control_port_widget.setToolTip("This specifies the UDP port used to communicate with other Joystick Gremlin Ex instances on the network.  The local firewall must allow the ports to broadcast.  The +1 port is used to receive messages.")
 
 
-        self.remote_control_layout.addWidget(self.enable_remote_control)
-        self.remote_control_layout.addWidget(self.enable_remote_broadcast)
+        self.remote_control_layout.addWidget(self.enable_remote_control_widget)
+        self.remote_control_layout.addWidget(self.enable_remote_broadcast_widget)
         self.remote_control_layout.addWidget(self.remote_control_label)
-        self.remote_control_layout.addWidget(self.remote_control_port)
+        self.remote_control_layout.addWidget(self.remote_control_port_widget)
         self.remote_control_layout.addStretch()
 
 
@@ -590,12 +539,8 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.macro_axis_polling_value.setRange(0.001, 1.0)
         self.macro_axis_polling_value.setSingleStep(0.05)
         self.macro_axis_polling_value.setDecimals(3)
-        self.macro_axis_polling_value.setValue(
-            self.config.macro_axis_polling_rate
-        )
-        self.macro_axis_polling_value.valueChanged.connect(
-            self._macro_axis_polling_rate
-        )
+        self.macro_axis_polling_value.setValue(self.config.macro_axis_polling_rate)
+        self.macro_axis_polling_value.valueChanged.connect(self._macro_axis_polling_rate)
         self.macro_axis_polling_layout.addWidget(self.macro_axis_polling_label)
         self.macro_axis_polling_layout.addWidget(self.macro_axis_polling_value)
         self.macro_axis_polling_layout.addStretch()
@@ -623,133 +568,80 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.runtime_ui_update.clicked.connect(self._runtime_ui_update)
         self.runtime_ui_update.setToolTip("When set, Joystick Gremlin Ex will update the UI on profile or mode changes at runtime - this can be turned off to enhance performance at runtime")
 
-
-        # gamepad device count
-        self.gamepad_container_widget = QtWidgets.QWidget()
-        self.gamepad_container_widget.setContentsMargins(0,0,0,0)
-        self.gamepad_container_layout = QtWidgets.QHBoxLayout(self.gamepad_container_widget)
-        self.gamepad_container_layout.setContentsMargins(0,0,0,0)
-        self.gamepad_device_count_widget = QtWidgets.QSpinBox()
-        self.gamepad_device_count_widget.setRange(0,4) # 0 (none), 1 to 4 devices
-        self.gamepad_device_count_widget.setValue(self.config.vigem_device_count)
-        self.gamepad_device_count_widget.setToolTip("Number of virtual gamepad devices to create, 0 for none, 1 to 4")
-        self.gamepad_device_count_widget.valueChanged.connect(self._device_count_changed)
-        self.gamepad_container_layout.addWidget(QtWidgets.QLabel("Gamepad count:"))
-        self.gamepad_container_layout.addWidget(self.gamepad_device_count_widget)
-        self.gamepad_container_layout.addStretch()
-
-
-        self.column_widget = QtWidgets.QWidget()
-        self.column_widget.setContentsMargins(0,0,0,0)
-        self.column_layout = QtWidgets.QGridLayout(self.column_widget)
-        self.column_layout.setContentsMargins(0,0,0,0)
+        column_widget = QtWidgets.QWidget()
+        column_widget.setContentsMargins(0,0,0,0)
+        column_layout = QtWidgets.QGridLayout(column_widget)
+        column_layout.setContentsMargins(0,0,0,0)
 
 
         # column 1
         col = 0
         row = 0
+        
+        column_layout.addWidget(self.sync_last_selection, row, col)
         row+=1
-        self.column_layout.addWidget(self.sync_last_selection, row, col)
+        column_layout.addWidget(self.close_to_systray, row, col)
         row+=1
-        self.column_layout.addWidget(self.close_to_systray, row, col)
+        column_layout.addWidget(self.enable_ui_runtime, row, col)
         row+=1
-        self.column_layout.addWidget(self.enable_ui_runtime, row, col)
+        column_layout.addWidget(self.start_minimized, row, col)
         row+=1
-        self.column_layout.addWidget(self.start_minimized, row, col)
+        column_layout.addWidget(self.start_with_windows, row, col)
         row+=1
-        self.column_layout.addWidget(self.start_with_windows, row, col)
+        column_layout.addWidget(self.numlock_enabled, row, col)
         row+=1
-        self.column_layout.addWidget(self.numlock_enabled, row, col)
-        row+=1
-        self.column_layout.addWidget(self.start_on_f5, row, col)
+        column_layout.addWidget(self.start_on_f5, row, col)
 
 
         # column 2
         col = 1
         row = 0
-        self.column_layout.addWidget(self.persist_clipboard, row, col)
+        column_layout.addWidget(self.persist_clipboard, row, col)
         row+=1
-        self.column_layout.addWidget(self.show_scancodes_widget, row, col)
+        column_layout.addWidget(self.show_scancodes_widget, row, col)
         row+=1
-        self.column_layout.addWidget(self.partial_plugin_save, row, col)
+        column_layout.addWidget(self.partial_plugin_save, row, col)
         row+=1
-        self.column_layout.addWidget(self.show_joystick_input_widget, row, col)
+        column_layout.addWidget(self.show_joystick_input_widget, row, col)
         row+=1
-        self.column_layout.addWidget(self.show_button_grid_widget, row, col)
+        column_layout.addWidget(self.show_button_grid_widget, row, col)
         row+=1
-        self.column_layout.addWidget(self.runtime_ui_update, row, col)
+        column_layout.addWidget(self.runtime_ui_update, row, col)
         row+=1
-        self.column_layout.addWidget(self.midi_enabled, row, col)
+        
+        column_layout.addWidget(self.runtime_ignore_device_change, row, col)
         row+=1
-        self.column_layout.addWidget(self.verbose_container_widget, row, col, 1, 2)
+        column_layout.addWidget(self.debug_ui, row, col)
         row+=1
-        self.column_layout.addWidget(self.runtime_ignore_device_change, row, col)
-        row+=1
-        self.column_layout.addWidget(self.debug_ui, row, col)
-        row+=1
-        self.column_layout.addWidget(self.show_input_enable, row, col)
+        column_layout.addWidget(self.show_input_enable, row, col)
 
         # column 3
         col = 2
         row = 0
-        self.column_layout.addWidget(self.highlight_enabled, row, col)
+        column_layout.addWidget(self.highlight_enabled, row, col)
         row+=1
-        self.column_layout.addWidget(self.highlight_autoswitch, row, col)
+        widget,_ = gremlin.ui.ui_common.getHContainer(self.highlight_hotkey_autoswitch,"  ")
+        column_layout.addWidget(widget, row, col)
         row+=1
-        self.column_layout.addWidget(self.highlight_hotkey_autoswitch, row, col)
+        widget,_ = gremlin.ui.ui_common.getHContainer(self.highlight_autoswitch,"  ")
+        column_layout.addWidget(widget, row, col)
         row+=1
-        
-        self.column_layout.addWidget(self.highlight_input_axis, row, col)
+        widget,_ = gremlin.ui.ui_common.getHContainer(self.highlight_input_axis,"  ")
+        column_layout.addWidget(widget, row, col)
         row+=1
-        self.column_layout.addWidget(self.highlight_input_buttons, row, col)
-
-        self.general_layout.addWidget(self.column_widget)
-        self.general_layout.addWidget(self.gamepad_container_widget)
-
-        
-        container = QtWidgets.QWidget()
-        container.setContentsMargins(0,0,0,0)
-        layout = QtWidgets.QHBoxLayout(container)
-        layout.setContentsMargins(0,0,0,0)
-        layout.addWidget(self.osc_enabled)
-        host_ip = gremlin.util.getHostIp()
-        server_widget = ui_common.QDataIPLineEdit()
-        server_widget.setText(host_ip)
-        server_widget.setReadOnly(True)
-        w = ui_common.get_text_width("MMM.MMM.MMM.MMM MM")
-        server_widget.setMaximumWidth(w)
-        layout.addWidget(QtWidgets.QLabel(f"OSC Server:"))
-        layout.addWidget(server_widget)
-        layout.addStretch()
-        self.general_layout.addWidget(container)
-
-        container = QtWidgets.QWidget()
-        container.setContentsMargins(0,0,0,0)
-        layout = QtWidgets.QHBoxLayout(container)
-        layout.setContentsMargins(0,0,0,0)
-
-        layout.addWidget(QtWidgets.QLabel("OSC Input port:"))
-        layout.addWidget(self.osc_input_port)
-        layout.addWidget(QtWidgets.QLabel("Output port:"))
-        layout.addWidget(self.osc_output_port)
-        layout.addWidget(QtWidgets.QLabel("Output host IP:"))
-        layout.addWidget(self.osc_host)
-        self.osc_host.setMaximumWidth(w)
-        layout.addStretch()
-        layout.setContentsMargins(0,0,0,0)
-        
+        widget,_ = gremlin.ui.ui_common.getHContainer(self.highlight_input_buttons,"  ")
+        column_layout.addWidget(widget, row, col)
         
 
-
+        page_layout.addWidget(column_widget)
         
-        self.general_layout.addWidget(container)
-        self.general_layout.addWidget(self.show_mode_change_message)
-        self.general_layout.addWidget(self.default_action_widget)
-        self.general_layout.addWidget(self.macro_axis_minimum_change_widget)
-        self.general_layout.addWidget(self.remote_control_widget)
-        self.general_layout.addWidget(self.enable_broadcast_speech)
-        self.general_layout.addStretch()
-        self.tab_container.addTab(self.general_page, "General")
+        page_layout.addWidget(self.show_mode_change_message)
+        page_layout.addWidget(self.default_action_widget)
+        page_layout.addWidget(self.macro_axis_minimum_change_widget)
+        page_layout.addWidget(self.remote_control_widget)
+        page_layout.addWidget(self.enable_broadcast_speech_widget)
+        page_layout.addStretch()
+        self.tab_container.addTab(page_widget, "General")
         
         self._update_highlight_options() # update highlight state for checkboxes
 
@@ -964,6 +856,225 @@ This setting is also available on a profile by profile basis on the profile tab,
 
         # enable/disable components
         self._autoload_mapped_profile(self.autoload_profile_widget.isChecked())
+
+
+
+    def _create_verbose_page(self):
+        """Creates the profile options page."""
+        page_widget = QtWidgets.QWidget()
+        page_layout = QtWidgets.QVBoxLayout(page_widget)
+
+        
+        column_widget = QtWidgets.QWidget()
+        column_widget.setContentsMargins(0,0,0,0)
+        column_layout = QtWidgets.QGridLayout(column_widget)
+        column_layout.setContentsMargins(0,0,0,0)
+
+        page_layout.addWidget(column_widget)
+        self.tab_container.addTab(page_widget, "Verbose")
+
+
+        self.verbose_widget = QtWidgets.QCheckBox("Enable Verbose Log Mode")
+        verbose = self.config.verbose
+        self.verbose_widget.setChecked(verbose)
+        self.verbose_widget.clicked.connect(self._verbose_cb)
+        page_layout.addWidget(self.verbose_widget)
+
+        page_layout.addWidget(QtWidgets.QLabel("Verbose modes:"))
+
+
+        # verbose modes
+        container = QtWidgets.QWidget()
+        container.setContentsMargins(8,0,0,0)
+        layout = QtWidgets.QGridLayout()
+        layout.setContentsMargins(0,0,0,0)
+        container.setLayout(layout)
+        self._verbose_mode_widgets = {}
+        row = 0
+        col = 0
+
+        for mode in gremlin.types.VerboseMode:
+            if mode in (gremlin.types.VerboseMode.NotSet, gremlin.types.VerboseMode.All):
+                continue
+            widget = ui_common.QDataCheckbox(mode.name, mode)
+            is_checked = self.config.is_verbose_mode(mode)
+            widget.setChecked(is_checked)
+            widget.clicked.connect(self._verbose_set_cb)
+            layout.addWidget(widget, row, col)
+            col += 1
+            if col > 3:
+                col = 0
+                row +=1
+            self._verbose_mode_widgets[mode] = widget
+        
+        layout.addWidget(QtWidgets.QWidget(),0,4)
+        layout.setColumnStretch(4,2)
+        
+        page_layout.addWidget(container)
+        text = "Warning: these options can degrade performance significantly due to the amount of log entries generated.  Log file size can also grow to become very large. Only use the modes to diagnose a specific subsystem.  Avoid detailed mode unless directed to."
+        warning_widget = gremlin.ui.ui_common.QIconLabel("fa.warning",use_qta=True,icon_color=QtGui.QColor("orange"),text= text, use_wrap=True)
+        page_layout.addWidget(warning_widget)
+        
+        page_layout.addStretch()
+
+    def _create_osc_page(self):
+        page_widget = QtWidgets.QWidget()
+        page_layout = QtWidgets.QVBoxLayout(page_widget)
+
+        
+        column_widget = QtWidgets.QWidget()
+        column_widget.setContentsMargins(0,0,0,0)
+        column_layout = QtWidgets.QGridLayout(column_widget)
+        column_layout.setContentsMargins(0,0,0,0)
+
+        page_layout.addWidget(column_widget)
+        self.tab_container.addTab(page_widget, "OSC/MIDI")
+
+
+        self.osc_enabled = QtWidgets.QCheckBox("Enable OSC input")
+        self.osc_enabled.clicked.connect(self._osc_enabled)
+        self.osc_enabled.setChecked(self.config.osc_enabled)
+        self.osc_enabled.setToolTip("When set, Joystick Gremlin Ex will listen to OSC network traffic on the specified port when a profile is activated.")
+
+        self.osc_input_port = ui_common.QIntLineEdit()
+        self.osc_input_port.setRange(4096,65535)
+        self.osc_input_port.setEnabled(self.config.osc_enabled)
+        port = self.config.osc_input_port
+        self.osc_input_port.setValue(port)
+        self.osc_input_port.valueChanged.connect(self._osc_port)
+
+        self.osc_output_port = ui_common.QIntLineEdit()
+        self.osc_output_port.setRange(4096,65535)
+        self.osc_output_port.setEnabled(self.config.osc_enabled)
+        port = self.config.osc_output_port
+        self.osc_output_port.setValue(port)
+        self.osc_output_port.valueChanged.connect(self._osc_output_port)
+
+
+        w = ui_common.get_text_width("MMM.MMM.MMM.MMM MM")
+
+        remote_host_ip_widget = ui_common.QDataIPLineEdit()
+        remote_host_ip_widget.setText(self.config.osc_host)
+        remote_host_ip_widget.setEnabled(self.config.osc_enabled)
+        remote_host_ip_widget.textChanged.connect(self._osc_host)
+        remote_host_ip_widget.setMinimumWidth(w)
+        remote_host_ip_widget.setMaximumWidth(w)
+        
+
+
+        
+
+        # midi enabled
+        self.midi_enabled = QtWidgets.QCheckBox("Enable MIDI input")
+        container = QtWidgets.QWidget()
+        container.setContentsMargins(8,0,0,0)
+        layout = QtWidgets.QHBoxLayout(container)
+        layout.setContentsMargins(0,0,0,0)
+
+        self.midi_enabled.clicked.connect(self._midi_enabled)
+        self.midi_enabled.setChecked(self.config.midi_enabled)
+        self.midi_enabled.setToolTip("When set, Joystick Gremlin Ex will listen to MIDI ports when a profile is activated.")
+
+        layout.addWidget(self.midi_enabled)
+
+        page_layout.addWidget(QtWidgets.QLabel("MIDI Input Options:"))
+        page_layout.addWidget(container)
+        
+
+
+        container = QtWidgets.QWidget()
+        container.setContentsMargins(8,0,0,0)
+        layout = QtWidgets.QHBoxLayout(container)
+        layout.setContentsMargins(0,0,0,0)
+
+        layout.addWidget(self.osc_enabled)
+
+        page_layout.addWidget(QtWidgets.QLabel("OSC (Open Sound Control) Input Options:"))
+        page_layout.addWidget(container)
+
+        container = QtWidgets.QWidget()
+        container.setContentsMargins(16,0,0,0)
+        layout = QtWidgets.QGridLayout(container)
+        layout.setContentsMargins(0,0,0,0)
+        
+        host_ip = gremlin.util.getHostIp()
+        local_host_ip_widget = ui_common.QDataIPLineEdit()
+        local_host_ip_widget.setText(host_ip)
+        local_host_ip_widget.setReadOnly(True)
+        local_host_ip_widget.setMinimumWidth(w)
+        local_host_ip_widget.setMaximumWidth(w)
+        
+        row = 0
+        col = 0
+        layout.addWidget(QtWidgets.QLabel(f"Local OSC Server:"), row, col)
+        col+=1
+        layout.addWidget(local_host_ip_widget, row, col)
+        col+=1
+        layout.addWidget(QtWidgets.QLabel("OSC Input port:"), row, col)
+        col+=1
+        layout.addWidget(self.osc_input_port, row, col)
+        
+        
+        row += 1
+        col = 0
+        layout.addWidget(QtWidgets.QLabel("Output host IP:"), row, col)
+        col+=1
+        layout.addWidget(remote_host_ip_widget, row, col)
+        col+=1
+        layout.addWidget(QtWidgets.QLabel("Output port:"), row, col)
+        col+=1
+        layout.addWidget(self.osc_output_port, row, col)
+
+        layout.addWidget(QtWidgets.QWidget(),0,4)
+        layout.setColumnStretch(4,2)
+
+        page_layout.addWidget(container)
+        
+        label = QtWidgets.QLabel("Please configure remote OSC devices to send their output to the local IP and port listed above.")
+        page_layout.addWidget(label)
+        
+    
+
+
+        
+        page_layout.addStretch()
+
+    def _create_vigem_page(self):
+        page_widget = QtWidgets.QWidget()
+        page_layout = QtWidgets.QVBoxLayout(page_widget)
+
+        
+
+
+        page_layout.addWidget(QtWidgets.QLabel("VIGEM (Virtual Gamepad Emulator) options:"))
+        self.tab_container.addTab(page_widget, "VIGEM")
+
+
+
+        
+        # gamepad device count
+        container = QtWidgets.QWidget()
+        container.setContentsMargins(8,0,0,0)
+        layout = QtWidgets.QHBoxLayout(container)
+        layout.setContentsMargins(0,0,0,0)
+        self.gamepad_device_count_widget = QtWidgets.QSpinBox()
+        self.gamepad_device_count_widget.setRange(0,4) # 0 (none), 1 to 4 devices
+        self.gamepad_device_count_widget.setValue(self.config.vigem_device_count)
+        self.gamepad_device_count_widget.setToolTip("Number of virtual gamepad devices to create, 0 for none, 1 to 4")
+        self.gamepad_device_count_widget.valueChanged.connect(self._vigem_device_count_changed)
+        layout.addWidget(QtWidgets.QLabel("Gamepad count:"))
+        layout.addWidget(self.gamepad_device_count_widget)
+        layout.addStretch()
+
+        page_layout.addWidget(container)
+
+        label = QtWidgets.QLabel("Set the number of gamepads to zero (0) to disable VIGEM.")
+        label.setContentsMargins(8,0,0,0)
+        page_layout.addWidget(label)
+
+
+
+        page_layout.addStretch()
 
 
     def _create_hidguardian_page(self):
@@ -1229,7 +1340,8 @@ This setting is also available on a profile by profile basis on the profile tab,
 
     @QtCore.Slot()
     def _osc_host(self):
-        self.config.osc_host = self.osc_host.text()
+        widget = self.sender()
+        self.config.osc_host = widget.text()
 
 
     @QtCore.Slot(bool)
@@ -1266,20 +1378,24 @@ This setting is also available on a profile by profile basis on the profile tab,
                 return True
         return False
 
-    def _device_count_changed(self):
+    def _vigem_device_count_changed(self):
         self.config.vigem_device_count = self.gamepad_device_count_widget.value()
+        self._reload_needed = True # this change requires a profile reload due to device changes
 
 
     @QtCore.Slot(bool)
     def _highlight_autoswitch(self, clicked):
         """Stores preference for input highlighting  """
         self.config.highlight_autoswitch = clicked
+        el = gremlin.event_handler.EventListener()
+        el.toggle_highlight.emit(clicked, None, None)
 
     
     @QtCore.Slot(bool)
     def _highlight_hotkey_autoswitch(self, clicked):
         """Stores preference for input highlighting  """
         self.config.highlight_hotkey_autoswitch = clicked
+        
 
 
     @QtCore.Slot(bool)
@@ -1289,6 +1405,8 @@ This setting is also available on a profile by profile basis on the profile tab,
         :param clicked whether or not the checkbox is ticked
         """
         self.config.highlight_input_axis = clicked
+        el = gremlin.event_handler.EventListener()
+        el.toggle_highlight.emit(None, clicked, None)
 
     @QtCore.Slot(bool)
     def _highlight_input_buttons(self, clicked):
@@ -1297,6 +1415,8 @@ This setting is also available on a profile by profile basis on the profile tab,
         :param clicked whether or not the checkbox is ticked
         """
         self.config.highlight_input_buttons = clicked
+        el = gremlin.event_handler.EventListener()
+        el.toggle_highlight.emit(None, None, clicked)
 
 
 

@@ -623,65 +623,74 @@ class AbstractExecutionGraph(QtCore.QObject):
         # a "release" event is sent.
         process_again = False
         self.run_event.clear()
-        
+
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_condition
-        verbose_input = config.verbose_mode_inputs
-        syslog = logging.getLogger("system")
-
-        if verbose_input: syslog.info(str(event))
-        
-        if verbose: syslog.info (f"Execution plan:")
-        functor_names = []
-        for index, functor in enumerate(self.functors):
-            functor_names.append(type(functor).__name__)
-            if hasattr(functor, "condition_name"):
-                condition_name = functor.condition_name()
-            else:
-                condition_name = ""
-            if verbose: syslog.info(f"\t{index} -> {functor_names[index]} {condition_name}")
-        
         if verbose:
-            # output the transition plan
-            syslog.info("Transition plan:")
-            for key, next_index in self.transitions.items():
-                syslog.info(f"\t{key} -> {next_index}")
+            gremlin.shared_state.pushLog()
+        try:
         
+            
+            verbose_input = config.verbose_mode_inputs
+            syslog = logging.getLogger("system")
+            logTabs = gremlin.shared_state.logTabs(True)
 
-        if verbose: syslog.info (f"Execution start:")
-        while self.current_index is not None and len(self.functors) > 0 and not self.run_event.is_set():
-            index = self.current_index
-            functor = self.functors[index]
-            if isinstance(functor, gremlin.actions.ActivationCondition):
-                if verbose: syslog.info(f"\t\tIndex {index} -> executing condition {functor_names[index]} {functor.condition_name()}")
-                result = functor.process_event(event, value)
-                if verbose: syslog.info (f"\t\t\t{index} -> condition result: {result}")
-                if result is None or not result:
-                    # condition is not met
-                    if verbose: syslog.info (f"\t\t\t{index} -> condition failed")
-                    
-            else:
-                if verbose: syslog.info(f"\t\t{index} -> executing action {functor_names[index]}")
-                result = functor.process_event(event, value)
-                if verbose: syslog.info (f"\t\t\t{index} -> action result: {result}")
-                if result is None or not result:
-                    return False
-                #     logging.getLogger("system").warning(f"Process event returned no data or FALSE - functor: {type(functor).__name__}")
+            if verbose_input: syslog.info(f"{logTabs}{str(event)}")
+            
+            if verbose: syslog.info (f"{logTabs}Execution plan:")
+            functor_names = []
+            for index, functor in enumerate(self.functors):
+                functor_names.append(type(functor).__name__)
+                if hasattr(functor, "condition_name"):
+                    condition_name = functor.condition_name()
+                else:
+                    condition_name = ""
+                if verbose: syslog.info(f"{logTabs}\t{index} -> {functor_names[index]} {condition_name}")
+            
+            if verbose:
+                # output the transition plan
+                syslog.info(f"{logTabs}Transition plan:")
+                for key, next_index in self.transitions.items():
+                    syslog.info(f"{logTabs}\t{key} -> {next_index}")
+            
 
-                if isinstance(functor, gremlin.actions.AxisButton):
-                    process_again = functor.forced_activation
+            if verbose: syslog.info (f"{logTabs}Execution start:")
+            while self.current_index is not None and len(self.functors) > 0 and not self.run_event.is_set():
+                index = self.current_index
+                functor = self.functors[index]
+                if isinstance(functor, gremlin.actions.ActivationCondition):
+                    if verbose: syslog.info(f"{logTabs}\t\tIndex {index} -> executing condition {functor_names[index]} {functor.condition_name()}")
+                    result = functor.process_event(event, value)
+                    if verbose: syslog.info (f"{logTabs}\t\t\t{index} -> condition result: {result}")
+                    if result is None or not result:
+                        # condition is not met
+                        if verbose: syslog.info (f"{logTabs}\t\t\t{index} -> condition failed")
+                        
+                else:
+                    if verbose: syslog.info(f"{logTabs}\t\t{index} -> executing action {functor_names[index]}")
+                    result = functor.process_event(event, value)
+                    if verbose: syslog.info (f"{logTabs}\t\t\t{index} -> action result: {result}")
+                    if result is None or not result:
+                        return False
+                    #     logging.getLogger("system").warning(f"Process event returned no data or FALSE - functor: {type(functor).__name__}")
 
-            self.current_index = self.transitions.get((index, result),None)
-            if verbose: syslog.info (f"\t\tNext step: {(index, result)} -> {self.current_index}")
+                    if isinstance(functor, gremlin.actions.AxisButton):
+                        process_again = functor.forced_activation
 
-        self.current_index = 0
+                self.current_index = self.transitions.get((index, result),None)
+                if verbose: syslog.info (f"{logTabs}\t\tNext step: {(index, result)} -> {self.current_index}")
 
-        if process_again and not self.run_event.is_set():
-            time.sleep(0.05)
-            self.process_event(event, value)
+            self.current_index = 0
 
-        self.graph_completed.emit(self)
-        return True
+            if process_again and not self.run_event.is_set():
+                time.sleep(0.05)
+                self.process_event(event, value)
+
+            self.graph_completed.emit(self)
+            return True
+        finally:
+            if verbose:
+                gremlin.shared_state.popLog()
 
     def _build_graph(self, instance, parent_node = None):
         """Builds the graph structure based on the given object's content.

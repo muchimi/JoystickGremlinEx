@@ -1832,6 +1832,7 @@ class MidiClient(QtCore.QObject):
         #self._event_listener.profile_loaded.connect(self._update_messages)
         self._event_listener.profile_start.connect(self._profile_start)
         self._event_listener.shutdown.connect(self.stop)
+        self._event_listener.options_changed.connect(self._options_changed)
 
         # start on initialization
         self.start()
@@ -1842,14 +1843,24 @@ class MidiClient(QtCore.QObject):
             self.start()
         else:
             self.stop()        
+
+    @QtCore.Slot()            
+    def _options_changed(self):
+        config = gremlin.config.Configuration()
+        midi_enabled = config.midi_enabled
+        if midi_enabled:
+            self.start()
+        else:
+            self.stop()
+
       
     @QtCore.Slot()
     def _profile_start(self):
         ''' occurs on profile start '''
         config = gremlin.config.Configuration()
-        verbose = config.verbose_mode_osc
+        verbose = config.verbose_mode_midi
         syslog = logging.getLogger("system")
-        # self._update_messages()
+        
         current_mode = gremlin.shared_state.current_mode
         if self._midi_map and current_mode in self._midi_map:
             if verbose:
