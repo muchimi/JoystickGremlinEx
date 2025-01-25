@@ -1442,10 +1442,18 @@ class Configuration:
         
         '''
         save_input_id = input_id
+        input_type = None
+        syslog = logging.getLogger("system")
+        device_name = gremlin.joystick_handling.device_name_from_guid(dinput_device_guid)
         if not dinput_device_guid in gremlin.shared_state.device_type_map:
             # input is missing
-            logging.getLogger("system").warning(f"Config: get last input: Unable to find device {dinput_device_guid} in device map")
+            syslog.warning(f"Config: get last input: Unable to determine input type:  Unable to find device {dinput_device_guid} {device_name} in device map")
             return (None, None, None)
+        
+        if input_id is None:
+            syslog.warning(f"Config: get last input: Unable to determine input type: NULL input id")
+            return (None, None, None)
+
         device_type = gremlin.shared_state.device_type_map[dinput_device_guid]
         if device_type == gremlin.types.DeviceType.Joystick:
             device_info = gremlin.joystick_handling.device_info_from_guid(dinput_device_guid)
@@ -1458,6 +1466,11 @@ class Configuration:
                     input_type = gremlin.input_types.InputType.JoystickButton
                     if input_id is None or input_id > device_info.button_count:
                         input_id = 1
+                elif device_info.hat_count > 0:
+                    input_type = gremlin.input_types.InputType.JoystickHat
+                    if input_id is None or input_id > device_info.hat_count:
+                        input_id = 1
+
         elif device_type in (gremlin.types.DeviceType.Keyboard, gremlin.types.DeviceType.Midi, gremlin.types.DeviceType.Osc):
             # grab the tab widget
             if device_type == gremlin.types.DeviceType.Keyboard:
@@ -1501,7 +1514,11 @@ class Configuration:
         
                     
         else:
-            assert False, f"Config: GetInputId() Don't know how to handle device type: {device_type}"
+            assert False, f"Config: GetInputId() Don't know how to handle device type: {device_type}  {device_name}"
+
+        if input_type is None or input_id is None:
+            syslog.warning(f"Config: get last input: Unable to determine input type for device {dinput_device_guid} {device_name}")
+            return (None, None, None)
 
         return (input_type, save_input_id, input_id)
 

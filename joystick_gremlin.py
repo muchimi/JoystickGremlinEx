@@ -120,7 +120,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_BASE = "m69"
+APPLICATION_BASE = "m69a"
 APPLICATION_VERSION = f"13.40.16ex ({APPLICATION_BASE})"
 
 
@@ -365,13 +365,15 @@ class GremlinUi(QtWidgets.QMainWindow):
         self._joystick_device_guids = []
         self.tab_guids = []
 
-        # remove all tab headers
+       
+        self._clear_tabs()
+
+
+    def _clear_tabs(self):
+         # remove all tab headers
         with QtCore.QSignalBlocker(self.ui.devices):
             while self.ui.devices.count():
                 self.ui.devices.removeTab(0)
-
-        # gremlin.shared_state.device_profile_map.clear()
-        
         
 
     def _add_tab(self, device_guid, tab_type, index = None) -> int: 
@@ -425,9 +427,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         tab_count = self.ui.devices.count()
         tab_map = {}
         for index in range(tab_count):
-            device_guid = self._tab_index_map[index]
-            data : TabData = self.ui.devices.tabData(index)
-            assert device_guid ==  data.device_guid
+            data : TabData =  self.ui.devices.tabData(index)
+            device_guid = data.device_guid
             device_name = self._tab_name_map[device_guid]
             
             tab_map[index] = (device_guid, device_name, data.tab_type, index)
@@ -2220,10 +2221,10 @@ class GremlinUi(QtWidgets.QMainWindow):
 
     def _get_tab_index(self, device_guid):
         ''' gets the tab index for the given GUID '''
-        widgets = self._get_tab_widgets()
-        for index, widget in enumerate(widgets):
-            if widget.data[1].casefold() == device_guid.casefold():
-                return index
+        if not isinstance(device_guid, str):
+            device_guid = str(device_guid)
+        if device_guid in self._tab_device_map:
+            return self._tab_device_map[device_guid]
         return None
 
 
@@ -2588,23 +2589,26 @@ class GremlinUi(QtWidgets.QMainWindow):
         # sorted list of item GUIDs
         guid_list = []
         tab_map = self._get_tab_map()
-        if self.config.verbose_mode_details:
+        if self.config.verbose:
+            syslog.info("SORT: pre sort state:")
             self._dump_tab_map(tab_map)
 
+        # add hardware joystick devices by their alphabetical name 
         joystick_devices = self._find_joystick_tab_data()
         joystick_devices.sort(key=lambda x: x[1].casefold())
         guid_list.extend(joystick_devices)
 
-        config = gremlin.config.Configuration()
+        
 
         # add the Keyboard, OSC and MIDI
-        guid_list.append(self._find_tab_data_guid(self._keyboard_device_guid))
-        if config.midi_enabled:
-            guid_list.append(self._find_tab_data_guid(self._midi_device_guid))
-        if config.osc_enabled:
-            guid_list.append(self._find_tab_data_guid(self._osc_device_guid))
+        
+        guid_list.append(self._find_tab_data_guid(gremlin.shared_state.keyboard_tab_guid))
+        if self.config.midi_enabled:
+            guid_list.append(self._find_tab_data_guid(gremlin.shared_state.midi_tab_guid))
+        if self.config.osc_enabled:
+            guid_list.append(self._find_tab_data_guid(gremlin.shared_state.osc_tab_guid))
 
-        # add the input vjoy
+        # add the input vjoy devices
         for device_guid in self._vjoy_input_device_guids:
             guid_list.append(self._find_tab_data_guid(device_guid))
 
@@ -2613,20 +2617,22 @@ class GremlinUi(QtWidgets.QMainWindow):
             guid_list.append(self._find_tab_data_guid(device_guid))
 
         # add the settings tab
-        guid_list.append(self._find_tab_data_guid(self._settings_device_guid))
+        guid_list.append(self._find_tab_data_guid(gremlin.shared_state.settings_tab_guid))
 
         # add the user plugin tab
-        guid_list.append(self._find_tab_data_guid(self._plugins_device_guid))
+        guid_list.append(self._find_tab_data_guid(gremlin.shared_state.plugins_tab_guid))
 
 
         # move the tabs to the correct location
+        tab_data = [self.ui.devices.tabData(index) for index in range(self.ui.devices.count())]
+        self._reset_tab_data()
         for index, (device_guid, device_name, device_type, tab_index) in enumerate(guid_list):
-            tab_index = self._get_tab_index(device_guid)
-            if tab_index is not None:
-                self.ui.devices.moveTab(tab_index, index)
+            data : TabData = tab_data[index]
+            self._add_tab(device_guid, data.tab_type, index)
 
         tab_map = self._get_tab_map()
-        if self.config.verbose_mode_details:
+        if self.config.verbose:
+            syslog.info("SORT: post result:")
             self._dump_tab_map(tab_map)
 
 

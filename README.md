@@ -210,6 +210,11 @@ Joystick Gremlin EX
 
 <!-- TOC --><a name="134016ex-pre-release"></a>
 ## 13.40.16ex (pre-release)
+### (m69a)
+- Fix: device sorting (sort menu)
+- Fix: input type exception when attempting to derive at type from an input that no longer exists, such as, the device is removed/disconnects.
+- Fix: references to deprecated highlighting tracking system
+
 ### (m69)
 - Improved: Keyboard macro bring up the unified keyboard list for enhanced keys.
 - Improved: Keyboard macro has quick add shortcut buttons for add a press, or add a release.
