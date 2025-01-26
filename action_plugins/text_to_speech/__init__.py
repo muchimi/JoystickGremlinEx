@@ -236,7 +236,7 @@ class TextToSpeech(gremlin.base_profile.AbstractAction):
     def _parse_xml(self, node, data = None):
         
         voice_id = None
-        
+        tts = gremlin.tts.TextToSpeech()
         if "voice_id" in node.attrib:
             voice_id = node.get("voice_id")
             if voice_id.isdigit():
@@ -244,7 +244,7 @@ class TextToSpeech(gremlin.base_profile.AbstractAction):
             else:
                 voice_id = 0
             
-            tts = gremlin.tts.TextToSpeech()
+    
             voices = tts.getVoices()
             if voices and voice_id < len(voices):
                 self.voice_name = voices[voice_id]

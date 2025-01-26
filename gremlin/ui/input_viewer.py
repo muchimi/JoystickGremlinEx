@@ -228,10 +228,9 @@ class VisualizationSelector(QtWidgets.QWidget):
             if visualization != VisualizationType.AxisTemporal and not dev.is_virtual:
                 with QtCore.QSignalBlocker(widget):
                     widget.setChecked(True)
-                visualisation, dev = widget.data
             else:
                 widget.setChecked(False)
-            self._create_callback(dev, visualisation, widget)()
+            self._create_callback(dev, visualization, widget)()
 
 
                     

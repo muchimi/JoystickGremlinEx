@@ -154,7 +154,9 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             vjoy_dev_id = self.action_data.vjoy_device_id
 
         # Get the input type which can change depending on the container used
-        input_type = self.action_data.input_type
+        input_type = self.action_data.get_input_type()
+        
+        
         if self.action_data.parent.tag == "hat_buttons":
             input_type = InputType.JoystickButton
 
@@ -408,12 +410,9 @@ class Remap(gremlin.base_profile.AbstractAction):
         self.parent = parent
         self.vjoy_device_id = None
         self.vjoy_input_id = None
-        input_type = self.parent.parent.input_type
+        input_type = self.get_input_type()
         self.input_type = input_type
-        if hasattr(self.parent.parent,"is_axis"):
-            self.is_axis = self.parent.parent.is_axis
-        else:
-            self.is_axis = input_type == InputType.JoystickAxis
+        self.is_axis = self.input_is_axis()
         
         self.axis_mode = "absolute"
         self.axis_scaling = 1.0
