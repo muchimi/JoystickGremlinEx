@@ -214,6 +214,9 @@ Joystick Gremlin EX
 - Improved: Options button added to main toolbar.
 - Improved: Options dialog has dedicated tabs for various options
 - Improved: Options performance improvements on close.
+- Fix: mode name change may not be updated in the profile
+- Fix: Simconnect: RPN calculator text will paste MIME types as plain text
+- Fix: Simconnect: RPN command displayed when not in calculator mode
 
 ### (m69a)
 - Fix: device sorting (sort menu)

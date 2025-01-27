@@ -1325,6 +1325,7 @@ class InputItemWidget(QtWidgets.QFrame):
                 if not current_button_widget:
                     widget = gremlin.ui.ui_common.ButtonStateWidget()
                     self.button_widget = widget
+                    
 
                 # remove axis widget if we changed modes
                 if self.axis_widget:
@@ -1696,8 +1697,6 @@ class InputItemWidget(QtWidgets.QFrame):
 
             self.setStyleSheet(style)
             self.selected_changed.emit(self)
-            #self.selected_changed.emit(self.identifier)
-
 
 
     def enable_close(self):

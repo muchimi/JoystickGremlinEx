@@ -2192,7 +2192,11 @@ class ModeManagerUi(ui_common.BaseDialogUi):
 
     @QtCore.Slot()
     def _close_cb(self):
+        # tell the UI the modes may have changed
+        el = gremlin.event_handler.EventListener()
+        el.mode_list_update.emit() 
         self.close()
+
 
     def _get_mode_list(self):
         modes = gremlin.shared_state.current_profile.get_modes()
@@ -2384,7 +2388,7 @@ The setting can be overriden by the global mode reload option set in Options for
         # eh = gremlin.event_handler.EventListener()
         # eh.edit_mode_changed.emit()
 
-    def _rename_mode(self, mode_name):
+    def _rename_mode(self, current_name):
         """Asks the user for the new name for the given mode.
 
         If the user provided name for the mode is invalid the
@@ -2393,45 +2397,48 @@ The setting can be overriden by the global mode reload option set in Options for
         :param mode_name new name for the mode
         """
         # Retrieve new name from the user
-        name, user_input = QtWidgets.QInputDialog.getText(
+        new_name, user_input = QtWidgets.QInputDialog.getText(
                 self,
                 "Mode name",
                 "",
                 QtWidgets.QLineEdit.Normal,
-                mode_name
+                current_name
         )
-        name = name.strip()
+        new_name = new_name.strip()
+        if new_name == current_name:
+            # nothing to change
+            return
+        
         if user_input:
-            if name in gremlin.profile.mode_list(self._profile):
+            if new_name in gremlin.profile.mode_list(self._profile):
                 gremlin.util.display_error(
-                    f"A mode with the name \"{name}\" already exists"
+                    f"A mode with the name \"{new_name}\" already exists"
                 )
             else:
                 # Update the renamed mode in each device
 
-                new_name = mode_name
                 for device in self._profile.devices.values():
                     
-                    device.modes[name] = device.modes[mode_name]
-                    device.modes[name].name = name
-                    del device.modes[mode_name]
-                    if gremlin.shared_state.edit_mode == mode_name:
-                        gremlin.shared_state.edit_mode = name
-                    if gremlin.shared_state.runtime_mode == mode_name:
-                        gremlin.shared_state.runtime_mode = name
+                    device.modes[new_name] = device.modes[current_name]
+                    device.modes[new_name].name = new_name
+                    del device.modes[current_name]
+                    if gremlin.shared_state.edit_mode == current_name:
+                        gremlin.shared_state.edit_mode = new_name
+                    if gremlin.shared_state.runtime_mode == current_name:
+                        gremlin.shared_state.runtime_mode = new_name
 
                     # Update inheritance information
                     for mode in device.modes.values():
-                        if mode.inherit == mode_name:
-                            mode.inherit = name
+                        if mode.inherit == current_name:
+                            mode.inherit = new_name
 
                 # rename the startup mode if it's the same
-                if mode_name == gremlin.shared_state.current_profile.get_start_mode():
-                    gremlin.shared_state.current_profile.set_start_mode(name)
+                if current_name == gremlin.shared_state.current_profile.get_start_mode():
+                    gremlin.shared_state.current_profile.set_start_mode(new_name)
 
                 # tell the UI of the name change
                 el = gremlin.event_handler.EventListener()
-                el.mode_name_changed.emit(new_name)
+                el.mode_name_changed.emit(current_name, new_name)
 
                 
 

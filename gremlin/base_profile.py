@@ -1941,7 +1941,11 @@ class Profile():
 
     def setSimconnectMode(self, key, mode):
         ''' sets the simconnect startup mode for a given aicraft key - the key comes from the SimconnectAicraftDefinition for the aircraft'''
+        # key is  (item.id, item.mode)
         assert len(key) == 2
+        key_ap, key_cp = key
+        assert key_ap,"Invalid AP key"
+        assert key_cp,"Invalid CP key"
         self._simconnect_modes[key] = mode
 
     def getSimconnectMode(self, key):
@@ -2319,6 +2323,27 @@ class Profile():
                     modes.append(mode.name)
         return list(set(modes))  # unduplicated
     
+    def rename_mode(self, old_mode:str, new_mode:str):
+        ''' renames an existing mode to a new mode '''
+        syslog = logging.getLogger("system")
+        verbose = gremlin.config.Configuration().verbose
+        if old_mode == new_mode:
+            if verbose: syslog.warning(f"PROFILE: rename [{old_mode}] and [{new_mode}] are the same, skip")   
+            return 
+        modes = self.get_modes(True)
+        mode : Mode
+        for mode in modes:
+            if mode.name == old_mode:
+                if verbose: syslog.info(f"PROFILE: rename [{old_mode}] to [{new_mode}]")
+                mode.name = new_mode
+                return True
+
+                
+        if verbose: syslog.error(f"PROFILE: rename [{old_mode}] to [{new_mode}] - [{old_mode}] was not found in the profile")
+        return False
+
+
+    
 
     def is_mode(self, mode) -> bool:
         ''' true if the mode exists in the current profile '''
@@ -2584,6 +2609,8 @@ class Profile():
                     # only store dual keys
                     continue
                 key_cp, key_ap = key
+                assert key_cp,"invalid CP key found"
+                assert key_ap,"invalid AP key found"
 
                 child = etree.Element("simconnect")
                 child.set("key_cp",key_cp)

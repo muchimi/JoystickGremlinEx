@@ -209,8 +209,8 @@ class SimconnectAicraftDefinition():
         self.id = id if id else gremlin.util.get_guid()
 
         assert community_path and aircraft_path,"Community path and Aircraft path are primary keys and cannot be NULL"
-        self.community_path = community_path.casefold() 
-        self.aircraft_path = aircraft_path.casefold()
+        self.community_path = community_path.casefold()  # AP
+        self.aircraft_path = aircraft_path.casefold() # CP
 
         
         
@@ -225,7 +225,8 @@ class SimconnectAicraftDefinition():
     
     @property
     def key(self):
-        return self.aircraft_path.casefold()  # unique key is the path
+        ''' key for this item (CP = community path, AP = aircraft path)'''
+        return (self.community_path, self.aircraft_path) 
 
     @property
     def valid(self):
@@ -2097,7 +2098,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
                     mode_index = selector.findData(mode)
                 selector.setCurrentIndex(mode_index)
             item.mode = mode
-            profile.setSimconnectMode(item.key, mode)
+            profile.setSimconnectMode(key, mode)
             print (f"set mode {mode} for {item.sim_name}")
 
 
@@ -2218,6 +2219,9 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self._mode_container_layout.addStretch()
 
+        self._mode_container_layout.addWidget(self._options_button_widget)
+
+
 
         # type options
         self._type_is_calculator_widget = QtWidgets.QCheckBox("RPN (Calculator) code")
@@ -2319,6 +2323,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         # calculator entry
         self._calculator_entry_widget = QtWidgets.QTextEdit()
+        self._calculator_entry_widget.setAcceptRichText(False)
         self._calculator_entry_widget.setToolTip("RPN calculator expression sent to MSFS")
         self._calculator_entry_widget.setMinimumWidth(200)
         self._calculator_entry_widget.setPlainText(self.action_data.command)
@@ -2326,6 +2331,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 
         self._calculator_release_entry_widget = QtWidgets.QTextEdit()
+        self._calculator_release_entry_widget.setAcceptRichText(False)
         self._calculator_release_entry_widget.setToolTip("RPN calculator expression sent to MSFS on input release")
         self._calculator_release_entry_widget.setMinimumWidth(200)
         self._calculator_release_entry_widget.setPlainText(self.action_data.command_release)
@@ -2379,7 +2385,6 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._action_selector_layout.addWidget(self._command_selector_widget)
         self._action_selector_layout.addStretch()
 
-        self._action_selector_layout.addWidget(self._options_button_widget)
         
         self._action_selector_widget.setContentsMargins(0,0,0,0)
         
@@ -2741,7 +2746,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         # update from ui
         self._update_ui()
-        self._update_visible()
+
 
 
     def _update_curve_icon(self):
@@ -3088,11 +3093,6 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _update_ui(self):
         ''' updates the UI with a data block '''
 
-        self._update_visible()
-
-
-        
-
         with QtCore.QSignalBlocker(self._trigger_on_release_widget):
             self._trigger_on_release_widget.setChecked(self.action_data.trigger_on_release)
 
@@ -3280,6 +3280,9 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
             value = gremlin.joystick_handling.get_axis(self.action_data.hardware_device_guid, self.action_data.hardware_input_id)
             self._update_axis_widget(value)
     
+        # update visibility
+        self._update_visible()
+
 
     def _update_visible(self):
         ''' updates the UI based on the output mode selected '''
@@ -3294,9 +3297,10 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._command_selector_widget.setVisible(simvar_visible)
         self._lvar_lookup_container_widget.setVisible(calc_visible)
         self._calculator_container_widget.setVisible(calc_visible)
+
         self._type_container_widget.setVisible(False) # disable for now as it doesn't serve a value until we have an edit / entry mode
         self._command_container_widget.setVisible(simvar_visible)
-        self._calculator_release_container_widget.setVisible(release_command_visible)
+        self._calculator_release_container_widget.setVisible(release_command_visible and calc_visible)
 
         self._output_container_widget.setVisible(simvar_visible)
         self._button_mode_container_widget.setVisible(simvar_visible)

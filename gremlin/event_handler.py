@@ -355,7 +355,8 @@ class EventListener(QtCore.QObject):
 	# occurs on mode edit/update/delete of modes (edit time only)
 	edit_mode_changed = QtCore.Signal(str) # param: the mode that was changed to
 
-	mode_name_changed = QtCore.Signal(str) # runs when a mode name change occurs for the UI to update - param - the name change
+	mode_name_changed = QtCore.Signal(str, str) # runs when a mode name change occurs for the UI to update - param (old name, new name)
+	mode_list_update = QtCore.Signal() # runs when mode lists changes
 
 	runtime_mode_changed = QtCore.Signal(str) # runs when the runtime profile mode changes (runtime mode only, when a profile has been started) - param - the mode changed to
 
@@ -367,6 +368,7 @@ class EventListener(QtCore.QObject):
 
 	# selection event - tells the UI to show a different input
 	select_input = QtCore.Signal(object, object, object, bool, bool, bool) # selects a particular input (device_guid, input_type, input_id, force_update, force_switch, tab_changed)
+	select_input_completed = QtCore.Signal(object, object, object) # indicates input selection is completed (device_guid, input_type, input_id)
 
 	input_selected = QtCore.Signal(object) # widget item was selected, parameter = InputItemWidget
 	input_item_selected = QtCore.Signal(object, int) # widget item was selected, parameter = InputItem, index of input item in the listview
@@ -430,8 +432,10 @@ class EventListener(QtCore.QObject):
 	# gremlin ex shutdown in progress
 	shutdown = QtCore.Signal() 
 
-	# toggle highlighting mode
+	# toggle highlighting modestate
 	toggle_highlight = QtCore.Signal(object, object, object) # param (axis,button)
+	enable_highlight_changed = QtCore.Signal(bool) # fires when highlight enable is turned on param(enabled)
+	
 	
 	# heartbeat
 	heartbeat = QtCore.Signal() # ticks every 30 seconds
@@ -811,11 +815,12 @@ class EventListener(QtCore.QObject):
 				is_axis = True,
 				is_virtual = is_virtual
 			)
-			self.joystick_event.emit(event)
 
 			# notify axis change for tab switches
 			if not gremlin.shared_state.is_running:
 				self.axis_state_change.emit(event)
+
+			self.joystick_event.emit(event)
 
 		elif event.input_type == dinput.InputType.Button:
 			event = Event(
@@ -825,9 +830,11 @@ class EventListener(QtCore.QObject):
 				is_pressed=event.value == 1,
 				is_virtual = is_virtual
 			)
-			self.joystick_event.emit(event)
+			
 			if not gremlin.shared_state.is_running:
-				self.button_state_change.emit(event)
+				gremlin.util.singleShot(lambda : self.button_state_change.emit(event))
+
+			gremlin.util.singleShot(lambda: self.joystick_event.emit(event))
 			
 		elif event.input_type == dinput.InputType.Hat:
 			value = dill_hat_lookup[event.value]
@@ -840,9 +847,11 @@ class EventListener(QtCore.QObject):
 				value = value,
 				raw_value= value
 			)
-			self.joystick_event.emit(event)
+			
 			if not gremlin.shared_state.is_running:
-				self.button_state_change.emit(event)
+				gremlin.util.singleShot(lambda : self.button_state_change.emit(event))
+
+			gremlin.util.singleShot(lambda: self.joystick_event.emit(event))
 
 
 	def _joystick_device_handler(self, data, action):

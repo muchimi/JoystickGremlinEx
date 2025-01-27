@@ -1317,7 +1317,7 @@ def pushCursor():
     global _cursor_push
     if _cursor_push == 0:
         QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.CursorShape.WaitCursor)
-        QtWidgets.QApplication.processEvents()
+        #QtWidgets.QApplication.processEvents()
     _cursor_push+=1
 
 def popCursor(reset = False):
@@ -1327,7 +1327,7 @@ def popCursor(reset = False):
         _cursor_push -= 1
     if _cursor_push == 0 or reset:
         QtWidgets.QApplication.restoreOverrideCursor()
-        QtWidgets.QApplication.processEvents()
+        #QtWidgets.QApplication.processEvents()
 
 def isCursorActive():
     ''' true if the cursor stack is not empty '''
@@ -1666,4 +1666,11 @@ def to_byte_string(source) -> tuple:
     if isinstance(source, bytes):
         return (source.decode(), source)
     return (source, source.encode('utf-8'))
+    
+
+def singleShot(callback):
+    ''' fires callback in a thread - returns immediately to caller '''
+    thread = threading.Thread(target = callback)
+    thread.name = "SingleShot"
+    thread.start()
     

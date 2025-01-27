@@ -126,6 +126,11 @@ class SimConnectBridge(QtCore.QObject):
         except:
             pass
 
+    @property
+    def is_alive(self)->bool:
+        ''' true if connnected '''
+        return self._alive
+
 
     def stop(self):
         if not self._started:
@@ -177,7 +182,8 @@ class SimConnectBridge(QtCore.QObject):
             packet = cast(client_data.dwData, POINTER(BRIDGE_PACKET)).contents
 
             if packet.code == BridgeCommands.Ping:
-                data = packet.data.decode()
+                data = packet.data.decode('ascii',errors='replace')
+                data = data.replace('\ufffd','') # remove junk characters
                 if data == "#pong#":
                     syslog.info(f"Bridge: received pong")
                     self._alive = True

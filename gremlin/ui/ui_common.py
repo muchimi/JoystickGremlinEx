@@ -152,9 +152,12 @@ class StateTracker():
     def __init__(self):
         self._axis_cache = {}
         self._button_cache = {}
+        self._state_cache = {}
         el = gremlin.event_handler.EventListener()
         el.button_state_change.connect(self._button_state_change)
         el.axis_state_change.connect(self._axis_state_change)
+        el.select_input_completed.connect(self._select_input_completed)
+        self._queue = []
 
 
     def _key(self, input_id):
@@ -232,14 +235,33 @@ class StateTracker():
 
 
     def _button_state_change(self, event: gremlin.event_handler.Event):
+
+
         if gremlin.shared_state.is_running:
             # do not update while profile is running
             return 
         
+        self._process_event(event)
+
+    def _process_event(self, event):
         device_guid = event.device_guid
         input_type = event.event_type
         input_id = event.identifier
-        
+        match input_type:
+            case InputType.JoystickButton:
+                state = event.is_pressed
+            case InputType.JoystickHat:
+                state = event.value
+            case InputType.OpenSoundControl:
+                state = input_id.button_value
+            case InputType.Midi:
+                state = input_id.button_value
+
+        self._store_state(device_guid, input_type, input_id, state)
+        self._update_widget(device_guid, input_type, input_id, state)
+
+    def _update_widget(self, device_guid, input_type, input_id, state):
+        ''' updates the state of the widget'''
         if not isinstance(device_guid, str):
             device_guid = str(device_guid)
         syslog = logging.getLogger("system")
@@ -254,18 +276,16 @@ class StateTracker():
                             match input_type:
                                 case InputType.JoystickButton:
                                     if hasattr(widget, "_update_value"):
-                                        widget._update_value(event.is_pressed)
+                                        widget._update_value(state)
                                 case InputType.JoystickHat:
                                     if hasattr(widget, "_update_hat"):
-                                        widget._update_hat(event.value)
+                                        widget._update_hat(state)
                                 case InputType.OpenSoundControl:
-                                    is_pressed = input_id.button_value
                                     if hasattr(widget, "_update_value"):
-                                        widget._update_value(is_pressed)
+                                        widget._update_value(state)
                                 case InputType.Midi:
-                                    is_pressed = input_id.button_value
                                     if hasattr(widget, "_update_value"):
-                                        widget._update_value(is_pressed)
+                                        widget._update_value(state)
 
                             
                     except:
@@ -275,6 +295,29 @@ class StateTracker():
                 #     syslog.info(f"ButtonState: {device_name} type {InputType.to_display_name(event.event_type)} input {event.identifier} connect")              
                 
                     
+    def _store_state(self, device_guid, input_type, input_id, state):
+        ''' stores the last button state for the given input '''
+        if not isinstance(device_guid, str):
+            device_guid = str(device_guid)
+        if not device_guid in self._state_cache:
+            self._state_cache[device_guid] = {}
+        if not input_type in self._state_cache[device_guid]:
+            self._state_cache[device_guid][input_type] = {}
+        # device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
+        # print (f"Store: {device_name} {InputType.to_display_name(input_type)} {input_id} state: {state}")
+        self._state_cache[device_guid][input_type][input_id] = state
+
+    def _get_state(self, device_guid, input_type, input_id):
+        ''' gets the last button state for the given input '''
+        if not isinstance(device_guid, str):
+            device_guid = str(device_guid)
+        if device_guid in self._state_cache:
+            if input_type in self._state_cache[device_guid]:
+                if input_id in self._state_cache[device_guid][input_type]:
+                    return self._state_cache[device_guid][input_type][input_id]
+        return None
+
+
 
     
     def _axis_state_change(self, event : gremlin.event_handler.Event):
@@ -326,6 +369,15 @@ class StateTracker():
                     widget = self._axis_cache[device_guid][input_type][key]
                     return widget
         return None
+    
+    @QtCore.Slot(object, object, object)
+    def _select_input_completed(self, device_guid, input_type, input_id):
+        state = self._get_state(device_guid, input_type, input_id)
+        # device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
+        # print (f"Completed: {device_name} {InputType.to_display_name(input_type)} {input_id} state: {state}")
+        if state is not None:
+            self._update_widget(device_guid, input_type, input_id, state)
+
     
     
 
@@ -1447,6 +1499,9 @@ class ModeWidget(QtWidgets.QWidget):
         self.main_layout = QtWidgets.QHBoxLayout(self)
         self._create_widget()
 
+        el = gremlin.event_handler.EventListener()
+        el.mode_list_update.connect(self._mode_list_update)
+
 
     def setRuntimeDisabled(self, value):
         ''' enables or disables profile runtime behavior'''
@@ -1470,6 +1525,15 @@ class ModeWidget(QtWidgets.QWidget):
     @QtCore.Slot()
     def _profile_stop_cb(self):
         self.setEnabled(True)
+
+    @QtCore.Slot()
+    def _mode_list_update(self):
+        ''' occurs when mode list may have changed '''
+        profile = gremlin.shared_state.current_profile
+        mode = gremlin.shared_state.current_mode
+        self.populate_selector(profile, mode)
+        self.select_mode(mode)
+
 
     def select_mode(self, mode: str):
         ''' selects the mode without firing a change event - ignored if the mode doesn't exist '''
@@ -2548,26 +2612,15 @@ class ButtonStateWidget(QtWidgets.QWidget):
         self._device_guid = device_guid
         self._input_id = input_id
         self._input_type = input_type
-        is_pressed = False
-        if self._input_type in (InputType.OpenSoundControl, InputType.Midi):
-            is_pressed = input_id.button_value
-        elif gremlin.joystick_handling.is_hardware_device(device_guid):
-            # read the current value
-            if self._input_type == InputType.JoystickHat:
-                value = gremlin.joystick_handling.dinput.DILL().get_hat(device_guid, input_id)
-                import vjoy
-                if value in vjoy.vjoy.Hat.to_continuous_position: 
-                    position = vjoy.vjoy.Hat.to_continuous_position[value]
-                else:
-                    position = (0,0)
-                self._update_hat(position)
-            else:
-                is_pressed = gremlin.joystick_handling.dinput.DILL().get_button(device_guid, input_id)
-                self._update_value(is_pressed)
-
+        self.updateState()
         self._tab_selected(device_guid)
 
-
+    def updateState(self):
+        ''' updates the widget state with the cached state  '''
+        tracker = StateTracker()
+        state = tracker._get_state(self._device_guid, self._input_type, self._input_id)
+        if state:
+            self._update_value(state)
 
     def unhookDevice(self):
         self._tab_unselected(self._device_guid)

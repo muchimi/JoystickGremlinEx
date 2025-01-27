@@ -210,6 +210,9 @@ class GremlinUi(QtWidgets.QMainWindow):
         self._button_highlighting_enabled = self.config.highlight_input_buttons # true if highlighting on buttons
         self._axis_highlighting_enabled = self.config.highlight_input_axis  # true if highligthing on axes
         self._input_highlighting_enabled = self.config.highlight_enabled  # on/off global
+
+        el.enable_highlight_changed.connect(self._highlight_enable_changed) # fires when highlight mode is toggled
+
         self._last_highlight_key = None    # last event processed for input highlights
         el.toggle_highlight.connect(self._handle_highlight_state) # input highlighting states
         el.ui_ready.connect(self._ui_ready)
@@ -244,7 +247,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         el.runtime_mode_changed.connect(self._runtime_mode_changed)
         el.edit_mode_changed.connect(self._edit_mode_changed)
-        el.mode_name_changed.connect(self._update_mode_status_bar)
+        el.mode_name_changed.connect(self._mode_name_changed)
 
         self.tab_guids = []
 
@@ -490,7 +493,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         if not is_pressed:
             # trigger only on presses
             return
-        if gremlin.shared_state.is_highlighting_suspended:
+        if gremlin.shared_state.is_highlighting_suspended():
             # highlighting disabled
             return
         is_button = self.is_button_highlighting
@@ -512,7 +515,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         
         # trigger switch
         self._select_input_handler(device_guid, input_type, input_id)
-        
+
+
 
     def _axis_state_change(self, event):
         ''' axis changed - triggered only at design time '''
@@ -1283,23 +1287,17 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.ui.actionModifyProfile.triggered.connect(self.profile_creator)
         self.ui.actionExit.triggered.connect(self._force_close)
         # Actions
-        self.ui.actionCreate1to1Mapping.triggered.connect(
-            self._create_1to1_mapping
-        )
+        self.ui.actionCreate1to1Mapping.triggered.connect(self._create_1to1_mapping)
         self.ui.actionMergeAxis.triggered.connect(self.merge_axis)
         self.ui.actionSwapDevices.triggered.connect(self.swap_devices)
 
         # Tools
-        self.ui.actionDeviceInformation.triggered.connect(
-            self.device_information
-        )
+        self.ui.actionDeviceInformation.triggered.connect(self.device_information)
         self.ui.actionManageModes.triggered.connect(self.manage_modes)
         self.ui.actionInputRepeater.triggered.connect(self.input_repeater)
         #self.ui.actionCalibration.triggered.connect(self.calibration)
         self.ui.actionInputViewer.triggered.connect(self.input_viewer)
-        self.ui.actionPDFCheatsheet.triggered.connect(
-            lambda: self._create_cheatsheet()
-        )
+        self.ui.actionPDFCheatsheet.triggered.connect(lambda: self._create_cheatsheet())
         self.ui.actionViewInput.triggered.connect(lambda: self._view_input_map())
         self.ui.actionOptions.triggered.connect(self.options_dialog)
         self.ui.actionLogDisplay.triggered.connect(self.log_window)
@@ -1526,7 +1524,17 @@ class GremlinUi(QtWidgets.QMainWindow):
     @QtCore.Slot()
     def _toggle_highlight_enabled(self, checked):
         self.config.highlight_enabled = not self.config.highlight_enabled
+        el = gremlin.event_handler.EventListener()
+        el.enable_highlight_changed.emit(checked)
+
+
+
+    @QtCore.Slot(bool)
+    def _highlight_enable_changed(self, enabled : bool):
         self._update_highlight_toolbar_enabled()
+        if enabled:
+            # reset the highlight stack
+            gremlin.shared_state.pop_suspend_highlighting(True)
         
 
         
@@ -2410,9 +2418,9 @@ class GremlinUi(QtWidgets.QMainWindow):
 
             self._selection_locked = True
 
-            self.push_highlighting()
+            #self.push_highlighting()
             
-            el.push_joystick() # suspend joystick input while changing UI
+            #el.push_joystick() # suspend joystick input while changing UI
 
             
             if not isinstance(device_guid, str):
@@ -2489,6 +2497,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                         widget.input_item_list_view.redraw_index(index)
                         widget.input_item_list_view.select_item(index, False)
 
+
                     # should have contents now
                     has_content = widget.hasRightContent()
                     assert has_content,"Device widget has no content to display"
@@ -2506,10 +2515,23 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         finally:
             self._selection_locked = False
-            self.pop_highlighting()
-            el.pop_joystick() # restore joystick input while changing UI
+            #self.pop_highlighting()
+            #el.pop_joystick() # restore joystick input while changing UI
+            #el.select_input_completed.emit(device_guid, input_type, input_id)
 
             gremlin.util.popCursor()
+
+            # # update the status
+            # tracker = gremlin.ui.ui_common.StateTracker()
+            # data = None
+            # match input_type:
+            #     case InputType.JoystickButton:
+            #         data = gremlin.joystick_handling.get_button(device_guid, input_id)
+            #     case InputType.JoystickHat:
+            #         data = gremlin.joystick_handling.get_hat(device_guid, input_id)
+            # if data:
+            #     tracker.update_widget(device_guid, input_type, input_id, data)
+            
 
 
     def _find_tab_index(self, search_guid : str):
@@ -3221,9 +3243,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         # gamepad count
         gremlin.gamepad_handling.gamepad_reset()
 
-        self._set_joystick_input_highlighting(
-            self.config.highlight_input_axis
-        )
+        self._set_joystick_input_highlighting(self.config.highlight_enabled)
+        self._set_joystick_input_axis_highlighting(self.config.highlight_input_axis)
         self._set_joystick_input_buttons_highlighting(self.config.highlight_input_buttons)
         if not ignore_minimize:
             self.setHidden(self.config.start_minimized)
@@ -3591,6 +3612,10 @@ class GremlinUi(QtWidgets.QMainWindow):
         self._do_load_profile(fname)
         self._create_recent_profiles()
 
+    @QtCore.Slot(str, str)
+    def _mode_name_changed(self, old_mode:str, new_mode:str):
+        self._update_mode_status_bar()
+
     def _edit_mode_changed(self, mode : str):
         ''' called when mode list has changed '''
 
@@ -3641,8 +3666,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         :param is_enabled if True the input highlighting is enabled and
             disabled otherwise
         """
-        self.config.highlight_enabled = is_enabled   
-        
+        el = gremlin.event_handler.EventListener()
+        el.enable_highlight_changed.emit(is_enabled)
 
 
     def _set_joystick_input_buttons_highlighting(self, is_enabled):
@@ -3667,7 +3692,8 @@ class GremlinUi(QtWidgets.QMainWindow):
     def _handle_highlight_state(self, autoswitch_state, axis_state, button_state):
         
         visible = not gremlin.shared_state.is_running
-        #self.ui_statusbar_highlight_container_widget.setVisible(visible)
+        self.ui_statusbar_highlight_container_widget.setVisible(visible)
+        
                         
 
         if autoswitch_state is not None:

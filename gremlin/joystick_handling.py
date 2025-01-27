@@ -155,6 +155,8 @@ def get_axis(guid, index, normalized = True):
     :param: normalized  - if set - normalizes to -1.0 +1.0 floating point
        
     '''
+    if isinstance(guid, str):
+        guid = gremlin.util.parse_guid(guid)
     if is_hardware_device(guid):
         value = dinput.DILL.get_axis(guid, index)
         if normalized:
@@ -165,16 +167,22 @@ def get_axis(guid, index, normalized = True):
 
 def get_curved_axis(guid, index):
     ''' returns curved/calibrated data same as the event handler '''
+    if isinstance(guid, str):
+        guid = gremlin.util.parse_guid(guid)
     eh = gremlin.event_handler.EventListener()
     value = dinput.DILL.get_axis(guid, index)
     return eh.apply_transforms(guid, index, value)
 
 def get_hat(guid, index):
     ''' gets the current hat value '''
+    if isinstance(guid, str):
+        guid = gremlin.util.parse_guid(guid)
     return dinput.DILL.get_hat(guid, index)
 
 def get_button(guid, index) -> bool:
     ''' gets the button pressed state '''
+    if isinstance(guid, str):
+        guid = gremlin.util.parse_guid(guid)
     return dinput.DILL.get_button(guid, index)
 
     

@@ -1055,6 +1055,17 @@ class SimConnectManager(QtCore.QObject):
             
 
             self.bridge.start()
+            timeout = time.time() + 3
+            while not self.bridge.is_alive:
+                self.bridge.ping()
+                if time.time() > timeout:
+                    break
+                time.sleep(0.2)
+
+            if not self.bridge.is_alive:
+                syslog.error("BRIDGE: not connected")    
+            else:
+                syslog.info("BRIDGE: connected")
 
             return True # connected  
         finally:
@@ -1089,14 +1100,15 @@ class SimConnectManager(QtCore.QObject):
     def block(self, command, clone = True) -> SimConnectBlock:
         ''' gets the command block for a given Simconnect command '''
         s_command, b_command = gremlin.util.to_byte_string(command)
-        key = s_command.casefold()
-        if key:
-            for cmd in self._commands:
-                if key in cmd.casefold():
-                    block = self._block_map[key]
-                    if clone:
-                        return block.clone()
-                    return block
+        if s_command:
+            key = s_command.casefold()
+            if key:
+                for cmd in self._commands:
+                    if key in cmd.casefold():
+                        block = self._block_map[key]
+                        if clone:
+                            return block.clone()
+                        return block
             
 
         return None

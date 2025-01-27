@@ -1001,9 +1001,6 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         
             self.setUpdatesEnabled(False)
 
-
-            
-
             config = gremlin.config.Configuration()
             verbose = config.verbose_mode_details
             #verbose = True
