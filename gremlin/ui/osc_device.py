@@ -1570,8 +1570,8 @@ class OscClient():
     def start(self, server_ip = None, server_port = None):
         '''
         starts the OSC client to send OSC commands
-        :param host_ip = ip address of server in format xxx.xxx.xxx.xxx
-        :param input_port = input port, numeric, default 8000
+        :param server_ip = ip address of server in format xxx.xxx.xxx.xxx
+        :param server_port = output port
         '''
 
         if server_ip:
@@ -1761,22 +1761,10 @@ class OscInterface(QtCore.QObject):
     def __init__(self):
         super().__init__()
 
-
         # find our current IP address
-        self._host_ip = gremlin.util.getHostIp()
-        # s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        # s.settimeout(0)
-        # try:
-            
-
-        #     s.connect(('10.254.254.254', 1)) # dummy address
-        #     self._host_ip = s.getsockname()[0]
-        # except Exception:
-        #     self._host_ip= '127.0.0.1'
-        # finally:
-        #     s.close()
-
-        #self._host_ip = "192.168.1.59"
+        self._host_ip = gremlin.util.getHostIp() 
+        
+        
         # host OSC listen port (UDP) - make sure the host's firewall allows that port in
         config = gremlin.config.Configuration()
         self._started = False
@@ -1792,6 +1780,9 @@ class OscInterface(QtCore.QObject):
 
         el = gremlin.event_handler.EventListener()
         el.request_osc.connect(self._request_osc_state)
+        el.osc_input_port_changed.connect(self._input_port_changed)
+        el.osc_output_port_changed.connect(self._output_port_changed)
+        el.osc_output_server_changed.connect(self._output_server_changed)
         
 
         self._started = False
@@ -1806,6 +1797,41 @@ class OscInterface(QtCore.QObject):
             self.start()
         else:
             self.stop()
+
+   
+    @QtCore.Slot()
+    def _input_port_changed(self):
+        config = gremlin.config.Configuration()
+        verbose = config.verbose_mode_osc
+        value = config.osc_input_port
+        if verbose:
+            syslog = logging.getLogger("system")
+            syslog.info(f"OSC: input port changed to: {value}")
+        self.input_port = value
+
+    @QtCore.Slot()
+    def _output_port_changed(self):
+        config = gremlin.config.Configuration()
+        verbose = config.verbose_mode_osc
+        value = config.osc_output_port
+        if verbose:
+            syslog = logging.getLogger("system")
+            syslog.info(f"OSC: output port changed to: {value}")
+        self.output_port = value
+
+    @QtCore.Slot()
+    def _output_server_changed(self):
+        config = gremlin.config.Configuration()
+        verbose = config.verbose_mode_osc
+        value = config.osc_host
+        if verbose:
+            syslog = logging.getLogger("system")
+            syslog.info(f"OSC: output host changed to: {value}")
+
+        self.target_server = value
+
+
+    
 
     def getClient(self, server : str, port : int, name : str = None) -> OscClient:
         ''' gets the client for that server/port '''
@@ -1839,10 +1865,31 @@ class OscInterface(QtCore.QObject):
         for client in self._client_pool.values():
             client.stop()
 
-    def startClients(self):
+    def startClients(self, server = None, port = None):
         ''' starts all registered clients '''
-        for client in self._client_pool.values():
+        remove_list = []
+        add_list = []
+        for key, client in self._client_pool.items():
+            if server is not None:
+                client._server_ip = server
+            if port is not None:
+                client._output_port = port
+            new_key = (client._server_ip, client._output_port)
+            if key != new_key:
+                add_list.append((new_key, client))
+                remove_list.append(key)
+
             client.start()
+
+        # update the clients with new keys
+        for key in remove_list:
+            del self._client_pool[key]
+        for key, client in add_list:
+            self._client_pool[key] = client
+
+    @property
+    def host_ip(self):
+        return self._host_ip
 
 
     @property
@@ -1852,16 +1899,32 @@ class OscInterface(QtCore.QObject):
     
     @input_port.setter
     def input_port(self, value):
-        self._input_port = value
+        if value != self._input_port:
+            self._input_port = value
+            self.stop()
+            self.start()
+
 
     @property
     def output_port(self):
         ''' UDP output port to use for OSC messages - default is 8001 '''
         return self._output_port
-    
     @output_port.setter
     def output_port(self, value):
-        self._output_port = value
+        if value != self._output_port:
+            self._output_port = value
+            self.stopClients()
+            self.startClients(self.target_server, value)
+        
+    @property
+    def target_server(self):
+        return self._target_ip
+    @target_server.setter
+    def target_server(self, value:str):
+        if value != self._target_ip:
+            self._target_ip = value
+            self.stopClients()
+            self.startClients(value, self.output_port)
     
     @property
     def host_ip(self):
@@ -2292,7 +2355,6 @@ class OscInputListenerWidget(QtWidgets.QFrame):
     def __init__(
             self,
             callback,
-            host_ip = None,
             input_port = None,
             parent=None
     ):
@@ -2309,13 +2371,7 @@ class OscInputListenerWidget(QtWidgets.QFrame):
 
         # setup and listen for the osc message
         self._interface = OscInterface()
-        if host_ip:
-            # use specified instead of default
-            self._interface.host_ip = host_ip
-        if input_port:
-            # use specified instead of default
-            self._interface.input_port = input_port
-
+        
         self.host_ip = self._interface.host_ip
         self.input_port = self._interface.input_port
 
@@ -2349,6 +2405,7 @@ class OscInputListenerWidget(QtWidgets.QFrame):
 
 
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
+        ''' called when dialog is closing '''
         gremlin.shared_state.pop_suspend_highlighting()
         return super().closeEvent(event)
 
@@ -2798,6 +2855,7 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         ''' listens to an inbound OSC message '''
 
 
+        config = gremlin.config.Configuration()
         self.listener_dialog = OscInputListenerWidget(self._capture_message)
 
         # Display the dialog centered in the middle of the UI

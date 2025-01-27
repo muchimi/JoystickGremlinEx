@@ -948,9 +948,10 @@ class SimconnectMonitor():
         el.profile_stop.connect(self.stop) # trap profile stop
         el.abort.connect(self.stop)
         el.shutdown.connect(self._shutdown) # trap application shutdown
-        el.runtime_mode_changed.connect(self._mode_changed) # trap runtime mode changes - these occur post validation
+        #el.runtime_mode_changed.connect(self._mode_changed) # trap runtime mode changes - these occur post validation
 
         self._auto_reconnect_event = threading.Event() # controls reconnect thread exit
+        self._enabled = False # default, not enabled - set by profile start event
 
         
 
@@ -991,6 +992,7 @@ class SimconnectMonitor():
     def _profile_start(self):
         ''' occurs when a profile starts '''
         enabled = gremlin.shared_state.getSimConnectEnabled()
+        self._enabled = enabled
         if enabled:
             logging.getLogger("system").info(f"SCMONITOR: Start")
 
@@ -1133,15 +1135,18 @@ class SimconnectMonitor():
         eh = gremlin.event_handler.EventHandler()
         eh.change_mode(mode)
 
-    @QtCore.Slot(str)
-    def _mode_changed(self, new_mode):        
-        ''' triggered on runtime mode changes '''
-        syslog = logging.getLogger("system")
-        syslog.info(f"SCMONITOR: Profile mode change request to mode [{new_mode}]")
-        mode = self.getStartupMode()
-        if mode and mode != new_mode and self._options.auto_mode_select:
-            syslog.info(f"SCMONITOR: per option - restoring mode for aicraft mode [{mode}]")
-            self.change_mode(mode)
+    # @QtCore.Slot(str)
+    # def _mode_changed(self, new_mode):        
+    #     ''' triggered on runtime mode changes '''
+
+    #     if self._enabled:
+    #         syslog = logging.getLogger("system")
+    #         syslog.info(f"SCMONITOR: Profile mode change request to mode [{new_mode}]")
+            
+    #         mode = self.getStartupMode()
+    #         if mode and mode != new_mode and self._options.auto_mode_select:
+    #             syslog.info(f"SCMONITOR: per option - restoring mode for aicraft mode [{mode}]")
+    #             self.change_mode(mode)
 
 
         
@@ -1423,8 +1428,8 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
 
         # hook mode changes
-        el = gremlin.event_handler.EventListener()
-        el.edit_mode_changed.connect(self._profile_edit_mode_changed)
+        #el = gremlin.event_handler.EventListener()
+        #el.edit_mode_changed.connect(self._profile_edit_mode_changed)
         
         self._populate_ui()
 

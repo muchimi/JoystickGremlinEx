@@ -31,6 +31,7 @@ import gremlin.ui.ui_common
 import gremlin.util
 import gremlin.shared_state
 import gremlin.config
+import anytree
 
 class SwitchModeWidget(gremlin.ui.input_item.AbstractActionWidget):
 
@@ -57,8 +58,14 @@ class SwitchModeWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.mode_selector_widget.clear()
             index = 0
             select_index = None
+
+            # remove the current mode so we cannot switch to ourselves
             ec = gremlin.execution_graph.ExecutionContext()
-            modes = ec.getModeNames(as_tuple=True)
+            modes = ec.getModeNames(as_tuple=True, include_current = False)
+            if not modes:
+                # allow to select self if that's the only option
+                modes = ec.getModeNames(as_tuple=True)
+            
             #modes = gremlin.shared_state.current_profile.get_modes()
             for entry, display in modes:
                 self.mode_selector_widget.addItem(display, entry)
@@ -118,7 +125,17 @@ class SwitchMode(gremlin.base_profile.AbstractAction):
     def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
-        self._mode = ""
+        profile = gremlin.shared_state.current_profile
+        current_mode = gremlin.shared_state.edit_mode
+        root = profile.modeTree()
+        node = anytree.find(root, lambda node: node.name == current_mode)
+        if node.children:
+            mode = node.children[0].name
+        elif node.parent:
+            mode = node.parent.name
+        else:
+            mode = current_mode
+        self._mode = mode
 
     @property
     def mode(self) -> str:

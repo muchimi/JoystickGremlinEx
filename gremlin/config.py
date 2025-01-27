@@ -909,6 +909,14 @@ class Configuration:
         self.save()
 
     @property
+    def macro_key_delay(self) -> int:
+        return self._data.get("macro_key_delay", 250)
+    @macro_key_delay.setter
+    def macro_key_delay(self, value: int):
+        self._data["macro_key_delay"] = value
+        self.save()
+
+    @property
     def macro_axis_minimum_change_rate(self):
         """Returns the minimum change in value required to record an axis event.
 
@@ -1188,7 +1196,7 @@ class Configuration:
     
     @property
     def osc_host(self):
-        ''' OSC client host (this is the IP the client sends OSC data to)'''
+        ''' OSC client host (this is the IP the machine GremlinEx sends OSC data to)'''
         host = self._data.get("osc_host", "127.0.0.1")
         return host
     

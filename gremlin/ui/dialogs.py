@@ -941,7 +941,7 @@ This setting is also available on a profile by profile basis on the profile tab,
         self.osc_input_port.setEnabled(self.config.osc_enabled)
         port = self.config.osc_input_port
         self.osc_input_port.setValue(port)
-        self.osc_input_port.valueChanged.connect(self._osc_port)
+        self.osc_input_port.valueChanged.connect(self._osc_input_port)
 
         self.osc_output_port = ui_common.QIntLineEdit()
         self.osc_output_port.setRange(4096,65535)
@@ -1331,17 +1331,24 @@ This setting is also available on a profile by profile basis on the profile tab,
 
 
     @QtCore.Slot()
-    def _osc_port(self):
+    def _osc_input_port(self):
         self.config.osc_input_port = self.osc_input_port.value()
+        ''' tell components the OSC port changed '''
+        el = gremlin.event_handler.EventListener()
+        el.osc_input_port_changed.emit()
 
     @QtCore.Slot()
     def _osc_output_port(self):
         self.config.osc_output_port = self.osc_output_port.value()
+        el = gremlin.event_handler.EventListener()
+        el.osc_input_port_changed.emit()
 
     @QtCore.Slot()
     def _osc_host(self):
         widget = self.sender()
         self.config.osc_host = widget.text()
+        el = gremlin.event_handler.EventListener()
+        el.osc_output_server_changed.emit()
 
 
     @QtCore.Slot(bool)

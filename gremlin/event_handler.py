@@ -421,6 +421,9 @@ class EventListener(QtCore.QObject):
 
 	# request OSC start/stop
 	request_osc = QtCore.Signal(bool) # param - flag - true to start, false to stop
+	osc_input_port_changed = QtCore.Signal() # occurs when OSC input port is changed
+	osc_output_port_changed = QtCore.Signal() # occurs when OSC output port is changed
+	osc_output_server_changed = QtCore.Signal() # occurs when OSC server output IP is changed
 
 	# request MIDI start/stop
 	request_midi = QtCore.Signal(bool) # param - flag - true to start, false to stop

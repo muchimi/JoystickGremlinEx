@@ -24,6 +24,7 @@ import time
 from PySide6 import QtCore, QtGui, QtWidgets
 
 import gremlin.base_profile
+import gremlin.config
 import gremlin.event_handler
 from gremlin.input_types import InputType
 import gremlin.keyboard
@@ -248,6 +249,8 @@ class MacroActionEditor(QtWidgets.QWidget):
 
     def _keyboard_ui(self):
         """Creates and populates the KeyAction editor UI."""
+
+        config = gremlin.config.Configuration()
         action = self.model.get_entry(self.index.row())
         if action is None:
             return
@@ -273,16 +276,36 @@ class MacroActionEditor(QtWidgets.QWidget):
         self.ui_elements["key_add_release"] = gremlin.ui.ui_common.QDataPushButton("Add Release", data = action)
         self.ui_elements["key_add_release"].clicked.connect(self._add_key_release)
 
+        delay_widget = gremlin.ui.ui_common.QIntLineEdit()
+        delay_widget.setRange(0, 20000)
+        delay_widget.setValue(config.macro_key_delay)
+        delay_widget.valueChanged.connect(self._key_delay_changed)
+
+        add_widget = gremlin.ui.ui_common.QDataPushButton("Add Press/Delay/Release", data = action)
+        add_widget.clicked.connect(self._add_key_full)
+        
+        container, _ = gremlin.ui.ui_common.getHContainer((delay_widget, add_widget),"Delay (ms):")
+
+        self.ui_elements["key_container"] = container
+        self.ui_elements["key_delay"] = delay_widget
+
+
         self.action_layout.addWidget(self.ui_elements["key_label"])
         self.action_layout.addWidget(self.ui_elements["key_input"])
         self.action_layout.addWidget(self.ui_elements["key_press"])
         self.action_layout.addWidget(self.ui_elements["key_release"])
+        
 
         widget,_ = gremlin.ui.ui_common.getHContainer((self.ui_elements["key_add_press"], self.ui_elements["key_add_release"]))
         self.action_layout.addWidget(widget)
+        self.action_layout.addWidget(container)
 
 
 
+    @QtCore.Slot()
+    def _key_delay_changed(self):
+        value = self.ui_elements["key_delay"].value()
+        gremlin.config.Configuration().macro_key_delay = value
 
     def _mouse_button_ui(self):
         """Creates and populates the MouseAction editor UI."""
@@ -702,6 +725,28 @@ class MacroActionEditor(QtWidgets.QWidget):
         new_key = key.duplicate()
         entry = gremlin.macro.KeyAction(new_key,True)
         self.model.add_entry(self.index.row(), entry)
+
+
+    @QtCore.Slot()
+    def _add_key_full(self):
+        key = self.model.get_entry(self.index.row()).key
+        
+
+        # key press
+        new_key = key.duplicate()
+        entry = gremlin.macro.KeyAction(new_key, False)
+        self.model.add_entry(self.index.row(), entry)
+
+        # pause
+        delay = gremlin.config.Configuration().macro_key_delay
+        entry = gremlin.macro.PauseAction(delay/1000) # to ms
+        self.model.add_entry(self.index.row(), entry)
+
+        # key release
+        new_key = key.duplicate()
+        entry = gremlin.macro.KeyAction(new_key, True)
+        self.model.add_entry(self.index.row(), entry)
+
 
 
     @QtCore.Slot()
@@ -1360,17 +1405,15 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
         :param parent the parent of the widget
         """
         super().__init__(action_data, parent=parent)
+        config = gremlin.config.Configuration()
 
-        self._polling_rate = \
-            gremlin.config.Configuration().macro_axis_polling_rate
-        self._minimum_change_amount = \
-            gremlin.config.Configuration().macro_axis_minimum_change_rate
-        self._recording_times = {
-            None: time.time()
-        }
-        self._recording_values = {
-            None: 0.0
-        }
+        self._polling_rate = config.macro_axis_polling_rate
+        self._minimum_change_amount = config.macro_axis_minimum_change_rate
+        self._recording_times = {None: time.time()}
+        self._recording_values = {None: 0.0}
+
+        
+
 
         self._create_ui()
         self._populate_ui()

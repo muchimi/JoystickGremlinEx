@@ -214,9 +214,16 @@ Joystick Gremlin EX
 - Improved: Options button added to main toolbar.
 - Improved: Options dialog has dedicated tabs for various options
 - Improved: Options performance improvements on close.
+- Improved: Simconnect: configuration button available in all action modes
+- Improved: Macro: additional diagnostics data output in macro verbose mode 
+- Improved: Switch mode and Temporary Switch mode not longer show current mode as a choice.
 - Fix: mode name change may not be updated in the profile
-- Fix: Simconnect: RPN calculator text will paste MIME types as plain text
-- Fix: Simconnect: RPN command displayed when not in calculator mode
+- Fix: Macro: do not reschedule an existing macro if already scheduled
+- Fix: Simconnect: RPN calculator text will now paste MIME types as plain text
+- Fix: Simconnect: RPN UI elements are only displayed in the RPN/calculator mode
+- Fix: Simconnect: stop intercepting mode changes in monitor thread.
+- Fix: OSC: Changing OSC port and IP options will reconfigure internal OSC client/server live so listen behavior uses the current configured port.
+
 
 ### (m69a)
 - Fix: device sorting (sort menu)

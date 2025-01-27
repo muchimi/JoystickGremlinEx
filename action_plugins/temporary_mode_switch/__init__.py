@@ -17,7 +17,7 @@
 
 
 import os
-from PySide6 import QtWidgets
+from PySide6 import QtWidgets, QtCore
 from lxml import etree as ElementTree
 
 import gremlin.base_profile
@@ -28,7 +28,9 @@ import gremlin.profile
 import gremlin.shared_state
 import gremlin.ui.input_item
 import gremlin.ui.ui_common
+import anytree
 import logging
+import gremlin.execution_graph
 
 
 class TemporaryModeSwitchWidget(gremlin.ui.input_item.AbstractActionWidget):
@@ -40,19 +42,42 @@ class TemporaryModeSwitchWidget(gremlin.ui.input_item.AbstractActionWidget):
         assert isinstance(action_data, TemporaryModeSwitch)
 
     def _create_ui(self):
-        self.mode_list = gremlin.ui.ui_common.QComboBox()
-        for entry in gremlin.profile.mode_list(self.action_data):
-            self.mode_list.addItem(entry)
-        self.mode_list.activated.connect(self._mode_list_changed_cb)
-        self.main_layout.addWidget(self.mode_list)
+        self.mode_selector_widget = gremlin.ui.ui_common.QComboBox()
+
+        mode = self.action_data.mode_name
+        index = 0
+        select_index = None
+
+        # remove the current mode so we cannot switch to ourselves
+        ec = gremlin.execution_graph.ExecutionContext()
+        modes = ec.getModeNames(as_tuple=True, include_current = False)
+        if not modes:
+            # allow to select self if that's the only option
+            modes = ec.getModeNames(as_tuple=True)
+
+
+        self.mode_selector_widget.activated.connect(self._mode_list_changed_cb)
+        self.main_layout.addWidget(self.mode_selector_widget)
+        for entry, display in modes:
+                self.mode_selector_widget.addItem(display, entry)
+                if mode and select_index is None and entry == mode:
+                    select_index = index
+                index += 1
+
+        
+        with QtCore.QSignalBlocker(self.mode_selector_widget):
+            if select_index is not None:
+                self.mode_selector_widget.setCurrentIndex(select_index)
+            elif self.mode_selector_widget.count():
+                self.mode_selector_widget.setCurrentIndex(0)
 
     def _mode_list_changed_cb(self):
-        self.action_data.mode_name = self.mode_list.currentText()
+        self.action_data.mode_name = self.mode_selector_widget.currentData()
         self.action_modified.emit()
 
     def _populate_ui(self):
-        mode_id = self.mode_list.findText(self.action_data.mode_name)
-        self.mode_list.setCurrentIndex(mode_id)
+        index = self.mode_selector_widget.findData(self.action_data.mode_name)
+        self.mode_selector_widget.setCurrentIndex(index)
 
 
 class TemporaryModeSwitchFunctor(gremlin.base_profile.AbstractFunctor):
@@ -123,7 +148,19 @@ class TemporaryModeSwitch(gremlin.base_profile.AbstractAction):
 
     def __init__(self, parent):
         super().__init__(parent)
-        self.mode_name = self.get_mode()
+
+        profile = gremlin.shared_state.current_profile
+        current_mode = gremlin.shared_state.edit_mode
+        root = profile.modeTree()
+        node = anytree.find(root, lambda node: node.name == current_mode)
+        if node.children:
+            mode = node.children[0].name
+        elif node.parent:
+            mode = node.parent.name
+        else:
+            mode = current_mode
+        
+        self.mode_name = mode
         self.parent = parent
         self.restore_mode = None
 

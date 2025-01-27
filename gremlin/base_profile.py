@@ -59,6 +59,7 @@ import gremlin.shared_state
 from gremlin.singleton_decorator import SingletonDecorator
 import gremlin.util
 import gremlin.ui.ui_common
+import anytree
 from anytree import Node
 
 syslog = logging.getLogger("system")
@@ -2078,32 +2079,67 @@ class Profile():
         new_device.type = device_type
         self.devices[device_guid] = new_device
 
+    def modeTree(self) -> Node:
+        ''' returns an anytree node - nodes contain the name of the mode '''
+        return self.build_inheritance_tree(as_tree = True)
+
     
-    def build_inheritance_tree(self):
+    def build_inheritance_tree(self, as_tree = False):
         """Returns a tree structure encoding the inheritance between the
         various modes.
 
         :return tree (dictionary keyed by mode name) encoding mode inheritance
         """
+
+        
+
+
         tree = {}
+        nodes = {}
+        
+        def addNode(name : str, parent = None) -> Node:
+            if not name in nodes:
+                node = Node(name)
+                nodes[name] = node
+                if parent:
+                    node.parent = parent
+            return nodes[name]
+        
+        root_node = addNode("__root__")
         for _, device in self.devices.items():
             for mode_name, mode in device.modes.items():
+                node = addNode(mode_name, root_node)
                 if mode.inherit is None and mode_name and mode_name not in tree:
                     tree[mode_name] = {}
+                    node.parent = root_node
                 elif mode.inherit:
                     stack = [mode_name, ]
                     parent = device.modes[mode.inherit]
                     stack.append(parent.name)
+                    parent_node = addNode(parent.name, root_node)
+                    node.parent = parent_node
+                    
                     while parent.inherit is not None:
+                        node = addNode(parent.name, root_node)
                         parent = device.modes[parent.inherit]
                         stack.append(parent.name)
+                        parent_node = addNode(parent.name, root_node)
+                        node.parent = parent_node
+                        
 
                     stack = list(reversed(stack))
                     branch = tree
                     for entry in stack:
                         if entry not in branch:
                             branch[entry] = {}
+
                         branch = branch[entry]
+                        
+
+        # for pre, fill, node in anytree.RenderTree(root_node, style=anytree.AsciiStyle()):
+        #     syslog.info(f"{pre}{str(node)}")
+        if as_tree:
+            return root_node       
         return tree
     
     def _inheritance_tree_to_list(self, data, tree, level = 0):

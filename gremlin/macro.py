@@ -320,7 +320,7 @@ class MacroManager(QtCore.QObject):
 
         self._is_executing_exclusive = False
         self._is_running = False
-        self._schedule_event = Event()
+        self._schedule_event = Event() # used to step through macro executions
 
         self._run_scheduler_thread = None
         self.el.profile_stop.connect(self._profile_stop)
@@ -370,7 +370,7 @@ class MacroManager(QtCore.QObject):
         syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_macro
         if verbose:
-            syslog.info("queue macro")
+            syslog.info(f"MACRO: queue macro ID [{macro.id}]")
             action : MacroAbstractAction
             for action in macro.sequence:
                 syslog.info(f"\t{str(action)}")
@@ -395,7 +395,8 @@ class MacroManager(QtCore.QObject):
     def clear_queue(self):
         ''' clears the current macro queue '''
         syslog = logging.getLogger("system")
-        syslog.info("macro clear queue")
+        verbose = gremlin.config.Configuration().verbose_mode_macro
+        if verbose: syslog.info("MACRO: clear queue")
         with self._queue_lock:
             self._queue.clear()
             self._schedule_event.set()
@@ -407,7 +408,8 @@ class MacroManager(QtCore.QObject):
         :param macro the macro to terminate
         """
         syslog = logging.getLogger("system")
-        syslog.info("terminate macro")
+        verbose = gremlin.config.Configuration().verbose_mode_macro
+        if verbose: syslog.info(f"MACRO: terminate macro [{macro.id}]")
         with self._queue_lock:
             self._queue.append(MacroEntry(macro, False, macro.is_local, macro.is_remote))
         self._schedule_event.set()
@@ -428,16 +430,15 @@ class MacroManager(QtCore.QObject):
             with self._queue_lock:
                 entries_to_remove = []
                 has_exclusive = False
-                for i, entry in enumerate(self._queue):
+                for entry in self._queue:
                     # Terminate macro if needed
                     if entry.state is False:
-                        if entry.macro.id in self._flags \
-                                and self._flags[entry.macro.id]:
+                        # entry marked as completed 
+                        if entry.macro.id in self._flags and self._flags[entry.macro.id]:
                             # Terminate currently running macro
                             with self._flags_lock:
                                 self._flags[entry.macro.id] = False
-                            # del self._queue[i]
-
+                            
                             # Remove all queued up macros with the same id as
                             # they should have been impossible to queue up
                             # in the first place
@@ -447,10 +448,9 @@ class MacroManager(QtCore.QObject):
                                     removal_list.append(queue_entry)
                             for queue_entry in removal_list:
                                 self._queue.remove(queue_entry)
-                    # Don't run a queued macro if the same instance is already
-                    # running
-                    # elif entry.macro.id in self._active:
-                    #     continue
+                    elif entry.macro.id in self._active:
+                        # don't dispatch a macro that is already scheduled and running
+                        continue
                     # Handle exclusive macros
                     elif entry.macro.exclusive:
                         has_exclusive = True
@@ -476,12 +476,10 @@ class MacroManager(QtCore.QObject):
         :param is_remote true if remote control, set to None to use the macro flag
         """
         if macro.id not in self._active:
-            self._active[macro.id] = macro
+            self._active[macro.id] = macro # add the macro to the active queue
             Thread(target=functools.partial(self._execute_macro, macro, is_local, is_remote)).start()
         else:
-            logging.getLogger("system").warning(
-                "Attempting to dispatch an already running macro"
-            )
+            logging.getLogger("system").warning(f"Attempting to dispatch an already running macro: ID: {macro.id}")
 
     def _execute_macro(self, macro : Macro, is_local : bool = None, is_remote : bool = None):
         """Executes a given macro in a separate thread.
@@ -496,6 +494,7 @@ class MacroManager(QtCore.QObject):
         """
         syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_macro
+        if verbose: syslog.info(f"MACRO: execute [{macro.id}]")
         (state_is_local, state_is_remote) = gremlin.input_devices.remote_state.state
         if not is_remote:
             is_remote = state_is_remote
@@ -510,13 +509,14 @@ class MacroManager(QtCore.QObject):
         if macro.repeat is not None:
             delay = macro.repeat.delay
 
+            # mark the macro as repeating
             with self._flags_lock:
                 self._flags[macro.id] = True
 
             # Handle count repeat mode
             if isinstance(macro.repeat, CountRepeat):
                 count = 0
-                if verbose: syslog.info(f"\tMACRO: autorepeat:")
+                if verbose: syslog.info(f"\tMACRO: autorepeat id [{macro.id}]")
                 while count < macro.repeat.count and self._flags[macro.id]:
                     for action in macro.sequence:
                         if verbose: syslog.info(f"\tAction: {str(action)}")
@@ -536,28 +536,40 @@ class MacroManager(QtCore.QObject):
         else:
             if verbose: 
                 msg = "".join(f"{str(a)} " for a in macro.sequence)
-                syslog.info(f"\tMACRO: single shot: {len(macro.sequence)} {msg}")
+                syslog.info(f"\tMACRO: single shot: id: [{macro.id} {len(macro.sequence)} {msg}")
             for action in macro.sequence:
                 action(is_local, is_remote, macro.force_remote)
-            # indicate the macro is done
-            if macro.completed_callback:
-                macro.completed_callback()
+
+
+        if verbose: syslog.info(f"MACRO: completed macro id [{macro.id}]")
+
+        # indicate the macro is done
+        if macro.completed_callback:
+            macro.completed_callback()
+
+        self.el.macro_step_completed.emit(macro.id) # indicate the macro has been completed
+        
 
         # Remove macro from active set, notify manager, and remove any
         # potential callbacks
         try:
-            del self._active[macro.id]
+            
+            if macro.id in self._active:
+                del self._active[macro.id]
+            else:
+                syslog.error(f"MACRO: attempt to delete macro id [{macro.id}] that no longer exists in active macro list")
             if macro.exclusive:
                 self._is_executing_exclusive = False
             with self._flags_lock:
                 if macro.id in self._flags:
                     self._flags[macro.id] = False
-            self._schedule_event.set()
-            
         except:
             pass
 
-        self.el.macro_step_completed.emit(macro.id) # indicate the macro step has been completed
+        # trigger next step
+        self._schedule_event.set()
+
+
 
     def _preprocess_macro(self, macro):
         """Inserts pauses as necessary into the macro."""
@@ -576,9 +588,7 @@ class Macro:
 
     """Represents a macro which can be executed."""
 
-    
-
-    # Unique identifier for each macro
+    # Unique identifier for each macro - bumps by one for each new macro
     _next_macro_id = 0
 
     def __init__(self, is_local = None, is_remote = None, force_remote = None):
@@ -616,39 +626,37 @@ class Macro:
             self._is_remote = is_remote
 
     @property
-    def id(self):
-        """Returns the unique id of this macro.
-
-        :return unique id of this macro
-        """
+    def id(self) -> int:
+        ''' unique macro id'''
         return self._id
     
     @property
-    def force_remote(self):
+    def force_remote(self) -> bool:
         return self._force_remote
+        
     @force_remote.setter
-    def force_remote(self, value):
+    def force_remote(self, value : bool):
         self._force_remote = value
 
     
     @property
-    def is_local(self):
+    def is_local(self) -> bool:
         ''' local control flag'''
         return self._is_local
     @is_local.setter
-    def is_local(self, value):
+    def is_local(self, value : bool):
         self._is_local = value
 
     @property
-    def is_remote(self):
+    def is_remote(self) -> bool:
         ''' remote control flag'''
         return self._is_remote
     @is_remote.setter
-    def is_remote(self, value):
+    def is_remote(self, value : bool):
         self._is_remote = value
 
     @property
-    def sequence(self):
+    def sequence(self) -> list:
         """Returns the action sequence of this macro.
 
         :return action sequence

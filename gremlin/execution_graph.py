@@ -197,12 +197,29 @@ class ExecutionContext():
         return None
     
     
-    def getModeNames(self, as_tuple = False) -> list:
-        ''' gets the mode names as a list of tuples '''
-        if as_tuple:
-            return [(node.mode, node.display) for node in anytree.PreOrderIter(self._mode_tree) if node.mode]
+    def getModeNames(self, as_tuple = False, include_current = True) -> list:
+        ''' gets the mode names as a list of tuples
+            as_tuple: returns as a tuple of data (mode_key, display_name)
+
+            include_current: if true, includes the current mode in the list, false excludes it which may cause an empty list to be returned
+
+            '''
         
-        return [node.mode for node in anytree.PreOrderIter(self._mode_tree) if node.mode]
+        current_mode = gremlin.shared_state.edit_mode # current edit mode
+
+        if as_tuple:
+            if include_current:
+                return [(node.mode, node.display) for node in anytree.PreOrderIter(self._mode_tree) if node.mode]
+            return [(node.mode, node.display) for node in anytree.PreOrderIter(self._mode_tree) if node.mode and node.mode != current_mode]
+
+        if include_current:       
+            return [node.mode for node in anytree.PreOrderIter(self._mode_tree) if node.mode]
+        return [node.mode for node in anytree.PreOrderIter(self._mode_tree) if node.mode if node.mode != current_mode]
+
+
+        
+
+
     
 
 
