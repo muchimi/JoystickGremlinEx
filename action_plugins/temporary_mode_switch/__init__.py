@@ -153,12 +153,14 @@ class TemporaryModeSwitch(gremlin.base_profile.AbstractAction):
         current_mode = gremlin.shared_state.edit_mode
         root = profile.modeTree()
         node = anytree.find(root, lambda node: node.name == current_mode)
-        if node.children:
-            mode = node.children[0].name
-        elif node.parent:
-            mode = node.parent.name
-        else:
-            mode = current_mode
+        mode = current_mode
+        if node:
+            if node.children:
+                mode = node.children[0].name
+            elif node.parent:
+                mode = node.parent.name
+            else:
+                mode = current_mode
         
         self.mode_name = mode
         self.parent = parent
