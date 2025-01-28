@@ -1118,8 +1118,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
     def input_viewer(self):
         """Displays the input viewer dialog."""
-        self.modal_windows["input_viewer"] = \
-            gremlin.ui.input_viewer.InputViewerUi()
+        self.modal_windows["input_viewer"] = gremlin.ui.input_viewer.InputViewerUi()
         geom = self.geometry()
         self.modal_windows["input_viewer"].setGeometry(
             int(geom.x() + geom.width() / 2 - 350),

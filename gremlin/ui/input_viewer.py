@@ -117,11 +117,8 @@ class VisualizationSelector(QtWidgets.QWidget):
     """Presents a list of devices and visualization widgets."""
 
     # Event emitted when the visualization configuration changes
-    changed = QtCore.Signal(
-        dinput.DeviceSummary,
-        VisualizationType,
-        bool
-    )
+    changed = QtCore.Signal(dinput.DeviceSummary,VisualizationType,bool)
+    clear = QtCore.Signal() # delete all
 
     def __init__(self, change_callback, parent=None):
         """Creates a new instance.
@@ -210,14 +207,10 @@ class VisualizationSelector(QtWidgets.QWidget):
     @QtCore.Slot()
     def _clear_selection(self):
         ''' clears the selection of all widgets '''
-        
-        
+        self.clear.emit()
         for widget in self._selector_widgets:
             with QtCore.QSignalBlocker(widget):
                 widget.setChecked(False)
-            visualisation, dev = widget.data
-            self._create_callback(dev, visualisation, widget)()
-            
         
 
     @QtCore.Slot()
@@ -263,11 +256,7 @@ class VisualizationSelector(QtWidgets.QWidget):
         checked = cb.isChecked()
         config = VisualizationConfig()
         config.setValue(device.device_guid, vis_type, checked)
-        self.changed.emit(
-                device,
-                vis_type,
-                checked
-            )
+        self.changed.emit(device,vis_type,checked)
 
 class InputViewerUi(ui_common.BaseDialogUi):
 
@@ -290,10 +279,6 @@ class InputViewerUi(ui_common.BaseDialogUi):
         self.devices = gremlin.joystick_handling.joystick_devices()
         self.main_layout = QtWidgets.QVBoxLayout()
         self.setLayout(self.main_layout)
-
-
-
-
         
         self.views = InputViewerArea()
 
@@ -304,10 +289,7 @@ class InputViewerUi(ui_common.BaseDialogUi):
 
         # Configure the widget holding the layout with all the buttons
         self.scroll_selector_widget.setLayout(self.scroll_selector_layout)
-        self.scroll_selector_widget.setSizePolicy(
-            QtWidgets.QSizePolicy.Expanding,
-            QtWidgets.QSizePolicy.Expanding
-        )
+        self.scroll_selector_widget.setSizePolicy(QtWidgets.QSizePolicy.Expanding,QtWidgets.QSizePolicy.Expanding)
         self.scroll_selector_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
         self.scroll_selector_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
 
@@ -322,6 +304,7 @@ class InputViewerUi(ui_common.BaseDialogUi):
 
         self.vis_selector = VisualizationSelector(self._add_remove_visualization_widget)
         self.vis_selector.changed.connect(self._add_remove_visualization_widget)
+        self.vis_selector.clear.connect(self._clear)
 
         self.scroll_selector_layout.addWidget(self.vis_selector)
 
@@ -354,7 +337,16 @@ class InputViewerUi(ui_common.BaseDialogUi):
         config = VisualizationConfig()
         config.save()
 
-    def _add_remove_visualization_widget(self, device, vis_type, is_active):
+    @QtCore.Slot()
+    def _clear(self):
+        ''' clears all widgets '''
+        widget_list = [widget for widget in self._widget_storage.values()]
+        for widget in widget_list:
+            self.views.remove_widget(widget)
+        self._widget_storage.clear()
+
+    @QtCore.Slot(dinput.DeviceSummary,VisualizationType,bool)
+    def _add_remove_visualization_widget(self, device : dinput.DeviceSummary, visualization : VisualizationType, is_active : bool):
         """Adds or removes a visualization widget.
 
         :param device the device which is being updated
@@ -362,10 +354,10 @@ class InputViewerUi(ui_common.BaseDialogUi):
         :param is_active if True the visualization is added, if False it is
             removed
         """
-        key = device, vis_type
+        key = (device, visualization)
         
         if is_active:
-            widget = ui_common.JoystickDeviceWidget(device, vis_type)
+            widget = ui_common.JoystickDeviceWidget(device, visualization)
             self.views.add_widget(widget)
             self._widget_storage[key] = widget
         elif key in self._widget_storage:
