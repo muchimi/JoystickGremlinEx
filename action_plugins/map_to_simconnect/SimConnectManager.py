@@ -1024,7 +1024,7 @@ class SimConnectManager(QtCore.QObject):
                 return False
 
             self._abort = False
-            if not self.connected:
+            if not self._sm.ok:
                 try:
                     if force_retry or self._connect_attempts > 0:
                         while self._connect_attempts > 0 and not self._abort:

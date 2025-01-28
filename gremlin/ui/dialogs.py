@@ -2537,6 +2537,7 @@ The setting can be overriden by the global mode reload option set in Options for
         """
         name, user_input = QtWidgets.QInputDialog.getText(None, "Mode name", "")
         name = name.strip()
+        new_mode = None
         if user_input:
             if name in gremlin.profile.mode_list(self._profile):
                 gremlin.util.display_error(
@@ -2548,7 +2549,7 @@ The setting can be overriden by the global mode reload option set in Options for
                     new_mode.name = name
                     device.modes[name] = new_mode
                 
-
+        if new_mode:
             self._populate_mode_layout()
             self._fire_mode_change(new_mode.name)
 
