@@ -143,12 +143,16 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         # last index selected, -1 means none
         self._last_selected_index = -1 
+
+
         
         # Select default entry
         selected_index = self.input_item_list_view.current_index
         if selected_index is None:
             selected_index = -1
         self._select_item_cb(selected_index)
+
+
 
 
 
@@ -294,7 +298,8 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
 
         self._last_selected_index = index
-    
+        el = gremlin.event_handler.EventListener()
+        el.input_selection_changed.emit(device_guid, input_type, input_id)
 
     def _custom_widget_handler(self, list_view, index : int, identifier, data, parent = None):
         ''' creates a widget for the input 

@@ -342,8 +342,8 @@ class SimConnect():
 		# el.shutdown.connect(self._shutdown)
 
 	
-		if auto_connect:
-			self.connect()
+		# if auto_connect:
+		# 	self.connect()
 
 	def reset(self):
 		''' resets abort flag set due to a load error - this is necessary upon reconnect'''
@@ -743,6 +743,12 @@ class SimConnect():
 		if self._connecting:
 			return
 		
+
+		syslog = logging.getLogger("system")
+		verbose = gremlin.config.Configuration().verbose_mode_simconnect
+		if verbose:
+			syslog.info("SIMCONNECT: connect...")
+		
 		self._connecting = True
 
 		try:
@@ -753,7 +759,7 @@ class SimConnect():
 			if self._abort:
 				# abort
 				return False
-			syslog = logging.getLogger("system")
+			
 			el = gremlin.event_handler.EventListener()
 			el.module_state_register.emit("simconnect","SimConnect",None)
 			if not self._dll_path or not os.path.isfile(self._dll_path):

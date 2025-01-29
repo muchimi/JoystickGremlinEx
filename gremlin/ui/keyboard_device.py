@@ -587,6 +587,8 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         self._last_selected_index = index           
 
+        el = gremlin.event_handler.EventListener()
+        el.input_selection_changed.emit(device_guid, input_type, input_id)
 
 
     def _index_for_key(self, key_or_index):

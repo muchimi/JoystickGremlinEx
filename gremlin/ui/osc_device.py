@@ -3129,6 +3129,9 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         self._last_selected_index = index 
         self._item_data = widget
+
+        el = gremlin.event_handler.EventListener()
+        el.input_selection_changed.emit(device_guid, input_type, input_id)
     
 
     def _close_item_cb(self, widget, index, data):

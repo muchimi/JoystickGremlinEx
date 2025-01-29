@@ -458,15 +458,15 @@ class CalibrationData:
         self.inverted = safe_read(node,"inverted",bool, False)
         
         self.centered = safe_read(node,"centered",bool)
-        self.calibrated_min = safe_read(node,"calibrate-min", float)
+        self.calibrated_min = safe_read(node,"calibrate-min", float,-1.0)
         
-        self.calibrated_max = safe_read(node,"calibrate-max", float)
-        self.deadzone_min = safe_read(node,"deadzone-min", float)
-        self.deadzone_max = safe_read(node,"deadzone-max", float)
+        self.calibrated_max = safe_read(node,"calibrate-max", float, 1.0)
+        self.deadzone_min = safe_read(node,"deadzone-min", float, -1.0)
+        self.deadzone_max = safe_read(node,"deadzone-max", float, 1.0)
         if self.centered:
-            self.calibrated_center = safe_read(node,"calibrate-center", float)
-            self.deadzone_center_min = safe_read(node,"deadzone-center-min", float)
-            self.deadzone_center_max = safe_read(node,"deadzone-center-max", float)
+            self.calibrated_center = safe_read(node,"calibrate-center", float, 0.0)
+            self.deadzone_center_min = safe_read(node,"deadzone-center-min", float, 0.0)
+            self.deadzone_center_max = safe_read(node,"deadzone-center-max", float, 0.0)
             
 
     def to_xml(self):

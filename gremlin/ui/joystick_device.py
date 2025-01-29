@@ -1095,10 +1095,10 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                     self._debug_widget.setText(f"Contents for : N/A")
                 widget = InputItemConfiguration()
                 self.addRightPanelWidget(widget)
-                
-
 
             self.last_selected_index = index
+            el = gremlin.event_handler.EventListener()
+            el.input_selection_changed.emit(device_guid, input_type, input_id)
 
         finally:    
             #widget.update()

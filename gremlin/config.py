@@ -1397,9 +1397,12 @@ class Configuration:
         
         if not isinstance(device_guid, str):
             device_guid = str(device_guid)
+
+        
+
         data : dict = self._profile_data.get("last_input", {})
         
-        verbose = self.verbose_mode_details
+        verbose = self.verbose
         # verbose = True
         if verbose:
             syslog = logging.getLogger("system") 
@@ -1420,10 +1423,10 @@ class Configuration:
                 if guid is not None:
                     input_id = str(guid)
                 else:
-                    syslog.warning(f"SetLastInput(): Don't know how to handle input_id [{input_id}] type: {type(input_id).__name__}")
+                    syslog.warning(f"CONFIG: SetLastInput(): Don't know how to handle input_id [{input_id}] type: {type(input_id).__name__}")
                     input_id = None
         else:
-            syslog.warning(f"SetLastInput(): Don't know how to handle input_id [{input_id}] type: {type(input_id).__name__}")
+            syslog.warning(f"CONFIG: SetLastInput(): Don't know how to handle input_id [{input_id}] type: {type(input_id).__name__}")
             input_id = None
 
         input_type = gremlin.input_types.InputType.convert(input_type)
@@ -1431,15 +1434,22 @@ class Configuration:
             data[device_guid] = (input_type, input_id)
 
             self._profile_data["last_input"] = data
-            self._data["last_device_guid"] = device_guid
             self._profile_data["last_device_guid"] = device_guid
+
+            self._data["last_device_guid"] = device_guid
+            self._data["last_input_type"] = gremlin.input_types.InputType.to_string(input_type)
+            self._data["last_input_id"] = input_id
+
+            if verbose: 
+                device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
+                syslog.info(f"CONFIG: save last input {device_name} {gremlin.input_types.InputType.to_string(input_type)} {input_id}") 
         
             self.save_profile()
+            self.save()
 
-            if verbose:
-                device_name = gremlin.shared_state.get_device_name(device_guid)
-                syslog.info(f"Saving last input selection: {device_guid} {device_name} {input_type} {input_id}")
-                pass
+          
+
+        
 
 
 
@@ -1466,9 +1476,9 @@ class Configuration:
             syslog.warning(f"Config: get last input: Unable to determine input type:  Unable to find device {dinput_device_guid} {device_name} in device map")
             return (None, None, None)
         
-        if input_id is None:
-            syslog.warning(f"Config: get last input: Unable to determine input type: NULL input id")
-            return (None, None, None)
+        # if input_id is None:
+        #     syslog.warning(f"Config: get last input: Unable to determine input type: NULL input id")
+        #     return (None, None, None)
 
         device_type = gremlin.shared_state.device_type_map[dinput_device_guid]
         if device_type == gremlin.types.DeviceType.Joystick:
@@ -1551,14 +1561,24 @@ class Configuration:
 
 
         if device_guid is None:
-            # get the last profile device guid
-            if not self._profile_config_fname:
-                self.ensure_profile(gremlin.shared_state.current_profile)
-            device_guid = self._profile_data.get("last_device_guid", None)
-            if not device_guid:
-                return (None, None, None)
-        
-            
+            # get the last profile device guid saved to config
+
+            device_guid = self._data.get("last_device_guid", None)
+            input_type = self._data.get("last_input_type", None)
+            if input_type:
+                input_type = gremlin.input_types.InputType.to_enum(input_type)
+            input_id = self._data.get("last_input_id", None)
+
+            if device_guid is not None and input_type is not None and input_id is not None:
+                return (device_guid, input_type, input_id)
+
+            if device_guid is None:
+                if not self._profile_config_fname:
+                    self.ensure_profile(gremlin.shared_state.current_profile)
+                device_guid = self._profile_data.get("last_device_guid", None)
+
+        if device_guid is None:
+            return (None, None, None)
 
         verbose = self.verbose_mode_details
         # verbose = True
@@ -1600,14 +1620,14 @@ class Configuration:
         input_id = None
         if dinput_device_guid in gremlin.shared_state.device_type_map:
             input_type, save_input_id, input_id = self._get_input_id(dinput_device_guid,  input_id)             
-
-            # save the new defaults
-            data[device_guid] = (input_type, save_input_id)
-            self._profile_data["last_input"] = data
-            self.save_profile()
-            if verbose:
-                logging.getLogger("system").info(f"Loading default input selection: {device_guid} {device_name} {input_type} {input_id}")
-            return (device_guid, input_type, input_id)
+            if input_type is not None and input_id is not None:
+                # save the new defaults
+                data[device_guid] = (input_type, save_input_id)
+                self._profile_data["last_input"] = data
+                self.save_profile()
+                if verbose:
+                    logging.getLogger("system").info(f"Loading default input selection: {device_guid} {device_name} {input_type} {input_id}")
+                return (device_guid, input_type, input_id)
             
 
         if verbose:

@@ -791,8 +791,18 @@ class Device:
         """
         self.name = node.get("name")
         self.label = safe_read(node, "label", default_value=self.name)
-        self.type = DeviceType.to_enum(safe_read(node, "type", str))
-        self.device_guid = parse_guid(node.get("device-guid"))
+        dt = safe_read(node, "type", str)
+        if not dt:
+            dt = DeviceType.NotSet
+        self.type = DeviceType.to_enum(dt)
+        device_guid = node.get("device-guid")
+        if not device_guid:
+            syslog=logging.getLogger("system")
+            syslog.error(f"Device XML: unable to parse device GUID: [{device_guid}]")
+            sys.exit(-1)
+            
+    
+        self.device_guid = parse_guid(device_guid)
         self.connected = gremlin.joystick_handling.is_device_connected(self.device_guid)
 
         for child in node:

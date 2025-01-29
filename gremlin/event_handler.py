@@ -450,6 +450,8 @@ class EventListener(QtCore.QObject):
 	module_state_change = QtCore.Signal(str, object) # send a module state update, (key, state)
 	module_state_register = QtCore.Signal(str, str, object) # registers a module state
 
+	# notify when an input is selected
+	input_selection_changed = QtCore.Signal(object, object, object) # (device_guid, input_type, input_id)
 	
 
 
@@ -479,10 +481,6 @@ class EventListener(QtCore.QObject):
 		self._running = True
 
 		self._process_device_change_lock = False
-
-		self._joystick_suspend_count = 0 # stack count for suspend joystick
-		self._input_selection_suspend_count = 0 # stack count for suspend input selection
-
 
 		# keyboard input handling buffer
 		self._keyboard_state = {}
@@ -555,34 +553,7 @@ class EventListener(QtCore.QObject):
 			key = (item.device_guid, item.input_id)
 			self._joystick_input_item_map[key] = item
 
-	def push_joystick(self):
-		''' suspends joystick input '''
-		self._joystick_suspend_count += 1
-
-	def pop_joystick(self):
-		''' restores joystick input '''
-		if self._joystick_suspend_count > 0:
-			self._joystick_suspend_count -= 1
-
-	def push_input_selection(self):
-		self._input_selection_suspend_count += 1
-
-	def pop_input_selection(self, reset = False):
-		if reset:
-			self._input_selection_suspend_count = 0
-			return
-		if self._input_selection_suspend_count > 0:
-			self._input_selection_suspend_count -= 1
-
-	@property
-	def joystick_input_suspended(self) -> bool:
-		''' true if joystick input suspended '''
-		return self._joystick_suspend_count > 0
-
-	@property
-	def input_selection_suspended(self) -> bool:
-		''' true if input selection is suspended '''
-		return self._input_selection_suspend_count > 0
+	
 
 
 	def _device_changed_cb(self):
@@ -602,7 +573,28 @@ class EventListener(QtCore.QObject):
 			self.mouse_hook.stop()
 			self.mouse_hook = None
 
+	def push_joystick(self):
+		gremlin.shared_state.push_joystick()
 
+	def pop_joystick(self, reset = False):
+		gremlin.shared_state.pop_joystick(reset)
+
+	def push_input_selection(self):
+		gremlin.shared_state.push_input_selection()
+
+	def pop_input_selection(self, reset = False):
+		gremlin.shared_state.pop_input_selection(reset)		
+
+
+	@property
+	def joystick_input_suspended(self) -> bool:
+		''' true if joystick input suspended '''
+		return gremlin.shared_state.is_joystick_input_suspended
+
+	@property
+	def input_selection_suspended(self) -> bool:
+		''' true if input selection is suspended '''
+		return gremlin.shared_state.is_input_selection_suspended
 
 
 	def _process_queue(self):
@@ -784,7 +776,7 @@ class EventListener(QtCore.QObject):
 			# not initialized yet
 			return 
 
-		if self._joystick_suspend_count > 0:
+		if gremlin.shared_state.is_joystick_suspended:
 			# ignore if joystick input is suspended
 			return
 

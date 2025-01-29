@@ -446,6 +446,42 @@ def logTabs(showLevel = False):
         return f"Nesting [{_log_nesting_level}]{tabs}"
     return tabs
 
+_joystick_suspend_count = 0
+_input_selection_suspend_count = 0
+
+def push_joystick():
+    ''' suspends joystick input '''
+    global _joystick_suspend_count
+    _joystick_suspend_count += 1
+
+def pop_joystick():
+    ''' restores joystick input '''
+    global _joystick_suspend_count
+    if _joystick_suspend_count > 0:
+       _joystick_suspend_count -= 1
+
+def push_input_selection():
+    global _input_selection_suspend_count
+    _input_selection_suspend_count += 1
+
+def pop_input_selection(reset = False):
+    global _input_selection_suspend_count
+    if reset:
+        _input_selection_suspend_count = 0
+        return
+    if _input_selection_suspend_count > 0:
+       _input_selection_suspend_count -= 1
+
+@module_property
+def _is_joystick_suspended()->bool:
+    global _joystick_suspend_count
+    return _joystick_suspend_count > 0
+		
+@module_property
+def _is_input_selection_suspended()->bool:
+    global _input_selection_suspend_count
+    return _input_selection_suspend_count > 0
+
 
 _get_root_path()
 

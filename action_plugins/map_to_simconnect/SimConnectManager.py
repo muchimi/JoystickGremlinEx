@@ -168,7 +168,7 @@ class SimConnectActionMode(enum.Enum):
         return "none"
     @staticmethod
     def to_enum(value, validate = True):
-        if value is None:
+        if value is None or value.casefold() == "none":
             return SimConnectActionMode.NotSet
         if value in _simconnect_action_mode_to_enum_lookup.keys():
             return _simconnect_action_mode_to_enum_lookup[value]

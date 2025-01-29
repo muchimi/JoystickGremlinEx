@@ -2503,35 +2503,43 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._command_max_range_widget.valueChanged.connect(self._command_min_range_changed_cb)
         self._command_max_range_widget.setMinimumWidth(w)
 
-
-        self._output_min_range_widget = gremlin.ui.ui_common.QFloatLineEdit()
-        self._output_min_range_widget.setRange(-1,1)
+        # controller scaled output value (integer)
+        self._output_min_range_widget = gremlin.ui.ui_common.QIntLineEdit()
+        self._output_max_range_widget.setRange(-16383,16384)
         self._output_min_range_widget.valueChanged.connect(self._min_range_changed_cb)
         self._output_min_range_widget.setMinimumWidth(w)
 
-        self._output_max_range_widget = gremlin.ui.ui_common.QFloatLineEdit()
-        self._output_max_range_widget.setRange(-1,1)
+        self._output_max_range_widget = gremlin.ui.ui_common.QIntLineEdit()
+        self._output_max_range_widget.setRange(-16383,16384)
         self._output_max_range_widget.valueChanged.connect(self._max_range_changed_cb)
         self._output_max_range_widget.setMinimumWidth(w)
         
 
         # normalized is -1 to + 1
-        self._output_min_normalized_range_widget = gremlin.ui.ui_common.QIntLineEdit()
+        self._output_min_normalized_range_widget = gremlin.ui.ui_common.QFloatLineEdit()
         self._output_min_normalized_range_widget.valueChanged.connect(self._min_normalized_range_changed_cb)
         self._output_min_normalized_range_widget.setMinimumWidth(w)
+        self._output_min_normalized_range_widget.setRange(-1,1)
         
-        self._output_max_normalized_range_widget = gremlin.ui.ui_common.QIntLineEdit()
+        
+        self._output_max_normalized_range_widget = gremlin.ui.ui_common.QFloatLineEdit()
         self._output_max_normalized_range_widget.valueChanged.connect(self._max_normalized_range_changed_cb)
         self._output_max_normalized_range_widget.setMinimumWidth(w)
+        self._output_max_normalized_range_widget.setRange(-1,1)
+        
 
 
         self._output_min_percent_range_widget = gremlin.ui.ui_common.QFloatLineEdit(decimals=2)
-        self._output_min_percent_range_widget.setReadOnly(True)
+        #self._output_min_percent_range_widget.setReadOnly(True)
+        self._output_min_percent_range_widget.setRange(0,100)
         self._output_min_percent_range_widget.setMinimumWidth(w)
+        self._output_min_percent_range_widget.valueChanged.connect(self._min_percent_changed_cb)
 
         self._output_max_percent_range_widget = gremlin.ui.ui_common.QFloatLineEdit(decimals=2)
-        self._output_max_percent_range_widget.setReadOnly(True)
+        #self._output_max_percent_range_widget.setReadOnly(True)
+        self._output_max_percent_range_widget.setRange(0,100)
         self._output_max_percent_range_widget.setMinimumWidth(w)
+        self._output_max_percent_range_widget.valueChanged.connect(self._max_percent_changed_cb)
 
 
         self._reset_range_widget = QtWidgets.QPushButton("Reset")
@@ -2578,38 +2586,42 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         row = 0
         # input data 
         output_data_entry_layout.addWidget(self._output_invert_axis_widget,row,0)
-        output_data_entry_layout.addWidget(QtWidgets.QLabel("Input min:"),row,1)
+        output_data_entry_layout.addWidget(QtWidgets.QLabel("Min"), row, 2)
+        output_data_entry_layout.addWidget(QtWidgets.QLabel("Max"), row, 3)
+
+
+
+        # value of the input axis
+        row += 1
+        output_data_entry_layout.addWidget(QtWidgets.QLabel("Output:"),row,1)
         output_data_entry_layout.addWidget(self._output_min_range_widget,row,2)
-        output_data_entry_layout.addWidget(QtWidgets.QLabel("Max:"),row,3)
-        output_data_entry_layout.addWidget(self._output_max_range_widget,row,4)
-        output_data_entry_layout.addWidget(self._reset_range_widget,row,5)
+        output_data_entry_layout.addWidget(self._output_max_range_widget,row,3)
+
+        output_data_entry_layout.addWidget(self._reset_range_widget,row,4)
 
         # normalized data
         row += 1
-        output_data_entry_layout.addWidget(QtWidgets.QLabel("Normalized min:"),row,1)
+        output_data_entry_layout.addWidget(QtWidgets.QLabel("Normalized:"),row,1)
         output_data_entry_layout.addWidget(self._output_min_normalized_range_widget,row,2)
-        output_data_entry_layout.addWidget(QtWidgets.QLabel("Max:"),row,3)
-        output_data_entry_layout.addWidget(self._output_max_normalized_range_widget,row,4)
+        output_data_entry_layout.addWidget(self._output_max_normalized_range_widget,row,3)
         
         
         # percent output
         row += 1
-        output_data_entry_layout.addWidget(QtWidgets.QLabel("Percent Min:"),row,1)
+        output_data_entry_layout.addWidget(QtWidgets.QLabel("Percent %:"),row,1)
         output_data_entry_layout.addWidget(self._output_min_percent_range_widget,row,2)
-        output_data_entry_layout.addWidget(QtWidgets.QLabel("%Max:"),row,3)
-        output_data_entry_layout.addWidget(self._output_max_percent_range_widget,row,4)
+        output_data_entry_layout.addWidget(self._output_max_percent_range_widget,row,3)
 
         # command range (command min / max range )        
         row +=1
-        output_data_entry_layout.addWidget(QtWidgets.QLabel("Command Min:"),row,1)
+        output_data_entry_layout.addWidget(QtWidgets.QLabel("Command:"),row,1)
         output_data_entry_layout.addWidget(self._command_min_range_widget,row,2)
-        output_data_entry_layout.addWidget(QtWidgets.QLabel("Max:"),row,3)
-        output_data_entry_layout.addWidget(self._command_max_range_widget,row,4)
+        output_data_entry_layout.addWidget(self._command_max_range_widget,row,3)
         
 
         
-        output_data_entry_layout.addWidget(QtWidgets.QLabel(" "),0,6)
-        output_data_entry_layout.setColumnStretch(6,2)
+        output_data_entry_layout.addWidget(QtWidgets.QLabel(" "),0,5)
+        output_data_entry_layout.setColumnStretch(5,2)
 
         self._output_range_container_layout.addWidget(output_data_entry_widget)
 
@@ -3000,19 +3012,14 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         # store to profile
         self.action_data.value = value
         percent = gremlin.util.scale_to_range(value, target_min = 0.0, target_max = 100.0)
-        self._output_value_percent_widget.setValue(percent)
+        with QtCore.QSignalBlocker(self._output_value_percent_widget):
+            self._output_value_percent_widget.setValue(percent)
         
 
 
-    def _min_normalized_range_changed_cb(self):
-        normalized = self._output_min_normalized_range_widget.value()
-        if normalized is not None:
-            value = gremlin.util.scale_to_range(normalized,
-                                                self.action_data.command_min_range, 
-                                                self.action_data.command_max_range)  # scale from -1 +1
-            with QtCore.QSignalBlocker(self._output_min_range_widget):
-                self._output_min_range_widget.setValue(value)
-            self._update_min_range(value)
+
+            
+            
 
     
 
@@ -3026,15 +3033,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.action_data.command_max_range = self._command_max_range_widget.value()
         self._update_ui()
 
-    def _min_range_changed_cb(self):
-        value = self._output_min_range_widget.value()
-        if value is not None:
-            normalized = gremlin.util.scale_to_range(value, 
-                                                     self.action_data.command_min_range, 
-                                                     self.action_data.command_max_range)  # scale from -1 +1
-            with QtCore.QSignalBlocker(self._output_min_normalized_range_widget):
-                self._output_min_normalized_range_widget.setValue(normalized)
-            self._update_min_range(normalized)
+
 
     def _update_min_range(self, value):
         # store to profile
@@ -3042,28 +3041,100 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.action_data.min_range = value
 
         percent = gremlin.util.scale_to_range(value, target_min = 0.0, target_max = 100.0)
-        self._output_min_percent_range_widget.setValue(percent)
+        with QtCore.QSignalBlocker(self._output_min_percent_range_widget):
+            self._output_min_percent_range_widget.setValue(percent)
 
 
+    @QtCore.Slot()
+    def _min_percent_changed_cb(self):
+        percent = self._output_min_percent_range_widget.value()
+        if percent is not None:
+            normalized = gremlin.util.scale_to_range(percent, source_min = 0, source_max = 100) # convert to -1, +1 range
+            min_range = self.action_data.command_min_range
+            max_range = self.action_data.command_max_range
+            value = int(gremlin.util.scale_to_range(normalized, target_min = min_range, target_max = max_range))  # convert to MSFS controller range
+            with QtCore.QSignalBlocker(self._output_min_normalized_range_widget):
+                self._output_min_normalized_range_widget.setValue(normalized)
+            with QtCore.QSignalBlocker(self._output_min_range_widget):
+                self._output_min_range_widget.setValue(value)
+            self.action_data.min_range = normalized
+            self._update_repeater()
+
+    @QtCore.Slot()
+    def _max_percent_changed_cb(self):
+        percent = self._output_min_percent_range_widget.value()
+        if percent is not None:
+            normalized = gremlin.util.scale_to_range(percent, source_min = 0, source_max = 100) # convert to -1, +1 range
+            min_range = self.action_data.command_min_range
+            max_range = self.action_data.command_max_range
+            value = gremlin.util.scale_to_range(normalized, target_min = min_range,target_max = max_range)  # convert to MSFS controller range
+            with QtCore.QSignalBlocker(self._output_max_normalized_range_widget):
+                self._output_max_normalized_range_widget.setValue(normalized)
+            with QtCore.QSignalBlocker(self._output_max_range_widget):
+                self._output_max_range_widget.setValue(value)
+            self.action_data.max_range = normalized
+            self._update_repeater()
+
+    @QtCore.Slot()
+    def _min_normalized_range_changed_cb(self):
+        normalized = self._output_min_normalized_range_widget.value()
+        if normalized is not None:
+            value = gremlin.util.scale_to_range(normalized, target_min = self.action_data.command_min_range, target_max = self.action_data.command_max_range)  # scale from -1 +1
+            percent = gremlin.util.scale_to_range(normalized, target_min=0, target_max = 100)
+            with QtCore.QSignalBlocker(self._output_min_range_widget):
+                self._output_min_range_widget.setValue(value)
+            with QtCore.QSignalBlocker(self._output_min_percent_range_widget):
+                self._output_min_percent_range_widget.setValue(percent)
+            self.action_data.min_range = normalized
+            self._update_repeater()
+
+    @QtCore.Slot()
     def _max_normalized_range_changed_cb(self):
         normalized = self._output_max_normalized_range_widget.value()
         if normalized is not None:
-            value = gremlin.util.scale_to_range(normalized, 
-                                                target_min = self.action_data.command_min_range,
-                                                target_max = self.action_data.command_max_range) # to -1 + 1
+            value = gremlin.util.scale_to_range(normalized, target_min = self.action_data.command_min_range, target_max = self.action_data.command_max_range)  # scale from -1 +11
+            percent = gremlin.util.scale_to_range(normalized, target_min=0, target_max = 100)
             with QtCore.QSignalBlocker(self._output_max_range_widget):
                 self._output_max_range_widget.setValue(value)
-            self._update_max_range(value)
+            with QtCore.QSignalBlocker(self._output_max_percent_range_widget):
+                self._output_max_percent_range_widget.setValue(percent)
+            self.action_data.max_range = normalized
+            self._update_repeater()
 
+    @QtCore.Slot()
+    def _min_range_changed_cb(self):
+        value = self._output_min_range_widget.value() # command value
+        if value is not None:
+            normalized = gremlin.util.scale_to_range(value, 
+                                                     source_min = self.action_data.command_min_range, 
+                                                     source_max = self.action_data.command_max_range)  # scale from -1 +1
+            percent = gremlin.util.scale_to_range(normalized, target_min=0, target_max = 100)
+            with QtCore.QSignalBlocker(self._output_min_normalized_range_widget):
+                self._output_min_normalized_range_widget.setValue(normalized)
+            with QtCore.QSignalBlocker(self._output_min_percent_range_widget):
+                self._output_min_percent_range_widget.setValue(percent)    
+            self.action_data.min_range = normalized
+            self._update_repeater()
+
+    @QtCore.Slot()
     def _max_range_changed_cb(self):
         value = self._output_max_range_widget.value()
         if value is not None:
             normalized = gremlin.util.scale_to_range(value, 
-                                                     self.action_data.command_min_range, 
-                                                     self.action_data.command_max_range) # to -1 + 1
+                                                     source_min = self.action_data.command_min_range, 
+                                                     source_max = self.action_data.command_max_range) # to -1 + 1
+            percent = gremlin.util.scale_to_range(normalized, target_min=0, target_max = 100)
             with QtCore.QSignalBlocker(self._output_max_normalized_range_widget):
                 self._output_max_normalized_range_widget.setValue(normalized)
-            self._update_max_range(normalized)
+            with QtCore.QSignalBlocker(self._output_max_percent_range_widget):
+                self._output_max_percent_range_widget.setValue(percent)
+            self.action_data.max_range = normalized
+            self._update_repeater()
+
+
+    def _update_repeater(self):
+        value = gremlin.joystick_handling.get_axis(self.action_data.hardware_device_guid, self.action_data.hardware_input_id)
+        self._update_axis_widget(value)
 
     def _update_max_range(self, value):
         # store to profile
@@ -3071,7 +3142,8 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.action_data.max_range = value
 
         percent = gremlin.util.scale_to_range(value, target_min = 0.0, target_max = 100.0)
-        self._output_max_percent_range_widget.setValue(percent)
+        with QtCore.QSignalBlocker(self._output_max_percent_range_widget):
+            self._output_max_percent_range_widget.setValue(percent)
 
     @QtCore.Slot(bool)
     def _output_invert_axis_cb(self, checked):
@@ -3124,10 +3196,13 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         
         output_mode = self.action_data.mode
-        min_range = gremlin.util.clamp(self.action_data.min_range, -1, 1) # value -1 to +1
-        max_range = gremlin.util.clamp(self.action_data.max_range, -1, 1)  # value -1 to +1
-        normalized_min_range = self.action_data.scale_output(min_range)
-        normalized_max_range =  self.action_data.scale_output(max_range)
+        normalized_min_range = gremlin.util.clamp(self.action_data.min_range, -1, 1) # value -1 to +1
+        normalized_max_range = gremlin.util.clamp(self.action_data.max_range, -1, 1)  # value -1 to +1
+        min_range = gremlin.util.scale_to_range(normalized_min_range, target_min = self.action_data.command_min_range, target_max = self.action_data.command_max_range)
+        max_range = gremlin.util.scale_to_range(normalized_max_range, target_min = self.action_data.command_min_range, target_max = self.action_data.command_max_range)
+        percent_min_range = gremlin.util.scale_to_range(min_range, target_min=0, target_max=100)
+        percent_max_range = gremlin.util.scale_to_range(max_range, target_min=0, target_max=100)
+                
 
         value = self.action_data.value
         inverted = self.action_data.inverted
@@ -3155,12 +3230,15 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         match output_mode:
 
             case SimConnectActionMode.Ranged:
+
                 with QtCore.QSignalBlocker(self._output_mode_ranged_widget):
                     self._output_mode_ranged_widget.setChecked(True)
+
                 with QtCore.QSignalBlocker(self._output_min_range_widget):
                     self._output_min_range_widget.setValue(min_range) # -1 to +1 - updates the normalized range
                 with QtCore.QSignalBlocker(self._output_max_range_widget):
                     self._output_max_range_widget.setValue(max_range) # -1 to +1 - updates the normalized range
+
                 with QtCore.QSignalBlocker(self._output_min_normalized_range_widget):
                     self._output_min_normalized_range_widget.setValue(normalized_min_range) # -1 to +1 - updates the normalized range
                 with QtCore.QSignalBlocker(self._output_max_normalized_range_widget):
@@ -3169,7 +3247,10 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
                     self._command_min_range_widget.setValue(self.action_data.command_min_range)
                 with QtCore.QSignalBlocker(self._command_max_range_widget):
                     self._command_max_range_widget.setValue(self.action_data.command_max_range)
-
+                with QtCore.QSignalBlocker(self._output_min_percent_range_widget):
+                    self._output_min_percent_range_widget.setValue(percent_min_range)
+                with QtCore.QSignalBlocker(self._output_max_percent_range_widget):
+                    self._output_max_percent_range_widget.setValue(percent_max_range)
 
 
                 with QtCore.QSignalBlocker(self._output_invert_axis_widget):
