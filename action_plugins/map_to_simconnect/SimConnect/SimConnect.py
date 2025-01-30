@@ -205,10 +205,10 @@ class Request(object):
 			temp = DWORD(0)
 			self._sm._dll.GetLastSentPacketID(self._sm._hSimConnect, temp)
 			self.LastID = temp.value
-			syslog.info(f"Simconnect: request defintion OK: {command}")
+			syslog.info(f"SIMCONNECT:request defintion OK: {command}")
 			return True
 		else:
-			syslog.error(f"Simconnect: request defintion error: {command}")
+			syslog.error(f"SIMCONNECT:request defintion error: {command}")
 			return False
 
 
@@ -355,7 +355,7 @@ class SimConnect():
 		syslog = logging.getLogger("system")
 		if self._dll:
 			try:
-				syslog.info("Simconnect: close")
+				syslog.info("SIMCONNECT: shutdown ")
 				self._dll.close()
 			except:
 				pass
@@ -378,7 +378,7 @@ class SimConnect():
 			verbose = gremlin.config.Configuration().verbose_mode_simconnect
 			if verbose:
 				syslog = logging.getLogger("system")
-				syslog.info("Simconnect: register new client data handler")
+				syslog.info("SIMCONNECT: register new client data handler")
 			self.client_data_handlers.append(handler)
 
 
@@ -388,7 +388,7 @@ class SimConnect():
 			verbose = gremlin.config.Configuration().verbose_mode_simconnect
 			if verbose:
 				syslog = logging.getLogger("system")
-				syslog.info("Simconnect: un register new client data handler")
+				syslog.info("SIMCONNECT: unregister new client data handler")
 			self.client_data_handlers.remove(handler)
 
 		
@@ -398,14 +398,14 @@ class SimConnect():
 		# mark completed
 		self._request_busy = False
 		syslog = logging.getLogger("system")
-		syslog.info(f"Simconnect: connect request completed")
+		syslog.info(f"SIMCONNECT: connect request completed")
 
 	@QtCore.Slot()
 	def _disconnected(self):
 		# marke completed
 		self._request_busy = False
 		syslog = logging.getLogger("system")
-		syslog.info(f"Simconnect: disconnect request completed")
+		syslog.info(f"SIMCONNECT: disconnect request completed")
 		
 
 	@QtCore.Slot()
@@ -418,7 +418,7 @@ class SimConnect():
 					self.connect()
 				except:
 					syslog = logging.getLogger("system")
-					syslog.warning("Simconnect: simulator not running yet - unable to connect.")
+					syslog.warning("SIMCONNECT: simulator not running yet - unable to connect.")
 					return
 
 				while not self._is_loop_running:
@@ -454,36 +454,36 @@ class SimConnect():
 		if uEventID == self._dll.EventID.EVENT_SIM_START.value:
 			self.running = True
 			self.handler.simconnect_sim_start.emit()
-			syslog.info("SimConnect: event: SIM START")
+			syslog.info("SIMCONNECT: event: SIM START")
 		elif uEventID == self._dll.EventID.EVENT_SIM_REQUEST_AIRCRAFT.value:
 			# aircraft request
 			pass
 		elif uEventID == self._dll.EventID.EVENT_SIM_STOP.value:
 			if self.verbose:
-				syslog.info("SimConnect: event: SIM Stop")
+				syslog.info("SIMCONNECT:event: SIM Stop")
 			self.running = False
 			self.handler.simconnect_sim_stop.emit()
 		elif uEventID == self._dll.EventID.EVENT_SIM_PAUSE_STATE.value:
 			paused = event.dwData == 1
 			if self.verbose:
-				syslog.info(f"SimConnect: event: SIM Pause State {paused}")
+				syslog.info(f"SIMCONNECT: event: SIM Pause State {paused}")
 			self.paused = paused
 			self.handler.simconnect_sim_paused.emit(paused)
 		# elif uEventID == self._dll.EventID.EVENT_SIM_PAUSED.value:
 		# 	self.handler.simconnect_sim_paused.emit()
 		# 	if self.verbose:
-		# 		syslog.info("SimConnect: event: SIM Paused")
+		# 		syslog.info("SIMCONNECT:event: SIM Paused")
 		# 	self.paused = True
 		# 	self.handler.simconnect_sim_paused.emit(self.paused)
 		# elif uEventID == self._dll.EventID.EVENT_SIM_UNPAUSED.value:
 		# 	self.handler.simconnect_sim_unpaused.emit()
 		# 	if self.verbose:
-		# 		syslog.info("SimConnect: event: SIM Unpaused")
+		# 		syslog.info("SIMCONNECT:event: SIM Unpaused")
 		# 	self.paused = False
 		# 	self.handler.simconnect_sim_paused.emit(self.paused)
 		elif uEventID == self._dll.EventID.EVENT_SIM_RUNNING.value:
 			if self.verbose:
-				syslog.info("SimConnect: event: SIM Running")
+				syslog.info("SIMCONNECT: event: SIM Running")
 			state = event.dwData != 0
 			self.running = state
 			self.handler.simconnect_sim_running.emit(state)
@@ -491,13 +491,13 @@ class SimConnect():
 		elif uEventID == self._dll.EventID.EVENT_SIM_AIRCRAFT_LOADED.value:
 			aircraft_cfg = event.dwData # air file loaded
 			if self.verbose:
-				syslog.info(f"SimConnect: event: AIRCRAFT LOADED: {aircraft_cfg}")
+				syslog.info(f"SIMCONNECT: event: AIRCRAFT LOADED: {aircraft_cfg}")
 			self.handle_folder_event(aircraft_cfg.decode())
 		
 			
 
 		# else:
-		# 	syslog.error(f"SIMCONNECT: received event {uEventID} - don't know how to handle")
+		# 	syslog.error(f"SIMCONNECT:received event {uEventID} - don't know how to handle")
 
 	
 
@@ -515,10 +515,10 @@ class SimConnect():
 		import re
 		syslog = logging.getLogger("system")
 		verbose = gremlin.config.Configuration().verbose_mode_simconnect
-		if verbose: syslog.info(f"Simconnect: parsing: {aircraft_cfg}")
+		if verbose: syslog.info(f"SIMCONNECT:parsing: {aircraft_cfg}")
 		
 		if not aircraft_cfg:
-			syslog.error(f"Simconnect: error - invalid aircraft string: {aircraft_cfg}")
+			syslog.error(f"SIMCONNECT:error - invalid aircraft string: {aircraft_cfg}")
 			return 
 		
 		# Example 1: SimObjects\Airplanes\a400m\presets\inibuilds\a400m_cargo\config\aircraft.CFG
@@ -536,7 +536,7 @@ class SimConnect():
 		index+=1
 		if index < max_index:
 			aircraft_name = splits[index]
-			if verbose: syslog.info(f"Simconnect: found {aircraft_name}")
+			if verbose: syslog.info(f"SIMCONNECT:found {aircraft_name}")
 			return aircraft_name
 			
 		
@@ -565,7 +565,7 @@ class SimConnect():
 		# not one of ours
 		return False
 		# syslog = logging.getLogger("system")
-		# syslog.warning(f"SimConnect: Event ID: {dwRequestID} is not handled")
+		# syslog.warning(f"SIMCONNECT:Event ID: {dwRequestID} is not handled")
 
 	def handle_clientdata_event(self, pData):
 		''' handles client data receipt '''
@@ -592,7 +592,7 @@ class SimConnect():
 			_request = self.Requests[_reqin]
 			if _request.LastID == _unsendid:
 				
-				syslog.warning(f"SimConnect: error: {_exception} {_request.definitions[0]}")
+				syslog.warning(f"SIMCONNECT:error: {_exception} {_request.definitions[0]}")
 				return
 
 		syslog.warning(_exception)
@@ -604,7 +604,7 @@ class SimConnect():
 		str_data = pData.szString
 		if self.verbose:
 			syslog = logging.getLogger("system")
-			syslog.info(f"SimConnect: state event: int: {pData.dwInteger} float: {pData.fFloat} str: {pData.szString}")
+			syslog.info(f"SIMCONNECT:state event: int: {pData.dwInteger} float: {pData.fFloat} str: {pData.szString}")
 
 		if str_data:
 			aircraft_cfg = str_data.decode()
@@ -651,7 +651,7 @@ class SimConnect():
 
 		elif dwID == SIMCONNECT_RECV_ID.SIMCONNECT_RECV_ID_OPEN.value:
 
-			if verbose: syslog.info("Simconnect: SIM OPEN")
+			if verbose: syslog.info("SIMCONNECT:SIM OPEN")
 			self._ok = True
 
 		elif dwID == SIMCONNECT_RECV_ID.SIMCONNECT_RECV_ID_EXCEPTION:
@@ -707,7 +707,7 @@ class SimConnect():
 		else:
 			if verbose:
 				syslog = logging.getLogger("system")
-				syslog.debug(f"Simconnect: Received: {SIMCONNECT_RECV_ID(dwID)}")
+				syslog.debug(f"SIMCONNECT:Received: {SIMCONNECT_RECV_ID(dwID)}")
 		return
 
 
@@ -746,8 +746,7 @@ class SimConnect():
 
 		syslog = logging.getLogger("system")
 		verbose = gremlin.config.Configuration().verbose_mode_simconnect
-		if verbose:
-			syslog.info("SIMCONNECT: connect...")
+		if verbose: syslog.info("SIMCONNECT:connect...")
 		
 		self._connecting = True
 
@@ -755,9 +754,11 @@ class SimConnect():
 		
 			if self._is_connected:
 				# already connected
+				if verbose: syslog.info("SIMCONNECT:already connected")
 				return True
 			if self._abort:
 				# abort
+				if verbose: syslog.info("SIMCONNECT:abort set - request skipped")
 				return False
 			
 			el = gremlin.event_handler.EventListener()
@@ -773,7 +774,7 @@ class SimConnect():
 						syslog.critical(msg) # issue a critical error because the DLL should be with the distribution
 						os._exit(1)
 
-					syslog.info(f"Simconnect: Using dll : {self._dll_path}")
+					syslog.info(f"SIMCONNECT:Using dll : {self._dll_path}")
 					self._library_path = self._dll_path
 					
 
@@ -786,10 +787,10 @@ class SimConnect():
 
 				try:
 					self._win_dll = windll.LoadLibrary(self._dll_path)
-					syslog.error(f"Simconnect: DLL load: ok")
+					syslog.error(f"SIMCONNECT:DLL load: ok")
 				except Exception as err:
 					self._abort = True
-					syslog.error(f"Simconnect: DLL load error: {err}")
+					syslog.error(f"SIMCONNECT:DLL load error: {err}")
 					self._quit = 1
 					
 					el.request_profile_stop.emit("Error loading DLL")
@@ -802,7 +803,7 @@ class SimConnect():
 				self._my_dispatch_proc_rd = self._dll.DispatchProc(self.simconnect_dispatch_proc)
 				err = self._dll.Open(byref(self._hSimConnect), LPCSTR(b"GremlinEx"), None, 0, 0, 0)
 				if self.IsHR(err, 0):
-					syslog.info("Simconnect: Connected to MSFS")
+					syslog.info("SIMCONNECT:Connected to MSFS")
 					# Request an event when the simulation starts
 
 					self._is_connected = True
@@ -843,14 +844,14 @@ class SimConnect():
 					)
 
 					
-					syslog.info(f"Simconnect: interface connected")
+					syslog.info(f"SIMCONNECT:interface connected")
 					self.run()
 
 
 				else:
 					self._abort = True
 					el.module_state_change.emit("simconnect",False)
-					syslog.error(f"Simconnect: Failed to connect: return code: 0x{err:X}")
+					syslog.error(f"SIMCONNECT:Failed to connect: return code: 0x{err:X}")
 					el.request_profile_stop.emit("Error opening SimConnect")
 					return False
 
@@ -876,7 +877,8 @@ class SimConnect():
 		self.handler.simconnect_connected.emit()
 		self._is_loop_running = True
 		syslog = logging.getLogger("system")
-		syslog.info("Simconnect: Open connection")
+		verbose = gremlin.config.Configuration().verbose_mode_simconnect
+		if verbose: syslog.info("SIMCONNECT: run loop start")
 		error_count = 10
 		self._quit = 0 # keep on running until stop
 		while self._quit == 0:
@@ -902,7 +904,7 @@ class SimConnect():
 			pass
 		
 		self._is_connected = False	
-		syslog.info("Simconnect: Close connection")
+		if verbose: syslog.info("SIMCONNECT: run loop end")
 		self._is_loop_running = False
 
 
@@ -913,6 +915,9 @@ class SimConnect():
 	def exit(self):
 		''' disconnects from the sim '''
 		if self._is_loop_running:
+			syslog = logging.getLogger("system")
+			verbose = gremlin.config.Configuration().verbose_mode_simconnect
+			if verbose: syslog.info("SIMCONNECT: exit requested")
 			self._quit = 1 # kill the thread loop
 			self._runThread.join()
 			# this also resets the flags
@@ -944,7 +949,7 @@ class SimConnect():
 			for m in self._dll.EventID:
 				if name.decode() == m.name:
 					if self.verbose_details:
-						syslog.debug(f"Simconnect: Already have event: {name} {m}")
+						syslog.debug(f"SIMCONNECT: already have event: {name} {m}")
 					return m
 
 			names = [m.name for m in self._dll.EventID] + [name.decode()]
@@ -955,11 +960,11 @@ class SimConnect():
 				if self.IsHR(err, 0):
 					return evnt
 			except:
-				syslog.error(f"Simconnect: Error: MapToSimEvent error: event: {err}")
+				syslog.error(f"SIMCONNECT:Error: MapToSimEvent error: event: {err}")
 				pass			
 		
 
-		syslog.error(f"Simconnect: Error: MapToSimEvent: not connected event: {name}")
+		syslog.error(f"SIMCONNECT:Error: MapToSimEvent: not connected event: {name}")
 		return None
 
 	def add_to_notification_group(self, group, event, maskable : bool =False):
@@ -1069,7 +1074,7 @@ class SimConnect():
 		if self._dll is None:
 			self.connect()
 		if self._dll is None:
-			logging.getLogger("system").warning(f"Simconnect: Setdata: not connected - request : {request.definitions}")
+			logging.getLogger("system").warning(f"SIMCONNECT:Setdata: not connected - request : {request.definitions}")
 			return False
 		if request.buffer is None:
 			return False
@@ -1108,7 +1113,7 @@ class SimConnect():
 			retries += 1
 		if request.buffer is None:
 			if self.verbose:
-				syslog.warning(f"Simconnect: warning: timeout in request {request}")
+				syslog.warning(f"SIMCONNECT:warning: timeout in request {request}")
 			return False
 		return True
 	

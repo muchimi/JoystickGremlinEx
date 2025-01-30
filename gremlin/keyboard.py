@@ -135,7 +135,7 @@ class Key():
         self._latched_keys = [] # TraceableList() #[] # list of keys latched to this keystroke (modifiers)
         # self._latched_keys.add_callback(self._changed_cb)            
 
-        
+        self._name = None
 
         if not name:
             self._load(scan_code, is_extended, virtual_code, is_mouse)
@@ -1024,6 +1024,21 @@ class KeyMap:
             return KeyMap._g_translate_map[keyid]
         vk = KeyMap.scan_code_to_virtual_code(scan_code, is_extended)
         return (keyid, vk)
+    
+    @staticmethod
+    def translate_lookup(key_tuple) -> tuple:
+        ''' translates a key id and returns a list of equivalent keys
+            this is to map similar keys together 
+            :param keyid (scan_code, is_extended)
+            :returns ((scan_code, is_extended), virtual_code)
+        '''
+        # flip the extended bit to force numlock OFF for numeric keypad so we always get the numeric keys
+        if key_tuple in KeyMap._g_translate_map:
+            key_trans, _ = KeyMap._g_translate_map[key_tuple]
+            return key_trans
+        return key_tuple
+        
+       
     
     
     @staticmethod

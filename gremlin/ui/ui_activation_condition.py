@@ -1034,7 +1034,6 @@ class ConditionModel(ui_common.AbstractModel):
 
     def rows(self):
         """Returns the number of rows in the model.
-
         :return number of rows
         """
         return len(self.condition_data.conditions)
@@ -1063,6 +1062,8 @@ class ConditionModel(ui_common.AbstractModel):
         self.data_changed.emit()
         el = gremlin.event_handler.EventListener()
         el.condition_state_changed.emit(container)
+
+        
 
     def delete_condition(self, condition):
         """Deletes a condition from the model.

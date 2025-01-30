@@ -1982,6 +1982,7 @@ class ConditionStateTracker():
         el = gremlin.event_handler.EventListener()
         el.condition_state_changed.connect(self._condition_state_changed)
         el.container_delete.connect(self._container_delete)
+        el.mapping_changed.connect(self._mapping_changed)
         self._icon_enabled = gremlin.util.load_icon("mdi.record", qta_color="green")
         self._icon_disabled = gremlin.util.load_icon("mdi.record", qta_color="lightgray")
 
@@ -2042,6 +2043,10 @@ class ConditionStateTracker():
             return
         self.unregister(input_item, container)
                     
+    @QtCore.Slot()
+    def _mapping_changed(self):
+        ''' called when a mapping is changed '''    
+        # ensure condition "state" is updated following the change
         
         
 
@@ -2058,6 +2063,7 @@ class ConditionStateTracker():
         except:
             pass
 
+    
         
 
 

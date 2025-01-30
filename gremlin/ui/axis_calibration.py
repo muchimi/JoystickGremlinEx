@@ -454,7 +454,12 @@ class CalibrationData:
         if not device_guid or device_guid == 'None':
             return # no calibration data
         self.device_guid = parse_guid(device_guid)
-        self.input_id = safe_read(node,"input-id", int)
+        input_id = safe_read(node,"input-id", str, "")
+        if input_id and input_id.isnumeric():
+            self.input_id = int(input_id)
+        else:
+            self.input_id = input_id
+        
         self.inverted = safe_read(node,"inverted",bool, False)
         
         self.centered = safe_read(node,"centered",bool)

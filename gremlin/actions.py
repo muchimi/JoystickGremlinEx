@@ -34,6 +34,7 @@ import gremlin.shared_state
 import gremlin.util
 import gremlin.fsm
 import gremlin.macro
+from PySide6 import QtCore
 
 def smart_all(conditions):
     """Returns True if all conditions are True, False otherwise.
@@ -125,6 +126,7 @@ class ActivationCondition:
     False which is used to indicate whether or not the entire condition is
     True or False.
     """
+
 
     rule_function = {
         ActivationRule.All: smart_all,

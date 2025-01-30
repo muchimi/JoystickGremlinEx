@@ -192,6 +192,7 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
 
     def _set_sequence(self, sequence):
         ''' loads a given key sequence into the virtual keyboard '''
+        syslog = logging.getLogger("system")
         if sequence:
             # the action keeps a list of keys in the format (scancode, extended_flag)
             # convert that to a key from it and selected it if the key is mapped
@@ -205,14 +206,23 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
                     widget.selected = True
                 elif isinstance(item, Key):
                     # key object
-                    key_name = self._key_map[item.index_tuple()]
-                    widget = self._key_widget_map[key_name]
-                    widget.selected = True
+                    lookup = item.index_tuple()
+                    lookup = gremlin.keyboard.KeyMap.translate_lookup(lookup)
+                    if lookup in self._key_map:
+                        key_name = self._key_map[lookup]
+                        widget = self._key_widget_map[key_name]
+                        widget.selected = True
+                    else:
+                        syslog.error(f"VIRTUAL KEYBOARD: key {lookup} not found in keyboard map ")
                 elif isinstance(item, tuple):
                     # key id
-                    key_name = self._key_map[item]
-                    widget = self._key_widget_map[key_name]
-                    widget.selected = True
+                    lookup = gremlin.keyboard.KeyMap.translate_lookup(item)
+                    if lookup in self._key_map:
+                        key_name = self._key_map[lookup]
+                        widget = self._key_widget_map[key_name]
+                        widget.selected = True
+                    else:
+                        syslog.error(f"VIRTUAL KEYBOARD: key {lookup} not found in keyboard map ")
                 elif isinstance(item, int):
                     # virtual code
                     key = gremlin.keyboard.KeyMap.find_virtual(item)

@@ -1050,6 +1050,16 @@ def get_xml_child(node, tag : str, multiple = False):
             return child
     return None
 
+def get_xml_parent(node, tag : str):
+    ''' gets the first parent node of that tag '''
+    value = tag.casefold()
+    parent = node.getparent()
+    while parent is not None:
+        if parent.tag.casefold() == tag:
+            return parent
+        parent = parent.getparent()
+    return None
+
 def get_xml_mode(node):
     ''' gets the mode from a parent xml node '''
     # grab the mode

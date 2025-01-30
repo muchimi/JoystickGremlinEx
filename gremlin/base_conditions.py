@@ -23,15 +23,20 @@ class ActivationRule(enum.Enum):
     Any = 2
 
 
+class ABCMetaQObject(ABCMeta, type(QtCore.QObject)):
+    pass
 
 
 
-class AbstractCondition(metaclass=ABCMeta):
+class AbstractCondition(QtCore.QObject, metaclass=ABCMetaQObject):
 
     """Base class of all individual condition representations."""
 
+    id_changed = QtCore.Signal(str, str)  # triggers when the ID changes
+
     def __init__(self):
         """Creates a new condition."""
+        super().__init__()
         import gremlin.util
         self._id = gremlin.util.get_guid()
         self._comparison = ""
@@ -44,6 +49,14 @@ class AbstractCondition(metaclass=ABCMeta):
             import gremlin.util
             self._id = gremlin.util.get_guid()
         return self._id
+    
+    @id.setter
+    def id(self, new_id):
+        ''' changes the ID '''
+        old_id = self._id
+        if old_id != new_id:
+            self._id = new_id
+            self.id_changed.emit(old_id, new_id)
 
     @property
     def comparison(self):
@@ -63,8 +76,6 @@ class AbstractCondition(metaclass=ABCMeta):
             str_id = node.get("condition_id")
             if str_id:
                 self._id = str_id
-
-        
 
     
     def to_xml(self):
@@ -460,6 +471,7 @@ class ConditionTracker():
         import gremlin.event_handler
         self._cache = {} # map of known conditions keyed by mode and condition ID
         self._owner_map = {} # map of condition ID to its input item owner so we know which input item has which condition
+        self._data_map = {} # map of condition ID to tracker data
         self._el = gremlin.event_handler.EventListener()
         self._el.shutdown.connect(self.reset)
         self._el.profile_unloaded.connect(self.reset)
@@ -469,6 +481,7 @@ class ConditionTracker():
         ''' triggered on app exit or profile unload '''
         self._cache.clear()
         self._owner_map.clear()
+        self._data_map.clear()
 
 
 
@@ -481,10 +494,24 @@ class ConditionTracker():
             self._cache[mode] = {}
         self._cache[mode][condition.id] = data
         self._owner_map[condition.id] = input_item
+        self._data_map[condition.id] = data
         self._el.condition_added.emit(input_item, mode, condition)
         self._el.condition_state_changed.emit(data.container)
         syslog = logging.getLogger("system")
         syslog.info(f"creating condition: {condition.id} for input: {data.input_item.display_name if hasattr(data.input_item,"display_name") else data.input_item} mode: {data.mode}")
+        data.condition.id_changed.connect(self._condition_id_changed)
+
+
+    @QtCore.Slot(str, str)
+    def _condition_id_changed(self, old_id, new_id):
+        ''' handle an ID swap for the condition in the tracking objects '''
+        if old_id in self._owner_map:
+            input_item = self._owner_map[old_id]
+            self._owner_map[new_id] = input_item
+            del self._owner_map[old_id]
+            data = self._data_map[old_id]
+            self._data_map[new_id] = data
+            del self._data_map[old_id]
         
 
     def unregisterCondition(self, condition : AbstractCondition):
@@ -546,15 +573,16 @@ class ConditionTracker():
             return conditions
         return None
 
-
-
-
-
-    
     def owner(self, condition : AbstractCondition):
         ''' what input item owns the condition '''
         if condition.id in self._cache:
             return self._owner_map[condition.id]
+        return None
+
+    def getData(self, condition : AbstractCondition):
+        ''' gets the condition tracking data '''
+        if condition.id in self._data_map:
+            return self._data_map[condition.id]
         return None
 
         
@@ -595,6 +623,10 @@ class ActivationCondition:
             import gremlin.util
             self._id = gremlin.util.get_guid()
         return self._id
+    
+    @id.setter
+    def id(self, value):
+        self._id = value
 
 
     def from_xml(self, node, data = None):
@@ -621,7 +653,9 @@ class ActivationCondition:
         else:
             import gremlin.shared_state
             mode = gremlin.shared_state.edit_mode
+        assert data is not None,"XML: error: data not provided for activation condition"    
         input_item, container = data
+        assert input_item is not None,"XML: error:input_item not provided for activation condition"
         for cond_node in node.findall("condition"):
             condition_type = safe_read(cond_node, "condition-type")
             condition = ActivationCondition.condition_lookup[condition_type]()

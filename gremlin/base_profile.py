@@ -87,7 +87,11 @@ def _get_input_item(parent):
         return parent
     return None
 
-class ProfileData(metaclass=ABCMeta):
+class ABCMetaQObject(ABCMeta, type(QtCore.QObject)):
+    pass
+
+
+class ProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
 
     """Base class for all items holding profile data.
 
@@ -100,6 +104,8 @@ class ProfileData(metaclass=ABCMeta):
 
         :param: parent the parent item of this instance in the profile tree (type: InputItem)
         """
+
+        super().__init__()
         assert parent is not None
         self.code = None
         self._id = gremlin.util.get_guid(no_brackets=True)
@@ -329,6 +335,8 @@ class AbstractContainer(ProfileData):
         InputType.Midi: None,
     }
 
+    id_changed = QtCore.Signal(str, str) # fires when id changes (old_id, new_id)
+
     # default allowed input types = all
     input_types = InputType.to_list()
 
@@ -371,6 +379,40 @@ class AbstractContainer(ProfileData):
             self.device_input_id = None
             self.device_input_type = None
             self.device = None
+
+    def generateGuids(self):
+        ''' called when GUIDs for this container, actions and conditions need to be re-set '''
+
+        tracker = ConditionTracker()
+
+        for action_set in self.get_action_sets():
+            for action in action_set:
+                action.id = gremlin.util.get_guid()
+                action.action_id = gremlin.util.get_guid()
+
+        self.activation_container_condition.id = gremlin.util.get_guid()
+        for condition in self.activation_container_condition.conditions:
+            data = tracker.getData(condition)
+            condition.id = gremlin.util.get_guid()
+            if data:
+                new_data = ConditionTrackerData(data.mode, data.input_item, self, condition)
+                tracker.registerCondition(new_data)
+
+
+        self.activation_condition.id = gremlin.util.get_guid()
+        for condition in self.activation_condition.conditions:
+            data = tracker.getData(condition)
+            condition.id = gremlin.util.get_guid()
+            if data:
+                new_data = ConditionTrackerData(data.mode, data.input_item, self, condition)
+                tracker.registerCondition(new_data)
+
+
+        el = gremlin.event_handler.EventListener()
+        el.condition_state_changed.emit(self)
+        
+
+
 
 
     @property
@@ -438,8 +480,11 @@ class AbstractContainer(ProfileData):
     def id(self):
         return self._id
     @id.setter
-    def id(self, value):
-        self._id = value
+    def id(self, new_id):
+        if new_id != self._id:
+            old_id = self._id
+            self._id = new_id
+            self.id_changed.emit(old_id, new_id)
 
     
     @property
@@ -638,6 +683,8 @@ class AbstractContainer(ProfileData):
             entry.from_xml(child, (input_item, self)) # pass input item, container as a tuple
             action_set.append(entry)
 
+
+
     def _parse_virtual_button_xml(self, node, data = None):
         """Parses the virtual button part of the XML data.
 
@@ -656,11 +703,14 @@ class AbstractContainer(ProfileData):
     def _parse_activation_condition_xml(self, node, data):
         ''' load the container condition '''
         self.activation_container_condition = ActivationCondition([], ActivationRule.All)
-        for _ in node.findall("activation-condition"):
-            condition_node = node.find("activation-condition")
-            input_item = data
-            if condition_node is not None:
-                self.activation_container_condition.from_xml(condition_node, (input_item, self))
+        self.activation_condition = ActivationCondition([], ActivationRule.All)
+
+        input_item = data
+        activation_node = gremlin.util.get_xml_child(node,"activation-condition")
+        if activation_node is not None:
+            self.activation_container_condition.from_xml(activation_node, (input_item, self))
+
+
 
     def _is_valid(self):
         """Returns whether or not this container is configured properly.
@@ -837,6 +887,8 @@ class AbstractAction(ProfileData):
     """Base class for all actions that can be encoded via the XML and
     UI system."""
 
+    id_changed = QtCore.Signal(str, str)  # triggers when the ID changes
+
     # allow all input types by default
     input_types = InputType.to_list()
 
@@ -861,6 +913,23 @@ class AbstractAction(ProfileData):
         eh.action_created.emit(self)
         eh.profile_unload.connect(self._cleanup)
         eh.action_delete.connect(self._action_delete)
+
+
+    @property
+    def id(self):
+        ''' unique ID for this condition, persisted '''
+        if not self._id:
+            import gremlin.util
+            self._id = gremlin.util.get_guid()
+        return self._id
+    
+    @id.setter
+    def id(self, new_id):
+        ''' changes the ID '''
+        old_id = self._id
+        if old_id != new_id:
+            self._id = new_id
+            self.id_changed.emit(old_id, new_id)   
 
     @property
     def has_conditions(self):
@@ -1359,6 +1428,7 @@ class InputItem():
     def id(self):
         ''' id of the InputItem '''
         return self._id
+
 
     @property
     def description(self):

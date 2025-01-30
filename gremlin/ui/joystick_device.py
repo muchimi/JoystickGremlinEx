@@ -24,6 +24,7 @@ import lxml.etree
 
 import gremlin
 import gremlin.base_buttons
+import gremlin.base_conditions
 import gremlin.base_profile
 import gremlin.base_profile
 import gremlin.config
@@ -285,8 +286,11 @@ class InputItemConfiguration(QtWidgets.QFrame):
 
         :param container container to be added
         """
+        el = gremlin.event_handler.EventListener()
         plugin_manager = gremlin.plugin_manager.ContainerPlugins()
         container_list = []
+
+        tracker = gremlin.base_conditions.ConditionTracker()
 
         if isinstance(container, ObjectEncoder):
             oc = container
@@ -301,19 +305,9 @@ class InputItemConfiguration(QtWidgets.QFrame):
                 if container_type in container_tag_map:
                     container_name = container_tag_map[container_type].name
                     if container_name in valid_containers_names:
-
-                        
                         new_container = container_tag_map[container_type](self.item_data)
-                        new_container.from_xml(node)
-
-
-
-                        #new_container = copy.deepcopy(container)
-
-                        for action_set in new_container.get_action_sets():
-                            for action in action_set:
-                                action.action_id = gremlin.util.get_guid()
-
+                        new_container.from_xml(node, self.item_data)
+                        new_container.generateGuids()
                         container_list.append(new_container)
 
             elif oc.encoder_type == EncoderType.MultiContainer:
@@ -326,11 +320,10 @@ class InputItemConfiguration(QtWidgets.QFrame):
                         if container_name in valid_containers_names:
                             
                             new_container = container_tag_map[container_type](self.item_data)
-                            new_container.from_xml(node)
+                            new_container.from_xml(node, self.item_data)
 
-                            for action_set in new_container.get_action_sets():
-                                for action in action_set:
-                                    action.action_id = gremlin.util.get_guid()
+                            new_container.generateGuids()
+                            
 
                             container_list.append(new_container)
 
@@ -344,11 +337,13 @@ class InputItemConfiguration(QtWidgets.QFrame):
                 if hasattr(new_container, "action_model"):
                     new_container.action_model = self.action_model
                 
-                    self.action_model.add_container(new_container)
                     plugin_manager.set_container_data(self.item_data, new_container)
+                    self.action_model.add_container(new_container)
+                    
 
-            eh = gremlin.event_handler.EventListener()
-            eh.mapping_changed.emit(self.item_data)
+
+            
+            el.mapping_changed.emit(self.item_data)
             self.notify_changed()
 
         return container_list
