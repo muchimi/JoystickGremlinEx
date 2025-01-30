@@ -200,14 +200,15 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
                 widget.selected = False
 
             for item in sequence:
-                if item in self._key_map.keys():
-                    key_name = self._key_map[item]
-                    widget = self._key_widget_map[key_name]
-                    widget.selected = True
-                elif isinstance(item, Key):
+                # if item in self._key_map.keys():
+                #     key_name = self._key_map[item]
+                #     widget = self._key_widget_map[key_name]
+                #     widget.selected = True
+                if isinstance(item, Key):
                     # key object
                     lookup = item.index_tuple()
-                    lookup = gremlin.keyboard.KeyMap.translate_lookup(lookup)
+                    if not lookup in self._key_map:
+                        lookup = gremlin.keyboard.KeyMap.translate_lookup(lookup)
                     if lookup in self._key_map:
                         key_name = self._key_map[lookup]
                         widget = self._key_widget_map[key_name]
@@ -216,7 +217,9 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
                         syslog.error(f"VIRTUAL KEYBOARD: key {lookup} not found in keyboard map ")
                 elif isinstance(item, tuple):
                     # key id
-                    lookup = gremlin.keyboard.KeyMap.translate_lookup(item)
+                    lookup = item
+                    if not lookup in self._key_map:
+                        lookup = gremlin.keyboard.KeyMap.translate_lookup(lookup)
                     if lookup in self._key_map:
                         key_name = self._key_map[lookup]
                         widget = self._key_widget_map[key_name]
@@ -229,7 +232,7 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
                     key_name = self._key_map[key.index_tuple()]
                     widget = self._key_widget_map[key_name]
                     widget.selected = True
-                elif item in self._key_map.keys():
+                elif item in self._key_map:
                     key_name = self._key_map[item]
                     widget = self._key_widget_map[key_name]
                     widget.selected = True

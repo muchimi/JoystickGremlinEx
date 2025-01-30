@@ -1838,7 +1838,9 @@ class InputListenerWidget(QtWidgets.QFrame):
 
         key = gremlin.keyboard.KeyMap.from_event(event)
 
-        # print (f"Head event: {event}  {key}")
+        syslog = logging.getLogger("system")
+        verbose = gremlin.config.Configuration().verbose_mode_keyboard
+        if verbose: syslog.info(f"LISTEN: Keyboard event: {event} {key}")
 
         if self._close_on_key:
             if key == self._esc_key:

@@ -836,12 +836,14 @@ class KeyMap:
     @staticmethod
     def find(scan_code, is_extended):
         ''' does a key lookup by scan code and extended key status '''
-        index = (scan_code, is_extended)
-        if not index in KeyMap._g_scan_code_to_key.keys():
+        lookup = (scan_code, is_extended)
+        if lookup in KeyMap._g_map:
+            return KeyMap._g_map[lookup].duplicate()
+        if not lookup in KeyMap._g_scan_code_to_key.keys():
             # see if we can add it
             key = KeyMap.get_key(scan_code, is_extended)
             if key:
-               KeyMap._g_scan_code_to_key[index] = key
+               KeyMap._g_scan_code_to_key[lookup] = key
                return key.duplicate()
             return None
         key = KeyMap._g_scan_code_to_key.get((scan_code, is_extended), None)
@@ -866,11 +868,9 @@ class KeyMap:
     @staticmethod
     def from_event(event):
         ''' returns a key based on a keyboard event '''
-        key = None
-        if event.virtual_code > 0:
+        key = KeyMap.find(event.identifier[0], event.identifier[1])
+        if not key and event.virtual_code > 0:
             key = KeyMap.find_virtual(event.virtual_code)
-        if not key :
-            key = KeyMap.find(event.identifier[0], event.identifier[1])
         if key is None:
             logging.getLogger("system").warning(f"Don't know how to handle key event: {event}")
         return key
@@ -1030,15 +1030,22 @@ class KeyMap:
         ''' translates a key id and returns a list of equivalent keys
             this is to map similar keys together 
             :param keyid (scan_code, is_extended)
-            :returns ((scan_code, is_extended), virtual_code)
+            :returns (scan_code, is_extended)
         '''
         # flip the extended bit to force numlock OFF for numeric keypad so we always get the numeric keys
+        if key_tuple in KeyMap._g_map:
+            return key_tuple
         if key_tuple in KeyMap._g_translate_map:
             key_trans, _ = KeyMap._g_translate_map[key_tuple]
             return key_trans
         return key_tuple
         
-       
+    @staticmethod
+    def vk_lookup(key_tuple):
+        ''' gets a virtual key from (scancode, extended) '''
+        scan_code, is_extended = key_tuple
+        vk = KeyMap.scan_code_to_virtual_code(scan_code, is_extended)
+        return vk
     
     
     @staticmethod
@@ -1120,6 +1127,8 @@ class KeyMap:
 
 
     }
+
+    _g_map = {}
 
     _g_name_map = {
         # Function keys
@@ -1222,6 +1231,7 @@ for mouse_button in MouseButton:
 for name_, data in KeyMap._g_name_map.items():
     key = Key(*data)
     key._lookup_name = name_
+    KeyMap._g_map[(data[1],data[2])] = key
     KeyMap.register(key)
 
 

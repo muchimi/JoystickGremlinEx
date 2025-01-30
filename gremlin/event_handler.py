@@ -914,7 +914,7 @@ class EventListener(QtCore.QObject):
 
 		:param event the keyboard event
 		"""
-		verbose = gremlin.config.Configuration().verbose_mode_detailed
+		verbose = gremlin.config.Configuration().verbose_mode_keyboard
 
 		# verbose = True
 		virtual_code = event.virtual_code
@@ -924,7 +924,8 @@ class EventListener(QtCore.QObject):
 			syslog.info(f"Recorded key: {key_id:} sc: {event.scan_code:X} ex: {event.is_extended} vk: {virtual_code} (0x{virtual_code:X}) pressed: {is_pressed}")
 
 		# deal with any code translations needed
-		key_id, virtual_code = gremlin.keyboard.KeyMap.translate(key_id) # modify scan codes if needed
+		key_id = gremlin.keyboard.KeyMap.translate_lookup(key_id) # modify scan codes if needed	
+		virtual_code = gremlin.keyboard.KeyMap.vk_lookup(key_id) # get virtual code
 		if verbose:
 			syslog.info(f"Translated key: {key_id:} sc: {event.scan_code:X} ex: {event.is_extended} vk: {virtual_code} (0x{virtual_code:X}) pressed: {is_pressed}")
 
