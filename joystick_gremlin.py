@@ -2566,7 +2566,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
             # save settings as the last input
             el.input_selection_changed.emit(device_guid, input_type, input_id)
-            
+            el.update_input_state.emit(device_guid)
             
 
         finally:

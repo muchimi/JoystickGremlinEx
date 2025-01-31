@@ -157,6 +157,7 @@ class StateTracker():
         el.button_state_change.connect(self._button_state_change)
         el.axis_state_change.connect(self._axis_state_change)
         el.select_input_completed.connect(self._select_input_completed)
+        el.update_input_state.connect(self._update_input_state)
         self._queue = []
 
 
@@ -260,6 +261,29 @@ class StateTracker():
         self._store_state(device_guid, input_type, input_id, state)
         self._update_widget(device_guid, input_type, input_id, state)
 
+    def _get_device_state(self, device_guid, input_type, input_id):
+        ''' gets the current state or value of the item '''
+        state = None
+        match input_type:
+            case InputType.JoystickAxis:
+                state = gremlin.joystick_handling.get_axis(device_guid, input_id)
+            case InputType.JoystickButton:
+                state = gremlin.joystick_handling.get_button(device_guid, input_id)
+            case InputType.JoystickHat:
+                value = gremlin.joystick_handling.get_hat(device_guid, input_id)
+                import vjoy.vjoy
+                if value in vjoy.vjoy.Hat.to_continuous_position: 
+                    state = vjoy.vjoy.Hat.to_continuous_position[value]
+
+
+            case InputType.OpenSoundControl:
+                pass
+            case InputType.Midi:
+                pass
+            case InputType.KeyboardLatched:
+                pass        
+        return state
+
     def _update_widget(self, device_guid, input_type, input_id, state):
         ''' updates the state of the widget'''
         if not isinstance(device_guid, str):
@@ -316,6 +340,7 @@ class StateTracker():
                 if input_id in self._state_cache[device_guid][input_type]:
                     return self._state_cache[device_guid][input_type][input_id]
         return None
+
 
 
 
@@ -379,7 +404,32 @@ class StateTracker():
             self._update_widget(device_guid, input_type, input_id, state)
 
     
-    
+    @QtCore.Slot(object)
+    def _update_input_state(self, device_guid):
+        ''' updates all the state widgets related to a single device based on stored state '''
+        if not isinstance(device_guid, str):
+            device_guid = str(device_guid)
+            # buttons
+        if device_guid in self._button_cache:
+            for input_type in self._button_cache[device_guid]:
+                for key in self._button_cache[device_guid][input_type]:
+                    widget = self._button_cache[device_guid][input_type][key]
+                    input_id = widget.input_id
+                    # get the current state
+                    state = self._get_device_state(device_guid, input_type, input_id)
+                    if state is not None:
+                        self._update_widget(device_guid, input_type, input_id, state)
+        # axes
+        if device_guid in self._axis_cache:
+            for input_type in self._axis_cache[device_guid]:
+                for key in self._axis_cache[device_guid][input_type]:
+                    widget = self._axis_cache[device_guid][input_type][key]
+                    input_id = widget.input_id
+                    # get the current state
+                    state = self._get_device_state(device_guid, input_type, input_id)
+                    if state is not None:
+                        self._update_widget(device_guid, input_type, input_id, state)
+ 
 
 
 _tabsplitter_tracker = WidgetTracker()
@@ -2655,6 +2705,16 @@ class ButtonStateWidget(QtWidgets.QWidget):
     @property
     def enabled(self) -> bool:
         return self._handler_connected
+    
+    @property
+    def input_id(self) -> object:
+        return self._input_id
+    @property
+    def device_guid(self) -> str:
+        return self._device_guid
+    @property
+    def input_type(self) -> InputType:
+        return self._input_type
 
 
     
@@ -2697,6 +2757,10 @@ class ButtonStateWidget(QtWidgets.QWidget):
 
     def _update_hat(self, position):
         ''' updates a hat position '''
+        if not isinstance(position,tuple):
+            # convert from value to position tuple
+            import vjoy.vjoy
+            position =  vjoy.vjoy.Hat.to_continuous_position[position]
         position = HatDirection.to_enum(position) 
         if not position in self._hat_icons:
             match position:
@@ -2872,6 +2936,15 @@ class AxisStateWidget(QtWidgets.QWidget):
             self._show_curved = value
             self._setValue(self._value, self._curve_value)
 
+    @property
+    def input_id(self) -> object:
+        return self._input_id
+    @property
+    def device_guid(self) -> str:
+        return self._device_guid
+    @property
+    def input_type(self) -> InputType:
+        return self._input_type
 
 
 

@@ -379,8 +379,8 @@ class EventListener(QtCore.QObject):
 
 
 	button_state_change = QtCore.Signal(Event) # indicates a change in button state params: (device_guid, input_type, input_id, is_pressed)
-
 	axis_state_change = QtCore.Signal(Event) # indicates a change in axis state params: (device_guid, input_type, input_id, is_pressed)
+	update_input_state = QtCore.Signal(object) # request to update the input states in the UI for a given device: (device_guid)
 
 	# mapping changed - either container or action added -
 	mapping_changed = QtCore.Signal(object) # fires when a container or action changes on an InputItem - passes the InputItem as the parameter
