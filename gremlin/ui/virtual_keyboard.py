@@ -207,14 +207,15 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
                 if isinstance(item, Key):
                     # key object
                     lookup = item.index_tuple()
-                    if not lookup in self._key_map:
-                        lookup = gremlin.keyboard.KeyMap.translate_lookup(lookup)
-                    if lookup in self._key_map:
-                        key_name = self._key_map[lookup]
-                        widget = self._key_widget_map[key_name]
-                        widget.selected = True
-                    else:
-                        syslog.error(f"VIRTUAL KEYBOARD: key {lookup} not found in keyboard map ")
+                    # if not lookup in self._key_map:
+                    #     lookup = gremlin.keyboard.KeyMap.translate_lookup(lookup)
+                    # if lookup in self._key_map:
+                    key_name = self._key_map[lookup]
+                    #key_name = self._key_map[lookup]
+                    widget = self._key_widget_map[key_name]
+                    widget.selected = True
+                    # else:
+                    #     syslog.error(f"VIRTUAL KEYBOARD: key {lookup} not found in keyboard map ")
                 elif isinstance(item, tuple):
                     # key id
                     lookup = item
@@ -496,8 +497,6 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
                     widget.clicked.connect(self._widget_clicked_cb)
                     widget.hover.connect(self._key_hover_cb)
                     #logging.getLogger("system").info(f"{key_name}: {key} {shifted}")
-  
-
                     self._key_map[(action_key.scan_code, action_key.is_extended)] = key_name
                     assert key_name not in self._key_widget_map.keys(),f"duplicate key in keyboard map found: {key_name}"
 

@@ -2798,9 +2798,12 @@ class AxisStateWidget(QtWidgets.QWidget):
             
         self._readout_widget = QtWidgets.QWidget()
         self._readout_layout = QtWidgets.QVBoxLayout(self._readout_widget)
+        w = gremlin.ui.ui_common.get_text_width("M"*15)
+        self._readout_widget.setMinimumWidth(w)
 
 
         self._label_widget = QtWidgets.QLabel()
+        
         
         if axis_id:
             self.setLabel(f"Axis {axis_id}")
