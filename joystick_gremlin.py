@@ -120,7 +120,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_BASE = "m70c"
+APPLICATION_BASE = "m70d"
 APPLICATION_VERSION = f"13.40.16ex ({APPLICATION_BASE})"
 
 
@@ -1466,10 +1466,11 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.status_bar_module_container_widget.setVisible(False)        
 
     @QtCore.Slot(str, str, object)
-    def registerStatusModule(self, key, label : str, state : object):
+    def registerStatusModule(self, key, label : str, state : object, callback):
         ''' registers a module with a state '''
         if not key in self._status_bar_module_states:
-            self._status_bar_module_states[key] = (label, state)
+            self._status_bar_module_states[key] = (label, state, callback)
+
             self._update_status_bar_modules_ui()
 
     
@@ -1478,15 +1479,15 @@ class GremlinUi(QtWidgets.QMainWindow):
         syslog = logging.getLogger("system")
         syslog.info(f"module state: {key} state: {state}")
         if key in self._status_bar_module_states:
-            label, value = self._status_bar_module_states[key]
+            label, value, callback = self._status_bar_module_states[key]
             if value != state:
-                self._status_bar_module_states[key] = (label, state)
+                self._status_bar_module_states[key] = (label, state, callback)
                 self._update_status_bar_modules_ui()
 
     def _update_status_bar_modules_ui(self):
         ''' recreates the module status bar UI based on current status'''
         gremlin.ui.ui_common.clear_layout(self.status_bar_module_container_layout)
-        for label, state in self._status_bar_module_states.values():
+        for label, state, callback in self._status_bar_module_states.values():
             if state is None:
                 pixmap = self._status_gray
             else:
@@ -1495,7 +1496,14 @@ class GremlinUi(QtWidgets.QMainWindow):
             
             widget = QtWidgets.QLabel()
             widget.setPixmap(pixmap)
-            self.status_bar_module_container_layout.addWidget(QtWidgets.QLabel(label))
+
+            if callback is not None:
+                action_widget = QtWidgets.QPushButton(label)
+                action_widget.clicked.connect(callback)
+                action_widget.setStyleSheet("background:transparent; border: 0;")
+            else:
+                action_widget = QtWidgets.QLabel(label)
+            self.status_bar_module_container_layout.addWidget(action_widget)
             self.status_bar_module_container_layout.addWidget(widget)
             self.status_bar_module_container_layout.addWidget(QtWidgets.QLabel(" "))
         self.status_bar_module_container_layout.addStretch()

@@ -502,6 +502,7 @@ class SimConnectManager(QtCore.QObject):
         handler.simconnect_sim_running.connect(self._running_cb)
         handler.simconnect_sim_start.connect(self._start_cb)
         handler.simconnect_sim_stop.connect(self._stop_cb)
+        handler.status_callback_clicked.connect(self._status_callback_cb) # called when status is clicked on the UI
         
 
         self._aircraft_events = AircraftEvents(self._sm)
@@ -512,7 +513,7 @@ class SimConnectManager(QtCore.QObject):
         
 
 
-        self._aircraft_tile = None # current title from aircraft.cfg
+        self._aircraft_title = None # current title from aircraft.cfg
         self._aircraft_name = None # current name from aicraft cfg path
         self._simvars_xml =  os.path.join(gremlin.util.userprofile_path(), "simconnect_simvars.xml")
 
@@ -868,6 +869,16 @@ class SimConnectManager(QtCore.QObject):
             self._is_started = False
             self.sim_stop.emit()
 
+    @QtCore.Slot()
+    def _status_callback_cb(self):
+        name = self._aircraft_name
+        if name:
+            folder = self._aircraft_folder
+            title = self._aircraft_title
+            self.sim_aircraft_loaded.emit(folder, name, title)
+            
+            
+
     @QtCore.Slot(bool)
     def _running_cb(self, state: bool):
         if self.verbose:
@@ -899,7 +910,7 @@ class SimConnectManager(QtCore.QObject):
     @property
     def current_aircraft_title(self):
         ''' currently loaded aircraft - TITLE from the aircraft.cfg file '''
-        return self._aircraft_tile
+        return self._aircraft_title
     
     @property
     def current_aircraft_sim_name(self):
@@ -925,7 +936,7 @@ class SimConnectManager(QtCore.QObject):
 
     def _aicraft_loaded_cb(self, folder, name):
         ''' called when a new aircraft is loaded '''
-        if folder != self._aircraft_folder:
+        if self._aircraft_name != name or self._aircraft_folder != folder:
             self._aircraft_folder = folder
             self._aircraft_name = name
             self._aircraft_loaded_internal.emit(folder, name)
@@ -943,7 +954,7 @@ class SimConnectManager(QtCore.QObject):
 
 
     def get_aircraft_title(self, force_update = False):
-        if not self._aircraft_tile or force_update:
+        if not self._aircraft_title or force_update:
             self._aircraft_title = None
             ar = self._aircraft_requests
             trigger = ar.find("TITLE")
@@ -968,11 +979,12 @@ class SimConnectManager(QtCore.QObject):
     def _aircraft_loaded_internal_cb(self, folder, name):
         # decode the data into useful bits
         syslog = logging.getLogger("system")
+        verbose = gremlin.config.Configuration().verbose_mode_simconnect
         title = self.get_aircraft_title(True)
-        self._aircraft_tile = title
+        self._aircraft_title = title
         self._aircraft_folder = folder
         self._aircraft_name = name
-        syslog.info(f"Simconnect (mgr): sim aircraft loaded event: {title}/{name}")
+        if verbose: syslog.info(f"SIMCONNECT MGR: sim aircraft loaded event: {title}/{name}")
         self.sim_aircraft_loaded.emit(folder, name, title)
 
 

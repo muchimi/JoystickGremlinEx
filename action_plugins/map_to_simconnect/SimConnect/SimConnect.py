@@ -295,12 +295,12 @@ class SimConnectEventHandler(QtCore.QObject):
 	simconnect_aircraft_loaded = QtCore.Signal(str, str) # sim aircraft loaded (folder, name) 
 	simconnect_event = QtCore.Signal(SimConnectEvent) # fires when we get a Simconnect data value notice
 	simconnect_state_changed = QtCore.Signal(int, float, str) # state change data (int, float, str)	
+	status_callback_clicked = QtCore.Signal() # fires when the status button is clicked 
 
 
 @SingletonDecorator
 class SimConnect():
 	''' MSFS simconnect interface '''
-
 
 	def __init__(self, handler : SimConnectEventHandler, auto_connect=True):
 		''' initializes sim connect 
@@ -327,6 +327,8 @@ class SimConnect():
 		self.DEFINITION_WAYPOINT = None
 		self._my_dispatch_proc_rd = None
 		self._aircraft_loaded_event = threading.Event() # locks the aircraft process thread in case we get multiple concurrent calls
+		self._last_loaded_aircraft = None
+		self._last_loaded_aircraft_cfg = None 
 
 		self.handler : SimConnectEventHandler = handler # used to trigger various events
 		self.client_data_handlers = [] # client data handlers - for when client data is received
@@ -338,6 +340,8 @@ class SimConnect():
 		self._library_path = None
 		self._critical = False
 
+		
+
 		# el = gremlin.event_handler.EventListener()
 		# el.shutdown.connect(self._shutdown)
 
@@ -348,6 +352,8 @@ class SimConnect():
 	def reset(self):
 		''' resets abort flag set due to a load error - this is necessary upon reconnect'''
 		self._abort = False
+
+
 
 	@QtCore.Slot()
 	def _shutdown(self):
@@ -371,6 +377,17 @@ class SimConnect():
 	@property
 	def handle(self):
 		return self._hSimConnect
+	
+	@property
+	def last_loaded_aircraft(self) -> str:
+		''' gets the name of the last loaded aircraft, None if not set'''
+		return self._last_loaded_aircraft
+	
+	@property
+	def last_loaded_aircraft_cfg(self) -> str:
+		''' gets the folder of the last loaded aircraft, None if not set'''
+		return self._last_loaded_aircraft_cfg
+	
 	
 	def register_client_data_handler(self, handler):
 		''' registers a client data area handler '''
@@ -494,8 +511,6 @@ class SimConnect():
 				syslog.info(f"SIMCONNECT: event: AIRCRAFT LOADED: {aircraft_cfg}")
 			self.handle_folder_event(aircraft_cfg.decode())
 		
-			
-
 		# else:
 		# 	syslog.error(f"SIMCONNECT:received event {uEventID} - don't know how to handle")
 
@@ -503,9 +518,14 @@ class SimConnect():
 
 	def _process_aircraft_string(self, aircraft_cfg):
 		''' processes an aircraft string - could be a load event or a folder event '''
+		syslog = logging.getLogger("system")
+		verbose = gremlin.config.Configuration().verbose_mode_simconnect
 		name = self._read_aicraft_config(aircraft_cfg)
+		if verbose: syslog.info(f"SIMCONNECT: aircraft string: {name}")
 		if name:
 			self.handler.simconnect_aircraft_loaded.emit(aircraft_cfg, name)
+		self._last_loaded_aircraft = name
+		self._last_loaded_aircraft_cfg = aircraft_cfg
 		self._aircraft_loaded_event.clear()
 
 
@@ -736,6 +756,11 @@ class SimConnect():
 
 		return None
 
+	@QtCore.Slot()
+	def _sync_callback(self):
+		handler = SimConnectEventHandler()
+		handler.status_callback_clicked.emit()
+
 	def connect(self):
 		from pathlib import Path
 		from gremlin.util import display_error, get_dll_version
@@ -762,7 +787,7 @@ class SimConnect():
 				return False
 			
 			el = gremlin.event_handler.EventListener()
-			el.module_state_register.emit("simconnect","SimConnect",None)
+			el.module_state_register.emit("simconnect","SimConnect",None, self._sync_callback)
 			if not self._dll_path or not os.path.isfile(self._dll_path):
 
 				if not self._library_path:
@@ -911,6 +936,8 @@ class SimConnect():
 	def disconnect(self):
 		''' disconnects from the sim '''
 		self.exit()
+		self._last_loaded_aircraft = None
+		self._last_loaded_aircraft_cfg = None
 
 	def exit(self):
 		''' disconnects from the sim '''

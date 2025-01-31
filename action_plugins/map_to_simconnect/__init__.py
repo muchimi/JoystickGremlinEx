@@ -959,7 +959,7 @@ class SimconnectMonitor():
     def getStartupMode(self):
         ''' gets the startup mode for the current aicraft '''
 
-        if self._manager.is_running:
+        if self._manager.connected:
             # sim is running
             
             state_folder = self._manager.current_aircraft_folder

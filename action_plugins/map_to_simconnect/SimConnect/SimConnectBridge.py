@@ -29,7 +29,7 @@ import gremlin.event_handler
 import gremlin.shared_state
 from .Enum import *
 import gremlin.config
-from .SimConnect import SimConnect
+from .SimConnect import SimConnect, SimConnectEventHandler
 from PySide6 import QtWidgets, QtCore, QtGui
 import threading
 import os
@@ -85,7 +85,8 @@ class SimConnectBridge(QtCore.QObject):
 
         self.sm = sm
         # add our dispatch handler to simconnect
-        
+        handler = SimConnectEventHandler()
+        handler.status_callback_clicked.connect(self._sync_bridge)
         self._started = False
         self._alive = False # true if alive (pong command received)
         self._id = 0 
@@ -162,7 +163,12 @@ class SimConnectBridge(QtCore.QObject):
         ''' terminate issued '''
         self.stop()
 
-        
+    @QtCore.Slot()
+    def _sync_bridge(self):
+        ''' request to sync the bridge '''
+        if not self._started:
+            self.start()
+
 
     @property
     def connected(self):
@@ -189,7 +195,7 @@ class SimConnectBridge(QtCore.QObject):
                     self._alive = True
                     self.alive.emit()
 
-            if packet.code == BridgeCommands.GetNamedVariable:
+            elif packet.code == BridgeCommands.GetNamedVariable:
                 # named variable
                 packet = cast(client_data.dwData, POINTER(BRIDGE_PACKET_DOUBLE)).contents
                 value = packet.data # double

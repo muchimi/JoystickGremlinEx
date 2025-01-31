@@ -448,7 +448,7 @@ class EventListener(QtCore.QObject):
 
 	# module status state notices
 	module_state_change = QtCore.Signal(str, object) # send a module state update, (key, state)
-	module_state_register = QtCore.Signal(str, str, object) # registers a module state
+	module_state_register = QtCore.Signal(str, str, object, object) # registers a module state (key, label, state, callback) - if callback is not None, sets up a button when clicked will execute the callback
 
 	# notify when an input is selected
 	input_selection_changed = QtCore.Signal(object, object, object) # (device_guid, input_type, input_id)
