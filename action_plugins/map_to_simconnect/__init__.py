@@ -2440,6 +2440,12 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._trigger_on_release_widget.setToolTip("When enabled, the action will trigger when the input is released.")
         self._trigger_on_release_widget.clicked.connect(self._trigger_on_release_cb)
 
+        self._trigger_on_press_widget = QtWidgets.QCheckBox("Trigger on press")
+        self._trigger_on_press_widget.setToolTip("When enabled, the action will trigger when the input is released.")
+        self._trigger_on_press_widget.clicked.connect(self._trigger_on_press_cb)
+
+
+        self._button_mode_container_layout.addWidget(self._trigger_on_press_widget)
         self._button_mode_container_layout.addWidget(self._trigger_on_release_widget)
         self._button_mode_container_layout.addStretch()
 
@@ -3143,6 +3149,9 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _trigger_on_release_cb(self, checked):
         self.action_data.trigger_on_release = checked
 
+    @QtCore.Slot(bool)
+    def _trigger_on_press_cb(self, checked):
+        self.action_data.trigger_on_press = checked
     
 
     def _command_changed_cb(self, index):
@@ -3160,6 +3169,8 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         with QtCore.QSignalBlocker(self._trigger_on_release_widget):
             self._trigger_on_release_widget.setChecked(self.action_data.trigger_on_release)
+        with QtCore.QSignalBlocker(self._trigger_on_press_widget):
+            self._trigger_on_press_widget.setChecked(self.action_data.trigger_on_press)
 
 
         # enabled = self.action_data._command_type == SimConnectCommandType.SimVar
@@ -3368,7 +3379,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._calculator_release_container_widget.setVisible(release_command_visible and calc_visible)
 
         self._output_container_widget.setVisible(simvar_visible)
-        self._button_mode_container_widget.setVisible(simvar_visible)
+        #self._button_mode_container_widget.setVisible(simvar_visible) # always visible
 
         input_type = self.action_data.input_type
         block : SimConnectBlock = self.action_data.block
@@ -3597,7 +3608,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         super().process_event(event, action_value)
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_simconnect
-        verbose_details = config.verbose_mode_details
+        verbose_details = True # config.verbose_mode_details
         #verbose = True
 
         syslog = logging.getLogger("system")
@@ -3618,13 +3629,16 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         output_mode = self.action_data.mode
         command_mode = self.action_data.command_mode
 
+        trigger = self.action_data.trigger_on_press and event.is_pressed or \
+                    self.action_data.trigger_on_release and not event.is_pressed
+
 
         if command_mode == SimconnectCommandMode.Calculator:
             if not self.action_data.command:
                 # nothing to calculate
                 return True
             if self.action_data.auto_repeat:
-                if event.is_pressed:
+                if trigger:
                     # calculator expression
                     if not self._auto_repeat_thread.is_alive():
                         # command auto repeats while pressed - not started
@@ -3632,7 +3646,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                         self._auto_repeat_thread.start()
                         return True
             
-            if event.is_pressed:
+            if trigger:
                 # regular calculate
                 command = self.action_data.command
                 if verbose: syslog.info(f"Simconnect: calc: execute press command: {command}")
@@ -3683,14 +3697,13 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
 
         elif output_mode == SimConnectActionMode.Trigger:
             if not event.is_axis:
-                if self.action_data.trigger_mode != SimConnectTriggerMode.InputValue:
-                    if event.is_pressed:
-                        if verbose: syslog.info(f"Trigger singleton: {block.command}")
-                        block.execute(1)
-                else:
-                    # input value
-                    if verbose: syslog.info(f"Trigger value: {block.command} {action_value.current}")
-                    block.execute(action_value.current)
+                value = 1 if self.action_data.trigger_mode != SimConnectTriggerMode.InputValue else action_value.current
+                if self.action_data.trigger_on_press and event.is_pressed:
+                    if verbose: syslog.info(f"Trigger singleton (on press): {block.command}")
+                    block.execute(value)
+                elif self.action_data.trigger_on_release and not event.is_pressed:
+                    if verbose: syslog.info(f"Trigger singleton (on release): {block.command}")
+                    block.execute(value)
         elif output_mode == SimConnectActionMode.SetValue:
             # set value mode 
             value = self.action_data.value
@@ -3701,7 +3714,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                     percent = gremlin.util.scale_to_range(value, target_min=0, target_max = 100)
                     syslog.info(f"Send block set value axis (release trigger): {block.command}  raw: {value:0.3f} mode: {gremlin.shared_state.runtime_mode} scaled: {scaled} percent: {percent:0.3f}")
                 block.execute(scaled)
-            elif not self.action_data.trigger_on_release and event.is_pressed:
+            elif self.action_data.trigger_on_press and event.is_pressed:
                 if verbose:
                     percent = gremlin.util.scale_to_range(value, target_min=0, target_max = 100)
                     syslog.info(f"Send block set value axis (press trigger): {block.command}  raw: {value:0.3f} mode: {gremlin.shared_state.runtime_mode} scaled: {scaled} percent: {percent:0.3f}")
@@ -3805,7 +3818,8 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         self.inverted = False # inversion flag
         self.trigger_mode = SimConnectTriggerMode.NoOp # trigger only
 
-        self.trigger_on_release = False # true if this is triggered on release when the action is tied to a button or hat intput
+        self.trigger_on_press = True # true if the action is triggered on a button press
+        self.trigger_on_release = False # true if the action is triggered on a button release
         
 
         # curve data applied to a simconnect axis output
@@ -4030,6 +4044,7 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
             self.auto_repeat = safe_read(node,"autorepeat", bool, False)
         
         self.trigger_on_release = safe_read(node,"trigger_on_release", bool, False)
+        self.trigger_on_press = safe_read(node,"trigger_on_press", bool, True)
 
 
         node_block =gremlin.util.get_xml_child(node,"block")
@@ -4088,6 +4103,7 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
             if self.action_type:
                 node.set("type", SimConnectCommandType.to_string(self.action_type))
             node.set("trigger_on_release", safe_format(self.trigger_on_release, bool))
+            node.set("trigger_on_press", safe_format(self.trigger_on_press, bool))
             node.set("min_range", safe_format(self.min_range, float)) 
             node.set("max_range", safe_format(self.max_range, float)) 
             node.set("command_min_range", safe_format(self.command_min_range, int)) 

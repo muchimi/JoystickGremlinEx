@@ -67,8 +67,12 @@ class QSliderWidget(QtWidgets.QWidget):
         self._internal_handle_pixmaps = {}  # holds the pixmaps for the current handle icons keyed by handle ID
         self._minimum = -1.0
         self._maximum = 1.0
+        self._draw_handles = True
+
+        self._tick_count = 0 # no ticks
 
         self.handleColor = QColor("#a7b59e")
+        self.tickColor = QColor("#232323")
         self.handleBorderColor = QColor("#e0e0e0")
         self.rangeBorderColor = QColor("#e0e0e0")
         self.rangeColor = QColor("#8fBc8f")  
@@ -175,6 +179,19 @@ class QSliderWidget(QtWidgets.QWidget):
         self._single_range = value
         self._update_offsets()
         self.update()
+
+    def setTickCount(self, value : int): 
+        ''' sets the number of ticks '''
+        value = gremlin.util.clamp(value, 0, 50)
+        if self._tick_count != value:
+            self._tick_count = value
+            self.update()
+
+    def setDrawHandles(self, value: bool):
+        ''' enable/disables the drawing of handles '''
+        if self._draw_handles != value:
+            self._draw_handles = value
+            self.update()
 
     def setHandleIcon(self, index, icon, use_qta = False, color = "#a0a0a0"):
         ''' sets the handle icon - to clear an icon, set it to None
@@ -358,14 +375,14 @@ class QSliderWidget(QtWidgets.QWidget):
         self._update_all_handle_pixmaps()
 
     def _update_marker_offsets(self):
-
-        # compute marker positions
-        source_min = self._minimum
-        source_max = self._maximum
-        target_min = self._usable_left # self._to_qinteger_space(self._range_left)
-        target_max = self._usable_right # self._to_qinteger_space(self._range_right)
-        self._int_marker_pos = [((v - source_min) * (target_max - target_min)) / (source_max - source_min) + target_min for v in self._marker_pos]
-        # print (f"marker: {[v for v in self._int_marker_pos]}")
+        if self._marker_pos:
+            # compute marker positions
+            source_min = self._minimum
+            source_max = self._maximum
+            target_min = self._usable_left # self._to_qinteger_space(self._range_left)
+            target_max = self._usable_right # self._to_qinteger_space(self._range_right)
+            self._int_marker_pos = [((v - source_min) * (target_max - target_min)) / (source_max - source_min) + target_min for v in self._marker_pos]
+            # print (f"marker: {[v for v in self._int_marker_pos]}")
         
 
     def _update_targets(self):
@@ -443,10 +460,16 @@ class QSliderWidget(QtWidgets.QWidget):
 
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
+        #painter.eraseRect(0,0,self.width(), self.height())
+        
 
         self._draw_widget(painter)
+        if self._tick_count > 0:
+            # draw the tick marks 
+            self._draw_ticks(painter)
         if self._marker_visible:
             self._draw_markers(painter)
+        
 
         painter.end()
 
@@ -526,7 +549,7 @@ class QSliderWidget(QtWidgets.QWidget):
 
         # draw ranges of different colors
         color_index = 0
-        color_count = len(range_colors)
+        # color_count = len(range_colors)
         painter.setPen(range_pen)
         msg = ""
         range_height = self._range_height
@@ -550,9 +573,15 @@ class QSliderWidget(QtWidgets.QWidget):
             x1 = self._handle_positions[a]
             x2 = self._handle_positions[b]  
 
-            range_left = x1 + self._handle_radius
+            if self._draw_handles:
+                range_left = x1 + self._handle_radius
+            else:
+                range_left = x1 - self._handle_radius
+                x1 -= self._handle_radius
+                x2 += self._handle_radius
+
             range_width = x2 - x1
-            
+                
             painter.drawRoundedRect(range_left, range_top, range_width, range_height, range_corner, range_corner)
 
             range_rect = QRect(range_left, range_top, range_width, range_height)
@@ -597,47 +626,76 @@ class QSliderWidget(QtWidgets.QWidget):
 
         self._range_msg = msg
 
-        for index in range(handle_count):
-            
-            is_hover = self._hover_handle and self._hover_handle_index == index
-            if is_hover:
-                color_fill = handle_fill_h
-                color_pen = handle_pen_h
+        if self._draw_handles:
+            for index in range(handle_count):
                 
-            else:
-                color_fill = handle_fill
-                color_pen = handle_pen
+                is_hover = self._hover_handle and self._hover_handle_index == index
+                if is_hover:
+                    color_fill = handle_fill_h
+                    color_pen = handle_pen_h
+                    
+                else:
+                    color_fill = handle_fill
+                    color_pen = handle_pen
 
-            painter.setBrush(color_fill)
-            painter.setPen(color_pen)    
+                painter.setBrush(color_fill)
+                painter.setPen(color_pen)    
+                
+                x = self._handle_positions[index]
+                # clickable areas
+                handle_rect = QRect(x, self._handle_top, self._handle_size, self._handle_size)
+                # print (f"handle [{index}  {handle_rect}]")
+                self._handle_hotspots.append(handle_rect)
+                painter.drawEllipse(handle_rect)
+
+                # handle icons
+                if index in self._internal_handle_pixmaps:
+                    # pick the regular or highlighted icon
+                    pd = self._internal_handle_pixmaps[index][1 if is_hover else 0]
+                    painter.drawPixmap(x + self._handle_radius + pd.offset_x, self._handle_top + pd.offset_y, pd.pixmap)
+
             
-            x = self._handle_positions[index]
-            # clickable areas
-            handle_rect = QRect(x, self._handle_top, self._handle_size, self._handle_size)
-            # print (f"handle [{index}  {handle_rect}]")
-            self._handle_hotspots.append(handle_rect)
-            painter.drawEllipse(handle_rect)
-
-            # handle icons
-            if index in self._internal_handle_pixmaps:
-                # pick the regular or highlighted icon
-                pd = self._internal_handle_pixmaps[index][1 if is_hover else 0]
-                painter.drawPixmap(x + self._handle_radius + pd.offset_x, self._handle_top + pd.offset_y, pd.pixmap)
-
-        
 
     def _draw_markers(self, painter: QPainter):
         ''' draws the markers on the widget '''
         positions = self._int_marker_pos
         center = self.height() *0.66
-        
+
         pixmaps = self._get_pixmaps()
         p_count = len(pixmaps)
         for index, value in enumerate(positions):
             if index < p_count:
                 pd = pixmaps[index]
                 painter.drawPixmap(value + pd.offset_x, center + pd.offset_y, pd.pixmap)
-    
+
+    def _draw_ticks(self, painter: QPainter):
+        ''' draws the tick markers '''
+        tick_pen = QPen(QBrush(self.tickColor), 1)
+        painter.setPen(tick_pen)
+        
+        count = self._tick_count
+        
+        x1 = self._handle_min + self._handle_radius
+        x2 = self._handle_max + self._handle_radius
+        center = self.height() *0.66
+        width = x2 - x1
+
+        if count > 0:
+            interval = width / (count-1)
+            y1 = center
+            y2 = 10 # int((self.height() - center) * 0.8)
+            x = x1     
+            for _ in range(self._tick_count+1):
+                p1 = QPoint(x, y1)
+                p2 = QPoint(x, y2)
+                painter.drawLine(p1,p2)
+                x += interval
+        
+        # horizontal line
+        p1 = QPoint(x1, y1)
+        p2 = QPoint(x2, y1)
+        painter.drawLine(p1,p2)
+
     def resizeEvent(self, event):
         ''' called on resize '''
         super().resizeEvent(event)

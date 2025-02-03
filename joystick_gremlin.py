@@ -120,7 +120,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_BASE = "m70d"
+APPLICATION_BASE = "m71"
 APPLICATION_VERSION = f"13.40.16ex ({APPLICATION_BASE})"
 
 
@@ -2291,16 +2291,9 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         # update the UI widgets that listen to inputs to disable the ones not visible 
         device_guid, input_type, input_id = self.restore_input
-
+        syslog = logging.getLogger("system")
         verbose = self.config.verbose
         
-        if verbose: 
-            syslog = logging.getLogger("system")
-
-
-            
-            
-
         if device_guid is None:
             # no default selected, pick the first tab
             device_guid = self.getFirstTabDeviceGuid()

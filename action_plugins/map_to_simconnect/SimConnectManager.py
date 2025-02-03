@@ -580,6 +580,14 @@ class SimConnectManager(QtCore.QObject):
         self._abort = True
 
 
+    def start_bridge(self):
+        ''' starts the bridge '''
+        if not self._bridge_alive:
+            self.bridge.start()
+
+        
+
+
     def load_internal(self):
         ''' loads GremlinEx simconnect internal commands '''
         self.reload()

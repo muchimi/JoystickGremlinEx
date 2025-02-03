@@ -36,6 +36,7 @@ import os
 import glob
 from gremlin.singleton_decorator import SingletonDecorator
 import copy
+import time
 
 kPacketDefinition = 6124
 kPublicDownlinkArea = 6125
@@ -98,11 +99,14 @@ class SimConnectBridge(QtCore.QObject):
 
     def start(self):
         if self._started:
+            if not self._alive:
+                # attempt a ping in case the first one didn' work
+                self.ping()
             return
         
+        syslog = logging.getLogger("system")
         try:
             self.sm.register_client_data_handler(self.client_data_callback_handler)
-            
             self.sm._dll.AddToClientDataDefinition(self.sm._hSimConnect, kPacketDefinition, 0, kPacketSize, 0.0, SIMCONNECT_UNUSED)
             self.sm._dll.MapClientDataNameToID(self.sm._hSimConnect, kPublicDownlinkChannel, kPublicDownlinkArea)
             self.sm._dll.MapClientDataNameToID(self.sm._hSimConnect, kPublicUplinkChannel, kPublicUplinkArea)    
@@ -115,8 +119,8 @@ class SimConnectBridge(QtCore.QObject):
                                        0,
                                        0,
                                        0)
-            syslog = logging.getLogger("system")
-            syslog.info(f"Bridge: data areas registered...")
+            
+            syslog.info(f"SIMCONNECT BRIDGE: started")
             self._started = True
 
             # send the ping command 
@@ -124,7 +128,8 @@ class SimConnectBridge(QtCore.QObject):
             self.ping()
 
 
-        except:
+        except Exception as err:
+            syslog.error(f"SIMCONNECT BRIDGE: start error: {err}")
             pass
 
     @property
@@ -138,7 +143,7 @@ class SimConnectBridge(QtCore.QObject):
             return
         if self.sm.is_connected:
             syslog = logging.getLogger("system")
-            syslog.info("Bridge: stop")
+            syslog.info("SIMCONNECT BRIDGE: stop")
             try:
                 self.sm.unregister_client_data_handler(self.client_data_callback_handler)
                 if self.sm._dll:
@@ -161,11 +166,14 @@ class SimConnectBridge(QtCore.QObject):
     @QtCore.Slot()
     def _shutdown(self):
         ''' terminate issued '''
+
         self.stop()
 
     @QtCore.Slot()
     def _sync_bridge(self):
         ''' request to sync the bridge '''
+        syslog = logging.getLogger("system")
+        syslog.info("SIMCONNECT BRIDGE: sync requested")
         if not self._started:
             self.start()
 
@@ -237,6 +245,7 @@ class SimConnectBridge(QtCore.QObject):
     def execute_calculator_code(self, command):
         ''' executes an RPN expression '''
         syslog = logging.getLogger("system")
+        verbose = gremlin.config.Configuration().verbose_mode_simconnect
         if self._wait_event.is_set():
             # currently executing another command - ignore
             syslog.info("execute: already executing")
@@ -246,7 +255,7 @@ class SimConnectBridge(QtCore.QObject):
         packet = BRIDGE_PACKET(id, BridgeCommands.ExecuteCalculatorCode, data)
         packet_pointer = cast(pointer(packet), c_void_p)
         
-        syslog.info("execute: start")
+        if verbose: syslog.info(f"SIMCONNECT BRIDGE: exec calculator code: [{command}]")
         self._wait_event.clear()
         self.sm._dll.SetClientData(
             self.sm._hSimConnect,
@@ -257,11 +266,11 @@ class SimConnectBridge(QtCore.QObject):
             kPacketSize, 
             packet_pointer)
         
-        syslog = logging.getLogger("system")
-        syslog.info(f"Bridge: send calculator: {command}")
+        
+        
         # wait for the event
         self._wait_event.wait(0.5)
-        syslog.info("execute: completed")
+        if verbose: syslog.info("SIMCONNECT BRIDGE: completed")
         self._wait_event.clear()
 
     def get_variable(self, command):
@@ -279,8 +288,10 @@ class SimConnectBridge(QtCore.QObject):
             kPacketSize, 
             packet_pointer)
         
-        syslog = logging.getLogger("system")
-        syslog.info(f"Bridge: get named variable: {command}")
+        verbose = gremlin.config.Configuration().verbose_mode_simconnect
+        if verbose:
+            syslog = logging.getLogger("system")
+            syslog.info(f"SIMCONNECT BRIDGE: get named variable: {command}")
 
     def ping(self):
         ''' sends the ping command '''
@@ -296,8 +307,10 @@ class SimConnectBridge(QtCore.QObject):
             kPacketSize, 
             packet_pointer)
         
-        syslog = logging.getLogger("system")
-        syslog.info(f"Bridge: ping")
+        verbose = gremlin.config.Configuration().verbose_mode_simconnect
+        if verbose:
+            syslog = logging.getLogger("system")
+            if verbose: syslog.info(f"Bridge: ping")
     
 
     def get_lvars(self):
