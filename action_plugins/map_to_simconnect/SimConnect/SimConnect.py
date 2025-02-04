@@ -826,7 +826,12 @@ class SimConnect():
 				self._dll = SimConnectDll(self._win_dll)
 				
 				self._my_dispatch_proc_rd = self._dll.DispatchProc(self.simconnect_dispatch_proc)
-				err = self._dll.Open(byref(self._hSimConnect), LPCSTR(b"GremlinEx"), None, 0, 0, 0)
+				try:
+					err = self._dll.Open(byref(self._hSimConnect), LPCSTR(b"GremlinEx"), None, 0, 0, 0)
+				except:
+					# likely not running
+					syslog.warning("SIMCONNECT: MSFS not running or missing DLL")
+					err = 1
 				if self.IsHR(err, 0):
 					syslog.info("SIMCONNECT:Connected to MSFS")
 					# Request an event when the simulation starts
@@ -871,6 +876,8 @@ class SimConnect():
 					
 					syslog.info(f"SIMCONNECT:interface connected")
 					self.run()
+		
+					
 
 
 				else:

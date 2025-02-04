@@ -210,6 +210,14 @@ Joystick Gremlin EX
 
 <!-- TOC --><a name="134016ex-pre-release"></a>
 ## 13.40.16ex (pre-release)
+
+### (m71)
+- New: Tick container.  A container that triggers actions at regular ticks on an axis.  The actions can be different based on the tick crossing direction.  
+- New: Stepped Axis mode for Vjoy Remap.  When attached to a button, this mode allows the action to set a VJOY axis value based on configurable ticks.  The mapped button is the tick "up" (increase).  The latched button defined in the action is the tick "down" (decrease) button.  The ticks are configurable to any position on the axis.  Use this mode to easily set axis values based on an up/down scheme.  
+- Improved: Settings has preset buttons for default startup axis values.  
+- Fixed: various UI fixes and edge case exceptions.  
+
+
 ### (m70)
 - Improved: Options button added to main toolbar.
 - Improved: Options dialog has dedicated tabs for various options
