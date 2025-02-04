@@ -1300,6 +1300,17 @@ def list_to_csv(data) -> str:
     writer.writerow(data)
     return output.getvalue().strip() # remove new lines
 
+def floatlist_to_csv(data, decimals = 3) -> str:
+    ''' converts an input list to a CSV stream  - returns a single row '''
+    if not data:
+        return ""
+    assert isinstance(data, tuple) or isinstance(data, list)
+    import csv
+    import io
+    output = io.StringIO()
+    writer = csv.writer(output, quoting=csv.QUOTE_MINIMAL)
+    writer.writerow([f'{x:.{decimals}f}' if isinstance(x, float) else x for x in data])
+    return output.getvalue().strip() # remove new lines
 
 def csv_to_list(value) -> list:
     ''' converts a single row csv input to a list '''
@@ -1315,6 +1326,20 @@ def csv_to_list(value) -> list:
             logging.getLogger("system").error(f"Unable to convert data stream {value} to a list")
     return []
 
+def csv_to_floatlist(value) -> list:
+    ''' converts a single row csv input to a list of floating point values '''
+    if value:
+        import csv
+        import io
+        input = io.StringIO(value)
+        try:
+            reader = csv.reader(input, delimiter=',')
+            for row in reader:
+                values = [float(v) for v in row]
+                return values
+        except:
+            logging.getLogger("system").error(f"Unable to convert data stream {value} to a list")
+    return []
 
 
 def waitCursor():
@@ -1683,4 +1708,13 @@ def singleShot(callback):
     thread = threading.Thread(target = callback)
     thread.name = "SingleShot"
     thread.start()
-    
+
+def cubic_progression(num_points, start, end):
+    ''' computes a cubic progression between two numbers'''
+    progression = []
+    for i in range(num_points):
+        t = i / (num_points - 1)  # Normalized parameter from 0 to 1
+        value = start + (end - start) * (3 * t**2 - 2 * t**3)
+        progression.append(value)
+
+    return progression    

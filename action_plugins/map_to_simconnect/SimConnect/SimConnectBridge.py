@@ -94,6 +94,7 @@ class SimConnectBridge(QtCore.QObject):
         self._lvars = [] # list of received lvars 
         self._state = None # response state
         self._wait_event = threading.Event() # wait event
+        self._wait_alive_event = threading.Event() # alive wait event when sending a ping
         el = gremlin.event_handler.EventListener()
         el.shutdown.connect(self._shutdown)
 
@@ -174,7 +175,8 @@ class SimConnectBridge(QtCore.QObject):
         ''' request to sync the bridge '''
         syslog = logging.getLogger("system")
         syslog.info("SIMCONNECT BRIDGE: sync requested")
-        if not self._started:
+        if not self.connected:
+            # not started or alive
             self.start()
 
 
@@ -199,15 +201,18 @@ class SimConnectBridge(QtCore.QObject):
                 data = packet.data.decode('ascii',errors='replace')
                 data = data.replace('\ufffd','') # remove junk characters
                 if data == "#pong#":
-                    syslog.info(f"Bridge: received pong")
+                    syslog.info(f"SIMCONNECT BRIDGE: received pong alive")
                     self._alive = True
-                    self.alive.emit()
+                    self._wait_alive_event.set() # terminate the ping thread
+                    self._alive_thread.join() # wait for it to finish
+                    self._alive_thread = None
+                    self.alive.emit() # report the bridge is alive
 
             elif packet.code == BridgeCommands.GetNamedVariable:
                 # named variable
                 packet = cast(client_data.dwData, POINTER(BRIDGE_PACKET_DOUBLE)).contents
                 value = packet.data # double
-                syslog.info(f"Bridge: received mobiflight value: {value}")
+                syslog.info(f"SIMCONNECT BRIDGE: received mobiflight value: {value}")
                 
             elif packet.code == BridgeCommands.GetVariableList:
                 data = packet.data.decode()
@@ -250,82 +255,106 @@ class SimConnectBridge(QtCore.QObject):
             # currently executing another command - ignore
             syslog.info("execute: already executing")
             return
-        id = self._get_next_id() # id is sequential so it's unique for each call and will roundrobin
-        data = command.encode("ascii")
-        packet = BRIDGE_PACKET(id, BridgeCommands.ExecuteCalculatorCode, data)
-        packet_pointer = cast(pointer(packet), c_void_p)
-        
-        if verbose: syslog.info(f"SIMCONNECT BRIDGE: exec calculator code: [{command}]")
-        self._wait_event.clear()
-        self.sm._dll.SetClientData(
-            self.sm._hSimConnect,
-            kPublicUplinkArea, 
-            kPacketDefinition,
-            SIMCONNECT_CLIENT_DATA_REQUEST_FLAG.SIMCONNECT_CLIENT_DATA_REQUEST_FLAG_DEFAULT,
-            0, # dwReserved
-            kPacketSize, 
-            packet_pointer)
-        
-        
-        
-        # wait for the event
-        self._wait_event.wait(0.5)
-        if verbose: syslog.info("SIMCONNECT BRIDGE: completed")
-        self._wait_event.clear()
+        try:
+            id = self._get_next_id() # id is sequential so it's unique for each call and will roundrobin
+            data = command.encode("ascii")
+            packet = BRIDGE_PACKET(id, BridgeCommands.ExecuteCalculatorCode, data)
+            packet_pointer = cast(pointer(packet), c_void_p)
+            
+            if verbose: syslog.info(f"SIMCONNECT BRIDGE: exec calculator code: [{command}]")
+            self._wait_event.clear()
+            self.sm._dll.SetClientData(
+                self.sm._hSimConnect,
+                kPublicUplinkArea, 
+                kPacketDefinition,
+                SIMCONNECT_CLIENT_DATA_REQUEST_FLAG.SIMCONNECT_CLIENT_DATA_REQUEST_FLAG_DEFAULT,
+                0, # dwReserved
+                kPacketSize, 
+                packet_pointer)
+                        
+            # wait for the event
+            self._wait_event.wait(0.5)
+            if verbose: syslog.info("SIMCONNECT BRIDGE: completed")
+            self._wait_event.clear()
+        except:
+            syslog.error(f"SIMCONNECT BRIDGE: error executing calculator code: {command}")
 
     def get_variable(self, command):
         ''' gets a named variables '''
-        id = self._get_next_id() # id is sequential so it's unique for each call and will roundrobin
-        data = command.encode("ascii")
-        packet = BRIDGE_PACKET(id, BridgeCommands.GetNamedVariable, data)
-        packet_pointer = cast(pointer(packet), c_void_p)
-        self.sm._dll.SetClientData(
-            self.sm._hSimConnect,
-            kPublicUplinkArea, 
-            kPacketDefinition,
-            SIMCONNECT_CLIENT_DATA_REQUEST_FLAG.SIMCONNECT_CLIENT_DATA_REQUEST_FLAG_DEFAULT,
-            0, # dwReserved
-            kPacketSize, 
-            packet_pointer)
-        
+        syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_simconnect
-        if verbose:
-            syslog = logging.getLogger("system")
-            syslog.info(f"SIMCONNECT BRIDGE: get named variable: {command}")
+        try:
+            id = self._get_next_id() # id is sequential so it's unique for each call and will roundrobin
+            data = command.encode("ascii")
+            packet = BRIDGE_PACKET(id, BridgeCommands.GetNamedVariable, data)
+            packet_pointer = cast(pointer(packet), c_void_p)
+            self.sm._dll.SetClientData(
+                self.sm._hSimConnect,
+                kPublicUplinkArea, 
+                kPacketDefinition,
+                SIMCONNECT_CLIENT_DATA_REQUEST_FLAG.SIMCONNECT_CLIENT_DATA_REQUEST_FLAG_DEFAULT,
+                0, # dwReserved
+                kPacketSize, 
+                packet_pointer)
+            
+            if verbose: syslog.info(f"SIMCONNECT BRIDGE: get named variable: {command}")
+        except:
+            syslog.error(f"SIMCONNECT BRIDGE: error getting named variable: {command}")
 
     def ping(self):
         ''' sends the ping command '''
-        id = self._get_next_id() # id is sequential so it's unique for each call and will roundrobin
-        packet = BRIDGE_PACKET(id, BridgeCommands.Ping)
-        packet_pointer = cast(pointer(packet), c_void_p)
-        self.sm._dll.SetClientData(
-            self.sm._hSimConnect,
-            kPublicUplinkArea, 
-            kPacketDefinition,
-            SIMCONNECT_CLIENT_DATA_REQUEST_FLAG.SIMCONNECT_CLIENT_DATA_REQUEST_FLAG_DEFAULT,
-            0, # dwReserved
-            kPacketSize, 
-            packet_pointer)
-        
+        syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_simconnect
-        if verbose:
-            syslog = logging.getLogger("system")
-            if verbose: syslog.info(f"Bridge: ping")
-    
+        if self._alive:
+            # already alive, ignore
+            return
+        if not self._wait_alive_event.is_set():
+            self._alive_thread = threading.Thread(target = self._ping_runner)
+            self._alive_thread.start()
+
+    def _ping_runner(self):
+        syslog = logging.getLogger("system")
+        verbose = gremlin.config.Configuration().verbose_mode_simconnect
+        try:
+            while not self._wait_alive_event.is_set():    
+                if verbose: syslog.info(f"SIMCONNECT BRIDGE: (alive thread) send ping request")
+                id = self._get_next_id() # id is sequential so it's unique for each call and will roundrobin
+                packet = BRIDGE_PACKET(id, BridgeCommands.Ping)
+                packet_pointer = cast(pointer(packet), c_void_p)
+                self.sm._dll.SetClientData(
+                    self.sm._hSimConnect,
+                    kPublicUplinkArea, 
+                    kPacketDefinition,
+                    SIMCONNECT_CLIENT_DATA_REQUEST_FLAG.SIMCONNECT_CLIENT_DATA_REQUEST_FLAG_DEFAULT,
+                    0, # dwReserved
+                    kPacketSize, 
+                    packet_pointer)
+                time.sleep(0.5)
+
+            if verbose:
+                if verbose: syslog.info(f"SIMCONNECT BRIDGE: ping")
+        except:
+            syslog.error(f"SIMCONNECT BRIDGE: error sending ping")
+
+        
 
     def get_lvars(self):
         ''' gets the list of lvars from the sim '''
-        id = self._get_next_id() # id is sequential so it's unique for each call and will roundrobin
-        packet = BRIDGE_PACKET(id, BridgeCommands.GetVariableList, b"")
-        packet_pointer = cast(pointer(packet), c_void_p)
-        self.sm._dll.SetClientData(
-            self.sm._hSimConnect,
-            kPublicUplinkArea, 
-            kPacketDefinition,
-            SIMCONNECT_CLIENT_DATA_REQUEST_FLAG.SIMCONNECT_CLIENT_DATA_REQUEST_FLAG_DEFAULT,
-            0, # dwReserved
-            kPacketSize, 
-            packet_pointer)
-        
         syslog = logging.getLogger("system")
-        syslog.info(f"Bridge: get variable list")
+        verbose = gremlin.config.Configuration().verbose_mode_simconnect
+        try:
+            id = self._get_next_id() # id is sequential so it's unique for each call and will roundrobin
+            packet = BRIDGE_PACKET(id, BridgeCommands.GetVariableList, b"")
+            packet_pointer = cast(pointer(packet), c_void_p)
+            self.sm._dll.SetClientData(
+                self.sm._hSimConnect,
+                kPublicUplinkArea, 
+                kPacketDefinition,
+                SIMCONNECT_CLIENT_DATA_REQUEST_FLAG.SIMCONNECT_CLIENT_DATA_REQUEST_FLAG_DEFAULT,
+                0, # dwReserved
+                kPacketSize, 
+                packet_pointer)
+            syslog.info(f"SIMCONNECT BRIDGE: get variable list")
+        except:
+            syslog.error(f"SIMCONNECT BRIDGE: error getting variable list")
+            

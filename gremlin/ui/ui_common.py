@@ -705,7 +705,7 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
             return
         other = self.value()
         if other is None or other != value:
-            s_value = f"{value:0.{self._decimals}f}"
+            s_value = f"{float(value):0.{self._decimals}f}"
             if s_value != self.text():
                 self.setText(s_value)
             self.valueChanged.emit(value)
@@ -1868,7 +1868,7 @@ class InputListenerWidget(QtWidgets.QFrame):
         # Ensure the event corresponds to a significant enough change in input
         process_event = gremlin.input_devices.JoystickInputSignificant().should_process(event)
         if event.event_type == InputType.JoystickButton:
-            process_event &= not event.is_pressed
+            process_event &= event.is_pressed
 
         if process_event:
             gremlin.input_devices.JoystickInputSignificant().reset()
@@ -2333,7 +2333,7 @@ class QDataPushButton(QtWidgets.QPushButton):
 class QDataLineEdit(QtWidgets.QLineEdit):
     ''' a checkbox that has a data property to track an object associated with the checkbox '''
     valueChanged = QtCore.Signal() # fires when the text has changed AND we lost the focus
-
+    lostFocus = QtCore.Signal() # fires when the input looses focus
 
     def __init__(self, text = None, data = None, parent = None):
         super().__init__(text, parent)
@@ -2351,6 +2351,7 @@ class QDataLineEdit(QtWidgets.QLineEdit):
 
     def focusOutEvent(self, event):
         if self._text_changed:
+            self.lostFocus.emit()
             self.valueChanged.emit()
         return super().focusOutEvent(event)
 

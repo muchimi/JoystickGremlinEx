@@ -125,6 +125,9 @@ class QSliderWidget(QtWidgets.QWidget):
         self._tooltip_range_map = {} # tooltips for a given range, the key is a tuple of the index two bounding gates (a,b)
         self._desired_height = 32
 
+        self._tick_marks = None
+        self._tick_count = 0
+
         
         #self.sizePolicy().setHorizontalPolicy(QtWidgets.QSizePolicy.Expanding)
 
@@ -186,6 +189,15 @@ class QSliderWidget(QtWidgets.QWidget):
         if self._tick_count != value:
             self._tick_count = value
             self.update()
+
+    def setTickMarks(self, value):
+        ''' sets the tick marks for the axis as set values '''
+        if value:
+            self._tick_marks = value
+            self._tick_count = len(value)
+        else:
+            self._tick_count = 0
+        self.update()
 
     def setDrawHandles(self, value: bool):
         ''' enable/disables the drawing of handles '''
@@ -681,15 +693,26 @@ class QSliderWidget(QtWidgets.QWidget):
         width = x2 - x1
 
         if count > 0:
-            interval = width / (count-1)
             y1 = center
             y2 = 10 # int((self.height() - center) * 0.8)
-            x = x1     
-            for _ in range(self._tick_count+1):
-                p1 = QPoint(x, y1)
-                p2 = QPoint(x, y2)
-                painter.drawLine(p1,p2)
-                x += interval
+
+            if self._tick_marks:
+                # variable spaced
+                for value in self._tick_marks:
+                    if value >= -1 and value <= 1:
+                        x = gremlin.util.scale_to_range(value, target_min=x1, target_max=x2)
+                        p1 = QPoint(x, y1)
+                        p2 = QPoint(x, y2)
+                        painter.drawLine(p1,p2)
+            else:
+                # equally spaced
+                interval = width / (count-1)
+                x = x1     
+                for _ in range(self._tick_count+1):
+                    p1 = QPoint(x, y1)
+                    p2 = QPoint(x, y2)
+                    painter.drawLine(p1,p2)
+                    x += interval
         
         # horizontal line
         p1 = QPoint(x1, y1)

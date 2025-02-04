@@ -105,13 +105,13 @@ class TickContainerWidget(AbstractContainerWidget):
         if self.profile_data.action_sets[0] is None:
             self._add_action_selector(
                 lambda x: self._add_action(0, x),
-                "Button Press",
+                "Tick Up",
                 lambda x: self._paste_action(0, x),
             )
         else:
             self._create_action_widget(
                 0,
-                "Button Press",
+                "Tick Up",
                 self.action_layout,
                 gremlin.ui.ui_common.ContainerViewTypes.Action
             )
@@ -119,13 +119,13 @@ class TickContainerWidget(AbstractContainerWidget):
         if self.profile_data.action_sets[1] is None:
             self._add_action_selector(
                 lambda x: self._add_action(1, x),
-                "Button Release",
+                "Tick Down",
                 lambda x: self._paste_action(1, x),
             )
         else:
             self._create_action_widget(
                 1,
-                "Button Release",
+                "Tick Down",
                 self.action_layout,
                 gremlin.ui.ui_common.ContainerViewTypes.Action
             )
