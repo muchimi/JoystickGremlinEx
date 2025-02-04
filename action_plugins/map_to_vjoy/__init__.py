@@ -57,13 +57,21 @@ import gremlin.curve_handler
 
 syslog = logging.getLogger("system")
 
+@SingletonDecorator
+class StepWidgetGroup():
+    def __init__(self):
+        self.group = QtWidgets.QButtonGroup()
+
+    def clear(self):
+        self.group = QtWidgets.QButtonGroup()
+
 
 class StepWidget(gremlin.ui.ui_common.QDataWidget):
     defaultChanged = QtCore.Signal(int, bool) # fires when default flag changes (index, flag)
     valueChanged = QtCore.Signal(int, float) # fires when value changes (index, value)
     deleteRequested = QtCore.Signal(int) # fires when delete is requested
 
-    def __init__(self, index, value, default=False):
+    def __init__(self, index, value):
         super().__init__()
         self.index = index
         layout = QtWidgets.QHBoxLayout(self)
@@ -71,8 +79,10 @@ class StepWidget(gremlin.ui.ui_common.QDataWidget):
         self.value_widget = gremlin.ui.ui_common.QFloatLineEdit()
         self.value_widget.setValue(value)
         self.value_widget.valueChanged.connect(self._step_value_changed)
-        self.default_cb = gremlin.ui.ui_common.QDataCheckbox("")
-        self.default_cb.setChecked(default)
+        self.default_cb = gremlin.ui.ui_common.QDataRadioButton("")
+        bg = StepWidgetGroup()
+        bg.group.addButton(self.default_cb)
+        
         self.default_cb.setToolTip("Set as profile start value")
         self.default_cb.clicked.connect(self._step_default_changed)
 
@@ -100,13 +110,18 @@ class StepWidget(gremlin.ui.ui_common.QDataWidget):
     def _delete(self):
         self.deleteRequested.emit(self.index)
 
-    @property
     def value(self) -> float:
         return self.value_widget.value()
-    @value.setter
-    def value(self, value: float):
+    
+    def setValue(self, value: float):
         with QtCore.QSignalBlocker(self.value_widget):
             self.value_widget.setValue(value)
+
+    def setDefault(self, value:bool):
+        ''' enable or disable default state '''
+        bg = StepWidgetGroup()
+        bg.group.buttons()[self.index].setChecked(value)
+    
     
     
 
@@ -1456,16 +1471,24 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             # updates individual step widgets and layout
             self._ensure_step_widgets()
 
-            self.step_count_widget.setValue(steps)
+            with QtCore.QSignalBlocker(self.step_count_widget):
+                self.step_count_widget.setValue(steps)
+
+            if not self.action_data.target_step_index in self.action_data.target_step_list:
+                # reset the default if no longer in the list
+                self.action_data.target_step_index = 0
+
             self.step_start_value_widget.setValue(self.action_data.target_step_list[self.action_data.target_step_index])
 
             self.slider_widget.setTickMarks(self.action_data.target_step_list)
 
+            self._update_start_value()
 
 
-    def _create_step_widget(self, id, value, default = False):
+
+    def _create_step_widget(self, id, value):
         ''' creates a step widget for the step value '''
-        widget = StepWidget(id, value, default)
+        widget = StepWidget(id, value)
         widget.valueChanged.connect(self._step_value_changed)
         widget.defaultChanged.connect(self._step_default_changed)
         widget.deleteRequested.connect(self._step_delete)
@@ -1476,9 +1499,10 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         ''' ensures we have a widget for each defined step value '''
         widgets = []
         self.target_step_index_map.clear()
+        bg = StepWidgetGroup()
+        bg.clear()
         for index, value in enumerate(self.action_data.target_step_list):
-            default = index == self.action_data.target_step_start_index
-            widget = self._create_step_widget(index, value, default)
+            widget = self._create_step_widget(index, value)
             widgets.append((index, widget))
 
         for index, widget in widgets:
@@ -1497,13 +1521,17 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         gremlin.ui.ui_common.clear_layout(self.step_widget_layout)
         row = 0
         col = 0
-        max_col = 4
+        max_col = 5
         for index, widget in self.target_step_index_map.items():
             self.step_widget_layout.addWidget(widget, row, col)
             col+=1
             if col > max_col:
                 row+=1
                 col = 0
+
+        
+            
+        
 
     @QtCore.Slot()
     def _add_step(self):
@@ -1532,11 +1560,40 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.action_data.target_step_list.sort()
         self.update_steps()
 
+    @QtCore.Slot()
+    def _step_count_changed(self):
+        ''' called when the count of steps changes '''
+        import random
+        target_count = self.step_count_widget.value()
+        current_count = len(self.action_data.target_step_list)
+        if target_count < current_count:
+            # need fewer points
+            while len(self.action_data.target_step_list) > target_count:
+                self.action_data.target_step_list.pop()
+        else:
+            count = len(self.action_data.target_step_list)
+            while count < target_count:
+                value = random.randrange(-100,100) / 100
+                while value in self.action_data.target_step_list:
+                    value = random.randrange(-100,100) / 100
+                
+                self.action_data.target_step_list.append(value)
+                count = len(self.action_data.target_step_list)
+
+        self.update_steps()
 
 
     @QtCore.Slot()
     def _step_start_index_changed(self):
-        self.action_data.target_step_start_index = self.step_start_index_widget.value()-1
+        index = self.step_start_index_widget.value()
+        count = len(self.action_data.target_step_list)
+        new_index = gremlin.util.clamp(index, 1, count)
+        if new_index != index:
+            with QtCore.QSignalBlocker(self.step_start_index_widget):
+                self.step_start_index_widget.setValue(new_index)
+            index = new_index
+    
+        self.action_data.target_step_start_index = index-1
         value = self.action_data.target_step_list[self.action_data.target_step_start_index]
         self.step_start_value_widget.setText(f"{value:0.3f}")
         self.update_steps()
@@ -1558,42 +1615,17 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.action_data.target_step_list.sort()
 
         # re-order the widgets based on the sorted steps
-        self._step_sort_widgets()
-        self.slider_widget.setTickMarks(self.action_data.target_step_list)
+        self.update_steps()
         
 
-    def _step_sort_widgets(self):
-        data = []
-        for index, widget in self.target_step_index_map.items():
-            value = widget.value()
-            data.append((index, widget, value))
-        
-        data.sort(lambda x: x[2]) # sort by value
-        sorted_widgets = [x[1] for x in data]
-        self.target_step_index_map.clear()
-        for index in len(sorted_widgets):
-            widget = sorted_widgets[index]
-            widget.index = index
-            self.target_step_index_map[index] = widget
-            self.container_stepped_layout.removeWidget(widget)
-
-
-        gremlin.ui.ui_common.clear_layout(self.container_stepped_layout)    
-        row = 0
-        col = 0
-        max_col = 4
-        for widget in sorted_widgets:
-            self.container_stepped_layout.addWidget(widget, row, col)
-            col+=1
-            if col > max_col:
-                row+=1
-                col = 0
-            self.container_stepped_layout.addWidget(widget)
+   
 
     @QtCore.Slot(int, bool)
     def _step_default_changed(self, index : int, flag: bool):
         if flag:
             self.action_data.target_step_start_index = index
+            self._update_start_value()
+
 
     @QtCore.Slot(int)
     def _step_delete(self, index: int):
@@ -1618,9 +1650,14 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self.step_value_container_widget = QtWidgets.QWidget()
         self.step_value_container_layout = QtWidgets.QHBoxLayout(self.step_value_container_widget)
+
+        self.progression_container_widget = QtWidgets.QWidget()
+        self.progression_container_layout = QtWidgets.QHBoxLayout(self.progression_container_widget)
+
         self.step_start_index_widget = gremlin.ui.ui_common.QIntLineEdit()
         self.step_count_widget = gremlin.ui.ui_common.QIntLineEdit()
-        self.step_count_widget.setReadOnly(True)
+        self.step_count_widget.setRange(0,100)
+        self.step_count_widget.valueChanged.connect(self._step_count_changed)
         self.step_start_value_widget = gremlin.ui.ui_common.QFloatLineEdit()
         self.step_start_value_widget.setReadOnly(True)
         value = self.action_data.target_step_list[self.action_data.target_step_start_index]
@@ -1653,17 +1690,21 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.normalize_widget.setToolTip("Normalizes steps to be evenly spaced")
         self.normalize_widget.clicked.connect(self._normalize_steps)
 
-        self.low_progression_widget = QtWidgets.QPushButton("Low Linear")
+        self.low_progression_widget = QtWidgets.QPushButton("Low")
         self.low_progression_widget.setToolTip("Steps follow a linear progression from the low range.  Most steps are in the lower half.")
         self.low_progression_widget.clicked.connect(self._low_progression_steps)
 
-        self.high_progression_widget = QtWidgets.QPushButton("High Linear")
+        self.high_progression_widget = QtWidgets.QPushButton("High")
         self.high_progression_widget.setToolTip("Steps follow a linear progression from the high range.  Most steps are in the higher half.")
         self.high_progression_widget.clicked.connect(self._high_progression_steps)
 
-        self.cubic_progression_widget = QtWidgets.QPushButton("Geometric")
-        self.cubic_progression_widget.setToolTip("Steps follow a geometric (log) progression.")
-        self.cubic_progression_widget.clicked.connect(self._geometric_progression_steps)
+        self.cubic_progression_low_widget = QtWidgets.QPushButton("Geometric Low")
+        self.cubic_progression_low_widget.setToolTip("Steps follow a geometric (log) progression.")
+        self.cubic_progression_low_widget.clicked.connect(self._geometric_progression_steps_low)
+
+        self.cubic_progression_high_widget = QtWidgets.QPushButton("Geometric High")
+        self.cubic_progression_high_widget.setToolTip("Steps follow a geometric (log) progression.")
+        self.cubic_progression_high_widget.clicked.connect(self._geometric_progression_steps_high)
         
 
         #self.step_value_container_layout.addWidget(self.grab_widget)
@@ -1674,14 +1715,21 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.step_value_container_layout.addWidget(self.step_start_value_widget)
         self.step_value_container_layout.addWidget(QtWidgets.QLabel("Steps:"))
         self.step_value_container_layout.addWidget(self.step_count_widget)
-        self.step_value_container_layout.addWidget(self.normalize_widget)
-        self.step_value_container_layout.addWidget(self.low_progression_widget)
-        self.step_value_container_layout.addWidget(self.high_progression_widget)
-        self.step_value_container_layout.addWidget(self.cubic_progression_widget)
+        
         self.step_value_container_layout.addStretch()
+
+        self.progression_container_layout.addWidget(QtWidgets.QLabel("Distribution:"))
+        self.progression_container_layout.addWidget(self.normalize_widget)
+        self.progression_container_layout.addWidget(self.low_progression_widget)
+        self.progression_container_layout.addWidget(self.high_progression_widget)
+        self.progression_container_layout.addWidget(self.cubic_progression_low_widget)
+        self.progression_container_layout.addWidget(self.cubic_progression_high_widget)
+        self.progression_container_layout.addStretch()
 
         self.step_widget_container = QtWidgets.QWidget()
         self.step_widget_layout = QtWidgets.QGridLayout(self.step_widget_container)
+        self.step_widget_layout.addWidget(QtWidgets.QWidget(),0,6)
+        self.step_widget_layout.setColumnStretch(6,2)
 
         self.stepped_selector_device_widget = gremlin.ui.ui_common.NoWheelComboBox()
         self.stepped_selector_input_widget = gremlin.ui.ui_common.NoWheelComboBox()
@@ -1700,11 +1748,11 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         device_layout.setColumnStretch(4,2)
 
         self.container_stepped_layout.addWidget(device_widget)
+        self.container_stepped_layout.addWidget(self.step_value_container_widget)
+        self.container_stepped_layout.addWidget(self.progression_container_widget)
         self.container_stepped_layout.addWidget(self.step_widget_container)
 
-        self.container_stepped_layout.addWidget(self.step_value_container_widget)
-
-        self.container_stepped_layout.addWidget(self.container_stepped_widget)
+        #self.container_stepped_layout.addWidget(self.container_stepped_widget)
 
 
         self.stepped_selector_device_widget.currentIndexChanged.connect(self._stepped_device_changed_cb)
@@ -1750,6 +1798,17 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         ''' gets the current axis value'''
         return gremlin.joystick_handling.get_curved_axis(self.action_data.hardware_device_guid, self.action_data.hardware_input_id)
     
+    def _update_start_value(self):
+        ''' updates the start value widget repeater '''
+        index = self.action_data.target_step_start_index
+        value = self.action_data.target_step_list[index]
+        self.step_start_value_widget.setText(f"{value:0.3f}")
+
+
+        # check the correct widget
+        widget = self.target_step_index_map[index]
+        widget.setDefault(True)
+        
 
     @QtCore.Slot()
     def _normalize_steps(self):
@@ -1763,7 +1822,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             data = [0]
         else:
             data = []
-            interval = 2 / count
+            interval = 2 / (count-1)
             x = -1
             for _ in range(count):
                 data.append(x)
@@ -1814,7 +1873,15 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.update_steps()   
 
     @QtCore.Slot()
-    def _geometric_progression_steps(self):
+    def _geometric_progression_steps_low(self):
+        self._geometric_progression(False)
+
+    
+    @QtCore.Slot()
+    def _geometric_progression_steps_high(self):
+        self._geometric_progression(True)
+
+    def _geometric_progression(self, inverted = False):
         import numpy as np
         count = len(self.action_data.target_step_list)
         if count == 0:
@@ -1827,10 +1894,11 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             data = []
             progression = np.geomspace(1,10,count)
             for n in progression:
-                value = gremlin.util.scale_to_range(float(n), source_min = 1, source_max = 10)
+                value = gremlin.util.scale_to_range(float(n), source_min = 1, source_max = 10, invert=inverted)
+                
                 data.append(value)
             data.sort()
-            
+
 
         self.action_data.target_step_list = data
         self.update_steps()           
@@ -2827,6 +2895,8 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
     def profile_start(self):
         # setup initial state
+        syslog = logging.getLogger("system")
+        verbose = gremlin.config.Configuration().verbose_mode_joystick
         if self.input_type in VJoyWidget.input_type_buttons:
             # set start button state
             joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = self.start_pressed
@@ -2867,8 +2937,10 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
         if self.action_mode == VjoyAction.VJoySetAxisStepped:
             # initial stepped axis value
+            
             self.step_index = self.action_data.target_step_start_index
             value = self.action_data.target_step_list[self.step_index]
+            syslog.info(f"VJOY: step mode initial value: {value:0.3f}")
             joystick_handling.VJoyProxy()[self.vjoy_device_id].axis(self.vjoy_input_id).value = value
 
 

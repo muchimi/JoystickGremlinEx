@@ -88,21 +88,15 @@ class ProfileSettingsWidget(QDataWidget):
         vjoy_as_input_widget.changed.connect(lambda: self.refresh_ui(True))
 
         # vJoy axis initialization value setup
-        for dev in sorted(
-                gremlin.joystick_handling.vjoy_devices(),
-                key=lambda x: x.vjoy_id
-        ):
+        for dev in sorted(gremlin.joystick_handling.vjoy_devices(), key=lambda x: x.vjoy_id):
             # Only show devices that are not treated as inputs
             if self.profile_settings.vjoy_as_input.get(dev.vjoy_id) is True:
                 continue
 
-            widget = QtWidgets.QGroupBox(f"{dev.name} #{dev.vjoy_id}")
+            widget = QtWidgets.QGroupBox(f"{dev.name} #{dev.vjoy_id} - Profile Start Initial Values")
             box_layout = QtWidgets.QVBoxLayout()
             widget.setLayout(box_layout)
-            box_layout.addWidget(VJoyAxisDefaultsWidget(
-                dev,
-                self.profile_settings
-            ))
+            box_layout.addWidget(VJoyAxisDefaultsWidget(dev, self.profile_settings))
 
             self.scroll_layout.addWidget(widget)
 
@@ -229,38 +223,56 @@ class VJoyAxisDefaultsWidget(QtWidgets.QWidget):
         self.main_layout.setColumnStretch(2, 1)
 
         self._spin_boxes = []
+
         self._create_ui()
 
     def _create_ui(self):
         """Creates the UI elements."""
         vjoy_proxy = gremlin.joystick_handling.VJoyProxy()
-        for i in range(self.device.axis_count):
-            # FIXME: This is a workaround to not being able to read a vJoy
-            #   device's axes names when it is grabbed by another process
-            #   and the inability of SDL to provide canonical axis names
-            axis_name = f"Axis {i+1:d}"
-            try:
-                axis_name = vjoy_proxy[self.device.vjoy_id]\
-                    .axis_name(linear_index=i+1)
-            except gremlin.error.VJoyError:
-                pass
-            self.main_layout.addWidget(
-                QtWidgets.QLabel(axis_name),
-                i,
-                0
-            )
+        self._spin_boxes.clear()
+        row = 0
+        for input_id in self.device.axis_index_list():
+            axis_name = self.device.get_axis_name(input_id)
+            self.main_layout.addWidget(QtWidgets.QLabel(axis_name), row, 0)
+            frame = QtWidgets.QFrame()
+            frame.setFrameStyle(QtWidgets.QFrame.Plain | QtWidgets.QFrame.Box)
+            frame.setStyleSheet("border: 2px solid #8FBC8F;")
+            frame.setLayout(QtWidgets.QHBoxLayout())
 
-            box = gremlin.ui.ui_common.DynamicDoubleSpinBox()
+            box = gremlin.ui.ui_common.QFloatLineEdit()
             box.setRange(-1, 1)
-            box.setSingleStep(0.05)
-            box.setValue(self.profile_data.get_initial_vjoy_axis_value(
-                self.device.vjoy_id,
-                i+1
-            ))
-            box.valueChanged.connect(self._create_value_cb(i+1))
+            box.setValue(self.profile_data.get_initial_vjoy_axis_value(self.device.vjoy_id, input_id))
+            box.valueChanged.connect(self._create_value_cb(input_id))
+            self._spin_boxes.append(box)
 
-            self.main_layout.addWidget(box, i, 1)
+            frame.layout().addWidget(box)
+
+            presets = [-1,-0.75,-0.5,-0.25,0,0.25,0.5,0.75,1]
+
+            container_widget = QtWidgets.QWidget()
+            container_layout = QtWidgets.QHBoxLayout(container_widget)
+            for value in presets:
+                widget = gremlin.ui.ui_common.QDataPushButton(f"{value:0.3f}")
+                widget.data = (row, value) # (axis_id, value)
+                widget.setToolTip(f"Sets to {value:0.3f}")
+                widget.clicked.connect(self._handle_preset)
+                container_layout.addWidget(widget)
+            container_layout.addStretch()
+
+            self.main_layout.addWidget(frame, row, 1)
+            self.main_layout.addWidget(container_widget, row, 2)
+            row += 1
+        self.main_layout.addWidget(QtWidgets.QWidget(), 0, 3)
+        self.main_layout.setColumnStretch(3,2)
         vjoy_proxy.reset()
+
+    @QtCore.Slot()
+    def _handle_preset(self):
+        widget = self.sender()
+        index, x = widget.data
+        self._spin_boxes[index].setValue(x)
+        
+
 
     def _create_value_cb(self, axis_id):
         """Creates a callback function which updates axis values.

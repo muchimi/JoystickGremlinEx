@@ -2528,7 +2528,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
                         self._last_input_item = input_item
                         
-
+            self._update_highlight_toolbar_enabled()
 
 
             if input_id is not None: 
