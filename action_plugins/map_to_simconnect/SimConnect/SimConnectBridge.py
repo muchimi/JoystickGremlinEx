@@ -96,6 +96,8 @@ class SimConnectBridge(QtCore.QObject):
         self._wait_event = threading.Event() # wait event
         self._wait_alive_event = threading.Event() # alive wait event when sending a ping
         el = gremlin.event_handler.EventListener()
+        self._alive_thread = None
+        self._connect_in_progress = False
         el.shutdown.connect(self._shutdown)
 
     def start(self):
@@ -202,11 +204,12 @@ class SimConnectBridge(QtCore.QObject):
                 data = data.replace('\ufffd','') # remove junk characters
                 if data == "#pong#":
                     syslog.info(f"SIMCONNECT BRIDGE: received pong alive")
-                    self._alive = True
-                    self._wait_alive_event.set() # terminate the ping thread
-                    self._alive_thread.join() # wait for it to finish
-                    self._alive_thread = None
-                    self.alive.emit() # report the bridge is alive
+                    if self._alive_thread and self._alive_thread.is_alive():
+                        self._alive = True
+                        self._connect_in_progress = False
+                        self._alive_thread.join() # wait for it to finish
+                        self._alive_thread = None
+                        self.alive.emit() # report the bridge is alive
 
             elif packet.code == BridgeCommands.GetNamedVariable:
                 # named variable
@@ -308,7 +311,9 @@ class SimConnectBridge(QtCore.QObject):
         if self._alive:
             # already alive, ignore
             return
-        if not self._wait_alive_event.is_set():
+        if not self._connect_in_progress:
+            syslog.info("SIMCONNECT BRIDGE: connecting...")
+            self._connect_in_progress = True
             self._alive_thread = threading.Thread(target = self._ping_runner)
             self._alive_thread.start()
 
@@ -316,7 +321,7 @@ class SimConnectBridge(QtCore.QObject):
         syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_simconnect
         try:
-            while not self._wait_alive_event.is_set():    
+            while self._connect_in_progress:    
                 if verbose: syslog.info(f"SIMCONNECT BRIDGE: (alive thread) send ping request")
                 id = self._get_next_id() # id is sequential so it's unique for each call and will roundrobin
                 packet = BRIDGE_PACKET(id, BridgeCommands.Ping)

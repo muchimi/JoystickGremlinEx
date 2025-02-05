@@ -1409,7 +1409,6 @@ class GremlinUi(QtWidgets.QMainWindow):
 
 
         
-
         self.ui_statusbar_highlight_state_container_layout.addWidget(QtWidgets.QLabel("Device"))                                                     
         self.ui_statusbar_highlight_state_container_layout.addWidget(self.status_bar_highlight_tabswitch_widget)
         self.ui_statusbar_highlight_state_container_layout.addWidget(QtWidgets.QLabel("Axis"))                                                     
@@ -1417,12 +1416,13 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.ui_statusbar_highlight_state_container_layout.addWidget(QtWidgets.QLabel("Button"))
         self.ui_statusbar_highlight_state_container_layout.addWidget(self.status_bar_highlight_button_widget)
 
+        self.ui_statusbar_highlight_container_layout.addStretch()
         self.ui_statusbar_highlight_container_layout.addWidget(QtWidgets.QLabel("<b>Highlight</b>"))
         self.ui_statusbar_highlight_container_layout.addWidget(self.ui_statusbar_highlight_state_container_widget)
         self.ui_statusbar_highlight_container_layout.addWidget(QtWidgets.QLabel("Enabled"))
         self.ui_statusbar_highlight_container_layout.addWidget(self.status_bar_highlight_enable_widget)
 
-        self.ui.statusbar_widget.addPermanentWidget(self.ui_statusbar_highlight_container_widget)
+        self.ui.statusbar_widget.addWidget(self.ui_statusbar_highlight_container_widget)
 
         
 
@@ -2181,6 +2181,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                 pass
 
             self.pop_highlighting()
+            self._update_highlight_toolbar_enabled()
 
             if verbose_detailed: 
                 syslog.info("Tab recreated:")
