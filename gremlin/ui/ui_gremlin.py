@@ -43,6 +43,14 @@ class Ui_Gremlin(object):
         
         self.main_layout.addWidget(self.tab_bar_widget)
         self.main_layout.addWidget(self.tab_content_widget)
+
+        self.statusbar_widget = QtWidgets.QWidget()
+        self.statusbar_widget.setContentsMargins(0,0,0,0)
+        self.statusbar_layout = QtWidgets.QHBoxLayout(self.statusbar_widget)
+        self.statusbar_layout.setContentsMargins(0,0,0,0)
+        self.statusbar_widget.setMaximumHeight(32)
+
+        self.main_layout.addWidget(self.statusbar_widget)
         
         main_window.setCentralWidget(self.main)
         self.menubar = QtWidgets.QMenuBar(main_window)
@@ -59,9 +67,9 @@ class Ui_Gremlin(object):
         self.menuActions = QtWidgets.QMenu(self.menubar)
         self.menuActions.setObjectName("menuActions")
         main_window.setMenuBar(self.menubar)
-        self.statusbar_widget = QtWidgets.QStatusBar(main_window)
-        self.statusbar_widget.setObjectName("statusbar")
-        main_window.setStatusBar(self.statusbar_widget)
+        # self.statusbar_widget = QtWidgets.QStatusBar(main_window)
+        # self.statusbar_widget.setObjectName("statusbar")
+        # main_window.setStatusBar(self.statusbar_widget)
         self.toolBar = QtWidgets.QToolBar(main_window)
         self.toolBar.setObjectName("toolBar")
         main_window.addToolBar(QtCore.Qt.ToolBarArea.TopToolBarArea, self.toolBar)

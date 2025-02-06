@@ -1391,11 +1391,11 @@ class GremlinUi(QtWidgets.QMainWindow):
         el.module_state_register.connect(self.registerStatusModule)
         
 
-        self.ui.statusbar_widget.addWidget(self.status_bar_is_active_widget)
-        self.ui.statusbar_widget.addWidget(self.status_bar_repeater_widget)
-        self.ui.statusbar_widget.addWidget(self.status_bar_mode_widget)
-        self.ui.statusbar_widget.addWidget(QtWidgets.QLabel(" "))
-        self.ui.statusbar_widget.addWidget(self.status_bar_module_container_widget)
+        self.ui.statusbar_layout.addWidget(self.status_bar_is_active_widget)
+        self.ui.statusbar_layout.addWidget(self.status_bar_repeater_widget)
+        self.ui.statusbar_layout.addWidget(self.status_bar_mode_widget)
+        self.ui.statusbar_layout.addWidget(QtWidgets.QLabel(" "))
+        self.ui.statusbar_layout.addWidget(self.status_bar_module_container_widget)
 
         self.ui_statusbar_highlight_container_widget = QtWidgets.QWidget()
         self.ui_statusbar_highlight_container_widget.setContentsMargins(0,0,0,0)
@@ -1422,7 +1422,9 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.ui_statusbar_highlight_container_layout.addWidget(QtWidgets.QLabel("Enabled"))
         self.ui_statusbar_highlight_container_layout.addWidget(self.status_bar_highlight_enable_widget)
 
-        self.ui.statusbar_widget.addWidget(self.ui_statusbar_highlight_container_widget)
+        self.ui.statusbar_layout.addStretch()
+        self.ui.statusbar_layout.addWidget(self.ui_statusbar_highlight_container_widget)
+        
 
         
 
@@ -1445,8 +1447,6 @@ class GremlinUi(QtWidgets.QMainWindow):
     def _update_highlight_toolbar_enabled(self):
         ''' updates the enabled status of the highlight status bar buttons based on current enabled state '''
         enabled = self.config.highlight_enabled
-        self.ui_statusbar_highlight_state_container_widget.setVisible(enabled)
-        
         icon = self._icon_green if enabled else self._icon_gray
         self.status_bar_highlight_enable_widget.setIcon(icon)
 
@@ -1456,14 +1456,15 @@ class GremlinUi(QtWidgets.QMainWindow):
     def _profile_start(self):
         self.setUiMode()
         self._update_status_bar_active(True)
-        self.status_bar_module_container_widget.setVisible(True)
         self._update_status_bar_modules_ui()
+        self.ui_statusbar_highlight_state_container_widget.setEnabled(False)
     
     @QtCore.Slot()
     def _profile_stop(self):
         self.setUiMode()
         self._update_status_bar_active(False)
-        self.status_bar_module_container_widget.setVisible(False)        
+        self._update_highlight_toolbar_enabled()
+        self.ui_statusbar_highlight_state_container_widget.setEnabled(True)
 
     @QtCore.Slot(str, str, object)
     def registerStatusModule(self, key, label : str, state : object, callback):
@@ -1508,7 +1509,6 @@ class GremlinUi(QtWidgets.QMainWindow):
             self.status_bar_module_container_layout.addWidget(QtWidgets.QLabel(" "))
         self.status_bar_module_container_layout.addStretch()
 
-        self.ui_statusbar_highlight_container_widget.setVisible(not gremlin.shared_state.is_running)
         self._update_highlight_toolbar_enabled()
 
 
@@ -3754,10 +3754,6 @@ class GremlinUi(QtWidgets.QMainWindow):
     @QtCore.Slot(object, object)
     def _handle_highlight_state(self, autoswitch_state, axis_state, button_state):
         
-        visible = not gremlin.shared_state.is_running
-        self.ui_statusbar_highlight_container_widget.setVisible(visible)
-        
-                        
 
         if autoswitch_state is not None:
             self.config.highlight_autoswitch = autoswitch_state
