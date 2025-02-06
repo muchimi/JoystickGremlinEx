@@ -2498,20 +2498,15 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._command_min_range_widget.valueChanged.connect(self._command_min_range_changed_cb)
         self._command_min_range_widget.setMinimumWidth(w)
 
-        self._output_max_range_widget = gremlin.ui.ui_common.QIntLineEdit()
-        self._output_max_range_widget.setRange(-16383,16384)
-        self._output_max_range_widget.valueChanged.connect(self._max_range_changed_cb)
-        self._output_max_range_widget.setMinimumWidth(w)        
-
         # output range                 
         self._command_max_range_widget = gremlin.ui.ui_common.QIntLineEdit()
         self._command_max_range_widget.setRange(-16383,16384)
-        self._command_max_range_widget.valueChanged.connect(self._command_min_range_changed_cb)
+        self._command_max_range_widget.valueChanged.connect(self._command_max_range_changed_cb)
         self._command_max_range_widget.setMinimumWidth(w)
 
         # controller scaled output value (integer)
         self._output_min_range_widget = gremlin.ui.ui_common.QIntLineEdit()
-        self._output_max_range_widget.setRange(-16383,16384)
+        self._output_min_range_widget.setRange(-16383,16384)
         self._output_min_range_widget.valueChanged.connect(self._min_range_changed_cb)
         self._output_min_range_widget.setMinimumWidth(w)
 
@@ -3181,8 +3176,8 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         block = self.manager.block(command)
         self.command_text_widget.setText(command)
         if block:
-            self.action_data.command_min_range = block.command_min_range
-            self.action_data.command_max_range = block.command_max_range
+            # self.action_data.command_min_range = block.command_min_range
+            # self.action_data.command_max_range = block.command_max_range
             self.description_text_widget.setText(block.description)
             
         else:

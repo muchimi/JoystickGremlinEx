@@ -959,7 +959,7 @@ class AircraftEvents():
 		list = [
 			(b'STEERING_INC', "Increments the nose wheel steering position by 5 percent.", "Shared Cockpit"),
 			(b'STEERING_DEC', "Decrements the nose wheel steering position by 5 percent.", "Shared Cockpit"),
-			(b'STEERING_SET', "Sets the value of the nose wheel steering position. Zero is straight ahead (-16383, far left +16383, far right),.", "Shared Cockpit"),
+			(b'STEERING_SET', "Sets the value of the nose wheel steering position. Zero is straight ahead (-16383, +16383),.", "Shared Cockpit"),
 		]
 
 	class __Cabin_pressurization(EventHelper):
