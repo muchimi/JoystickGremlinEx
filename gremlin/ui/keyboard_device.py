@@ -561,14 +561,13 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         else:
             item_data = self.input_item_list_model.data(index)
 
+        device_guid = self.device_guid
+        input_type = InputType.KeyboardLatched
+        input_id = item_data.input_id if item_data else None
+
         if item_data:
             
             config = gremlin.config.Configuration()
-            device_guid = self.device_guid
-            input_type = InputType.KeyboardLatched
-
-
-            input_id = item_data.input_id if item_data else None
             config.set_last_input(device_guid, input_type, input_id)
 
             widget = InputItemConfiguration(item_data)

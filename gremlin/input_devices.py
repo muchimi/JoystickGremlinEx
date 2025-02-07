@@ -1883,19 +1883,22 @@ class JoystickInputSignificant:
         from gremlin.input_types import InputType
         self._mre_registry[event.callbackKey] = event
 
-        if event.event_type == InputType.JoystickAxis:
-            return self._process_axis(event, deviation)
-        elif event.event_type == InputType.JoystickButton:
-            return self._process_button(event)
-        elif event.event_type == InputType.JoystickHat:
-            return self._process_hat(event)
-        else:
-            logging.getLogger("system").warning(
-                "Event with unknown type received"
-            )
-            return False
+        match event.event_type:
+            case InputType.JoystickAxis:
+                return self._process_axis(event, deviation)
+            case InputType.JoystickButton:
+                return self._process_button(event)
+            case InputType.JoystickHat:
+                return self._process_hat(event)
+            # case InputType.Keyboard:
+            #     pass
+            # case InputType.KeyboardLatched:
+            #     pass
+            # case _:
+            #     logging.getLogger("system").warning(f"Event with unknown type received: {event.event_type}")
+        return False
 
-    def last_event(self, event):
+    def get_last_event(self, event):
         """Returns the most recent event of this type.
 
         Args:

@@ -22,6 +22,10 @@ import time
 from PySide6 import QtCore
 
 from . import common, event_handler, input_devices, joystick_handling
+import logging
+from gremlin.input_types import InputType
+from gremlin.actions import Value
+import gremlin.joystick_handling
 
 
 class Repeater(QtCore.QObject):
@@ -49,8 +53,7 @@ class Repeater(QtCore.QObject):
         self._stop_timer = threading.Timer(5.0, self.stop)
         self._update_func = update_func
         self._timeout = time.time()
-        self._vjoy_device_guids = \
-            [dev.device_guid for dev in joystick_handling.vjoy_devices()]
+        self._vjoy_device_guids = [dev.device_guid for dev in joystick_handling.vjoy_devices()]
         self._event_registry = {}
 
     @property
@@ -106,6 +109,9 @@ class Repeater(QtCore.QObject):
             event_list = [event.clone(), event.clone()]
             event_list[0].is_pressed = False
             event_list[1].is_pressed = True
+            event_list[0].value = True 
+            event_list[1].value = False
+            
         elif event.event_type == common.InputType.JoystickAxis:
             event_list = [
                 event.clone(),
@@ -117,9 +123,14 @@ class Repeater(QtCore.QObject):
             event_list[1].value = 0.0
             event_list[2].value = 0.75
             event_list[3].value = 0.0
+            
         elif event.event_type == common.InputType.JoystickHat:
             event_list = [event.clone(), event.clone()]
-            event_list[0].value = (0, 0)
+            event_list[0].value = (0,0)
+            
+        # mark events as repeater events so actions handle forced values correctly
+        for event in event_list:
+            event.is_repeater = True
 
         self.events = event_list
 
@@ -144,17 +155,22 @@ class Repeater(QtCore.QObject):
         """Emits events until stopped."""
         index = 0
         el = event_handler.EventListener()
+        syslog = logging.getLogger("system")
+        verbose = True
+
+        
 
         # Repeatedly send events until the thread is interrupted
         while self.is_running:
-            if self._events[0].event_type == common.InputType.Keyboard:
-                el.keyboard_event.emit(self._events[index])
+            event = self._events[index]
+            if event.event_type == common.InputType.Keyboard:
+                if verbose: syslog.info(f"REPEATER: send keyboard event: {str(event)}")
+                el.keyboard_event.emit(event)
             else:
-                el.joystick_event.emit(self._events[index])
+                if verbose: syslog.info(f"REPEATER: send joystick event: {str(event)}")
+                el.joystick_event.emit(event)
 
-            self._update_func(
-                f"{common.InputType.to_string(self._events[index].event_type).capitalize()} {str(self._events[index].identifier)}"
-                )
+            self._update_func(f"{common.InputType.to_string(event.event_type).capitalize()} {str(event.identifier)}")
 
             index = (index + 1) % len(self._events)
             time.sleep(0.25)
@@ -169,9 +185,9 @@ class Repeater(QtCore.QObject):
         if event.event_type == common.InputType.JoystickButton:
             event.is_pressed = False
         elif event.event_type == common.InputType.JoystickAxis:
-            last_event = input_devices.JoystickInputSignificant().last_event(event)
+            last_event = input_devices.JoystickInputSignificant().get_last_event(event)
             if last_event:
-                event.value = last_event(event).value
+                event.value = last_event.value
             else:
                 return
         elif event.event_type == common.InputType.JoystickHat:
@@ -179,3 +195,24 @@ class Repeater(QtCore.QObject):
         el.joystick_event.emit(event)
         self._event_registry = {}
         self._update_func("Waiting for input")
+
+
+    # def _vjoy_process_event(self, event):
+    #     ''' handles a vjoy output event '''
+    #     value = event.value
+    #     vjoy_device_id = gremlin.joystick_handling.vjoy_id_from_guid(event.device_guid, -1)
+    #     if vjoy_device_id == -1:
+    #         syslog = logging.getLogger("system")
+    #         syslog.warning(f"Device ID: {event.device_guid} is not a VJOY device")
+    #         return
+        
+    #     input_id = event.identifier
+    #     input_type = event.event_type
+    #     if event.is_axis:
+    #         joystick_handling.VJoyProxy()[vjoy_device_id].axis(input_id).value = value.current
+
+    #     elif input_type == InputType.JoystickButton:
+    #         joystick_handling.VJoyProxy()[vjoy_device_id].button(input_id).is_pressed = value.is_pressed
+
+    #     elif input_type == InputType.JoystickHat:
+    #         joystick_handling.VJoyProxy()[vjoy_device_id].hat(input_id).direction = value.current

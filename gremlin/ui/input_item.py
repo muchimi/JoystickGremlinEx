@@ -2153,7 +2153,8 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         el.condition_state_changed.connect(self._update_ui)
 
         self.activation_count_widget = None
-        self._update_ui(self.container)
+        el.condition_state_changed.emit(self.container)
+        #self._update_ui(self.container)
         
 
     @QtCore.Slot(object)

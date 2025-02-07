@@ -231,7 +231,7 @@ def select_first_valid_vjoy_input(valid_types):
     return None
 
 
-def vjoy_id_from_guid(guid : str | dinput.GUID):
+def vjoy_id_from_guid(guid : str | dinput.GUID, not_found_id = 1):
     """Returns the vJoy id corresponding to the given device GUID.
 
     Parameters
@@ -253,7 +253,7 @@ def vjoy_id_from_guid(guid : str | dinput.GUID):
     logging.getLogger("system").error(
         f"Could not find vJoy matching guid {str(guid)}"
     )
-    return 1
+    return not_found_id
 
 def device_name_from_guid(guid : str | dinput.GUID) -> str:
     ''' gets device name from GUID '''

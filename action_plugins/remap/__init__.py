@@ -299,9 +299,12 @@ class RemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
     def process_event(self, event, value):
         if event.is_axis:
+            if event.is_repeater:
+                value = event.value
+            else:
+                value = value.current
             if self.axis_mode == "absolute":
-                joystick_handling.VJoyProxy()[self.vjoy_device_id] \
-                    .axis(self.vjoy_input_id).value = value.current
+                joystick_handling.VJoyProxy()[self.vjoy_device_id].axis(self.vjoy_input_id).value = value
             else:
                 self.should_stop_thread = abs(event.value) < 0.05
                 self.axis_delta_value = \

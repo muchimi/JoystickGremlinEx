@@ -2995,16 +2995,23 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         if event.is_axis:
             # process input options and any merge and curve operation - the current value will already be curved by the input curve if one exists
 
-            # raw_value = gremlin.joystick_handling.get_axis(self.action_data.hardware_device_guid, self.action_data.hardware_input_id)
-            # received = action_value.current
 
-            # get list of curves that applies to this input
-            curves = self.getCurveData(event, action_value)
 
-            value = self.action_data.get_filtered_axis_value(curves = curves)
+            if event.is_repeater:
+                # use the repeater value
+                value = event.value
+            else:
 
-            # syslog = logging.getLogger("system")
-            # syslog.info(f"VjoyRemap: raw {raw_value:0.3f} received: {received:0.3f}  computed: {value:0.3f}  ")
+                # raw_value = gremlin.joystick_handling.get_axis(self.action_data.hardware_device_guid, self.action_data.hardware_input_id)
+                # received = action_value.current
+
+                # get list of curves that applies to this input
+                curves = self.getCurveData(event, action_value)
+
+                value = self.action_data.get_filtered_axis_value(curves = curves)
+
+                # syslog = logging.getLogger("system")
+                # syslog.info(f"VjoyRemap: raw {raw_value:0.3f} received: {received:0.3f}  computed: {value:0.3f}  ")
 
             action_value = gremlin.actions.Value(value)
 

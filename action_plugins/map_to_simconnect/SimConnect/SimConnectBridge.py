@@ -109,6 +109,7 @@ class SimConnectBridge(QtCore.QObject):
         
         syslog = logging.getLogger("system")
         try:
+            syslog.info(f"SIMCONNECT BRIDGE: starting...")
             self.sm.register_client_data_handler(self.client_data_callback_handler)
             self.sm._dll.AddToClientDataDefinition(self.sm._hSimConnect, kPacketDefinition, 0, kPacketSize, 0.0, SIMCONNECT_UNUSED)
             self.sm._dll.MapClientDataNameToID(self.sm._hSimConnect, kPublicDownlinkChannel, kPublicDownlinkArea)
@@ -123,7 +124,7 @@ class SimConnectBridge(QtCore.QObject):
                                        0,
                                        0)
             
-            syslog.info(f"SIMCONNECT BRIDGE: started")
+            
             self._started = True
 
             # send the ping command 
@@ -144,7 +145,7 @@ class SimConnectBridge(QtCore.QObject):
     def stop(self):
         if not self._started:
             return
-        if self.sm.is_connected:
+        if self.sm.is_connected and self._alive:
             syslog = logging.getLogger("system")
             syslog.info("SIMCONNECT BRIDGE: stop")
             try:
@@ -156,8 +157,9 @@ class SimConnectBridge(QtCore.QObject):
             except:
                 pass
         
-        self._started = False
-
+            self._started = False
+            self._connect_in_progress = False # if we are aborting
+        
     def _get_next_id(self):
         # gets the next packet ID
         id = self._id
@@ -205,10 +207,10 @@ class SimConnectBridge(QtCore.QObject):
                 if data == "#pong#":
                     syslog.info(f"SIMCONNECT BRIDGE: received pong alive")
                     if self._alive_thread and self._alive_thread.is_alive():
-                        self._alive = True
                         self._connect_in_progress = False
                         self._alive_thread.join() # wait for it to finish
                         self._alive_thread = None
+                        self._alive = True
                         self.alive.emit() # report the bridge is alive
 
             elif packet.code == BridgeCommands.GetNamedVariable:
@@ -312,7 +314,7 @@ class SimConnectBridge(QtCore.QObject):
             # already alive, ignore
             return
         if not self._connect_in_progress:
-            syslog.info("SIMCONNECT BRIDGE: connecting...")
+            if verbose: syslog.info("SIMCONNECT BRIDGE: handshake initiated...")
             self._connect_in_progress = True
             self._alive_thread = threading.Thread(target = self._ping_runner)
             self._alive_thread.start()
@@ -334,12 +336,17 @@ class SimConnectBridge(QtCore.QObject):
                     0, # dwReserved
                     kPacketSize, 
                     packet_pointer)
-                time.sleep(0.5)
+                time.sleep(0.1) # give it time to respond
 
             if verbose:
-                if verbose: syslog.info(f"SIMCONNECT BRIDGE: ping")
+                if verbose: syslog.info(f"SIMCONNECT BRIDGE: handhake completed")
         except:
             syslog.error(f"SIMCONNECT BRIDGE: error sending ping")
+            self._connect_in_progress = False
+            self._alive = False
+
+
+        
 
         
 

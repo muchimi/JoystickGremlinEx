@@ -292,16 +292,17 @@ class GremlinUi(QtWidgets.QMainWindow):
         # hook status bar to events
         el = gremlin.event_handler.EventListener()
         el.broadcast_changed.connect(self._update_status_bar)
-        el.keyboard_event.connect(self._kb_event_cb)
+        el.keyboard_event.connect(self._kb_event_cb) # for repeaters
+        
         el.suspend_keyboard_input.connect(self._kb_suspend_cb)
         el.profile_start.connect(self._profile_start)
         el.profile_stop.connect(self._profile_stop)
-        #el.joystick_event.connect(self._joystick_input_handler)
+        
         el.profile_changed.connect(self._profile_changed_cb)
         el.button_state_change.connect(self._button_state_change)
         el.axis_state_change.connect(self._axis_state_change)
         el.input_selection_changed.connect(self._input_changed_handler)
-        #el.request_profile_stop.connect(lambda reason: self.abort_requested(reason)) # request profile to stop
+        
 
         
         # hook input selection
@@ -2565,22 +2566,9 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         finally:
             self._selection_locked = False
-            #self.pop_highlighting()
-            #el.pop_joystick() # restore joystick input while changing UI
-            #el.select_input_completed.emit(device_guid, input_type, input_id)
-
             gremlin.util.popCursor()
 
-            # # update the status
-            # tracker = gremlin.ui.ui_common.StateTracker()
-            # data = None
-            # match input_type:
-            #     case InputType.JoystickButton:
-            #         data = gremlin.joystick_handling.get_button(device_guid, input_id)
-            #     case InputType.JoystickHat:
-            #         data = gremlin.joystick_handling.get_hat(device_guid, input_id)
-            # if data:
-            #     tracker.update_widget(device_guid, input_type, input_id, data)
+
             
     @QtCore.Slot(object, object, object)
     def _input_changed_handler(self, device_guid, input_type, input_id):

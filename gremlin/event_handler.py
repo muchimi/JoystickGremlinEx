@@ -119,6 +119,7 @@ class Event:
 		self.is_virtual_button = False # true if a virtual button
 		self.is_custom = False # true if a custom event (should be processed)
 		self.mode = mode # mode to act on, should be null for default
+		self.is_repeater = False # True if the event is a repeater generated event
 		
 
 

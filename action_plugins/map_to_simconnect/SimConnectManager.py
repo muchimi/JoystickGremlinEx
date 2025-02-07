@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 import os
+import shutil
 import lxml
 from lxml import etree
 
@@ -30,6 +31,7 @@ import gremlin.macro
 import gremlin.shared_state
 import gremlin.ui.ui_common
 import gremlin.ui.input_item
+import gremlin.util
 import gremlin.util
 from .SimConnect import *
 from .SimConnect.SimConnect import *
@@ -516,6 +518,7 @@ class SimConnectManager(QtCore.QObject):
         self._aircraft_title = None # current title from aircraft.cfg
         self._aircraft_name = None # current name from aicraft cfg path
         self._simvars_xml =  os.path.join(gremlin.util.userprofile_path(), "simconnect_simvars.xml")
+        self._ensure_simvar_xml() # make srue the simvars file exists
 
         # https://docs.flightsimulator.com/html/Programming_Tools/SimConnect/API_Reference/Events_And_Data/SimConnect_AddToDataDefinition.htm
         self._lvars_xml = os.path.join(gremlin.util.userprofile_path(), "simconnect_lvars.xml")
@@ -544,6 +547,17 @@ class SimConnectManager(QtCore.QObject):
 
         # load internal commands
         self.load_internal()
+
+    def _ensure_simvar_xml(self):
+        if not os.path.isfile(self._simvars_xml):
+            # place a copy of the master lis into the user folder
+            master_xml = gremlin.util.find_file("simconnect_simvars.xml")
+            if master_xml is not None and os.path.isfile(master_xml):
+                try:
+                    shutil.copy(master_xml, self._simvars_xml)
+                except:
+                    syslog.error("SIMMCONNECT: error placing master simvars to user profile")
+
 
     @QtCore.Slot()
     def _bridge_alive_cb(self):
@@ -601,12 +615,14 @@ class SimConnectManager(QtCore.QObject):
 
         # list of command blocks
         self._block_map = {}
-                
-        if force_update and os.path.isfile(self._simvars_xml):
-            os.unlink(self._simvars_xml)
 
-        if not os.path.isfile(self._simvars_xml):
-            self._write_default_xml(self._simvars_xml)
+        self._ensure_simvar_xml() # make sure the simvars file exists
+                
+        # if force_update and os.path.isfile(self._simvars_xml):
+        #     os.unlink(self._simvars_xml)
+
+        # if not os.path.isfile(self._simvars_xml):
+        #     self._write_default_xml(self._simvars_xml)
 
 
         self._block_map = {}
@@ -1081,17 +1097,6 @@ class SimConnectManager(QtCore.QObject):
             
 
             self.bridge.start()
-            timeout = time.time() + 3
-            while not self.bridge.is_alive:
-                self.bridge.ping()
-                if time.time() > timeout:
-                    break
-                time.sleep(0.2)
-
-            if not self.bridge.is_alive:
-                syslog.error("BRIDGE: not connected")    
-            else:
-                syslog.info("BRIDGE: connected")
 
             return True # connected  
         finally:
