@@ -212,10 +212,14 @@ Joystick Gremlin EX
 ## 13.40.16ex (pre-release)
 
 ### (m71)
-- New: Tick container.  A container that triggers actions at regular ticks on an axis.  The actions can be different based on the tick crossing direction.  
-- New: Stepped Axis mode for Vjoy Remap.  When attached to a button, this mode allows the action to set a VJOY axis value based on configurable ticks.  The mapped button is the tick "up" (increase).  The latched button defined in the action is the tick "down" (decrease) button.  The ticks are configurable to any position on the axis.  Use this mode to easily set axis values based on an up/down scheme.  
-- Improved: Settings has preset buttons for default startup axis values.  
-- Fixed: various UI fixes and edge case exceptions.  
+- New: Tick container.  The tick container is a container that triggers actions at regular ticks on an axis.  The actions can be different based on the tick crossing direction.  
+- New: Stepped Axis mode in Vjoy Remap.  When attached to a button, this mode allows the action to set a VJOY axis value based on configurable ticks.  The mapped button is the tick "up" (increase).  The latched button defined in the action is the tick "down" (decrease) button.  The ticks are configurable to any position on the axis.  Use this mode to easily set axis values based on an up/down scheme.  
+- Improved: Settings tab has new preset buttons to setup default startup VJOY axis values at profile start.
+- Fixed: Gated axis will now send a button event on range enter/exit triggers instead of axis triggers.  This was confusing actions added to these triggers because they were never seeing a button input, so ignore the trigger completely.
+- Improved: Gated axis ranges now also have a delay entry for the triggers that are momentary (exit/enter).  The delay, as with normal gates, is the time between a press and a release.
+- Fixed: Simconnect connection start/stop behavior not reconnecting, causing errors if MSFS is not ready/running, or getting in some cases in a race condition with the WASM bridge module.  Tested with MSFS 24 beta patch.
+- Fixed: Simconnect WASM (c++) - alive ping no longer sends the LVARs.
+- Fixed: various UI fixes and exceptions.
 
 
 ### (m70)

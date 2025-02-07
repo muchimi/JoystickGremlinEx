@@ -948,37 +948,37 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         return widget
     
 
-    def _populate_axis_input_widget_ui(self, input_widget, container_widget, data):
-        ''' called when the repeater widget is created for an axis input  '''
+    # def _populate_axis_input_widget_ui(self, input_widget, container_widget, data):
+    #     ''' called when the repeater widget is created for an axis input  '''
 
-        if gremlin.config.Configuration().show_input_axis:
-            layout = QtWidgets.QVBoxLayout(container_widget)
-            widget = gremlin.ui.ui_common.AxisStateWidget(show_label = False, orientation=QtCore.Qt.Orientation.Horizontal, show_percentage=False)
-            widget.setWidth(10)
-            widget.setMaximumWidth(200)
-            # automatically update from the joystick
-            widget.hookDevice(data.device_guid, data.input_id)
-            widget.setContentsMargins(0,0,0,0)
-            layout.setContentsMargins(0,0,0,0)
-            layout.addWidget(widget)
-            layout.addStretch()
-            widget.valueChanged.connect(self._input_value_changed) # hook value changed event on the axis repeater when displayed
-            return widget
-        return None
+    #     if gremlin.config.Configuration().show_input_axis:
+    #         layout = QtWidgets.QVBoxLayout(container_widget)
+    #         widget = gremlin.ui.ui_common.AxisStateWidget(show_label = False, orientation=QtCore.Qt.Orientation.Horizontal, show_percentage=False)
+    #         widget.setWidth(10)
+    #         widget.setMaximumWidth(200)
+    #         # automatically update from the joystick
+    #         widget.hookDevice(data.device_guid, data.input_id)
+    #         widget.setContentsMargins(0,0,0,0)
+    #         layout.setContentsMargins(0,0,0,0)
+    #         layout.addWidget(widget)
+    #         layout.addStretch()
+    #         widget.valueChanged.connect(self._input_value_changed) # hook value changed event on the axis repeater when displayed
+    #         return widget
+    #     return None
     
-    def _populate_button_input_widget_ui(self, input_widget, container_widget, data):
-        ''' called when the widget is created for a button input  '''
-        if gremlin.config.Configuration().show_input_axis:
-            layout = QtWidgets.QVBoxLayout(container_widget)
-            widget = gremlin.ui.ui_common.ButtonStateWidget()
-            #widget.setMaximumWidth(20)
-            # automatically update from the joystick
-            widget.hookDevice(data.device_guid, data.input_type, data.input_id)
-            widget.setContentsMargins(0,0,0,0)
-            layout.setContentsMargins(0,0,0,0)
-            layout.addWidget(widget)
-            layout.addStretch()
-            return widget
+    # def _populate_button_input_widget_ui(self, input_widget, container_widget, data):
+    #     ''' called when the widget is created for a button input  '''
+    #     if gremlin.config.Configuration().show_input_axis:
+    #         layout = QtWidgets.QVBoxLayout(container_widget)
+    #         widget = gremlin.ui.ui_common.ButtonStateWidget()
+    #         #widget.setMaximumWidth(20)
+    #         # automatically update from the joystick
+    #         widget.hookDevice(data.device_guid, data.input_type, data.input_id)
+    #         widget.setContentsMargins(0,0,0,0)
+    #         layout.setContentsMargins(0,0,0,0)
+    #         layout.addWidget(widget)
+    #         layout.addStretch()
+    #         return widget
         
     @property
     def running(self):

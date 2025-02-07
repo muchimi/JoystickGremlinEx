@@ -160,6 +160,15 @@ class Event:
 	# 		pass
 	# 	self._is_pressed = value
 
+	def fake_button(self, is_pressed = True):
+		''' converts the event to a fake button '''
+		self.event_type = InputType.JoystickButton
+		self.identifier = 1
+		self.is_axis = False # range exit is a button type event
+		self.value = is_pressed
+		self.is_pressed = is_pressed
+		
+
 
 	def __eq__(self, other):
 		return self.__hash__() == other.__hash__()

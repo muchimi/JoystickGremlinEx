@@ -2884,9 +2884,6 @@ class AxisStateWidget(QtWidgets.QWidget):
             self.main_layout.addWidget(self._progress_widget)
             self.main_layout.addWidget(self._readout_widget)
 
-
-
-
         self._min_range = -1.0
         self._max_range = 1.0
         self._device_guid = None

@@ -1063,7 +1063,7 @@ class SimConnectManager(QtCore.QObject):
                 # simconnect is not enabled
                 return False
 
-            self._abort = False
+         
             if not self._sm.ok:
                 try:
                     attempt_count = 1

@@ -3103,14 +3103,19 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         else:
             item_data = self.input_item_list_model.data(index)
 
+
+        device_guid = self.device_guid
+        input_id = item_data.input_id if item_data else None
+        input_type = InputType.OpenSoundControl
+
         if item_data:
             
             config = gremlin.config.Configuration()
             device_guid = self.device_guid
-            input_type = InputType.OpenSoundControl
+            
 
 
-            input_id = item_data.input_id if item_data else None
+        
             config.set_last_input(device_guid, input_type, input_id)
 
             widget = gremlin.ui.joystick_device.InputItemConfiguration(item_data)

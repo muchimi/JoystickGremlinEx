@@ -1224,6 +1224,8 @@ class InputItemWidget(QtWidgets.QFrame):
         self._container_input_axis_layout = QtWidgets.QHBoxLayout(self._container_input_axis_widget)
         self._container_input_axis_widget.setContentsMargins(8,0,0,0)
         self._container_input_axis_layout.setContentsMargins(0,0,0,0)
+        self._container_input_axis_widget.setMinimumHeight(32)
+        self._container_input_axis_widget.setMaximumHeight(32)
         
         
         self.axis_widget = None
