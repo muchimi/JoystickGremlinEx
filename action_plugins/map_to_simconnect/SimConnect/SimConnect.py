@@ -317,7 +317,7 @@ class SimConnect():
 		self._hSimConnect = HANDLE()
 		self._quit = 0
 		self._ok = False
-		self._abort = False # true if we're aborting and should stop running
+		self._request_abort = False # true if we're aborting and should stop running
 		self.running = False
 		self._is_loop_running = False  # true if the DLL event listen loop is running
 		self._is_connected = False # true if the DLL is hooked
@@ -351,7 +351,7 @@ class SimConnect():
 
 	def reset(self):
 		''' resets abort flag set due to a load error - this is necessary upon reconnect'''
-		self._abort = False
+		self._request_abort = False
 
 
 
@@ -771,7 +771,7 @@ class SimConnect():
 
 		syslog = logging.getLogger("system")
 		verbose = gremlin.config.Configuration().verbose_mode_simconnect
-		if verbose: syslog.info("SIMCONNECT:connect...")
+		if verbose: syslog.info("SIMCONNECT: connect...")
 		
 		self._connecting = True
 
@@ -779,11 +779,11 @@ class SimConnect():
 		
 			if self._is_connected:
 				# already connected
-				if verbose: syslog.info("SIMCONNECT:already connected")
+				if verbose: syslog.info("\talready connected")
 				return True
-			if self._abort:
+			if self._request_abort:
 				# abort
-				if verbose: syslog.info("SIMCONNECT:abort set - request skipped")
+				if verbose: syslog.info("\tabort set - request skipped")
 				return False
 			
 			el = gremlin.event_handler.EventListener()
@@ -799,22 +799,22 @@ class SimConnect():
 						syslog.critical(msg) # issue a critical error because the DLL should be with the distribution
 						os._exit(1)
 
-					syslog.info(f"SIMCONNECT:Using dll : {self._dll_path}")
-					self._library_path = self._dll_path
-					
-
-
+				if verbose: syslog.info(f"\tUsing dll : {self._dll_path}")
+				self._library_path = self._dll_path
+			
 				self._is_loop_running = False
 				self._quit = 0
 			
+			
+		
 			if not self._win_dll:
 				# dll is not loaded
 
 				try:
 					self._win_dll = windll.LoadLibrary(self._dll_path)
-					syslog.error(f"SIMCONNECT:DLL load: ok")
+					syslog.error(f"\tDLL load: ok")
 				except Exception as err:
-					self._abort = True
+					self._request_abort = True
 					syslog.error(f"SIMCONNECT:DLL load error: {err}")
 					self._quit = 1
 					
@@ -823,17 +823,21 @@ class SimConnect():
 					
 			if self._win_dll:
 
+				if verbose: syslog.info(f"\tUsing win dll : {self._win_dll}")
+		
+
 				self._dll = SimConnectDll(self._win_dll)
 				
 				self._my_dispatch_proc_rd = self._dll.DispatchProc(self.simconnect_dispatch_proc)
 				try:
+					if verbose: syslog.info(f"\tloading dll...")
 					err = self._dll.Open(byref(self._hSimConnect), LPCSTR(b"GremlinEx"), None, 0, 0, 0)
 				except:
 					# likely not running
 					syslog.warning("SIMCONNECT: MSFS not running or missing DLL")
 					err = 1
 				if self.IsHR(err, 0):
-					syslog.info("SIMCONNECT:Connected to MSFS")
+					syslog.info("\tConnected to MSFS - hr code 0")
 					# Request an event when the simulation starts
 
 					self._is_connected = True
@@ -856,14 +860,7 @@ class SimConnect():
 						self._hSimConnect, self._dll.EventID.EVENT_SIM_PAUSE_STATE.value, b"Pause"
 					)
 					self._dll.SetSystemEventState(self._hSimConnect, self._dll.EventID.EVENT_SIM_PAUSE_STATE.value, SIMCONNECT_STATE.SIMCONNECT_STATE_ON)
-					# # Request a notification when the flight is paused
-					# self._dll.SubscribeToSystemEvent(
-					# 	self._hSimConnect, self._dll.EventID.EVENT_SIM_PAUSED.value, b"Paused"
-					# )
-					# # Request a notification when the flight is un-paused.
-					# self._dll.SubscribeToSystemEvent(
-					# 	self._hSimConnect, self._dll.EventID.EVENT_SIM_UNPAUSED.value, b"Unpaused"
-					# )
+					
 					# Request a notification when the flight is un-paused.
 					self._dll.SubscribeToSystemEvent(
 						self._hSimConnect, self._dll.EventID.EVENT_SIM_RUNNING.value, b"Sim"
@@ -874,14 +871,14 @@ class SimConnect():
 					)
 
 					
-					syslog.info(f"SIMCONNECT:interface connected")
+					syslog.info(f"\tinterface connected")
 					self.run()
 		
 					
 
 
 				else:
-					self._abort = True
+					self._request_abort = True
 					el.module_state_change.emit("simconnect",False)
 					syslog.error(f"SIMCONNECT:Failed to connect: return code: 0x{err:X}")
 					el.request_profile_stop.emit("Error opening SimConnect")
@@ -963,13 +960,13 @@ class SimConnect():
 
 	def is_connected(self, auto_connect = True):
 		''' determines if connected and optionally starts the connection '''
-		if self._abort:
+		if self._request_abort:
 			return False
 		return self.ok
 	
 	def is_running(self, auto_connect = True):
 		''' determines if the event loop is running or not '''
-		if self._abort:
+		if self._request_abort:
 			return False
 		if not self._is_loop_running and auto_connect:
 			self.connect()

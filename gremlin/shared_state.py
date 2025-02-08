@@ -153,12 +153,14 @@ def get_virtual_device_name(device_guid):
 
 def get_device_name(device_guid):
     ''' gets the name corresponding to a hardware or virtual device '''
+    if not isinstance(device_guid, str):
+        device_guid = str(device_guid)
     device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
     if not device_name:
         device_name = get_virtual_device_name(device_guid)
     if not device_name:
         logging.getLogger("system").error(f"Unable to find device name for id: {device_guid}")
-        pass
+        return None
     return device_name
 
 

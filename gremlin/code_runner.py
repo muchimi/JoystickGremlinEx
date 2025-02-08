@@ -378,34 +378,22 @@ class CodeRunner:
 
            
             # hook mouse events
-            evt_listener.mouse_event.connect(
-                self.event_handler.process_event
-            )
+            evt_listener.mouse_event.connect(self.event_handler.execute_event)
 
             # hook keyboard events
-            evt_listener.keyboard_event.connect(
-                self.event_handler.process_event
-            )
+            evt_listener.keyboard_event.connect(self.event_handler.execute_event)
 
             # hook joystick input events
-            evt_listener.joystick_event.connect(
-                self.event_handler.process_event
-            )
+            evt_listener.joystick_event.connect(self.event_handler.execute_event)
 
             # hook virtual events
-            evt_listener.virtual_event.connect(
-                self.event_handler.process_event
-            )
+            evt_listener.virtual_event.connect(self.event_handler.execute_event)
 
             # hook midi events
-            evt_listener.midi_event.connect(
-                self.event_handler.process_event
-            )
+            evt_listener.midi_event.connect(self.event_handler.execute_event)
 
             # hook osc events
-            evt_listener.osc_event.connect(
-                self.event_handler.process_event
-            )
+            evt_listener.osc_event.connect(self.event_handler.execute_event)
 
             # set keyboard startup state for numlock - use global numlock or profile numlock
             numlock_off = numlock_off or profile.get_force_numlock()
@@ -538,11 +526,11 @@ class CodeRunner:
         # Disconnect all signals
 
         kb = gremlin.input_devices.Keyboard()
-        el.keyboard_event.disconnect(self.event_handler.process_event)
-        el.joystick_event.disconnect(self.event_handler.process_event)
-        el.virtual_event.disconnect(self.event_handler.process_event)
-        el.midi_event.disconnect(self.event_handler.process_event)
-        el.osc_event.disconnect(self.event_handler.process_event)
+        el.keyboard_event.disconnect(self.event_handler.execute_event)
+        el.joystick_event.disconnect(self.event_handler.execute_event)
+        el.virtual_event.disconnect(self.event_handler.execute_event)
+        el.midi_event.disconnect(self.event_handler.execute_event)
+        el.osc_event.disconnect(self.event_handler.execute_event)
 
         el.keyboard_event.disconnect(kb.keyboard_event)
         el.gremlin_active = False

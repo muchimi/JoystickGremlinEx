@@ -23,16 +23,22 @@ for root, _, files in os.walk("gremlin"):
     for fname in files:
         if fname.endswith(".md"):
             doc_files.append((os.path.join(root, fname), root))
-
+xml_files = []
+for root, _, files in os.walk(".xml"):
+    for fname in files:
+        if fname.endswith(".xml"):
+            xml_files.append((os.path.join(root, fname), root))
 
 added_files = [
     ("about", "about"),
     ("doc", "doc"),
-    ("gfx", "gfx")
+    ("gfx", "gfx"),
 ]
+
 added_files.extend(action_plugins_files)
 added_files.extend(container_plugins_files)
 added_files.extend(doc_files)
+added_files.extend(xml_files)
 added_binaries = [
     ("vjoy/vJoyInterface.dll", "."),
     ("dill.dll", "."),

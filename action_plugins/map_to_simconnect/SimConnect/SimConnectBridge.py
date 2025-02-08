@@ -196,7 +196,7 @@ class SimConnectBridge(QtCore.QObject):
         #client_data = copy.deepcopy(data)
 
 
-        syslog.info(f"client data callback: define id: {client_data.dwDefineID}")
+        #syslog.info(f"client data callback: define id: {client_data.dwDefineID}")
         if client_data.dwRequestID  == kDownlinkRequest:
             # mobiflight core client data received on MobiFlight client registration
             packet = cast(client_data.dwData, POINTER(BRIDGE_PACKET)).contents
@@ -217,7 +217,7 @@ class SimConnectBridge(QtCore.QObject):
                 # named variable
                 packet = cast(client_data.dwData, POINTER(BRIDGE_PACKET_DOUBLE)).contents
                 value = packet.data # double
-                syslog.info(f"SIMCONNECT BRIDGE: received mobiflight value: {value}")
+                #syslog.info(f"SIMCONNECT BRIDGE: received value: {value}")
                 
             elif packet.code == BridgeCommands.GetVariableList:
                 data = packet.data.decode()
@@ -246,7 +246,7 @@ class SimConnectBridge(QtCore.QObject):
             # find the terminating zero
 
             data = packet.data
-            syslog.info(f"Bridge: received mobiflight data: {data}")
+            #syslog.info(f"SIMCONNECT BRIDGE: received data: {data}")
             
             
 
@@ -255,14 +255,17 @@ class SimConnectBridge(QtCore.QObject):
     def execute_calculator_code(self, command):
         ''' executes an RPN expression '''
         syslog = logging.getLogger("system")
-        verbose = gremlin.config.Configuration().verbose_mode_simconnect
+        #verbose = gremlin.config.Configuration().verbose_mode_simconnect
+        verbose = False
         if self._wait_event.is_set():
             # currently executing another command - ignore
-            syslog.info("execute: already executing")
+            #if verbose: syslog.info("execute: already executing")
             return
         try:
             id = self._get_next_id() # id is sequential so it's unique for each call and will roundrobin
             data = command.encode("ascii")
+                
+
             packet = BRIDGE_PACKET(id, BridgeCommands.ExecuteCalculatorCode, data)
             packet_pointer = cast(pointer(packet), c_void_p)
             
@@ -278,7 +281,7 @@ class SimConnectBridge(QtCore.QObject):
                 packet_pointer)
                         
             # wait for the event
-            self._wait_event.wait(0.5)
+            self._wait_event.wait(0.1)
             if verbose: syslog.info("SIMCONNECT BRIDGE: completed")
             self._wait_event.clear()
         except:

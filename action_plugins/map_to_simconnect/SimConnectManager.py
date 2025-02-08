@@ -454,6 +454,7 @@ class SimConnectManager(QtCore.QObject):
     
     sim_state = QtCore.Signal(int, float, str) # fires when sim state data changes (depends on the state )
     _aircraft_loaded_internal = QtCore.Signal(str, str) # fires when aircraft (name, title)
+    
 
     def __init__(self) -> None:
         ''' manages simconnect connections and interactions 
@@ -474,7 +475,9 @@ class SimConnectManager(QtCore.QObject):
 
 
         self._connect_in_progress = False
+        self._connected = False
         self._sm = None
+        
 
         handler = SimConnectEventHandler()
 
@@ -536,7 +539,7 @@ class SimConnectManager(QtCore.QObject):
         self._aircraft_folder = None
         self._aircraft_title = None
 
-        self._abort = False # true if processing should stop
+        self._request_abort = False # true if processing should stop
 
         self._registered_feed_blocks = {}
         self._registered_requests = {}
@@ -591,7 +594,7 @@ class SimConnectManager(QtCore.QObject):
         self.bridge.stop()
         self._bridge_alive = False
         self.sim_disconnect()
-        self._abort = True
+        self._request_abort = True
 
 
     def start_bridge(self):
@@ -1016,11 +1019,10 @@ class SimConnectManager(QtCore.QObject):
 
     def reset(self):
         ''' resets the connection '''
-        if self._sm.is_connected:
-            return
-        
         self._sm.reset()
-        self._connect_attempts = 3
+        self._connect_attempts = 5
+        self._request_abort = False
+        self._connected = False
 
 
 
@@ -1045,12 +1047,16 @@ class SimConnectManager(QtCore.QObject):
     def reconnect(self, force_retry = False):
         # not connected
 
+        if self._connected:
+            return
         if self._connect_in_progress:
             return
         
         self._connect_in_progress = True
         syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_simconnect
+
+        if verbose: syslog.info(f"SIMCONNECT MGR: reconnect...")
 
         try:
             
@@ -1068,7 +1074,7 @@ class SimConnectManager(QtCore.QObject):
                 try:
                     attempt_count = 1
                     if force_retry or self._connect_attempts > 0:
-                        while self._connect_attempts > 0 and not self._abort:
+                        while self._connect_attempts > 0 and not self._request_abort:
                             self._connect_attempts -= 1
                             self._sm.connect()
                             if self._sm.ok:
@@ -1098,6 +1104,8 @@ class SimConnectManager(QtCore.QObject):
 
             self.bridge.start()
 
+            self._connected = True
+
             return True # connected  
         finally:
             self._connect_in_progress = False
@@ -1106,7 +1114,7 @@ class SimConnectManager(QtCore.QObject):
         ''' connects to the sim (has to be different from connect() due to event processing )'''
         if self._sm.is_connected() and self._bridge_alive:
             return True
-        
+        self.reset()
         return self.reconnect()
 
     def sim_disconnect(self):
@@ -2076,7 +2084,7 @@ class SimConnectBlock():
                     syslog.error(f"SIMCONNECT: event: '{self._command}' not found")
             elif self._command_type in (SimConnectCommandType.SimVar, SimConnectCommandType.Calculator):
                 # set simvar
-                if self.verbose: syslog.info(f"\command type: simvar / calculator")
+                if self.verbose: syslog.info(f"\tcommand type: simvar / calculator")
                 ae = AircraftEvents(self.sm)
                 request = mgr.findRequest(self._command)
                 if not request:

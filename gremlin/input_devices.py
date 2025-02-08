@@ -1919,6 +1919,9 @@ class JoystickInputSignificant:
         self._time_registry = {}
         
 
+    def should_process_axis(self, event, deviation = 0.1) -> bool:
+        return self._process_axis(event, deviation)
+
     def _process_axis(self, event, deviation = 0.1) -> bool:
         """Process an axis event.
 

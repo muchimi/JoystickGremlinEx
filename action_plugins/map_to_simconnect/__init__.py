@@ -33,6 +33,7 @@ import gremlin.shared_state
 import gremlin.singleton_decorator
 import gremlin.ui.ui_common
 import gremlin.ui.input_item
+import gremlin.input_devices
 #import gremlin.gated_handler
 import enum
 from gremlin.profile import safe_format, safe_read
@@ -2615,14 +2616,26 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         # command range (command min / max range )        
         row +=1
-        output_data_entry_layout.addWidget(QtWidgets.QLabel("Command:"),row,1)
-        output_data_entry_layout.addWidget(self._command_min_range_widget,row,2)
-        output_data_entry_layout.addWidget(self._command_max_range_widget,row,3)
-        
+        col = 1
+        output_data_entry_layout.addWidget(QtWidgets.QLabel("Command:"),row, col)
+        col +=1
+        output_data_entry_layout.addWidget(self._command_min_range_widget,row,col)
+        col +=1
+        output_data_entry_layout.addWidget(self._command_max_range_widget,row,col)
+        col +=1
+
+        widget = gremlin.ui.ui_common.QDataPushButton("Percent", data = (0, 100))
+        widget.clicked.connect(self._set_command_range)
+        output_data_entry_layout.addWidget(widget, row, col)
+        col +=1
+        widget = gremlin.ui.ui_common.QDataPushButton("MSFS Normal", data = (-16383, 16383))
+        widget.clicked.connect(self._set_command_range)
+        output_data_entry_layout.addWidget(widget, row, col)
+        col +=1
 
         
-        output_data_entry_layout.addWidget(QtWidgets.QLabel(" "),0,5)
-        output_data_entry_layout.setColumnStretch(5,2)
+        output_data_entry_layout.addWidget(QtWidgets.QLabel(" "),0,col)
+        output_data_entry_layout.setColumnStretch(col,2)
 
         self._output_range_container_layout.addWidget(output_data_entry_widget)
 
@@ -2763,6 +2776,12 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._update_ui()
 
 
+    @QtCore.Slot()
+    def _set_command_range(self):
+        widget = self.sender()
+        min_value, max_value = widget.data
+        self._command_min_range_widget.setValue(min_value)
+        self._command_max_range_widget.setValue(max_value)
 
     def _update_curve_icon(self):
         if self.action_data.curve_data:
@@ -3024,11 +3043,19 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _command_min_range_changed_cb(self):
         ''' command min range changed '''
         self.action_data.command_min_range = self._command_min_range_widget.value()
+        min_value = self.action_data.command_min_range
+        max_value = self.action_data.command_max_range
+        self.action_data.min_range = gremlin.util.clamp(self.action_data.min_range, min_value, max_value)
+        self._output_min_range_widget.setRange(min_value, max_value)
         self._update_ui()
 
     def _command_max_range_changed_cb(self):
         ''' command max range changed '''
         self.action_data.command_max_range = self._command_max_range_widget.value()
+        min_value = self.action_data.command_min_range
+        max_value = self.action_data.command_max_range
+        self.action_data.max_range = gremlin.util.clamp(self.action_data.max_range, min_value, max_value)
+        self._output_max_range_widget.setRange(min_value, max_value)
         self._update_ui()
 
 
@@ -3106,15 +3133,19 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _min_range_changed_cb(self):
         value = self._output_min_range_widget.value() # command value
         if value is not None:
+            self.action_data.min_range = value
             normalized = gremlin.util.scale_to_range(value, 
                                                      source_min = self.action_data.command_min_range, 
                                                      source_max = self.action_data.command_max_range)  # scale from -1 +1
             self._set_normalized_min(normalized)
+      
+        
 
     @QtCore.Slot()
     def _max_range_changed_cb(self):
         value = self._output_max_range_widget.value()
         if value is not None:
+            self.action_data.max_range = value
             normalized = gremlin.util.scale_to_range(value, 
                                                      source_min = self.action_data.command_min_range, 
                                                      source_max = self.action_data.command_max_range) # to -1 + 1
@@ -3183,24 +3214,27 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         else:
             
             self.description_text_widget.setText("No description found")
-            self.action_data.command_min_range = 0
-            self.action_data.command_max_range = 0
+            # self.action_data.command_min_range = 0
+            # self.action_data.command_max_range = 0
             
  
 
         
         output_mode = self.action_data.mode
-        normalized_min_range = gremlin.util.clamp(self.action_data.min_range, -1, 1) # value -1 to +1
-        normalized_max_range = gremlin.util.clamp(self.action_data.max_range, -1, 1)  # value -1 to +1
+        normalized_min_range = gremlin.util.scale_to_range(self.action_data.min_range, source_min = self.action_data.command_min_range, source_max = self.action_data.command_max_range) # value -1 to +1
+        normalized_max_range = gremlin.util.scale_to_range(self.action_data.max_range, source_min = self.action_data.command_min_range, source_max = self.action_data.command_max_range) # value -1 to +1
+        #normalized_max_range = gremlin.util.clamp(self.action_data.max_range, -1, 1)  # value -1 to +1
         min_range = gremlin.util.scale_to_range(normalized_min_range, target_min = self.action_data.command_min_range, target_max = self.action_data.command_max_range)
         max_range = gremlin.util.scale_to_range(normalized_max_range, target_min = self.action_data.command_min_range, target_max = self.action_data.command_max_range)
         percent_min_range = gremlin.util.scale_to_range(min_range, target_min=0, target_max=100)
         percent_max_range = gremlin.util.scale_to_range(max_range, target_min=0, target_max=100)
-                
+
 
         value = self.action_data.value
         inverted = self.action_data.inverted
         trigger_mode = self.action_data.trigger_mode
+
+
 
 
     
@@ -3228,6 +3262,11 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
                 with QtCore.QSignalBlocker(self._output_mode_ranged_widget):
                     self._output_mode_ranged_widget.setChecked(True)
+                
+                with QtCore.QSignalBlocker(self._output_min_range_widget):
+                    self._output_min_range_widget.setValue(min_range)
+                with QtCore.QSignalBlocker(self._output_max_range_widget):
+                    self._output_max_range_widget.setValue(max_range)
 
                 with QtCore.QSignalBlocker(self._command_min_range_widget):
                     self._command_min_range_widget.setValue(self.action_data.command_min_range)
@@ -3373,7 +3412,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._command_container_widget.setVisible(simvar_visible)
         self._calculator_release_container_widget.setVisible(release_command_visible and calc_visible)
 
-        self._output_container_widget.setVisible(simvar_visible)
+        
         #self._button_mode_container_widget.setVisible(simvar_visible) # always visible
 
         input_type = self.action_data.input_type
@@ -3383,7 +3422,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         setvalue_visible = output_mode == SimConnectActionMode.SetValue
         trigger_visible = output_mode == SimConnectActionMode.Trigger
         if input_type == InputType.JoystickAxis:
-            range_visible = output_mode == SimConnectActionMode.Ranged and not setvalue_visible
+            range_visible = (output_mode == SimConnectActionMode.Ranged and not setvalue_visible) or mode == SimconnectCommandMode.Calculator
             
             # gated_visible = block.output_mode == SimConnectActionMode.Gated
             repeater_visible = True
@@ -3393,6 +3432,8 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
             range_visible = False
             #gated_visible = False
         
+
+        self._output_container_widget.setVisible(simvar_visible or range_visible)
         self._output_range_container_widget.setVisible(range_visible)
         self._output_trigger_bool_container_widget.setVisible(trigger_visible)
         self._output_value_container_widget.setVisible(setvalue_visible)
@@ -3510,12 +3551,14 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
     manager = gremlin.macro.MacroManager()
 
     def __init__(self, action, parent = None):
+        
         super().__init__(action, parent)
         self.action_data : MapToSimConnect = action
         self.command = action.command # the command to execute
         self.value = action.value # the value to send (None if no data to send)
         self.manager : SimConnectManager = SimConnectManager()
         self.valid = False
+        self._significant = gremlin.input_devices.JoystickInputSignificant()
         
         self.reconnect_timeout = 5
         self.last_reconnect_time = None
@@ -3537,8 +3580,8 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         ''' occurs when the profile starts '''
 
 
-        eh = SimConnectEventHandler()
-        eh.request_connect.emit()
+        # eh = SimConnectEventHandler()
+        # eh.request_connect.emit()
         
         self.reconnect_timeout = 5
         self.last_reconnect_time = None
@@ -3575,13 +3618,6 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
 
         if not gremlin.shared_state.is_running or gremlin.shared_state.abort:
             return
-    
-
-        #block = self.action_data.block
-        # if block:
-        #     syslog.info(f"SIMCONNECT: process event {block.command}")
-        #     if "ARM" in block.command:
-        #         pass
 
         if not self.valid:
             return
@@ -3603,7 +3639,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         super().process_event(event, action_value)
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_simconnect
-        verbose_details = True # config.verbose_mode_details
+        verbose_details = False # config.verbose_mode_details
         #verbose = True
 
         syslog = logging.getLogger("system")
@@ -3624,14 +3660,33 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         output_mode = self.action_data.mode
         command_mode = self.action_data.command_mode
 
-        trigger = self.action_data.trigger_on_press and event.is_pressed or \
-                    self.action_data.trigger_on_release and not event.is_pressed
+        trigger = self.action_data.trigger_on_press and event.is_pressed or self.action_data.trigger_on_release and not event.is_pressed
 
 
         if command_mode == SimconnectCommandMode.Calculator:
             if not self.action_data.command:
                 # nothing to calculate
                 return True
+            
+            if event.is_axis:
+                
+                process_input = self._significant.should_process_axis(event, 0.01)
+                if process_input:
+                    if self.action_data.mode == SimConnectActionMode.Ranged:
+                        min_value = self.action_data.min_range
+                        max_value = self.action_data.max_range
+                        value = gremlin.util.scale_to_range(event.value, target_min = min_value, target_max = max_value)
+                        command = f"{value:0.3f} {self.action_data.command}"
+                    elif self.action_data.mode == SimConnectActionMode.SetValue:
+                        value = self.action_data.value
+                        command = f"{value:0.3f} {self.action_data.command}"
+                    else:
+                        command = self.action_data.command
+                    
+                    if verbose: syslog.info(f"Simconnect: calc: execute axis command: {command}")
+                    self.manager.calculate(command) # run RPN script   
+                return True
+            
             if self.action_data.auto_repeat:
                 if trigger:
                     # calculator expression
@@ -3644,7 +3699,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
             if trigger:
                 # regular calculate
                 command = self.action_data.command
-                if verbose: syslog.info(f"Simconnect: calc: execute press command: {command}")
+                if verbose_details: syslog.info(f"Simconnect: calc: execute press command: {command}")
                 self.manager.calculate(command) # run RPN script
             else:
                 # release calculate auto repeat
@@ -3659,7 +3714,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                     # execute release command
                     command = self.action_data.command_release
                     if command:
-                        if verbose: syslog.info(f"Simconnect: calc: execute release command: {command}")
+                        if verbose_details: syslog.info(f"Simconnect: calc: execute release command: {command}")
                         self.manager.calculate(command) # run RPN script
 
 
@@ -3669,6 +3724,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
             # invalid command
             syslog.warning(f"Error: invalid block: {block.command} type: {block.command_type}")
             return True        
+        
         if event.is_axis and output_mode in (SimConnectActionMode.Ranged, SimConnectActionMode.Gated):
             # value = self.action_data.get_filtered_axis_value(action_value.current)
             # process input options and any merge and curve operation
@@ -3687,17 +3743,17 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
 
             
 
-            if verbose: syslog.info(f"Simconnect: send: command: {block.command} input: {action_value.current:0.3f} scaled: {normalized:0.3f} curved: {curved:0.3f} -> scaled: {output_value}")
+            if verbose_details: syslog.info(f"Simconnect: send: command: {block.command} input: {action_value.current:0.3f} scaled: {normalized:0.3f} curved: {curved:0.3f} -> scaled: {output_value}")
             block.execute(output_value)
 
         elif output_mode == SimConnectActionMode.Trigger:
             if not event.is_axis:
                 value = 1 if self.action_data.trigger_mode != SimConnectTriggerMode.InputValue else action_value.current
                 if self.action_data.trigger_on_press and event.is_pressed:
-                    if verbose: syslog.info(f"Trigger singleton (on press): {block.command}")
+                    if verbose_details: syslog.info(f"Trigger singleton (on press): {block.command}")
                     block.execute(value)
                 elif self.action_data.trigger_on_release and not event.is_pressed:
-                    if verbose: syslog.info(f"Trigger singleton (on release): {block.command}")
+                    if verbose_details: syslog.info(f"Trigger singleton (on release): {block.command}")
                     block.execute(value)
         elif output_mode == SimConnectActionMode.SetValue:
             # set value mode 
@@ -3707,12 +3763,12 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
             if self.action_data.trigger_on_release and not event.is_pressed:
                 if verbose:
                     percent = gremlin.util.scale_to_range(value, target_min=0, target_max = 100)
-                    syslog.info(f"Send block set value axis (release trigger): {block.command}  raw: {value:0.3f} mode: {gremlin.shared_state.runtime_mode} scaled: {scaled} percent: {percent:0.3f}")
+                    if verbose_details: syslog.info(f"Send block set value axis (release trigger): {block.command}  raw: {value:0.3f} mode: {gremlin.shared_state.runtime_mode} scaled: {scaled} percent: {percent:0.3f}")
                 block.execute(scaled)
             elif self.action_data.trigger_on_press and event.is_pressed:
                 if verbose:
                     percent = gremlin.util.scale_to_range(value, target_min=0, target_max = 100)
-                    syslog.info(f"Send block set value axis (press trigger): {block.command}  raw: {value:0.3f} mode: {gremlin.shared_state.runtime_mode} scaled: {scaled} percent: {percent:0.3f}")
+                    if verbose_details: syslog.info(f"Send block set value axis (press trigger): {block.command}  raw: {value:0.3f} mode: {gremlin.shared_state.runtime_mode} scaled: {scaled} percent: {percent:0.3f}")
                 block.execute(scaled)
         elif self.action_data.mode == SimConnectActionMode.Trigger:
             # trigger action 
@@ -3720,12 +3776,13 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         return True
     
     def _auto_repeat_command(self):
+        verbose_details = False
         while not self._auto_repeat_event.is_set():
             self.manager.calculate(self.action_data.command)
             time.sleep(self.action_data.auto_repeat_interval)
 
         syslog = logging.getLogger("system")
-        syslog.info("autorepeat: thread stop")
+        if verbose_details: syslog.info("autorepeat: thread stop")
 
     
 
@@ -3807,8 +3864,8 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         self.value = 0.0
         self._min_range = -1.0 # min range for ranged output
         self._max_range = 1.0 # max range for ranged output 
-        self.command_min_range = -16383
-        self.command_max_range = 16383
+        self._command_min_range = -16383
+        self._command_max_range = 16383
 
         self.inverted = False # inversion flag
         self.trigger_mode = SimConnectTriggerMode.NoOp # trigger only
@@ -3833,6 +3890,20 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
 
         # readonly mode
         self.is_readonly = False
+
+    @property
+    def command_min_range(self) -> float:
+        return self._command_min_range
+    @command_min_range.setter
+    def command_min_range(self, value: float):
+        self._command_min_range = value
+
+    @property
+    def command_max_range(self) -> float:
+        return self._command_max_range
+    @command_max_range.setter
+    def command_max_range(self, value: float):
+        self._command_max_range = value
 
     @property
     def command_mode(self) -> SimconnectCommandMode:
@@ -4076,38 +4147,31 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         command = self._command if self._command else ""
         command_release = self._command_release if self._command_release else ""
 
-        if self.command_mode == SimconnectCommandMode.Calculator:
-            node.set("command",safe_format(command, str))
-            node.set("command_release",safe_format(command_release, str))
-            node.set("has_release", safe_format(self.is_release_command, bool))
-            node.set("mode", SimConnectActionMode.to_string(self.mode))
-            node.set("command_mode", SimconnectCommandMode.to_string(self._command_mode))
-            node.set("type", SimConnectCommandType.to_string(self._command_type))
-            node.set("units", self.units)
-            node.set("datatype", self.data_type)
+        node.set("command",safe_format(command, str))
+        node.set("command_release",safe_format(command_release, str))
+        node.set("mode", SimConnectActionMode.to_string(self.mode))
+        node.set("command_mode", SimconnectCommandMode.to_string(self._command_mode))
+        node.set("has_release", safe_format(self.is_release_command, bool))
+        node.set("type", SimConnectCommandType.to_string(self._command_type))
+        node.set("units", self.units)
+        node.set("datatype", self.data_type)
 
-        else: # simvar mode
-            # simconnect command
             
-            node.set("command",safe_format(command, str))
-            node.set("command_release",safe_format(command_release, str))
-            node.set("has_release", safe_format(self.is_release_command, bool))
-            node.set("value", safe_format(self.value, float)) # normalized
-            node.set("mode", SimConnectActionMode.to_string(self.mode))
-            node.set("command_mode", SimconnectCommandMode.to_string(self._command_mode))
-            if self.action_type:
-                node.set("type", SimConnectCommandType.to_string(self.action_type))
-            node.set("trigger_on_release", safe_format(self.trigger_on_release, bool))
-            node.set("trigger_on_press", safe_format(self.trigger_on_press, bool))
-            node.set("min_range", safe_format(self.min_range, float)) 
-            node.set("max_range", safe_format(self.max_range, float)) 
-            node.set("command_min_range", safe_format(self.command_min_range, int)) 
-            node.set("command_max_range", safe_format(self.command_max_range, int)) 
-            node.set("inverted", safe_format(self.inverted, bool))
-            node.set("trigger", SimConnectTriggerMode.to_string(self.trigger_mode))
+        if self.action_type:
+            node.set("type", SimConnectCommandType.to_string(self.action_type))
+        node.set("trigger_on_release", safe_format(self.trigger_on_release, bool))
+        node.set("trigger_on_press", safe_format(self.trigger_on_press, bool))
+        node.set("trigger", SimConnectTriggerMode.to_string(self.trigger_mode))
+        node.set("autorepeat", safe_format(self.auto_repeat, bool))
+        node.set("delay", safe_format(self.auto_repeat_interval, int))
 
-            node.set("autorepeat", safe_format(self.auto_repeat, bool))
-            node.set("delay", safe_format(self.auto_repeat_interval, int))
+
+        node.set("value", safe_format(self.value, float)) # normalized
+        node.set("min_range", safe_format(self.min_range, float)) 
+        node.set("max_range", safe_format(self.max_range, float)) 
+        node.set("command_min_range", safe_format(self.command_min_range, int)) 
+        node.set("command_max_range", safe_format(self.command_max_range, int)) 
+        node.set("inverted", safe_format(self.inverted, bool))            
 
         if self.curve_data is not None:
             curve_node =  self.curve_data._generate_xml()

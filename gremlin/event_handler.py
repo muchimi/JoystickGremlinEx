@@ -551,7 +551,7 @@ class EventListener(QtCore.QObject):
 		
 		# fire mode change for mode enter (press + release)
 		eh = EventHandler()
-		m2_list, f2_list = eh.process_event(event_enter_pressed)
+		m2_list, f2_list = eh.execute_event(event_enter_pressed)
 		enter_release = Timer(delay, lambda : eh._execute_callbacks(event_enter_released, m2_list, f2_list))
 		enter_release.start()
 
@@ -1731,7 +1731,7 @@ class EventHandler(QtCore.QObject):
 								mode = new_mode)
 					
 					# fire mode change control for mode exit (press + release)
-					m1_list, f1_list = self.process_event(event_exit_pressed)
+					m1_list, f1_list = self.execute_event(event_exit_pressed)
 					exit_release = Timer(delay, lambda : self._execute_callbacks(event_exit_released, m1_list, f1_list))
 					exit_release.start()
 					
@@ -1761,7 +1761,7 @@ class EventHandler(QtCore.QObject):
 
 
 					# fire mode change for mode enter (press + release)
-					m2_list, f2_list = self.process_event(event_enter_pressed)
+					m2_list, f2_list = self.execute_event(event_enter_pressed)
 					enter_release = Timer(delay, lambda : self._execute_callbacks(event_enter_released, m2_list, f2_list))
 					enter_release.start()
 
@@ -1815,8 +1815,7 @@ class EventHandler(QtCore.QObject):
 		self.osc_callbacks = {}
 		
 
-	@QtCore.Slot(Event)
-	def process_event(self, event : Event):
+	def execute_event(self, event : Event):
 		"""Processes a single event by passing it to all callbacks registered for this event.
 
 		:param event the event to process
