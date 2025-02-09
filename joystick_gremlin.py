@@ -120,7 +120,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 #from gremlin.input_devices import remote_state
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_BASE = "m71"
+APPLICATION_BASE = "m72"
 APPLICATION_VERSION = f"13.40.16ex ({APPLICATION_BASE})"
 
 
@@ -421,10 +421,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         if tab_type == TabDeviceType.Joystick:
             self._joystick_device_guids.append(device_guid)
         
-        verbose = gremlin.config.Configuration().verbose
-        if verbose:
-            
-            syslog.info(f"Add tab: {position} {device_name} {device_guid}")
+        verbose = gremlin.config.Configuration().verbose_mode_device
+        if verbose: syslog.info(f"Add tab: {position} {device_name} {device_guid}")
 
         return position
     
@@ -457,7 +455,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         self._tab_device_map.clear()
         self._tab_name_map.clear()
         
-        verbose = gremlin.config.Configuration().verbose
+        verbose = gremlin.config.Configuration().verbose_mode_device
         syslog = logging.getLogger("system")
         if verbose: syslog.info("UI: tab reindex")
         for index in range(self.ui.devices.count()):
@@ -1781,7 +1779,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
             config = gremlin.config.Configuration()
             verbose_detailed = config.verbose_mode_detailed
-            verbose = config.verbose
+            verbose = config.verbose_mode_device
 
 
             gremlin.shared_state.is_tab_loading = True

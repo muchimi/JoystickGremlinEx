@@ -1090,22 +1090,23 @@ class Configuration:
 
     @property
     def verbose_mode_mouse(self):
-        ''' true if verbose mode is in inputs mode '''
+        ''' true if verbose mode is in mouse mode '''
         return self.verbose and VerboseMode.Mouse in self.verbose_mode
+    
     
     @property
     def verbose_mode_details(self):
-        ''' true if verbose mode is in inputs mode '''
+        ''' true if verbose mode is in detail mode '''
         return self.verbose and VerboseMode.Details in self.verbose_mode
     
     @property
     def verbose_mode_detailed(self):
-        ''' true if verbose mode is in inputs mode '''
+        ''' true if verbose mode is in detail mode '''
         return self.verbose and VerboseMode.Details in self.verbose_mode
     
     @property
     def verbose_mode_device(self):
-        ''' true if verbose mode is in inputs mode '''
+        ''' true if verbose mode is in device mode '''
         return self.verbose and VerboseMode.Device in self.verbose_mode
 
     @property

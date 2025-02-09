@@ -918,7 +918,8 @@ class VerboseMode(IntFlag):
     Device = auto() # device change modes
     Macro = auto() # macro 
     Gate = auto() # auto
-    All = Keyboard | Joystick | Inputs | Mouse | Details | SimConnect | Condition | Process | Exec | Midi | Device | Macro | Gate
+    
+    All = Keyboard | Joystick | Inputs | Mouse | Details | SimConnect | Condition | Process | Exec | Midi | Device | Macro | Gate 
 
     def __contains__(self, item):
         return  (self.value & item.value) == item.value

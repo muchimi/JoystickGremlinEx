@@ -2063,28 +2063,29 @@ class SimConnectBlock():
             return False
         
         mgr = SimConnectManager()
+        verbose = False # self.verbose
 
-        if self.verbose: syslog.info(f"SIMCONNECT: block execute: ({self._command})  value: ({value})")
+        if verbose: syslog.info(f"SIMCONNECT: block execute: ({self._command})  value: ({value})")
 
         if self._command:
             if self._command_type == SimConnectCommandType.Event:
-                if self.verbose: syslog.info(f"\command type: event")
+                if verbose: syslog.info(f"\tcommand type: event")
                 ae = AircraftEvents(self.sm)
                 trigger = ae.find(self._command)
                 if trigger:
                     if self.is_readonly:
                         # no param to set
-                        if self.verbose: syslog.info(f"\ttrigger event (single) readonly")
+                        if verbose: syslog.info(f"\ttrigger event (single) readonly")
                         trigger()
                     else:
-                        if self.verbose: syslog.info(f"\ttrigger event value")
+                        if verbose: syslog.info(f"\ttrigger event value")
                         trigger(value)
                     return True
                 else:
                     syslog.error(f"SIMCONNECT: event: '{self._command}' not found")
-            elif self._command_type in (SimConnectCommandType.SimVar, SimConnectCommandType.Calculator):
+            elif self._command_type == SimConnectCommandType.SimVar:
                 # set simvar
-                if self.verbose: syslog.info(f"\tcommand type: simvar / calculator")
+                if verbose: syslog.info(f"\tcommand type: simvar")
                 ae = AircraftEvents(self.sm)
                 request = mgr.findRequest(self._command)
                 if not request:
@@ -2094,28 +2095,28 @@ class SimConnectBlock():
                     if trigger:
                         if self.is_readonly:
                             # no param to set
-                            if self.verbose: syslog.info(f"\ttrigger event (single): {self._command}")
+                            if verbose: syslog.info(f"\ttrigger event (single): {self._command}")
                             trigger()
                         else:
-                            if self.verbose: syslog.info(f"\ttrigger event value: {self._command} {value}")
+                            if verbose: syslog.info(f"\ttrigger event value: {self._command} {value}")
                             trigger(value)
                         return True
                 
                 if not request:
                     # register it
-                    if self.verbose: syslog.info(f"\tregistering request...")
+                    if verbose: syslog.info(f"\tregistering request...")
                     request = mgr.registerRequest(self._command, self._units, self._value)
                 if not request:
                     syslog.error(f"\trequest: '{self._command}' not found or could not be registered.")
                     return False
 
-                if self.verbose:  syslog.info(f"\tset simvar: '{self._command}' mode: {self.output_mode}")
+                if verbose:  syslog.info(f"\tset simvar: '{self._command}' mode: {self.output_mode}")
                 if mode is None:
                     mode = self.output_mode
                 ar = AircraftRequests()
                 if mode == SimConnectActionMode.Trigger:
                     trigger_mode = self.trigger_mode
-                    if self.verbose: syslog.info(f"\taircraft request trigger mode")
+                    if verbose: syslog.info(f"\taircraft request trigger mode")
                     match trigger_mode:
                         case  SimConnectTriggerMode.Toggle:
                             # get the current state and flip it
@@ -2126,29 +2127,29 @@ class SimConnectBlock():
                         case SimConnectTriggerMode.TurnOff:
                             
                             value = 0
-                            if self.verbose: syslog.info(f"\t\tTrigger Turn off: {value}")
+                            if verbose: syslog.info(f"\t\tTrigger Turn off: {value}")
                         case SimConnectTriggerMode.TurnOn:
                             value = 1
-                            if self.verbose: syslog.info(f"\t\tTrigger Turn on: {value}")
+                            if verbose: syslog.info(f"\t\tTrigger Turn on: {value}")
                         case SimConnectTriggerMode.NoOp:
                             value = 1
-                            if self.verbose: syslog.info(f"\t\tTrigger No op: {value}")
+                            if verbose: syslog.info(f"\t\tTrigger No op: {value}")
                             
                         case SimConnectTriggerMode.InputValue:
                             if isinstance(value, bool):
                                 value = 1 if value else 0
-                            if self.verbose: syslog.info(f"\t\tTrigger InputValue: {value}")
+                            if verbose: syslog.info(f"\t\tTrigger InputValue: {value}")
                     
                     # regular request
                     request.set(value)
 
                 elif mode == SimConnectActionMode.SetValue:
-                    if self.verbose: syslog.info(f"\tset value mode:")
+                    if verbose: syslog.info(f"\tset value mode:")
                     ar.set(self._command, value)
-                    if self.verbose: syslog.info(f"\t\tSet value: {value}")
+                    if verbose: syslog.info(f"\t\tSet value: {value}")
                 elif mode == SimConnectActionMode.GetValue:
                     value = ar.get(self._command)
-                    if self.verbose: syslog.info(f"\t\tGet value: {value}")
+                    if verbose: syslog.info(f"\t\tGet value: {value}")
                     return value
 
                 return True
@@ -2158,7 +2159,7 @@ class SimConnectBlock():
 
 
             elif self._command_type == SimConnectCommandType.Request and not self._readonly:
-                if self.verbose: syslog.info(f"\tcommand type: request")
+                if verbose: syslog.info(f"\tcommand type: request")
                 ar = AircraftRequests(self.sm, time=2000)
                 self._request = ar.request(self._command)
                 if self._request:
@@ -2168,7 +2169,7 @@ class SimConnectBlock():
                         self.sm._request_periodic_data(self._request)
                     else:
                         self.sm._request_data(self._request)
-                    if self.verbose: syslog.info(f"\tset request {self._command} {value}")
+                    if verbose: syslog.info(f"\tset request {self._command} {value}")
                 else:
                     syslog.error(f"\tError: unknown command '{self._command}'")
                 return True
@@ -2276,4 +2277,4 @@ class SimConnectBlock():
 
 
 
-_manager = SimConnectManager()
+_manager = SimConnectManager() 

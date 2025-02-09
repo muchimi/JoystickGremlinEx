@@ -5326,4 +5326,612 @@ def getVContainer(widget_or_list = None, label = None, alignment = None):
     if stretch:
         layout.addStretch()
     return (widget, layout)
+
+def getGridContainer(widget_or_list = None, alignment = QtCore.Qt.AlignmentFlag.AlignLeft, start_col = 0, start_row = None, stretch_col = None, add_to_widget = None):
+    ''' gets a qt grid container widget
+     
+    :param widget_or_list: the widget or widgets to add to the next row
+    :param alignment: cell alignment
+    :param start_col: starting column where to add the new widget, starting from the left column
+    :param start_row: starting row where to add the new widgets
+    :param add_to_widget: add widgets to an existing grid widget
+       
+    '''
+
+    if add_to_widget is not None:
+        widget = add_to_widget
+        layout : QtWidgets.QGridLayout = widget.layout()
+        row = layout.rowCount() if start_row is None else start_row
+        stretch = False
+
+    else:
+        widget = QtWidgets.QWidget()
+        layout = QtWidgets.QGridLayout(widget)
+        widget.setContentsMargins(0,0,0,0)
+        layout.setContentsMargins(0,0,0,0)
+        row = 0 if start_row is None else start_row
+        stretch = True
+
+
+    col = 0 if start_col is None else start_col
     
+    
+    if widget_or_list:
+        if isinstance(widget_or_list, list) or isinstance(widget_or_list, tuple):
+            for item in widget_or_list:
+                layout.addWidget(item, row, col, alignment)
+                col+=1
+        else:
+            layout.addWidget(widget_or_list, row, col, alignment)
+            col+=1
+
+    if stretch:
+        if stretch_col is not None:
+            col = stretch_col
+        else:
+            col = layout.columnCount()
+        layout.addWidget(QtWidgets.QWidget(), 0, col)
+        layout.setColumnStretch(col, 2)
+    return (widget, layout)
+
+
+def synchronize_grids(widget_list : list):
+    ''' synchronizes cell widths between multiple grid layouts '''
+    if len(widget_list) < 2:
+        return # nothing to do
+    
+    g: QtWidgets.QGridLayout
+    max_cols = 0
+    layouts = [g.layout() for g in widget_list]
+    max_cols = max(g.columnCount() for g in layouts)
+    
+    for col in range(max_cols):
+        width = 0    
+        for g in layouts:
+            rows = g.rowCount()
+            if col < g.columnCount():
+                for row in range(rows):
+                    width = max(width, g.itemAtPosition(row, col).minimumSize().width())
+
+        for g in layouts:
+            g.setColumnMinimumWidth(col, width)
+    
+
+    
+class QJoystickRangeWidget(QtWidgets.QWidget):
+    ''' a widget that displays and collects range information for a joytick '''
+
+
+    valueChanged = QtCore.Signal(object) # occurs when the data range value changes ((min,max)) or (value)
+    modeChanged = QtCore.Signal() # occurs if the mode changes from single value to range mode
+    invertChanged = QtCore.Signal() # occurs when inversion flag is changed
+
+    def __init__(self, data = None, min_range = -1, max_range = 1, decimals = 3, is_range = True, show_mode_change = False, show_inverted = True, inverted = False,  parent = None):
+        '''
+        :param data: the data object if any
+        :param min_range: the default min range of the widget
+        :param max_range: the default max range of the widget
+        :param decimals: the number of decimal places to display 
+        :param is_range: if set, the widget displays a min/max range, if false displays a single value range
+        '''
+        super().__init__(parent)
+        
+        self.data = data
+
+   
+        self._showCommandRange = True
+        self._showNormalizedRange = True
+        self._showPercentRange = True
+        self._showDataRange = True
+        self._showModeChange = show_mode_change
+        self._decimals = decimals
+        self._is_range = is_range
+        self._inverted = inverted
+
+        self._last_cmd_min = min_range
+        self._last_cmd_max = max_range
+        self._last_min = min_range
+        self._last_max = max_range
+
+        main_layout = QtWidgets.QVBoxLayout(self)
+
+        
+
+        w = gremlin.ui.ui_common.get_text_width("0000000.0000")
+
+        output_data_entry_widget = QtWidgets.QWidget()
+        output_data_entry_layout = QtWidgets.QGridLayout(output_data_entry_widget)
+
+
+         # output range                 
+        self._command_min_widget = QFloatLineEdit()
+        self._command_min_widget.setRange(min_range,max_range)
+        self._command_min_widget.setValue(min_range)
+        self._command_min_widget.valueChanged.connect(self._update_from_command)
+        self._command_min_widget.setMinimumWidth(w)
+        
+
+        # output range                 
+        self._command_max_widget = QFloatLineEdit()
+        self._command_max_widget.setRange(min_range, max_range)
+        self._command_max_widget.setValue(max_range)
+        self._command_max_widget.valueChanged.connect(self._update_from_command)
+        self._command_max_widget.setMinimumWidth(w)
+        
+
+        # controller scaled output value (integer)
+        self._data_min_widget = QFloatLineEdit()
+        self._data_min_widget.setRange(min_range, max_range)
+        self._data_min_widget.valueChanged.connect(self._update_from_data)
+        self._data_min_widget.setMinimumWidth(w)
+
+        self._data_max_widget = QFloatLineEdit()
+        self._data_max_widget.setRange(min_range, max_range)
+        self._data_max_widget.valueChanged.connect(self._update_from_data)
+        self._data_max_widget.setMinimumWidth(w)
+        self._data_max_widget.setVisible(is_range)
+        
+
+        # normalized is -1 to + 1
+        self._normalized_min_widget = gremlin.ui.ui_common.QFloatLineEdit()
+        self._normalized_min_widget.valueChanged.connect(self._update_from_normalized)
+        self._normalized_min_widget.setMinimumWidth(w)
+        self._normalized_min_widget.setRange(-1,1)
+        self._normalized_min_widget.setVisible(is_range)
+        
+        
+        self._normalized_max_widget = gremlin.ui.ui_common.QFloatLineEdit()
+        self._normalized_max_widget.valueChanged.connect(self._update_from_normalized)
+        self._normalized_max_widget.setMinimumWidth(w)
+        self._normalized_max_widget.setRange(-1,1)
+        self._normalized_max_widget.setVisible(is_range)
+        
+
+        self._percent_min_widget = gremlin.ui.ui_common.QFloatLineEdit(decimals=2)
+        #self._output_min_percent_range_widget.setReadOnly(True)
+        self._percent_min_widget.setRange(0,100)
+        self._percent_min_widget.setMinimumWidth(w)
+        self._percent_min_widget.valueChanged.connect(self._update_from_percent)
+
+        self._percent_max_widget = gremlin.ui.ui_common.QFloatLineEdit(decimals=2)
+        #self._output_max_percent_range_widget.setReadOnly(True)
+        self._percent_max_widget.setRange(0,100)
+        self._percent_max_widget.setMinimumWidth(w)
+        self._percent_max_widget.valueChanged.connect(self._update_from_percent)
+        self._percent_max_widget.setVisible(is_range)
+
+
+        # inverted flag
+        self._invert_output_widget = QtWidgets.QCheckBox("Invert Output")
+        self._invert_output_widget.setChecked(inverted)
+        self._invert_output_widget.clicked.connect(self._inverted_changed)
+
+        # options container
+        widget, options_layout = getHContainer()
+        options_layout.addWidget(self._invert_output_widget)
+
+        main_layout.addWidget(widget)
+
+        # single or range mode
+        widgets = []
+        widget = QDataRadioButton("Single Value",data=False)
+        widget.clicked.connect(self._mode_changed)
+        widgets.append(widget)
+        widget = QDataRadioButton("Range Mode",data=True)
+        widget.clicked.connect(self._mode_changed)
+        widgets.append(widget)
+
+        self._output_mode_widget, _ = getHContainer(widgets,"Output Mode:")
+        self._output_mode_widget.setVisible(show_mode_change)
+
+        options_layout.addWidget(self._output_mode_widget)
+        options_layout.addStretch()
+
+        grids = []
+
+        self.grid_header, _ = getGridContainer(
+            [   
+                QtWidgets.QLabel(""),
+                QtWidgets.QLabel("Min:"),
+                QtWidgets.QLabel("Max:"),
+            ]
+        )
+
+        grids.append(self.grid_header)
+
+        self.grid_data, _ = getGridContainer(
+            [   
+                QtWidgets.QLabel("Output Value:"),
+                self._data_min_widget,
+                self._data_max_widget,
+            ]
+        )
+
+        grids.append(self.grid_data)
+
+        self.grid_normalized, _ = getGridContainer(
+            [   
+                QtWidgets.QLabel("Normalized:"),
+                self._normalized_min_widget,
+                self._normalized_max_widget,
+            ]
+        )
+
+        grids.append(self.grid_normalized)
+
+        self.grid_percent, _ = getGridContainer(
+            [   
+                QtWidgets.QLabel("Percent:"),
+                self._percent_min_widget,
+                self._percent_max_widget,
+            ]
+        )
+
+        grids.append(self.grid_percent)
+
+
+        
+        self.grid_command, _ = getGridContainer(
+            [   
+                QtWidgets.QLabel("Command Range:"),
+                self._command_min_widget,
+                self._command_max_widget,
+            ]
+        )
+
+        grids.append(self.grid_command)
+
+
+        for grid in grids:
+            main_layout.addWidget(grid)
+
+        # make the grids line up
+        synchronize_grids(grids)
+
+        # hide grids by default
+        self.grid_data.setVisible(self._showDataRange)
+        self.grid_command.setVisible(self._showCommandRange)
+        self.grid_header.setVisible(is_range)
+
+    @QtCore.Slot(bool)
+    def _inverted_changed(self, checked):
+        self.inverted = checked
+        self.invertChanged.emit()
+
+    @QtCore.Slot()
+    def _mode_changed(self):
+        widget = self.sender()
+        self.isRange = widget.data
+        self.grid_header.setVisible(self.is_range)
+
+
+    def _update_from_normalized(self, value : float,  emit = True):
+        min_norm = self._normalized_min_widget.value()
+        max_norm = self._normalized_max_widget.value()
+        min_cmd = self._command_min_widget.value() # minimum range
+        max_cmd = self._command_max_widget.value() # maximum range
+        min_value = gremlin.util.scale_to_range(min_norm, target_min=min_cmd, target_max=max_cmd) 
+        max_value = gremlin.util.scale_to_range(max_norm, target_min=min_cmd, target_max=max_cmd) 
+
+        min_cmd = self._command_min_widget.value() # minimum range
+        max_cmd = self._command_max_widget.value() # maximum range
+   
+        if self._last_cmd_min != min_cmd or \
+           self._last_cmd_max != max_cmd or \
+           self._last_min != min_value or \
+           self._last_max != max_value:
+
+
+            min_percent = gremlin.util.scale_to_range(min_value, source_min=min_cmd, source_max=max_cmd, target_min = 0, target_max = 100) 
+            max_percent = gremlin.util.scale_to_range(max_value, source_min=min_cmd, source_max=max_cmd, target_min = 0, target_max = 100)
+
+            self._last_cmd_min = min_cmd
+            self._last_cmd_max = max_cmd
+            
+            self._last_min = min_value
+            self._last_max = max_value
+
+            with QtCore.QSignalBlocker(self._data_min_widget):
+                self._data_min_widget.setValue(min_value)
+            with QtCore.QSignalBlocker(self._data_max_widget):
+                self._data_max_widget.setValue(max_value)
+
+            with QtCore.QSignalBlocker(self._percent_min_widget):
+                self._percent_min_widget.setValue(min_percent)
+            with QtCore.QSignalBlocker(self._percent_max_widget):
+                self._percent_max_widget.setValue(max_percent)
+
+            if emit:
+                if self._is_range:
+                    self.valueChanged.emit((min_value, max_value))
+                else:
+                    self.valueChanged.emit(min_value)
+
+    def _update_from_percent(self, value : float,  emit = True):
+        min_percent = self._percent_min_widget.value()
+        max_percent = self._percent_max_widget.value()
+        min_cmd = self._command_min_widget.value() # minimum range
+        max_cmd = self._command_max_widget.value() # maximum range
+        min_value = gremlin.util.scale_to_range(min_percent, source_min = 0, source_max = 100, target_min=min_cmd, target_max=max_cmd) 
+        max_value = gremlin.util.scale_to_range(max_percent, source_min = 0, source_max = 100, target_min=min_cmd, target_max=max_cmd) 
+        min_norm = gremlin.util.scale_to_range(min_value, source_min=min_cmd, source_max=max_cmd) # to -1, 1
+        max_norm = gremlin.util.scale_to_range(max_value, source_min=min_cmd, source_max=max_cmd) # to -1, 1
+
+        if self._last_cmd_min != min_cmd or \
+           self._last_cmd_max != max_cmd or \
+           self._last_min != min_value or \
+           self._last_max != max_value:
+            
+            self._last_cmd_min = min_cmd
+            self._last_cmd_max = max_cmd
+            
+            self._last_min = min_value
+            self._last_max = max_value
+
+            with QtCore.QSignalBlocker(self._data_min_widget):
+                self._data_min_widget.setValue(min_value)
+            with QtCore.QSignalBlocker(self._data_max_widget):
+                self._data_max_widget.setValue(max_value)
+
+            with QtCore.QSignalBlocker(self._normalized_min_widget):
+                self._normalized_min_widget.setValue(min_norm)
+            with QtCore.QSignalBlocker(self._normalized_max_widget):
+                self._normalized_max_widget.setValue(max_norm)
+
+            if emit:
+                if self._is_range:
+                    self.valueChanged.emit((min_value, max_value))
+                else:
+                    self.valueChanged.emit(min_value)
+
+
+    def _update_from_data(self, value, emit = True):
+        min_cmd = self._command_min_widget.value() # minimum range
+        max_cmd = self._command_max_widget.value() # maximum range
+        min_source = self._data_min_widget.value()
+        max_source = self._data_max_widget.value()
+
+        if self._last_cmd_min != min_cmd or \
+           self._last_cmd_max != max_cmd or \
+           self._last_min != min_source or \
+           self._last_max != max_source:
+
+
+            min_value = gremlin.util.clamp(min_source, min_cmd, max_cmd)
+            max_value = gremlin.util.clamp(max_source, min_cmd, max_cmd)
+
+            min_norm = gremlin.util.scale_to_range(min_value, source_min=min_cmd, source_max=max_cmd) # to -1, 1
+            max_norm = gremlin.util.scale_to_range(max_value, source_min=min_cmd, source_max=max_cmd) # to -1, 1
+            min_percent = gremlin.util.scale_to_range(min_value, source_min=min_cmd, source_max=max_cmd, target_min = 0, target_max = 100) 
+            max_percent = gremlin.util.scale_to_range(max_value, source_min=min_cmd, source_max=max_cmd, target_min = 0, target_max = 100)
+
+            self._last_cmd_min = min_cmd
+            self._last_cmd_max = max_cmd
+            
+            self._last_min = min_value
+            self._last_max = max_value
+
+            with QtCore.QSignalBlocker(self._normalized_min_widget):
+                self._normalized_min_widget.setValue(min_norm)
+            with QtCore.QSignalBlocker(self._normalized_max_widget):
+                self._normalized_max_widget.setValue(max_norm)
+
+            with QtCore.QSignalBlocker(self._percent_min_widget):
+                self._percent_min_widget.setValue(min_percent)
+            with QtCore.QSignalBlocker(self._percent_max_widget):
+                self._percent_max_widget.setValue(max_percent)
+
+            if emit:
+                if self._is_range:
+                    self.valueChanged.emit((min_value, max_value))
+                else:
+                    self.valueChanged.emit(min_value)
+            
+
+    def _update_from_command(self, value, emit = True):
+        
+        
+        min_cmd = self._command_min_widget.value() # minimum range
+        max_cmd = self._command_max_widget.value() # maximum range
+        min_source = self._data_min_widget.value()
+        max_source = self._data_max_widget.value()
+
+        if self._last_cmd_min != min_cmd or \
+           self._last_cmd_max != max_cmd or \
+           self._last_min != min_source or \
+           self._last_max != max_source:
+            
+            
+            min_value = gremlin.util.clamp(min_source, min_cmd, max_cmd)
+            max_value = gremlin.util.clamp(max_source, min_cmd, max_cmd)
+            
+
+            min_norm = gremlin.util.scale_to_range(min_value, source_min=min_cmd, source_max=max_cmd) # to -1, 1
+            max_norm = gremlin.util.scale_to_range(max_value, source_min=min_cmd, source_max=max_cmd) # to -1, 1
+            min_percent = gremlin.util.scale_to_range(min_value, source_min=min_cmd, source_max=max_cmd, target_min = 0, target_max = 100) 
+            max_percent = gremlin.util.scale_to_range(max_value, source_min=min_cmd, source_max=max_cmd, target_min = 0, target_max = 100)
+
+            self._last_cmd_min = min_cmd
+            self._last_cmd_max = max_cmd
+            
+            self._last_min = min_value
+            self._last_max = max_value
+
+            with QtCore.QSignalBlocker(self._normalized_min_widget):
+                self._normalized_min_widget.setValue(min_norm)
+            with QtCore.QSignalBlocker(self._normalized_max_widget):
+                self._normalized_max_widget.setValue(max_norm)
+
+            with QtCore.QSignalBlocker(self._percent_min_widget):
+                self._percent_min_widget.setValue(min_percent)
+            with QtCore.QSignalBlocker(self._percent_max_widget):
+                self._percent_max_widget.setValue(max_percent)
+
+            if min_value != min_source or max_value != max_source:
+
+                with QtCore.QSignalBlocker(self._data_min_widget):
+                    self._data_min_widget.setValue(min_value)
+                with QtCore.QSignalBlocker(self._data_max_widget):
+                    self._data_max_widget.setValue(max_value)
+                if emit:
+                    if self._is_range:
+                        self.valueChanged.emit((min_value, max_value))
+                    else:
+                        self.valueChanged.emit(min_value)
+
+
+
+    @property
+    def min_range(self) -> float:
+        return self._data_min_widget.value()
+    @min_range.setter
+    def min_range(self, value: float):
+        if self._data_min_widget.value() != value:
+            self._data_min_widget.setValue(value)
+
+    @property
+    def max_range(self) -> float:
+        return self._data_max_widget.value()
+    @max_range.setter
+    def max_range(self, value: float):
+        if self._data_max_widget.value() != value:
+            self._data_max_widget.setValue(value)
+
+
+    @property
+    def min_command(self) -> float:
+        return self._command_min_widget.value()
+    @min_command.setter
+    def min_command(self, value: float):
+        if self._command_min_widget.value() != value:
+            self._command_min_widget.setValue(value)
+
+    @property
+    def max_command(self) -> float:
+        return self._command_max_widget.value()
+    @max_command.setter
+    def max_command(self, value: float):
+        if self._command_max_widget.value() != value:
+            self._command_max_widget.setValue(value)      
+
+    @property
+    def inverted(self) -> bool:
+        return self._inverted
+    @inverted.setter
+    def inverted(self, value : bool):
+        if self._inverted != value:
+            self._inverted = value
+            self.invertChanged.emit()
+            with QtCore.QSignalBlocker(self._invert_output_widget):
+                self._invert_output_widget.setChecked(value)
+
+
+    def setRange(self, min_value, max_value):
+        ''' updates the range min and max values '''
+        if min_value == max_value:
+            syslog = logging.getLogger("system")
+            syslog.error(f"RANGE WIDGET: cannot set range to the same value: {min_value:0.3f} - skipping")
+            return
+        with QtCore.QSignalBlocker(self._command_min_widget):
+            self._command_min_widget.setRange(min_value, max_value)
+            self._command_min_widget.setValue(min_value)
+        with QtCore.QSignalBlocker(self._command_max_widget):
+            self._command_max_widget.setRange(min_value, max_value)
+            self._command_max_widget.setValue(max_value)
+        with QtCore.QSignalBlocker(self._data_min_widget):
+            self._data_min_widget.setRange(min_value, max_value)
+        with QtCore.QSignalBlocker(self._data_max_widget):
+            self._data_max_widget.setRange(min_value, max_value)
+        self._update_from_command(None, False)
+
+    def setPercent(self, min_percent, max_percent):
+        ''' updates based on percentage'''
+        min_percent = gremlin.util.clamp(min_percent,0, 100)
+        max_percent = gremlin.util.clamp(max_percent,0, 100)
+
+        with QtCore.QSignalBlocker(self._percent_min_widget):
+            self._percent_min_widget.setValue(min_percent)
+        with QtCore.QSignalBlocker(self._percent_max_widget):
+            self._percent_min_widget.setValue(max_percent)
+        self._update_from_percent(None, False)
+
+    def setNormalized(self, min_norm, max_norm):
+        ''' updates range from normalized values (-1 to +1)'''
+        min_norm = gremlin.util.clamp(min_norm,-1,1)
+        max_norm = gremlin.util.clamp(max_norm,-1,1)
+        with QtCore.QSignalBlocker(self._normalized_min_widget):
+            self._normalized_min_widget.setValue(min_norm)
+        with QtCore.QSignalBlocker(self._normalized_max_widget):
+            self._normalized_max_widget.setValue(max_norm)
+        self._update_from_normalized(None, False)
+
+    def setValue(self, min_value, max_value):
+        ''' sets the range value '''
+        min_cmd = self._command_min_widget.value()
+        max_cmd = self._command_max_widget.value()
+        min_value = gremlin.util.clamp(min_value, min_cmd, max_cmd)
+        max_value = gremlin.util.clamp(max_value, min_cmd, max_cmd)
+
+        with QtCore.QSignalBlocker(self._data_min_widget):
+            self._data_min_widget.setValue(min_value)
+        with QtCore.QSignalBlocker(self._data_max_widget):
+            self._data_max_widget.setValue(max_value)
+        
+        print (f"Range widget set value: {min_value:0.3f} {max_value:0.3f}  commmand: {min_cmd:0.3f} {max_cmd:0.3f}")
+        self._update_from_data(None, False)
+
+    def value(self):
+        ''' gets the value '''
+        if self._is_range:
+            return (self._data_min_widget.value(), self._data_max_widget.value())
+        else:
+            return self._data_min_widget.value()
+
+
+    def showCommandRange(self, value : bool):
+        ''' show/hide the command range '''
+        self._showCommandRange = value
+        self.grid_command.setVisible(value)
+        header_visible = not value and not self._is_range
+        self.grid_header.setVisible(header_visible)
+    
+    def showPercentRange(self, value : bool):
+        ''' show/hid the percentage range '''
+        self._showPercentRange = value
+        self.grid_percent.setVisible(value)
+    
+    def showNormalizedRange(self, value : bool):
+        ''' show/hide the normalized range '''
+        self._showNormalizedRange = value
+        self.grid_normalized.setVisible(value)
+
+    def showDataRange(self, value : bool):
+        ''' show/hide the value range '''
+        self._showDataRange = value
+        self.grid_data.setVisible(value)
+
+    def showModeChange(self, value: bool):
+        ''' show/hide mode change radio buttons '''
+        self._showModeChange = value
+        self._output_mode_widget.setVisible(value)
+
+    def showInverted(self, value: bool):
+        self._showInverted = value
+        self._invert_output_widget.setVisible(value)
+
+    @property
+    def isRange(self) -> bool:
+        ''' enables single value mode if false or min/max mode if true'''
+        return self._is_range
+    @isRange.setter
+    def isRange(self, value : bool):
+        if value != self._is_range:
+            self._is_range = value
+            visible = value
+            self._data_max_widget.setVisible(visible)
+            self._normalized_max_widget.setVisible(visible)
+            self._percent_max_widget.setVisible(visible)
+            header_visible = self._is_range
+            self.grid_header.setVisible(header_visible)
+            self.modeChanged.emit()
+
