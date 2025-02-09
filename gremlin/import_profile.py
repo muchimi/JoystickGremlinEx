@@ -668,6 +668,11 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
         self.container_buttons_layout = QtWidgets.QHBoxLayout(self.container_buttons_widget)
         self.container_buttons_layout.setContentsMargins(0,0,0,0)
 
+        self.clear_profile_widget = QtWidgets.QPushButton("Clear Profile")
+        self.clear_profile_widget.setToolTip("Clears the current profile before import")
+        self.clear_profile_widget.clicked.connect(self._clear_profile)
+
+
         self.import_button_widget = QtWidgets.QPushButton("Import")
         self.import_button_widget.setToolTip("Imports the mapped items into the current profile")
         self.import_button_widget.clicked.connect(self._execute_import)
@@ -676,6 +681,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
         self.close_button_widget.clicked.connect(self._close_cb)
 
         self.container_buttons_layout.addStretch()
+        self.container_buttons_layout.addWidget(self.clear_profile_widget)
         self.container_buttons_layout.addWidget(self.import_button_widget)
         self.container_buttons_layout.addWidget(self.close_button_widget)
 
@@ -1470,10 +1476,10 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
     def _update_import_item(self, import_item : ImportItem, device_node : QtWidgets.QTreeWidgetItem):
         ''' updates an import item mapping '''
 
-        verbose = gremlin.config.Configuration().verbose_mode_inputs
+        verbose = gremlin.config.Configuration().verbose
         syslog = logging.getLogger("system")
         tree = self.import_input_tree_widget
-        syslog = logging.getLogger("system")
+        
         mode_item: ImportModeItem
         target_widget = self._map[import_item]
         source_device_guid = import_item.device_guid
@@ -1535,14 +1541,17 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                         syslog.info(f"\t\t{input_item.input_name} -> not set")
                     continue
                 elif not input_item.input_type in self._default_info_map:
-                    syslog.warning(f"Import: unable to map {input_item.input_type} - no matching suitable device found ")
-                    has_mapping = False
-                    if verbose:
-                        syslog.info(f"\t\t{input_item.input_name} -> not mapping found")
+                    syslog.warning(f"Import: unable to map {input_item.input_type} - no matching suitable device found: type: {input_item.input_type}  name: {input_item.input_name} ")
+                    if input_item.input_type == InputType.JoystickHat:
+                        input_item.input_type = InputType.JoystickButton
+                        syslog.info(f"\tChanging input type: HAT to input type BUTTON id : {input_item.input_id}")
+                    else:
+                        has_mapping = False
+                        if verbose:
+                            syslog.info(f"\t\t{input_item.input_name} -> no mapping found")
 
                 if has_mapping:
-                    default_target_device_guid, default_target_input_id = self._default_info_map[input_item.input_type ]
-
+                    default_target_device_guid, default_target_input_id = self._default_info_map[input_item.input_type]
                    
 
                     # derive the target input
@@ -2106,6 +2115,14 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
             #self.import_input_tree_widget.expandItem(item)
 
     @QtCore.Slot()
+    def _clear_profile(self):
+        ''' clears the current profile data before import '''
+        msgbox = gremlin.ui.ui_common.ConfirmBox(f"Reset profile?")
+        result = msgbox.show()
+        if result == QtWidgets.QMessageBox.StandardButton.Ok:
+            self.target_profile = gremlin.base_profile.Profile()
+
+    @QtCore.Slot()
     def _execute_import(self):
         ''' run the import based on the mapping options '''
         # only map the selected import items
@@ -2299,6 +2316,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
 
             eh = gremlin.event_handler.EventListener()
             eh.profile_changed.emit()
+
 
         finally:
             gremlin.util.popCursor()
