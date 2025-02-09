@@ -2587,7 +2587,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         current_device_guid, current_input_type, current_input_id = gremlin.shared_state.get_last_input_id()
         if current_device_guid != device_guid or current_input_type != input_type or current_input_id != input_id:
             syslog = logging.getLogger("system")
-            verbose = self.config.verbose
+            verbose = self.config.verbose_mode_device
             if verbose: 
                 device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
                 syslog.info(f"INPUT CHANGE: selected {device_name} {device_guid} {InputType.to_display_name(input_type)} input: {input_id}")

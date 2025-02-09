@@ -5279,11 +5279,46 @@ class QTabHeader(QtWidgets.QTabBar):
                 self.tabChanged.emit(index)
             
         return False # allow further processing
+    
+def getRadioContainer(label_data_pairs, callback, default = None, horizontal = True, label = None, parent = None):
+    ''' returns an H container for radio buttons 
+    :param label_data_pairs: list of tuples of (label, data, [tooltip]) for each radio button to create - tooltip is optional
+    :param callback: the callback for each radio button - the data component will indicate which radio button was selected 
+    :param default: the default value to select, set to None to not select anything, if the default doesn't exist, nothing is selected
+    :param label: label text to add, if any
+    :param horizontal: creates an H container, if false, creates a V container
+    '''
+    widget = QtWidgets.QWidget(parent=parent)
+    if horizontal:
+        layout = QtWidgets.QHBoxLayout(widget)
+    else:
+        layout = QtWidgets.QVBoxLayout(widget)
+    widget.setContentsMargins(0,0,0,0)
+    layout.setContentsMargins(0,0,0,0)
+    if label:
+        layout.addWidget(QtWidgets.QLabel(label))
+    for data in label_data_pairs:
+        tooltip = None
+        if len(data) == 2:
+            text, data = data
+        elif len(data) == 3:
+            text, data, tooltip = data
+        else:
+            continue # malformed
+        rb = QDataRadioButton(text, data)
+        if tooltip:
+            rb.setToolTip(tooltip)
+        if data == default:
+            rb.setChecked(True)
+        rb.clicked.connect(callback)
+        layout.addWidget(rb)
+    layout.addStretch()
+    return (widget, layout)
 
    
-def getHContainer(widget_or_list = None, label = None):
+def getHContainer(widget_or_list = None, label = None, parent = None):
     ''' gets a qt H container widget '''
-    widget = QtWidgets.QWidget()
+    widget = QtWidgets.QWidget(parent=parent)
     layout = QtWidgets.QHBoxLayout(widget)
     widget.setContentsMargins(0,0,0,0)
     layout.setContentsMargins(0,0,0,0)
@@ -5303,9 +5338,9 @@ def getHContainer(widget_or_list = None, label = None):
     return (widget, layout)
     
 
-def getVContainer(widget_or_list = None, label = None, alignment = None):
+def getVContainer(widget_or_list = None, label = None, alignment = None, parent = None):
     ''' gets a qt H container widget '''
-    widget = QtWidgets.QWidget()
+    widget = QtWidgets.QWidget(parent=parent)
     layout = QtWidgets.QVBoxLayout(widget)
     widget.setContentsMargins(0,0,0,0)
     layout.setContentsMargins(0,0,0,0)
@@ -5469,7 +5504,7 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
         self._data_max_widget.setRange(min_range, max_range)
         self._data_max_widget.valueChanged.connect(self._update_from_data)
         self._data_max_widget.setMinimumWidth(w)
-        self._data_max_widget.setVisible(is_range)
+        
         
 
         # normalized is -1 to + 1
@@ -5477,14 +5512,14 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
         self._normalized_min_widget.valueChanged.connect(self._update_from_normalized)
         self._normalized_min_widget.setMinimumWidth(w)
         self._normalized_min_widget.setRange(-1,1)
-        self._normalized_min_widget.setVisible(is_range)
+        
         
         
         self._normalized_max_widget = gremlin.ui.ui_common.QFloatLineEdit()
         self._normalized_max_widget.valueChanged.connect(self._update_from_normalized)
         self._normalized_max_widget.setMinimumWidth(w)
         self._normalized_max_widget.setRange(-1,1)
-        self._normalized_max_widget.setVisible(is_range)
+        
         
 
         self._percent_min_widget = gremlin.ui.ui_common.QFloatLineEdit(decimals=2)
@@ -5498,7 +5533,7 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
         self._percent_max_widget.setRange(0,100)
         self._percent_max_widget.setMinimumWidth(w)
         self._percent_max_widget.valueChanged.connect(self._update_from_percent)
-        self._percent_max_widget.setVisible(is_range)
+        
 
 
         # inverted flag
@@ -5522,7 +5557,7 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
         widgets.append(widget)
 
         self._output_mode_widget, _ = getHContainer(widgets,"Output Mode:")
-        self._output_mode_widget.setVisible(show_mode_change)
+        
 
         options_layout.addWidget(self._output_mode_widget)
         options_layout.addStretch()
@@ -5592,7 +5627,12 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
         self.grid_data.setVisible(self._showDataRange)
         self.grid_command.setVisible(self._showCommandRange)
         self.grid_header.setVisible(is_range)
-
+        self._percent_max_widget.setVisible(is_range)
+        self._output_mode_widget.setVisible(show_mode_change)
+        self._normalized_max_widget.setVisible(is_range)
+        self._normalized_min_widget.setVisible(is_range)
+        self._data_max_widget.setVisible(is_range)
+        
     @QtCore.Slot(bool)
     def _inverted_changed(self, checked):
         self.inverted = checked
@@ -5867,6 +5907,9 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
 
     def setValue(self, min_value, max_value):
         ''' sets the range value '''
+
+        syslog = logging.getLogger("system")
+        verbose = gremlin.config.Configuration().verbose_mode_detailed
         min_cmd = self._command_min_widget.value()
         max_cmd = self._command_max_widget.value()
         min_value = gremlin.util.clamp(min_value, min_cmd, max_cmd)
@@ -5877,7 +5920,7 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
         with QtCore.QSignalBlocker(self._data_max_widget):
             self._data_max_widget.setValue(max_value)
         
-        print (f"Range widget set value: {min_value:0.3f} {max_value:0.3f}  commmand: {min_cmd:0.3f} {max_cmd:0.3f}")
+        if verbose: syslog.info(f"Range widget set value: {min_value:0.3f} {max_value:0.3f}  commmand: {min_cmd:0.3f} {max_cmd:0.3f}")
         self._update_from_data(None, False)
 
     def value(self):

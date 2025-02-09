@@ -114,7 +114,8 @@ class Request(object):
 
 	def transmit(self):
 		''' sends the data to simconnect '''
-		self._sm.set_data(self)
+		if self._ensure_def():
+			self._sm.set_data(self)
 
 	def setIndex(self, index):
 		if not hasattr(self, "lastIndex"):
@@ -155,8 +156,11 @@ class Request(object):
 		
 		if self.defined is True:
 			return True
+		
+		syslog = logging.getLogger("system")
+		verbose = gremlin.config.Configuration().verbose_mode_simconnect
 	
-		DATATYPE = SIMCONNECT_DATATYPE.SIMCONNECT_DATATYPE_FLOAT64
+		data_type = SIMCONNECT_DATATYPE.SIMCONNECT_DATATYPE_FLOAT64
 		if ':index' in str(self.definitions[0][0]):
 			self.lastIndex = b':index'
 			return False
@@ -167,7 +171,7 @@ class Request(object):
 		
 		if s_rtype.casefold() == 'string':
 			rtype = None
-			DATATYPE = SIMCONNECT_DATATYPE.SIMCONNECT_DATATYPE_STRINGV
+			data_type = SIMCONNECT_DATATYPE.SIMCONNECT_DATATYPE_STRINGV
 
 		command = self.definitions[0][0]
 
@@ -181,6 +185,7 @@ class Request(object):
 			self._sm.Requests[self.DATA_REQUEST_ID.value] = self
 
 		if self.is_client_data:
+			# string definition
 			err = self._sm._dll.AddToClientDataDefinition(
 				self._sm._hSimConnect,
 				self.DATA_DEFINITION_ID.value,
@@ -191,12 +196,13 @@ class Request(object):
 			)
 
 		else:
+			# floating point definition
 			err = self._sm._dll.AddToDataDefinition(
 				self._sm._hSimConnect,
 				self.DATA_DEFINITION_ID.value,
 				command,
 				rtype,
-				DATATYPE,
+				data_type,
 				0,
 				SIMCONNECT_UNUSED,
 			)
@@ -205,10 +211,10 @@ class Request(object):
 			temp = DWORD(0)
 			self._sm._dll.GetLastSentPacketID(self._sm._hSimConnect, temp)
 			self.LastID = temp.value
-			syslog.info(f"SIMCONNECT:request defintion OK: {command}")
+			if verbose: syslog.info(f"SIMCONNECT: created request defintion OK: {command}  definition ID: {self.DATA_DEFINITION_ID.value}")
 			return True
 		else:
-			syslog.error(f"SIMCONNECT:request defintion error: {command}")
+			syslog.error(f"SIMCONNECT:request defintion error: {command} ")
 			return False
 
 
@@ -1125,7 +1131,7 @@ class SimConnect():
 			request.DATA_DEFINITION_ID.value,
 			SIMCONNECT_SIMOBJECT_TYPE.SIMCONNECT_SIMOBJECT_TYPE_USER,
 			SIMCONNECT_DATA_SET_FLAG.SIMCONNECT_DATA_SET_FLAG_DEFAULT,
-			0, # one element 
+			1, # one element 
 			sizeof(ctypes.c_double) * len(pyarr), # size of the element in bytes
 			pObjData
 		)

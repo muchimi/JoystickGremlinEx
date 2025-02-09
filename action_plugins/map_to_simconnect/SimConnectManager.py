@@ -253,7 +253,8 @@ class SimConnectCommandType(enum.Enum):
     Event = 1 # request event
     Request = 2 # request data
     SimVar = 3 # set simvar
-    Calculator = 4 # RPN expression
+    Calculator = 4 # RPN expression via the bridge
+    LVar = 5 # LVAR command via simconnect (floating point data only)
 
     @staticmethod
     def to_string(value : SimConnectCommandType) -> str:
@@ -272,6 +273,8 @@ _command_type_to_string_map = {
     SimConnectCommandType.Request: "request",
     SimConnectCommandType.SimVar : "simvar",
     SimConnectCommandType.Calculator: "rpn",
+    SimConnectCommandType.LVar : "lvar",
+
 }
 
 _command_type_to_enum_map = {
@@ -281,7 +284,8 @@ _command_type_to_enum_map = {
     "lvar": SimConnectCommandType.Calculator,
     "rpn" : SimConnectCommandType.Calculator,
     "avar": SimConnectCommandType.Calculator,
-    "simvar" : SimConnectCommandType.SimVar
+    "simvar" : SimConnectCommandType.SimVar,
+    "lvar": SimConnectCommandType.LVar
 }
 
 
@@ -720,13 +724,16 @@ class SimConnectManager(QtCore.QObject):
         else:
             self._disable_feed()
 
-    def registerRequest(self, command, datatype, settable : bool = False) -> Request:
-        ''' registers a request '''
+    def registerRequest(self, command : str, datatype : str, settable : bool = False) -> Request:
+        ''' registers a request 
+        :param command: the command (variable name or expression)
+        :param datatype: the MSFS simconnect datatype such as "number" "percent"
+        '''
 
         # see if the request is already registered
         s_command, b_command = gremlin.util.to_byte_string(command)
         key = s_command.casefold()
-        s_datatype, b_datatype = gremlin.util.to_byte_string(datatype)
+        _, b_datatype = gremlin.util.to_byte_string(datatype)
         if not key in self._registered_requests:
             request = Request(definitions = (b_command, b_datatype), sm = self.sm, settable = settable)
             request._ensure_def()
@@ -1110,6 +1117,14 @@ class SimConnectManager(QtCore.QObject):
         finally:
             self._connect_in_progress = False
 
+    def clearRequests(self):
+        ''' unregisters all requests '''
+        if self._sm.ok:
+            for request in self._registered_requests.values():
+                self._sm.clear(request)
+        self._registered_requests.clear()
+
+
     def sim_connect(self):
         ''' connects to the sim (has to be different from connect() due to event processing )'''
         if self._sm.is_connected() and self._bridge_alive:
@@ -1143,7 +1158,7 @@ class SimConnectManager(QtCore.QObject):
             key = s_command.casefold()
             if key:
                 for cmd in self._commands:
-                    if key in cmd.casefold():
+                    if key in self._block_map:
                         block = self._block_map[key]
                         if clone:
                             return block.clone()
