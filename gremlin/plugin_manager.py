@@ -325,10 +325,12 @@ class ActionPlugins:
             log_sys_error(f"{error_count} plugin(s) failed to load")
 
 
-    def duplicate(self, action, container):
+    def duplicate(self, action, container, input_item = None):
         ''' duplicates an action and gives it a unique ID '''
         from gremlin.util import get_guid
 
+        if input_item is None:
+            input_item = container.parent
         node = action.to_xml()
         action_tag = node.tag
         action_tag_map = self.tag_map

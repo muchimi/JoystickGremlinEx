@@ -2710,7 +2710,13 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
     @QtCore.Slot()
     def _command_type_changed(self):
         widget = self.sender()
-        self.action_data.command_type = widget.data
+        command_type = widget.data
+        self.action_data.command_type = command_type
+        # match command_type:
+        #     case SimConnectCommandType.LVar:
+
+        #         self._value_widget.isRange = False # single value
+        
         self._update_ui()
 
     @QtCore.Slot(bool)
@@ -2767,6 +2773,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         
     QtCore.Slot(object)
     def _value_changed(self, data):
+        
         if self._value_widget.isRange:
             min_value, max_value = data
             self.action_data.min_range = min_value
@@ -2777,7 +2784,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
             # single mode
             value = data
             self.action_data.value = value
-            print (f"Single value: {min_value:0.3f} {max_value:0.3f}")
+            print (f"Single value: {value:0.3f}")
         
         self._update_repeater()
     
@@ -3263,6 +3270,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         simvar_visible = not calc_visible
         warning_visible = mode == SimConnectCommandMode.CalculatorParam and not self.action_data._is_value_command()
         block_visible = mode == SimConnectCommandMode.Simvar
+        
 
         release_command_visible = self.action_data.is_release_command
         
@@ -3290,18 +3298,16 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         #self._button_mode_container_widget.setVisible(simvar_visible) # always visible
 
         input_type = self.action_data.input_type
-        block : SimConnectBlock = self.action_data.block
         repeater_visible = False
         output_mode = self.action_data.mode
-        setvalue_visible = output_mode == SimConnectActionMode.SetValue
         trigger_visible = output_mode == SimConnectActionMode.Trigger
         if input_type == InputType.JoystickAxis:
-            range_visible = (output_mode == SimConnectActionMode.Ranged and not setvalue_visible) or mode == SimConnectCommandMode.CalculatorParam
+            range_visible = output_mode in (SimConnectActionMode.Ranged, SimConnectActionMode.SetValue) or mode == SimConnectCommandMode.CalculatorParam
             repeater_visible = True
             
         else:
             # momentary
-            range_visible = False
+            range_visible = self.action_data.command_type == SimConnectCommandType.LVar
         
 
         self._output_container_widget.setVisible(simvar_visible or range_visible)
@@ -3578,9 +3584,10 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                 
                 if trigger:
                     # regular calculate
-                    
-                    if verbose_details: syslog.info(f"Simconnect: calc: execute press command: {command}")
-                    manager.calculate(command) # run RPN script
+                    command = self.action_data.command
+                    if command:
+                        if verbose_details: syslog.info(f"Simconnect: calc: execute press command: {command}")
+                        manager.calculate(command) # run RPN script
                 else:
                     # release calculate auto repeat
                     if self.action_data.auto_repeat and self._auto_repeat_thread:

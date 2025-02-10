@@ -5632,7 +5632,8 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
         self._normalized_max_widget.setVisible(is_range)
         self._normalized_min_widget.setVisible(is_range)
         self._data_max_widget.setVisible(is_range)
-        
+        self._invert_output_widget.setVisible(is_range)
+
     @QtCore.Slot(bool)
     def _inverted_changed(self, checked):
         self.inverted = checked
@@ -5640,9 +5641,13 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
 
     @QtCore.Slot()
     def _mode_changed(self):
+        ''' called when the mode changes from range (true) to single (false)'''
         widget = self.sender()
         self.isRange = widget.data
-        self.grid_header.setVisible(self.is_range)
+        is_range = widget.data
+        self.isRange = is_range
+        
+        
 
 
     def _update_from_normalized(self, value : float,  emit = True):
@@ -5905,9 +5910,16 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
             self._normalized_max_widget.setValue(max_norm)
         self._update_from_normalized(None, False)
 
-    def setValue(self, min_value, max_value):
+    def setValue(self, min_value, max_value = None):
         ''' sets the range value '''
 
+        if self._is_range and max_value is None:
+            # if the widget is a range value, expecting two data points
+            raise ValueError()
+        elif not self._is_range and max_value is None:
+            # not a range item, make max the same as min
+            max_value = min_value
+        
         syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_detailed
         min_cmd = self._command_min_widget.value()
@@ -5976,5 +5988,6 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
             self._percent_max_widget.setVisible(visible)
             header_visible = self._is_range
             self.grid_header.setVisible(header_visible)
+            self._invert_output_widget.setVisible(visible)
             self.modeChanged.emit()
 
