@@ -1718,3 +1718,47 @@ def cubic_progression(num_points, start, end):
         progression.append(value)
 
     return progression    
+
+
+class ResetTimer(threading.Thread):
+    ''' a reusable/resettable timer '''
+
+    def __init__(self, interval, target, args = None, kwargs = None):
+        super().__init__()
+        self.interval = interval
+        self.function = target
+        self.args = args if args is not None else []
+        self.kwargs = kwargs if kwargs is not None else {}
+        self.finished = threading.Event()
+        self._is_reset = True
+        self._started = False
+        
+    def cancel(self):
+        ''' stops the timer '''
+        self.finished.set()
+
+    @property
+    def started(self) -> bool:
+        return self._started
+
+
+    def run(self):
+        self._started = True
+        while self._is_reset:
+            self._is_reset = False
+            self.finished.wait(self.interval)
+
+        if not self.finished.isSet():
+            self.function(*self.args, **self.kwargs)
+        self.finished.set()
+        self._started = False
+
+    def reset(self, interval=None):
+        """ Reset the timer """
+
+        if interval is not None:
+            self.interval = interval
+
+        self._is_reset = True
+        self.finished.set()
+        self.finished.clear()

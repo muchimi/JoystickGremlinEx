@@ -1162,22 +1162,26 @@ class SimConnect():
 	def send_event(self, evnt, data=DWORD(0)):
 		if self._dll is None:
 			return False
+		try:
+			err = self._dll.TransmitClientEvent(
+				self._hSimConnect,
+				SIMCONNECT_OBJECT_ID_USER,
+				evnt.value,
+				data,
+				SIMCONNECT_GROUP_PRIORITY_HIGHEST,
+				SIMCONNECT_EVENT_FLAG_GROUPID_IS_PRIORITY  #DWORD(16),
+				
+			)
 
-		err = self._dll.TransmitClientEvent(
-			self._hSimConnect,
-			SIMCONNECT_OBJECT_ID_USER,
-			evnt.value,
-			data,
-			SIMCONNECT_GROUP_PRIORITY_HIGHEST,
-			SIMCONNECT_EVENT_FLAG_GROUPID_IS_PRIORITY  #DWORD(16),
-			
-		)
-
-		if self.IsHR(err, 0):
-			# LOGGER.debug("Event Sent")
-			return True
-		else:
-			return False
+			if self.IsHR(err, 0):
+				# LOGGER.debug("Event Sent")
+				return True
+			else:
+				return False
+		except:
+			pass
+		return False
+		
 		
 
 	def new_client_data_definition_id(self):
@@ -1186,7 +1190,6 @@ class SimConnect():
 		
 		_name = "ClientDataDef_" + str(len(list(self._dll.CLIENT_DATA_DEFINITION_ID)))
 		names = [m.name for m in self._dll.CLIENT_DATA_DEFINITION_ID] + [_name]
-
 		self._dll.CLIENT_DATA_DEFINITION_ID = Enum(self._dll.CLIENT_DATA_DEFINITION_ID.__name__, names)
 		CLIENT_DATA_DEFINITION_ID = list(self._dll.CLIENT_DATA_DEFINITION_ID)[-1]
 		return CLIENT_DATA_DEFINITION_ID
