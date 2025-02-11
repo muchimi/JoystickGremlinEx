@@ -23,6 +23,7 @@ from lxml import etree as ElementTree
 import gremlin.base_profile
 import gremlin.config
 import gremlin.config
+import gremlin.event_handler
 from gremlin.input_types import InputType
 import gremlin.profile
 import gremlin.shared_state
@@ -43,6 +44,15 @@ class TemporaryModeSwitchWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _create_ui(self):
         self.mode_selector_widget = gremlin.ui.ui_common.QComboBox()
+        self.mode_selector_widget.activated.connect(self._mode_list_changed_cb)
+        self.main_layout.addWidget(self.mode_selector_widget)
+        self._update_modes()
+
+        el = gremlin.event_handler.EventListener()
+        el.edit_mode_changed.connect(self._update_modes)        
+        el.profile_modes_changed.connect(self._update_modes)
+
+    def _update_modes(self):
 
         mode = self.action_data.mode_name
         index = 0
@@ -56,20 +66,19 @@ class TemporaryModeSwitchWidget(gremlin.ui.input_item.AbstractActionWidget):
             modes = ec.getModeNames(as_tuple=True)
 
 
-        self.mode_selector_widget.activated.connect(self._mode_list_changed_cb)
-        self.main_layout.addWidget(self.mode_selector_widget)
-        for entry, display in modes:
+        with QtCore.QSignalBlocker(self.mode_selector_widget):
+            self.mode_selector_widget.clear()
+            for entry, display in modes:
                 self.mode_selector_widget.addItem(display, entry)
                 if mode and select_index is None and entry == mode:
                     select_index = index
                 index += 1
 
-        
-        with QtCore.QSignalBlocker(self.mode_selector_widget):
             if select_index is not None:
                 self.mode_selector_widget.setCurrentIndex(select_index)
             elif self.mode_selector_widget.count():
                 self.mode_selector_widget.setCurrentIndex(0)
+
 
     def _mode_list_changed_cb(self):
         self.action_data.mode_name = self.mode_selector_widget.currentData()

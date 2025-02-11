@@ -2121,8 +2121,9 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         self.profile_data = profile_data
         self.action_widgets = []
 
+        mode = self.profile_data.get_mode()
         self.setTitleBarWidget(TitleBar(
-            self._get_window_title(),
+            f"{self._get_window_title()} ({mode})",
             gremlin.hints.hint.get(self.profile_data.tag, ""),
             self._container_remove,
             self._container_copy,
@@ -2393,6 +2394,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
     def _get_window_title(self):
         """Returns the title to show on the widget."""
+        # container name
         return self.profile_data.name
 
 
@@ -2725,8 +2727,10 @@ class BasicActionWrapper(AbstractActionWrapper):
         """
         super().__init__(action_widget, parent)
 
+        mode = action_widget.action_data.get_mode()
+
         self.setTitleBarWidget(TitleBar(
-            action_widget.action_data.name,
+            f"{action_widget.action_data.name} ({mode})",
             gremlin.hints.hint.get(self.action_widget.action_data.tag, ""),
             self._remove,
             self._clipboard_copy,

@@ -146,6 +146,7 @@ class ExecutionContext():
        el.edit_mode_changed.connect(self.reset) # reload data on mode changes
        el.profile_start.connect(self.reset) # reload data on profile start
        el.profile_changed.connect(self.reset) # reload data on profile change
+       el.profile_modes_changed.connect(self.reset) # modes changed
        self.reset()
 
     def reset(self):
@@ -161,8 +162,14 @@ class ExecutionContext():
         self._mode_tree = root_mode
 
         verbose = gremlin.config.Configuration().verbose_mode_exec
+        #verbose = True
         if verbose:
             self.dump()
+        
+        # tell the ui the execution context changed
+        el = gremlin.event_handler.EventListener()
+        el.execution_context_changed.emit()
+
 
 
     def _walk_mode_tree(self, node, branch):

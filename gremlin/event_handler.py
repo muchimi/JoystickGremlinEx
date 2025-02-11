@@ -367,6 +367,8 @@ class EventListener(QtCore.QObject):
 
 	mode_name_changed = QtCore.Signal(str, str) # runs when a mode name change occurs for the UI to update - param (old name, new name)
 	mode_list_update = QtCore.Signal() # runs when mode lists changes
+	profile_modes_changed = QtCore.Signal() # occurs when the hierarchy, or list of modes changed for a given profile (mode added, removed, changed or renamed)
+	execution_context_changed = QtCore.Signal() # occurs when execution context changes 
 
 	runtime_mode_changed = QtCore.Signal(str) # runs when the runtime profile mode changes (runtime mode only, when a profile has been started) - param - the mode changed to
 
@@ -388,9 +390,7 @@ class EventListener(QtCore.QObject):
 	tab_unselected = QtCore.Signal(str) # tab unselected, the device_guid (str) is passed as the parameter - this is triggered when a device tab is selected and made visible
 
 
-	button_state_change = QtCore.Signal(Event) # indicates a change in button state params: (device_guid, input_type, input_id, is_pressed)
-	axis_state_change = QtCore.Signal(Event) # indicates a change in axis state params: (device_guid, input_type, input_id, is_pressed)
-	update_input_state = QtCore.Signal(object) # request to update the input states in the UI for a given device: (device_guid)
+	
 
 	# mapping changed - either container or action added -
 	mapping_changed = QtCore.Signal(object) # fires when a container or action changes on an InputItem - passes the InputItem as the parameter
@@ -445,10 +445,14 @@ class EventListener(QtCore.QObject):
 	# gremlin ex shutdown in progress
 	shutdown = QtCore.Signal() 
 
-	# toggle highlighting modestate
+	# toggle highlighting mode state
 	toggle_highlight = QtCore.Signal(object, object, object) # param (axis,button)
 	enable_highlight_changed = QtCore.Signal(bool) # fires when highlight enable is turned on param(enabled)
-	
+
+	button_state_change = QtCore.Signal(Event) # indicates a change in button state params: (device_guid, input_type, input_id, is_pressed)
+	axis_state_change = QtCore.Signal(Event) # indicates a change in axis state params: (device_guid, input_type, input_id, is_pressed)
+
+	update_input_state = QtCore.Signal(object) # request to update all axis and button input states in the UI for a given device: (device_guid) 
 	
 	# heartbeat
 	heartbeat = QtCore.Signal() # ticks every 30 seconds
@@ -1636,6 +1640,8 @@ class EventHandler(QtCore.QObject):
 
 		import gremlin.ui.mode_device
 
+
+		el = EventListener()
 		try:
 		
 
@@ -1659,7 +1665,6 @@ class EventHandler(QtCore.QObject):
 				# already in this mode
 				return
 			
-			el = EventListener()
 			el.push_input_selection()
 			
 			profile_modes = current_profile.get_modes()
@@ -1753,7 +1758,7 @@ class EventHandler(QtCore.QObject):
 						el.runtime_mode_changed.emit(new_mode)
 
 					# tell other internal components the mode is changing (runtime only)
-					el = EventListener()
+					
 					el.runtime_mode_changed.emit(new_mode)
 					
 				
@@ -1785,8 +1790,14 @@ class EventHandler(QtCore.QObject):
 			device_guid, input_type, input_id = gremlin.config.Configuration().get_last_input()
 			if input_type and input_id:
 				el.select_input.emit(device_guid, input_type, input_id, False, True, False)
+
+			# fire the UI update on change mode      
+			el.update_input_state.emit(device_guid)  # force a UI widget status update	
 		finally:	
 			gremlin.util.popCursor()
+
+		
+
 
 
 	

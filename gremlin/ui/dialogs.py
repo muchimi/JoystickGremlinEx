@@ -2136,6 +2136,9 @@ class ModeManagerUi(ui_common.BaseDialogUi):
         if self.selected_mode:
             el.edit_mode_changed.emit(self.selected_mode)
         el.keyboard_hook.start()
+
+        el.profile_modes_changed.emit() # tell the UI the profile mode options have changed
+
         super().closeEvent(event)
 
     def _create_ui(self):

@@ -48,6 +48,8 @@ class SwitchModeWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.main_layout.addWidget(self.mode_selector_widget)
         el = gremlin.event_handler.EventListener()
         el.edit_mode_changed.connect(self._update_modes)
+        el.execution_context_changed.connect(self._update_modes)
+        
 
     @QtCore.Slot()
     def _update_modes(self):
@@ -65,6 +67,8 @@ class SwitchModeWidget(gremlin.ui.input_item.AbstractActionWidget):
             if not modes:
                 # allow to select self if that's the only option
                 modes = ec.getModeNames(as_tuple=True)
+                
+            print (modes)
             
             #modes = gremlin.shared_state.current_profile.get_modes()
             for entry, display in modes:
