@@ -34,6 +34,7 @@ class VisualizationType(IntEnum):
     AxisTemporal = 1
     AxisCurrent = 2
     ButtonHat = 3
+    Keyboard = 4 
 
 class KeyboardOutputMode(Enum):
     Both = 0 # keyboard make and break (press/release) (pulse mode)

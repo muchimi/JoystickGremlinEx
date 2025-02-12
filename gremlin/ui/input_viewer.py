@@ -25,7 +25,11 @@ import dinput
 
 import gremlin
 import gremlin.config
+import gremlin.joystick_handling
+import gremlin.keyboard
 import gremlin.shared_state
+import gremlin.ui.virtual_keyboard
+import gremlin.util
 from . import ui_common
 from gremlin.input_types import InputType
 from gremlin.types import VisualizationType
@@ -84,6 +88,12 @@ class VisualizationConfig():
             tree.write(fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
         except:
             pass
+
+    def clear(self):
+        ''' clears config selection '''
+        for device_guid in self._config.keys():
+            for id in self._config[device_guid]:
+                self._config[device_guid][id] = False
 
 
     def reload(self):
@@ -153,7 +163,7 @@ class VisualizationSelector(QtWidgets.QWidget):
         config = VisualizationConfig()
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
-
+        self.main_layout.setContentsMargins(0,0,0,0)
         
 
         dev : dinput.DeviceSummary
@@ -162,19 +172,24 @@ class VisualizationSelector(QtWidgets.QWidget):
             box = QtWidgets.QGroupBox(dev.name)
 
             at_cb = gremlin.ui.ui_common.QDataCheckbox("Axes - Temporal", data = (VisualizationType.AxisTemporal, dev))
+            at_cb.setIgnoreKeyboard(True)
             callback = self._create_callback(dev, VisualizationType.AxisTemporal, at_cb)
             at_cb.clicked.connect(callback)
             self._selector_callbacks[at_cb] = callback
 
             ac_cb = gremlin.ui.ui_common.QDataCheckbox("Axes - Current",  data = (VisualizationType.AxisCurrent, dev))
+            ac_cb.setIgnoreKeyboard(True)
             callback = self._create_callback(dev, VisualizationType.AxisCurrent, ac_cb)
             ac_cb.clicked.connect(callback)
             self._selector_callbacks[ac_cb] = callback
 
             bh_cb = gremlin.ui.ui_common.QDataCheckbox("Buttons + Hats",  data = (VisualizationType.ButtonHat, dev))
+            bh_cb.setIgnoreKeyboard(True)
             callback = self._create_callback(dev, VisualizationType.ButtonHat, bh_cb)
             bh_cb.clicked.connect(callback)
             self._selector_callbacks[bh_cb] = callback
+
+
 
             layout = QtWidgets.QVBoxLayout()
             layout.addWidget(at_cb)
@@ -211,7 +226,6 @@ class VisualizationSelector(QtWidgets.QWidget):
         for widget in self._selector_widgets:
             with QtCore.QSignalBlocker(widget):
                 widget.setChecked(False)
-        
 
     @QtCore.Slot()
     def _select_real(self):
@@ -277,13 +291,22 @@ class InputViewerUi(ui_common.BaseDialogUi):
         self.setWindowFlag(QtCore.Qt.WindowMinimizeButtonHint, True)
 
         self.devices = gremlin.joystick_handling.joystick_devices()
-        self.main_layout = QtWidgets.QVBoxLayout()
-        self.setLayout(self.main_layout)
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+
+        self.keyboard_visualizer_widget = None
+        self.keyboard_widget = None # keyboard widget
+
         
+        widget, layout = gremlin.ui.ui_common.getVContainer()
+        self.view_container_widget = widget
+        self.view_container_layout = layout
         self.views = InputViewerArea()
 
+        self.view_container_layout.addWidget(self.views)
+
+
         # configure the scroll area for the selectors
-        self.scroll_selector_layout = QtWidgets.QHBoxLayout()
+        self.scroll_selector_layout = QtWidgets.QVBoxLayout()
         self.scroll_selector_area = QtWidgets.QScrollArea()
         self.scroll_selector_widget = QtWidgets.QWidget()
 
@@ -299,13 +322,25 @@ class InputViewerUi(ui_common.BaseDialogUi):
         self.scroll_selector_area.setWidget(self.scroll_selector_widget)
 
 
-        
+        self.keyboard_widget_selector = gremlin.ui.ui_common.QDataCheckbox("Keyboard")
+        self.keyboard_widget_selector.setIgnoreKeyboard(True)
+        self.keyboard_widget_selector.clicked.connect(self._toggle_keyboard_widget)
 
 
         self.vis_selector = VisualizationSelector(self._add_remove_visualization_widget)
         self.vis_selector.changed.connect(self._add_remove_visualization_widget)
         self.vis_selector.clear.connect(self._clear)
 
+
+        system_selector_widget =  QtWidgets.QGroupBox("System Inputs")
+        system_selector_layout = QtWidgets.QHBoxLayout(system_selector_widget)
+        
+    
+    
+
+        system_selector_layout.addWidget(self.keyboard_widget_selector)
+
+        self.scroll_selector_layout.addWidget(system_selector_widget)
         self.scroll_selector_layout.addWidget(self.vis_selector)
 
 
@@ -326,14 +361,22 @@ class InputViewerUi(ui_common.BaseDialogUi):
 
         self.main_layout.addWidget(options_widget)
 
-        content_widget, _ = gremlin.ui.ui_common.getHContainer((self.scroll_selector_area, self.views))
+        content_widget, _ = gremlin.ui.ui_common.getHContainer((self.scroll_selector_area, self.view_container_widget))
         # Add the scroll area to the main layout
         self.main_layout.addWidget(content_widget)
         self.closed.connect(self._closed)
 
+
+        config = VisualizationConfig()
+        keyboard_visible = config.getValue(gremlin.shared_state.keyboard_tab_guid, VisualizationType.Keyboard)
+        self._toggle_keyboard_widget(keyboard_visible)
+        
+
     @QtCore.Slot()
     def _closed(self):
         ''' save the config on close'''
+        if self.keyboard_widget:
+            self.keyboard_widget.unhook()
         config = VisualizationConfig()
         config.save()
 
@@ -342,8 +385,20 @@ class InputViewerUi(ui_common.BaseDialogUi):
         ''' clears all widgets '''
         widget_list = [widget for widget in self._widget_storage.values()]
         for widget in widget_list:
-            self.views.remove_widget(widget)
+            if widget == self.keyboard_widget:
+                with QtCore.QSignalBlocker(self.keyboard_widget_selector):
+                    self.keyboard_widget_selector.setChecked(False)
+            if hasattr(widget,"unhook"):
+                widget.unhook()
+            widget.setParent(None)
+            
         self._widget_storage.clear()
+        self.hideKeyboard()
+        config = VisualizationConfig()
+        config.clear()
+        config.save()
+
+
 
     @QtCore.Slot(dinput.DeviceSummary,VisualizationType,bool)
     def _add_remove_visualization_widget(self, device : dinput.DeviceSummary, visualization : VisualizationType, is_active : bool):
@@ -360,10 +415,66 @@ class InputViewerUi(ui_common.BaseDialogUi):
             widget = ui_common.JoystickDeviceWidget(device, visualization)
             self.views.add_widget(widget)
             self._widget_storage[key] = widget
+            widget.hook()
         elif key in self._widget_storage:
-            self.views.remove_widget(self._widget_storage[key])
+            widget = self._widget_storage[key]
+            widget.unhook()
+            self.views.remove_widget(widget)
             del self._widget_storage[key]
 
+        self._update_view()
+
+        
+    def showKeyboard(self):
+        # keyboard device
+        if not self.keyboard_visualizer_widget:
+            
+            self.keyboard_visualizer_widget =  QtWidgets.QGroupBox("Keyboard")
+            self.keyboard_visualizer_layout = QtWidgets.QVBoxLayout(self.keyboard_visualizer_widget)
+            self.keyboard_widget = gremlin.ui.virtual_keyboard.QKeyboardWidget()
+            self.keyboard_visualizer_layout.addWidget(self.keyboard_widget)
+            self.keyboard_widget.hook()
+            self.views.add_widget(self.keyboard_visualizer_widget)
+            key = (gremlin.shared_state.keyboard_tab_guid, VisualizationType.Keyboard)
+            self._widget_storage[key] = self.keyboard_visualizer_widget
+        with QtCore.QSignalBlocker(self.keyboard_widget_selector):
+            self.keyboard_widget_selector.setChecked(True)
+
+    def hideKeyboard(self):
+        if self.keyboard_visualizer_widget:
+            self.keyboard_widget.unhook()
+            self.views.remove_widget(self.keyboard_visualizer_widget)
+            self.keyboard_widget = None
+            key = (gremlin.shared_state.keyboard_tab_guid, VisualizationType.Keyboard)
+            if key in self._widget_storage:
+                del self._widget_storage[key]
+            self.keyboard_visualizer_widget = None
+            
+        with QtCore.QSignalBlocker(self.keyboard_widget_selector):
+            self.keyboard_widget_selector.setChecked(False)
+
+        self._update_view()
+    
+    @QtCore.Slot(bool)
+    def _toggle_keyboard_widget(self, checked):
+        if checked:
+            self.showKeyboard()
+        else:
+            self.hideKeyboard()
+
+        config = VisualizationConfig()
+        config.setValue(gremlin.shared_state.keyboard_tab_guid, VisualizationType.Keyboard, checked)
+
+            
+
+    def _update_view(self):
+        ''' rebuids the view '''
+        self.view_container_layout.removeWidget(self.views)
+        self.views = InputViewerArea()
+        self.view_container_layout.addWidget(self.views)
+
+        for widget in self._widget_storage.values():
+            self.views.add_widget(widget)
         
 class InputViewerArea(QtWidgets.QScrollArea):
 
@@ -413,17 +524,20 @@ class InputViewerArea(QtWidgets.QScrollArea):
         :param widget the widget to remove
         """
         self.scroll_layout.removeWidget(widget)
-        widget.hide()
-        del self.widgets[self.widgets.index(widget)]
-        del widget
+        if widget is self.widgets:
+            index = self.widgets.index(widget)
+            del self.widgets[index]
+            del widget
 
     def clear(self):
         ''' clears all widgets '''
-        for widget in self.widget:
-            self.scroll_layout.removeWidget(widget)
-            widget.hide()
+
+        for widget in self.widgets:
+            self.scroll_layout.removeWidget(widget)    
+            widget.unhook()
             del self.widgets[self.widgets.index(widget)]
             del widget
+        self.widgets.clear()
 
 
 _visualization_config = VisualizationConfig()

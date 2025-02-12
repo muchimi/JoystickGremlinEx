@@ -3304,7 +3304,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             el.keyboard_event.connect(self._kb_event_cb)
             # syslog.info("Enable keyboard events")
 
-
+    @QtCore.Slot(object)
     def _kb_event_cb(self, event):
         ''' listen for keyboard modifiers and keyboard events at runtime '''
 

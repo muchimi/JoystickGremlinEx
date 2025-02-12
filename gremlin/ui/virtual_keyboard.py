@@ -4,6 +4,7 @@ from lxml import etree as ElementTree
 from PySide6 import QtWidgets, QtCore, QtGui
 
 import gremlin.base_profile
+import gremlin.event_handler
 from gremlin.input_types import InputType
 from gremlin.input_devices import ButtonReleaseActions
 import gremlin.keyboard
@@ -85,14 +86,14 @@ class QKeyWidget(QtWidgets.QPushButton):
             self.setStyleSheet(self._default_style)
 
   
-    def eventFilter(self, obj, event):
+    def eventFilter(self, widget, event):
         t = event.type()
         if t == QtCore.QEvent.Type.HoverEnter:
             self.hover.emit(self, True)
         elif t == QtCore.QEvent.Type.HoverLeave:
             self.hover.emit(self, False)
 
-        return False
+        return False # super().eventFilter(widget, event)
     
     @property
     def display_name(self):
@@ -102,7 +103,259 @@ class QKeyWidget(QtWidgets.QPushButton):
         return ""
         
 
-    
+class QKeyboardWidget(QtWidgets.QWidget):
+    ''' virtual keyboard widget '''
+    def __init__(self, parent = None):
+
+        ''' creates a full keyboard widget for manual data entry '''
+        super().__init__(parent)
+
+        main_layout = QtWidgets.QVBoxLayout(self)
+        main_layout.setContentsMargins(0,0,0,0)
+        grid_layout = QtWidgets.QGridLayout()
+        main_layout.addLayout(grid_layout)
+        
+        
+        # list of scancodes  https://handmade.network/forums/articles/t/2823-keyboard_inputs_-_scancodes%252C_raw_input%252C_text_input%252C_key_names
+
+        # first row = QUERTY object
+        row_0 = ["","","F13","F14","F15","F16","F17","F18","F19","F20","F21","F22","F23","F24","","mouse_1","mouse_2","mouse_3","","mouse_4","mouse_5","wheel_up","wheel_down"]
+        row_1 = ["Esc","","F1","F2","F3","F4","F5","F6","F7","F8","F9","F10","F11","F12","",["PrtSc","printscreen"],["Scrlck","scrolllock"],["Pause","pause"],"","","","wheel_left","wheel_right"]
+        row_2 = ["`","1","2","3","4","5","6","7","8","9","0","-","=",["Back","backspace"],"",["Ins","insert"],["Home","home"],["PgUp","pageup"],"",["NumLck","numlock"],["/","npdivide"],["*","npmultiply"],["-","npminus"]]
+        row_3 = [["Tab","tab"],"Q","W","E","R","T","Y","U","I","O","P","[","]","\\","",["Del","delete"],"End",["PgDn","pagedown"],"",["7","np7"],["8","np8"],["9","np9"],["+","npplus",1,2]]
+        row_4 = [["CapsLck","capslock"],"A","S","D","F","G","H","J","K","L",";","'",["Enter",2],"","","","","",["4","np4"],["5","np5"],["6","np6"]]
+        row_5 = [["LShift","leftshift"],"Z","X","C","V","B","N","M",",",".","/",["RShift","rightshift"],"","","","","up","","",["1","np1"],["2","np2"],["3","np3"],["Enter","npenter",1,2]]
+        row_6 = [["LCtrl","leftcontrol"],["LWin","leftwin"],["LAlt","leftalt"],["Spacebar","space",6],["RAlt","rightalt2"],["RWin","rightwin"],["RCtrl","rightcontrol"],"","","","left","down","right","",["0/Ins","np0",2],["./Del","npdelete"]]
+
+        shifted_list = [
+            ("`","~"),("1","!"),("2","@"),("3","#"),("4","$"),("5","%"),("6","^"),
+            ("7","&&"),("8","*"),("9","("),("0",")"),("-","_"),("=","+"),
+            ("[","{"),("]","}"),("\\","|"),(";",":"),("'","\""),(",","<"),(".",">"),("/","?")
+            ]
+        
+        shifted_map = {}
+        for normal, shifted in shifted_list:
+            shifted_map[normal] = shifted
+
+
+
+        rows = [row_0,row_1,row_2,row_3,row_4,row_5,row_6]
+
+        current_row = 0
+        self._key_map = {} # map of key (scancode, extended) to key name
+        self._key_widget_map = {} # map of key (scancode, extended) to widget
+        self._hooked = False
+
+        for row in rows:
+            current_column = 0
+            for data in row:
+                if isinstance(data, list):
+                    # combo
+                    found_key = False
+                    found_name = False
+                    found_column = False
+                    found_row = False
+                    key = None
+                    key_name = None
+                    column_span = 1
+                    row_span= 1
+                    for item in data:
+                        if not found_key:
+                            key = item
+                            key_name = key.lower()
+                            found_key = True
+                            continue
+                        if not found_name and isinstance(item, str):
+                            found_name = True
+                            key_name = item
+                            continue
+                        if not found_column and isinstance(item, int):
+                            found_column = True
+                            column_span = item
+                            continue
+                        if not found_row and isinstance(item, int):
+                            found_row = True
+                            row_span = item
+                            continue
+                    key_complex = True
+                else:
+                    key = data
+                    key_name = key.lower()
+                    key_complex = False
+                    column_span = 1
+                    row_span= 1                    
+
+                if key:
+                    if key in shifted_map.keys():
+                        shifted = shifted_map[key] if not key_complex else key
+                    else:
+                        shifted = None
+
+                    icon = None
+                    # handle special key names
+                    tooltip = ""
+                    if key == "mouse_1":
+                        key = "M1"
+                        icon = "mdi.mouse"
+                        toolltip = "Left Mouse Button"
+                    elif key == "mouse_2":
+                        key = "M2"
+                        icon = "mdi.mouse"
+                        toolltip = "Middle Mouse Button"
+                    elif key == "mouse_3":
+                        key = "M3"
+                        icon = "mdi.mouse"
+                        toolltip = "Right Mouse Button"
+                    elif key == "mouse_4":
+                        key = "M4"
+                        icon = "mdi.mouse"
+                        toolltip = "Forward Mouse Button"
+                    elif key == "mouse_5":
+                        key = "M5"
+                        icon = "mdi.mouse"
+                        toolltip = "Back Mouse Button"
+                    elif key == "wheel_up":
+                        key = "MWU"
+                        icon = "mdi.mouse"
+                        toolltip = "Wheel Up"
+                    elif key == "wheel_down":
+                        key = "MWD"
+                        icon = "mdi.mouse"
+                        toolltip = "Wheel Down"
+                    elif key == "wheel_left":
+                        key = "MWL"
+                        icon = "mdi.mouse"    
+                        toolltip = "Tilt Left"  
+                    elif key == "wheel_right":
+                        key = "MWR"
+                        icon = "mdi.mouse"
+                        toolltip = "Tilt Right"   
+                    
+                    widget = QKeyWidget(key)
+                    if icon:
+                        widget.setIcon(load_icon(icon))
+                        widget.setIconSize(QtCore.QSize(14,14))
+
+
+                    action_key = gremlin.keyboard.key_from_name(key_name)
+                    widget.key = action_key # this name must be defined in keybpoard.py 
+                    widget.normal_key = key
+                    widget.shifted_key = shifted if shifted else widget.normal_key
+                    
+                    widget.clicked.connect(self._widget_clicked_cb)
+                    widget.hover.connect(self._key_hover_cb)
+                    #logging.getLogger("system").info(f"{key_name}: {key} {shifted}")
+                    self._key_map[(action_key.scan_code, action_key.is_extended)] = key_name
+                    self._key_widget_map[(action_key.scan_code, action_key.is_extended)] = widget
+
+                    assert key_name not in self._key_widget_map.keys(),f"duplicate key in keyboard map found: {key_name}"
+
+                    
+                    self._key_widget_map[key_name] = widget
+
+                else:
+                    widget = QtWidgets.QLabel(" ")
+                grid_layout.addWidget(widget, current_row, current_column, row_span, column_span)
+                
+                
+                # bump column
+                current_column += column_span
+            # bump next row
+            current_column = 0
+            current_row +=1
+
+
+        self.key_description = QtWidgets.QLabel()
+        main_layout.addWidget(self.key_description)
+
+
+    def _key_hover_cb(self, widget, hover):
+        if hover:
+            self.key_description.setText(widget.display_name)
+        else:
+            self.key_description.setText("")
+
+    def _widget_clicked_cb(self):
+        ''' occurs when the widget is selected'''
+        current_widget = self.sender()
+        if self.solo_select:
+            # deselect all
+            self.deselect()
+
+        if self._select_single:
+            # single select mode
+            source_modifier = False
+            if self._allow_modifiers and current_widget.key.lookup_name in self._modifier_keys:
+                source_modifier = True
+            if not source_modifier:
+                selected_widgets = [widget for widget in self._key_widget_map.values() if widget.selected]
+                for widget in selected_widgets:
+                    if self._allow_modifiers and widget.key.lookup_name in self._modifier_keys:
+                        continue
+                    widget.selected = False # deselect
+
+
+    def hook(self):
+        ''' hooks to the keyboard input '''
+        import gremlin.windows_event_hook
+        if not self._hooked:
+            el = gremlin.event_handler.EventListener()
+            el.keyboard_event.connect(self._keyboard_handler)
+            self.mouse_hook = gremlin.windows_event_hook.MouseHook()
+            self.mouse_hook.register(self._mouse_handler)
+            self._hooked = True
+
+
+    def unhook(self):
+        ''' unhooks keyboard event '''
+        if self._hooked:
+            el = gremlin.event_handler.EventListener()
+            el.keyboard_event.disconnect(self._keyboard_handler)
+            if self.mouse_hook:
+                self.mouse_hook.unregister(self._mouse_handler)
+            self._hooked = False
+
+
+
+    @QtCore.Slot(object)
+    def _keyboard_handler(self, event):
+        
+        key = gremlin.keyboard.KeyMap.from_event(event)
+        map_key = key.index_tuple()
+
+        if map_key is not None and map_key in self._key_widget_map:
+            widget = self._key_widget_map[map_key]
+            widget.selected = event.is_pressed
+
+    def _mouse_handler(self, event):
+        ''' mouse handler '''
+        # mouse special case
+        match event.button_id:
+            case gremlin.types.MouseButton.Left:
+                map_key = "mouse_1"
+            case gremlin.types.MouseButton.Right:
+                map_key = "mouse_2"
+            case gremlin.types.MouseButton.Middle: 
+                map_key = "mouse_3"
+            case gremlin.types.MouseButton.Back: 
+                map_key = "mouse_5"
+            case gremlin.types.MouseButton.Forward: 
+                map_key = "mouse_4"
+            case gremlin.types.MouseButton.WheelRight:
+                map_key = "wheel_right"
+            case gremlin.types.MouseButton.WheelLeft:
+                map_key = "wheel_left"
+            case gremlin.types.MouseButton.WheelUp:
+                map_key = "wheel_up"
+            case gremlin.types.MouseButton.WheelDown:
+                map_key = "wheel_down"
+            case _:
+                return
+            
+        if map_key is not None and map_key in self._key_widget_map:
+            widget = self._key_widget_map[map_key]
+            widget.selected = event.is_pressed
+
 
 class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
     ''' dialog showing a virtual keyboard in which to select key combinations with the keyboard or mouse '''

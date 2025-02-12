@@ -37,7 +37,7 @@ class ControlWidget(gremlin.ui.input_item.AbstractActionWidget):
     ''' control plugin UI '''
 
     def __init__(self, action_data, parent=None):
-        """Creates a new VjoyRemapWidget.
+        """Creates a new system control widget.
 
         :param action_data profile data managed by this widget
         :param parent the parent of this widget

@@ -2291,6 +2291,9 @@ class QDataCheckbox(QtWidgets.QCheckBox):
     def __init__(self, text = None, data = None, parent = None):
         super().__init__(text, parent)
         self._data = data
+        self._ignore_keyboard = False
+        self.installEventFilter(self)
+
 
     @property
     def data(self):
@@ -2300,7 +2303,15 @@ class QDataCheckbox(QtWidgets.QCheckBox):
     def data(self, value):
         self._data = value
 
+    
+    def eventFilter(self, widget, event):
+        t = event.type()
+        if t == QtCore.QEvent.Type.KeyPress and self._ignore_keyboard:
+            return True
+        return super().eventFilter(widget, event)
 
+    def setIgnoreKeyboard(self, value : bool):
+        self._ignore_keyboard = value
 
 class QDataRadioButton(QtWidgets.QRadioButton):
     ''' a radio button that has a data property to track an object associated with the checkbox '''
@@ -3640,9 +3651,17 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
         layout = QtWidgets.QHBoxLayout()
         layout.setContentsMargins(0,0,0,0)
         self.setLayout(layout)
+        self.vis_type = vis_type
+        self._hooked = False
+        
 
+        
 
-
+    def hook(self):
+        ''' hooks events '''
+        if self._hooked:
+            return
+        vis_type = self.vis_type
         el = gremlin.event_handler.EventListener()
         if vis_type == gremlin.types.VisualizationType.AxisCurrent:
             self._create_current_axis()
@@ -3651,12 +3670,31 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
             self._create_temporal_axis()
             el.joystick_event.connect(self._temporal_axis_update)
             for widget in self.widgets:
-                for i in device_data.axis_index_list():
+                for i in self.device_data.axis_index_list():
                     value = gremlin.joystick_handling.get_axis(self.device_guid, i)
                     widget.add_point(value, i)
         elif vis_type == gremlin.types.VisualizationType.ButtonHat:
             self._create_button_hat()
             el.joystick_event.connect(self._button_hat_update)
+
+        self._hooked = True
+
+    def unhook(self):
+        ''' unhooks events '''
+        if not self._hooked:
+            return
+        vis_type = self.vis_type
+        el = gremlin.event_handler.EventListener()
+        if vis_type == gremlin.types.VisualizationType.AxisCurrent:
+            el.joystick_event.disconnect(self._current_axis_update)
+        elif vis_type == gremlin.types.VisualizationType.AxisTemporal:
+            el.joystick_event.disconnect(self._temporal_axis_update)
+        elif vis_type == gremlin.types.VisualizationType.ButtonHat:
+            el.joystick_event.disconnect(self._button_hat_update)
+        self._hooked = False
+
+    def _clear_ui(self):
+        self.unhook()
 
     def minimumSizeHint(self):
         """Returns the minimum size of this widget.

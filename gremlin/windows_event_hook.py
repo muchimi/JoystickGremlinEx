@@ -21,6 +21,7 @@ from ctypes import wintypes
 import threading
 import time
 import gremlin.common
+import gremlin.config
 import gremlin.event_handler
 import gremlin.shared_state
 from gremlin.singleton_decorator import SingletonDecorator
@@ -430,6 +431,12 @@ class MouseHook:
         global g_mouse_callbacks
         g_mouse_callbacks.append(callback)
 
+    def unregister(self, callback):
+        ''' removes a mouse callback '''
+        global g_mouse_callbacks
+        if callback in g_mouse_callbacks:
+            g_mouse_callbacks.remove(callback)
+
     def start(self):
         """Starts the hook if it is not yet running."""
         if self._running:
@@ -450,6 +457,9 @@ class MouseHook:
 
     def _listen(self):
         """Configures the hook and starts listening."""
+        syslog = logging.getLogger("system")
+        verbose = gremlin.config.Configuration().verbose
+        syslog.info("MOUSE: HOOK started")
         self.hook_id = user32.SetWindowsHookExW(
             WH_MOUSE_LL,
             process_mouse_event,
