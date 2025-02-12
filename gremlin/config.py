@@ -1474,7 +1474,7 @@ class Configuration:
         device_name = gremlin.joystick_handling.device_name_from_guid(dinput_device_guid)
         if not dinput_device_guid in gremlin.shared_state.device_type_map:
             # input is missing
-            syslog.warning(f"Config: get last input: Unable to determine input type:  Unable to find device {dinput_device_guid} {device_name} in device map")
+            #syslog.warning(f"Config: get last input: Unable to determine input type:  Unable to find device {dinput_device_guid} {device_name} in device map")
             return (None, None, None)
         
         # if input_id is None:

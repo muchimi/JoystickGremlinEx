@@ -32,6 +32,7 @@ import gremlin.util
 import gremlin.shared_state
 import gremlin.config
 import anytree
+import logging
 
 class SwitchModeWidget(gremlin.ui.input_item.AbstractActionWidget):
 
@@ -43,53 +44,61 @@ class SwitchModeWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _create_ui(self):
         self.mode_selector_widget = gremlin.ui.ui_common.QComboBox()
-        self._update_modes()
         self.mode_selector_widget.currentIndexChanged.connect(self._mode_selected_changed)
         self.main_layout.addWidget(self.mode_selector_widget)
+        self.ec = gremlin.execution_graph.ExecutionContext()
         el = gremlin.event_handler.EventListener()
         el.edit_mode_changed.connect(self._update_modes)
         el.execution_context_changed.connect(self._update_modes)
-        
+        self._update_modes()
+
+            
 
     @QtCore.Slot()
     def _update_modes(self):
         ''' called when mode list needs to be updated '''
         # update the list of available modes 
         with QtCore.QSignalBlocker(self.mode_selector_widget):
-            mode = self.action_data.mode # current mode
+            current_mode = self.action_data.mode # current mode
             self.mode_selector_widget.clear()
-            index = 0
-            select_index = None
+            
 
             # remove the current mode so we cannot switch to ourselves
-            ec = gremlin.execution_graph.ExecutionContext()
-            modes = ec.getModeNames(as_tuple=True, include_current = False)
+            
+            modes = self.ec.getModeNames(as_tuple=True, include_current = False)
             if not modes:
                 # allow to select self if that's the only option
-                modes = ec.getModeNames(as_tuple=True)
+                modes = self.ec.getModeNames(as_tuple=True)
                 
-            print (modes)
-            
-            #modes = gremlin.shared_state.current_profile.get_modes()
-            for entry, display in modes:
-                self.mode_selector_widget.addItem(display, entry)
-                if mode and select_index is None and entry == mode:
+            index = 0
+            select_index = None
+            for mode, display in modes:
+                print (f"Mode: {display} -> {mode}")
+                self.mode_selector_widget.addItem(display, mode)
+                if select_index is None and mode == current_mode and current_mode is not None:
                     select_index = index
                 index += 1
             if select_index is not None:
-                with QtCore.QSignalBlocker(self.mode_selector_widget):
-                    self.mode_selector_widget.setCurrentIndex(select_index)
-            elif self.mode_selector_widget.count():
-                self.mode_selector_widget.setCurrentIndex(0)
-        self._mode_selected_changed()
+                self.mode_selector_widget.setCurrentIndex(select_index)
+        
 
     def _mode_selected_changed(self):
         mode = self.mode_selector_widget.currentData()
         self.action_data.mode = mode
 
     def _populate_ui(self):
-        index = self.mode_selector_widget.findData(self.action_data.mode)
+        assert self.mode_selector_widget.count() > 0
+        mode = self.action_data.mode
+        if mode is None:
+            index = 0
+        else:
+            index = self.mode_selector_widget.findData(mode)
+            if index == -1:
+                index = 0
+
         self.mode_selector_widget.setCurrentIndex(index)
+            
+        
 
 
 class SwitchModeFunctor(gremlin.base_profile.AbstractFunctor):
@@ -147,7 +156,13 @@ class SwitchMode(gremlin.base_profile.AbstractAction):
     
     @mode.setter
     def mode(self, value: str):
-        self._mode = value
+        if value != self._mode:
+            self._mode = value
+            syslog = logging.getLogger("system")
+            verbose = gremlin.config.Configuration().verbose
+            if verbose:
+                input_item = self.get_input_item()
+                syslog.info(f"SWITCHMODE: mode set to: {value}  input: {str(input_item)}")
 
     def display_name(self):
         ''' returns a display string for the current configuration '''
@@ -168,11 +183,12 @@ class SwitchMode(gremlin.base_profile.AbstractAction):
         ]
 
     def _parse_xml(self, node, data = None):
-        self.mode = node.get("name")
+        self._mode = node.get("name")
+        print (f"Read mode: {self._mode} from XML - edit mode: {gremlin.shared_state.edit_mode}")
 
     def _generate_xml(self):
         node = ElementTree.Element("switch-mode")
-        node.set("name", self.mode)
+        node.set("name", self._mode)
         return node
 
     def _is_valid(self):

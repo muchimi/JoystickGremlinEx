@@ -137,6 +137,8 @@ class ExecutionContextInputData():
         self.mode = mode # mode the input is referenced by
         self.modes = modes # modes referencing this input item
 
+
+
 @SingletonDecorator
 class ExecutionContext():
     ''' holds the current execution context '''
@@ -147,13 +149,17 @@ class ExecutionContext():
        el.profile_start.connect(self.reset) # reload data on profile start
        el.profile_changed.connect(self.reset) # reload data on profile change
        el.profile_modes_changed.connect(self.reset) # modes changed
-       self.reset()
+       self._mode_tree = None
 
     def reset(self):
         ''' reloads the execution context to capture changes '''
         syslog = logging.getLogger("system")
         syslog.info("CONTEXT: reload")
+        if not gremlin.shared_state.current_profile:
+            # no profile loaded
+            return 
         self.root = ExecutionGraphNode(ExecutionGraphNodeType.Root) # root node
+
         self._build_execution_tree(self.root)
 
         tree = gremlin.shared_state.current_profile.build_inheritance_tree()
@@ -162,7 +168,7 @@ class ExecutionContext():
         self._mode_tree = root_mode
 
         verbose = gremlin.config.Configuration().verbose_mode_exec
-        #verbose = True
+        verbose = True
         if verbose:
             self.dump()
         
@@ -185,13 +191,15 @@ class ExecutionContext():
     @property
     def modeTree(self):
         ''' gets the mode tree '''
+        if not self._mode_tree:
+            self.reset()
         return self._mode_tree
     
     def searchModeTree(self, mode : str) -> ExecutionModeNode:
         ''' find the node for a mode in the mode tree '''
         syslog = logging.getLogger("system")
         try:
-            nodes = anytree.search.findall_by_attr(self._mode_tree, mode, name="mode")
+            nodes = anytree.search.findall_by_attr(self.modeTree, mode, name="mode")
         except Exception as err:
             syslog.warning(f"SearchModeTree: tree exception: {err}")
             nodes = None
@@ -213,15 +221,17 @@ class ExecutionContext():
             '''
         
         current_mode = gremlin.shared_state.edit_mode # current edit mode
-
+        mode_tree = self.modeTree
+        if not mode_tree:
+            return []
         if as_tuple:
             if include_current:
-                return [(node.mode, node.display) for node in anytree.PreOrderIter(self._mode_tree) if node.mode]
-            return [(node.mode, node.display) for node in anytree.PreOrderIter(self._mode_tree) if node.mode and node.mode != current_mode]
+                return [(node.mode, node.display) for node in anytree.PreOrderIter(mode_tree) if node.mode]
+            return [(node.mode, node.display) for node in anytree.PreOrderIter(mode_tree) if node.mode and node.mode != current_mode]
 
         if include_current:       
-            return [node.mode for node in anytree.PreOrderIter(self._mode_tree) if node.mode]
-        return [node.mode for node in anytree.PreOrderIter(self._mode_tree) if node.mode if node.mode != current_mode]
+            return [node.mode for node in anytree.PreOrderIter(mode_tree) if node.mode]
+        return [node.mode for node in anytree.PreOrderIter(mode_tree) if node.mode if node.mode != current_mode]
 
 
         
@@ -467,7 +477,7 @@ class ExecutionContext():
                                                                 range_action_node.action = range_action
                                                                 range_action_node.mode = mode.name
 
-
+ec = ExecutionContext()
 
 
 
@@ -1018,3 +1028,4 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
 
 
         self._create_transitions(sequence)
+
