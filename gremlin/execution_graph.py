@@ -44,6 +44,8 @@ from gremlin.singleton_decorator import SingletonDecorator
 from PySide6 import QtCore
 from threading import Event
 
+syslog = logging.getLogger("system")
+
 class ExecutionGraphNodeType(Enum):
     ''' types of tree nodes in an execution graph '''
     Root = auto()
@@ -153,7 +155,7 @@ class ExecutionContext():
 
     def reset(self):
         ''' reloads the execution context to capture changes '''
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         syslog.info("CONTEXT: reload")
         if not gremlin.shared_state.current_profile:
             # no profile loaded
@@ -197,7 +199,7 @@ class ExecutionContext():
     
     def searchModeTree(self, mode : str) -> ExecutionModeNode:
         ''' find the node for a mode in the mode tree '''
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         try:
             nodes = anytree.search.findall_by_attr(self.modeTree, mode, name="mode")
         except Exception as err:
@@ -249,7 +251,7 @@ class ExecutionContext():
     def getCallbacks(self, callbacks, key, mode):
         callback_list = []
         verbose = gremlin.config.Configuration().verbose_mode_inputs
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         node = self.searchModeTree(mode)
             
         if node:
@@ -348,7 +350,7 @@ class ExecutionContext():
 
     def dumpExecTree(self):
         # dumps the execution tree
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         syslog.info(f"Execution Tree:")
 
         for pre, fill, node in anytree.RenderTree(self.root, style=anytree.AsciiStyle()):
@@ -356,7 +358,7 @@ class ExecutionContext():
 
     def dumpActive(self):
         ''' dumps active execution nodes ONLY'''
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         syslog.info(f"Execution Tree:")
 
         for pre, fill, node in anytree.RenderTree(self.root, style=anytree.AsciiStyle()):
@@ -365,7 +367,7 @@ class ExecutionContext():
         
 
     def dumpModeTree(self):
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         syslog.info(f"Mode Tree:")
         for pre, fill, node in anytree.RenderTree(self.modeTree, style=anytree.AsciiStyle()):
             syslog.info(f"{pre}{node.display} [{node.mode}]")
@@ -376,7 +378,7 @@ class ExecutionContext():
         mode_source = gremlin.shared_state.current_profile.traverse_mode()
         mode_source.sort(key = lambda x: x[0]) # sort parent to child
         mode_list = [mode for (_,mode) in mode_source if mode] # parent mode first
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         mode_nodes = {}
         for mode in mode_list:
             if not mode:
@@ -666,7 +668,7 @@ class AbstractExecutionGraph(QtCore.QObject):
         
             
             verbose_input = config.verbose_mode_inputs
-            syslog = logging.getLogger("system")
+            # syslog = logging.getLogger("system")
             logTabs = gremlin.shared_state.logTabs(True)
 
             if verbose_input: syslog.info(f"{logTabs}{str(event)}")

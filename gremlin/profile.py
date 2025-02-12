@@ -39,6 +39,8 @@ from gremlin.util import *
 from gremlin.input_types import InputType
 from . import error, joystick_handling
 
+syslog = logging.getLogger("system")
+
 def mode_list(node):
     """Returns a list of all modes based on the given node.
 
@@ -134,7 +136,7 @@ class ProfileConverter:
                 old_version += 1
                     
             else:
-                syslog = logging.getLogger("system")
+                # syslog = logging.getLogger("system")
                 syslog.warning(f"Unexpected version: {old_version} found in profile.  Some unsupported features may not have loaded correctly.")
 
         if converted:
@@ -476,7 +478,7 @@ class ProfileConverter:
         ''' converts to the EX version '''
 
         root.attrib["version"] = "100"
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
 
         config = gremlin.config.Configuration()
         convert_response_curve = config.convert_response_curve
@@ -556,7 +558,7 @@ class ProfileConverter:
             Modified XML root element
         """
         root.attrib["version"] = "10"
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
 
         class GUIDConverter:
 

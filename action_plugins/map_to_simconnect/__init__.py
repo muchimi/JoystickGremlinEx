@@ -51,6 +51,7 @@ import gremlin.curve_handler
 from gremlin.input_types import InputType
 from action_plugins.map_to_simconnect.SimConnectManager import SimConnectManager
 
+syslog = logging.getLogger("system")
 
 class QHLine(QtWidgets.QFrame):
     def __init__(self, parent = None):
@@ -369,7 +370,7 @@ class SimconnectOptions(QtCore.QObject):
     
     def dump(self):
         ''' dumps current data to the log file '''
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         syslog.info("Scanned entry mode configurations:")
         for item in self._aircraft_definitions:
             syslog.info(f"\t{item.display_name} {item.sim_name} mode: {item.mode}")
@@ -698,7 +699,7 @@ class SimconnectOptions(QtCore.QObject):
     def scan_entry(self, folder):
         ''' scans a single aicraft folder entry '''
 
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_simconnect
 
         community_folder = self._getCommunityFolder()
@@ -731,7 +732,7 @@ class SimconnectOptions(QtCore.QObject):
 
     def _read_aicraft_config(self, aircraft_cfg):
         ''' reads a configuration folder and extracts a configuration object '''
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_simconnect
 
         if not aircraft_cfg or not os.path.isfile(aircraft_cfg):
@@ -941,7 +942,7 @@ class SimconnectMonitor():
     
     '''
     def __init__(self):
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         syslog.info("SCMonitor: listening")
         self._manager = SimConnectManager()
         self._manager.sim_aircraft_loaded.connect(self._sim_aircraft_loaded)
@@ -972,7 +973,7 @@ class SimconnectMonitor():
             name = self._manager.current_aircraft_sim_name
             title = self._manager.current_aircraft_title
 
-            syslog = logging.getLogger("system")
+            # syslog = logging.getLogger("system")
 
             syslog.info(f"SCMONITOR: Aircraft changed: mode lookup for {title}/{name}")
 
@@ -1077,7 +1078,7 @@ class SimconnectMonitor():
 
     def _shutdown(self):
         ''' program exit - cleanup monitoring '''
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         syslog.info("SCMONITOR: shutdown")
 
         # remove the validator 
@@ -1096,7 +1097,7 @@ class SimconnectMonitor():
     @QtCore.Slot(str, str)
     def _sim_aircraft_loaded(self, folder = None, name = None, title = None):
         ''' called when a new aicraft has been detected '''
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         syslog.info(f"SCMONITOR: Aircraft changed detected: {title}/{name}")
         mode = self.getStartupMode() # get the mode to use for this profile
         if mode:
@@ -1106,14 +1107,14 @@ class SimconnectMonitor():
     @QtCore.Slot()
     def _sim_start(self):
         ''' sim started event '''
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         syslog.info(f"SCMONITOR: sim start")
 
 
     @QtCore.Slot()
     def _sim_stop(self):
         ''' sim stop event '''
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         syslog.info(f"SCMONITOR: sim stop")        
 
     def _mode_change_validator(self, new_mode) -> bool:
@@ -1123,7 +1124,7 @@ class SimconnectMonitor():
             # allow mode change while at edit/design time
             return True
         
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         syslog.info(f"SCMONITOR: Profile mode change request to: {new_mode}")
         mode = self.getStartupMode()
         if mode and mode != new_mode and self._options.auto_mode_lock:
@@ -1146,7 +1147,7 @@ class SimconnectMonitor():
     #     ''' triggered on runtime mode changes '''
 
     #     if self._enabled:
-    #         syslog = logging.getLogger("system")
+    #         # syslog = logging.getLogger("system")
     #         syslog.info(f"SCMONITOR: Profile mode change request to mode [{new_mode}]")
             
     #         mode = self.getStartupMode()
@@ -2189,7 +2190,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         #import gremlin.gated_handler
 
         verbose = gremlin.config.Configuration().verbose_mode_detailed
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         if verbose:
             syslog.info(f"Simconnect UI for: {self.action_data.hardware_input_type_name}  {self.action_data.hardware_device_name} input: {self.action_data.hardware_input_id}")
 
@@ -2904,7 +2905,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 
         verbose = gremlin.config.Configuration().verbose_mode_simconnect
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         if self.input_type == InputType.JoystickAxis:
             
             raw_value = self.action_data.get_raw_axis_value()
@@ -3046,7 +3047,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _command_changed_cb(self, index):
         ''' called when selected command changes '''
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_simconnect
         command = self._command_selector_widget.currentText()
         if verbose: syslog.info(f"Command changed to: {command}")
@@ -3056,7 +3057,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     @QtCore.Slot()
     def _lvar_changed_cb(self):
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_simconnect
         command = self._lvar_command_widget.text()
         if verbose: syslog.info(f"Command changed to: {command}")
@@ -3522,7 +3523,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         verbose_details = False # config.verbose_mode_details
         #verbose = True
         manager : SimConnectManager = self.manager
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
 
 
         if not self.manager.is_running:
@@ -3693,7 +3694,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
             self.manager.calculate(self.action_data.command)
             time.sleep(self.action_data.auto_repeat_interval)
 
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         if verbose_details: syslog.info("autorepeat: thread stop")
 
     

@@ -569,7 +569,7 @@ class SimConnectManager(QtCore.QObject):
     @QtCore.Slot()
     def _bridge_alive_cb(self):
         # indicates the simconnect bridge is connected and responding to commands
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         syslog.info("Simconnect Event: bridge alive")
         self._bridge_alive = True
         self.alive.emit()
@@ -788,7 +788,7 @@ class SimConnectManager(QtCore.QObject):
     def _lvars_updated_cb(self, lvars):
         ''' gets the list of lvars when they are available '''
         self._lvars = lvars
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         # save the lvars
         xml_source = self._lvars_xml
         try:
@@ -1012,7 +1012,7 @@ class SimConnectManager(QtCore.QObject):
 
     def _aircraft_loaded_internal_cb(self, folder, name):
         # decode the data into useful bits
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_simconnect
         title = self.get_aircraft_title(True)
         self._aircraft_title = title
@@ -1060,7 +1060,7 @@ class SimConnectManager(QtCore.QObject):
             return
         
         self._connect_in_progress = True
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_simconnect
 
         if verbose: syslog.info(f"SIMCONNECT MGR: reconnect...")

@@ -39,14 +39,15 @@ from PySide6 import QtWidgets, QtCore, QtGui
 # List of all joystick devices
 _joystick_devices = [] # all devices
 
-# map of physical devices by their GUID
-_joystick_device_guid_map = {}
+_joystick_device_guid_map = {}  # map of DeviceSummary objects keyed by dInput GUID
 
 # Joystick initialization lock
 _joystick_init_lock = threading.Lock()
 
 # initialized flag
 _joystick_initialized = False
+
+syslog = logging.getLogger("system")
 
 class VJoyProxy:
 
@@ -253,24 +254,51 @@ def vjoy_id_from_guid(guid : str | dinput.GUID, not_found_id = 1):
     logging.getLogger("system").error(
         f"Could not find vJoy matching guid {str(guid)}"
     )
+    syslog.warning(f"getVjoyFromGuid: vjoy {guid} not found")
     return not_found_id
 
-def device_name_from_guid(guid : str | dinput.GUID) -> str:
+def registerSpecialDevice(dev : DeviceSummary):
+    ''' adds a special device to the tracking list '''
+    assert (_joystick_initialized)
+    device_guid = dev.device_guid
+    device_id = dev.device_id
+    if not device_id in _joystick_device_guid_map:
+        _joystick_device_guid_map[device_guid] = dev
+        _joystick_device_guid_map[device_id] = dev
+        verbose = gremlin.config.Configuration().verbose
+        if verbose:
+            syslog.info("SYSTEM: register special device")
+            syslog.info(f"\t{dev.device_id} -> {dev.name}")
+
+
+def device_name_from_guid(device_guid : str | dinput.GUID) -> str:
     ''' gets device name from GUID '''
     assert (_joystick_initialized)
-    if isinstance(guid, str):
-        guid = util.parse_guid(guid) # convert to dinput GUID
-    if guid in _joystick_device_guid_map.keys():
-        return _joystick_device_guid_map[guid].name
+    if device_guid in _joystick_device_guid_map:
+        return _joystick_device_guid_map[device_guid].name
+    syslog.warning(f"getDeviceName: {str(device_guid)} - name not found")
+    verbose = gremlin.config.Configuration().verbose
+    if verbose:
+        syslog.info("\tKnown devices:")
+        for guid in known_devices():
+            syslog.info(f"\t\t{str(guid)} {_joystick_device_guid_map[guid].name}")
     return None
     
-def device_info_from_guid(guid : str | dinput.GUID) -> DeviceSummary:
+def known_devices() -> list:
+    ''' gets the list of device GUID (strings) known to GremlinEx '''
+    return [guid for guid in _joystick_device_guid_map.keys() if isinstance(guid, str)]
+
+def device_info_from_guid(device_guid : str | dinput.GUID) -> DeviceSummary:
     ''' gets physical device information '''
     assert (_joystick_initialized)
-    if isinstance(guid, str):
-        guid = util.parse_guid(guid) # convert to dinput GUID 
-    if guid in _joystick_device_guid_map.keys():
-        return _joystick_device_guid_map[guid]
+    if device_guid in _joystick_device_guid_map:
+        return _joystick_device_guid_map[device_guid]
+    syslog.warning(f"getDeviceInfo: {device_guid} - info not found")
+    verbose = gremlin.config.Configuration().verbose
+    if verbose:
+        syslog.info("\tKnown devices:")
+        for guid in known_devices():
+            syslog.info(f"\t\t{guid} {_joystick_device_guid_map[guid].name}")
     return None
 
 def vjoy_info_from_vjoy_id(id : int ) -> DeviceSummary:
@@ -279,14 +307,18 @@ def vjoy_info_from_vjoy_id(id : int ) -> DeviceSummary:
     for dev in vjoy_devices():
         if dev.vjoy_id == id:
             return dev
+    syslog.warning(f"getVjoyInfo: vjoy {id} not found")
+    verbose = gremlin.config.Configuration().verbose
+    if verbose:
+        syslog.info("\tKnown devices:")
+        for dev in vjoy_devices():
+            syslog.info(f"\t\t{str(dev.device_guid)} vjoy id: {dev.vjoy_id}")
     return None
 
-def is_device_connected(guid : str | dinput.GUID) -> bool:
+def is_device_connected(device_guid : str | dinput.GUID) -> bool:
     ''' true if the device is connected (reported in) '''
     assert (_joystick_initialized)
-    if isinstance(guid, str):
-        guid = util.parse_guid(guid) # convert to dinput GUID 
-    return guid in _joystick_device_guid_map.keys()
+    return device_guid in _joystick_device_guid_map.keys()
 
 
 
@@ -364,11 +396,10 @@ def joystick_devices_initialization():
         syslog.warning(f"INIT: DirectX reports no hardware devices detected")
         
 
-    # Process all connected devices in order to properly initialize the
-    # device registry
+    # Process all connected devices in order to properly initialize the device registry
     devices = []
     _joystick_devices = []
-    _joystick_device_guid_map = {}
+    _joystick_device_guid_map.clear()
     virtual_count = 0
     real_count = 0
     virtual_devices = {}
@@ -377,7 +408,8 @@ def joystick_devices_initialization():
         devices.append(dev)
         syslog.info(f"\tindex: [{device_index}] {str(dev)}")
         _joystick_devices.append(dev)
-        _joystick_device_guid_map[dev.device_guid] = dev
+        _joystick_device_guid_map[dev.device_guid] = dev # key by GUID
+        _joystick_device_guid_map[dev.device_id] = dev # key by string ID
         if dev.is_virtual: 
             virtual_count += 1
             virtual_devices[dev.hashkey] = dev

@@ -55,6 +55,7 @@ from gremlin.singleton_decorator import SingletonDecorator
 from gremlin.types import HatDirection
 from dinput import DeviceSummary
 
+syslog = logging.getLogger("system")
 class WidgetTracker():
 
     def __init__(self):
@@ -288,7 +289,7 @@ class StateTracker():
         ''' updates the state of the widget'''
         if not isinstance(device_guid, str):
             device_guid = str(device_guid)
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         device_name = gremlin.shared_state.get_device_name(device_guid)
         if device_guid in self._button_cache:
             if input_type in self._button_cache[device_guid]:
@@ -1587,7 +1588,7 @@ class ModeWidget(QtWidgets.QWidget):
 
     def select_mode(self, mode: str):
         ''' selects the mode without firing a change event - ignored if the mode doesn't exist '''
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         syslog.info(f"Mode: set edit selector mode to [{mode}]")
         index =  self.edit_mode_selector.findData(mode)
         if index >= 0:
@@ -1670,7 +1671,7 @@ class ModeWidget(QtWidgets.QWidget):
         """
         # tell the UI about the mode change
         new_mode = self.mode_list[idx]
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         syslog.info(f"Mode: edit selector request change to [{new_mode}]")
         self.edit_mode_changed.emit(new_mode)
 
@@ -1888,7 +1889,7 @@ class InputListenerWidget(QtWidgets.QFrame):
 
         key = gremlin.keyboard.KeyMap.from_event(event)
 
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_keyboard
         if verbose: syslog.info(f"LISTEN: Keyboard event: {event} {key}")
 
@@ -2690,7 +2691,7 @@ class ButtonStateWidget(QtWidgets.QWidget):
             # already connected
             return
         if self._device_guid:
-            syslog = logging.getLogger("system")
+            # syslog = logging.getLogger("system")
             device_name = gremlin.shared_state.get_device_name(device_guid)
             if isinstance(device_guid, str):
                 device_guid = gremlin.util.parse_guid(device_guid)
@@ -2729,7 +2730,7 @@ class ButtonStateWidget(QtWidgets.QWidget):
         if not self._handler_connected:
             # not connected
             return 
-        # syslog = logging.getLogger("system")
+        # # syslog = logging.getLogger("system")
         # el = gremlin.event_handler.EventListener()
         if device_guid:
             if isinstance(device_guid, str):
@@ -3197,7 +3198,7 @@ class AxisStateWidget(QtWidgets.QWidget):
             input_id = self._input_id
             verbose = gremlin.config.Configuration().verbose_mode_inputs
             if verbose: 
-                syslog = logging.getLogger("system")
+                # syslog = logging.getLogger("system")
                 syslog.info(f"AxisState: {device_name} axis {str(input_id)} connect")
             _state_tracker.registerAxisState(self, self._device_guid, self._input_type, self._input_id)
             self._handler_connected = True
@@ -3214,7 +3215,7 @@ class AxisStateWidget(QtWidgets.QWidget):
         if not self._handler_connected:
             # not connected 
             return
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         el = gremlin.event_handler.EventListener()
         if device_guid:
             if isinstance(device_guid, str):
@@ -5874,7 +5875,7 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
     def setRange(self, min_value, max_value):
         ''' updates the range min and max values '''
         if min_value == max_value:
-            syslog = logging.getLogger("system")
+            # syslog = logging.getLogger("system")
             syslog.error(f"RANGE WIDGET: cannot set range to the same value: {min_value:0.3f} - skipping")
             return
         with QtCore.QSignalBlocker(self._command_min_widget):
@@ -5920,7 +5921,7 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
             # not a range item, make max the same as min
             max_value = min_value
         
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_detailed
         min_cmd = self._command_min_widget.value()
         max_cmd = self._command_max_widget.value()

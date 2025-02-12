@@ -64,7 +64,7 @@ import gremlin.util
 import vjoy
 import vjoy.vjoy
 
-  
+syslog = logging.getLogger("system")
 
 ### OSC handler start ------------------------------------------------------- 
 # Adapted from: Python-OSC  https://github.com/attwad/python-osc 
@@ -1579,7 +1579,7 @@ class OscClient():
         if server_port:
             self._output_port = server_port
         
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         if self._server_ip is not None and self._output_port is not None:
             self._client = UDPClient(self._server_ip, self._output_port)
             self._started = True
@@ -1591,7 +1591,7 @@ class OscClient():
         if self._started:
             self._client = None
             self._started = False
-            syslog = logging.getLogger("system")
+            # syslog = logging.getLogger("system")
             syslog.info("OSC client stop")
         
 
@@ -1609,7 +1609,7 @@ class OscClient():
                 else:
                     builder.add_arg(value, OscMessageBuilder.ARG_TYPE_FALSE)
             else:
-                syslog = logging.getLogger("system")
+                # syslog = logging.getLogger("system")
                 syslog.warning(f"OSC Argument: don't know how to handle {value} {type(value).__name__}")
 
 
@@ -1622,7 +1622,7 @@ class OscClient():
         
         
         '''
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_osc
         if not self._started:
             return # not started
@@ -1726,7 +1726,7 @@ class OscServer():
             self._server_thread.start()
             self._running = True
 
-            syslog = logging.getLogger("system")
+            # syslog = logging.getLogger("system")
             syslog.info(f"OSC: start {self._host_ip} port {self._input_port}")        
 
 
@@ -1805,7 +1805,7 @@ class OscInterface(QtCore.QObject):
         verbose = config.verbose_mode_osc
         value = config.osc_input_port
         if verbose:
-            syslog = logging.getLogger("system")
+            # syslog = logging.getLogger("system")
             syslog.info(f"OSC: input port changed to: {value}")
         self.input_port = value
 
@@ -1815,7 +1815,7 @@ class OscInterface(QtCore.QObject):
         verbose = config.verbose_mode_osc
         value = config.osc_output_port
         if verbose:
-            syslog = logging.getLogger("system")
+            # syslog = logging.getLogger("system")
             syslog.info(f"OSC: output port changed to: {value}")
         self.output_port = value
 
@@ -1825,7 +1825,7 @@ class OscInterface(QtCore.QObject):
         verbose = config.verbose_mode_osc
         value = config.osc_host
         if verbose:
-            syslog = logging.getLogger("system")
+            # syslog = logging.getLogger("system")
             syslog.info(f"OSC: output host changed to: {value}")
 
         self.target_server = value
@@ -1841,7 +1841,7 @@ class OscInterface(QtCore.QObject):
             self._client_pool[key] = client
             verbose = gremlin.config.Configuration().verbose_mode_osc
             if verbose:
-                syslog = logging.getLogger("system")
+                # syslog = logging.getLogger("system")
                 syslog.info(f"OSC: register client {key}")
 
 
@@ -1855,7 +1855,7 @@ class OscInterface(QtCore.QObject):
                 client.stop()
                 verbose = gremlin.config.Configuration().verbose_mode_osc
                 if verbose:
-                    syslog = logging.getLogger("system")
+                    # syslog = logging.getLogger("system")
                     syslog.info(f"OSC: unregister client {key}")
                 del self._client_pool[key]
 
@@ -3370,7 +3370,7 @@ class InputOscClient(QtCore.QObject):
         import gremlin.execution_graph
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_osc
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         self._update_messages()
        
         if self._osc_map:
@@ -3417,7 +3417,7 @@ class InputOscClient(QtCore.QObject):
 
     def unregisterInput(self, input_item):
         ''' unregisters an OSC input item '''
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_osc
         if isinstance(input_item, OscInputItem):
             message_key = input_item.message_key

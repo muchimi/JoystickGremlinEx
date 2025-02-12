@@ -45,6 +45,8 @@ kUplinkRequest = 6125
 kDownlinkRequest = 6126
 kPacketDataSize = 1024
 
+syslog = logging.getLogger("system")
+
 class BridgeCommands(IntEnum):
     ExecuteCalculatorCode = 0
     GetNamedVariable = 1
@@ -107,7 +109,7 @@ class SimConnectBridge(QtCore.QObject):
                 self.ping()
             return
         
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         try:
             syslog.info(f"SIMCONNECT BRIDGE: starting...")
             self.sm.register_client_data_handler(self.client_data_callback_handler)
@@ -146,7 +148,7 @@ class SimConnectBridge(QtCore.QObject):
         if not self._started:
             return
         if self.sm.is_connected and self._alive:
-            syslog = logging.getLogger("system")
+            # syslog = logging.getLogger("system")
             syslog.info("SIMCONNECT BRIDGE: stop")
             try:
                 self.sm.unregister_client_data_handler(self.client_data_callback_handler)
@@ -177,7 +179,7 @@ class SimConnectBridge(QtCore.QObject):
     @QtCore.Slot()
     def _sync_bridge(self):
         ''' request to sync the bridge '''
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         syslog.info("SIMCONNECT BRIDGE: sync requested")
         if not self.connected:
             # not started or alive
@@ -191,7 +193,7 @@ class SimConnectBridge(QtCore.QObject):
     # simconnect library callback
     def client_data_callback_handler(self, pData):
         ''' processes received simconnect data to see if it came from mobiflight '''
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         client_data = cast(pData, POINTER(SIMCONNECT_RECV_CLIENT_BYTE_DATA)).contents
         #client_data = copy.deepcopy(data)
 
@@ -254,7 +256,7 @@ class SimConnectBridge(QtCore.QObject):
                 
     def execute_calculator_code(self, command):
         ''' executes an RPN expression '''
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         #verbose = gremlin.config.Configuration().verbose_mode_simconnect
         verbose = False
         if self._wait_event.is_set():
@@ -289,7 +291,7 @@ class SimConnectBridge(QtCore.QObject):
 
     def get_variable(self, command):
         ''' gets a named variables '''
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_simconnect
         try:
             id = self._get_next_id() # id is sequential so it's unique for each call and will roundrobin
@@ -311,7 +313,7 @@ class SimConnectBridge(QtCore.QObject):
 
     def ping(self):
         ''' sends the ping command '''
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_simconnect
         if self._alive:
             # already alive, ignore
@@ -323,7 +325,7 @@ class SimConnectBridge(QtCore.QObject):
             self._alive_thread.start()
 
     def _ping_runner(self):
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_simconnect
         try:
             while self._connect_in_progress:    
@@ -355,7 +357,7 @@ class SimConnectBridge(QtCore.QObject):
 
     def get_lvars(self):
         ''' gets the list of lvars from the sim '''
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_simconnect
         try:
             id = self._get_next_id() # id is sequential so it's unique for each call and will roundrobin

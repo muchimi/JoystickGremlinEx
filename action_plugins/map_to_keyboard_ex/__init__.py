@@ -29,6 +29,7 @@ import gremlin.event_handler
 from gremlin.input_types import InputType
 from gremlin.input_devices import ButtonReleaseActions
 import gremlin.config
+import gremlin.keyboard
 import gremlin.macro
 import gremlin.shared_state
 import gremlin.ui.ui_common
@@ -44,6 +45,9 @@ import threading
 import time
 from gremlin.util import log_info
 import gremlin.util
+import gremlin.input_devices
+
+syslog = logging.getLogger("system")
 
 class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
@@ -336,7 +340,7 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
     def __init__(self, action, parent = None):
         super().__init__(action, parent)
 
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_keyboard
         verbose = True
 
@@ -444,8 +448,9 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
 
 
     def process_event(self, event, value):
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_keyboard
+      
         if event.is_axis or value.current or event.is_pressed:
             # joystick values or virtual button
             # verbose = True
@@ -499,9 +504,10 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
                             self.registerMacro(id)
                         else:
                             # send direct
+                            key : gremlin.keyboard.Key
                             for key in self._press_keys:
                                 if verbose: syslog.info(f"send key press: {key}")
-                                gremlin.macro._send_key_down(key)
+                                gremlin.keyboard.send_key_down(key)
 
                     if event.is_pressed and auto_release: 
                         id = gremlin.macro.MacroManager().queue_macro(self.press)
@@ -530,7 +536,7 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
                             # not using macros
                             for key in self._release_keys:
                                 if verbose: syslog.info(f"send key release: {key}")
-                                gremlin.macro._send_key_up(key)
+                                gremlin.keyboard.send_key_up(key)
 
             self._ar_running = False
             self._ar_event.set()

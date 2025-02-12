@@ -1539,7 +1539,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         data = self.action_data.target_step_list
         count = len(data)
         if count >= 20:
-            syslog = logging.getLogger("system")
+            # syslog = logging.getLogger("system")
             syslog.error(f"VJOY: unable to add more than 20 steps.")
             return
         if count > 1:
@@ -2895,7 +2895,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
     def profile_start(self):
         # setup initial state
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_joystick
         if self.input_type in VJoyWidget.input_type_buttons:
             # set start button state
@@ -3010,7 +3010,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
                 value = self.action_data.get_filtered_axis_value(curves = curves)
 
-                # syslog = logging.getLogger("system")
+                # # syslog = logging.getLogger("system")
                 # syslog.info(f"VjoyRemap: raw {raw_value:0.3f} received: {received:0.3f}  computed: {value:0.3f}  ")
 
             action_value = gremlin.actions.Value(value)
@@ -3021,14 +3021,17 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         ''' runs when a joystick even occurs like a button press or axis movement when a profile is running '''
         (is_local, is_remote) = input_devices.remote_state.state
         usage_data = gremlin.joystick_handling.VJoyUsageState()
-        verbose = gremlin.config.Configuration().verbose_mode_inputs
-        syslog = logging.getLogger("system")
+        verbose = gremlin.config.Configuration().verbose_mode_outputs
+        # syslog = logging.getLogger("system")
         if event.force_remote:
             # force remote mode on if specified in the event
             is_remote = True
             is_local = False
 
         auto_complete = True # assume the functor completes this pass
+
+        #if verbose: syslog.info(f"VJOY MAPPER: local: {is_local} remote: {is_remote}")
+
 
 
         if event.is_axis: # self.input_type == InputType.JoystickAxis:
@@ -3157,8 +3160,12 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                         if is_remote or is_paired:
                             self.remote_client.send_button(self.vjoy_device_id, self.vjoy_input_id, True, force_remote = force_remote )
                 else:
+                    auto_release = False
+                    is_pressed = action_value.current
+                    if is_pressed:
+                        auto_release = event.event_type in [InputType.Keyboard, InputType.KeyboardLatched, InputType.Midi, InputType.OpenSoundControl] and self.needs_auto_release
 
-                    if event.event_type in [InputType.JoystickButton, InputType.Keyboard, InputType.KeyboardLatched, InputType.Midi, InputType.OpenSoundControl] and event.is_pressed and self.needs_auto_release:
+                    if auto_release:
                         if verbose: syslog.info(f"VjoyRemap: remap setup autorelease for {str(event)}")
                         input_devices.ButtonReleaseActions().register_button_release(
                             (self.vjoy_device_id, self.vjoy_input_id),
@@ -3169,11 +3176,13 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                             activate_on = False # released
                         )
 
-                    #if event.is_pressed:
-                    if is_local:
-                        joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = action_value.current
-                    if is_remote or is_paired:
-                        self.remote_client.send_button(self.vjoy_device_id, self.vjoy_input_id, action_value.current, force_remote = is_paired )
+
+                    trigger = is_pressed or (not auto_release and not is_pressed)  # trigger on press, or on release unless an auto-release was already registered for the release action to avoid double releases
+                    if trigger:
+                        if is_local:
+                            joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = is_pressed
+                        if is_remote or is_paired:
+                            self.remote_client.send_button(self.vjoy_device_id, self.vjoy_input_id, is_pressed, force_remote = is_paired )
 
 
 
@@ -3764,9 +3773,6 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         """
 
         try:
-
-            syslog = logging.getLogger("system")
-
 
 
             vjoy_id = safe_read(node, "vjoy", int)

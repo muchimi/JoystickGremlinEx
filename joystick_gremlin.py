@@ -126,6 +126,7 @@ APPLICATION_VERSION = f"13.40.16ex ({APPLICATION_BASE})"
 
 # the main ui
 ui = None
+syslog = logging.getLogger("system")
 
 from gremlin.singleton_decorator import SingletonDecorator
 
@@ -394,7 +395,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
 
         
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
 
         device_name = gremlin.shared_state.get_device_name(device_guid)
         if not device_name:
@@ -456,7 +457,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         self._tab_name_map.clear()
         
         verbose = gremlin.config.Configuration().verbose_mode_device
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         if verbose: syslog.info("UI: tab reindex")
         for index in range(self.ui.devices.count()):
             data = self.ui.devices.tabData(index)
@@ -1479,7 +1480,7 @@ class GremlinUi(QtWidgets.QMainWindow):
     
     @QtCore.Slot(str, object)
     def _module_state_changed(self, key, state : object):
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         syslog.info(f"module state: {key} state: {state}")
         if key in self._status_bar_module_states:
             label, value, callback = self._status_bar_module_states[key]
@@ -1900,7 +1901,13 @@ class GremlinUi(QtWidgets.QMainWindow):
                 DeviceType.to_string(DeviceType.Keyboard)
             )
 
-            device_guid = str(dinput.GUID_Keyboard)
+            device_guid = str(gremlin.shared_state.keyboard_tab_guid)
+            dev = dinput.DeviceSummary()
+            dev.name = "Keyboard"
+            dev.device_guid = gremlin.shared_state.keyboard_tab_guid
+            dev.device_id = device_guid
+            dev.is_special = True
+            gremlin.joystick_handling.registerSpecialDevice(dev)
             widget = self.getWidget(device_guid)
             if not widget:
                 widget = gremlin.ui.keyboard_device.KeyboardDeviceTabWidget(
@@ -1921,7 +1928,13 @@ class GremlinUi(QtWidgets.QMainWindow):
             
             # =======================================================
             # Create MIDI tab
-            device_guid = str(gremlin.ui.midi_device.MidiDeviceTabWidget.device_guid)
+            device_guid = str(gremlin.shared_state.midi_tab_guid)
+            dev = dinput.DeviceSummary()
+            dev.name = "MIDI"
+            dev.device_guid = gremlin.shared_state.midi_tab_guid
+            dev.device_id = device_guid
+            dev.is_special = True
+            gremlin.joystick_handling.registerSpecialDevice(dev)
             midi_device_guid = device_guid
             if midi_enabled:
                 device_profile = self.profile.get_device_modes(
@@ -1952,8 +1965,14 @@ class GremlinUi(QtWidgets.QMainWindow):
 
             # =======================================================
             # Create OSC tab
-            device_guid = str(gremlin.ui.osc_device.OscDeviceTabWidget.device_guid)
+            device_guid = str(gremlin.shared_state.osc_tab_guid)
             osc_device_guid = device_guid
+            dev = dinput.DeviceSummary()
+            dev.name = "OSC"
+            dev.device_guid = gremlin.shared_state.osc_tab_guid
+            dev.device_id = device_guid
+            dev.is_special = True
+            gremlin.joystick_handling.registerSpecialDevice(dev)
             if osc_enabled:
                 device_profile = self.profile.get_device_modes(
                     gremlin.ui.osc_device.OscDeviceTabWidget.device_guid,
@@ -1986,6 +2005,12 @@ class GremlinUi(QtWidgets.QMainWindow):
             # create mode control tab
             guid = gremlin.shared_state.mode_tab_guid
             device_guid = str(guid)
+            dev = dinput.DeviceSummary()
+            dev.name = "MODE"
+            dev.device_guid = guid
+            dev.device_id = device_guid
+            dev.is_special = True
+            gremlin.joystick_handling.registerSpecialDevice(dev)
 
             device_profile = self.profile.get_device_modes(
                     guid,
@@ -2058,6 +2083,12 @@ class GremlinUi(QtWidgets.QMainWindow):
 
             device_guid = str(gremlin.shared_state.settings_tab_guid)
             device_name = "Settings"
+            dev = dinput.DeviceSummary()
+            dev.name = device_name
+            dev.device_guid = gremlin.shared_state.settings_tab_guid
+            dev.device_id = device_guid
+            dev.is_special = True
+            gremlin.joystick_handling.registerSpecialDevice(dev)
             if device_name:
                 
                 widget = self.getWidget(device_guid)
@@ -2077,6 +2108,12 @@ class GremlinUi(QtWidgets.QMainWindow):
             # Add a plugin custom modules tab
             device_guid = str(gremlin.shared_state.plugins_tab_guid)
             device_name = "Plugins"
+            dev = dinput.DeviceSummary()
+            dev.name = device_name
+            dev.device_guid = gremlin.shared_state.plugins_tab_guid
+            dev.device_id = device_guid
+            dev.is_special = True
+            gremlin.joystick_handling.registerSpecialDevice(dev)
             widget = self.getWidget(device_guid)
             if not widget:
                 widget = gremlin.ui.user_plugin_management.ModuleManagementController(self.profile)
@@ -2304,7 +2341,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         # update the UI widgets that listen to inputs to disable the ones not visible 
         device_guid, input_type, input_id = self.restore_input
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         verbose = self.config.verbose
         
         if device_guid is None:
@@ -2464,7 +2501,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         self._last_input_change_timestamp = time.time()
 
         
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         input_id = restore_input_id
         input_type = restore_input_type
 
@@ -2586,7 +2623,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         ''' called when an input changes '''
         current_device_guid, current_input_type, current_input_id = gremlin.shared_state.get_last_input_id()
         if current_device_guid != device_guid or current_input_type != input_type or current_input_id != input_id:
-            syslog = logging.getLogger("system")
+            # syslog = logging.getLogger("system")
             verbose = self.config.verbose_mode_device
             if verbose: 
                 device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
@@ -2823,7 +2860,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             while self._device_change_queue > 0:
                 verbose = gremlin.config.Configuration().verbose_mode_device
                 try:
-                    syslog =logging.getLogger("system")
+                    # syslog =logging.getLogger("system")
                     if verbose:
                         syslog.info(f"Device change begin")
 
@@ -2899,7 +2936,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
 
     def _get_process_mode(self, process_path):
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_process
         if process_path in self._process_runtime_map:
             mode = self._process_runtime_map[process_path]
@@ -2928,7 +2965,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         config = gremlin.config.Configuration()
 
         verbose = config.verbose_mode_process
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
 
         if not self.current_process_path:
             self.current_process_path = new_process_path
@@ -3203,7 +3240,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             is_running = gremlin.shared_state.is_running
             runtime_mode = gremlin.shared_state.runtime_mode
 
-            syslog = logging.getLogger("system")
+            # syslog = logging.getLogger("system")
 
 
             edit_mode = gremlin.shared_state.edit_mode
@@ -3633,7 +3670,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         """
         config = gremlin.config.Configuration()
         option_restore_mode = config.restore_profile_mode_on_start or gremlin.shared_state.current_profile.get_restore_mode()
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         syslog.info(f"RUNTIME MODE: Runtime mode determination for profile [{self.profile.name}]")
 
         if option_restore_mode:
@@ -3692,7 +3729,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         gremlin.shared_state.runtime_mode = mode
         if self._active_process_path:
             verbose = gremlin.config.Configuration().verbose_mode_process
-            syslog = logging.getLogger("system")
+            # syslog = logging.getLogger("system")
             
             if verbose:
                 base_name = os.path.basename(self._active_process_path)
@@ -4020,7 +4057,7 @@ if __name__ == "__main__":
 
 
 
-    syslog = logging.getLogger("system")
+    # syslog = logging.getLogger("system")
 
     syslog.info(F"Joystick Gremlin Ex version {Version().version}")
 

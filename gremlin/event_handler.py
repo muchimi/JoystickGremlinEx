@@ -716,7 +716,7 @@ class EventListener(QtCore.QObject):
 	def terminate(self):
 		"""Stops the loop from running."""
 
-		syslog = logging.getLogger("system")
+		# syslog = logging.getLogger("system")
 		syslog.info("EVENT: shutdown requested")
 		gremlin.shared_state.terminating = True # tell UI we're terminating to avoid uncessary updates if we're shutting down
 		self._running = False
@@ -896,7 +896,7 @@ class EventListener(QtCore.QObject):
 			return
 		
 		self._process_device_change_lock = True
-		syslog = logging.getLogger("system")
+		# syslog = logging.getLogger("system")
 
 		try:
 			
@@ -2035,7 +2035,7 @@ class EventHandler(QtCore.QObject):
 
 			verbose = config.Configuration().verbose_mode_osc
 			if verbose and not callback_list:
-				syslog = logging.getLogger("system")
+				# syslog = logging.getLogger("system")
 				syslog.info(f"OSC: no callbacks found for key: [{key}] mode: [{self.runtime_mode}]")
 
 		# Filter events when the system is paused

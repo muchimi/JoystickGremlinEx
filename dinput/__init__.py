@@ -460,6 +460,7 @@ class DeviceSummary:
             logical_count = 0
             self.is_input_enabled = False # do not allow usage as an input device
             self.vjoy_id = -1
+        self.is_special = False
         
 
     @property

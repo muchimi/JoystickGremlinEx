@@ -43,6 +43,7 @@ from gremlin.util import get_guid
 import gremlin.input_types
 import vjoy.vjoy
 
+
 from . import error
 
 import win32api
@@ -335,7 +336,7 @@ class RemoteControl():
             return
         
         self._mode = value
-        syslog.debug(f"Remote control status: local: {self._is_local} remote: {self._is_remote}")
+        syslog.info(f"SYSTEM: Remote control status: local: {self._is_local} remote: {self._is_remote}")
 
         if self._is_local != is_local or self._is_remote != is_remote:
             # status changed
@@ -1090,19 +1091,8 @@ class RemoteClient(QtCore.QObject):
                 data["action"] = "hb"
                 raw_data = msgpack.packb(data)
                 self._send(raw_data)
-                syslog.debug("Alive heartbeat")
-
-        # notify_time = time.time()
-        # while not self._alive_thread_stop_requested:
-        #     if time.time() >= notify_time:
-        #         data = {}
-        #         data["sender"] = self._id
-        #         data["action"] = "hb"
-        #         raw_data = msgpack.packb(data)
-        #         self._send(raw_data)
-        #         syslog.debug("Alive heartbeat")
-        #         notify_time = time.time() + 30
-        #     time.sleep(10)
+                verbose = gremlin.config.Configuration().verbose
+                if verbose: syslog.info("Alive heartbeat")
         
 
     def _send(self, data = None):
@@ -1114,6 +1104,9 @@ class RemoteClient(QtCore.QObject):
     def send_button(self, device_id, button_id, is_pressed, force_remote = False):
         ''' handles a remote joystick event '''
         if self.enabled or force_remote:
+            verbose = gremlin.config.Configuration().verbose_mode_outputs
+            if verbose:
+                syslog.info(f"REMOTE OUTPUT: send button: VJoyId: {device_id} button {button_id} pressed: {is_pressed}")               
             data = {}
             data["sender"] = self._id
             data["action"] = "button"
@@ -1127,6 +1120,9 @@ class RemoteClient(QtCore.QObject):
     def toggle_button(self, device_id, button_id, force_remote = False):
         ''' toggles a button '''
         if self.enabled or force_remote:
+            verbose = gremlin.config.Configuration().verbose_mode_outputs
+            if verbose:
+                syslog.info(f"REMOTE OUTPUT: toggle button: VJoyId: {device_id} button {button_id}")            
             data = {}
             data["sender"] = self._id
             data["action"] = "toggle"
@@ -1139,6 +1135,9 @@ class RemoteClient(QtCore.QObject):
     def send_axis(self, device_id, axis_id, value, relative_value = None, force_remote = False):
         ''' handles a remote joystick event '''
         if self.enabled or force_remote:
+            verbose = gremlin.config.Configuration().verbose_mode_outputs
+            if verbose:
+                syslog.info(f"REMOTE OUTPUT: relative axis: VJoyId: {device_id} axis: {axis_id} value: {value:0.3f}")
             data = {}
             data["sender"] = self._id
             data["action"] = "axis"
@@ -1153,6 +1152,9 @@ class RemoteClient(QtCore.QObject):
     def send_relative_axis(self, device_id, axis_id, value, force_remote = False):
         ''' handles a remote relative axis joystick event '''
         if self.enabled or force_remote:
+            verbose = gremlin.config.Configuration().verbose_mode_outputs
+            if verbose:
+                syslog.info(f"REMOTE OUTPUT: relative axis: VJoyId: {device_id} axis: {axis_id} value: {value:0.3f}")
             data = {}
             data["sender"] = self._id
             data["action"] = "relative_axis"
@@ -1165,6 +1167,10 @@ class RemoteClient(QtCore.QObject):
     def send_hat(self, device_id, hat_id, direction, force_remote = False):
         ''' handles a remote joystick event '''
         if self.enabled or force_remote:
+            verbose = gremlin.config.Configuration().verbose_mode_outputs
+            if verbose:
+                syslog.info(f"REMOTE OUTPUT: VJoyId: {device_id} hat: {hat_id} direction: {direction}")
+        
             data = {}
             data["sender"] = self._id
             data["action"] = "hat"
@@ -1178,6 +1184,11 @@ class RemoteClient(QtCore.QObject):
     def send_key(self, virtual_code, scan_code, flags, force_remote = False):
         ''' handles a key event '''
         if self.enabled or force_remote:
+            verbose = gremlin.config.Configuration().verbose_mode_outputs
+            if verbose:
+                code = int(scan_code)
+                syslog.info(f"REMOTE OUTPUT: key: 0x{code:02x} flags: 0x{flags:02x}")
+        
             data = {}
             data["sender"] = self._id
             data["action"] = "key"
@@ -1191,6 +1202,9 @@ class RemoteClient(QtCore.QObject):
     def send_mouse_button(self, button_id, is_pressed, force_remote = False):
         ''' sends a mouse button press or release '''
         if self.enabled or force_remote:
+            verbose = gremlin.config.Configuration().verbose_mode_outputs
+            if verbose:
+                syslog.info(f"REMOTE OUTPUT: mouse button: {button_id} pressed: {is_pressed}")
             data = {}
             data["sender"] = self._id
             data["action"] = "mouse"
@@ -1205,6 +1219,10 @@ class RemoteClient(QtCore.QObject):
     def send_mouse_button_double_click(self, button_id, is_pressed, force_remote = False):
         ''' sends a mouse button press or release '''
         if self.enabled or force_remote:
+            verbose = gremlin.config.Configuration().verbose_mode_outputs
+            if verbose:
+                syslog.info(f"REMOTE OUTPUT: mouse dblclick {button_id} pressed: {is_pressed}")
+        
             data = {}
             data["sender"] = self._id
             data["action"] = "mouse"
@@ -1218,6 +1236,10 @@ class RemoteClient(QtCore.QObject):
     def send_mouse_wheel(self, direction, force_remote = False):
         ''' sends mousewheel data  '''
         if self.enabled or force_remote:
+            verbose = gremlin.config.Configuration().verbose_mode_outputs
+            if verbose:
+                syslog.info(f"REMOTE OUTPUT: mouse wheel: {direction}")
+        
             data = {}
             data["sender"] = self._id
             data["action"] = "mouse"
@@ -1231,6 +1253,10 @@ class RemoteClient(QtCore.QObject):
     def send_mouse_h_wheel(self, direction, force_remote = False):
         ''' sends horizontal mousewheel data  '''
         if self.enabled or force_remote:
+            verbose = gremlin.config.Configuration().verbose_mode_outputs
+            if verbose:
+                syslog.info(f"REMOTE OUTPUT: mouse H wheel: {direction}")
+        
             data = {}
             data["sender"] = self._id
             data["action"] = "mouse"
@@ -1244,6 +1270,10 @@ class RemoteClient(QtCore.QObject):
     def send_mouse_motion(self, dx, dy, force_remote = False):
         ''' sends mouse motion data '''
         if self.enabled or force_remote:
+            verbose = gremlin.config.Configuration().verbose_mode_outputs
+            if verbose:
+                syslog.info(f"REMOTE OUTPUT: mouse motion: {dx}, {dy}")
+        
             data = {}
             data["sender"] = self._id
             data["action"] = "mouse"
@@ -1257,6 +1287,10 @@ class RemoteClient(QtCore.QObject):
 
     def send_mouse_motion_acceleration(self, a, min_speed, max_speed, time_to_max_speed, force_remote = False):
         if self.enabled or force_remote:
+            verbose = gremlin.config.Configuration().verbose_mode_outputs
+            if verbose:
+                syslog.info(f"REMOTE OUTPUT: mouse motion acceleration")
+        
             data = {}
             data["sender"] = self._id
             data["action"] = "mouse"
@@ -1271,6 +1305,10 @@ class RemoteClient(QtCore.QObject):
     def send_gamepad_axis(self, index, mode, value, force_remote = False):
         ''' sends a gamepad axis to the remote client '''
         if self.enabled or force_remote:
+            verbose = gremlin.config.Configuration().verbose_mode_outputs
+            if verbose:
+                syslog.info(f"REMOTE OUTPUT: gamepad axis: index: {index} mode: {mode} value: {value:0.3f}")
+        
             data = {}
             data["sender"] = self._id
             data["action"] = "gamepad"
@@ -1284,6 +1322,10 @@ class RemoteClient(QtCore.QObject):
     def send_gamepad_button(self, index, mode, is_pressed, force_remote = False):
         ''' sends a gamepad button to the remote client '''
         if self.enabled or force_remote:
+            verbose = gremlin.config.Configuration().verbose_mode_outputs
+            if verbose:
+                syslog.info(f"REMOTE OUTPUT: gamepad: index: {index} mode: {mode} pressed: {is_pressed}")
+            
             data = {}
             data["sender"] = self._id
             data["action"] = "gamepad"

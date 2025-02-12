@@ -41,6 +41,7 @@ import gremlin.ui.joystick_device
 import gremlin.base_profile
 import gremlin.util
 
+syslog = logging.getLogger("system")
 
 ''' these MIDI objects are based on the MIDO and python-rtMIDI libraries '''
 
@@ -1863,7 +1864,7 @@ class MidiClient(QtCore.QObject):
         ''' occurs on profile start '''
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_midi
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         
         current_mode = gremlin.shared_state.current_mode
         if self._midi_map and current_mode in self._midi_map:
@@ -1887,7 +1888,7 @@ class MidiClient(QtCore.QObject):
                 
     def registerInput(self, input_item):
         ''' registers a MIDI input item '''
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_midi
         current_mode = gremlin.shared_state.current_mode
         if isinstance(input_item, MidiInputItem):
@@ -1908,7 +1909,7 @@ class MidiClient(QtCore.QObject):
 
     def unregisterInput(self, input_item):
         ''' unregister a MIDI input item '''
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_midi
         if isinstance(input_item, MidiInputItem):
             current_mode = gremlin.shared_state.current_mode
@@ -1926,7 +1927,7 @@ class MidiClient(QtCore.QObject):
         # build a list of input items to midi messages
         verbose = gremlin.config.Configuration().verbose_mode_midi
         profile = gremlin.shared_state.current_profile
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         if profile:
             self._midi_map = {}  # list of message keys
             current_mode = gremlin.shared_state.current_mode

@@ -43,6 +43,8 @@ import gremlin.ui.ui_common
 from  gremlin.clipboard import Clipboard, ObjectEncoder, EncoderType
 import lxml
 
+syslog = logging.getLogger("system")
+
 class InputItemConfiguration(QtWidgets.QFrame):
 
     """ mapping viewer for a selected input item (this is the right side of the device tab) """
@@ -894,7 +896,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     def _edit_mode_changed_cb(self, mode : str):
         ''' called on edit mode change '''
         self.set_mode(mode)
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         syslog.info(f"DeviceWidget: {self.device_name} change mode: [{mode}]")
         self.update_curve_icons()
 
@@ -999,7 +1001,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             config = gremlin.config.Configuration()
             verbose = config.verbose_mode_details
             #verbose = True
-            syslog = logging.getLogger("system")
+            # syslog = logging.getLogger("system")
             widget = None
             current_mode = gremlin.shared_state.edit_mode
             #self.device_profile.ensure_mode_exists(current_mode, self.device)
@@ -1128,7 +1130,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         ''' changes the mode of the tab '''
 
         if gremlin.config.Configuration().verbose_mode_detailed:
-            syslog = logging.getLogger("system")
+            # syslog = logging.getLogger("system")
             syslog.info(f"Device tab: change mode requested: device tab: {gremlin.shared_state.get_device_name(self.device.device_guid)} current mode: [{mode}]  new mode: [{mode}] ")
             
         self.device_profile.ensure_mode_exists(mode, self.device)
@@ -1288,7 +1290,7 @@ class InputConfigurationWidgetCache():
 
     def dump(self):
         ''' dumps the cache content to the log for debug purposes '''
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         items = list(self._widget_map.values())
         items.sort(key = lambda x: (x.item_data.profile_mode, x.item_data.device_guid, x.item_data.input_type, x.item_data.input_id))
         current_device_guid = None

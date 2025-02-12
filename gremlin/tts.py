@@ -32,6 +32,7 @@ import pyttsx3
 import gremlin.singleton_decorator
 from PySide6 import QtCore
 
+syslog = logging.getLogger("system")
 
 @gremlin.singleton_decorator.SingletonDecorator
 class TextToSpeech:
@@ -42,7 +43,7 @@ class TextToSpeech:
 
     def __init__(self):
         """Creates a new instance."""
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         self.valid = False
         el = gremlin.event_handler.EventListener()
         el.shutdown.connect(self.end)
@@ -93,7 +94,7 @@ class TextToSpeech:
         try:
             self.engine.setProperty("voice", voice.id)
         except:
-            syslog = logging.getLogger("system")
+            # syslog = logging.getLogger("system")
             syslog.warning(f"TTS: unable to select voice {voice.name}")
             if self.default_voice:
                 try:
@@ -106,7 +107,7 @@ class TextToSpeech:
     def speak(self, text, rate = 100, threaded = True):     
         if not self.valid:
             return
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose
         if verbose: syslog.info(f"TTS: SPEAK add to queue: {text}")
 
@@ -132,7 +133,7 @@ class TextToSpeech:
 
     def speak_single(self, text, rate = None, threaded = True):        
         if text:
-            syslog = logging.getLogger("system")
+            # syslog = logging.getLogger("system")
             verbose = gremlin.config.Configuration().verbose
             if verbose: syslog.info(f"TTS: SPEAK SINGLE add to queue: {text}")
             self._lock.acquire_lock()
@@ -205,7 +206,7 @@ class TextToSpeech:
 
     def _queue_runner(self):
         ''' processes the speech queue '''
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         threading.current_thread().reset()
         verbose = gremlin.config.Configuration().verbose
         while not self._queue_thread.stopped():
@@ -229,7 +230,7 @@ class TextToSpeech:
             return
         
         if self._started:
-            syslog = logging.getLogger("system")
+            # syslog = logging.getLogger("system")
             syslog.info("TTS: shutdown")
 
             self._queue_thread.stop()

@@ -29,7 +29,9 @@ from gremlin.types import MouseButton
 # from gremlin.singleton_decorator import SingletonDecorator
 import gremlin.config
 
+
 user32 = ctypes.WinDLL("user32")
+syslog = logging.getLogger("system")
 
 def _create_function(lib_name, fn_name, param_types, return_type):
     """Creates a handle to a windows dll library function.
@@ -456,13 +458,17 @@ def send_key_down(key):
 
     :param key the key for which to send the KEYDOWN event
     """
-    flags = win32con.KEYEVENTF_EXTENDEDKEY if key.is_extended else 0
-
     from gremlin import input_devices
-    (is_local, is_remote) = input_devices.remote_state.state
+    key: gremlin.keyboard.Key
+    flags = win32con.KEYEVENTF_EXTENDEDKEY if key.is_extended else 0
+    verbose = gremlin.config.Configuration().verbose_mode_outputs
+    
+    is_local, is_remote = input_devices.remote_state.state
     if is_local:
+        if verbose: syslog.info(f"OUTPUT: (local) keydown {key.debug_name}")
         win32api.keybd_event(key.virtual_code, key.scan_code, flags, 0)
     if is_remote:
+        if verbose: syslog.info(f"OUTPUT: (remote) keydown {key.debug_name}")
         input_devices.remote_client.send_key(key.virtual_code, key.scan_code, flags )
 
 
@@ -473,14 +479,19 @@ def send_key_up(key):
     """
 
     from gremlin import input_devices
+    key: gremlin.keyboard.Key
+    verbose = gremlin.config.Configuration().verbose_mode_outputs
+
     flags = win32con.KEYEVENTF_EXTENDEDKEY if key.is_extended else 0
     flags |= win32con.KEYEVENTF_KEYUP
 
 
     (is_local, is_remote) = input_devices.remote_state.state
     if is_local:
+        if verbose: syslog.info(f"OUTPUT: (local) keyup {key.debug_name}")
         win32api.keybd_event(key.virtual_code, key.scan_code, flags, 0)
     if is_remote:
+        if verbose: syslog.info(f"OUTPUT: (remote) keyup {key.debug_name}")
         input_devices.remote_client.send_key(key.virtual_code, key.scan_code, flags )
 
 def mouse_from_name(name):

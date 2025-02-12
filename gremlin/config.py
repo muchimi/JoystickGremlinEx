@@ -32,6 +32,7 @@ from gremlin.types import VerboseMode
 import gremlin.types
 import gremlin.util
 
+syslog = logging.getLogger("system")
 
 import gremlin.singleton_decorator
 @gremlin.singleton_decorator.SingletonDecorator
@@ -203,7 +204,7 @@ class Configuration:
         if not item:
             self._data["last_mode"] = {}
         self._data["last_mode"][profile_path] = mode_name
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         syslog.info(f"CONFIG: storing last runtime profile mode: [{mode_name}] for profile [{os.path.basename(profile_path)}]")
         self.save()
 
@@ -1155,6 +1156,15 @@ class Configuration:
         return self.verbose and VerboseMode.Gate in self.verbose_mode
     
     @property
+    def verbose_mode_outputs(self):
+        ''' true if verbose mode is in output mode '''
+        return self.verbose and VerboseMode.Outputs in self.verbose_mode
+    
+    @property
+    def verbose_mode_output(self):
+        return self.verbose_mode_outputs
+    
+    @property
     def midi_enabled(self):
         ''' true if MIDI module is enabled '''
         return self._data.get("midi_enabled", True)
@@ -1404,9 +1414,6 @@ class Configuration:
         data : dict = self._profile_data.get("last_input", {})
         
         verbose = self.verbose
-        # verbose = True
-        if verbose:
-            syslog = logging.getLogger("system") 
         
         if input_type != gremlin.input_types.InputType.ModeControl and isinstance(input_id, gremlin.base_classes.AbstractInputItem):
             # convert to an ID we can use
@@ -1470,7 +1477,7 @@ class Configuration:
         '''
         save_input_id = input_id
         input_type = None
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         device_name = gremlin.joystick_handling.device_name_from_guid(dinput_device_guid)
         if not dinput_device_guid in gremlin.shared_state.device_type_map:
             # input is missing
@@ -1558,7 +1565,7 @@ class Configuration:
            
         '''
 
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
 
 
         if device_guid is None:

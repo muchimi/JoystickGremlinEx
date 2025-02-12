@@ -37,7 +37,7 @@ from gremlin.singleton_decorator import SingletonDecorator
 
 
 _library_path = os.path.splitext(os.path.abspath(__file__))[0] + '.dll'
-
+syslog = logging.getLogger("system")
 
 
 def millis():
@@ -157,7 +157,7 @@ class Request(object):
 		if self.defined is True:
 			return True
 		
-		syslog = logging.getLogger("system")
+		# syslog = logging.getLogger("system")
 		verbose = gremlin.config.Configuration().verbose_mode_simconnect
 	
 		data_type = SIMCONNECT_DATATYPE.SIMCONNECT_DATATYPE_FLOAT64
@@ -364,7 +364,7 @@ class SimConnect():
 	@QtCore.Slot()
 	def _shutdown(self):
 		''' called when the app is shutting down '''
-		syslog = logging.getLogger("system")
+		# syslog = logging.getLogger("system")
 		if self._dll:
 			try:
 				syslog.info("SIMCONNECT: shutdown ")
@@ -400,7 +400,7 @@ class SimConnect():
 		if not handler in self.client_data_handlers:
 			verbose = gremlin.config.Configuration().verbose_mode_simconnect
 			if verbose:
-				syslog = logging.getLogger("system")
+				# syslog = logging.getLogger("system")
 				syslog.info("SIMCONNECT: register new client data handler")
 			self.client_data_handlers.append(handler)
 
@@ -410,7 +410,7 @@ class SimConnect():
 		if handler in self.client_data_handlers:
 			verbose = gremlin.config.Configuration().verbose_mode_simconnect
 			if verbose:
-				syslog = logging.getLogger("system")
+				# syslog = logging.getLogger("system")
 				syslog.info("SIMCONNECT: unregister new client data handler")
 			self.client_data_handlers.remove(handler)
 
@@ -420,14 +420,14 @@ class SimConnect():
 	def _connected(self):
 		# mark completed
 		self._request_busy = False
-		syslog = logging.getLogger("system")
+		# syslog = logging.getLogger("system")
 		syslog.info(f"SIMCONNECT: connect request completed")
 
 	@QtCore.Slot()
 	def _disconnected(self):
 		# marke completed
 		self._request_busy = False
-		syslog = logging.getLogger("system")
+		# syslog = logging.getLogger("system")
 		syslog.info(f"SIMCONNECT: disconnect request completed")
 		
 
@@ -440,7 +440,7 @@ class SimConnect():
 				try:
 					self.connect()
 				except:
-					syslog = logging.getLogger("system")
+					# syslog = logging.getLogger("system")
 					syslog.warning("SIMCONNECT: simulator not running yet - unable to connect.")
 					return
 
@@ -472,7 +472,7 @@ class SimConnect():
 		return ctypes.c_ulong(_hr.value).value == value
 
 	def handle_id_event(self, event : SIMCONNECT_RECV_EVENT):
-		syslog = logging.getLogger("system")
+		# syslog = logging.getLogger("system")
 		uEventID = event.uEventID
 		if uEventID == self._dll.EventID.EVENT_SIM_START.value:
 			self.running = True
@@ -524,7 +524,7 @@ class SimConnect():
 
 	def _process_aircraft_string(self, aircraft_cfg):
 		''' processes an aircraft string - could be a load event or a folder event '''
-		syslog = logging.getLogger("system")
+		# syslog = logging.getLogger("system")
 		verbose = gremlin.config.Configuration().verbose_mode_simconnect
 		name = self._read_aicraft_config(aircraft_cfg)
 		if verbose: syslog.info(f"SIMCONNECT: aircraft string: {name}")
@@ -539,7 +539,7 @@ class SimConnect():
 	def _read_aicraft_config(self, aircraft_cfg):
 		''' reads a configuration folder and extracts a configuration object '''
 		import re
-		syslog = logging.getLogger("system")
+		# syslog = logging.getLogger("system")
 		verbose = gremlin.config.Configuration().verbose_mode_simconnect
 		if verbose: syslog.info(f"SIMCONNECT:parsing: {aircraft_cfg}")
 		
@@ -590,7 +590,7 @@ class SimConnect():
 		
 		# not one of ours
 		return False
-		# syslog = logging.getLogger("system")
+		# # syslog = logging.getLogger("system")
 		# syslog.warning(f"SIMCONNECT:Event ID: {dwRequestID} is not handled")
 
 	def handle_clientdata_event(self, pData):
@@ -613,7 +613,7 @@ class SimConnect():
 		# _index = exc.dwIndex
 
 		# request exceptions
-		syslog = logging.getLogger("system")
+		# syslog = logging.getLogger("system")
 		for _reqin in self.Requests:
 			_request = self.Requests[_reqin]
 			if _request.LastID == _unsendid:
@@ -629,7 +629,7 @@ class SimConnect():
 		float_data = pData.fFloat
 		str_data = pData.szString
 		if self.verbose:
-			syslog = logging.getLogger("system")
+			# syslog = logging.getLogger("system")
 			syslog.info(f"SIMCONNECT:state event: int: {pData.dwInteger} float: {pData.fFloat} str: {pData.szString}")
 
 		if str_data:
@@ -654,7 +654,7 @@ class SimConnect():
 		# print("my_dispatch_proc")
 		verbose = gremlin.config.Configuration().verbose_mode_simconnect
 		dwID = pData.contents.dwID
-		syslog = logging.getLogger("system")
+		# syslog = logging.getLogger("system")
 		# if dwID == 16:
 		# 	syslog.info(f"dispatch: client data ")
 		
@@ -732,7 +732,7 @@ class SimConnect():
 
 		else:
 			if verbose:
-				syslog = logging.getLogger("system")
+				# syslog = logging.getLogger("system")
 				syslog.debug(f"SIMCONNECT:Received: {SIMCONNECT_RECV_ID(dwID)}")
 		return
 
@@ -775,7 +775,7 @@ class SimConnect():
 			return
 		
 
-		syslog = logging.getLogger("system")
+		# syslog = logging.getLogger("system")
 		verbose = gremlin.config.Configuration().verbose_mode_simconnect
 		if verbose: syslog.info("SIMCONNECT: connect...")
 		
@@ -911,7 +911,7 @@ class SimConnect():
 	def _run(self):
 		self.handler.simconnect_connected.emit()
 		self._is_loop_running = True
-		syslog = logging.getLogger("system")
+		# syslog = logging.getLogger("system")
 		verbose = gremlin.config.Configuration().verbose_mode_simconnect
 		if verbose: syslog.info("SIMCONNECT: run loop start")
 		error_count = 10
@@ -952,7 +952,7 @@ class SimConnect():
 	def exit(self):
 		''' disconnects from the sim '''
 		if self._is_loop_running:
-			syslog = logging.getLogger("system")
+			# syslog = logging.getLogger("system")
 			verbose = gremlin.config.Configuration().verbose_mode_simconnect
 			if verbose: syslog.info("SIMCONNECT: exit requested")
 			self._quit = 1 # kill the thread loop
@@ -981,7 +981,7 @@ class SimConnect():
 
 
 	def map_to_sim_event(self, name):
-		syslog = logging.getLogger("system")
+		# syslog = logging.getLogger("system")
 		if self._dll is not None:
 			for m in self._dll.EventID:
 				if name.decode() == m.name:

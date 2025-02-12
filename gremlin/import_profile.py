@@ -87,7 +87,7 @@ from lxml import etree as ElementTree
 NodeItem = namedtuple("NodeItem","device_name device_guid device_type node")
 #_ContainerItem= namedtuple("ContainerItem","device_name device_guid device_type mode input_type input_id input_description container_nodes data")
 
-
+syslog = logging.getLogger("system")
     
 class MapperMode(enum.IntEnum):
     ''' automatic mapping modes '''
@@ -429,7 +429,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
 
         # make modal
         self.setWindowModality(QtCore.Qt.ApplicationModal)
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
 
         # get the device information
         self.target_profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
@@ -915,7 +915,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
         '''
 
 
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
 
 
         self.source_profile = gremlin.base_profile.Profile()
@@ -937,7 +937,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
         self._input_items_by_source_device_guid = {}
 
         verbose = gremlin.config.Configuration().verbose
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
 
         item_list = []
         node_devices = self.root.xpath("//device")
@@ -1373,7 +1373,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
         
 
         verbose = gremlin.config.Configuration().verbose_mode_inputs
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         if target_device_guid in self.target_devices_map:
             target_device_guid = target_device_guid
             target_device = self.target_devices_map[target_device_guid]
@@ -1477,7 +1477,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
         ''' updates an import item mapping '''
 
         verbose = gremlin.config.Configuration().verbose
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
         tree = self.import_input_tree_widget
         
         mode_item: ImportModeItem
@@ -1668,7 +1668,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                 tree.setHeaderLabels(["Device","Actions","Map To Input","",""])
                 
                 
-                syslog = logging.getLogger("system")
+                # syslog = logging.getLogger("system")
 
                 self._tree_device_nodes = []
                 self._tree_mode_nodes = []
@@ -1828,7 +1828,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
         ''' creates a listing of all possible output types for the given input type  '''
 
         verbose = gremlin.config.Configuration().verbose_mode_inputs
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
 
         source_input_type = source_input_item.input_type
         if source_input_type == InputType.Keyboard:
@@ -2143,7 +2143,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
             action_count = 0
 
             verbose = gremlin.config.Configuration().verbose
-            syslog = logging.getLogger("system")
+            # syslog = logging.getLogger("system")
 
             processed_mode_set = set()
 
@@ -2334,7 +2334,7 @@ class ImportDetailDialog(gremlin.ui.ui_common.QRememberDialog):
 
         # make modal
         self.setWindowModality(QtCore.Qt.ApplicationModal)
-        syslog = logging.getLogger("system")
+        # syslog = logging.getLogger("system")
 
         target_info : DeviceSummary = gremlin.joystick_handling.device_info_from_guid(target_device_guid)
         self.main_layout = QtWidgets.QHBoxLayout(self)
@@ -2384,7 +2384,7 @@ class Mapper():
 
             # make modal
             self.setWindowModality(QtCore.Qt.ApplicationModal)
-            syslog = logging.getLogger("system")
+            # syslog = logging.getLogger("system")
 
             self.setMinimumWidth(400)
 
@@ -2567,7 +2567,7 @@ class Mapper():
             gremlin.util.pushCursor()
             el = gremlin.event_handler.EventListener()
             try:
-                syslog = logging.getLogger("system")
+                # syslog = logging.getLogger("system")
                 tab_device_type : TabDeviceType
                 gremlin_ui = gremlin.shared_state.ui
                 
