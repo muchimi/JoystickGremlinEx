@@ -145,6 +145,7 @@ class QKeyboardWidget(QtWidgets.QWidget):
         self._key_map = {} # map of key (scancode, extended) to key name
         self._key_widget_map = {} # map of key (scancode, extended) to widget
         self._hooked = False
+        self._read_only = False
 
         for row in rows:
             current_column = 0
@@ -269,6 +270,13 @@ class QKeyboardWidget(QtWidgets.QWidget):
         main_layout.addWidget(self.key_description)
 
 
+    def setReadonly(self, value: bool):
+        ''' set readonly flag - when readonly - acts as a repeater only (cannot be interacted with)'''
+        self._read_only = value
+
+    def isReadonly(self) -> bool:
+        return self._read_only
+
     def _key_hover_cb(self, widget, hover):
         if hover:
             self.key_description.setText(widget.display_name)
@@ -277,8 +285,11 @@ class QKeyboardWidget(QtWidgets.QWidget):
 
     def _widget_clicked_cb(self):
         ''' occurs when the widget is selected'''
+        if self._read_only:
+            # no interaction
+            return
         current_widget = self.sender()
-        if self.solo_select:
+        if current_widget.solo_select:
             # deselect all
             self.deselect()
 
