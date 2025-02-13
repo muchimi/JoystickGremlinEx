@@ -13,6 +13,7 @@ from PySide6 import QtCore, QtGui, QtWidgets
 class Ui_About(object):
     def setupUi(self, About):
         import joystick_gremlin
+        import gremlin.util
         About.setObjectName("About")
         About.setWindowModality(QtCore.Qt.WindowModal)
         About.resize(400, 300)
@@ -33,8 +34,11 @@ class Ui_About(object):
 
         self.version_widget = QtWidgets.QLabel(f"Version: {joystick_gremlin.Version().version}")
         self.about_box_layout.addWidget(self.version_widget)
+        self.about_box_layout.addWidget(QtWidgets.QLabel(f"Python: {gremlin.util.getPythonVersion()}"))
         self.about_box_layout.addWidget(self.about)
         self.horizontalLayout_4.addWidget(self.about_box_widget)
+
+        
         
         self.tabWidget.addTab(self.tab, "")
         self.tab_2 = QtWidgets.QWidget()

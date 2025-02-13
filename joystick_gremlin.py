@@ -4059,7 +4059,7 @@ if __name__ == "__main__":
 
     # syslog = logging.getLogger("system")
 
-    syslog.info(F"Joystick Gremlin Ex version {Version().version}")
+    syslog.info(F"Joystick Gremlin Ex version {Version().version}  (P{gremlin.util.getPythonVersion()})")
 
     # Initialize the vjoy interface
     from vjoy.vjoy_interface import VJoyInterface

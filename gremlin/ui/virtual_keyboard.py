@@ -17,9 +17,10 @@ import enum
 from gremlin.keyboard import Key
 from gremlin.util import load_icon
 import logging
-import copy
-
+import datetime
+import time
       
+syslog = logging.getLogger("system")
 
 class QKeyWidget(QtWidgets.QPushButton):
 
@@ -105,6 +106,9 @@ class QKeyWidget(QtWidgets.QPushButton):
 
 class QKeyboardWidget(QtWidgets.QWidget):
     ''' virtual keyboard widget '''
+
+    keyEvent = QtCore.Signal() # called when the data has changed
+
     def __init__(self, parent = None):
 
         ''' creates a full keyboard widget for manual data entry '''
@@ -114,6 +118,21 @@ class QKeyboardWidget(QtWidgets.QWidget):
         main_layout.setContentsMargins(0,0,0,0)
         grid_layout = QtWidgets.QGridLayout()
         main_layout.addLayout(grid_layout)
+
+        widget, layout = gremlin.ui.ui_common.getVContainer()
+        self.repeater_container_widget = widget
+        self.repeater_container_layout= layout
+        
+        main_layout.addWidget(self.repeater_container_widget)
+        self._show_repeater = True
+        self._repeater_lines = 30 # number of lines displayed in the repeater
+        self._repeater_list = []
+        self._repeater_timestamp = {}
+
+        self.repeater_widget = QtWidgets.QPlainTextEdit()
+        self.repeater_container_layout.addWidget(self.repeater_widget)
+
+        self.keyEvent.connect(self._update_repeater)
         
         
         # list of scancodes  https://handmade.network/forums/articles/t/2823-keyboard_inputs_-_scancodes%252C_raw_input%252C_text_input%252C_key_names
@@ -283,6 +302,17 @@ class QKeyboardWidget(QtWidgets.QWidget):
         else:
             self.key_description.setText("")
 
+    def setRepeaterVisible(self, value : bool):
+        ''' turns repeater on/off'''
+        self._show_repeater = value
+        self.repeater_container_widget.setVisible(value)
+
+    def setRepeaterLineCount(self, value : int):
+        if value >= 1:
+            self._repeater_lines = value
+            self._update_repeater()
+
+
     def _widget_clicked_cb(self):
         ''' occurs when the widget is selected'''
         if self._read_only:
@@ -336,7 +366,10 @@ class QKeyboardWidget(QtWidgets.QWidget):
 
         if map_key is not None and map_key in self._key_widget_map:
             widget = self._key_widget_map[map_key]
-            widget.selected = event.is_pressed
+            is_pressed = event.is_pressed
+            widget.selected = is_pressed
+            if self._show_repeater:
+                self._add_repeater(key, is_pressed)
 
     def _mouse_handler(self, event):
         ''' mouse handler '''
@@ -365,7 +398,42 @@ class QKeyboardWidget(QtWidgets.QWidget):
             
         if map_key is not None and map_key in self._key_widget_map:
             widget = self._key_widget_map[map_key]
-            widget.selected = event.is_pressed
+            is_pressed = event.is_pressed
+            widget.selected = is_pressed
+            if self._show_repeater:
+                key = gremlin.keyboard.key_from_name(map_key)
+                self._add_repeater(key, is_pressed)
+
+    def _add_repeater(self, key, is_pressed : bool ):
+        ''' adds a key to the repeater '''
+        count = len(self._repeater_list)
+
+        now = datetime.datetime.now()
+        timestamp = now.strftime("%H:%M:%S")
+        interval = None
+        if is_pressed:
+            self._repeater_timestamp[key] = time.time()
+        else:
+            # released
+            interval = time.time() - self._repeater_timestamp[key]
+
+        line = f"{timestamp}: [{key.name}] 0x{key.scan_code:X} ({key.scan_code}) {'[EX]' if key.is_extended else ''} {'pressed' if is_pressed else 'released'}"
+
+        if interval is not None:
+            line += f" ({int(interval*1000)} ms)"
+        
+        if count > self._repeater_lines:
+            self._repeater_list.pop(0)
+
+        self._repeater_list.append(line)
+        self.keyEvent.emit()
+
+    def _update_repeater(self):
+        text = ''.join(line + "\n" for line in self._repeater_list)
+        self.repeater_widget.setPlainText(text)
+        syslog.info(text)
+
+
 
 
 class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
@@ -456,7 +524,7 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
 
     def _set_sequence(self, sequence):
         ''' loads a given key sequence into the virtual keyboard '''
-        syslog = logging.getLogger("system")
+        
         if sequence:
             # the action keeps a list of keys in the format (scancode, extended_flag)
             # convert that to a key from it and selected it if the key is mapped

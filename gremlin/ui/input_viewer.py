@@ -79,9 +79,14 @@ class VisualizationConfig():
                 value = self._config[device_guid][id]
                 node = etree.Element("data")
                 node.set("device-guid", device_guid)
-                node.set("id",str(id))
+                node.set("id",str(id)) # visualization type
                 node.set("value", str(value))
                 root.append(node)
+                device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
+                input_type = VisualizationType(id).name
+                node_comment = etree.Comment(f"{device_name}  {device_guid} type: {input_type}")
+                node.addprevious(node_comment)
+
 
         try:
             tree = etree.ElementTree(root)
@@ -91,9 +96,7 @@ class VisualizationConfig():
 
     def clear(self):
         ''' clears config selection '''
-        for device_guid in self._config.keys():
-            for id in self._config[device_guid]:
-                self._config[device_guid][id] = False
+        self._config.clear()
 
 
     def reload(self):

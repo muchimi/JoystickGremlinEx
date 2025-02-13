@@ -23,11 +23,14 @@ class AbortableThread(threading.Thread):
     ''' killable thread '''
 
     def __init__(self, *args, **kwargs):
+
+        super().__init__(*args, **kwargs)
+        
         import gremlin.event_handler
 
         eh = gremlin.event_handler.EventListener()
-        eh.shutdown.connect(self._stop)
-        super().__init__(*args, **kwargs)
+        eh.shutdown.connect(self.stop)
+        
         #self._stop_event = threading.Event()
         self._shutdown_requested = False
 

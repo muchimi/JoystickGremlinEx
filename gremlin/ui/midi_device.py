@@ -475,7 +475,7 @@ class MidiListener(AbortableThread):
         '''
 
 
-        super().__init__(parent)
+        super().__init__()
         self.port_number = port_number
         self.port_name = port_name
         self.callback = callback
@@ -498,6 +498,7 @@ class MidiListener(AbortableThread):
                     logging.getLogger("system").info(f"MIDI: close port {self.port_number}")
         except Exception as err:
             logging.getLogger("system").error(f"MIDI: unable to open port {self.port_name} {self.port_number} - ensure another utility is not using this port.")
+
 
 
 @SingletonDecorator
@@ -545,8 +546,6 @@ class MidiInterface(QtCore.QObject):
     
         for port in self._port_names:
             logging.getLogger("system").info(f"MIDI device detected: {port}")
-
-
 
     def buildMessageKey(self, command, port_name, message):
         ''' builds a MIDI message key from data '''
@@ -1961,9 +1960,11 @@ class MidiClient(QtCore.QObject):
             return
         self._interface.start()
         self._started = True
-        
 
     def stop(self):
+        self._stop()
+        
+    def _stop(self):
         ''' stops the client '''
         if not self._started:
             return

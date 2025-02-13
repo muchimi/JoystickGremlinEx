@@ -43,14 +43,14 @@ sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
 
 # -- Project information -----------------------------------------------------
 
-project = "Joystick Gremlin"
-copyright = "2019, WhiteMagic"
-author = "WhiteMagic"
+project = "Joystick Gremlin EX"
+copyright = "2025, Muchimi"
+author = "Muchimi"
 
 # The short X.Y version
 version = ""
 # The full version, including alpha/beta/rc tags
-release = "R13.3"
+release = "R13.16.40"
 
 
 # -- General configuration ---------------------------------------------------

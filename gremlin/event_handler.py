@@ -476,12 +476,15 @@ class EventListener(QtCore.QObject):
 		self.keyboard_hook.register(self._keyboard_handler)
 		
 		# if in debug mode - don't hook the mouse
+		enable_mouse_hook = False
 		self.mouse_hook = windows_event_hook.MouseHook()
-		self.mouse_hook.start()
-		if not gremlin.config.Configuration().is_debug:
-			self.mouse_hook.register(self._mouse_handler)
-		else:
-			syslog.warning("************ DEBUG MODE - MOUSE HOOKS ARE DISABLED ")
+		if enable_mouse_hook:
+			
+			self.mouse_hook.start()
+			if not gremlin.config.Configuration().is_debug:
+				self.mouse_hook.register(self._mouse_handler)
+			else:
+				syslog.warning("************ DEBUG MODE - MOUSE HOOKS ARE DISABLED ")
 
 		# Calibration function for each axis of all devices
 		self._calibrations = {}

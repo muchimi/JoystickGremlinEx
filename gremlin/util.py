@@ -1762,3 +1762,9 @@ class ResetTimer(threading.Thread):
         self._is_reset = True
         self.finished.set()
         self.finished.clear()
+
+
+
+def getPythonVersion() -> str:
+    ''' gets the python environment version as a string '''
+    return f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"

@@ -9,7 +9,7 @@ md joystick_gremlin
 cd ..
 
 @echo "Building executable ..."
-c:\python\python312\python -m PyInstaller -y --log-level INFO --clean joystick_gremlin.spec
+c:\python\python313\python -m PyInstaller -y --log-level INFO --clean joystick_gremlin.spec
 cd dist
 
 

@@ -520,7 +520,7 @@ def mouse_from_name(name):
     return mouse_button
 
 
-def key_from_name(name, validate = False):
+def key_from_name(name, validate = False) -> Key:
     """Returns the key corresponding to the provided name.
 
     If no key exists with the provided name None is returned.

@@ -31,7 +31,9 @@ class Ui_Gremlin(object):
         self.devices.setUsesScrollButtons(True)
         self.devices.setObjectName("devices")
         
+        
         self.tab_bar_layout.addWidget(self.devices)
+        self.tab_bar_layout.addStretch(2)
 
         # content panel below the tab
         self.tab_content_widget = QtWidgets.QWidget(self.main)
