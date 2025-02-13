@@ -3312,7 +3312,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         
 
         self._output_container_widget.setVisible(simvar_visible or range_visible)
-        self._output_range_container_widget.setVisible(range_visible)
+        self._output_range_container_widget.setVisible(simvar_visible or range_visible)
         self._output_trigger_bool_container_widget.setVisible(trigger_visible)
         
 
