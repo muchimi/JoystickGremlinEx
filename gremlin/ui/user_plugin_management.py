@@ -193,7 +193,7 @@ class ModuleManagementController(QtCore.QObject):
 
 
         if verbose:
-            log = logging.getLogger("system")
+            log = syslog
             log.info(f"Configure instance: {instance.name}")
         for var in variables:
             # if verbose:
@@ -228,7 +228,7 @@ class ModuleManagementController(QtCore.QObject):
                 )
                 layout.addLayout(ui_element)
             else:
-                logging.getLogger("system").error(
+                syslog.error(
                     "Invalid variable type encountered in user "
                     f"plugin {instance.parent.file_name} : {var.label}"
                 )

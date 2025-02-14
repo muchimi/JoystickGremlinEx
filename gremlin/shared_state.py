@@ -159,7 +159,7 @@ def get_device_name(device_guid):
     if not device_name:
         device_name = get_virtual_device_name(device_guid)
     if not device_name:
-        logging.getLogger("system").error(f"Unable to find device name for id: {device_guid}")
+        syslog.error(f"Unable to find device name for id: {device_guid}")
         return None
     return device_name
 

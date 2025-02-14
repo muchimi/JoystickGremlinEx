@@ -279,7 +279,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
             xml = lxml.etree.tostring(root)
             oc = ObjectEncoder(self.item_data.containers, xml, "multi", EncoderType.MultiContainer)
             clipboard.data = oc
-            logging.getLogger("system").info(f"multi container copied to clipboard")
+            syslog.info(f"multi container copied to clipboard")
     
 
 
@@ -672,7 +672,7 @@ class ActionContainerView(gremlin.ui.ui_common.AbstractView):
                 self.redraw_lock = False
                
         else:
-            logging.getLogger("system").error("re-entry code detected")
+            syslog.error("re-entry code detected")
 
     def _create_closed_cb(self, widget):
         """Create callbacks to remove individual containers from the model.
@@ -1216,7 +1216,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             # Handle non continuous axis setups
             axis_keys = sorted(input_items.config[InputType.JoystickAxis].keys())
             if not input_items.has_data(InputType.JoystickAxis, axis_keys[index]):
-                logging.getLogger("system").error(
+                syslog.error(
                     "Attempting to retrieve non existent axis input, "
                     f"type={InputType.to_string(InputType.JoystickAxis)} index={axis_keys[index]}"
                 )
@@ -1230,7 +1230,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                     InputType.JoystickButton,
                     index - axis_count + 1
             ):
-                logging.getLogger("system").error(
+                syslog.error(
                     "Attempting to retrieve non existent button input, "
                     f"type={InputType.to_string(InputType.JoystickButton)} index={index - axis_count + 1}"
                 )
@@ -1244,7 +1244,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                     InputType.JoystickHat,
                     index - axis_count - button_count + 1
             ):
-                logging.getLogger("system").error(
+                syslog.error(
                     "Attempting to retrieve non existent hat input, "
                     f"type={ InputType.to_string(InputType.JoystickHat)} index={index - axis_count - button_count + 1}"
                 )

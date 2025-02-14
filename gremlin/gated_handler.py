@@ -3438,7 +3438,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
         verbose = gremlin.config.Configuration().verbose_mode_gate
 
         if verbose:
-            logging.getLogger("system").info(f"gate axis widget: init {self.id} {self.action_data.input_display_name}")
+            syslog.info(f"gate axis widget: init {self.id} {self.action_data.input_display_name}")
 
         self.hook()
 
@@ -3542,7 +3542,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
 
         verbose = gremlin.config.Configuration().verbose_mode_gate
         if verbose:
-            logging.getLogger("system").info(f"gate axis widget: hook {self.id} {self.action_data.input_display_name}")
+            syslog.info(f"gate axis widget: hook {self.id} {self.action_data.input_display_name}")
 
         self._gate_data.registerValueChangedCallback(self._update_slider_marker)
         self._gate_data.hook()
@@ -3570,7 +3570,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
         if self._hooked:
             verbose = gremlin.config.Configuration().verbose_mode_gate
             if verbose:
-                logging.getLogger("system").info(f"gate axis widget: unhook {self.id} {self.action_data.input_display_name}")
+                syslog.info(f"gate axis widget: unhook {self.id} {self.action_data.input_display_name}")
 
             eh = GateEventHandler()
             self._gate_data.unhook()
@@ -3615,7 +3615,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
             range_max, range_min = range_min, range_max
         verbose = gremlin.config.Configuration().verbose_mode_details
         if verbose:
-            logging.getLogger("system").info(f"Gate widget: set display range {range_min, range_max}")
+            syslog.info(f"Gate widget: set display range {range_min, range_max}")
         
         self._gate_data.setDisplayRange(range_min, range_max)
 

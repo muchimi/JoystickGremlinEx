@@ -205,7 +205,7 @@ class ButtonContainerFunctor(gremlin.base_conditions.AbstractFunctor):
             is_hat = True
             is_pressed = value.current != (0,0)
         elif not isinstance(value.current, bool):
-            logging.getLogger("system").warning(
+            syslog.warning(
                 f"Invalid data type received in Button container: {type(event.value)}"
             )
             return False

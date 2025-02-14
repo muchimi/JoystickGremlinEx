@@ -164,7 +164,7 @@ class TextToSpeech:
 
 
         except Exception as err:
-            logging.getLogger("system").error(f"Error in TTS: {err}")
+            syslog.error(f"Error in TTS: {err}")
 
 
     def stop(self):

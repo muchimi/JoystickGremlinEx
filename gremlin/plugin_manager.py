@@ -155,7 +155,7 @@ class ContainerPlugins:
                 except Exception as e:
                     # Log an error and ignore the action_plugins if
                     # anything is wrong with it
-                    logging.getLogger("system").warning(
+                    syslog.warning(
                         f"\tLoading container_plugins '{fname}' failed due to: {e}"
                     )
 
@@ -352,7 +352,7 @@ class ActionPlugins:
                 xml = item.data
                 if container is None:
                     # no container provided for the parent - can't duplicate
-                    logging.getLogger("system").error("FromClipboard: unable to instantiate action because no container is provided")
+                    syslog.error("FromClipboard: unable to instantiate action because no container is provided")
                     return None
                 if container is not None:
                     node = etree.fromstring(xml)

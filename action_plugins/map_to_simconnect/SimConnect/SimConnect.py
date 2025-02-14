@@ -1111,7 +1111,7 @@ class SimConnect():
 		if self._dll is None:
 			self.connect()
 		if self._dll is None:
-			logging.getLogger("system").warning(f"SIMCONNECT:Setdata: not connected - request : {request.definitions}")
+			syslog.warning(f"SIMCONNECT:Setdata: not connected - request : {request.definitions}")
 			return False
 		if request.buffer is None:
 			return False

@@ -421,7 +421,7 @@ class ExecutionContext():
                         for container in input_item.containers:
                             if not container.is_valid():
                                 test = container.is_valid()
-                                logging.getLogger("system").warning(
+                                syslog.warning(
                                     "Incomplete container ignored"
                                 )
                                 continue
@@ -545,7 +545,7 @@ class ContainerCallback:
 
         if event == InputType.VirtualButton:
             # TODO: remove this at a future stage
-            logging.getLogger("system").error(
+            syslog.error(
                 "Virtual button code path being used"
             )
         else:
@@ -708,7 +708,7 @@ class AbstractExecutionGraph(QtCore.QObject):
                     if verbose: syslog.info (f"{logTabs}\t\t\t{index} -> action result: {result}")
                     if result is None or not result:
                         return False
-                    #     logging.getLogger("system").warning(f"Process event returned no data or FALSE - functor: {type(functor).__name__}")
+                    #     syslog.warning(f"Process event returned no data or FALSE - functor: {type(functor).__name__}")
 
                     if isinstance(functor, gremlin.actions.AxisButton):
                         process_again = functor.forced_activation
@@ -865,7 +865,7 @@ class ContainerExecutionGraph(AbstractExecutionGraph):
         node.functors.append(functor)
         
         if verbose:
-            logging.getLogger("system").info(f"Enable container functor: {type(functor).__name__}")
+            syslog.info(f"Enable container functor: {type(functor).__name__}")
 
         extra_inputs = functor.latch_extra_inputs()
         if extra_inputs:
@@ -933,7 +933,7 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
         # present it is executed last (after a curving action for example) (unless it's a mode switch action - mode switching must happen last because it changes the action list)
         ordered_action_set = []
         if verbose:
-            logging.getLogger("system").info("Ordering action sets:")
+            syslog.info("Ordering action sets:")
         for action in action_set:
 
 
@@ -946,7 +946,7 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
                 priority = action.priority
             ordered_action_set.append((priority, action))
             if verbose:
-                logging.getLogger("system").info(f"\tadding action: {type(action)} priority: {priority} data: {str(action)}" )
+                syslog.info(f"\tadding action: {type(action)} priority: {priority} data: {str(action)}" )
 
             node = ExecutionGraphNode(ExecutionGraphNodeType.Action)
             node.parent = action_set_node
@@ -961,12 +961,12 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
 
 
         if verbose:
-            logging.getLogger("system").info("Action order:")
+            syslog.info("Action order:")
             for index, action in enumerate(ordered_action_set):
                 input_item = action.input_item # get_input_item()
                 input_id = input_item.input_id
                 input_stub = str(input_id)
-                logging.getLogger("system").info(f"\t{index}: input type: {input_item.input_type} {input_stub} action: {type(action)}  data: {str(action)} ")
+                syslog.info(f"\t{index}: input type: {input_item.input_type} {input_stub} action: {type(action)}  data: {str(action)} ")
 
 
         # Create functors

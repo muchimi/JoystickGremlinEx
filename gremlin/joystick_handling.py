@@ -74,12 +74,12 @@ class VJoyProxy:
                 device = vjoy.VJoy(key)
                 VJoyProxy.vjoy_devices[key] = device
                 # msg = f"Registering vJoy id={key}"
-                # logging.getLogger("system").debug(msg)
+                # syslog.debug(msg)
                 return device
             except error.VJoyError as e:
                 msg = f"Failed accessing vJoy id={key}, error is: {e}"
-                logging.getLogger("system").debug(msg)
-                logging.getLogger("system").error(msg)
+                syslog.debug(msg)
+                syslog.error(msg)
                 raise e
 
     @classmethod
@@ -251,7 +251,7 @@ def vjoy_id_from_guid(guid : str | dinput.GUID, not_found_id = 1):
         if dev.device_guid == guid:
             return dev.vjoy_id
 
-    logging.getLogger("system").error(
+    syslog.error(
         f"Could not find vJoy matching guid {str(guid)}"
     )
     syslog.warning(f"getVjoyFromGuid: vjoy {guid} not found")
@@ -346,7 +346,7 @@ def linear_axis_index(axis_map : dinput.AxisMap, axis_index : int) -> int:
 
 def reset_devices():
     ''' resets devices on device change '''
-    logging.getLogger("system").info("Joystick device change detected - re-initializing joysticks")
+    syslog.info("Joystick device change detected - re-initializing joysticks")
     joystick_devices_initialization()
     el = gremlin.event_handler.EventListener()
 
@@ -753,7 +753,7 @@ class VJoyUsageState():
     
     def toggle_inverted(self, device_id, input_id):
         ''' toggles inversion state of specified device/axis is inverted '''
-        sylog = logging.getLogger("system")
+        sylog = syslog
         if device_id in self._axis_invert_map:
             if input_id in self._axis_invert_map[device_id]:
                 self._axis_invert_map[device_id][input_id] = not self._axis_invert_map[device_id][input_id]

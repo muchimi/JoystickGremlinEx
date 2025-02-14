@@ -40,6 +40,8 @@ from . import error
 
 from gremlin.singleton_decorator import SingletonDecorator
 
+syslog = logging.getLogger("system")
+
 # Table storing which modules have been imported already
 g_loaded_modules = {}
 
@@ -187,15 +189,15 @@ def userprofile_path():
             try:
                 # copy from original profile
                 shutil.copytree(source_path, path)
-                logging.getLogger("system").info(f"First run - copied Joystick Gremlin profiles to to Joystick Gremlin Ex")
+                syslog.info(f"First run - copied Joystick Gremlin profiles to to Joystick Gremlin Ex")
             except Exception as error:
-                logging.getLogger("system").error(f"Unable to copy profile from Joystick Gremlin to Joystick Gremlin Ex:\n{error}")
+                syslog.error(f"Unable to copy profile from Joystick Gremlin to Joystick Gremlin Ex:\n{error}")
         if not os.path.isdir(path):
             try:
                 # just create it
                 os.mkdir(path)
             except Exception as error:
-                logging.getLogger("system").error(f"Unable to create profile folder for Joystick Gremlin Ex:\n{error}")
+                syslog.error(f"Unable to create profile folder for Joystick Gremlin Ex:\n{error}")
                 
         if not os.path.isdir(path):
                 from gremlin.error import GremlinError
@@ -265,19 +267,19 @@ def log(msg):
 
 def log_sys(msg):
     ''' logs to the system log '''
-    logging.getLogger("system").debug(str(msg))
+    syslog.debug(str(msg))
 
 def log_info(msg):
     ''' logs to the system log '''
-    logging.getLogger("system").info(str(msg))
+    syslog.info(str(msg))
 
 def log_sys_warn(msg):
     ''' logs to the system log '''
-    logging.getLogger("system").warning(str(msg))
+    syslog.warning(str(msg))
 
 def log_sys_error(msg):
     ''' logs to the system error log'''
-    logging.getLogger("system").error(str(msg))
+    syslog.error(str(msg))
 
 def format_name(name):
     """Returns the name formatted as valid python variable name.
@@ -758,14 +760,14 @@ def _find_file(file_path, root_folder = None):
         files.sort(key = lambda x: len(x)) # shortest to largest
         found_path = files.pop(0) # grab the first one
         if verbose:
-            logging.getLogger("system").info(f"Find_files() - found : {found_path} for {file_path}")
+            syslog.info(f"Find_files() - found : {found_path} for {file_path}")
         return found_path
     
     if circuit_breaker == 0:
-        logging.getLogger("system").error(f"Find_files() - search exceeded maximum when searching for: {file_path}")
+        syslog.error(f"Find_files() - search exceeded maximum when searching for: {file_path}")
     
     if verbose or circuit_breaker == 0:
-        logging.getLogger("system").error(f"Find_files() failed for: {file_path}")
+        syslog.error(f"Find_files() failed for: {file_path}")
     return None
 
 
@@ -794,27 +796,27 @@ def get_icon_path(*paths):
             return gremlin.shared_state._icon_path_cache[the_path]
 
    
-        # logging.getLogger("system").info(f"icon path: {the_path}  root: {root_path}")
+        # syslog.info(f"icon path: {the_path}  root: {root_path}")
         icon_file = os.path.join(root_path, the_path)
         icon_file = icon_file.replace("/",os.sep).lower()
         if icon_file:
             if os.path.isfile(icon_file):
                 if verbose:
-                    logging.getLogger("system").info(f"Icon file (straight) found: {icon_file}")
+                    syslog.info(f"Icon file (straight) found: {icon_file}")
                 gremlin.shared_state._icon_path_cache[the_path] = icon_file
                 return icon_file
             if not icon_file.endswith(".png"):
                 icon_file_png = icon_file + ".png"
                 if os.path.isfile(icon_file_png):
                     if verbose:
-                        logging.getLogger("system").info(f"Icon file (png) found: {icon_file_png}")
+                        syslog.info(f"Icon file (png) found: {icon_file_png}")
                     gremlin.shared_state._icon_path_cache[the_path] = icon_file_png
                     return icon_file_png
             if not icon_file.endswith(".svg"):
                 icon_file_svg = icon_file + ".svg"
                 if os.path.isfile(icon_file_svg):
                     if verbose:
-                        logging.getLogger("system").info(f"Icon file (svg) found: {icon_file_svg}")
+                        syslog.info(f"Icon file (svg) found: {icon_file_svg}")
                     gremlin.shared_state._icon_path_cache[the_path] = icon_file_svg
                     return icon_file_svg
             brute_force = find_file(the_path)
@@ -822,7 +824,7 @@ def get_icon_path(*paths):
                 gremlin.shared_state._icon_path_cache[the_path] = brute_force
                 return brute_force
         
-        logging.getLogger("system").error(f"Icon file not found: {icon_file}")
+        syslog.error(f"Icon file not found: {icon_file}")
     
         return None
 
@@ -832,11 +834,11 @@ def load_pixmap(*paths):
     if the_path:
         pixmap = QtGui.QPixmap(the_path)
         if pixmap.isNull():
-            logging.getLogger("system").warning(f"load_pixmap(): pixmap failed: {the_path}")
+            syslog.warning(f"load_pixmap(): pixmap failed: {the_path}")
             return None
         return pixmap
     
-    logging.getLogger("system").error(f"load_pixmap(): invalid path")
+    syslog.error(f"load_pixmap(): invalid path")
     return None
 
    
@@ -862,13 +864,13 @@ def load_icon(*paths, use_qta = False, qta_color = None):
         pixmap = load_pixmap(*paths)
         if not pixmap or pixmap.isNull():
             if verbose:
-                logging.getLogger("system").info(f"LoadIcon() using generic icon - failed to locate: {paths}")
+                syslog.info(f"LoadIcon() using generic icon - failed to locate: {paths}")
             return get_generic_icon()
 
         icon = QtGui.QIcon()
         icon.addPixmap(pixmap, QtGui.QIcon.Normal)
         if verbose:
-            logging.getLogger("system").info(f"LoadIcon() found icon: {paths}")
+            syslog.info(f"LoadIcon() found icon: {paths}")
     return icon
 
 
@@ -899,10 +901,10 @@ def load_image(*paths):
     the_path = get_icon_path(*paths)
     if the_path:
         if verbose:
-            logging.getLogger("system").info(f"LoadImage() found image: {paths}")
+            syslog.info(f"LoadImage() found image: {paths}")
         return QtGui.QImage(the_path)
     if verbose:
-            logging.getLogger("system").info(f"LoadImage() failed to locate: {paths}")
+            syslog.info(f"LoadImage() failed to locate: {paths}")
     return None
         
     
@@ -916,12 +918,12 @@ def get_generic_icon():
     if generic_icon and os.path.isfile(generic_icon):
         pixmap = QtGui.QPixmap(generic_icon)
         if pixmap.isNull():
-            logging.getLogger("system").warning(f"load_icon(): generic pixmap failed: {generic_icon}")
+            syslog.warning(f"load_icon(): generic pixmap failed: {generic_icon}")
             return None
         icon = QtGui.QIcon()
         icon.addPixmap(pixmap, QtGui.QIcon.Normal)
         return icon
-    logging.getLogger("system").warning(f"load_icon(): generic icon file not found: {generic_icon}")
+    syslog.warning(f"load_icon(): generic icon file not found: {generic_icon}")
     return None
 
 
@@ -991,7 +993,7 @@ def safe_read(node, key, type_cast=None, default_value=None):
 
         except ValueError:
             msg = f"XML: Failed casting '{value}' to type '{str(type_cast)}'"
-            logging.getLogger("system").error(msg)
+            syslog.error(msg)
             raise error.ProfileError(msg)
     return value
 
@@ -1323,7 +1325,7 @@ def csv_to_list(value) -> list:
             for row in reader:
                 return row
         except:
-            logging.getLogger("system").error(f"Unable to convert data stream {value} to a list")
+            syslog.error(f"Unable to convert data stream {value} to a list")
     return []
 
 def csv_to_floatlist(value) -> list:
@@ -1338,7 +1340,7 @@ def csv_to_floatlist(value) -> list:
                 values = [float(v) for v in row]
                 return values
         except:
-            logging.getLogger("system").error(f"Unable to convert data stream {value} to a list")
+            syslog.error(f"Unable to convert data stream {value} to a list")
     return []
 
 
@@ -1474,7 +1476,7 @@ def display_file(path):
     if os.path.isfile(path):
         webbrowser.open(path)
     else:
-        logging.getLogger("system").error(f"DISPLAYFILE: warning: file not found: {path}")
+        syslog.error(f"DISPLAYFILE: warning: file not found: {path}")
 
 
 def debug_pickle(instance, exception=None, string='', first_only=True):

@@ -209,7 +209,7 @@ class ProfileConverter:
                 if device.get("name") in device_name_map:
                     device.set("id", str(device_name_map[device.get("name")]))
                 else:
-                    logging.getLogger("system").warning(
+                    syslog.warning(
                         f"Device '{device.get("name")}' missing, no conversion performed, ID will be incorrect."
                     )
         return new_root
@@ -590,7 +590,7 @@ class ProfileConverter:
 
                 device = self.dev_info[device_guid]
                 if linear_id > device.axis_count or linear_id >= len(device.axis_map):
-                    logging.getLogger("system").error(
+                    syslog.error(
                         f"Invalid linear axis id received, {device.name} id = {linear_id}"
                     )
                     return linear_id
@@ -917,7 +917,7 @@ class ProfileModifier:
         """
 
         if source_guid == target_guid:
-            logging.getLogger("system").warning(
+            syslog.warning(
                 "Swap devices: Source and target device are identical"
             )
             return
@@ -937,7 +937,7 @@ class ProfileModifier:
 
         # Can't move anything from a non-existent source device
         if source_dev is None:
-            logging.getLogger("system").warning(
+            syslog.warning(
                 "Swap devices: Specified a source device that doesn't exist"
             )
             return
@@ -954,7 +954,7 @@ class ProfileModifier:
         # copying and deleting things.
         if target_dev is None:
             if target_hardware_device is None:
-                logging.getLogger("system").warning(
+                syslog.warning(
                     "Swap devices: Empty target device configuration found"
                 )
                 return
@@ -976,7 +976,7 @@ class ProfileModifier:
                     input_id = input_item.input_id
 
                     if input_id not in target_mode.config[input_type]:
-                        logging.getLogger("system").warning(
+                        syslog.warning(
                             "Swap devices: Source input id not present in "
                             "target device"
                         )

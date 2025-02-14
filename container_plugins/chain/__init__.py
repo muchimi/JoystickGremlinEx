@@ -127,7 +127,7 @@ class ChainContainerWidget(AbstractContainerWidget):
         index = self._get_widget_index(widget)
 
         if index == -1:
-            logging.getLogger("system").warning(
+            syslog.warning(
                 "Unable to find widget specified for interaction, not doing "
                 "anything."
             )
@@ -187,7 +187,7 @@ class ChainContainerFunctor(gremlin.base_conditions.AbstractFunctor):
         if event.event_type == InputType.JoystickHat:
             is_pressed = value.current != (0,0)
         elif not isinstance(value.current, bool):
-            logging.getLogger("system").warning(
+            syslog.warning(
                 f"Invalid data type received in Chain container: {type(event.value)}"
             )
             return False
@@ -202,7 +202,7 @@ class ChainContainerFunctor(gremlin.base_conditions.AbstractFunctor):
 
         verbose = gremlin.config.Configuration().verbose
         if verbose:
-            logging.getLogger("system").info(f"Chain: index {self.index}")
+            syslog.info(f"Chain: index {self.index}")
         result = self.action_sets[self.index].process_event(event, value)
 
         if (self.switch_on_press and is_pressed) or not is_pressed:

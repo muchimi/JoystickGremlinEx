@@ -676,7 +676,7 @@ class OscMessage(object):
                     param_stack.pop()
                 # TODO: Support more exotic types as described in the specification.
                 else:
-                    logging.getLogger("system").warning(f'Unhandled parameter type: {param}')
+                    syslog.warning(f'Unhandled parameter type: {param}')
                     continue
                 if param not in "[]":
                     param_stack[-1].append(val)
@@ -1654,21 +1654,21 @@ class OscServer():
     def _server_thread_loop(self):
         ''' main threading loop '''
         
-        #logging.getLogger("system").info("OSC: server starting")
+        #syslog.info("OSC: server starting")
         self._dispatcher = OscDispatcher()
         self._dispatcher.set_default_handler(self._callback)
         self._server = BlockingOSCUDPServer((self._host_ip, self._input_port), self._dispatcher)
-        logging.getLogger("system").info("OSC: server starting")
+        syslog.info("OSC: server starting")
         # this blocks until the server is shutdown
         self._server.serve_forever()  # blocks until shutdown
 
-        logging.getLogger("system").info("OSC: server shutdown")
+        syslog.info("OSC: server shutdown")
         self._server = None
 
 
 
     def __init__(self):
-        #logging.getLogger("system").info("OSC: server init")
+        #syslog.info("OSC: server init")
         self._server = None
         self._server_thread = None
         self._stop = False
@@ -1695,7 +1695,7 @@ class OscServer():
     def started(self):
         ''' true if server is started or in the process of starting '''
         if self._lock.locked():
-            logging.getLogger("system").info("OSC: server locked")
+            syslog.info("OSC: server locked")
             return True
         
         return self._running
@@ -1712,7 +1712,7 @@ class OscServer():
         with self._lock:
             # everything here is now locked until the server start is completed
 
-            #logging.getLogger("system").info("OSC: start requested")
+            #syslog.info("OSC: start requested")
             if self._running:
                 return
             
@@ -1736,14 +1736,14 @@ class OscServer():
         ''' stops the server '''
         if not self._running or self._start_requested:
             return
-        #logging.getLogger("system").info("OSC: stop requested")
+        #syslog.info("OSC: stop requested")
         self._stop = True
         if self._server:
             self._server.shutdown()
         self._server_thread.join()
         self._server_thread = None
         self._running = False
-        logging.getLogger("system").info("OSC: server stopped")
+        syslog.info("OSC: server stopped")
 
     
 
@@ -1937,16 +1937,16 @@ class OscInterface(QtCore.QObject):
 
     def log(msg):
         ''' displays a log message in Gremlin and in the console '''
-        logging.getLogger("system").info(msg)
+        syslog.info(msg)
 
     def _osc_message_handler(self, address, *args):
         ''' handles internal OSC messages'''
         verbose = gremlin.config.Configuration().verbose_mode_osc
-        if verbose: logging.getLogger("system").info(f"OSC: {address}: {args}")
+        if verbose: syslog.info(f"OSC: {address}: {args}")
         address = address.casefold()
         if address == "/noop":
             # heartbeat
-            #logging.getLogger("system").info(f"OSC: tick") 
+            #syslog.info(f"OSC: tick") 
             return
         self.osc_message.emit(address, args)
 
@@ -1954,7 +1954,7 @@ class OscInterface(QtCore.QObject):
         ''' starts listening to OSC messages '''
 
         if not self._started:
-            logging.getLogger("system").info(f"OSC (interface): starting with IP: {self._host_ip} port: {self._input_port} send host: {self._target_ip} port: {self._output_port}")
+            syslog.info(f"OSC (interface): starting with IP: {self._host_ip} port: {self._input_port} send host: {self._target_ip} port: {self._output_port}")
             self._osc_server.start(self._host_ip, self._input_port, self._osc_message_handler)
             self.startClients()
             self._started = True
@@ -2676,7 +2676,7 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
 
                     other_key = other_input.message_key
                     if key == other_key:
-                        logging.getLogger("system").info(f"OSC: conflict detected: key {key} is the same as {other_key}")
+                        syslog.info(f"OSC: conflict detected: key {key} is the same as {other_key}")
                         self._validation_message_widget.setText(f"Input conflict detected with input [{index+1}] - ensure inputs are unique")
                         self._validation_message_widget.setIcon("fa.warning",True, color="red")
                         valid = False
@@ -3412,7 +3412,7 @@ class InputOscClient(QtCore.QObject):
         
             self._osc_map[message_key].append(input_item)
             if self._verbose:
-                logging.getLogger("system").info(f"OSC: register trigger on: {input_item.display_name} mode: {input_item.mode_string} key: {message_key}")
+                syslog.info(f"OSC: register trigger on: {input_item.display_name} mode: {input_item.mode_string} key: {message_key}")
         
 
     def unregisterInput(self, input_item):
@@ -3497,7 +3497,7 @@ class InputOscClient(QtCore.QObject):
         
         verbose = gremlin.config.Configuration().verbose_mode_osc
         if message_key in self._osc_map:
-            # logging.getLogger("system").info(f"OSC: runtime: processing {message_key}")
+            # syslog.info(f"OSC: runtime: processing {message_key}")
             for input_item in self._osc_map[message_key]:
 
                 # button press mode - if the value is in the top half of the range, the button is considered pressed
@@ -3562,7 +3562,7 @@ class InputOscClient(QtCore.QObject):
                 
 
                 if self._verbose:
-                    logging.getLogger("system").info(f"OSC: send event: is_pressed: {is_pressed} value: {value} raw value: {raw_value} is axis: {is_axis}")
+                    syslog.info(f"OSC: send event: is_pressed: {is_pressed} value: {value} raw value: {raw_value} is axis: {is_axis}")
 
                 if not is_axis:
                     event = gremlin.event_handler.Event(
@@ -3588,7 +3588,7 @@ class InputOscClient(QtCore.QObject):
                         timer.start()
 
         else:
-            if verbose: logging.getLogger("system").info(f"OSC: runtime: ignoring {message_key}")
+            if verbose: syslog.info(f"OSC: runtime: ignoring {message_key}")
 
 
 # listen to OSC input

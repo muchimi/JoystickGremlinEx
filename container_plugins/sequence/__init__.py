@@ -130,7 +130,7 @@ class SequenceContainerWidget(AbstractContainerWidget):
         index = self._get_widget_index(widget)
 
         if index == -1:
-            logging.getLogger("system").warning(
+            syslog.warning(
                 "Unable to find widget specified for interaction, not doing "
                 "anything."
             )

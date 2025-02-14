@@ -263,7 +263,7 @@ class QSliderWidget(QtWidgets.QWidget):
             values[index] = value
             self.setValue(values)
         except:
-            logging.getLogger("system").error(f"Unable to set value index {index} - out of index range error")
+            syslog.error(f"Unable to set value index {index} - out of index range error")
 
         
     def setValue(self, value : int | float | list | tuple):

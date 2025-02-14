@@ -44,7 +44,7 @@ class VigemClient():
                 if not os.path.isfile(_dll_path):
                     msg = f"Unable to continue - missing dll: {_dll_path}"
                     display_error(msg)
-                    logging.getLogger("system").critical(msg)
+                    syslog.critical(msg)
                     return
                     
             dll_version = get_dll_version(_dll_path)
@@ -55,14 +55,14 @@ class VigemClient():
 
             except Exception as error:
                 msg = f"Unable to load Vigem interface dll: {_dll_path}\n{error}"
-                logging.getLogger("system").warning(msg)
+                syslog.warning(msg)
             try:
                 VigemClient._dll = _di_listener_dll
                 
             except Exception as error:
                 msg = f"Unable to initialize Vigem: {_dll_path}\n{error}"
                 display_error(msg)
-                logging.getLogger("system").warning(msg)
+                syslog.warning(msg)
 
             VigemClient.initalized = True
 

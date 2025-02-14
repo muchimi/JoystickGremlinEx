@@ -75,7 +75,7 @@ class AxisNames(Enum):
         try:
             return _AxisNames_to_string_lookup[value]
         except KeyError:
-            logging.getLogger("system").error(f"AxisNames: Don't know how to convert axis to string: '{value}' to a string - defaulting to X (1)")
+            syslog.error(f"AxisNames: Don't know how to convert axis to string: '{value}' to a string - defaulting to X (1)")
             return "X"
 
     @staticmethod
@@ -83,7 +83,7 @@ class AxisNames(Enum):
         try:
             return _AxisNames_to_enum_lookup[value]
         except KeyError:
-            logging.getLogger("system").error(f"AxisNames: Don't know how to convert axis to enum: '{value}' to a string - defaulting to X (1)")
+            syslog.error(f"AxisNames: Don't know how to convert axis to enum: '{value}' to a string - defaulting to X (1)")
             return AxisNames.X
         
     @staticmethod

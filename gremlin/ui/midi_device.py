@@ -486,18 +486,18 @@ class MidiListener(AbortableThread):
         try:
             self.reset()
             with mido.open_input(self.port_name) as inport:
-                logging.getLogger("system").info(f"MIDI Interface: Active on port: {self.port_name} [{self.port_number}]")
+                syslog.info(f"MIDI Interface: Active on port: {self.port_name} [{self.port_number}]")
                 while not self.stopped():
                     for message in inport.iter_pending():
                         if verbose:
-                            logging.getLogger("system").info(f"MIDI: heard message: {message}")
+                            syslog.info(f"MIDI: heard message: {message}")
                         self.callback(self.port_name, self.port_number, message)
                     time.sleep(0.01)
                         
                 if verbose:
-                    logging.getLogger("system").info(f"MIDI: close port {self.port_number}")
+                    syslog.info(f"MIDI: close port {self.port_number}")
         except Exception as err:
-            logging.getLogger("system").error(f"MIDI: unable to open port {self.port_name} {self.port_number} - ensure another utility is not using this port.")
+            syslog.error(f"MIDI: unable to open port {self.port_name} {self.port_number} - ensure another utility is not using this port.")
 
 
 
@@ -545,7 +545,7 @@ class MidiInterface(QtCore.QObject):
 
     
         for port in self._port_names:
-            logging.getLogger("system").info(f"MIDI device detected: {port}")
+            syslog.info(f"MIDI device detected: {port}")
 
     def buildMessageKey(self, command, port_name, message):
         ''' builds a MIDI message key from data '''
@@ -593,7 +593,7 @@ class MidiInterface(QtCore.QObject):
         for port_number in self._monitored_ports:
             port_name = self._port_names[port_number]
             if verbose:
-                logging.getLogger("system").info(f"MIDI Interface: START listen requested on port: {port_name} [{port_number}]")
+                syslog.info(f"MIDI Interface: START listen requested on port: {port_name} [{port_number}]")
             listener = MidiListener(port_name, port_number, self._message_cb)
             listener.start()
             self._listeners[port_number] = listener
@@ -604,7 +604,7 @@ class MidiInterface(QtCore.QObject):
         # request stop
         verbose = gremlin.config.Configuration().verbose_mode_details
         if verbose:
-            logging.getLogger("system").info(f"MIDI Interface: STOP listen requested")
+            syslog.info(f"MIDI Interface: STOP listen requested")
 
 
         for port_number in self._monitored_ports:
@@ -615,7 +615,7 @@ class MidiInterface(QtCore.QObject):
                 listener.stop()
                 listener.join()
             if verbose:
-                logging.getLogger("system").info(f"MIDI Interface: port [{port_number}] stopped")
+                syslog.info(f"MIDI Interface: port [{port_number}] stopped")
             del self._listeners[port_number]
 
         # clear
@@ -683,7 +683,7 @@ class MidiInputListenerWidget(QtWidgets.QFrame):
         self._callback = callback
 
         if port_name and not port_name in self._interface.ports:
-            logging.getLogger("system").error(f"MIDI listener: invalid port name: {port_name}")
+            syslog.error(f"MIDI listener: invalid port name: {port_name}")
             self.close()
             return
         
@@ -950,7 +950,7 @@ class MidiInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
                     self._midi_message = message
                     self._load_message(port_name, port_index, message)
                 else:
-                    logging.getLogger("system").error(f"MIDI config: unable to find port {port_name} - skipping load")
+                    syslog.error(f"MIDI config: unable to find port {port_name} - skipping load")
         
         self.command = self._midi_command_selector_widget.currentData()
         self.port_name = self._midi_port_selector_widget.currentText()
@@ -1284,7 +1284,7 @@ class MidiInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
             hex = byte_list_to_string(data)
             self._midi_data_widget.setText(hex)
             if verbose:
-                logging.getLogger("system").info(f"MIDI: set port: {port_name} cmd: {command} data: {data}")
+                syslog.info(f"MIDI: set port: {port_name} cmd: {command} data: {data}")
         else:
   
             # set the channel
@@ -1315,7 +1315,7 @@ class MidiInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
                 raise ValueError(f"MIDI _load_message(): don't know how ot handle command: {command}")
 
             if verbose:
-                logging.getLogger("system").info(f"MIDI: set port: {port_name} cmd: {command} V1 {v1}/{v1:02X} V2 {v2}/{v2:02X}")
+                syslog.info(f"MIDI: set port: {port_name} cmd: {command} V1 {v1}/{v1:02X} V2 {v2}/{v2:02X}")
             
               
             with QtCore.QSignalBlocker(self._midi_data_a_widget):
@@ -1361,7 +1361,7 @@ class MidiInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
 
                     other_key = other_input.message_key
                     if key == other_key:
-                        logging.getLogger("system").info(f"MIDI: conflict detected: key {key} is the same as {other_key}")
+                        syslog.info(f"MIDI: conflict detected: key {key} is the same as {other_key}")
                         self._validation_message_widget.setText(f"Input conflict detected with input [{index+1}] - ensure inputs are unique")
                         self._validation_message_widget.setIcon("fa.warning",True, color="red")
                         valid = False
@@ -1945,7 +1945,7 @@ class MidiClient(QtCore.QObject):
                                     if input_item.port_valid:
                                         self._midi_map[current_mode][message_key].append(input_item)
                                         if verbose:
-                                            logging.getLogger("system").info(f"MIDI: profile mode: [{current_mode}] register trigger on: {input_item.display_name} mode: {input_item.mode_string} key: {message_key}")
+                                            syslog.info(f"MIDI: profile mode: [{current_mode}] register trigger on: {input_item.display_name} mode: {input_item.mode_string} key: {message_key}")
             if verbose: syslog.info(f"MIDI: Map loaded: found {len(self._midi_map)} items")
 
 
@@ -1989,7 +1989,7 @@ class MidiClient(QtCore.QObject):
         current_mode = gremlin.shared_state.current_mode
 
         if current_mode in self._midi_map and message_key in self._midi_map[current_mode]:
-            # logging.getLogger("system").info(f"MIDI: runtime: processing {message_key}")
+            # syslog.info(f"MIDI: runtime: processing {message_key}")
             for input_item in self._midi_map[current_mode][message_key]:
                 # send the value over if the message is a value type message
                 range = 128
@@ -2025,7 +2025,7 @@ class MidiClient(QtCore.QObject):
                     value = raw_value
 
                 if verbose:
-                    logging.getLogger("system").info(f"MIDI: send event: is_pressed: {is_pressed} value: {value} raw value: {raw_value} is axis: {is_axis}")
+                    syslog.info(f"MIDI: send event: is_pressed: {is_pressed} value: {value} raw value: {raw_value} is axis: {is_axis}")
 
                 # tell the UI about the message
                 self._event_listener.midi_event.emit(

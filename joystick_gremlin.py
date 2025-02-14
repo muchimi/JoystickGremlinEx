@@ -595,7 +595,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         if device_guid is not None:
             verbose = gremlin.config.Configuration().verbose
             if verbose:
-                logging.getLogger("system").info(f"Tab index change: new tab [{index}] {self.ui.devices.tabText(index)} - device {device_guid} {gremlin.shared_state.get_device_name(device_guid)}")
+                syslog.info(f"Tab index change: new tab [{index}] {self.ui.devices.tabText(index)} - device {device_guid} {gremlin.shared_state.get_device_name(device_guid)}")
             self.last_tab_index = index
             _, restore_input_type, restore_input_id = self.config.get_last_input(device_guid)
             self._select_input(device_guid = device_guid, input_type = restore_input_type, input_id = restore_input_id, force_update =True, force_switch=True, tab_changed = True)
@@ -1004,7 +1004,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         import gremlin.shared_state
 
         if self.activate_locked:
-            #logging.getLogger("system").info("Activate: re-entry")
+            #syslog.info("Activate: re-entry")
             return
 
 
@@ -1014,7 +1014,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
             self.abort_received = False
             self.abort_reason = None
-            #logging.getLogger("system").info("Activate: start")
+            #syslog.info("Activate: start")
             self.activate_locked = True
 
             is_running = gremlin.shared_state.is_running
@@ -1059,7 +1059,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             else:
                 # Stop running the code
                 if verbose:
-                    logging.getLogger("system").info(f"Deactivate profile requested")
+                    syslog.info(f"Deactivate profile requested")
                 if is_running:
                     # running - save the last running mode to the executing profile
                     self.profile.set_last_runtime_mode(gremlin.shared_state.runtime_mode)
@@ -1101,11 +1101,11 @@ class GremlinUi(QtWidgets.QMainWindow):
                 except:
                     pass
         except Exception as err:
-            logging.getLogger("system").error(f"Activate: error: {err}\n{traceback.format_exc()}")
+            syslog.error(f"Activate: error: {err}\n{traceback.format_exc()}")
 
         finally:
 
-            #logging.getLogger("system").info("Activate: completed")
+            #syslog.info("Activate: completed")
             self.activate_locked = False
 
             self.setUiMode()
@@ -2696,7 +2696,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         return (None, None)
 
     def _dump_tab_map(self, tab_map):
-        log = logging.getLogger("system")
+        log = syslog
         for index, (device_guid, device_name, device_class, tab_index) in tab_map.items():
             log.info(f"[{index}] Tab index: [{tab_index}] {device_name} {device_class} {device_guid}")
 
@@ -2860,7 +2860,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             while self._device_change_queue > 0:
                 verbose = gremlin.config.Configuration().verbose_mode_device
                 try:
-                    # syslog =logging.getLogger("system")
+                    # syslog =syslog
                     if verbose:
                         syslog.info(f"Device change begin")
 
@@ -2890,12 +2890,12 @@ class GremlinUi(QtWidgets.QMainWindow):
                     self.ui.actionActivate.setChecked(False)
                     restart = self.runner.is_running()
                     if restart:
-                        logging.getLogger("system").info(f"Profile restart due to device change")
+                        syslog.info(f"Profile restart due to device change")
                     self.activate(restart)
                 finally:
 
                     if verbose:
-                        logging.getLogger("system").info(f"Device change end")
+                        syslog.info(f"Device change end")
                     self.device_change_locked = False
                 # mark items processed
                 self._device_change_queue = 0
@@ -3487,7 +3487,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         except (KeyError, TypeError) as error:
             # An error occurred while parsing an existing profile,
             # creating an empty profile instead
-            logging.getLogger("system").exception(f"Invalid profile content:\n{error}")
+            syslog.exception(f"Invalid profile content:\n{error}")
             self.new_profile()
         except gremlin.error.ProfileError as error:
             # Parsing the profile went wrong, stop loading and start with an
@@ -4014,7 +4014,7 @@ def exception_hook(exception_type, value, trace):
     """
     msg = "Uncaught exception:\n"
     msg += " ".join(traceback.format_exception(exception_type, value, trace))
-    logging.getLogger("system").error(msg)
+    syslog.error(msg)
     gremlin.util.display_error(msg)
 
 
@@ -4077,7 +4077,7 @@ if __name__ == "__main__":
     from dinput import DILL
     DILL.init()
     DILL.initialize_capi()
-    logging.getLogger("system").info(f"Found DirectInput Interface version {DILL.version}")
+    syslog.info(f"Found DirectInput Interface version {DILL.version}")
 
     # Show unhandled exceptions to the user when running a compiled version
     # of Joystick Gremlin
@@ -4129,11 +4129,11 @@ if __name__ == "__main__":
         syslog.info("Checking vJoy installation")
         vjoy_count = len([dev for dev in gremlin.joystick_handling.joystick_devices() if dev.is_virtual])
         vjoy_working = vjoy_count != 0
-        logging.getLogger("system").info(f"\tFound {vjoy_count} vjoy device(s)")
+        syslog.info(f"\tFound {vjoy_count} vjoy device(s)")
 
         if not vjoy_working:
             msg = "No configured VJOY devices were found<br>This could be related to a different error scanning devices, check log in verbose mode"
-            logging.getLogger("system").error(msg)
+            syslog.error(msg)
             gremlin.ui.ui_common.MessageBox("Error Scanning Devices", msg)
             # raise gremlin.error.GremlinError(msg)
 

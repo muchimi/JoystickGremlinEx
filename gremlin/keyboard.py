@@ -138,6 +138,8 @@ class Key():
         # self._latched_keys.add_callback(self._changed_cb)            
 
         self._name = None
+        self._key_id_translate = None
+        self._key_id = None
 
         if not name:
             self._load(scan_code, is_extended, virtual_code, is_mouse)
@@ -155,8 +157,15 @@ class Key():
         self._update()
 
     @property
-    def key_id(self):
+    def key_id(self) -> tuple:
         return self._key_id
+    
+    @property
+    def key_id_translated(self) -> tuple:
+        if not self._key_id_translate and self._key_id:
+            self._key_id_translate, _ = KeyMap.translate(self._key_id)
+        return self._key_id_translate
+        
 
     @property
     def virtual_code(self):
@@ -211,6 +220,8 @@ class Key():
                 scan_code = scan_code & 0xFF
                 is_extended = True
 
+     
+
             if virtual_code > 0 and scan_code == 0:
                 # get scan code from VK
                 scan_code, is_extended = KeyMap.find_virtual(virtual_code)
@@ -260,7 +271,7 @@ class Key():
         self._update()
 
     # def _changed_cb(self, owner , action, index, value):
-    #     logging.getLogger("system").info(f"Key {self.name} latch change: {action} index: {index} value: {value}")
+    #     syslog.info(f"Key {self.name} latch change: {action} index: {index} value: {value}")
     #     self._update()
 
     def _update(self):
@@ -278,10 +289,10 @@ class Key():
                 if code:
                     code += " + "
                 result += key._name
-                code += f"0x{key._scan_code:X}{'_EX' if key._is_extended else ''}"
+                code += f"0x{key._scan_code:X}({key._scan_code:02}){' EX' if key._is_extended else ''}"
             self._latched_name = result
         else: 
-            code = f"0x{self._scan_code:X}{'_EX' if self._is_extended else ''}"
+            code = f"0x{self._scan_code:02X}({self._scan_code:02}){' EX' if self._is_extended else ''}"
             self._latched_name = ""
         self._latched_code = code
         
@@ -325,7 +336,7 @@ class Key():
                     # one key isn't pressed = not latched
                     return False
 
-        #logging.getLogger("system").info(f"latch check: key {self.name} latched: {latched}")
+        #syslog.info(f"latch check: key {self.name} latched: {latched}")
         return latched
     
     
@@ -353,7 +364,7 @@ class Key():
     
     @property
     def debug_name(self):
-        return f"{self.name} (0x{self._scan_code:X}/{self._scan_code}/{self._is_extended}]"
+        return f"{self.name} (0x{self._scan_code:02X}/{self._scan_code}{' EX' if self._is_extended else ''}]"
 
 
     def __eq__(self, other):
@@ -555,7 +566,7 @@ def key_from_name(name, validate = False) -> Key:
             # skip error reporting on validation
             return None
         
-        logging.getLogger("system").warning(
+        syslog.warning(
             f"Invalid key name specified \"{name}\""
         )
         raise error.KeyboardError(
@@ -630,7 +641,7 @@ def key_from_code(scan_code, is_extended):
     name = KeyMap.virtual_input_to_unicode(virtual_code)
     
     if virtual_code == 0xFF or name is None:
-        logging.getLogger("system").warning(
+        syslog.warning(
             f"Invalid scan code specified ({scan_code} (0x{scan_code:x}), {is_extended})"
         )
         # raise error.KeyboardError(
@@ -879,12 +890,20 @@ class KeyMap:
     @staticmethod
     def from_event(event):
         ''' returns a key based on a keyboard event '''
-        key = KeyMap.find(event.identifier[0], event.identifier[1])
-        if not key and event.virtual_code > 0:
-            key = KeyMap.find_virtual(event.virtual_code)
-        if key is None:
-            logging.getLogger("system").warning(f"Don't know how to handle key event: {event}")
-        return key
+        try:
+            if event:
+                scan_code = event.identifier[0]
+                extended = event.identifier[1]
+                key = KeyMap.find(scan_code, extended)
+                if not key and event.virtual_code > 0:
+                    key = KeyMap.find_virtual(event.virtual_code)
+                if key is None:
+                    syslog.error(f"KEY: Don't know how to handle event: 0x{scan_code:02X} ({scan_code}) extended: {extended}")
+                return key
+        except Exception as ex:
+            syslog.error(f"KEY: error: invalid event: {ex}")
+        syslog.error("KEY: invalid event")
+        return None
 
     
      
@@ -945,7 +964,15 @@ class KeyMap:
                 break
 
         if state == 0:
-            name = f"Key 0x{scan_code:X} (0x{virtual_code:X}))"
+            # resolve manually
+            name = None
+            for p_name, p_scan_code, p_extended, p_virtual_code in KeyMap._g_name_map.values():
+                if scan_code == p_scan_code and virtual_code == p_virtual_code:
+                    name = p_name
+                    break
+            
+            if not name:
+                name = f"Key 0x{scan_code:02X}({scan_code:02}) VK {virtual_code:X}))"
             return name
         return output_buffer.value.upper()
     
@@ -1142,7 +1169,7 @@ class KeyMap:
     _g_map = {}
 
     _g_name_map = {
-        # Function keys
+        # Function keys  (name, scancode, extended, virtual code)
         "f1": ("F1", 0x3b, False, win32con.VK_F1),
         "f2": ("F2", 0x3c, False, win32con.VK_F2),
         "f3": ("F3", 0x3d, False, win32con.VK_F3),

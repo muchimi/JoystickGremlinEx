@@ -251,7 +251,7 @@ class DoubleTapContainerFunctor(gremlin.base_conditions.AbstractFunctor):
         if event.event_type == InputType.JoystickHat:
             is_pressed = value.current != (0,0)
         elif not isinstance(value.current, bool):
-            logging.getLogger("system").warning(
+            syslog.warning(
                 f"Invalid data type received in DoubleTap container: {type(event.value)}"
             )
             return False

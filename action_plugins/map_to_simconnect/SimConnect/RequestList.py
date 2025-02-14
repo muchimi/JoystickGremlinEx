@@ -39,7 +39,7 @@ class AircraftRequests():
 		''' sets the value of the current request '''
 		request = self.request(key)
 		if request is None:
-			logging.getLogger("system").warning(f"Simconnect: Request: key {key} not found in request list")
+			syslog.warning(f"Simconnect: Request: key {key} not found in request list")
 			return False
 		
 		self.sm.set_data(request)

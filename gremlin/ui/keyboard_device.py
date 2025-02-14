@@ -510,11 +510,11 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
             identifier = self.input_item_list_model.data(index)
             input_id = identifier.input_id
-            #logging.getLogger("system").info(f"Editing index {index} {input_id.display_name}")
+            #syslog.info(f"Editing index {index} {input_id.display_name}")
         else:
             input_id = KeyboardInputItem()
             index = self.input_item_list_model.rows() # new index
-            #logging.getLogger("system").info(f"Adding new kbd input index {index} ")
+            #syslog.info(f"Adding new kbd input index {index} ")
         input_id.key = root_key
         input_type = InputType.KeyboardLatched # always use latched type starting with 13.40.14ex if root_key.is_latched else InputType.Keyboard
 
@@ -539,7 +539,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         verbose = gremlin.config.Configuration().verbose
         if verbose:
-            logging.getLogger("system").info(f"Final item index {index} {input_id.display_name}")
+            syslog.info(f"Final item index {index} {input_id.display_name}")
         
  
 
@@ -710,7 +710,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         data = self.model.data(index)
         sequence = data.input_id.sequence
             
-        logging.getLogger("system").info(f"Editing index {index} {data.input_id.display_name}")
+        syslog.info(f"Editing index {index} {data.input_id.display_name}")
         gremlin.shared_state.push_suspend_ui_keyinput()
         self._keyboard_dialog = InputKeyboardDialog(sequence, parent = self, select_single = False, index = index)
         self._keyboard_dialog.accepted.connect(self._dialog_ok_cb)

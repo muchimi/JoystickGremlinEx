@@ -178,7 +178,7 @@ def _virtual_input_to_unicode(virtual_code):
     )
 
     if state == 0:
-        logging.getLogger("system").error(
+        syslog.error(
             f"No translation for key {hex(virtual_code)} available"
         )
         return str(hex(virtual_code))
@@ -478,7 +478,7 @@ class MacroManager(QtCore.QObject):
             self._active[macro.id] = macro # add the macro to the active queue
             Thread(target=functools.partial(self._execute_macro, macro, is_local, is_remote)).start()
         else:
-            logging.getLogger("system").warning(f"Attempting to dispatch an already running macro: ID: {macro.id}")
+            syslog.warning(f"Attempting to dispatch an already running macro: ID: {macro.id}")
 
     def _execute_macro(self, macro : Macro, is_local : bool = None, is_remote : bool = None):
         """Executes a given macro in a separate thread.

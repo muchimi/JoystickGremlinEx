@@ -870,7 +870,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
             if not mode in self.description_map[device_guid]:
                 self.description_map[device_guid][mode] = {}
             self.description_map[device_guid][mode][input_id] = description
-            logging.getLogger("system").info(f"register description: device guid: {str(device_guid)} {gremlin.shared_state.get_device_name(device_guid)} mode: {mode} input: {input_id} description: {description}")
+            syslog.info(f"register description: device guid: {str(device_guid)} {gremlin.shared_state.get_device_name(device_guid)} mode: {mode} input: {input_id} description: {description}")
 
 
     def _get_description(self, device_guid, mode, input_id):

@@ -245,7 +245,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
 
     def _paste_short_action(self, action, container):
         ''' called when a paste occurs '''
-        logging.getLogger("system").info("Paste short action")
+        syslog.info("Paste short action")
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
         action_item = plugin_manager.duplicate(action, self.profile_data)
         self.profile_data.short_action_sets.append([action_item])
@@ -265,7 +265,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
     
     def _paste_long_action(self, action, container):
         ''' called when a paste occurs '''
-        logging.getLogger("system").info("Paste long action")
+        syslog.info("Paste long action")
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
         action_item = plugin_manager.duplicate(action, self.profile_data)
         self.profile_data.long_action_sets.append([action_item])
@@ -432,12 +432,12 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractFunctor):
 
         if self.short_timeout > 0.0:
             if self.last_short_execution + self.short_timeout < time.time():
-                # logging.getLogger("system").info(f"reset short index")
+                # syslog.info(f"reset short index")
                 self.short_index = 0
             self.last_short_execution = time.time()
 
         if self.short_index < len(self.short_set):
-            # logging.getLogger("system").info(f"execute short press {self.short_index}")
+            # syslog.info(f"execute short press {self.short_index}")
             if self.short_index  == 1:
                 pass
             self.short_set[self.short_index].process_event(event, value)
@@ -445,25 +445,25 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractFunctor):
         if self.chain_short and (self.switch_on_press and value.current) or not value.current:
             # bump short index if chaining
             self.short_index = (self.short_index + 1) % len(self.short_set)
-            # logging.getLogger("system").info(f"bump short index {self.short_index}")
+            # syslog.info(f"bump short index {self.short_index}")
 
     def _trigger_long_press(self, event, value):
         ''' triggers a long press '''
 
         if self.long_timeout > 0.0:
             if self.last_long_execution + self.long_timeout < time.time():
-                # logging.getLogger("system").info(f"reset long index")
+                # syslog.info(f"reset long index")
                 self.long_index = 0
             self.last_long_execution = time.time()
 
         if self.long_index < len(self.long_set):
-            # logging.getLogger("system").info(f"execute long press {self.long_index}")
+            # syslog.info(f"execute long press {self.long_index}")
             self.long_set[self.long_index].process_event(event, value)
 
         if self.chain_long and (self.switch_on_press and value.current) or not value.current:
             # bump long index if chaining
             self.long_index = (self.long_index + 1) % len(self.long_set)
-            # logging.getLogger("system").info(f"bump long index {self.long_index}")            
+            # syslog.info(f"bump long index {self.long_index}")            
 
     def process_event(self, event, value):
         # TODO: Currently this does not handle hat or axis events, however
@@ -471,7 +471,7 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractFunctor):
         if event.event_type == InputType.JoystickHat:
             is_pressed = value.current != (0,0)
         elif not isinstance(value.current, bool):
-            logging.getLogger("system").warning(
+            syslog.warning(
                 f"Invalid data type received in TempoEx container: {type(event.value)}"
             )
             return False
@@ -491,7 +491,7 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractFunctor):
             self.timer.start()
 
             if self.activate_on == "press":
-                # logging.getLogger("system").info(f"execute short press (activation mode = press)")
+                # syslog.info(f"execute short press (activation mode = press)")
                 self._trigger_short_press(self.event_press, self.value_press)
 
         else:
@@ -515,7 +515,7 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractFunctor):
                 # Long press
                 self._trigger_long_press(event, value)
                 if self.activate_on == "press":
-                    # logging.getLogger("system").info(f"execute short press (activation mode = press) in LONG PRESS")
+                    # syslog.info(f"execute short press (activation mode = press) in LONG PRESS")
                     self._trigger_short_press(event, value)
 
 

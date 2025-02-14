@@ -15,7 +15,7 @@ import logging
 
 def check_err(err):
     if err != vcom.VIGEM_ERRORS.VIGEM_ERROR_NONE:
-        logging.getLogger("system").warning(f"VIGEM error: {vcom.VIGEM_ERRORS(err).name}")
+        syslog.warning(f"VIGEM error: {vcom.VIGEM_ERRORS(err).name}")
         return False
     return True
 

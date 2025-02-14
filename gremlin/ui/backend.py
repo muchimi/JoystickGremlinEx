@@ -146,7 +146,7 @@ class Backend(QtCore.QObject):
             )
             return InputItemModel(item, self)
         except error.ProfileError as e:
-            logging.getLogger("system").error(e)
+            syslog.error(e)
 
     @Slot(str, result=bool)
     def isActionExpanded(self, uuid_str: str) -> bool:
@@ -343,7 +343,7 @@ class Backend(QtCore.QObject):
         except (KeyError, TypeError) as e:
             # An error occurred while parsing an existing profile,
             # creating an empty profile instead
-            logging.getLogger("system").exception(
+            syslog.exception(
                 f"Invalid profile content:\n{e}"
             )
             self.newProfile()

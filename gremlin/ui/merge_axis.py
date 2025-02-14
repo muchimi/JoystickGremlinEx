@@ -283,7 +283,7 @@ class MergeAxisEntry(QtWidgets.QDockWidget):
                 "Default values have been set for the input, but they are "
                 "not what has been specified."
             )
-            logging.getLogger("system").error(str(e))
+            syslog.error(str(e))
 
         # Create correct physical device id
         joy1_id = data["lower"]["device_guid"]

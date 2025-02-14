@@ -465,7 +465,7 @@ def mouse_wheel(motion):
 def mouse_h_wheel(motion):
     # horizontal mouse wheel
     import logging
-    logging.getLogger("system").info(f"send h wheel direction {motion}")
+    syslog.info(f"send h wheel direction {motion}")
     _send_input(_mouse_input(MOUSEEVENTF_HWHEEL, data=-motion*WHEEL_DELTA))
 
 

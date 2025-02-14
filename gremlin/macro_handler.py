@@ -1036,7 +1036,7 @@ class MacroListModel(QtCore.QAbstractListModel):
         :return entry stored at the given index
         """
         if not 0 <= index < len(self._data):
-            logging.getLogger("system").error(
+            syslog.error(
                 "Attempted to retrieve macro entry at invalid index"
             )
             return None
@@ -1049,7 +1049,7 @@ class MacroListModel(QtCore.QAbstractListModel):
         :param index the index at which to store the entry
         """
         if not 0 <= index < len(self._data):
-            logging.getLogger("system").error(
+            syslog.error(
                 "Attempted to set an entry with index greater "
                 "then number of elements"
             )

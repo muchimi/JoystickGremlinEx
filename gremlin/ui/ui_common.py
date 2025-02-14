@@ -1461,7 +1461,7 @@ class ActionSelector(QtWidgets.QWidget):
         valid_actions = self._valid_action_list()
         if action.name in valid_actions:
             # valid action - clone it and add it
-            # logging.getLogger("system").info("Clipboard paste action trigger...")
+            # syslog.info("Clipboard paste action trigger...")
             self.action_paste.emit(action, self.container)
         else:
             # dish out a message
@@ -1763,7 +1763,7 @@ class ModeWidget(QtWidgets.QWidget):
             with QtCore.QSignalBlocker(self):
                 self.setCurrentIndex(index)
         else:
-            logging.getLogger("system").error(f"SetModeError: mode '{current_mode}' is not defined")
+            syslog.error(f"SetModeError: mode '{current_mode}' is not defined")
 
     def setShowModeEdit(self, value):
         ''' determines if the mode edit button is visible or not '''
@@ -5205,7 +5205,7 @@ class MarkdownDialog(QRememberDialog):
         else:
             location = gremlin.util.find_file(source, gremlin.shared_state.root_path)
         if location is not None and os.path.isfile(location):
-            logging.getLogger("system").info(f"dialog: found file : {location}")
+            syslog.info(f"dialog: found file : {location}")
             self._source = location
             with open(location,"+rt") as f:
                 md = f.read()

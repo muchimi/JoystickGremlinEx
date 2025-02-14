@@ -116,7 +116,7 @@ class SplitAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
                 "Default values have been set for the input, but they are "
                 "not what has been specified."
             )
-            logging.getLogger("system").error(str(e))
+            syslog.error(str(e))
 
     def save_vjoy_selection(self, axis_id, data):
         """Stores the data of a vJoy selector.

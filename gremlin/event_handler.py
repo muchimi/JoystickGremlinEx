@@ -476,6 +476,7 @@ class EventListener(QtCore.QObject):
 		self.keyboard_hook.register(self._keyboard_handler)
 		
 		# if in debug mode - don't hook the mouse
+		enable_mouse_hook = True 
 		enable_mouse_hook = False
 		self.mouse_hook = windows_event_hook.MouseHook()
 		if enable_mouse_hook:

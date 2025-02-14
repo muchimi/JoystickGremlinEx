@@ -198,7 +198,7 @@ class Axis:
             self._response_curve_fn = \
                 gremlin.spline.CubicBezierSpline(control_points)
         else:
-            logging.getLogger("system").error("Invalid spline type specified")
+            syslog.error("Invalid spline type specified")
             self._response_curve_fn = lambda x: x
 
     def set_deadzone(self, low, center_low, center_high, high):
@@ -233,7 +233,7 @@ class Axis:
         from gremlin.input_types import InputType
 
         if p_value is None or p_value < -1.0 or p_value > 1.0:
-            logging.getLogger("system").warning(
+            syslog.warning(
                 "Wrong data type provided, has to be float in [-1, 1]"
                 f" provided value was {p_value}"
             )
@@ -248,7 +248,7 @@ class Axis:
         # Log an error on invalid data but continue processing by clamping
         # the values in the next step
         if 1.0 - abs(p_value) < -0.001:
-            logging.getLogger("system").warning(
+            syslog.warning(
                 "Wrong data type provided, has to be float in [-1, 1],"
                 f" provided value was {p_value:.2f}"
             )
@@ -281,7 +281,7 @@ class Axis:
         # Log an error on invalid data but continue processing by clamping
         # the values in the next step
         if 1.0 - abs(value) < -0.001:
-            logging.getLogger("system").warning(
+            syslog.warning(
                 "Wrong data type provided, has to be float in [-1, 1],"
                 f" provided value was {value:.2f}"
             )
@@ -556,23 +556,23 @@ class VJoy:
         self.vjoy_id = None
 
         if not VJoyInterface.vJoyEnabled():
-            logging.getLogger("system").error("vJoy is not currently running")
+            syslog.error("vJoy is not currently running")
             raise VJoyError("vJoy is not currently running")
         #vjoy_version = VJoyInterface.GetvJoyVersion()
         # if vjoy_version < 0x218:
-        #     logging.getLogger("system").error(
+        #     syslog.error(
         #         f"Running incompatible vJoy version, 2.1.8+ is required - found {vjoy_version:x}"
         #     )
         #     raise VJoyError("Running incompatible vJoy version, 2.1.8  or later required")
         if VJoyInterface.GetVJDStatus(vjoy_id) != VJoyState.Free.value:
-            logging.getLogger("system").error(
+            syslog.error(
                 f"Requested vJoy device is not available - vid: {vjoy_id}"
             )
             raise VJoyError(
                 f"Requested vJoy device is not available - vid: {vjoy_id}"
             )
         elif not VJoyInterface.AcquireVJD(vjoy_id):
-            logging.getLogger("system").error(
+            syslog.error(
                 f"Failed to acquire the vJoy device - vid: {vjoy_id}"
             )
             raise VJoyError(
@@ -615,7 +615,7 @@ class VJoy:
 
         if self.pid != VJoyInterface.GetOwnerPid(self.vjoy_id):
             if not VJoyInterface.AcquireVJD(self.vjoy_id):
-                logging.getLogger("system").error(
+                syslog.error(
                     f"Failed to re-acquire the vJoy device - vid: {self.vjoy_id}")
                 raise VJoyError(
                     f"Failed to re-acquire the vJoy device - vid: {self.vjoy_id}"
@@ -789,7 +789,7 @@ class VJoy:
             for i in self._hat:
                 self._hat[i].direction = hat_states[i]
         else:
-            logging.getLogger("system").info(
+            syslog.info(
                 "Could not reset vJoy device, are we using it?"
             )
 
@@ -867,7 +867,7 @@ class VJoy:
             error_msg = "vJoy is configured incorrectly. \n\n" \
                     "Please ensure hats are configured as 'Continuous' " \
                     "rather then '4 Directions'."
-            logging.getLogger("system").error(error_msg)
+            syslog.error(error_msg)
             raise VJoyError(error_msg)
         # for hat_id in range(1, VJoyInterface.GetVJDDiscPovNumber(self.vjoy_id)+1):
         #     hats[hat_id] = Hat(self, hat_id, HatType.Discrete)

@@ -189,7 +189,7 @@ class SmartToggleContainerFunctor(gremlin.base_conditions.AbstractFunctor):
         # TODO: Currently this does not handle hat or axis events, however
         #       virtual buttons created on those inputs is supported
         if not isinstance(value.current, bool):
-            logging.getLogger("system").warning(
+            syslog.warning(
                 f"Invalid data type received in Smart Toggle container: {type(event.value)}"
             )
             return False

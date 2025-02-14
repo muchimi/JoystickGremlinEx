@@ -228,7 +228,7 @@ class InputItemListModel(ui_common.AbstractModel):
 
         if not index in self._index_map.keys():
             # bad index
-            #logging.getLogger("system").error(f"InputItemListModel: bad index request {index} for mode: {self._mode} device: {self._device_data.name}")
+            #syslog.error(f"InputItemListModel: bad index request {index} for mode: {self._mode} device: {self._device_data.name}")
             return None
 
         return self._index_map[index]
@@ -544,7 +544,7 @@ class InputItemListView(ui_common.AbstractView):
 
                     
                     if verbose:
-                        logging.getLogger("system").info(f"LV: {device_name} [{index:02d}] type: {InputType.to_string(data.input_type)} name: {data.input_id}")
+                        syslog.info(f"LV: {device_name} [{index:02d}] type: {InputType.to_string(data.input_type)} name: {data.input_id}")
 
 
                 self.scroll_layout.addStretch()
@@ -563,7 +563,7 @@ class InputItemListView(ui_common.AbstractView):
             return
 
 
-        # logging.getLogger("system").info(f"redraw_index: {index}")
+        # syslog.info(f"redraw_index: {index}")
 
         data = self.model.data(index)
         item = self.scroll_layout.itemAt(index)
@@ -982,7 +982,7 @@ class ActionSetView(ui_common.AbstractView):
             self.control_delete = QtWidgets.QPushButton(
                 load_icon("gfx/button_delete.png"), ""
             )
-            # logging.getLogger("system").info(f"action: delete allowed")
+            # syslog.info(f"action: delete allowed")
             self.control_delete.clicked.connect(
                 lambda: self.interacted.emit(ActionSetView.Interactions.Delete)
             )
@@ -1551,7 +1551,7 @@ class InputItemWidget(QtWidgets.QFrame):
                             lbl.setMinimumHeight(max_height)
                             lbl.setMaximumHeight(max_height)
                             lbl.setMinimumWidth(32)
-                            lbl.setToolTip(f"{key.name} Scan:  {key.scan_code:000}/0x{key.scan_code:X} Ext: {'yes' if key.is_extended else 'no'}")
+                            lbl.setToolTip(key.debug_name)
                             key_layout.addWidget(lbl)
                             container_layout.addWidget(key_widget)
                     else:
@@ -2302,7 +2302,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         verbose = gremlin.config.Configuration().verbose
         try:
             if verbose:
-                   logging.getLogger("system").info(f"Device change begin")
+                   syslog.info(f"Device change begin")
             tab_text = self.dock_tabs.tabText(index)
             self.profile_data.current_view_type = ui_common.ContainerViewTypes.to_enum(tab_text.lower())
             
@@ -2312,7 +2312,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
             return
         finally:
             if verbose:
-                   logging.getLogger("system").info(f"Device change end")
+                   syslog.info(f"Device change end")
 
     def _get_widget_index(self, widget):
         """Returns the index of the provided widget.
@@ -2365,7 +2365,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         oc.name = container.name
         clipboard.data = oc
         #clipboard.data = self.profile_data
-        logging.getLogger("system").info(f"container {self.profile_data.name} copied to clipboard")
+        syslog.info(f"container {self.profile_data.name} copied to clipboard")
 
     def _handle_interaction(self, widget, action):
         """Handles interaction with widgets inside the container.
@@ -2751,7 +2751,7 @@ class BasicActionWrapper(AbstractActionWrapper):
         oc =  ObjectEncoder(action, xml, action.name, EncoderType.Action)
         #clipboard.data = action
         clipboard.data = oc
-        logging.getLogger("system").info(f"copy to clipboard: {action.name}")
+        syslog.info(f"copy to clipboard: {action.name}")
 
 
 class ConditionActionWrapper(AbstractActionWrapper):

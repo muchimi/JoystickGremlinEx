@@ -326,7 +326,7 @@ def process_mouse_event(n_code, w_param, l_param):
                 is_wheel = True
 
         # if button_id:
-        #     logging.getLogger("system").info(f"Mouse button: {button_id}")
+        #     syslog.info(f"Mouse button: {button_id}")
 
         if button_id:
             # Create the event and pass it to all all registered callbacks

@@ -84,7 +84,7 @@ def get_variable_definitions(fname):
     for key, value in module.__dict__.items():
         if isinstance(value, AbstractVariable):
             if value.label in variables:
-                logging.getLogger("system").error(
+                syslog.error(
                     f"Plugin: Duplicate label {value.label} present in {fname}"
                 )
             variables[value.label] = value
@@ -636,7 +636,7 @@ class VirtualInputVariable(AbstractVariable):
 
     def set(self, vjoy, event):
         if event.event_type != self.value["input_type"]:
-            logging.getLogger("system").warning(
+            syslog.warning(
                 f"Invalid types for vJoy set action for vjoy {str(self.value["device_id"]),} {InputType.to_string(self.value["input_type"])} {self.value["input_id"]:d}"
             )
             return

@@ -133,7 +133,7 @@ class ProfileOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         default_mode = self.profile.get_default_mode()
         if not start_mode in self.mode_list:
             # the start mode no longer exists - use the default mode
-            logging.getLogger("system").warning(f"Specified start mode {start_mode} no longer exists - using default mode {default_mode}")
+            syslog.warning(f"Specified start mode {start_mode} no longer exists - using default mode {default_mode}")
             default_mode = self.profile.get_default_mode()
             start_mode = default_mode
             self.profile.set_start_mode(default_mode)
@@ -2684,7 +2684,7 @@ class DeviceInformationUi(ui_common.BaseDialogUi):
                 if item is not None:
                     verbose = gremlin.config.Configuration().verbose
                     if verbose:
-                        logging.getLogger("system").info(f"DeviceInfo: context click on: {item.row()} {item.column()} {item.text()}")
+                        syslog.info(f"DeviceInfo: context click on: {item.row()} {item.column()} {item.text()}")
                     self.menu = QtWidgets.QMenu(self)
                     action = QtWidgets.QWidgetAction(self)
                     label = QtWidgets.QLabel(self)
@@ -2705,7 +2705,7 @@ class DeviceInformationUi(ui_common.BaseDialogUi):
             clipboard.set_windows_clipboard_text(item.text())
             verbose = gremlin.config.Configuration().verbose
             if verbose:
-                logging.getLogger("system").info(f"DeviceInfo: copy to clipboard Item: {item.row()} {item.column()} {item.text()}")
+                syslog.info(f"DeviceInfo: copy to clipboard Item: {item.row()} {item.column()} {item.text()}")
 
     def _context_menu_cb(self, loc):
         ''' context menu for the table '''
@@ -3046,7 +3046,7 @@ class SubstituteDialog(gremlin.ui.ui_common.QRememberDialog):
             try:
                shutil.copyfile(xml_file, backup_file)
             except Exception as err:
-                logging.getLogger("system").error(f"Error backing up profile to :{backup_file}\n{err}")
+                syslog.error(f"Error backing up profile to :{backup_file}\n{err}")
                 self.ok_message_box("Error backing up the profile")
                 return
 
@@ -3077,7 +3077,7 @@ class SubstituteDialog(gremlin.ui.ui_common.QRememberDialog):
                 # out_file = os.path.join(dirname, f"sub_{basename}")
                 tree.write(out_file, pretty_print=True,xml_declaration=True,encoding="utf-8")
             except Exception as err:
-                logging.getLogger("system").error(f"Error writing updated profile: {out_file}\n{err}")
+                syslog.error(f"Error writing updated profile: {out_file}\n{err}")
                 self.ok_message_box("Error writing new profile")
                 return
         

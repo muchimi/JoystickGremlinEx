@@ -2164,7 +2164,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
 
     def _handle_symmetry_cb(self, state):
         if not isinstance(self.curve_model, CubicBezierSplineModel):
-            logging.getLogger("system").error(
+            syslog.error(
                 "Handle symmetry callback in non bezier curve attempted."
             )
             return

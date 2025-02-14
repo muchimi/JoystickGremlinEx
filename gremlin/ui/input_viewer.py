@@ -371,8 +371,20 @@ class InputViewerUi(ui_common.BaseDialogUi):
 
 
         config = VisualizationConfig()
-        keyboard_visible = config.getValue(gremlin.shared_state.keyboard_tab_guid, VisualizationType.Keyboard)
-        self._toggle_keyboard_widget(keyboard_visible)
+        self._keyboard_visible = config.getValue(gremlin.shared_state.keyboard_tab_guid, VisualizationType.Keyboard)
+        self._toggle_keyboard_widget(self._keyboard_visible)
+
+
+        self.installEventFilter(self)
+
+    def eventFilter(self, widget, event):
+        # filter events for keys so the window hotkeys don't interfere with the keyboard repeater
+        if self._keyboard_visible:
+            # keyboard visible - filter keys
+            t = event.type()
+            if t in (QtCore.QEvent.Type.KeyPress, QtCore.QEvent.Type.KeyRelease): 
+                return True
+        return super().eventFilter(widget, event)
         
 
     @QtCore.Slot()
@@ -441,6 +453,7 @@ class InputViewerUi(ui_common.BaseDialogUi):
             self.views.add_widget(self.keyboard_visualizer_widget)
             key = (gremlin.shared_state.keyboard_tab_guid, VisualizationType.Keyboard)
             self._widget_storage[key] = self.keyboard_visualizer_widget
+            self._keyboard_visible = True
         with QtCore.QSignalBlocker(self.keyboard_widget_selector):
             self.keyboard_widget_selector.setChecked(True)
 
@@ -453,6 +466,7 @@ class InputViewerUi(ui_common.BaseDialogUi):
             if key in self._widget_storage:
                 del self._widget_storage[key]
             self.keyboard_visualizer_widget = None
+            self._keyboard_visible = False
             
         with QtCore.QSignalBlocker(self.keyboard_widget_selector):
             self.keyboard_widget_selector.setChecked(False)

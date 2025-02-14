@@ -4,6 +4,7 @@ from lxml import etree as ElementTree
 from PySide6 import QtWidgets, QtCore, QtGui
 
 import gremlin.base_profile
+import gremlin.config
 import gremlin.event_handler
 from gremlin.input_types import InputType
 from gremlin.input_devices import ButtonReleaseActions
@@ -114,22 +115,48 @@ class QKeyboardWidget(QtWidgets.QWidget):
         ''' creates a full keyboard widget for manual data entry '''
         super().__init__(parent)
 
+        self.installEventFilter(self)  # capture keys so the window doesn't go nuts when we hit special keys
+
         main_layout = QtWidgets.QVBoxLayout(self)
         main_layout.setContentsMargins(0,0,0,0)
         grid_layout = QtWidgets.QGridLayout()
         main_layout.addLayout(grid_layout)
+
+        self.config = gremlin.config.Configuration()
 
         widget, layout = gremlin.ui.ui_common.getVContainer()
         self.repeater_container_widget = widget
         self.repeater_container_layout= layout
         
         main_layout.addWidget(self.repeater_container_widget)
-        self._show_repeater = True
+        self._show_repeater = self.config.keyboard_repeater_show
         self._repeater_lines = 30 # number of lines displayed in the repeater
         self._repeater_list = []
         self._repeater_timestamp = {}
+        self._invert_display = self.config.keyboard_repeater_invert_display
+        self._capture_mouse = self.config.keyboard_repeater_capture_mouse
 
+
+        clear_widget = QtWidgets.QPushButton("Clear")
+        clear_widget.setToolTip("Clears selection")
+        clear_widget.clicked.connect(self._clear_repeater)
+
+        capture_mouse_widget = QtWidgets.QCheckBox("Mouse Events")
+        capture_mouse_widget.setToolTip("Capture mouse events")
+        capture_mouse_widget.setChecked(self._capture_mouse)
+        capture_mouse_widget.clicked.connect(self._capture_mouse_changed)
+
+        invert_display_widget = QtWidgets.QCheckBox("Invert display")
+        invert_display_widget.setToolTip("Reverse event list")
+        invert_display_widget.setChecked(self._invert_display)
+        invert_display_widget.clicked.connect(self._invert_display_changed)
+
+
+        self.options_widget, _= gremlin.ui.ui_common.getHContainer([clear_widget, capture_mouse_widget, invert_display_widget])
+
+        self.repeater_container_layout.addWidget(self.options_widget)
         self.repeater_widget = QtWidgets.QPlainTextEdit()
+        self.repeater_widget.setReadOnly(True)
         self.repeater_container_layout.addWidget(self.repeater_widget)
 
         self.keyEvent.connect(self._update_repeater)
@@ -264,7 +291,7 @@ class QKeyboardWidget(QtWidgets.QWidget):
                     
                     widget.clicked.connect(self._widget_clicked_cb)
                     widget.hover.connect(self._key_hover_cb)
-                    #logging.getLogger("system").info(f"{key_name}: {key} {shifted}")
+                    #syslog.info(f"{key_name}: {key} {shifted}")
                     self._key_map[(action_key.scan_code, action_key.is_extended)] = key_name
                     self._key_widget_map[(action_key.scan_code, action_key.is_extended)] = widget
 
@@ -288,6 +315,45 @@ class QKeyboardWidget(QtWidgets.QWidget):
         self.key_description = QtWidgets.QLabel()
         main_layout.addWidget(self.key_description)
 
+    def eventFilter(self, widget, event):
+        t = event.type()
+        if t in (QtCore.QEvent.Type.KeyPress, QtCore.QEvent.Type.KeyRelease): 
+            return True
+        return super().eventFilter(widget, event)
+
+
+
+    @QtCore.Slot()
+    def _clear_repeater(self):
+        self._repeater_list.clear()
+        self._update_repeater()
+
+    @QtCore.Slot(bool)
+    def _capture_mouse_changed(self, checked):
+        self._capture_mouse = checked
+        self.config.keyboard_repeater_capture_mouse = checked
+        if not checked:
+            # clear mouse widgets
+            mouse_names = ["mouse_1",
+                           "mouse_2",
+                           "mouse_3",
+                           "mouse_4",
+                           "mouse_5",
+                           "wheel_right",
+                           "wheel_left",
+                           "wheel_up",
+                           "wheel_down"]
+            for map_key in mouse_names:
+                widget = self._key_widget_map[map_key]
+                widget.selected = False
+
+    
+    @QtCore.Slot(bool)
+    def _invert_display_changed(self, checked):
+        self._invert_display = checked
+        self.config.keyboard_repeater_invert_display = checked
+        self._repeater_list.reverse()
+        self._update_repeater()
 
     def setReadonly(self, value: bool):
         ''' set readonly flag - when readonly - acts as a repeater only (cannot be interacted with)'''
@@ -305,6 +371,7 @@ class QKeyboardWidget(QtWidgets.QWidget):
     def setRepeaterVisible(self, value : bool):
         ''' turns repeater on/off'''
         self._show_repeater = value
+        self.config.keyboard_repeater_show = value
         self.repeater_container_widget.setVisible(value)
 
     def setRepeaterLineCount(self, value : int):
@@ -337,7 +404,7 @@ class QKeyboardWidget(QtWidgets.QWidget):
 
 
     def hook(self):
-        ''' hooks to the keyboard input '''
+        ''' hooks to keyboard / mouse events '''
         import gremlin.windows_event_hook
         if not self._hooked:
             el = gremlin.event_handler.EventListener()
@@ -348,7 +415,7 @@ class QKeyboardWidget(QtWidgets.QWidget):
 
 
     def unhook(self):
-        ''' unhooks keyboard event '''
+        ''' unhooks keyboard / mouse events '''
         if self._hooked:
             el = gremlin.event_handler.EventListener()
             el.keyboard_event.disconnect(self._keyboard_handler)
@@ -360,19 +427,40 @@ class QKeyboardWidget(QtWidgets.QWidget):
 
     @QtCore.Slot(object)
     def _keyboard_handler(self, event):
-        
+        ''' handles an inbound API key '''
         key = gremlin.keyboard.KeyMap.from_event(event)
-        map_key = key.index_tuple()
+        if key is not None:
+            map_key = key.key_id
+            if map_key is not None:
+                if not map_key in self._key_widget_map:
+                    # see if a translation is needed
+                    map_key, vk = gremlin.keyboard.KeyMap.translate(map_key)
+                if map_key in self._key_widget_map:
+                    widget = self._key_widget_map[map_key]
+                    is_pressed = event.is_pressed
+                    widget.selected = is_pressed
+                    if self._show_repeater:
+                        self._add_repeater(key, is_pressed)
+                    return
+        
+            # output error message
+            now = datetime.datetime.now()
+            timestamp = now.strftime("%H:%M:%S")
+            try:
+                scan_code = event.identifier[0]
+                extended = event.identifier[1]
+                line = f"{timestamp}: [ERROR] 0x{scan_code:X} ({scan_code}) {'[EX]' if extended else ''} >>>> key not found"
+            except Exception as ex:
+                line = f"{timestamp}: [ERROR] {ex}"
+            self._add_line(line)
+                
 
-        if map_key is not None and map_key in self._key_widget_map:
-            widget = self._key_widget_map[map_key]
-            is_pressed = event.is_pressed
-            widget.selected = is_pressed
-            if self._show_repeater:
-                self._add_repeater(key, is_pressed)
+
 
     def _mouse_handler(self, event):
         ''' mouse handler '''
+        if not self._capture_mouse:
+            return
         # mouse special case
         match event.button_id:
             case gremlin.types.MouseButton.Left:
@@ -406,32 +494,53 @@ class QKeyboardWidget(QtWidgets.QWidget):
 
     def _add_repeater(self, key, is_pressed : bool ):
         ''' adds a key to the repeater '''
-        count = len(self._repeater_list)
-
+        
         now = datetime.datetime.now()
         timestamp = now.strftime("%H:%M:%S")
         interval = None
+        key_id = key.key_id_translated
         if is_pressed:
-            self._repeater_timestamp[key] = time.time()
+            self._repeater_timestamp[key_id] = time.time()
         else:
             # released
-            interval = time.time() - self._repeater_timestamp[key]
+            if key_id in self._repeater_timestamp:
+                interval = time.time() - self._repeater_timestamp[key_id]
+
 
         line = f"{timestamp}: [{key.name}] 0x{key.scan_code:X} ({key.scan_code}) {'[EX]' if key.is_extended else ''} {'pressed' if is_pressed else 'released'}"
 
         if interval is not None:
             line += f" ({int(interval*1000)} ms)"
         
-        if count > self._repeater_lines:
-            self._repeater_list.pop(0)
+        self._add_line(line)
+        
 
-        self._repeater_list.append(line)
+    def _add_line(self, line : str):
+        ''' adds a line to the display '''
+        count = len(self._repeater_list)
+        if count > self._repeater_lines:
+            if self._invert_display:
+                self._repeater_list.pop(-1)    
+            else:
+                self._repeater_list.pop(0)
+
+        if self._invert_display:
+            self._repeater_list.insert(0, line)
+        else:
+            self._repeater_list.append(line)
         self.keyEvent.emit()
 
     def _update_repeater(self):
         text = ''.join(line + "\n" for line in self._repeater_list)
         self.repeater_widget.setPlainText(text)
-        syslog.info(text)
+        cursor = self.repeater_widget.textCursor()
+        
+        if self._invert_display:
+            # move cursor to top
+            cursor.movePosition(QtGui.QTextCursor.MoveOperation.Start, QtGui.QTextCursor.MoveMode.MoveAnchor)
+        else:
+            cursor.movePosition(QtGui.QTextCursor.MoveOperation.End, QtGui.QTextCursor.MoveMode.MoveAnchor)
+        self.repeater_widget.setTextCursor(cursor)
 
 
 
@@ -571,7 +680,7 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
                     widget.selected = True
                 else:
                     # log the fact we didn't find the key in the keyboard dialog
-                    logging.getLogger("system").warning(f"Keyboard: unable to find {item} in dialog keyboard")
+                    syslog.warning(f"Keyboard: unable to find {item} in dialog keyboard")
 
     def _force_numlock_cb(self, checked):
         gremlin.shared_state.current_profile.set_force_numlock(checked)
@@ -828,7 +937,7 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
                     
                     widget.clicked.connect(self._widget_clicked_cb)
                     widget.hover.connect(self._key_hover_cb)
-                    #logging.getLogger("system").info(f"{key_name}: {key} {shifted}")
+                    #syslog.info(f"{key_name}: {key} {shifted}")
                     self._key_map[(action_key.scan_code, action_key.is_extended)] = key_name
                     assert key_name not in self._key_widget_map.keys(),f"duplicate key in keyboard map found: {key_name}"
 

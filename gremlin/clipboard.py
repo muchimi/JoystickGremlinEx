@@ -156,7 +156,7 @@ class Clipboard(QtCore.QObject):
                         f.flush()
                     except Exception as error:
                         write_ok = False
-                        logging.getLogger("system").error(f"Unable to store clipboard data: {error}")
+                        syslog.error(f"Unable to store clipboard data: {error}")
                 if not write_ok and os.path.isfile(self._clipboard_file):
                     os.unlink(self._clipboard_file)
 
@@ -168,7 +168,7 @@ class Clipboard(QtCore.QObject):
                     packed = base64.b64encode(pickled).decode('ascii') # text encoded
                     self.set_windows_clipboard_text(packed)
                 except Exception as error:
-                        logging.getLogger("system").error(f"DILL serializationf failed: {error}")        
+                        syslog.error(f"DILL serializationf failed: {error}")        
 
 
     def set_windows_clipboard_text(self, value : str):

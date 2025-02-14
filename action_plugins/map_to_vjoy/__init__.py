@@ -2472,7 +2472,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         # input_type information
         if input_type is None:
             input_type = InputType.JoystickButton
-            logging.getLogger("system").warning("None as input type encountered")
+            syslog.warning("None as input type encountered")
 
         # If no valid input item is selected get the next unused one
         if self.action_data.vjoy_input_id in [0, None]:
@@ -2599,7 +2599,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
                 "Default values have been set for the input, but they are "
                 "not what has been specified."
             )
-            logging.getLogger("system").error(str(e))
+            syslog.error(str(e))
 
     @QtCore.Slot()
     def _axis_reverse_changed(self):

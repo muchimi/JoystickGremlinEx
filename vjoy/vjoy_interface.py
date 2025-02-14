@@ -22,6 +22,8 @@ import os
 from gremlin.error import GremlinError
 import logging
 
+syslog = logging.getLogger("system")
+
 class VJoyState(enum.Enum):
 
     """Enumeration of the possible VJoy device states."""
@@ -173,7 +175,7 @@ class VJoyInterface:
                 if not os.path.isfile(_dll_path):
                     msg = f"Unable to continue - missing dll: {_dll_path}"
                     display_error(msg)
-                    logging.getLogger("system").critical(msg)
+                    syslog.critical(msg)
                     os._exit(1) 
 
             # check vjoy driver version and that it's installed
@@ -184,15 +186,15 @@ class VJoyInterface:
             #     if not version_valid(driver_version, min_version):
             #         msg = f"Invalid VJOY driver: {min_version} required, found {driver_version}"
             #         display_error(msg)
-            #         logging.getLogger("system").critical(msg)
+            #         syslog.critical(msg)
             #         os._exit(1) 
 
-            #     logging.getLogger("system").info(f"Found VJOY driver {driver_version}")
+            #     syslog.info(f"Found VJOY driver {driver_version}")
             # else:
             #     # no driver
             #     msg = f"VJOY driver not detected - unable to continue - expecting version {min_version}"
             #     display_error(msg)
-            #     logging.getLogger("system").critical(msg)
+            #     syslog.critical(msg)
             #     os._exit(1)             
 
 
@@ -202,17 +204,17 @@ class VJoyInterface:
             if not version_valid(dll_version, min_version):
                 msg = f"Invalid version dll: {_dll_path}\nVersion {min_version} required, found {dll_version}"
                 display_error(msg)
-                logging.getLogger("system").critical(msg)
+                syslog.critical(msg)
                 os._exit(1)
 
-            logging.getLogger("system").info(f"Found VJOY DLL version {dll_version}")
+            syslog.info(f"Found VJOY DLL version {dll_version}")
 
             try:
                 VJoyInterface.vjoy_dll = ctypes.cdll.LoadLibrary(_dll_path)
             except Exception as error:
                 msg = f"vjoy_interface.dll load error, unable to continue:\n{error}"
                 display_error(msg)
-                logging.getLogger("system").critical(msg)
+                syslog.critical(msg)
                 os._exit(1)
 
 

@@ -427,7 +427,7 @@ class Configuration:
         # Handle the normal case where the path matches directly
         profile_path = self.get_profile(exec_path)
         if profile_path is not None:
-            logging.getLogger("system").info(
+            syslog.info(
                 f"Found exact match for {exec_path}, returning {profile_path}"
             )
             return profile_path
@@ -445,7 +445,7 @@ class Configuration:
             # Treat key as regular expression and attempt to match it to the
             # provided executable path
             if re.search(key, exec_path) is not None:
-                logging.getLogger("system").info(
+                syslog.info(
                     f"Found regex match in {key} for {exec_path}, returning {value}"
                 )
                 return value
@@ -1634,12 +1634,12 @@ class Configuration:
                 self._profile_data["last_input"] = data
                 self.save_profile()
                 if verbose:
-                    logging.getLogger("system").info(f"Loading default input selection: {device_guid} {device_name} {input_type} {input_id}")
+                    syslog.info(f"Loading default input selection: {device_guid} {device_name} {input_type} {input_id}")
                 return (device_guid, input_type, input_id)
             
 
         if verbose:
-            logging.getLogger("system").info(f"Loading input selection: nothing found for {device_guid} {device_name}")
+            syslog.info(f"Loading input selection: nothing found for {device_guid} {device_name}")
         return (None, None, None)
         
 
@@ -1869,3 +1869,32 @@ class Configuration:
     @start_on_f5.setter
     def start_on_f5(self, value:bool):
         self._data["start_on_f5"] = value
+        self.save()
+
+
+    @property
+    def keyboard_repeater_invert_display(self) -> bool:
+        return self._data.get("keyboard_repeater_invert_display", False)
+    
+    @keyboard_repeater_invert_display.setter
+    def keyboard_repeater_invert_display(self, value : bool):
+        self._data["keyboard_repeater_invert_display"] = value
+        self.save()
+
+    @property
+    def keyboard_repeater_capture_mouse(self) -> bool:
+        return self._data.get("keyboard_repeater_capture_mouse", False)
+    
+    @keyboard_repeater_capture_mouse.setter
+    def keyboard_repeater_capture_mouse(self, value : bool):
+        self._data["keyboard_repeater_capture_mouse"] = value
+        self.save()
+
+    @property
+    def keyboard_repeater_show(self) -> bool:
+        return self._data.get("keyboard_repeater_show", True)
+    
+    @keyboard_repeater_show.setter
+    def keyboard_repeater_show(self, value : bool):
+        self._data["keyboard_repeater_show"] = value
+        self.save()

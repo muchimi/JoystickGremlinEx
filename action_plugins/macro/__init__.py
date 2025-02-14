@@ -134,7 +134,7 @@ class Macro(gremlin.base_profile.AbstractAction):
                 elif repeat_type == "hold":
                     self.repeat = gremlin.macro.HoldRepeat()
                 else:
-                    logging.getLogger("system").warning(
+                    syslog.warning(
                         f"Invalid macro repeat type: {repeat_type}"
                     )
 

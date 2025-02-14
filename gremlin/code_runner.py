@@ -163,7 +163,7 @@ class CodeRunner:
         # heuristic
 
         start_mode = gremlin.shared_state.current_profile.get_start_mode()
-        logging.getLogger("system").info(f"Startup mode: {start_mode}")
+        syslog.info(f"Startup mode: {start_mode}")
         
         # Set default macro action delay
         gremlin.macro.MacroManager().default_delay = settings.default_delay
@@ -198,7 +198,7 @@ class CodeRunner:
                 for instance in plugin.instances:
                     # Skip all instances that are not fully configured
                     if not instance.is_configured():
-                        logging.getLogger("system").warn(f"Warning: User plugin '{plugin_basename}': instance '{instance.name}' reports not configured - skipping runtime activation")
+                        syslog.warn(f"Warning: User plugin '{plugin_basename}': instance '{instance.name}' reports not configured - skipping runtime activation")
                         continue
 
                     # Store variable values in the registry
@@ -292,7 +292,7 @@ class CodeRunner:
                             for container in input_item.containers:
                                 if not container.is_valid():
                                     test = container.is_valid()
-                                    logging.getLogger("system").warning(
+                                    syslog.warning(
                                         "Incomplete container ignored"
                                     )
                                     continue

@@ -571,7 +571,7 @@ class SimconnectOptions(QtCore.QObject):
 
 
         except Exception as err:
-            logging.getLogger("system").error(f"Simconnect Config: XML read error: {xml_source}: {err}")
+            syslog.error(f"Simconnect Config: XML read error: {xml_source}: {err}")
             return False
 
     def to_xml(self):
@@ -640,7 +640,7 @@ class SimconnectOptions(QtCore.QObject):
             tree = etree.ElementTree(root)
             tree.write(self._xml_source, pretty_print=True,xml_declaration=True,encoding="utf-8")
         except Exception as err:
-            logging.getLogger("system").error(f"SimconnectData: unable to create XML simvars: {self._xml_source}: {err}")
+            syslog.error(f"SimconnectData: unable to create XML simvars: {self._xml_source}: {err}")
 
     def get_community_folder(self):
         ''' looks for the community folder '''
@@ -1001,7 +1001,7 @@ class SimconnectMonitor():
         enabled = gremlin.shared_state.getSimConnectEnabled()
         self._enabled = enabled
         if enabled:
-            logging.getLogger("system").info(f"SCMONITOR: Start")
+            syslog.info(f"SCMONITOR: Start")
 
             eh = gremlin.event_handler.EventHandler()
             eh.registerModeValidator(self._mode_change_validator) # filter mode change requests and discard them if needed to avoid interrupting Simconnect activities
@@ -1009,7 +1009,7 @@ class SimconnectMonitor():
             self.start()
         else:
             self.stop() # stop monitoring if it was
-            logging.getLogger("system").info(f"SCMONITOR: no simconnect mappings found - start skipped")
+            syslog.info(f"SCMONITOR: no simconnect mappings found - start skipped")
 
     
     def start(self):
@@ -2130,7 +2130,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
     def _mode_from_aircraft_button_cb(self):
         ''' mode from aicraft button '''
         aircraft, model, title = self._sm_data.get_aircraft_data()
-        logging.getLogger("system").info(f"Aircraft: {aircraft} model: {model} title: {title}")
+        syslog.info(f"Aircraft: {aircraft} model: {model} title: {title}")
         if not title in self._mode_list:
             self.profile.add_mode(title)
             

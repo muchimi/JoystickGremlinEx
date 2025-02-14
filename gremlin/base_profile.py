@@ -644,7 +644,7 @@ class AbstractContainer(ProfileData):
                 self.action_sets.append(action_set)
             # update 5/30/24 - EMCS remove warning as custom action sets won't be read here
             # else:
-            #     logging.getLogger("system").warning(
+            #     syslog.warning(
             #         f"Unknown node present: {child.tag}"
             #     )
 
@@ -659,7 +659,7 @@ class AbstractContainer(ProfileData):
         for child in node:
             
             if child.tag not in action_name_map:
-                logging.getLogger("system").warning(
+                syslog.warning(
                     f"Unknown node present: {child.tag}"
                 )
                 continue
@@ -725,7 +725,7 @@ class AbstractContainer(ProfileData):
             for action in actions:
                 action_valid = action.is_valid()
                 if not action_valid:
-                    logging.getLogger("system").warning(f"Action warning: {type(action).__name__} reports invalid - hardware {self.hardware_device_name} input: {self.hardware_input_type_name}  {self.hardware_input_id}")
+                    syslog.warning(f"Action warning: {type(action).__name__} reports invalid - hardware {self.hardware_device_name} input: {self.hardware_input_type_name}  {self.hardware_input_id}")
                 state = state & action_valid
         return state
     
@@ -823,7 +823,7 @@ class Device:
         if device is not None:
             for i in range(device.axis_count):
                 if i >= len(device.axis_map):
-                    logging.getLogger("system").error(
+                    syslog.error(
                         f"{device.name} invalid axis request {device.axis_count} < {i}"
                     )
                 else:
@@ -849,7 +849,7 @@ class Device:
         self.type = DeviceType.to_enum(dt)
         device_guid = node.get("device-guid")
         if not device_guid:
-            syslog=logging.getLogger("system")
+            syslog=syslog
             syslog.error(f"Device XML: unable to parse device GUID: [{device_guid}]")
             sys.exit(-1)
             
@@ -974,7 +974,7 @@ class AbstractAction(ProfileData):
         verbose = gremlin.config.Configuration().verbose_mode_details
 
         if verbose and value:
-            logging.getLogger("system").info(f"Functor: {self.name} {type(self).__name__} enabled")
+            syslog.info(f"Functor: {self.name} {type(self).__name__} enabled")
 
     def input_is_axis(self):
         ''' true if the input is an axis type input '''
@@ -1737,7 +1737,7 @@ class InputItem():
                             input_item.parse_xml(child, data)
                             break
             self.input_type = InputType.KeyboardLatched # force new input type
-            #logging.getLogger("system").info(f"Loaded key input: {input_item.display_name}")
+            #syslog.info(f"Loaded key input: {input_item.display_name}")
             self.input_id = input_item
 
 
@@ -1804,14 +1804,14 @@ class InputItem():
                 # ignore extra data
                 continue
             if not "type" in child.attrib:
-                logging.getLogger("system").error(
+                syslog.error(
                     f"XML {child.tag} is missing container 'type' attribute"
                 )
                 continue 
             container_type = child.get("type")
             
             if container_type not in container_tag_map:
-                logging.getLogger("system").warning(
+                syslog.warning(
                     f"Unknown container type used: {container_type}"
                 )
                 continue
@@ -1897,7 +1897,7 @@ class InputItem():
                 container_node.append(entry.to_xml())
             else:
                 if gremlin.config.Configuration().verbose:
-                    logging.getLogger("system").info(f"SaveProfile: input: {self.input_type} {InputType.to_display_name(self.input_type)} input id: {self.input_id} container has no data - won't save {entry.name}")
+                    syslog.info(f"SaveProfile: input: {self.input_type} {InputType.to_display_name(self.input_type)} input id: {self.input_id} container has no data - won't save {entry.name}")
 
         return node
 
@@ -2109,7 +2109,7 @@ class Profile():
             # Touch every input to ensure it gets default initialized
             for i in range(device.axis_count):
                 if i >= len(device.axis_map):
-                    logging.getLogger("system").error(
+                    syslog.error(
                         f"{device.name,} invalid axis request { device.axis_count} < {i}"
                     )
                 else:
@@ -2345,7 +2345,7 @@ class Profile():
         import gremlin.event_handler
         ''' adds a new mode parented to inherited_name'''
         if name in self.mode_list():
-            logging.getLogger("system").warning(f"Add Mode: error: mode {name} already exists")
+            syslog.warning(f"Add Mode: error: mode {name} already exists")
             return False
         for device in self.devices.values():
             new_mode = Mode(device)
@@ -2389,7 +2389,7 @@ class Profile():
         import gremlin.event_handler
         mode_list = self.mode_list()
         if not name in self.mode_list():
-            logging.getLogger("system").warning(f"Remove Mode: error: mode {name} not found")
+            syslog.warning(f"Remove Mode: error: mode {name} not found")
             return False
                 
         if not force and len(mode_list.keys()) == 1:
@@ -2578,7 +2578,7 @@ class Profile():
         profile_converter = gremlin.profile.ProfileConverter()
         profile_was_updated = False
         if not profile_converter.is_current(fname):
-            logging.getLogger("system").warning("Outdated profile, converting")
+            syslog.warning("Outdated profile, converting")
             profile_converter.convert_profile(fname)
             profile_was_updated = True
 
@@ -2891,7 +2891,7 @@ class Profile():
         self._start_mode = value
         verbose = gremlin.config.Configuration().verbose
         if verbose:
-            logging.getLogger("system").info(f"Profile {self.name}: set start mode to {value}")
+            syslog.info(f"Profile {self.name}: set start mode to {value}")
         self.save()
 
     def set_default_start_mode(self, value : str):
@@ -2903,7 +2903,7 @@ class Profile():
         self._start_mode = value
         verbose = gremlin.config.Configuration().verbose
         if verbose:
-            logging.getLogger("system").info(f"Profile {self.name}: set default start mode to {value}")
+            syslog.info(f"Profile {self.name}: set default start mode to {value}")
         self.save(backup = False)
 
     def get_default_start_mode(self):
@@ -2927,7 +2927,7 @@ class Profile():
         self._restore_last_mode = value
         verbose = gremlin.config.Configuration().verbose
         if verbose:
-            logging.getLogger("system").info(f"Profile {self.name}: set auto-restore flag {value}")
+            syslog.info(f"Profile {self.name}: set auto-restore flag {value}")
         self.save(backup = False)
 
     def save(self, save_as_name = None, backup = True):
@@ -3228,7 +3228,7 @@ class PluginInstance:
             variable.from_xml(child, data)
             self.variables[variable.name] = variable
             if verbose:
-                log = logging.getLogger("system")
+                log = syslog
                 log.info(str(variable))
         pass
             
@@ -3544,7 +3544,7 @@ class ProfileMapItem():
                     pd.force_numlock_off = force_numlock_off
 
                 except Exception as ex:
-                    logging.getLogger("system").error(f"PROC MAP: Unable to open profile mapping: {profile}:\n{ex}")
+                    syslog.error(f"PROC MAP: Unable to open profile mapping: {profile}:\n{ex}")
 
         return pd
     
@@ -3605,7 +3605,7 @@ class ProfileMapItem():
             # save the profile map
 
             except Exception as ex:
-                logging.getLogger("system").error(f"PROC MAP: Unable to open profile mapping: {profile}:\n{ex}")
+                syslog.error(f"PROC MAP: Unable to open profile mapping: {profile}:\n{ex}")
 
     def _update(self):
         pd = self._get_profile_data()
@@ -3670,9 +3670,9 @@ class ProfileMap():
 
                     self._items.append(item)
                     if verbose:
-                        logging.getLogger("system").info(f"PROC MAP: Registered mapping: {process} -> {profile}")
+                        syslog.info(f"PROC MAP: Registered mapping: {process} -> {profile}")
             except Exception as ex:
-                logging.getLogger("system").error(f"PROC MAP: Unable to open profile mapping: {fname}:\n{ex}")
+                syslog.error(f"PROC MAP: Unable to open profile mapping: {fname}:\n{ex}")
         self._update()
 
     def save_profile_map(self):
@@ -3698,10 +3698,10 @@ class ProfileMap():
             # save the file
             tree = etree.ElementTree(root)
             tree.write(fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
-            logging.getLogger("system").info(f"PROC MAP: saved preferences to {fname}")
+            syslog.info(f"PROC MAP: saved preferences to {fname}")
 
         except Exception as err:
-            logging.getLogger("system").error(F"PROC MAP: failed to save preferences to {fname}: {err}")
+            syslog.error(F"PROC MAP: failed to save preferences to {fname}: {err}")
 
 
     @property

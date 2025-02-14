@@ -726,7 +726,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
         elif self.condition_data.input_type == InputType.JoystickAxis:
             self.condition_data.comparison = data.casefold()
         else:
-            logging.getLogger("system").warning(
+            syslog.warning(
                 f"Invalid input type encountered: {self.condition_data.input_type}"
             )
         
@@ -939,7 +939,7 @@ class VJoyConditionWidget(AbstractConditionWidget):
         elif self.condition_data.input_type == InputType.JoystickAxis:
             self.condition_data.comparison = data.casefold()
         else:
-            logging.getLogger("system").warning(
+            syslog.warning(
                 f"Invalid input type encountered: {self.condition_data.input_type}"
             )
 

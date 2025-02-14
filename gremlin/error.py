@@ -28,7 +28,7 @@ class GremlinError(Exception):
     """
 
     def __init__(self, value):
-        logging.getLogger("system").exception(value)
+        syslog.exception(value)
         self.value = value
 
     def __str__(self):

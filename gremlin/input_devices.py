@@ -715,7 +715,7 @@ class StateChangeRegistry():
         verbose = gremlin.config.Configuration().verbose
         if verbose:
             for item in signature:
-                logging.getLogger("system").info(item)
+                syslog.info(item)
         partial_fn = functools.partial
         if "self" in signature:
             partial_fn = functools.partialmethod
@@ -1740,7 +1740,7 @@ class JoystickDecorator:
         try:
             self.device_guid = gremlin.profile.parse_guid(device_guid)
         except error.ProfileError:
-            logging.getLogger("system").error(
+            syslog.error(
                 f"Invalid guid value '{device_guid}' received"
             )
             self.device_guid = GUID_Invalid
@@ -1863,7 +1863,7 @@ class ButtonReleaseActions(QtCore.QObject):
                 remote_client.send_button(vjoy_input[0], vjoy_input[1], False, force_remote = force_remote )
             
         else:
-            logging.getLogger("system").warning(
+            syslog.warning(
                 f"Attempted to use non existent button: " +
                 f"vJoy {vjoy_input[0]:d} button {vjoy_input[1]:d}"
             )
@@ -1937,7 +1937,7 @@ class JoystickInputSignificant:
             # case InputType.KeyboardLatched:
             #     pass
             # case _:
-            #     logging.getLogger("system").warning(f"Event with unknown type received: {event.event_type}")
+            #     syslog.warning(f"Event with unknown type received: {event.event_type}")
         return False
 
     def get_last_event(self, event):

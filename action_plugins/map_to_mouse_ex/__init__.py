@@ -905,7 +905,7 @@ class MapToMouseEx(gremlin.base_profile.AbstractAction):
                 safe_read(node, "button-id", int, 1)
             )
         except ValueError as e:
-            logging.getLogger("system").warning(
+            syslog.warning(
                 f"Invalid mouse identifier in profile: {e:}"
             )
             self.button_id = gremlin.types.MouseButton.Left

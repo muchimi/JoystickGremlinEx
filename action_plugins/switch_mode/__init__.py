@@ -117,7 +117,7 @@ class SwitchModeFunctor(gremlin.base_profile.AbstractFunctor):
             mode = self.action_data.mode
             current_mode =  gremlin.shared_state.runtime_mode
             if mode and current_mode and mode != current_mode:
-                if verbose: logging.getLogger("system").info(f"ACTION SWITCH: mode switch from [{current_mode}] to [{mode}] requested")
+                if verbose: syslog.info(f"ACTION SWITCH: mode switch from [{current_mode}] to [{mode}] requested")
                 gremlin.control_action.switch_mode(mode)
         return True
 
