@@ -420,7 +420,8 @@ class DeviceSummary:
             self.vendor_id = data.vendor_id
             self.product_id = data.product_id
             self.joystick_id = data.joystick_id
-            self.name = data.name.decode("utf-8")
+            name = data.name.decode("utf-8", errors="replace")
+            self.name = name.replace('\ufffd','') # remove junk characters
             self.axis_count = data.axis_count
             self.button_count = data.button_count
             self.hat_count = data.hat_count

@@ -1770,3 +1770,11 @@ class ResetTimer(threading.Thread):
 def getPythonVersion() -> str:
     ''' gets the python environment version as a string '''
     return f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+
+
+def decode(data) -> str:
+    ''' decodes data and handles invalid characters '''
+    if data:
+        text = data.decode('ascii',errors='replace')
+        return text.replace('\ufffd','') # remove junk characters
+    return ''
