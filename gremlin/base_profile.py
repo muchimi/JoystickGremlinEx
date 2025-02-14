@@ -1645,32 +1645,33 @@ class InputItem():
         
         input_id = self._input_id
         self.is_axis = False
-        if input_id is not None and self._device_guid is not None:
-            if self._input_type == InputType.JoystickAxis:
-                self.is_axis = True # indicate we are an axis
-                self._is_button = False
-                el = gremlin.event_handler.EventListener()
-                el.registerInput(self)
-                info = gremlin.joystick_handling.device_info_from_guid(self._device_guid)
-                if info:
-                    self._input_name = f"Axis {info.axis_names[input_id-1]}"
-                else:
-                    self._input_name = f"Axis {input_id}"
+        if input_id is not None  and self._device_guid is not None:
+            if isinstance(input_id, int):
+                if self._input_type == InputType.JoystickAxis:
+                    self.is_axis = True # indicate we are an axis
+                    self._is_button = False
+                    el = gremlin.event_handler.EventListener()
+                    el.registerInput(self)
+                    info = gremlin.joystick_handling.device_info_from_guid(self._device_guid)
+                    if info:
+                        self._input_name = f"Axis {info.axis_names[input_id-1]}"
+                    else:
+                        self._input_name = f"Axis {input_id}"
 
 
-                mgr = gremlin.ui.axis_calibration.CalibrationManager()
-                self._calibration = mgr.getCalibration(self._device_guid, self._input_id)
+                    mgr = gremlin.ui.axis_calibration.CalibrationManager()
+                    self._calibration = mgr.getCalibration(self._device_guid, self._input_id)
 
 
-                el.update_input_icons.emit()
-            elif self._input_type == InputType.JoystickButton:
-                self._input_name = f"Button {input_id}"
-            elif self._input_type == InputType.JoystickHat:
-                self._input_name = f"Hat {input_id}"
-            elif self._input_type in (InputType.JoystickButton, InputType.JoystickHat):
-                self._is_axis = False
-                self._is_button = True
-                
+                    el.update_input_icons.emit()
+                elif self._input_type == InputType.JoystickButton:
+                    self._input_name = f"Button {input_id}"
+                elif self._input_type == InputType.JoystickHat:
+                    self._input_name = f"Hat {input_id}"
+                elif self._input_type in (InputType.JoystickButton, InputType.JoystickHat):
+                    self._is_axis = False
+                    self._is_button = True
+                    
 
             elif self._input_type in (InputType.Keyboard, InputType.KeyboardLatched):
                 if isinstance(input_id, gremlin.keyboard.Key):

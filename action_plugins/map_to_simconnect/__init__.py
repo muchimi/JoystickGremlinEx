@@ -4019,7 +4019,7 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         self.min_range = safe_read(node,"min_range", float, -1.0)
         self.max_range = safe_read(node,"max_range", float, 1.0)
         min_range = safe_read(node,"command_min_range", float) if "command_min_range" in node.attrib else -16383
-        max_range = safe_read(node,"command_max_range", float) if "command_max_range" in node.attrib else 16383
+        max_range = safe_read(node,"command_max_range", float) if "command_max_range" in node.attrib else 16384
         if min_range == max_range:
             min_range = -16383
             max_range = 16383

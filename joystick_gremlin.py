@@ -3654,6 +3654,14 @@ class GremlinUi(QtWidgets.QMainWindow):
 
 
 
+            # tmp1_path = os.path.join(os.getenv("temp"), "g1.xml")
+            # tmp2_path = os.path.join(os.getenv("temp"), "g2.xml")
+            
+            # t1.write(tmp1_path, pretty_print=True,xml_declaration=True,encoding="utf-8")
+            # t2.write(tmp2_path, pretty_print=True,xml_declaration=True,encoding="utf-8")
+
+            # gremlin.util.display_file(tmp1_path)
+            # gremlin.util.display_file(tmp2_path)
 
 
             is_changed = etree.tostring(t1) != etree.tostring(t2)
