@@ -1077,6 +1077,22 @@ class KeyMap:
             key_trans, _ = KeyMap._g_translate_map[key_tuple]
             return key_trans
         return key_tuple
+    
+    @staticmethod
+    def reverse_translate(key_tuple) -> tuple:
+         if not KeyMap._g_reverse_translate_map:
+             for key_id, data in KeyMap._g_translate_map.items():
+                 t_key, vk = data
+                 KeyMap._g_reverse_translate_map[t_key] = key_id
+
+         if key_tuple in KeyMap._g_reverse_translate_map:
+             return KeyMap._g_reverse_translate_map[key_tuple]
+         
+         
+         
+         return None
+             
+            
         
     @staticmethod
     def vk_lookup(key_tuple):
@@ -1162,9 +1178,9 @@ class KeyMap:
         (0x49,False): ((0x49, False), win32con.VK_NUMPAD9),
 
         (0x36,True): ((0x36, False), win32con.VK_RSHIFT),  # combine rshift and rshift 2
-
-
     }
+
+    _g_reverse_translate_map = {}
 
     _g_map = {}
 

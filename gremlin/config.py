@@ -1070,9 +1070,6 @@ class Configuration:
         else:
             value = value & ~mode
         self.verbose_mode = value
-        
-
-
 
     @property
     def verbose_mode_keyboard(self):
@@ -1093,7 +1090,6 @@ class Configuration:
     def verbose_mode_mouse(self):
         ''' true if verbose mode is in mouse mode '''
         return self.verbose and VerboseMode.Mouse in self.verbose_mode
-    
     
     @property
     def verbose_mode_details(self):

@@ -635,12 +635,12 @@ class EventListener(QtCore.QObject):
 			key = gremlin.keyboard.KeyMap.find_virtual(virtual_code)
 			self._keyboard_buffer[virtual_code] = is_pressed
 			key_id = key.index_tuple()
-			
 		else:
 			
 			key_id = item
 			scan_code, is_extended = item
 			key = gremlin.keyboard.KeyMap.find(scan_code, is_extended)
+
 			if key is None:
 				syslog.error(f"DEQUEUE KEY: don't know how to handle scancode: {scan_code:x} extended: {is_extended}")	
 				is_error = True
@@ -650,7 +650,7 @@ class EventListener(QtCore.QObject):
 
 		if not is_error:
 			if verbose:
-				syslog.info(f"DEQUEUE KEY {gremlin.keyboard.KeyMap.keyid_tostring(key_id)} vk: {virtual_code} (0x{virtual_code:X}) name: {key.name} pressed: {is_pressed}")
+				syslog.info(f"DEQUEUE KEY {gremlin.keyboard.KeyMap.keyid_tostring(key_id)} id: {key_id} vk: {virtual_code} (0x{virtual_code:X}) name: {key.name} pressed: {is_pressed}")
 			
 
 			self.keyboard_event.emit(Event(
@@ -1518,12 +1518,11 @@ class EventHandler(QtCore.QObject):
 			if verbose:
 				syslog.info(f"matching mouse event {event.identifier} to {gremlin.keyboard.KeyMap.keyid_tostring(index)}")
 		else:
-			verbose = gremlin.config.Configuration().verbose_mode_detailed
+			verbose = gremlin.config.Configuration().verbose_mode_keyboard
 			device_guid = event.device_guid
 			# index = event.virtual_code if event.virtual_code > 0 else event.identifier  # this is (scan_code, is_extended)
 			index, _ = gremlin.keyboard.KeyMap.translate(event.identifier)
-			if verbose:
-				syslog.info(f"matching key event {event.identifier} to {gremlin.keyboard.KeyMap.keyid_tostring(index)}")
+			if verbose: syslog.info(f"matching key event {event.identifier} to {gremlin.keyboard.KeyMap.keyid_tostring(index)}")
 
 		#event_key = Key(scan_code = identifier[0], is_extended = identifier[1], is_mouse = is_mouse, virtual_code= virtual_code)
 		input_items = []
@@ -1548,9 +1547,10 @@ class EventHandler(QtCore.QObject):
 				for input_item in matching_keys:
 					# key = input_item.key
 					input_items.append(input_item)
+
+				if verbose: syslog.info(f"KEY: found {len(input_items)} matching items")
 				return input_items
-			
-			
+		
 		return []
 	
 
@@ -1842,7 +1842,6 @@ class EventHandler(QtCore.QObject):
 
 		:param event the event to process
 		"""
-
 		
 		import gremlin.config
 		import gremlin.keyboard
@@ -1897,11 +1896,18 @@ class EventHandler(QtCore.QObject):
 					# print (data)
 					latched_keys = [input_item.key]
 					latched_keys.extend(input_item.latched_keys)
-					if verbose:
-						syslog.info(f"Checking latching: {len(latched_keys)} key(s)")
+					if verbose: syslog.info(f"KEY: Checking latching: {len(latched_keys)} key(s)")
 					for k in latched_keys:
 						index = k.index_tuple()
 						found = index in data.keys()
+						if not found:
+							# try the reverse translate
+							r_index = gremlin.keyboard.KeyMap.reverse_translate(index)
+							if r_index is not None:
+								found = r_index in data.keys()
+								if found:
+									index = r_index
+
 						state = data[index] if found else False
 						if verbose:
 							syslog.info(f"\tcheck latched key: {gremlin.keyboard.KeyMap.keyid_tostring(index)} {k.name} found: {found} state: {state} {'*****' if state else ''}")

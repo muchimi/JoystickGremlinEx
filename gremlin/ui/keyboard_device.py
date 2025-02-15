@@ -54,6 +54,11 @@ class KeyboardInputItem(AbstractInputItem):
 
         self._suspend_update = False
         self._update()
+
+
+    def getOverrideInputType(self):
+        ''' override type '''
+        return InputType.JoystickButton
         
     @property
     def title_name(self):
