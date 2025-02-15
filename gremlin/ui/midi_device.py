@@ -1723,8 +1723,12 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def _close_item_cb(self, widget, index, data):
         ''' called when the close button is clicked '''
-        self.input_item_list_model.removeRow(index)
-        self.input_item_list_view.redraw()
+        
+        if not self.input_item_list_model.rows():
+            # display blank page if no item left
+            self._item_data = gremlin.ui.joystick_device.InputItemConfiguration()
+            self.setRightPanelWidget(self._item_data)
+
         
 
     def _update_conflicts(self):

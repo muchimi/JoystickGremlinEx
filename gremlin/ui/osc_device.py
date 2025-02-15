@@ -3283,9 +3283,11 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     def _close_item_cb(self, widget, index, data):
         ''' called when the close button is clicked '''
 
-        # show a warning before deleting an input
-        self.input_item_list_model(index)
-        self.input_item_list_view.redraw()
+        if not self.input_item_list_model.rows():
+            # display blank page if no item left
+            self._item_data = gremlin.ui.joystick_device.InputItemConfiguration()
+            self.setRightPanelWidget(self._item_data)
+
         
 
     def _custom_widget_handler(self, list_view, index : int, identifier, data, parent = None):

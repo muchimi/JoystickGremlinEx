@@ -368,6 +368,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         # Handle user interaction
         self.input_item_list_view.item_selected.connect(self._select_item_cb)
         self.input_item_list_view.item_edit.connect(self._edit_item_cb)
+        self.input_item_list_view.item_closed.connect(self._close_item_cb)
 
         self.addLeftPanelWidget(self.input_item_list_view)
         
@@ -726,7 +727,13 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self._keyboard_dialog.showNormal()
         
 
-
+    def _close_item_cb(self, widget, index, data):
+        ''' called when the close button is clicked '''
+        
+        if not self.input_item_list_model.rows():
+            # display blank page if no item left
+            self._item_data = gremlin.ui.joystick_device.InputItemConfiguration()
+            self.setRightPanelWidget(self._item_data)
 
 
 

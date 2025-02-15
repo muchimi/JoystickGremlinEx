@@ -287,6 +287,7 @@ class SequenceContainer(AbstractContainer):
         InputType.JoystickButton,
         InputType.JoystickHat,
         InputType.Keyboard,
+        InputType.KeyboardLatched,
         InputType.OpenSoundControl,
         InputType.Midi,
         InputType.Mouse

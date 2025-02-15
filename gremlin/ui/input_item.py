@@ -457,7 +457,7 @@ class InputItemListView(ui_common.AbstractView):
                     new_index = 0
             
             self.select_item(new_index)
-        pass
+        
 
 
     def redraw(self):
@@ -684,6 +684,8 @@ class InputItemListView(ui_common.AbstractView):
 
     def _confirmed_close(self, index):
         self.removeRow(index)
+        self.item_closed.emit(self, index, self.model.data(index)) # widget, index, data
+
 
     def _edit_item_cb(self, index : int):
         ''' emits the edit event along with the item being edited '''
@@ -698,12 +700,12 @@ class InputItemListView(ui_common.AbstractView):
     def _update_value_changed(self, index : int, value : float):
         self.item_input_value_changed.emit(self, index, self.model.data(index), value)
 
-    def _closed_item_cb(self):
-        ''' emits the edit event along with the item is closed '''
-        index = self.current_index
-        if not index:
-            return None
-        self.item_closed.emit(self, index, self.model.data(index)) # widget, index, data
+    # def _closed_item_cb(self):
+    #     ''' emits the edit event along with the item is closed '''
+    #     index = self.current_index
+    #     if not index:
+    #         return None
+    #     self.item_closed.emit(self, index, self.model.data(index)) # widget, index, data
 
 
     def update_item(self, index):
