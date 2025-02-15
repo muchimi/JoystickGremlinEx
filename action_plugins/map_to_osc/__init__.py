@@ -177,8 +177,8 @@ class OscInputWidget(QtWidgets.QWidget):
     valueReleaseChanged = QtCore.Signal() # fires when the value changes (release)
     rangeChanged = QtCore.Signal() # fires when the axis range changes
     enabledChanged = QtCore.Signal(bool) # fires when enabled status changes
-    typePressChanged = QtCore.Signal() # fires when the type change
-    typeReleaseChanged = QtCore.Signal() # fires when the type change
+    typePressChanged = QtCore.Signal(int) # fires when the type change
+    typeReleaseChanged = QtCore.Signal(int) # fires when the type change
     
 
     def __init__(self, label = None, 
