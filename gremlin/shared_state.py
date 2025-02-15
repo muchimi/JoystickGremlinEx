@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -27,6 +27,8 @@ import gremlin.shared_state
 from gremlin.types import DeviceType
 import logging
 from PySide6 import QtWidgets, QtCore, QtGui
+
+syslog = logging.getLogger("system")
 
 def module_property(func):
     """Decorator to turn module functions into properties.

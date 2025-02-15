@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -110,7 +110,9 @@ def button_input_devices() -> list[DeviceSummary]:
 
 def is_hardware_device(device_guid) -> bool:
     ''' true if the device is a hardware device '''
-    return device_guid in _joystick_device_guid_map
+    info = device_info_from_guid(device_guid)
+    return not info.is_special
+    #return device_guid in _joystick_device_guid_map
 
 def vjoy_devices() -> list[DeviceSummary]:
     """Returns the list of vJoy devices.
@@ -457,9 +459,15 @@ def joystick_devices_initialization():
         
 
         if hat_count > 0 and not vjoy.hat_configuration_valid(vjoy_index):
+            import gremlin.ui.ui_common
+            import gremlin.event_handler
+            import sys
             error_string = f"VJoy id {vjoy_index:d}: Hats are set to discrete but have to be set as continuous."
-            syslog.debug(error_string)
+            syslog.error(error_string)
+            el = gremlin.event_handler.EventListener()
+            el.terminate() # terminates and sends the relevant shutdown triggers
             util.display_error(error_string)
+            sys.exit(1)
 
         # As we are ensured that no duplicate vJoy devices exist from
         # the previous step we can directly link the SDL and vJoy device

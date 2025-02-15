@@ -1,5 +1,6 @@
 from .SimConnect import *
-
+import logging
+syslog = logging.getLogger("system")
 
 class Event(object):
 

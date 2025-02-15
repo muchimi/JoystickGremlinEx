@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -37,6 +37,8 @@ import os
 from gremlin.util import *
 import gremlin.event_handler
 import gremlin.util
+
+syslog = logging.getLogger("system")
 
 class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
@@ -298,6 +300,7 @@ class RemapFunctor(gremlin.base_conditions.AbstractFunctor):
         self.test = False
 
     def process_event(self, event, value):
+        input_type = event.getInputType()
         if event.is_axis:
             if event.is_repeater:
                 value = event.value
@@ -318,7 +321,7 @@ class RemapFunctor(gremlin.base_conditions.AbstractFunctor):
                     )
                     self.thread.start()
 
-        elif self.input_type == InputType.JoystickButton:
+        elif input_type == InputType.JoystickButton:
             if event.event_type in [InputType.JoystickButton, InputType.Keyboard] \
                     and event.is_pressed \
                     and self.needs_auto_release:
@@ -327,20 +330,12 @@ class RemapFunctor(gremlin.base_conditions.AbstractFunctor):
                     event
                 )
 
-
-            # if joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed != value.is_pressed:
-            #     if not self.test and not value.is_pressed:
-            #         self.test = True
-            #     if self.test and value.is_pressed:
-            #         pass
-            #     print (f"test button state toggle: {value.is_pressed}")
-
             joystick_handling.VJoyProxy()[self.vjoy_device_id] \
                 .button(self.vjoy_input_id).is_pressed = value.is_pressed
             
             
 
-        elif self.input_type == InputType.JoystickHat:
+        elif input_type == InputType.JoystickHat:
             joystick_handling.VJoyProxy()[self.vjoy_device_id] \
                 .hat(self.vjoy_input_id).direction = value.current
 
@@ -446,7 +441,7 @@ class Remap(gremlin.base_profile.AbstractAction):
                 input_string = "hat"
         if input_string:
             
-            root_path = gremlin.shared_state.root_path
+            #root_path = gremlin.shared_state.root_path
             # folder = os.path.join(root_path, "action_plugins", "remap")
             # icon_file = os.path.join(folder, "gfx", f"icon_{input_string}_{self.vjoy_input_id:03d}.png")
             # if os.path.isfile(icon_file):

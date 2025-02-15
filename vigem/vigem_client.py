@@ -11,7 +11,7 @@ from .vigem_commons import XUSB_REPORT, DS4_REPORT, DS4_REPORT_EX, VIGEM_TARGET_
 import os
 import logging
 from gremlin.util import display_error, get_dll_version
-
+syslog = logging.getLogger("system")
 
 class VigemClient():
 

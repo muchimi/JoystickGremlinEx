@@ -25,7 +25,7 @@ from typing import Tuple, Union
 import gremlin.error
 
 import logging
-
+syslog = logging.getLogger("system")
 
 class VisualizationType(IntEnum):
 

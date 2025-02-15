@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -62,6 +62,8 @@ https://msdn.microsoft.com/en-us/library/ms646270(v=vs.85).aspx
 INPUT_MOUSE = 0
 INPUT_KEYBOARD = 1
 
+import logging
+syslog = logging.getLogger("system")
 
 class MotionType(enum.Enum):
 

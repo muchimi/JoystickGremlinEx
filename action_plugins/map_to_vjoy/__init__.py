@@ -3032,7 +3032,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
         #if verbose: syslog.info(f"VJOY MAPPER: local: {is_local} remote: {is_remote}")
 
-
+        input_type = event.getInputType()
 
         if event.is_axis: # self.input_type == InputType.JoystickAxis:
             # axis response mode
@@ -3144,7 +3144,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
             self.hat_position = position
 
-        elif self.input_type in VJoyWidget.input_type_buttons:
+        elif input_type in VJoyWidget.input_type_buttons:
             is_paired = remote_state.paired
             force_remote = event.force_remote or is_paired
 
@@ -3285,7 +3285,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
 
 
-        elif self.input_type == InputType.JoystickHat:
+        elif input_type == InputType.JoystickHat:
             if is_local:
                 joystick_handling.VJoyProxy()[self.vjoy_device_id].hat(self.vjoy_input_id).direction = action_value.current
             if is_remote:
@@ -3447,7 +3447,7 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
     def get_raw_axis_value(self):
         if self.input_is_hardware():
             return gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, self.hardware_input_id)
-        return self.hardware_input_id.axis_value
+        return self.hardware_input_id.getAxisValue()
 
     def get_filtered_axis_value(self, value : float = None, curves : list = None) -> float:
         ''' computes the output value for the current configuration  '''

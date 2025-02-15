@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -86,7 +86,8 @@ class Event:
 			data = None,
 			is_axis = False, # true if the input should be considered an axis (variable) input
 			is_virtual = False, # true if the input is a virtual input (vjoy),
-			mode = None # mode to fire the event on - leave null for current mode,
+			mode = None, # mode to fire the event on - leave null for current mode,
+			override_input_type = None,
 	):
 		"""Creates a new Event object.
 
@@ -120,6 +121,7 @@ class Event:
 		self.is_custom = False # true if a custom event (should be processed)
 		self.mode = mode # mode to act on, should be null for default
 		self.is_repeater = False # True if the event is a repeater generated event
+		self.override_input_type = override_input_type # override input type - used as the input type for actions 
 		
 
 
@@ -149,6 +151,11 @@ class Event:
 	@identifier.setter
 	def identifier(self, value):
 		self._identifier = value
+
+	def getInputType(self):
+		if self.override_input_type:
+			return self.override_input_type
+		return self.event_type
 
 	# @property
 	# def is_pressed(self):

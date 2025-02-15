@@ -2,7 +2,7 @@
 
 # -*- coding: utf-8; -*-
 
-# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -287,7 +287,12 @@ class MidiInputItem(AbstractInputItem):
     def is_button(self) -> bool:
         return self._mode != MidiInputItem.InputMode.Axis
 
-
+    def getOverrideInputType(self):
+        # override input type
+        if self.is_axis:
+            return InputType.JoystickAxis
+        else:
+            return InputType.JoystickButton
 
 
     @property
@@ -2054,7 +2059,9 @@ class MidiClient(QtCore.QObject):
                         value = value,
                         raw_value = value,
                         is_virtual = True, # indicate we are not a hardware input
-                        is_axis = True)
+                        is_axis = True,
+                        override_input_type=InputType.JoystickAxis
+                        )
 
                     self._event_listener.joystick_event.emit(event)
                     self._event_listener.axis_state_change.emit(event)
@@ -2070,7 +2077,9 @@ class MidiClient(QtCore.QObject):
                         value = is_pressed,
                         raw_value = is_pressed,
                         is_virtual = True, # indicate we are not a hardware input
-                        is_axis = False)
+                        is_axis = False,
+                        override_input_type=InputType.JoystickButton
+                        )
 
                     self._event_listener.joystick_event.emit(event)
                     self._event_listener.button_state_change.emit(event)

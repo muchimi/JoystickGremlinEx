@@ -2,7 +2,7 @@
 
 # -*- coding: utf-8; -*-
 
-# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -53,6 +53,9 @@ from gremlin.ui.ui_common import DynamicDoubleSpinBox, DualSlider, get_text_widt
 import enum
 from lxml import etree
 from gremlin.ui.deadzone import DeadzonePreset, DeadzoneWidget
+
+import logging
+syslog = logging.getLogger("system")
 
 
 g_scene_size = 250.0

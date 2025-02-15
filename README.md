@@ -211,7 +211,10 @@ Joystick Gremlin EX
 <!-- TOC --><a name="134016ex-pre-release"></a>
 ## 13.40.16ex (pre-release)
 ### (m72)
-- Improvements: new "outputs" verbose mode to track outputs (warning, very verbose, will slow things down considerably)
+- Improvements: new "outputs" verbose mode to track outputs (warning, very verbose, will slow things down considerably)  
+- New: XY pads (or multidimensional data) for OSC inputs allow to specify which argument is used.  The UI was also modified to allow duplicate OSC inputs provided that they use different source parameters.  When the action is listened to, the UI will automatically determine how many parameters were sent.  That also means that manual entries will default to 1 parameter for now (I'll see if I can improve that).
+- API: Events now have an override input type (optional).
+- Fix: syslog consolidated to eliminate 476 calls.
 - Fix: macro keyboard output using correct API call for remote control.
 - Fix: mode switch action entries reverting to default settings in certain conditions.
 - Improvement: performance optimization related to logging.  

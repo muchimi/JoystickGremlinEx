@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -44,7 +44,6 @@ from functools import partial
 from  gremlin.clipboard import Clipboard, ObjectEncoder, EncoderType
 from gremlin.util import get_guid
 import logging
-syslog = logging.getLogger("system")
 import qtawesome as qta
 import gremlin.ui.input_item
 import lxml
@@ -53,6 +52,8 @@ import lxml
 
 
 from gremlin.ui import virtual_button
+
+syslog = logging.getLogger("system")
 
 class InputIdentifier(QtCore.QObject):
 

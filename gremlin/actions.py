@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -35,6 +35,8 @@ import gremlin.util
 import gremlin.fsm
 import gremlin.macro
 from PySide6 import QtCore
+
+syslog = logging.getLogger("system")
 
 def smart_all(conditions):
     """Returns True if all conditions are True, False otherwise.

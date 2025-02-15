@@ -16,6 +16,8 @@ from enum import IntEnum
 import gremlin.base_profile
 from gremlin.singleton_decorator import SingletonDecorator
 
+syslog = logging.getLogger("system")
+
 class EncoderType(IntEnum):
     Action = 1 # single action
     Container = 2 # single container

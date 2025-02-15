@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -32,6 +32,8 @@ import gremlin.event_handler
 
 # Definition of the flags for limited information queries
 PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+
+syslog = logging.getLogger("system")
 
 @SingletonDecorator
 class ProcessMonitor(QtCore.QObject):

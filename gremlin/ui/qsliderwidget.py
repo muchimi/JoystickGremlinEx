@@ -31,6 +31,8 @@ from PySide6.QtGui import QColor, QBrush, QPaintEvent, QPen, QPainter, QFont, QM
 
 from itertools import pairwise
 
+syslog = logging.getLogger("system")
+
 class QSliderWidget(QtWidgets.QWidget):
     ''' custom slider object '''
 

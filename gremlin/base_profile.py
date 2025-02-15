@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -259,6 +259,13 @@ class ProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
     @property
     def hardware_input_type(self) -> InputType :
         ''' gets the type of hardware device attached to this '''
+        if self._input_item:
+            input_id = self._input_item.input_id
+            input_type = None
+            if hasattr(input_id, "getOverrideInputType"):
+                input_type = input_id.getOverrideInputType()
+            if input_type:
+                self.override_input_type = input_type
         if self.override_input_type is not None:
             return self.override_input_type
         return self.input_item.input_type if self.input_item else None

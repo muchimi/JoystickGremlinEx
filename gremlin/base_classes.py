@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -272,10 +272,12 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
     @property
     def axis_value(self) -> float:
         ''' gets the current axis value '''
+        return self.getAxisValue()
+    
+    def getAxisValue(self):
         if self._axis_value is None:
             return 0.0
         return self._axis_value
-    
     
     def setAxisValue(self, value : float):
         ''' sets the axis value and triggers a joystick input event 
@@ -284,10 +286,13 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
         :param emit: flag to trigger a joystick event if the value is set
         
         '''
-        import gremlin.event_handler
-        import gremlin.util
         if self.axis_value is None or value != self._axis_value:
             self._axis_value = value
+
+
+    def getOverrideInputType(self):
+        # override input type            
+        return None
 
     @property
     def button_value(self) -> bool:

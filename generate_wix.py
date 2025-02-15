@@ -7,7 +7,8 @@ import sys
 import pickle
 #from xml.dom import minidom
 from lxml import etree as ElementTree
-
+import logging
+syslog = logging.getLogger("system")
 
 def generate_file_list(root_folder):
     """Returns a list of file paths in the given folder.

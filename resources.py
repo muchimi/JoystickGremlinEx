@@ -5,6 +5,9 @@
 
 from PySide6 import QtCore
 
+import logging
+syslog = logging.getLogger("system")
+
 qt_resource_data = b"\
 \x00\x03\xad\xf2\
 \x00\

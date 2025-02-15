@@ -11,7 +11,7 @@ from ctypes import CFUNCTYPE, c_void_p, c_ubyte
 from abc import ABC, abstractmethod
 from inspect import signature  # Check if user defined callback function is legal
 import logging
-
+syslog = logging.getLogger("system")
 
 def check_err(err):
     if err != vcom.VIGEM_ERRORS.VIGEM_ERROR_NONE:

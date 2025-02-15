@@ -11,6 +11,8 @@ from gremlin.util import safe_format, safe_read, parse_bool, parse_guid, write_g
 from PySide6 import QtWidgets, QtCore, QtGui
 from gremlin.singleton_decorator import SingletonDecorator
 
+syslog = logging.getLogger("system")
+
 class ActivationRule(enum.Enum):
 
     """Activation rules for collections of conditions.

@@ -32,6 +32,7 @@ from gremlin.ui.device import InputIdentifier
 from gremlin.ui.profile import ActionNodeModel, InputItemBindingModel, \
     InputItemModel
 
+syslog = logging.getLogger("system")
 
 config.Configuration().register(
     "global",

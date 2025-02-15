@@ -3,6 +3,9 @@ from .Enum import *
 from .Constants import *
 from gremlin.singleton_decorator import SingletonDecorator
 
+import logging
+syslog = logging.getLogger("system")
+
 @SingletonDecorator
 class AircraftRequests():
 	def find(self, key):

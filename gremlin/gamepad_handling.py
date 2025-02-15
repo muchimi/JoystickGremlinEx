@@ -8,7 +8,7 @@ from vigem.vigem_client import VigemClient as vc
 import gremlin.config
 from enum import Enum, auto
 
-
+syslog = logging.getLogger("system")
 
 _gamepad_available = False
 _gamepad_devices = {}

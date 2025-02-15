@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -2538,6 +2538,13 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._axis_value_widget.setMinimumWidth(w)
         self._axis_value_widget.setDecimals(0)
 
+
+        self._axis_alt_repeater_widget = gremlin.ui.ui_common.AxisStateWidget(show_percentage=True,orientation=QtCore.Qt.Orientation.Horizontal)
+        self._axis_alt_value_widget = gremlin.ui.ui_common.QFloatLineEdit()
+        self._axis_alt_value_widget.setReadOnly(True)
+        self._axis_alt_value_widget.setMinimumWidth(w)
+        self._axis_alt_value_widget.setDecimals(0)
+
         self._calculator_value_widget = QtWidgets.QPlainTextEdit()
         self._calculator_value_widget.setReadOnly(True)
 
@@ -2545,6 +2552,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.container_repeater_layout.addWidget(self.curve_button_widget)
         self.container_repeater_layout.addWidget(self.curve_clear_widget)
         self.container_repeater_layout.addWidget(self._axis_repeater_widget)
+        self.container_repeater_layout.addWidget(self._axis_alt_repeater_widget)
         self.container_repeater_layout.addWidget(QtWidgets.QLabel("SimConnect Output:"))
         self.container_repeater_layout.addWidget(self._axis_value_widget)
         self.container_repeater_layout.addWidget(self._calculator_value_widget)

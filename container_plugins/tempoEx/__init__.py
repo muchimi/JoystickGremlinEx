@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -37,7 +37,7 @@ from gremlin.base_profile import AbstractContainer
 import gremlin.execution_graph
 from gremlin.input_types import InputType
 
-
+syslog = logging.getLogger("system")
 class TempoExContainerWidget(AbstractContainerWidget):
 
     """Container with two actions, triggered based on activation duration."""
