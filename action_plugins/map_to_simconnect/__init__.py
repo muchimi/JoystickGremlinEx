@@ -2518,8 +2518,11 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
          
         self.curve_button_widget = QtWidgets.QPushButton("Output Curve")
-        self.curve_icon_inactive = gremlin.util.load_icon("mdi.chart-bell-curve",qta_color="gray")
-        self.curve_icon_active = gremlin.util.load_icon("mdi.chart-bell-curve",qta_color="blue")
+        active_color = gremlin.ui.ui_common.Color.activeColor()
+        normal_color = gremlin.ui.ui_common.Color.normalColor()
+        self.curve_icon_inactive = gremlin.util.load_icon("mdi.chart-bell-curve",qta_color=normal_color)
+        self.curve_icon_active = gremlin.util.load_icon("mdi.chart-bell-curve",qta_color=active_color)
+        
         self.curve_button_widget.setToolTip("Curve output")
         self.curve_button_widget.clicked.connect(self._curve_button_cb)
 

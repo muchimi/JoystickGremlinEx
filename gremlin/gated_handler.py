@@ -2905,8 +2905,10 @@ class GateWidgetInfo(ui_common.QDataWidget):
 
     def _update_icon(self):
         ''' updates the icon on the setup button depending on the container state '''
+        active_color = gremlin.ui.ui_common.Color().getActive()
+
         if self.gate.hasAnyContainers():
-            self.setup_widget.setIcon(load_icon("ei.cog-alt",qta_color="#365a75"))
+            self.setup_widget.setIcon(load_icon("ei.cog-alt",qta_color=active_color))
         else:
             self.setup_widget.setIcon(load_icon("fa.gear"))
 

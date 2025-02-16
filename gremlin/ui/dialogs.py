@@ -36,6 +36,7 @@ import gremlin.process_monitor
 import gremlin.shared_state
 import gremlin.types
 import gremlin.ui
+import gremlin.ui.theme
 import gremlin.ui.ui_common
 
 import gremlin.ui.ui_about as ui_about
@@ -326,6 +327,25 @@ class OptionsUi(ui_common.BaseDialogUi):
         page_widget.setLayout(page_layout)
 
 
+
+        # # themes
+        # themes = [("Windows","auto"),
+        #           ("Light","light"),
+        #           ("Dark","dark"),
+        #           ]
+        
+        # widgets = []
+        # current_theme = self.config.theme
+        # for theme, data in themes:
+        #     widget = gremlin.ui.ui_common.QDataRadioButton(theme, data)
+        #     if data == current_theme:
+        #         widget.setChecked(True)
+        #     widget.clicked.connect(self._theme_changed)
+        #     widgets.append(widget)
+
+        # self.theme_widget, _ = gremlin.ui.ui_common.getHContainer(widgets,"Theme")
+
+
         # Switch to highlighted device (master switch)
         self.highlight_enabled = QtWidgets.QCheckBox("Enable Input Highlighting")
         self.highlight_enabled.clicked.connect(self._highlight_enabled_cb)
@@ -579,7 +599,8 @@ class OptionsUi(ui_common.BaseDialogUi):
         # column 1
         col = 0
         row = 0
-        
+        # column_layout.addWidget(self.theme_widget, row, col)
+        # row+=1
         column_layout.addWidget(self.sync_last_selection, row, col)
         row+=1
         column_layout.addWidget(self.close_to_systray, row, col)
@@ -1163,6 +1184,15 @@ This setting is also available on a profile by profile basis on the profile tab,
         self.highlight_input_buttons.setEnabled(enabled)
         self.highlight_input_axis.setEnabled(enabled)
         self.highlight_hotkey_autoswitch.setEnabled(enabled)
+
+    # @QtCore.Slot()
+    # def _theme_changed(self):
+    #     theme = self.sender().data
+    #     self.config.theme = theme   
+    #     gremlin.shared_state.ui.update_theme()
+        
+      
+                
 
     @QtCore.Slot(bool)
     def _highlight_enabled_cb(self, checked):
@@ -2183,7 +2213,7 @@ class ModeManagerUi(ui_common.BaseDialogUi):
             "defined in the parent, unless the mode configures its own actions "
             "for specific inputs."
         )
-        label.setStyleSheet("QLabel { background-color : #8FBC8F; }")
+        label.setStyleSheet(f"QLabel {{ background-color : {gremlin.ui.ui_common.Color.selectColor()}; }}")
         label.setWordWrap(True)
         label.setFrameShape(QtWidgets.QFrame.Box)
         label.setMargin(10)

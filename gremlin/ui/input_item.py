@@ -29,8 +29,11 @@ import gremlin.event_handler
 import gremlin.event_handler
 import gremlin.keyboard
 import gremlin.shared_state
+import gremlin.shared_state
+import gremlin.shared_state
 import gremlin.ui.axis_calibration
 import gremlin.ui.midi_device
+import gremlin.ui.ui_common
 from gremlin.util import load_icon, load_pixmap
 from gremlin.input_types import InputType
 from gremlin.base_buttons import *
@@ -1119,12 +1122,14 @@ class InputItemWidget(QtWidgets.QFrame):
         
 
         # icons
-        self._curve_icon_inactive = load_icon("mdi.chart-bell-curve",qta_color="gray")
-        self._curve_icon_active = load_icon("mdi.chart-bell-curve",qta_color="blue")
-        self._input_icon_inactive = load_icon("fa.power-off",qta_color="gray")
-        self._input_icon_active = load_icon("fa.power-off",qta_color="blue")
-        self._calibration_icon_active = load_icon("mdi.arrow-expand-horizontal",qta_color="blue")
-        self._calibration_icon_inactive = load_icon("mdi.arrow-expand-horizontal",qta_color="gray")
+        active_color = gremlin.ui.ui_common.Color.activeColor()
+        normal_color = gremlin.ui.ui_common.Color.normalColor()
+        self._curve_icon_inactive = load_icon("mdi.chart-bell-curve",qta_color=normal_color)
+        self._curve_icon_active = load_icon("mdi.chart-bell-curve",qta_color=active_color)
+        self._input_icon_inactive = load_icon("fa.power-off",qta_color=normal_color)
+        self._input_icon_active = load_icon("fa.power-off",qta_color=active_color)
+        self._calibration_icon_active = load_icon("mdi.arrow-expand-horizontal",qta_color=active_color)
+        self._calibration_icon_inactive = load_icon("mdi.arrow-expand-horizontal",qta_color=normal_color)
 
 
         # title row
@@ -1135,7 +1140,7 @@ class InputItemWidget(QtWidgets.QFrame):
                 
 
         # action buttons
-        self._edit_button_widget = QtWidgets.QPushButton(qta.icon("fa.gear"),"") 
+        self._edit_button_widget = QtWidgets.QPushButton(qta.icon("fa.gear",color=normal_color),"") 
         self._edit_button_widget.setToolTip("Configure")
         self._edit_button_widget.setFixedSize(24,16)
         self._edit_button_widget.clicked.connect(self._edit_button_cb)
@@ -1693,12 +1698,13 @@ class InputItemWidget(QtWidgets.QFrame):
 
     @selected.setter
     def selected(self, value):
+        import gremlin.ui.ui_common
         if value != self._selected:
             self._selected = value
             if value:
-                style = "#main_layout{background-color: #8FBC8F; }"
+                style = f"#main_layout{{background-color: {gremlin.ui.ui_common.Color.selectColor()}; }}"
             else:
-                style = "#main_layout{background-color: #E8E8E8; }"
+                style = f"#main_layout{{background-color: {gremlin.ui.ui_common.Color.backgroundColor()}; }}"
 
             self.setStyleSheet(style)
             self.selected_changed.emit(self)
@@ -1855,6 +1861,7 @@ class ContainerSelector(QtWidgets.QWidget):
         super().__init__(parent)
         self.input_type = input_type
         self.is_axis = is_axis
+        is_dark = gremlin.shared_state.is_dark_theme
 
 
         self.main_layout = QtWidgets.QHBoxLayout(self)
@@ -1872,14 +1879,17 @@ class ContainerSelector(QtWidgets.QWidget):
 
         # clipboard
         self.copy_button =  QtWidgets.QPushButton()
-        icon = gremlin.util.load_icon("button_copy.svg")
+        copy_icon = "gfx/dark_button_copy.svg" if is_dark else "gfx/button_copy.svg"
+        icon = gremlin.util.load_icon(copy_icon)
         self.copy_button.setIcon(icon)
         self.copy_button.clicked.connect(self._copy_container)
         self.copy_button.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Minimum)
         self.copy_button.setToolTip("Copy container(s)")
 
         self.paste_button = QtWidgets.QPushButton()
-        icon = gremlin.util.load_icon("button_paste.svg")
+
+        paste_icon = "gfx/dark_button_paste.svg" if is_dark else "gfx/button_paste.svg"
+        icon = gremlin.util.load_icon(paste_icon)
         self.paste_button.setIcon(icon)
         self.paste_button.clicked.connect(self._paste_container)
         self.paste_button.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Minimum)
@@ -2086,10 +2096,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
     container_modified = QtCore.Signal()  # container contents changed
 
 
-    # Palette used to render widgets
-    palette = QtGui.QPalette()
-    palette.setColor(QtGui.QPalette.ColorRole.Window, QtGui.QColorConstants.LightGray)
-
+   
     # Maps virtual button data to virtual button widgets
     virtual_axis_to_widget = {
         VirtualAxisButton: virtual_button.VirtualAxisButtonWidget,
@@ -2107,8 +2114,20 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         import gremlin.event_handler
         import gremlin.base_profile
         import gremlin.ui.ui_common
+        import gremlin.shared_state
+
         assert isinstance(profile_data, gremlin.base_profile.AbstractContainer)
         super().__init__(parent)
+
+        # Palette used to render widgets
+        # palette = QtGui.QPalette()
+        # palette.setColor(QtGui.QPalette.ColorRole.Window, QtGui.QColorConstants.LightGray)
+
+        #if gremlin.shared_state.is_dark_theme:
+        border_color = gremlin.ui.ui_common.Color.borderColor()
+        background_color = gremlin.ui.ui_common.Color.containerBackgroundColor()
+        css = f"background-color:{background_color}"
+        self.setStyleSheet(css)
 
         
 
@@ -2239,9 +2258,17 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
         # conditions for the actions in the container
         self.action_condition_frame_widget = QtWidgets.QFrame()
-
+        self.action_condition_frame_widget.setContentsMargins(0,0,0,0)
         self.action_condition_frame_widget.setFrameShape(QtWidgets.QFrame.Shape.Box)
+        
+        border_color = gremlin.ui.ui_common.Color.borderColor()
+        background_color = gremlin.ui.ui_common.Color.actionBackgroundColor()
+        css = f"#frame {{ border 1px solid {border_color}; border-top: none; background-color:{background_color} }}"
+        self.action_condition_frame_widget.setStyleSheet(css)
+
         self.activation_condition_layout = QtWidgets.QVBoxLayout(self.action_condition_frame_widget)
+        self.activation_condition_layout.setContentsMargins(0,0,0,0)
+
         self.activation_count_widget = QtWidgets.QLabel()
         self.activation_condition_layout.addWidget(self.activation_count_widget)
 
@@ -2422,7 +2449,12 @@ class AbstractActionWidget(QtWidgets.QFrame):
         :param layout_type type of layout to use for the widget
         :param parent parent widget
         """
+
+        import gremlin.ui.ui_common
         QtWidgets.QFrame.__init__(self, parent)
+
+        css = f"background-color: {gremlin.ui.ui_common.Color.actionBackgroundColor()}"
+        self.setStyleSheet(css) 
 
         self.action_data = action_data
 
@@ -2510,9 +2542,10 @@ class AbstractActionWrapper(QtWidgets.QDockWidget):
         self.dock_widget = QtWidgets.QFrame()
         self.dock_widget.setFrameShape(QtWidgets.QFrame.Box)
         self.dock_widget.setObjectName("frame")
-        self.dock_widget.setStyleSheet(
-            "#frame { border: 1px solid #949494; border-top: none; background-color: #afafaf; }"
-        )
+        border_color = gremlin.ui.ui_common.Color.borderColor()
+        background_color = gremlin.ui.ui_common.Color.actionBackgroundColor()
+        css = f"#frame {{ border 1px solid {border_color}; border-top: none; background-color:{background_color} }}"
+        self.dock_widget.setStyleSheet(css)
         self.setWidget(self.dock_widget)
 
         # Create default layout
@@ -2636,7 +2669,16 @@ class TitleBar(QtWidgets.QFrame):
         :param clipboard_cb the function to call for clipboard operations (optional)
         :param parent the parent of this widget
         """
+        import gremlin.ui.ui_common
+        import gremlin.shared_state
         super().__init__(parent)
+
+        is_dark = gremlin.shared_state.is_dark_theme
+        border_color = gremlin.ui.ui_common.Color.borderColor()
+        
+        css = f"# frame {{border: 1px solid {border_color};}}')"
+        self.setStyleSheet(css) 
+        
 
         self.hint = hint
         self.label = QtWidgets.QLabel(label)
@@ -2645,7 +2687,10 @@ class TitleBar(QtWidgets.QFrame):
 
         # help button
         self.help_button = TitleBarButton()
-        pixmap_help = load_pixmap("gfx/help.png")
+
+        #icon_help = "gfx/dark_help.png" if is_dark else "gfx/help.png"
+        icon_help = load_icon("mdi.help")
+        pixmap_help = icon_help.pixmap(size, size) # load_pixmap(icon_help)
         if not pixmap_help or pixmap_help.isNull():
             self.help_button.setText("?")
         else:
@@ -2659,7 +2704,10 @@ class TitleBar(QtWidgets.QFrame):
 
         # close button
         self.close_button = TitleBarButton()
-        pixmap_close = load_pixmap("gfx/close.png")
+
+        close_icon = load_icon("fa.close")
+
+        pixmap_close = close_icon.pixmap(size,size) # load_pixmap("gfx/close.png")
         if not pixmap_close or pixmap_close.isNull():
             self.close_button.setText("X")
         else:
@@ -2674,13 +2722,15 @@ class TitleBar(QtWidgets.QFrame):
         # clipboard copy button - only if a handler is given
         if clipboard_cb:
             self.copy_button = TitleBarButton()
-            pixmap_copy = load_pixmap("gfx/button_copy.svg")
+            copy_icon = "gfx/dark_button_copy.svg" if is_dark else "gfx/button_copy.svg"
+            pixmap_copy = load_pixmap(copy_icon)
             icon = QtGui.QIcon()
             pixmap_copy = pixmap_copy.scaled(size, size, QtCore.Qt.KeepAspectRatio)
             icon.addPixmap(pixmap_copy, QtGui.QIcon.Normal)
             self.copy_button.setIcon(icon)
             self.copy_button.clicked.connect(clipboard_cb)
             self.copy_button.setToolTip("Copy")
+
 
         self.layout = QtWidgets.QHBoxLayout(self)
         self.layout.setSpacing(0)
@@ -2697,10 +2747,7 @@ class TitleBar(QtWidgets.QFrame):
 
         self.setFrameShape(QtWidgets.QFrame.Box)
         self.setObjectName("frame")
-        self.setStyleSheet(
-            "#frame { border: 1px solid #949494; background-color: #dadada; }"
-        )
-
+        
         
 
     def _show_hint(self):

@@ -36,6 +36,8 @@ from PySide6 import QtCore, QtWidgets, QtGui
 from win32api import GetFileVersionInfo, LOWORD, HIWORD
 from PySide6.QtGui import QColor
 
+import gremlin.ui
+
 from . import error
 
 from gremlin.singleton_decorator import SingletonDecorator
@@ -841,19 +843,37 @@ def load_pixmap(*paths):
     syslog.error(f"load_pixmap(): invalid path")
     return None
 
-   
-
 def load_icon(*paths, use_qta = False, qta_color = None):
     ''' gets an icon (returns a QIcon) - uses the qtawesome library or does a raw file search '''
     from gremlin.config import Configuration
+    import gremlin.shared_state
+    import gremlin.ui.ui_common
     verbose = Configuration().verbose_mode_details
-    
+
+    is_dark = gremlin.shared_state.is_dark_theme
+
     (the_path,) = paths
-    _, ext = os.path.splitext(the_path.lower())
+    _ , ext = os.path.splitext(the_path.casefold())
+
+    if ext == ".svg":
+        if not os.path.isfile(the_path):
+            the_path = find_file(the_path)
+        if os.path.isfile(the_path):
+            if is_dark:
+                dark_path = dark_file(the_path)
+                if not os.path.isfile(dark_path):
+                    # create the dark version automatically
+                    create_dark_svg(the_path, dark_path)
+                if os.path.isfile(dark_path):
+                    # load the dark equivalent
+                    the_path = dark_path 
+        
     icon = None
     if ext == "" or not (ext in (".png",".ico",".svg")) or use_qta:
         # assume a QTA icon if no extension
         try:
+            if not qta_color:
+                qta_color = gremlin.ui.ui_common.Color.normalColor()
             if qta_color:
                 icon = QtGui.QIcon(qta.icon(the_path, color = qta_color))
             else:
@@ -872,6 +892,40 @@ def load_icon(*paths, use_qta = False, qta_color = None):
         if verbose:
             syslog.info(f"LoadIcon() found icon: {paths}")
     return icon
+
+
+def dark_file(image_path):
+    ''' gets the dark file name for an icon, if it exists '''
+    the_path = image_path.casefold()
+    dirname, basefile = os.path.split(the_path)
+    basename, ext = os.path.splitext(basefile)
+    if not basename.startswith("dark_"):
+        return os.path.join(dirname, f"dark_{basename}{ext}")
+    return image_path
+
+
+
+def create_dark_svg(source_path, dark_path, hexcolor = ""):
+    if os.path.isfile(source_path):
+        if not os.path.isfile(dark_path):
+            new_color = "#CCCCCC"
+            new_gray_color = "#AAAAAA"
+            new_stroke = "#666666"
+            with open(source_path,"r") as fin:
+                with open(dark_path,"w") as fout:
+                    for line in fin.readlines():
+                        
+                        line = line.replace("#ffffff",new_stroke)
+                        line = line.replace("#666666",new_gray_color)
+                        line = line.replace("#000000",new_color)
+                        line = line.replace("#000005;",new_color)
+                        
+                        fout.write(line)
+                    fout.flush()
+                    fout.close()
+                fin.close()
+
+
 
 
 def recolor_icon_pixmap(image_path, color = "red"):

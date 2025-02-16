@@ -173,6 +173,7 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractFunctor):
         self.container = container
         self.graph_map = {} # holds index to graph
         self.index_map = {} # holds graph to index
+        self._macro_id = None
         index = 0
         for action_set in container.action_sets:
             graph = gremlin.execution_graph.ActionSetExecutionGraph(action_set, parent)

@@ -59,6 +59,9 @@ This is ugly but the only sane way to do this at the moment.
 
 root_path = None # root path
 
+vjoy_enabled = True # assume vjoy enabled
+is_dark_theme = False # true if windows is in dark theme
+
 # Flag indicating whether or not input highlighting should be
 # prevented even if it is enabled by the user
 _suspend_input_highlighting = False

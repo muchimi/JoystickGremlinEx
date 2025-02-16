@@ -309,6 +309,10 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         if VJoyWidget.locked:
             return
+        
+        if not gremlin.shared_state.vjoy_enabled:
+            self.main_layout.addWidget(QtWidgets.QLabel("VJOY is not available.  Ensure VJOY is installed and configured."))
+            return
 
         
         veh = gremlin.event_handler.VjoyRemapEventHandler()
@@ -668,9 +672,10 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._axis_repeater_widget = gremlin.ui.ui_common.AxisStateWidget(show_percentage=False,orientation=QtCore.Qt.Orientation.Horizontal, parent= self.container_repeater_widget)
         self.curve_button_widget = QtWidgets.QPushButton("Output Curve")
 
-
-        self.curve_icon_inactive = util.load_icon("mdi.chart-bell-curve",qta_color="gray")
-        self.curve_icon_active = util.load_icon("mdi.chart-bell-curve",qta_color="blue")
+        active_color = gremlin.ui.ui_common.Color.activeColor()
+        normal_color = gremlin.ui.ui_common.Color.normalColor()
+        self.curve_icon_inactive = util.load_icon("mdi.chart-bell-curve",qta_color=normal_color)
+        self.curve_icon_active = util.load_icon("mdi.chart-bell-curve",qta_color=active_color)
         self.curve_button_widget.setToolTip("Curve output")
         self.curve_button_widget.clicked.connect(self._curve_button_cb)
 
@@ -3696,9 +3701,9 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
 
         :return icon representing the remap action
         """
-        # Do not return a valid icon if the input id itself is invalid
-        # if self.vjoy_input_id is None:
-        #     return None
+        import gremlin.shared_state
+        is_dark = gremlin.shared_state.is_dark_theme
+
         fallback = "joystick.svg"
         if self.action_mode in (VjoyAction.VJoySetAxis, VjoyAction.VJoyInvertAxis, VjoyAction.VJoyAxis):
             input_string = "axis"
@@ -3713,8 +3718,8 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
             input_string = None
             #log_sys_warn(f"VjoyRemap: don't know how to handle action mode: {self.action_mode}")
 
-
-        icon_path = f"icon_{input_string}_{self.vjoy_input_id:03d}.png" if input_string else "joystick.png"
+        dark_stub = "dark_" if is_dark else ""
+        icon_path = f"{dark_stub}icon_{input_string}_{self.vjoy_input_id:03d}.png" if input_string else "joystick.png"
 
         icon_file = get_icon_path(icon_path)
         if os.path.isfile(icon_file):

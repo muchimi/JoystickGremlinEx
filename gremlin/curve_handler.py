@@ -993,7 +993,9 @@ class CurveView(QtWidgets.QGraphicsScene):
         self.point_editor = point_editor
         from gremlin.util import load_image
         
-        self.background_image = load_image("curve_grid_ex.svg")
+        is_dark = gremlin.shared_state.is_dark_theme
+        curve_image = "dark_curve_grid_ex.svg" if is_dark else "curve_grid_ex.svg"
+        self.background_image = load_image(curve_image)
 
         # Connect editor widget signals
         self.point_editor.x_input.valueChanged.connect(self._editor_update)
@@ -1307,7 +1309,7 @@ class CurveView(QtWidgets.QGraphicsScene):
             )
             for x in range(-int(g_scene_size), int(g_scene_size+1), 2):
                 path.lineTo(x, -g_scene_size * curve_fn(x / g_scene_size))
-            self.addPath(path, QtGui.QPen(QtGui.QColor("#8FBC8F"), 4))
+            self.addPath(path, QtGui.QPen(QtGui.QColor(gremlin.ui.ui_common.Color.selectColor()), 4))
 
             # update the tracking item
             if self.show_input_axis:
@@ -1686,14 +1688,19 @@ class AxisCurveWidget(QtWidgets.QWidget):
         self.container_options_layout.addStretch()
 
         self.copy_button_widget = QtWidgets.QPushButton()
-        icon = gremlin.util.load_icon("button_copy.svg")
+
+        is_dark = gremlin.shared_state.is_dark_theme
+        copy_icon = "gfx/dark_button_copy.svg" if is_dark else "gfx/button_copy.svg"
+        icon = gremlin.util.load_icon(copy_icon)
         self.copy_button_widget.setIcon(icon)
         self.copy_button_widget.setMaximumWidth(24)
         self.copy_button_widget.setToolTip("Copy curve")
         self.copy_button_widget.clicked.connect(self._copy_curve_cb)
         
         self.paste_button_widget = QtWidgets.QPushButton()
-        icon = gremlin.util.load_icon("button_paste.svg")
+
+        paste_icon = "gfx/dark_button_paste.svg" if is_dark else "gfx/button_paste.svg"
+        icon = gremlin.util.load_icon(paste_icon)
         self.paste_button_widget.setIcon(icon)
         self.paste_button_widget.setMaximumWidth(24)
         self.paste_button_widget.setToolTip("Paste curve")
@@ -1770,7 +1777,9 @@ class AxisCurveWidget(QtWidgets.QWidget):
         self.curve_model.set_symmetry_mode(self.action_data.symmetry_mode)
 
         self.container_curve_widget = QtWidgets.QFrame()
-        self.container_curve_widget.setStyleSheet('.QFrame{background-color: #ffffff; border-radius: 10px;}')
+
+        background_color = gremlin.ui.ui_common.Color.actionBackgroundColor()
+        self.container_curve_widget.setStyleSheet(f'.QFrame{{background-color: {background_color}; border-radius: 10px;}}')
         self.container_curve_layout = QtWidgets.QHBoxLayout(self.container_curve_widget)
 
         # Graphical curve editor

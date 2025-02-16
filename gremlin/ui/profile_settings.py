@@ -236,7 +236,7 @@ class VJoyAxisDefaultsWidget(QtWidgets.QWidget):
             self.main_layout.addWidget(QtWidgets.QLabel(axis_name), row, 0)
             frame = QtWidgets.QFrame()
             frame.setFrameStyle(QtWidgets.QFrame.Plain | QtWidgets.QFrame.Box)
-            frame.setStyleSheet("border: 2px solid #8FBC8F;")
+            frame.setStyleSheet(f"border: 2px solid {gremlin.ui.ui_common.Color.selectColor()};")
             frame.setLayout(QtWidgets.QHBoxLayout())
 
             box = gremlin.ui.ui_common.QFloatLineEdit()

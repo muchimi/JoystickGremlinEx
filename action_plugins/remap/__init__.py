@@ -73,6 +73,13 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _create_ui(self):
         """Creates the UI components."""
+        import gremlin.shared_state
+
+        if not gremlin.shared_state.vjoy_enabled:
+            self.main_layout.addWidget(QtWidgets.QLabel("VJOY is not available.  Ensure VJOY is installed and configured."))
+            return
+
+
         input_types = {
             InputType.Keyboard: [
                 InputType.JoystickButton
@@ -430,6 +437,7 @@ class Remap(gremlin.base_profile.AbstractAction):
         :return icon representing the remap action
         """
         import gremlin.shared_state
+        is_dark = gremlin.shared_state.is_dark_theme
         # Do not return a valid icon if the input id itself is invalid
         if self.vjoy_input_id is None:
             input_string = None
@@ -439,6 +447,8 @@ class Remap(gremlin.base_profile.AbstractAction):
                 input_string = "button"
             elif self.input_type == InputType.JoystickHat:
                 input_string = "hat"
+
+        dark_stub = "dark_" if is_dark else ""
         if input_string:
             
             #root_path = gremlin.shared_state.root_path
@@ -448,7 +458,8 @@ class Remap(gremlin.base_profile.AbstractAction):
             #     return icon_file
             
 
-            icon_file = f"icon_{input_string}_{self.vjoy_input_id:03d}.png"
+
+            icon_file = f"{dark_stub}icon_{input_string}_{self.vjoy_input_id:03d}.png"
             icon_path = gremlin.util.find_file(icon_file)
             if os.path.isfile(icon_path):
                 return icon_file

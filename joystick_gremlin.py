@@ -49,6 +49,7 @@ import gremlin.ui.keyboard_device
 import gremlin.ui.midi_device
 import gremlin.ui.osc_device
 import gremlin.ui.mode_device
+import gremlin.ui.theme
 import gremlin.util
 import gremlin.curve_handler
 import gremlin.gated_handler
@@ -122,7 +123,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 syslog = logging.getLogger("system")
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_BASE = "m72c"
+APPLICATION_BASE = "m73"
 APPLICATION_VERSION = f"13.40.16ex ({APPLICATION_BASE})"
 
 
@@ -170,6 +171,7 @@ class GremlinUi(QtWidgets.QMainWindow):
 
         QtWidgets.QMainWindow.__init__(self, parent)
         self.ui = Ui_Gremlin()
+        #self.update_theme()
         self.ui.setupUi(self)
         #self._recreate_tab_widget()
         self.locked = False
@@ -2781,56 +2783,74 @@ class GremlinUi(QtWidgets.QMainWindow):
             gfx_folder = os.path.join(parent, "gfx")
             if not os.path.isdir(gfx_folder):
                 raise gremlin.error.GremlinError(f"Unable to find icons: {folder}")
+            
+        normal_color = gremlin.ui.ui_common.Color.normalColor()        
+        is_dark = gremlin.shared_state.is_dark_theme    
 
-        icon = load_icon("gfx/profile_open.svg")
+        profile_icon = "gfx/dark_profile_open.svg" if is_dark else "gfx/profile_open.svg"
+
+        icon = load_icon(profile_icon)
         #icon = self.load_icon("profile_open.svg"))
         self.ui.actionLoadProfile.setIcon(icon)
 
-        icon = load_icon("gfx/profile_new.svg")
+        profile_new_icon = "gfx/dark_profile_new.svg" if is_dark else "gfx/profile_new.svg"
+
+        icon = load_icon(profile_new_icon)
         self.ui.actionNewProfile.setIcon(icon)
 
-        icon = load_icon("gfx/profile_save.svg")
+        profile_save_icon = "gfx/dark_profile_save.svg" if is_dark else "gfx/profile_save.svg"
+        icon = load_icon(profile_save_icon)
         self.ui.actionSaveProfile.setIcon(icon)
 
-        icon = load_icon("gfx/profile_save_as.svg")
+        profile_save_as_icon = "gfx/dark_profile_save_as.svg" if is_dark else "gfx/profile_save_as.svg"
+        icon = load_icon(profile_save_as_icon)
         self.ui.actionSaveProfileAs.setIcon(icon)
 
-        icon = load_icon("gfx/device_information.svg")
+
+        device_information_icon = "gfx/dark_device_information.svg" if is_dark else "gfx/device_information.svg"
+        icon = load_icon(device_information_icon)
         self.ui.actionDeviceInformation.setIcon(icon)
 
-        icon = load_icon("gfx/manage_modules.svg")
+        manage_module_icon = "gfx/dark_manage_modules.svg" if is_dark else "gfx/manage_modules.svg"
+        icon = load_icon(manage_module_icon)
         self.ui.actionManageCustomModules.setIcon(icon)
 
-        icon = load_icon("gfx/manage_modes.svg")
+        manage_modes_icon = "gfx/dark_manage_modes.svg" if is_dark else "gfx/manage_modes.svg"
+        icon = load_icon(manage_modes_icon)
         self.ui.actionManageModes.setIcon(icon)
 
-        icon = load_icon("gfx/input_repeater.svg")
+        input_repeater_icon = "gfx/dark_input_repeater.svg" if is_dark else "gfx/input_repeater.svg"
+        icon = load_icon(input_repeater_icon)
         self.ui.actionInputRepeater.setIcon(icon)
 
-        # icon = load_icon("gfx/calibration.svg")
-        # self.ui.actionCalibration.setIcon(icon)
 
-        icon = load_icon("gfx/input_viewer.svg")
+        input_viewer_icon = "gfx/dark_input_viewer.svg" if is_dark else "gfx/input_viewer.svg"
+        icon = load_icon(input_viewer_icon)
         self.ui.actionInputViewer.setIcon(icon)
 
         icon = load_icon("gfx/logview.png")
         self.ui.actionLogDisplay.setIcon(icon)
         self.ui.actionLogEdit.setIcon(icon)
 
-        icon = load_icon("gfx/options.svg")
+        options_icon = "gfx/dark_options.svg" if is_dark else "gfx/options.svg"
+        icon = load_icon(options_icon)
         self.ui.actionOptions.setIcon(icon)
 
-        icon = load_icon("gfx/about.svg")
+        about_icon = "gfx/dark_about.svg" if is_dark else "gfx/about.svg"
+        icon = load_icon(about_icon)
         self.ui.actionAbout.setIcon(icon)
 
-        icon = load_icon("ei.adjust-alt")
+        icon = load_icon("ei.adjust-alt", qta_color=normal_color)
         self.ui.actionInputViewer.setIcon(icon)
 
 
         # Toolbar actions
 
-        pixmap_off = load_pixmap("gfx/activate.svg")
-        pixmap_on = load_pixmap("gfx/activate_on.svg")
+        
+        activate_icon = "gfx/dark_activate.svg" if is_dark else "gfx/activate.svg"
+        activate_on_icon = "gfx/dark_activate_on.svg" if is_dark else "gfx/activate_on.svg"
+        pixmap_off = load_pixmap(activate_icon)
+        pixmap_on = load_pixmap(activate_on_icon)
         if pixmap_off and pixmap_on:
             activate_icon = QtGui.QIcon()
             activate_icon.addPixmap(pixmap_off, QtGui.QIcon.Normal)
@@ -2839,9 +2859,11 @@ class GremlinUi(QtWidgets.QMainWindow):
         else:
             self.ui.actionActivate.setText("Run")
 
-        self.ui.actionOpen.setIcon(load_icon("gfx/profile_open.svg"))
+        
+        self.ui.actionOpen.setIcon(load_icon(profile_icon))
 
-        self.ui.actionSave.setIcon(load_icon("fa5s.save"))
+        
+        self.ui.actionSave.setIcon(load_icon("fa5s.save", qta_color=normal_color))
 
 
     # +---------------------------------------------------------------
@@ -3975,6 +3997,32 @@ class GremlinUi(QtWidgets.QMainWindow):
             self.setWindowTitle(title)
 
 
+    # def update_theme(self):
+    #     import gremlin.shared_state
+    #     import gremlin.config
+    #     import gremlin.ui.theme
+    #     theme = gremlin.config.Configuration().theme
+    #     app = QtWidgets.QApplication.instance()
+    #     match theme:
+    #         case "auto":
+    #             is_dark = gremlin.shared_state.is_dark_theme
+    #             windows_dark = gremlin.ui.theme.theme() == "Dark"
+    #             if is_dark != windows_dark:
+    #                 gremlin.shared_state.is_dark_theme = windows_dark
+                
+    #             app.setStyle("Fusion")
+
+    #         case "light":
+    #             gremlin.shared_state.is_dark_theme = False
+    #             app.setStyle("windows:darkmode=0")
+
+
+    #         case "dark":
+    #             gremlin.shared_state.is_dark_theme = True
+    #             app.setStyle("windows:darkmode=2")
+
+    #     # force a full repaint
+    #     self.update()
 
 
 def configure_logger(config):
@@ -4098,9 +4146,13 @@ if __name__ == "__main__":
 
 
     # disable dark mode for now while we sort icons in a future version
-    os.environ["QT_QPA_PLATFORM"] = "windows:darkmode=0"
+    #os.environ["QT_QPA_PLATFORM"] = "windows:darkmode=0"
 
     app = QtWidgets.QApplication(sys.argv)
+    gremlin.shared_state.is_dark_theme = gremlin.ui.theme.theme() == "Dark"
+    app.setStyle("Fusion")
+  
+    
 
     # for now force localization to use US English until we have proper localization support
     locale = QtCore.QLocale("UnitedStates")
@@ -4133,6 +4185,8 @@ if __name__ == "__main__":
         vjoy_working = vjoy_count != 0
         syslog.info(f"\tFound {vjoy_count} vjoy device(s)")
 
+        gremlin.shared_state.vjoy_enabled = vjoy_working
+
         if not vjoy_working:
             msg = "No configured VJOY devices were found.  VJOY output will be disabled.  This is normal if VJOY is not installed or not configured."
             syslog.warning(msg)
@@ -4163,6 +4217,7 @@ if __name__ == "__main__":
 
     # Create Gremlin UI
     ui = GremlinUi()
+
     gremlin.shared_state.ui = ui
 
     syslog.info("GremlinEx UI created")

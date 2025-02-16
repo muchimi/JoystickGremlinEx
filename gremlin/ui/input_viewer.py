@@ -449,6 +449,7 @@ class InputViewerUi(ui_common.BaseDialogUi):
             self.keyboard_visualizer_widget =  QtWidgets.QGroupBox("Keyboard")
             self.keyboard_visualizer_layout = QtWidgets.QVBoxLayout(self.keyboard_visualizer_widget)
             self.keyboard_widget = gremlin.ui.virtual_keyboard.QKeyboardWidget()
+            self.keyboard_widget.setMaximumWidth(800)
             self.keyboard_widget.setReadonly(True)
             self.keyboard_visualizer_layout.addWidget(self.keyboard_widget)
             self.keyboard_widget.hook()

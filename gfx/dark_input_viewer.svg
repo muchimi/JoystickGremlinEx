@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="svg2" xmlns="http://www.w3.org/2000/svg" version="1.1" xmlns:cc="http://creativecommons.org/ns#" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns:svg="http://www.w3.org/2000/svg" viewBox="0 0 76 76">
+  <!-- Generator: Adobe Illustrator 29.3.0, SVG Export Plug-In . SVG Version: 2.1.0 Build 146)  -->
+  <defs>
+    <style>
+      .st0 {
+        fill: none;
+      }
+
+      .st0, .st1 {
+        stroke: #aaa;
+        stroke-width: 4px;
+      }
+
+      .st1 {
+        fill: #ccc;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-opacity: 1;
+      }
+    </style>
+  </defs>
+  <sodipodi:namedview id="namedview6" bordercolor="#AAAAAA" borderopacity="1" gridtolerance="10" guidetolerance="10" inkscape:current-layer="svg2" inkscape:cx="49.508384" inkscape:cy="26.380658" inkscape:pageopacity="0" inkscape:pageshadow="2" inkscape:window-height="810" inkscape:window-maximized="0" inkscape:window-width="1161" inkscape:window-x="1282" inkscape:window-y="495" inkscape:zoom="6.2105263" objecttolerance="10" pagecolor="#AAAAAA" showgrid="false"/>
+  <path id="path5079" class="st0" d="M5,38c10.2-10.2,18.8-18,33-18s24.4,9.4,33,18c-8.7,8.7-19.6,18-33,18s-21.8-6.8-33-18Z" inkscape:connector-curvature="0" sodipodi:nodetypes="czcsc"/>
+  <circle id="path5081" class="st1" cx="38" cy="38" r="10.5"/>
+</svg>

@@ -38,13 +38,22 @@ class QKeyWidget(QtWidgets.QPushButton):
         self._selected = False
         self.setAttribute(QtCore.Qt.WidgetAttribute.WA_Hover, True)
 
-        self._default_style = "QPushButton {border: 2px solid black; border-radius: 4px; background-color: #E8E8E8; border-style: outset; padding: 4px; min-width: 32px; max-height: 30px;} QPushButton:hover {border: 2px #4A4648;}"
-        self._selected_style = "QPushButton {border: 2px solid black; border-radius: 4px; background-color: #8FBC8F; border-style: outset; padding: 4px; min-width: 32px; max-height: 30px;} QPushButton:hover {border: 2px #4A4648;}"
+        font = QtGui.QFont()
+        font.setPointSize(8)
+        self.setFont(font)
+
+
+        foreground_color = gremlin.ui.ui_common.Color.keyForegroundColor()
+        background_color = gremlin.ui.ui_common.Color.keyBackgroundColor()
+        selected_color = gremlin.ui.ui_common.Color.selectColor()
+        self._default_style = f"QPushButton {{border: 2px solid black; border-radius: 4px; color: {foreground_color} background-color: {background_color}; border-style: outset; padding: 4px; min-width: 32px; max-height: 30px;}} QPushButton:hover {{border: 2px #4A4648;}}"
+        self._selected_style = f"QPushButton {{border: 2px solid black; border-radius: 4px; color: {foreground_color} background-color: {selected_color}; border-style: outset; padding: 4px; min-width: 32px; max-height: 30px;}} QPushButton:hover {{border: 2px #4A4648;}}"
         self.setStyleSheet(self._default_style)
         
         self.normal_key = None # what to display normally
         self.shifted_key = None # what to display when shifted
         self.installEventFilter(self)
+        
 
     @property
     def key(self) -> Key:
@@ -167,9 +176,9 @@ class QKeyboardWidget(QtWidgets.QWidget):
         # first row = QUERTY object
         row_0 = ["","","F13","F14","F15","F16","F17","F18","F19","F20","F21","F22","F23","F24","","mouse_1","mouse_2","mouse_3","","mouse_4","mouse_5","wheel_up","wheel_down"]
         row_1 = ["Esc","","F1","F2","F3","F4","F5","F6","F7","F8","F9","F10","F11","F12","",["PrtSc","printscreen"],["Scrlck","scrolllock"],["Pause","pause"],"","","","wheel_left","wheel_right"]
-        row_2 = ["`","1","2","3","4","5","6","7","8","9","0","-","=",["Back","backspace"],"",["Ins","insert"],["Home","home"],["PgUp","pageup"],"",["NumLck","numlock"],["/","npdivide"],["*","npmultiply"],["-","npminus"]]
+        row_2 = ["`","1","2","3","4","5","6","7","8","9","0","-","=",["Back","backspace"],"",["Ins","insert"],["Home","home"],["PgUp","pageup"],"",["NmLck","numlock"],["/","npdivide"],["*","npmultiply"],["-","npminus"]]
         row_3 = [["Tab","tab"],"Q","W","E","R","T","Y","U","I","O","P","[","]","\\","",["Del","delete"],"End",["PgDn","pagedown"],"",["7","np7"],["8","np8"],["9","np9"],["+","npplus",1,2]]
-        row_4 = [["CapsLck","capslock"],"A","S","D","F","G","H","J","K","L",";","'",["Enter",2],"","","","","",["4","np4"],["5","np5"],["6","np6"]]
+        row_4 = [["CpsLck","capslock"],"A","S","D","F","G","H","J","K","L",";","'",["Enter",2],"","","","","",["4","np4"],["5","np5"],["6","np6"]]
         row_5 = [["LShift","leftshift"],"Z","X","C","V","B","N","M",",",".","/",["RShift","rightshift"],"","","","","up","","",["1","np1"],["2","np2"],["3","np3"],["Enter","npenter",1,2]]
         row_6 = [["LCtrl","leftcontrol"],["LWin","leftwin"],["LAlt","leftalt"],["Spacebar","space",6],["RAlt","rightalt2"],["RWin","rightwin"],["RCtrl","rightcontrol"],"","","","left","down","right","",["0/Ins","np0",2],["./Del","npdelete"]]
 
@@ -282,7 +291,6 @@ class QKeyboardWidget(QtWidgets.QWidget):
                     if icon:
                         widget.setIcon(load_icon(icon))
                         widget.setIconSize(QtCore.QSize(14,14))
-
 
                     action_key = gremlin.keyboard.key_from_name(key_name)
                     widget.key = action_key # this name must be defined in keybpoard.py 
@@ -808,6 +816,7 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
 
     def _create_keyboard_widget(self, parent = None):
         ''' creates a full keyboard widget for manual data entry '''
+        
         grid_layout = QtWidgets.QGridLayout()
         # grid_layout.setSizeConstraint(QtWidgets.QLayout.SizeConstraint.SetFixedSize)
         
@@ -816,9 +825,9 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
         # first row = QUERTY object
         row_0 = ["","","F13","F14","F15","F16","F17","F18","F19","F20","F21","F22","F23","F24","","mouse_1","mouse_2","mouse_3","","mouse_4","mouse_5","wheel_up","wheel_down"]
         row_1 = ["Esc","","F1","F2","F3","F4","F5","F6","F7","F8","F9","F10","F11","F12","",["PrtSc","printscreen"],["Scrlck","scrolllock"],["Pause","pause"],"","","","wheel_left","wheel_right"]
-        row_2 = ["`","1","2","3","4","5","6","7","8","9","0","-","=",["Back","backspace"],"",["Ins","insert"],["Home","home"],["PgUp","pageup"],"",["NumLck","numlock"],["/","npdivide"],["*","npmultiply"],["-","npminus"]]
+        row_2 = ["`","1","2","3","4","5","6","7","8","9","0","-","=",["Back","backspace"],"",["Ins","insert"],["Home","home"],["PgUp","pageup"],"",["NLck","numlock"],["/","npdivide"],["*","npmultiply"],["-","npminus"]]
         row_3 = [["Tab","tab"],"Q","W","E","R","T","Y","U","I","O","P","[","]","\\","",["Del","delete"],"End",["PgDn","pagedown"],"",["7","np7"],["8","np8"],["9","np9"],["+","npplus",1,2]]
-        row_4 = [["CapsLck","capslock"],"A","S","D","F","G","H","J","K","L",";","'",["Enter",2],"","","","","",["4","np4"],["5","np5"],["6","np6"]]
+        row_4 = [["CpLck","capslock"],"A","S","D","F","G","H","J","K","L",";","'",["Enter",2],"","","","","",["4","np4"],["5","np5"],["6","np6"]]
         row_5 = [["LShift","leftshift"],"Z","X","C","V","B","N","M",",",".","/",["RShift","rightshift"],"","","","","up","","",["1","np1"],["2","np2"],["3","np3"],["Enter","npenter",1,2]]
         row_6 = [["LCtrl","leftcontrol"],["LWin","leftwin"],["LAlt","leftalt"],["Spacebar","space",6],["RAlt","rightalt2"],["RWin","rightwin"],["RCtrl","rightcontrol"],"","","","left","down","right","",["0/Ins","np0",2],["./Del","npdelete"]]
 
@@ -961,6 +970,7 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
 
 
         grid_widget = QtWidgets.QWidget(parent)
+        grid_widget.setMaximumWidth(800)
         grid_widget.setLayout(grid_layout)
 
         return grid_widget

@@ -1709,7 +1709,9 @@ class ModeWidget(QtWidgets.QWidget):
 
         # add the mode change button
         self.mode_change = QtWidgets.QPushButton()
-        self.mode_change.setIcon(load_icon("manage_modes.svg"))
+        is_dark = gremlin.shared_state.is_dark_theme    
+        manage_modes_icon = "gfx/dark_manage_modes.svg" if is_dark else "gfx/manage_modes.svg"
+        self.mode_change.setIcon(load_icon(manage_modes_icon))
         self.mode_change.setToolTip("Manage Profile Modes")
         self.mode_change.clicked.connect(self._manage_modes_cb)
 
@@ -6272,3 +6274,73 @@ class QVjoySelector(QtWidgets.QWidget):
         self._current_input_id = input_id
         self._current_input_type = input_type
         self.selectionChanged.emit(self._current_device_guid, self._current_vjoy_id, input_type, input_id)
+
+class Color():
+    @staticmethod
+    def activeColor():
+        return "#8ce2fa" if gremlin.shared_state.is_dark_theme else "#365a75"
+    @staticmethod
+    def normalColor():
+        return "#AAAAAA" if gremlin.shared_state.is_dark_theme else "#111111"
+    @staticmethod
+    def backgroundColor():
+        return "#020202" if gremlin.shared_state.is_dark_theme else "#888888"
+    @staticmethod
+    def borderColor():
+        return "#AAAAAA" if gremlin.shared_state.is_dark_theme else "#111111"
+    @staticmethod
+    def titleBackgroundColor():
+        return "#222222" if gremlin.shared_state.is_dark_theme else "#888888"
+    @staticmethod
+    def warningColor():
+        return "#b39f32"
+    @staticmethod
+    def selectColor():
+        return "#658265" if gremlin.shared_state.is_dark_theme else "#8FBC8F"
+    @staticmethod
+    def rangeColor():
+        return "#8FBC8F"
+    @staticmethod
+    def alternateRangeColor():
+        return "#8fb9bc"
+    @staticmethod
+    def rangeBorderColor():
+        return "#8FBC8F"
+    @staticmethod
+    def keyBackgroundColor():
+        return "#101010" if gremlin.shared_state.is_dark_theme else "#888888"
+    @staticmethod
+    def keyForegroundColor():
+        return "#AAAAAA" if gremlin.shared_state.is_dark_theme else "#111111"
+    @staticmethod
+    def containerBackgroundColor():
+        return "#101010" if gremlin.shared_state.is_dark_theme else "#888888"
+    @staticmethod
+    def actionBackgroundColor():
+        return "#202020" if gremlin.shared_state.is_dark_theme else "#CCCCCC"
+    @staticmethod
+    def sliderTickColor():
+        return "#303030" if gremlin.shared_state.is_dark_theme else "#232323"
+    @staticmethod
+    def sliderHandleColor():
+        return "#a7b59e" if gremlin.shared_state.is_dark_theme else "#a7b59e"
+    @staticmethod
+    def sliderHandleBorderColor():
+        return "#e0e0e0" if gremlin.shared_state.is_dark_theme else "#e0e0e0"
+    @staticmethod
+    def sliderRangeBorderColor():
+        return "#8fb9bc" if gremlin.shared_state.is_dark_theme else "#8fb9bc"
+    @staticmethod
+    def sliderRangeColor():
+        return "#8fb9bc" if gremlin.shared_state.is_dark_theme else "#8fb9bc"
+    @staticmethod
+    def sliderAlternateRangeColor():
+        return "#8fb9bc" if gremlin.shared_state.is_dark_theme else "#8fb9bc"
+    @staticmethod
+    def sliderBackgroundColor():
+        return "#060606" if gremlin.shared_state.is_dark_theme else "#c3c3c3"
+    
+    
+
+    
+    

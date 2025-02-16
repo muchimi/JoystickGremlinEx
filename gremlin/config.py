@@ -1894,3 +1894,14 @@ class Configuration:
     def keyboard_repeater_show(self, value : bool):
         self._data["keyboard_repeater_show"] = value
         self.save()
+
+    @property
+    def theme(self):
+        return self._data.get("theme","auto")
+    @theme.setter
+    def theme(self, value :str):
+        if value:
+            value = value.casefold()
+            if value in ("auto","light","dark"):
+                self._data["theme"] = value
+                self.save()

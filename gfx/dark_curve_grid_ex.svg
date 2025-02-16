@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" version="1.1" xmlns:cc="http://creativecommons.org/ns#" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns:svg="http://www.w3.org/2000/svg" viewBox="0 0 500 500">
+  <!-- Generator: Adobe Illustrator 29.3.0, SVG Export Plug-In . SVG Version: 2.1.0 Build 146)  -->
+  <defs>
+    <style>
+      .st0 {
+        fill: #141414;
+        stroke: #3b3b3b;
+      }
+
+      .st0, .st1, .st2 {
+        stroke-miterlimit: 10;
+      }
+
+      .st0, .st2 {
+        stroke-width: 1.8px;
+      }
+
+      .st1 {
+        stroke-width: 1.9px;
+      }
+
+      .st1, .st3, .st4, .st5, .st6, .st2, .st7 {
+        fill: none;
+      }
+
+      .st1, .st2 {
+        stroke: #454545;
+      }
+
+      .st3 {
+        stroke-dasharray: 0 0 2 2;
+      }
+
+      .st3, .st4, .st5, .st6, .st7 {
+        stroke: #383838;
+      }
+
+      .st4 {
+        stroke-dasharray: 0 0 0 0 6 6;
+      }
+
+      .st8 {
+        display: none;
+      }
+
+      .st6 {
+        stroke-dasharray: 0 0 0 0 5.9 5.9;
+      }
+
+      .st7 {
+        stroke-dasharray: 0 0 0 0 0 0;
+      }
+    </style>
+  </defs>
+  <g id="svg2987" class="st8" inkscape:version="0.92.1 r15371" sodipodi:docname="grid.svg">
+    <sodipodi:namedview id="base" bordercolor="#666666" borderopacity="1.0" inkscape:current-layer="layer1" inkscape:cx="256.9791" inkscape:cy="296.55015" inkscape:document-units="px" inkscape:pageopacity="0.0" inkscape:pageshadow="2" inkscape:window-height="1127" inkscape:window-maximized="0" inkscape:window-width="1426" inkscape:window-x="504" inkscape:window-y="667" inkscape:zoom="1.2625" pagecolor="#ffffff" showgrid="false"/>
+  </g>
+  <g id="Layer_2">
+    <rect class="st0" width="499.8" height="500"/>
+    <g>
+      <rect class="st5" x="2" y=".4" width="499.6" height="499.6"/>
+      <g id="LINES">
+        <rect class="st5" x="1.8" width="500" height="499.6"/>
+        <g>
+          <line class="st5" x1="1.8" y1="437.1" x2="2.8" y2="437.1"/>
+          <line class="st3" x1="4.8" y1="437.1" x2="499.8" y2="437.1"/>
+          <line class="st5" x1="500.8" y1="437.1" x2="501.8" y2="437.1"/>
+        </g>
+        <g>
+          <line class="st5" x1="1.8" y1="374.7" x2="4.8" y2="374.7"/>
+          <line class="st4" x1="10.7" y1="374.7" x2="31.6" y2="374.7"/>
+          <line class="st7" x1="34.5" y1="374.7" x2="495.8" y2="374.7"/>
+          <line class="st5" x1="498.8" y1="374.7" x2="501.8" y2="374.7"/>
+        </g>
+        <g>
+          <line class="st5" x1="1.8" y1="312.2" x2="2.8" y2="312.2"/>
+          <line class="st3" x1="4.8" y1="312.2" x2="499.8" y2="312.2"/>
+          <line class="st5" x1="500.8" y1="312.2" x2="501.8" y2="312.2"/>
+        </g>
+        <g class="st8">
+          <g>
+            <line class="st5" x1="1.8" y1="249.8" x2="4.8" y2="249.8"/>
+            <line class="st4" x1="10.7" y1="249.8" x2="31.6" y2="249.8"/>
+            <line class="st7" x1="34.5" y1="249.8" x2="495.8" y2="249.8"/>
+            <line class="st5" x1="498.8" y1="249.8" x2="501.8" y2="249.8"/>
+          </g>
+        </g>
+        <g>
+          <line class="st5" x1="1.8" y1="187.3" x2="2.8" y2="187.3"/>
+          <line class="st3" x1="4.8" y1="187.3" x2="499.8" y2="187.3"/>
+          <line class="st5" x1="500.8" y1="187.3" x2="501.8" y2="187.3"/>
+        </g>
+        <g>
+          <line class="st5" x1="1.8" y1="124.9" x2="4.8" y2="124.9"/>
+          <line class="st4" x1="10.7" y1="124.9" x2="31.6" y2="124.9"/>
+          <line class="st7" x1="34.5" y1="124.9" x2="495.8" y2="124.9"/>
+          <line class="st5" x1="498.8" y1="124.9" x2="501.8" y2="124.9"/>
+        </g>
+        <g>
+          <line class="st5" x1="1.8" y1="62.4" x2="2.8" y2="62.4"/>
+          <line class="st3" x1="4.8" y1="62.4" x2="499.8" y2="62.4"/>
+          <line class="st5" x1="500.8" y1="62.4" x2="501.8" y2="62.4"/>
+        </g>
+        <g>
+          <line class="st5" x1="439.3" x2="439.3" y2="1"/>
+          <line class="st3" x1="439.3" y1="3" x2="439.3" y2="497.6"/>
+          <line class="st5" x1="439.3" y1="498.6" x2="439.3" y2="499.6"/>
+        </g>
+        <g>
+          <line class="st5" x1="376.8" x2="376.8" y2="3"/>
+          <line class="st6" x1="376.8" y1="8.9" x2="376.8" y2="29.8"/>
+          <line class="st7" x1="376.8" y1="32.7" x2="376.8" y2="493.6"/>
+          <line class="st5" x1="376.8" y1="496.6" x2="376.8" y2="499.6"/>
+        </g>
+        <g>
+          <line class="st5" x1="314.3" x2="314.3" y2="1"/>
+          <line class="st3" x1="314.3" y1="3" x2="314.3" y2="497.6"/>
+          <line class="st5" x1="314.3" y1="498.6" x2="314.3" y2="499.6"/>
+        </g>
+        <g class="st8">
+          <g>
+            <line class="st5" x1="251.8" x2="251.8" y2="3"/>
+            <line class="st6" x1="251.8" y1="8.9" x2="251.8" y2="29.8"/>
+            <line class="st7" x1="251.8" y1="32.7" x2="251.8" y2="493.6"/>
+            <line class="st5" x1="251.8" y1="496.6" x2="251.8" y2="499.6"/>
+          </g>
+        </g>
+        <g>
+          <line class="st5" x1="189.3" x2="189.3" y2="1"/>
+          <line class="st3" x1="189.3" y1="3" x2="189.3" y2="497.6"/>
+          <line class="st5" x1="189.3" y1="498.6" x2="189.3" y2="499.6"/>
+        </g>
+        <g>
+          <line class="st5" x1="126.8" x2="126.8" y2="3"/>
+          <line class="st6" x1="126.8" y1="8.9" x2="126.8" y2="29.8"/>
+          <line class="st7" x1="126.8" y1="32.7" x2="126.8" y2="493.6"/>
+          <line class="st5" x1="126.8" y1="496.6" x2="126.8" y2="499.6"/>
+        </g>
+        <g>
+          <line class="st5" x1="64.3" x2="64.3" y2="1"/>
+          <line class="st3" x1="64.3" y1="3" x2="64.3" y2="497.6"/>
+          <line class="st5" x1="64.3" y1="498.6" x2="64.3" y2="499.6"/>
+        </g>
+      </g>
+    </g>
+    <line class="st1" x1="250" x2="250" y2="500"/>
+    <line class="st2" y1="248.7" x2="500" y2="248.7"/>
+  </g>
+</svg>

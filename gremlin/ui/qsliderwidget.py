@@ -19,6 +19,7 @@ import gremlin.input_types
 import gremlin.joystick_handling
 import gremlin.keyboard
 import gremlin.shared_state
+import gremlin.shared_state
 import gremlin.types
 import gremlin.util
 from  PySide6.QtCore import (
@@ -62,6 +63,8 @@ class QSliderWidget(QtWidgets.QWidget):
                 self.height = 0    
 
     def __init__(self, parent = None):
+        import gremlin.ui.ui_common
+        import gremlin.shared_state
         super().__init__(parent)
 
         self._values = [-1.0, 1.0]  # position of the gates inside the range - the values must be between the slider's min/max values
@@ -73,14 +76,15 @@ class QSliderWidget(QtWidgets.QWidget):
 
         self._tick_count = 0 # no ticks
 
-        self.handleColor = QColor("#a7b59e")
-        self.tickColor = QColor("#232323")
-        self.handleBorderColor = QColor("#e0e0e0")
-        self.rangeBorderColor = QColor("#e0e0e0")
-        self.rangeColor = QColor("#8fBc8f")  
-        self.rangeAlternateColor = QColor("#8fb9bc") 
+
+        self.handleColor = QColor(gremlin.ui.ui_common.Color.sliderHandleColor()) #QColor("#a7b59e")
+        self.tickColor = QColor(gremlin.ui.ui_common.Color.sliderTickColor()) #QColor("#232323")
+        self.handleBorderColor = QColor(gremlin.ui.ui_common.Color.sliderHandleBorderColor()) #QColor("#e0e0e0")
+        self.rangeBorderColor = QColor(gremlin.ui.ui_common.Color.sliderRangeBorderColor()) #QColor("#e0e0e0")
+        self.rangeColor = QColor(gremlin.ui.ui_common.Color.sliderRangeColor()) #QColor("8fb9bc")  
+        self.rangeAlternateColor = QColor(gremlin.ui.ui_common.Color.sliderAlternateRangeColor()) #QColor("#8fb9bc") 
         self.UseAlternateColor = True # alternate range colors
-        self.BackgroundColor = QColor("#c3c3c3")
+        self.BackgroundColor = QColor(gremlin.ui.ui_common.Color.sliderBackgroundColor()) #QColor("#c3c3c3")
         
         self._finishedProgressLength = 0
         self._handle_hotspots = [] # rects of handle clickable spots

@@ -134,7 +134,9 @@ class MergeAxisEntryWidget(QtWidgets.QDockWidget):
         
 
         # configure button
-        self.configure_icon_active = gremlin.util.load_icon("ei.cog-alt",qta_color="#365a75")
+    
+        active_color = "#367550" if gremlin.shared_state.is_dark_theme else "#365a75"
+        self.configure_icon_active = gremlin.util.load_icon("ei.cog-alt",qta_color= active_color)
         self.configure_icon_inactive = gremlin.util.load_icon("fa.gear")
 
         self.configure_button_widget = QtWidgets.QPushButton("Actions") 
