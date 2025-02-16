@@ -122,7 +122,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 syslog = logging.getLogger("system")
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_BASE = "m72a"
+APPLICATION_BASE = "m72b"
 APPLICATION_VERSION = f"13.40.16ex ({APPLICATION_BASE})"
 
 
@@ -4134,9 +4134,9 @@ if __name__ == "__main__":
         syslog.info(f"\tFound {vjoy_count} vjoy device(s)")
 
         if not vjoy_working:
-            msg = "No configured VJOY devices were found<br>This could be related to a different error scanning devices, check log in verbose mode"
-            syslog.error(msg)
-            gremlin.ui.ui_common.MessageBox("Error Scanning Devices", msg)
+            msg = "No configured VJOY devices were found.  VJOY output will be disabled.  This is normal if VJOY is not installed or not configured."
+            syslog.warning(msg)
+            #gremlin.ui.ui_common.MessageBox("Error Scanning Devices", msg)
             # raise gremlin.error.GremlinError(msg)
 
     except (gremlin.error.GremlinError, dinput.DILLError) as e:

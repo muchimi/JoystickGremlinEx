@@ -277,7 +277,7 @@ class ProfileConverter:
                                 if "button" in action.keys() or \
                                         "hat" in action.keys():
                                     copy_condition = True
-                            elif action.tag == "response-curve":
+                            elif gremlin.base_profile._is_curve_tag(action.tag):
                                 pass
                             else:
                                 copy_condition = True
@@ -388,12 +388,17 @@ class ProfileConverter:
         """
         new_root = copy.deepcopy(root)
         new_root.set("version", "6")
+        search_list = [".[@type='basic']//remap[@axis]",
+                       ".[@type='basic']//response-curve",
+                       ".[@type='basic']//response-curve-ex",
+                       ".[@type='basic']//curve-data"
+                       ]
         for axis in new_root.iter("axis"):
             has_remap = False
             has_curve = False
             for container in axis:
-                has_remap |= container.find(".[@type='basic']//remap[@axis]") is not None
-                has_curve |= container.find(".[@type='basic']//response-curve") is not None
+                for exp in search_list:
+                    has_remap |= container.find(exp) is not None
 
             # If we have both axis remap and response curve actions place them
             # all in a single basic container
@@ -407,12 +412,10 @@ class ProfileConverter:
                 containers_to_delete = []
                 for container in axis:
                     remove_container = False
-                    for node in container.findall(".[@type='basic']//remap[@axis]"):
-                        new_actionset.append(node)
-                        remove_container = True
-                    for node in container.findall(".[@type='basic']//response-curve"):
-                        new_actionset.append(node)
-                        remove_container = True
+                    for exp in search_list:
+                        for node in container.findall(exp):
+                            new_actionset.append(node)
+                            remove_container = True
 
                     if remove_container:
                         containers_to_delete.append(container)
@@ -488,6 +491,7 @@ class ProfileConverter:
         # convert all response-curve to response-curve EX
         if convert_response_curve:        
             nodes = root.xpath("//response-curve")
+            nodes.extend(root.xpath("//curve-data"))
             for node in nodes:
                 node.tag = "response-curve-ex"
 

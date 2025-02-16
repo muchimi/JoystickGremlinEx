@@ -2236,7 +2236,7 @@ class AxisCurveData():
         :param node the XML node to parse
         """
 
-        if not node.tag in ("curve-data","response-curve-ex"):
+        if not gremlin.base_profile._is_curve_tag(node.tag):
             return
 
         if "mode" in node.attrib:

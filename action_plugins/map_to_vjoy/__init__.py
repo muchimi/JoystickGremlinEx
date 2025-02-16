@@ -2774,7 +2774,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         actions = []
         nodes = []
         for node in self.getSiblings():
-            if node.action.tag in ("response-curve", "response-curve-ex"):
+            if gremlin.base_profile._is_curve_tag(node.action.tag): 
                 nodes.append(node)
 
 
@@ -3920,10 +3920,14 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
                 self.stepped_input_id = safe_read(node,"stepped-input-id", int, 0)
 
             # curve data
+
             curve_node = util.get_xml_child(node,"curve-data")
             if not curve_node:
                 # older style
                 curve_node = util.get_xml_child(node,"response-curve-ex")
+                if not curve_node:
+                    curve_node = util.get_xml_child(node,"response-curve")
+
             
             if curve_node is not None:
                 self.curve_data = gremlin.curve_handler.AxisCurveData()

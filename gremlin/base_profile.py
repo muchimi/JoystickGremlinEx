@@ -87,6 +87,12 @@ def _get_input_item(parent):
         return parent
     return None
 
+def _is_curve_tag(tag):
+     ''' true if a curve tag'''
+     if tag:
+        return tag.casefold() in ("curve-data","response-curve","response-curve-ex")
+     return False
+
 class ABCMetaQObject(ABCMeta, type(QtCore.QObject)):
     pass
 
@@ -673,7 +679,7 @@ class AbstractContainer(ProfileData):
 
             # apply any conversions
             tag = child.tag
-            if config.convert_response_curve and tag == "response-curve":
+            if config.convert_response_curve and gremlin.base_profile._is_curve_tag(tag):
                 tag = "response-curve-ex"
                 if not tag in action_name_map:
                     # new mapper not found
@@ -1780,7 +1786,7 @@ class InputItem():
         elif self.input_type == InputType.JoystickAxis:
             # check for curve data
             for child in node:
-                if child.tag == "response-curve-ex":
+                if gremlin.base_profile._is_curve_tag(child.tag):
                     self.curve_data = gremlin.curve_handler.AxisCurveData()
                     self.curve_data._parse_xml(child)
                     self.curve_data.calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(self.device_guid, self.input_id)
@@ -1807,7 +1813,7 @@ class InputItem():
 
         
         for child in container_node:
-            if child.tag in ("latched", "input", "keylatched","response-curve","response-curve-ex"):
+            if child.tag in ("latched", "input", "keylatched") or gremlin.base_profile._is_curve_tag(child.tag):
                 # ignore extra data
                 continue
             if not "type" in child.attrib:
