@@ -6030,3 +6030,245 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
             self._invert_output_widget.setVisible(visible)
             self.modeChanged.emit()
 
+
+
+
+class QVjoySelector(QtWidgets.QWidget):
+    ''' widget to select a vjoy device '''
+
+    selectionChanged = QtCore.Signal(object, int,  InputType, int) # fires when selection changes (device_guid, vjoy_id, input_type, input_id)
+
+    def __init__(self, device_label = "Device:", input_label = "Input:", parent = None):
+        super().__init__(parent)
+
+
+        self._enable_hats = False # true if hat list enabled
+        self._enable_buttons = False # true if button list enabled
+        self._enable_axis = True  # true if axis list enabled
+
+        self._current_device_guid = None # selected device
+        self._current_vjoy_id = None # current vjoy #
+        self._current_input_id = None # selected input id
+        self._current_input_type = None # selected input type
+
+        widget, layout = getVContainer()
+        self.container_stepped_widget = widget
+        self.container_stepped_layout = layout
+
+        self.selector_device_widget = NoWheelComboBox()
+        self.selector_input_widget = NoWheelComboBox()
+        listen_widget = QtWidgets.QPushButton("Listen")
+        listen_widget.clicked.connect(self._stepped_listen)
+
+        device_widget = QtWidgets.QWidget()
+        device_layout = QtWidgets.QGridLayout(device_widget)
+        device_layout.addWidget(QtWidgets.QLabel(device_label),0,0)
+        device_layout.addWidget(self.selector_device_widget,0,1)
+        device_layout.addWidget(listen_widget,0,3)
+        device_layout.addWidget(QtWidgets.QLabel(" "),0,4)
+        device_layout.addWidget(QtWidgets.QLabel(input_label),1,0)
+        device_layout.addWidget(self.selector_input_widget,1,1)
+        device_layout.setColumnStretch(4,2)
+
+        self.container_stepped_layout.addWidget(device_widget)
+        self.container_stepped_layout.addWidget(self.step_value_container_widget)
+        self.container_stepped_layout.addWidget(self.progression_container_widget)
+        self.container_stepped_layout.addWidget(self.step_widget_container)
+
+        self.selector_device_widget.currentIndexChanged.connect(self._device_changed_cb)
+        self.selector_input_widget.currentIndexChanged.connect(self._input_changed_cb)
+
+        self.stepped_device_map = {} # holds the device information keyed by device_id (str)
+        self.input_map = {} # holds the list of buttons for the given device by device_id(str)
+
+        main_layout = QtWidgets.QVBoxLayout(self)
+        main_layout.addWidget(self.container_stepped_widget)
+
+        self._update_devices()
+     
+
+
+    def _update_devices(self):
+        ''' reloads input choices in the selector '''
+        
+        devices = sorted(gremlin.joystick_handling.vjoy_devices(),key=lambda x: x.name)
+        
+        device_index = None
+        current_index = 0
+        dev: DeviceSummary
+        axis_list = {}
+        button_list = {}
+        hat_list = {}
+        with QtCore.QSignalBlocker(self.selector_device_widget):
+            self.selector_device_widget.clear()
+            for dev in devices:
+                self.stepped_device_map[dev.device_id] = dev
+                button_list = {}
+                if self._enable_axis:
+                    for input_id in range(1, dev.axis_count+1):
+                        # if dev.device_guid == self.action_data.hardware_device_guid and \
+                        #     input_id == self.action_data.hardware_input_id:
+                        #     # skip self as a possible input
+                        #     continue
+                        axis_list[input_id] = f"Axis {input_id}"
+
+                if self._enable_buttons:
+                    for input_id in range(1, dev.button_count+1):
+                        # if dev.device_guid == self.action_data.hardware_device_guid and \
+                        #     input_id == self.action_data.hardware_input_id:
+                        #     # skip self as a possible input
+                        #     continue
+                        button_list[input_id] = f"Button {input_id}"
+                        
+                if self._enable_hats:
+                    for input_id in range(1, dev.hat_count+1):
+                        # if dev.device_guid == self.action_data.hardware_device_guid and \
+                        #     input_id == self.action_data.hardware_input_id:
+                        #     # skip self as a possible input
+                        #     continue
+                        hat_list[input_id] = f"Hat {input_id}"
+
+
+            
+                    self.input_map[dev.device_id] = {}
+                    self.input_map[dev.device_id][InputType.JoystickAxis] = axis_list
+                    self.input_map[dev.device_id][InputType.JoystickButton] = button_list
+                    self.input_map[dev.device_id][InputType.JoystickHat] = hat_list
+                    self.selector_device_widget.addItem(dev.name, (dev.device_id, dev.joystick_id)) # data (device_guid, vjoy_id)
+
+        self._select_first_device()
+
+
+    def _update_inputs(self):
+        ''' populates the device input list based on current filters - entry data is (input_type, input_id)'''
+        device_guid, vjoy_id = self.selector_device_widget.currentData()
+        current_index = 0
+        selected_input_index = None
+        self._current_device_guid = device_guid
+        self._current_vjoy_id = vjoy_id
+        active_input_id = self.current_input_id
+        active_input_type = self.current_input_type
+
+        with QtCore.QSignalBlocker(self.selector_input_widget):
+            self.selector_input_widget.clear()
+            first_input_id = None
+            if self._enable_axis:
+                for input_id, input_name in self.input_map[device_guid][InputType.JoystickAxis].items():
+                    self.selector_input_widget.addItem(input_name, (InputType.JoystickAxis, input_id))
+                    if first_input_id is None:
+                        first_input_id = input_id
+                    if selected_input_index is None and input_id == active_input_id:
+                        selected_input_index = current_index
+                    current_index +=1 
+            if self._enable_buttons:
+                for input_id, input_name in self.input_map[device_guid][InputType.JoystickButton].items():
+                    self.selector_input_widget.addItem(input_name, (InputType.JoystickButton, input_id))
+                    if first_input_id is None:
+                        first_input_id = input_id
+                    if selected_input_index is None and input_id == active_input_id:
+                        selected_input_index = current_index
+                    current_index +=1 
+            if self._enable_hats:
+                for input_id, input_name in self.input_map[device_guid][InputType.JoystickHat].items():
+                    self.selector_input_widget.addItem(input_name, (InputType.JoystickHat, input_id))
+                    if first_input_id is None:
+                        first_input_id = input_id
+                    if selected_input_index is None and input_id == active_input_id:
+                        selected_input_index = current_index
+                    current_index +=1 
+
+
+            self._select_input(active_input_type, active_input_id)
+                
+
+
+    @property
+    def input_id(self) -> int:
+        return self._current_input_id
+    
+    def setAxisEnabled(self, value:bool):
+        if self._enable_axis != value:
+            self._enable_axis = value
+            self._update_inputs()
+
+    def setButtonsEnabled(self, value:bool):
+        if self._enable_buttons != value:
+            self._enable_buttons = value
+            self._update_inputs()
+    
+    def setHatsEnabled(self, value:bool):
+        if self._enable_hats != value:
+            self._enable_hats = value
+            self._update_inputs()
+
+    
+    @input_id.setter
+    def input_id(self, value : int):
+        
+        if value < 1:
+            syslog.error(f"Invalid input id: {value}")
+            return # invalid value
+        
+        if value == self._current_input_id:
+            # nothing to do
+            return
+        
+        info = gremlin.joystick_handling.device_info_from_guid(self._current_device_guid)
+        if info:
+            match self._current_input_type:
+                case InputType.JoystickAxis:
+                    if value <= info.axis_count:
+                        self._current_input_id = value
+                case InputType.JoystickButton:
+                    if value <= info.button_count:
+                        self._current_input_id = value
+                case InputType.JoystickHat:
+                    if value <= info.hat_count:
+                        self._current_input_id = value
+
+            self._select_input(self._current_input_type, self._current_input_id)
+
+    def _select_input(self, input_type, input_id):
+        ''' selects the entry in the control for the given input type and input ID if it exists'''
+
+        key = (input_type, input_id)
+        index = self.selector_input_widget.findData(key)
+        if index != -1:
+            self.selector_input_widget.setCurrentIndex(index)
+            return True
+        return False
+    
+
+    def _select_first_device(self):
+        ''' selects the first device if there is a device to select '''
+        if self.selector_device_widget.count():
+            self.selector_device_widget.setCurrentIndex(0)
+    
+    def _select_first_input(self):
+        ''' selects the first input if there is an input to select '''
+        if self.selector_input_widget.count():
+            self.selector_input_widget.setCurrentIndex(0)
+            
+    def _select_device(self, device_guid, input_type, input_id):
+
+        key = device_guid
+        index = self.selector_device_widget.findData(key)
+        if index != -1:
+            self.selector_device_widget.setCurrentIndex(index)
+
+
+    @QtCore.Slot()
+    def _device_changed_cb(self):
+        ''' called when device selection changes '''
+        device_guid = self.selector_device_widget.currentData()
+        self._current_device_guid = device_guid
+        self._select_first_input()
+
+    @QtCore.Slot()
+    def _input_changed_cb(self):
+        ''' called when the input selection changed '''
+        input_type, input_id = self.selector_input_widget.currentData()
+        
+        self._current_input_id = input_id
+        self._current_input_type = input_type
+        self.selectionChanged.emit(self._current_device_guid, self._current_vjoy_id, input_type, input_id)

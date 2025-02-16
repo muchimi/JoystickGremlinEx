@@ -2158,9 +2158,6 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         super().__init__(action_data, parent=parent)
 
 
-
-
-
     def _create(self, action_data):
         '''' initialize before createUI() '''
         
@@ -2762,14 +2759,14 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _expression_changed_cb(self):
         ''' expression changed '''
         self.action_data.command = self._calculator_entry_widget.toPlainText()
-        warning_visible = not self.action_data._is_value_command()
+        warning_visible = self.action_data.command_mode == SimConnectCommandMode.CalculatorParam and not self.action_data._is_value_command()
         self._warning_widget.setVisible(warning_visible)
 
     @QtCore.Slot()
     def _expression_release_changed_cb(self):
         ''' expression changed '''
         self.action_data.command_release = self._calculator_release_entry_widget.toPlainText()
-        warning_visible = not self.action_data._is_value_command()
+        warning_visible = self.action_data.command_mode == SimConnectCommandMode.CalculatorParam and not self.action_data._is_value_command()
         self._warning_widget.setVisible(warning_visible)
 
     QtCore.Slot()            
@@ -3318,6 +3315,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
             # momentary
             range_visible = self.action_data.command_type == SimConnectCommandType.LVar
         
+        range_visible = True
 
         self._output_container_widget.setVisible(simvar_visible or range_visible)
         self._output_range_container_widget.setVisible(simvar_visible or range_visible)
@@ -3513,6 +3511,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
 
         if not self.manager.is_running:
             # sim is not running - attempt to reconnect every few seconds
+            syslog.info("SIMCONNECT: manager not running - connecting....")
             if self.last_reconnect_time is None or self.last_reconnect_time + self.reconnect_timeout > time.time():
                 self.last_reconnect_time = time.time()
                 eh = SimConnectEventHandler()

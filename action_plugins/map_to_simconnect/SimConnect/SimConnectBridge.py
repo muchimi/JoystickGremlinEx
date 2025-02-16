@@ -257,12 +257,12 @@ class SimConnectBridge(QtCore.QObject):
     def execute_calculator_code(self, command):
         ''' executes an RPN expression '''
         # syslog = logging.getLogger("system")
-        #verbose = gremlin.config.Configuration().verbose_mode_simconnect
-        verbose = False
-        if self._wait_event.is_set():
-            # currently executing another command - ignore
-            #if verbose: syslog.info("execute: already executing")
-            return
+        verbose = gremlin.config.Configuration().verbose_mode_simconnect
+        #verbose = False
+        # if self._wait_event.is_set():
+        #     # currently executing another command - ignore
+        #     if verbose: syslog.info("execute: already executing")
+        #     return
         try:
             id = self._get_next_id() # id is sequential so it's unique for each call and will roundrobin
             data = command.encode("ascii")
@@ -283,9 +283,9 @@ class SimConnectBridge(QtCore.QObject):
                 packet_pointer)
                         
             # wait for the event
-            self._wait_event.wait(0.1)
-            if verbose: syslog.info("SIMCONNECT BRIDGE: completed")
-            self._wait_event.clear()
+            # self._wait_event.wait(0.1)
+            if verbose: syslog.info(f"SIMCONNECT BRIDGE: {command} sent")
+            #self._wait_event.clear()
         except:
             syslog.error(f"SIMCONNECT BRIDGE: error executing calculator code: {command}")
 
