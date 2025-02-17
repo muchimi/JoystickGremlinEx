@@ -328,22 +328,23 @@ class OptionsUi(ui_common.BaseDialogUi):
 
 
 
-        # # themes
-        # themes = [("Windows","auto"),
-        #           ("Light","light"),
-        #           ("Dark","dark"),
-        #           ]
+        # themes
+        themes = [("Windows","auto"),
+                  ("Light","light"),
+                  ("Dark","dark"),
+                  ]
         
-        # widgets = []
-        # current_theme = self.config.theme
-        # for theme, data in themes:
-        #     widget = gremlin.ui.ui_common.QDataRadioButton(theme, data)
-        #     if data == current_theme:
-        #         widget.setChecked(True)
-        #     widget.clicked.connect(self._theme_changed)
-        #     widgets.append(widget)
+        widgets = []
+        current_theme = self.config.theme
+        for theme, data in themes:
+            widget = gremlin.ui.ui_common.QDataRadioButton(theme, data)
+            if data == current_theme:
+                widget.setChecked(True)
+            widget.clicked.connect(self._theme_changed)
+            widgets.append(widget)
 
-        # self.theme_widget, _ = gremlin.ui.ui_common.getHContainer(widgets,"Theme")
+        self.theme_widget, _ = gremlin.ui.ui_common.getHContainer(widgets,"Theme")
+        self.theme_widget.setToolTip("Theme changes take effect at the next start.")
 
 
         # Switch to highlighted device (master switch)
@@ -599,8 +600,8 @@ class OptionsUi(ui_common.BaseDialogUi):
         # column 1
         col = 0
         row = 0
-        # column_layout.addWidget(self.theme_widget, row, col)
-        # row+=1
+        column_layout.addWidget(self.theme_widget, row, col)
+        row+=1
         column_layout.addWidget(self.sync_last_selection, row, col)
         row+=1
         column_layout.addWidget(self.close_to_systray, row, col)
@@ -1185,11 +1186,12 @@ This setting is also available on a profile by profile basis on the profile tab,
         self.highlight_input_axis.setEnabled(enabled)
         self.highlight_hotkey_autoswitch.setEnabled(enabled)
 
-    # @QtCore.Slot()
-    # def _theme_changed(self):
-    #     theme = self.sender().data
-    #     self.config.theme = theme   
-    #     gremlin.shared_state.ui.update_theme()
+    @QtCore.Slot()
+    def _theme_changed(self):
+        theme = self.sender().data
+        self.config.theme = theme   
+
+        #gremlin.shared_state.ui.update_theme()
         
       
                 
@@ -1730,7 +1732,8 @@ This setting is also available on a profile by profile basis on the profile tab,
 
 
                 if not item.valid:
-                    warning_widget = ui_common.QIconLabel("fa.warning", text=item.warning, use_qta = True,  icon_color="red")
+                    warning_color = gremlin.ui.ui_common.Color.warningColor()
+                    warning_widget = ui_common.QIconLabel("fa.warning", text=item.warning, use_qta = True,  icon_color= QtGui.QColor(warning_color))
                     container_layout.addWidget(warning_widget, row, 0, 1, -1)
                     row+=1
 

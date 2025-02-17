@@ -85,8 +85,8 @@ class MapToMouseWidget(gremlin.ui.input_item.AbstractActionWidget):
         else:
             self._create_button_hat_ui()
 
-        
-        warning_widget = gremlin.ui.ui_common.QIconLabel("fa.warning",use_qta=True,icon_color=QtGui.QColor("yellow"),text="Legacy mapper - consider using <i>Map to Mouse Ex</i> for additional functionality", use_wrap=False)
+        warning_color = gremlin.ui.ui_common.Color.warningColor()
+        warning_widget = gremlin.ui.ui_common.QIconLabel("fa.warning",use_qta=True,icon_color=QtGui.QColor(warning_color),text="Legacy mapper - consider using <i>Map to Mouse Ex</i> for additional functionality", use_wrap=False)
         self.main_layout.addWidget(self.container_widget)
         self.main_layout.addWidget(warning_widget)            
 

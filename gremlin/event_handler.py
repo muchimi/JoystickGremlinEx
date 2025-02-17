@@ -534,6 +534,22 @@ class EventListener(QtCore.QObject):
 		self._keep_alive_thread.setName("heartbeat")
 		self._keep_alive_thread.start()
 
+		self.shutdown.connect(self._shutdown_handler)
+
+
+	@QtCore.Slot()
+	def _shutdown_handler(self):
+		''' terminate threads '''
+		if self._keep_alive_thread:
+			self._keep_alive_event.set()
+			self._keep_alive_thread.join()
+			self._keep_alive_thread = None
+
+		if self._run_thread:
+			self._run_event.set()
+			self._run_thread.join()
+			self._run_thread = None
+
 	@property
 	def calibrationManager(self):
 		from gremlin.ui.axis_calibration import CalibrationManager

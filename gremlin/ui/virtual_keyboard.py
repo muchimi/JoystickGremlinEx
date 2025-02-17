@@ -38,16 +38,14 @@ class QKeyWidget(QtWidgets.QPushButton):
         self._selected = False
         self.setAttribute(QtCore.Qt.WidgetAttribute.WA_Hover, True)
 
-        font = QtGui.QFont()
-        font.setPointSize(8)
-        self.setFont(font)
-
-
         foreground_color = gremlin.ui.ui_common.Color.keyForegroundColor()
         background_color = gremlin.ui.ui_common.Color.keyBackgroundColor()
         selected_color = gremlin.ui.ui_common.Color.selectColor()
-        self._default_style = f"QPushButton {{border: 2px solid black; border-radius: 4px; color: {foreground_color}; background-color: {background_color}; border-style: outset; padding: 4px; min-width: 32px; max-height: 30px;}} QPushButton:hover {{border: 2px #4A4648;}}"
-        self._selected_style = f"QPushButton {{border: 2px solid black; border-radius: 4px; color: {foreground_color}; background-color: {selected_color}; border-style: outset; padding: 4px; min-width: 32px; max-height: 30px;}} QPushButton:hover {{border: 2px #4A4648;}}"
+        border = gremlin.ui.ui_common.Color.keyBorderColor()
+        hover_border = gremlin.ui.ui_common.Color.keyHoverBorderColor()
+        self._default_style = f"QPushButton {{font-size:10px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {background_color}; border-style: outset; padding: 2px; min-width: 32px; max-height: 30px;}} QPushButton:hover {{border: 2px {hover_border};}}"
+        self._selected_style = f"QPushButton {{font-size:10px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {selected_color}; border-style: outset; padding: 2px; min-width: 32px; max-height: 30px;}} QPushButton:hover {{border: 2px {hover_border};}}"
+
         self.setStyleSheet(self._default_style)
         
         self.normal_key = None # what to display normally
@@ -129,6 +127,7 @@ class QKeyboardWidget(QtWidgets.QWidget):
         main_layout = QtWidgets.QVBoxLayout(self)
         main_layout.setContentsMargins(0,0,0,0)
         grid_layout = QtWidgets.QGridLayout()
+        grid_layout.setSpacing(2)
         main_layout.addLayout(grid_layout)
 
         self.config = gremlin.config.Configuration()
@@ -201,6 +200,9 @@ class QKeyboardWidget(QtWidgets.QWidget):
         self._key_widget_map = {} # map of key (scancode, extended) to widget
         self._hooked = False
         self._read_only = False
+
+        min_w = 0
+        key_widgets = []
 
         for row in rows:
             current_column = 0
@@ -307,6 +309,7 @@ class QKeyboardWidget(QtWidgets.QWidget):
 
                     
                     self._key_widget_map[key_name] = widget
+                    key_widgets.append(widget)
 
                 else:
                     widget = QtWidgets.QLabel(" ")
@@ -322,6 +325,14 @@ class QKeyboardWidget(QtWidgets.QWidget):
 
         self.key_description = QtWidgets.QLabel()
         main_layout.addWidget(self.key_description)
+
+        # ensure widgets have a minimum size
+        widget : QtWidgets.QWidget
+
+        min_w = max(widget.minimumSizeHint().width() for widget in key_widgets if len(widget.text()) <= 5)
+        for widget in key_widgets:
+            widget.setMinimumWidth(min_w)
+            
 
     def eventFilter(self, widget, event):
         t = event.type()
@@ -818,6 +829,7 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
         ''' creates a full keyboard widget for manual data entry '''
         
         grid_layout = QtWidgets.QGridLayout()
+        grid_layout.setSpacing(2)
         # grid_layout.setSizeConstraint(QtWidgets.QLayout.SizeConstraint.SetFixedSize)
         
         # list of scancodes  https://handmade.network/forums/articles/t/2823-keyboard_inputs_-_scancodes%252C_raw_input%252C_text_input%252C_key_names
@@ -847,6 +859,7 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
 
         current_row = 0
         self._key_map = {}
+        key_widgets = []
 
         for row in rows:
             current_column = 0
@@ -950,12 +963,9 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
                     self._key_map[(action_key.scan_code, action_key.is_extended)] = key_name
                     assert key_name not in self._key_widget_map.keys(),f"duplicate key in keyboard map found: {key_name}"
 
-                    # # handle special duplicates
-                    # if key_name == "rightshift":
-                    #     other_key = gremlin.keyboard.key_from_name("rightshift2")
-                    #     self._key_map[(other_key.scan_code, other_key.is_extended)] = key_name
-                    #     self._key_widget_map["rightshift2"] = widget
+                    
                     self._key_widget_map[key_name] = widget
+                    key_widgets.append(widget)
 
                 else:
                     widget = QtWidgets.QLabel(" ")
@@ -970,8 +980,15 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
 
 
         grid_widget = QtWidgets.QWidget(parent)
-        grid_widget.setMaximumWidth(800)
         grid_widget.setLayout(grid_layout)
+
+        # ensure widgets have a minimum size
+        widget : QtWidgets.QWidget
+
+        min_w = max(widget.minimumSizeHint().width() for widget in key_widgets if len(widget.text()) <= 5)
+        for widget in key_widgets:
+            widget.setMinimumWidth(min_w)
+            
 
         return grid_widget
     

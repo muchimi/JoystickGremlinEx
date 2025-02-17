@@ -1406,7 +1406,8 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
         warning_container = QtWidgets.QWidget()
         warning_layout = QtWidgets.QHBoxLayout(warning_container)
-        self.warning_widget = gremlin.ui.ui_common.QIconLabel("fa.warning",use_qta=True,icon_color=QtGui.QColor("yellow"),text="Error goes here", use_wrap=False)
+        warning_color = gremlin.ui.ui_common.Color.warningColor()
+        self.warning_widget = gremlin.ui.ui_common.QIconLabel("fa.warning",use_qta=True,icon_color=QtGui.QColor(warning_color),text="Error goes here", use_wrap=False)
         self.warning_widget.setVisible(False)
         warning_layout.addWidget(self.warning_widget)
         warning_layout.addStretch()
@@ -2191,7 +2192,8 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         if verbose:
             syslog.info(f"Simconnect UI for: {self.action_data.hardware_input_type_name}  {self.action_data.hardware_device_name} input: {self.action_data.hardware_input_id}")
 
-        self._warning_widget = gremlin.ui.ui_common.QIconLabel("fa.warning",use_qta=True,icon_color=QtGui.QColor("yellow"),text="Parameter Calculation requires a {#} marker in the expression where the output value goes.", use_wrap=False)
+        warning_color = gremlin.ui.ui_common.Color.warningColor()
+        self._warning_widget = gremlin.ui.ui_common.QIconLabel("fa.warning",use_qta=True,icon_color=QtGui.QColor(warning_color),text="Parameter Calculation requires a {#} marker in the expression where the output value goes.", use_wrap=False)
 
         # if the input is chained 
         self.chained_input = self.action_data.input_item.is_action
@@ -2666,7 +2668,8 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         #self.main_layout.addWidget(self._toolbar_container_widget)
 
-        warning_widget = gremlin.ui.ui_common.QIconLabel("fa.warning",use_qta=True,icon_color=QtGui.QColor("orange"),text="This function is experimental and still in development, and not necessary feature complete", use_wrap=False)
+        warning_color = gremlin.ui.ui_common.Color.warningColor()
+        warning_widget = gremlin.ui.ui_common.QIconLabel("fa.warning",use_qta=True,icon_color=QtGui.QColor(warning_color),text="This function is experimental and still in development, and not necessary feature complete", use_wrap=False)
         self.main_layout.addWidget(warning_widget)
 
         self.main_layout.addWidget(self._mode_container_widget)

@@ -176,7 +176,8 @@ class MergeAxisEntryWidget(QtWidgets.QDockWidget):
             QtWidgets.QLabel("<b>Output</b>"), 0, 4
         )
 
-        self.status_widget = ui_common.QIconLabel("fa.warning",use_qta=True,icon_color=QtGui.QColor("yellow"), use_wrap=False)
+        warning_color = gremlin.ui.ui_common.Color.warningColor()
+        self.status_widget = ui_common.QIconLabel("fa.warning",use_qta=True,icon_color=QtGui.QColor(warning_color), use_wrap=False)
         
         
         self.grid_layout.addWidget(self.joy1_selector, 1, 0)

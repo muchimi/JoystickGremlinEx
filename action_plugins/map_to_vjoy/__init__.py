@@ -1279,7 +1279,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         # vjoy device selection - display vjoy target ID and vjoy target input - the input changes based on the behavior
 
 
-        row = 2
+        row += 1
         self.lbl_vjoy_device_selector = QtWidgets.QLabel("Device:")
         grid.addWidget(self.lbl_vjoy_device_selector,row,0)
         self.cb_vjoy_device_selector = gremlin.ui.ui_common.NoWheelComboBox()
@@ -1289,13 +1289,20 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 
 
-        row = 3
+        row += 1
         self.cb_vjoy_input_selector = gremlin.ui.ui_common.NoWheelComboBox()
         self.lbl_vjoy_input_selector = QtWidgets.QLabel("Output:")
         grid.addWidget(self.lbl_vjoy_input_selector,row,0)
         grid.addWidget(self.cb_vjoy_input_selector,row,1)
 
-        row = 4
+        row += 1
+
+        warning_color = gremlin.ui.ui_common.Color.warningColor()
+        self.warning_widget = gremlin.ui.ui_common.QIconLabel("fa.warning",use_qta=True,icon_color=QtGui.QColor(warning_color),text="", use_wrap=False)
+        warning_container, warning_layout = gremlin.ui.ui_common.getHContainer(self.warning_widget)
+        grid.addWidget(warning_container, row,1,1,-1)
+
+        row += 1
 
         source =  QtWidgets.QWidget()
         box = QtWidgets.QHBoxLayout(source)
@@ -1452,6 +1459,11 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.b_range_bottom.clicked.connect(self._b_range_bot_clicked)
         self.b_range_top.clicked.connect(self._b_range_top_clicked)
 
+
+    def setWarning(self, text):
+        ''' updates warning'''
+        self.warning_widget.setText(text)
+        self.warning_widget.setVisible(text is not None and len(text))
 
     def update_steps(self):
         ''' updates the stepped list widgets '''
@@ -2085,11 +2097,12 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.cb_vjoy_input_selector.clear()
             input_type = self._get_selector_input_type()
             action_mode = self._get_action_mode()
+            self.setWarning(None) # clear any warnings
 
             if not self.action_data.vjoy_device_id in self.action_data.vjoy_map:
                 self.action_data.refresh_vjoy()
                 if not self.action_data.vjoy_device_id in self.action_data.vjoy_map:
-                    gremlin.ui.ui_common.MessageBox(prompt=f"VJOY configuration has changed and GremlinEx is unable to find the requested Vjoy device # {self.action_data.vjoy_device_id}")
+                    self.setWarning(f"VJOY configuration has changed and GremlinEx is unable to find the requested Vjoy device # {self.action_data.vjoy_device_id}")
                     return
 
 
@@ -2100,14 +2113,22 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
                     axis_name = dev.axis_names[id-1]
                     self.cb_vjoy_input_selector.addItem(f"Axis {axis_name}",id)
                     #self.cb_vjoy_input_selector.addItem(f"Axis {id} ({self.get_axis_name(id)})",id)
-            elif input_type in VJoyWidget.input_type_buttons or action_mode in (VjoyAction.VJoyAxisToButton, VjoyAction.VJoyHatToButton):
+            elif input_type in VJoyWidget.input_type_buttons or action_mode in (VjoyAction.VJoyButton, VjoyAction.VJoyButtonRelease, VjoyAction.VJoyPulse, VjoyAction.VJoyToggle, VjoyAction.VJoyAxisToButton, VjoyAction.VJoyHatToButton):
                 count = dev.button_count
                 for id in range(1, count+1):
                     self.cb_vjoy_input_selector.addItem(f"Button {id}",id)
+                input_id = self.action_data.vjoy_input_id
+                if input_id < 1 or input_id > count:
+                    self.setWarning(f"VJOY configuration has changed and GremlinEx is unable to find the requested Vjoy button # {input_id}")
+                    return
             elif input_type == InputType.JoystickHat:
                 count = dev.hat_count
                 for id in range(1, count+1):
                     self.cb_vjoy_input_selector.addItem(f"Hat {id}",id)
+                    input_id = self.action_data.vjoy_input_id
+                if input_id < 1 or input_id > count:
+                    self.setWarning(f"VJOY configuration has changed and GremlinEx is unable to find the requested Vjoy hat # {input_id}")
+                    return
             else:
                 # keyboard, latched keyboard, midi and OSC
                 pass
@@ -2438,9 +2459,10 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.cb_vjoy_input_selector.setCurrentIndex(button_id-1)
 
         # update the grid
-        cb = self._grid_widgets[button_id]
-        with QtCore.QSignalBlocker(cb):
-            cb.setChecked(True)
+        if button_id in self._grid_widgets:
+            cb = self._grid_widgets[button_id]
+            with QtCore.QSignalBlocker(cb):
+                cb.setChecked(True)
 
         self.usage_state.set_usage_state(vjoy_id, self.active_id, state = True, action = self.action_data, emit=True)
 
@@ -3720,9 +3742,8 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
 
         dark_stub = "dark_" if is_dark else ""
         icon_path = f"{dark_stub}icon_{input_string}_{self.vjoy_input_id:03d}.png" if input_string else "joystick.png"
-
         icon_file = get_icon_path(icon_path)
-        if os.path.isfile(icon_file):
+        if icon_file and os.path.isfile(icon_file):
             return icon_file
 
         return fallback

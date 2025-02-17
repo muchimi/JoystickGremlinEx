@@ -2749,7 +2749,9 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
 
                         syslog.info(f"OSC: conflict detected: key {key} is the same as {other_key}")
                         self._validation_message_widget.setText(f"Input conflict detected with input [{index+1}] - ensure inputs are unique")
-                        self._validation_message_widget.setIcon("fa.warning",True, color="red")
+                        warning_color = gremlin.ui.ui_common.Color.warningColor()
+                        icon_color= QtGui.QColor(warning_color)
+                        self._validation_message_widget.setIcon("fa.warning",True, color=icon_color)
                         valid = False
                         return
                         
@@ -2765,12 +2767,16 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
                 
                     if self._min_range > self._max_range:
                         self._validation_message_widget.setText(f"Min range must be less than max range")
-                        self._validation_message_widget.setIcon("fa.warning",True, color="red")
+                        warning_color = gremlin.ui.ui_common.Color.warningColor()
+                        icon_color= QtGui.QColor(warning_color)
+                        self._validation_message_widget.setIcon("fa.warning",True, color=icon_color)
                         return
                     
                     if self._min_range == self._max_range:
                         self._validation_message_widget.setText(f"Min range cannot be the same as the max range")
-                        self._validation_message_widget.setIcon("fa.warning",True, color="red")
+                        warning_color = gremlin.ui.ui_common.Color.warningColor()
+                        icon_color= QtGui.QColor(warning_color)
+                        self._validation_message_widget.setIcon("fa.warning",True, color=icon_color)
                         return
                     
                     # ensure the argument is numeric
@@ -2779,7 +2785,9 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
                     arg = self._command_data[0]
                     if not (isinstance(arg, int) or isinstance(arg, float)):
                         self._validation_message_widget.setText(f"First data item must be a number for axis input")
-                        self._validation_message_widget.setIcon("fa.warning",True, color="red")
+                        warning_color = gremlin.ui.ui_common.Color.warningColor()
+                        icon_color= QtGui.QColor(warning_color)
+                        self._validation_message_widget.setIcon("fa.warning",True, color=icon_color)
                         return
 
 
@@ -3344,8 +3352,11 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 other_key = other_input.message_key
                 if key == other_key:
                     index = widgets.index(widget)
-                    self._set_status(widget,"fa.warning", f"Input conflict detected with input [{input_widget_index + 1}]", color = "red")
-                    self._set_status(input_widget,"fa.warning", f"Input conflict detected with input [{index + 1}]", color = "red")
+                    warning_color = gremlin.ui.ui_common.Color.warningColor()
+                    icon_color= QtGui.QColor(warning_color)
+                    
+                    self._set_status(widget,"fa.warning", f"Input conflict detected with input [{input_widget_index + 1}]", color = icon_color)
+                    self._set_status(input_widget,"fa.warning", f"Input conflict detected with input [{index + 1}]", color = icon_color)
                     conflicted_widgets.append(widget)
                     conflicted_widgets.append(input_widget)
                     break
@@ -3382,7 +3393,9 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
        
         icon = None
         if is_warning:
-            icon = gremlin.util.load_icon("fa.warning", use_qta=True, qta_color="red")
+            warning_color = gremlin.ui.ui_common.Color.warningColor()
+            icon_color= QtGui.QColor(warning_color)
+            icon = gremlin.util.load_icon("fa.warning", use_qta=True, qta_color=icon_color)
 
         input_widget.setStatus(status_text, icon)
 

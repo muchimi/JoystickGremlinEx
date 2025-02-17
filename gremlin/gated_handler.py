@@ -2913,7 +2913,8 @@ class GateWidgetInfo(ui_common.QDataWidget):
             self.setup_widget.setIcon(load_icon("fa.gear"))
 
         if self.gate.isError:
-            self.setIcon("fa.warning", color = "red")
+            warning_color = gremlin.ui.ui_common.Color.warningColor()
+            self.setIcon("fa.warning", color = QtGui.QColor(warning_color))
         else:
             self.setIcon(None)
 
@@ -3312,7 +3313,8 @@ class GatedAxisWidget(QtWidgets.QWidget):
         self._slider.rangeDoubleClicked.connect(self._slider_range_configure_cb) # calls up range actions
         self._slider.handleDragStart.connect(self._slider_drag_start_cb)
         
-        self.warning_widget = ui_common.QIconLabel("fa.warning", text="", use_qta = True,  icon_color="red")
+        warning_color = gremlin.ui.ui_common.Color.warningColor()
+        self.warning_widget = ui_common.QIconLabel("fa.warning", text="", use_qta = True,  icon_color=QtGui.QColor(warning_color))
         self.warning_widget.setVisible(False)
 
         self.slider_frame_layout.addWidget(self._slider)

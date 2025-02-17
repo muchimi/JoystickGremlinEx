@@ -4014,12 +4014,12 @@ class GremlinUi(QtWidgets.QMainWindow):
 
     #         case "light":
     #             gremlin.shared_state.is_dark_theme = False
-    #             app.setStyle("windows:darkmode=0")
+    #             app.setStyle("")
 
 
     #         case "dark":
     #             gremlin.shared_state.is_dark_theme = True
-    #             app.setStyle("windows:darkmode=2")
+    #             app.setStyle("Fusion")
 
     #     # force a full repaint
     #     self.update()
@@ -4146,11 +4146,33 @@ if __name__ == "__main__":
 
 
     # disable dark mode for now while we sort icons in a future version
-    #os.environ["QT_QPA_PLATFORM"] = "windows:darkmode=0"
+    
+    theme = gremlin.config.Configuration().theme
+    match theme:
+        case "auto":
+            gremlin.shared_state.is_dark_theme = gremlin.ui.theme.theme() == "Dark"
+            app = QtWidgets.QApplication(sys.argv)
+            
 
-    app = QtWidgets.QApplication(sys.argv)
-    gremlin.shared_state.is_dark_theme = gremlin.ui.theme.theme() == "Dark"
+        case "light":
+            os.environ["QT_QPA_PLATFORM"] = "windows:darkmode=0"
+            gremlin.shared_state.is_dark_theme = False
+            app = QtWidgets.QApplication(sys.argv)
+            app.setStyle("Windows")
+
+        case "dark":
+            os.environ["QT_QPA_PLATFORM"] = "windows:darkmode=2"
+            gremlin.shared_state.is_dark_theme = True
+            app = QtWidgets.QApplication(sys.argv)
+
+        
     app.setStyle("Fusion")
+
+
+    
+    #gremlin.shared_state.is_dark_theme = gremlin.ui.theme.theme() == "Dark"
+    #app.setStyle("Fusion")
+    #app.setStyle("windowsvista")
   
     
 

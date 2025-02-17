@@ -1523,6 +1523,12 @@ class InputItemWidget(QtWidgets.QFrame):
 
                 if isinstance(value[0], gremlin.keyboard.Key):
 
+
+                    #foreground_color = gremlin.ui.ui_common.Color.keyForegroundColor()
+                    background_color = gremlin.ui.ui_common.Color.keyEntryBackgroundColor()
+
+                    #css = f"QPushButton {{border: 2px solid black; border-radius: 4px; color: {foreground_color}; background-color: {background_color}; border-style: outset; padding: 4px; min-width: 32px; max-height: 30px;}} QPushButton:hover {{border: 2px #4A4648;}}"
+
                     # list of individual keys
                     container_widget = QtWidgets.QWidget()
                     container_widget.setContentsMargins(8,2,2,2)
@@ -1554,8 +1560,9 @@ class InputItemWidget(QtWidgets.QFrame):
                             key_widget.setMaximumHeight(max_height)
                             key_layout = QtWidgets.QHBoxLayout(key_widget)
                             key_layout.setContentsMargins(0,0,0,0)
-
-                            lbl.setStyleSheet(f"background-color:white; border: 2px solid black; border-radius: 4px 8px;{css_pad}")
+                             
+                            lbl.setStyleSheet(f"background-color:{background_color}; border: 2px solid black; border-radius: 4px 8px;{css_pad}")
+                            #lbl.setStyleSheet(f"{css};{css_pad}")
                             lbl.setMinimumHeight(max_height)
                             lbl.setMaximumHeight(max_height)
                             lbl.setMinimumWidth(32)
@@ -2144,12 +2151,15 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         self.action_widgets = []
 
         mode = self.profile_data.get_mode()
-        self.setTitleBarWidget(TitleBar(
+        widget = TitleBar(
             f"{self._get_window_title()} ({mode})",
             gremlin.hints.hint.get(self.profile_data.tag, ""),
             self._container_remove,
-            self._container_copy,
-        ))
+            self._container_copy)
+        
+        widget.setBackgroundColor(gremlin.ui.ui_common.Color.containerBackgroundColor())
+        
+        self.setTitleBarWidget(widget)
 
         # Create tab widget to display various UI controls in
         self.dock_tabs =  gremlin.ui.ui_common.QDataTab()
@@ -2761,6 +2771,13 @@ class TitleBar(QtWidgets.QFrame):
         if self._close_callback:
             self._close_callback()
 
+    def setBackgroundColor(self, color : str):
+        ''' sets the background color of the title bar '''
+        border_color = gremlin.ui.ui_common.Color.borderColor()
+        css = f"# frame {{border: 1px solid {border_color}; background-color: {color}}}')"
+        self.setStyleSheet(css) 
+        
+
 
 class BasicActionWrapper(AbstractActionWrapper):
 
@@ -2779,12 +2796,14 @@ class BasicActionWrapper(AbstractActionWrapper):
 
         mode = action_widget.action_data.get_mode()
 
-        self.setTitleBarWidget(TitleBar(
+        widget = TitleBar(
             f"{action_widget.action_data.name} ({mode})",
             gremlin.hints.hint.get(self.action_widget.action_data.tag, ""),
             self._remove,
-            self._clipboard_copy,
-        ))
+            self._clipboard_copy)
+
+        widget.setBackgroundColor(gremlin.ui.ui_common.Color.actionBackgroundColor())
+        self.setTitleBarWidget(widget)
 
         self.main_layout.addWidget(self.action_widget)
 

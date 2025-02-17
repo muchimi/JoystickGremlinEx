@@ -111,7 +111,9 @@ def button_input_devices() -> list[DeviceSummary]:
 def is_hardware_device(device_guid) -> bool:
     ''' true if the device is a hardware device '''
     info = device_info_from_guid(device_guid)
-    return not info.is_special
+    if info:
+        return not info.is_special
+    return False
     #return device_guid in _joystick_device_guid_map
 
 def vjoy_devices() -> list[DeviceSummary]:

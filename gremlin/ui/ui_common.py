@@ -1351,12 +1351,9 @@ class ActionSelector(QtWidgets.QWidget):
         self._container = container
 
         self.action_dropdown = QComboBox()
-        # warning_icon = load_icon("fa.warning", use_qta=True, qta_color = QtGui.QColor('#918B16'))
+        
         for name in self._valid_action_list():
-            # if name in ("Remap","Map to Keyboard","Map to Mouse"):
-            #     self.action_dropdown.addItem(warning_icon, name)
-            # else:
-                self.action_dropdown.addItem(name)
+            self.action_dropdown.addItem(name)
         config = gremlin.config.Configuration()
         self.action_dropdown.setCurrentText(config.last_action)
         self.action_dropdown.currentIndexChanged.connect(self._action_changed)
@@ -6284,13 +6281,13 @@ class Color():
         return "#AAAAAA" if gremlin.shared_state.is_dark_theme else "#111111"
     @staticmethod
     def backgroundColor():
-        return "#020202" if gremlin.shared_state.is_dark_theme else "#888888"
+        return "#020202" if gremlin.shared_state.is_dark_theme else "#AAAAAA"
     @staticmethod
     def borderColor():
         return "#AAAAAA" if gremlin.shared_state.is_dark_theme else "#111111"
     @staticmethod
     def titleBackgroundColor():
-        return "#222222" if gremlin.shared_state.is_dark_theme else "#888888"
+        return "#222222" if gremlin.shared_state.is_dark_theme else "#AAAAAA"
     @staticmethod
     def warningColor():
         return "#b39f32"
@@ -6308,13 +6305,22 @@ class Color():
         return "#8FBC8F"
     @staticmethod
     def keyBackgroundColor():
-        return "#101010" if gremlin.shared_state.is_dark_theme else "#888888"
+        return "#101010" if gremlin.shared_state.is_dark_theme else "#EEEEEE"
+    @staticmethod
+    def keyEntryBackgroundColor():
+        return "#293d2d" if gremlin.shared_state.is_dark_theme else "#EEEEEE"
     @staticmethod
     def keyForegroundColor():
-        return "#AAAAAA" if gremlin.shared_state.is_dark_theme else "#111111"
+        return "#AAAAAA" if gremlin.shared_state.is_dark_theme else "#000000"
+    @staticmethod
+    def keyBorderColor():
+        return "#AAAAAA" if gremlin.shared_state.is_dark_theme else "#000000"
+    @staticmethod
+    def keyHoverBorderColor():
+        return "#457d45" if gremlin.shared_state.is_dark_theme else "#56b056"
     @staticmethod
     def containerBackgroundColor():
-        return "#101010" if gremlin.shared_state.is_dark_theme else "#888888"
+        return "#101010" if gremlin.shared_state.is_dark_theme else "#EEEEEE"
     @staticmethod
     def actionBackgroundColor():
         return "#202020" if gremlin.shared_state.is_dark_theme else "#CCCCCC"
@@ -6340,7 +6346,9 @@ class Color():
     def sliderBackgroundColor():
         return "#060606" if gremlin.shared_state.is_dark_theme else "#c3c3c3"
     
-    
+    @staticmethod
+    def warningColor(): # color for the warning flag
+        return "#ab8d18" if gremlin.shared_state.is_dark_theme else "#fc1900"
 
     
     

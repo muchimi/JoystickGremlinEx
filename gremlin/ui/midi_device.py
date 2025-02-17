@@ -1155,7 +1155,9 @@ class MidiInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
                     with QtCore.QSignalBlocker(self._mode_on_change_widget):
                         self._mode_on_change_widget.setChecked(True)
                 self._validation_message_widget.setText(f"The current MIDI command cannot be setup as an axis input.")
-                self._validation_message_widget.setIcon("fa.warning",True,color="red")
+                warning_color = gremlin.ui.ui_common.Color.warningColor()
+                icon_color= QtGui.QColor(warning_color)
+                self._validation_message_widget.setIcon("fa.warning",True,color=icon_color)
             else:
                 # allowed
                 self._mode = MidiInputItem.InputMode.Axis
@@ -1368,7 +1370,9 @@ class MidiInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
                     if key == other_key:
                         syslog.info(f"MIDI: conflict detected: key {key} is the same as {other_key}")
                         self._validation_message_widget.setText(f"Input conflict detected with input [{index+1}] - ensure inputs are unique")
-                        self._validation_message_widget.setIcon("fa.warning",True, color="red")
+                        warning_color = gremlin.ui.ui_common.Color.warningColor()
+                        icon_color= QtGui.QColor(warning_color)
+                        self._validation_message_widget.setIcon("fa.warning",True, color=icon_color)
                         valid = False
                         return
                         

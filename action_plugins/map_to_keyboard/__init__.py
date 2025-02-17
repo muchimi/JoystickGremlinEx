@@ -51,12 +51,10 @@ class MapToKeyboardWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.main_layout.addWidget(self.key_combination)
         self.main_layout.addWidget(self.record_button)
 
-        warning_container = QtWidgets.QWidget()
-        warning_layout = QtWidgets.QHBoxLayout(warning_container)
-        warning_widget = gremlin.ui.ui_common.QIconLabel("fa.warning",use_qta=True,icon_color=QtGui.QColor("yellow"),text="Legacy mapper - consider using <i>Map to Keyboard Ex</i> for additional functionality", use_wrap=False)
-        warning_layout.addWidget(warning_widget)
-        warning_layout.addStretch()
-        self.main_layout.addWidget(warning_container)                   
+        warning_color = gremlin.ui.ui_common.Color.warningColor()
+        warning_widget = gremlin.ui.ui_common.QIconLabel("fa.warning",use_qta=True,icon_color=QtGui.QColor(warning_color),text="Legacy mapper - consider using <i>Map to Keyboard Ex</i> for additional functionality", use_wrap=False)
+        warning_container, warning_layout = gremlin.ui.ui_common.getHContainer(warning_widget)
+        self.main_layout.addWidget(warning_container)
 
     def _populate_ui(self):
         """Populates the UI components."""

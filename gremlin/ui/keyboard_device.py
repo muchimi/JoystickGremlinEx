@@ -693,7 +693,9 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         icon = None
         if is_warning:
-            icon = gremlin.util.load_icon("fa.warning", use_qta=True, qta_color="red")
+            warning_color = gremlin.ui.ui_common.Color.warningColor()
+            icon_color= QtGui.QColor(warning_color)
+            icon = gremlin.util.load_icon("fa.warning", use_qta=True, qta_color=QtGui.QColor(warning_color))
                 
         input_widget.setStatus(status_text, icon)
 
