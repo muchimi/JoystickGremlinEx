@@ -46,8 +46,8 @@ class QKeyWidget(QtWidgets.QPushButton):
         foreground_color = gremlin.ui.ui_common.Color.keyForegroundColor()
         background_color = gremlin.ui.ui_common.Color.keyBackgroundColor()
         selected_color = gremlin.ui.ui_common.Color.selectColor()
-        self._default_style = f"QPushButton {{border: 2px solid black; border-radius: 4px; color: {foreground_color} background-color: {background_color}; border-style: outset; padding: 4px; min-width: 32px; max-height: 30px;}} QPushButton:hover {{border: 2px #4A4648;}}"
-        self._selected_style = f"QPushButton {{border: 2px solid black; border-radius: 4px; color: {foreground_color} background-color: {selected_color}; border-style: outset; padding: 4px; min-width: 32px; max-height: 30px;}} QPushButton:hover {{border: 2px #4A4648;}}"
+        self._default_style = f"QPushButton {{border: 2px solid black; border-radius: 4px; color: {foreground_color}; background-color: {background_color}; border-style: outset; padding: 4px; min-width: 32px; max-height: 30px;}} QPushButton:hover {{border: 2px #4A4648;}}"
+        self._selected_style = f"QPushButton {{border: 2px solid black; border-radius: 4px; color: {foreground_color}; background-color: {selected_color}; border-style: outset; padding: 4px; min-width: 32px; max-height: 30px;}} QPushButton:hover {{border: 2px #4A4648;}}"
         self.setStyleSheet(self._default_style)
         
         self.normal_key = None # what to display normally
