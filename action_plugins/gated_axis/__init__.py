@@ -33,8 +33,10 @@ class GatedAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
     """Widget associated with the action of switching to the previous mode."""
 
     def __init__(self, action_data, parent=None):
-        super().__init__(action_data, parent=parent)
         self.action_data = action_data
+        self.gate_widget = None
+        super().__init__(action_data, parent=parent)
+  
 
 
 
@@ -57,6 +59,7 @@ class GatedAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _cleanup_ui(self):
         ''' cleanup the UI and widget hooks '''
+
         if self.gate_widget:
             self.gate_widget.unhook()
             self.main_layout.removeWidget(self.gate_widget)
