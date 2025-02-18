@@ -6281,7 +6281,7 @@ class Color():
         return "#AAAAAA" if gremlin.shared_state.is_dark_theme else "#111111"
     @staticmethod
     def backgroundColor():
-        return "#020202" if gremlin.shared_state.is_dark_theme else "#AAAAAA"
+        return "#020202" if gremlin.shared_state.is_dark_theme else "#EEEEEE"
     @staticmethod
     def borderColor():
         return "#AAAAAA" if gremlin.shared_state.is_dark_theme else "#111111"
