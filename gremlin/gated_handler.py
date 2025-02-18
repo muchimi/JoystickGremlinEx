@@ -2905,7 +2905,7 @@ class GateWidgetInfo(ui_common.QDataWidget):
 
     def _update_icon(self):
         ''' updates the icon on the setup button depending on the container state '''
-        active_color = gremlin.ui.ui_common.Color().getActive()
+        active_color = gremlin.ui.ui_common.Color().activeColor()
 
         if self.gate.hasAnyContainers():
             self.setup_widget.setIcon(load_icon("ei.cog-alt",qta_color=active_color))
@@ -3285,7 +3285,6 @@ class GatedAxisWidget(QtWidgets.QWidget):
 
         self._grab_icon = load_icon("mdi.record-rec",qta_color = "red")
         self._setup_icon = load_icon("fa.gear")
-        #self._setup_container_icon = load_icon("fa.gears")
         self._setup_container_icon = load_icon("ei.cog-alt",qta_color="#365a75")
         
         # get the curent axis normalized value -1 to +1
@@ -3301,7 +3300,8 @@ class GatedAxisWidget(QtWidgets.QWidget):
 
         self.slider_frame_widget = QtWidgets.QFrame()
         self.slider_frame_layout = QtWidgets.QHBoxLayout(self.slider_frame_widget)
-        self.slider_frame_widget.setStyleSheet('.QFrame{background-color: #d3d3d3; border-radius: 10px;}')
+        background_color = gremlin.ui.ui_common.Color.sliderBackgroundColor()
+        self.slider_frame_widget.setStyleSheet(f'.QFrame{{background-color: {background_color}; border-radius: 10px;}}')
         self._slider = QSliderWidget(parent = self.slider_frame_widget) #ui_common.QMarkerDoubleRangeSlider()
      
         #self._slider.setOrientation(QtCore.Qt.Horizontal)
@@ -3331,14 +3331,11 @@ class GatedAxisWidget(QtWidgets.QWidget):
         self.slider_frame_layout.addWidget(help_button)
       
         self.container_slider_widget = QtWidgets.QWidget()
-        self.container_slider_layout = QtWidgets.QGridLayout(self.container_slider_widget)
-
-        self.container_slider_layout.addWidget(self.slider_frame_widget,0,0,-1,1)
-
-        self.container_slider_layout.addWidget(QtWidgets.QLabel(" "),0,6)
-
-        self.container_slider_layout.setColumnStretch(0,3)
         
+        self.container_slider_layout = QtWidgets.QGridLayout(self.container_slider_widget)
+        self.container_slider_layout.addWidget(self.slider_frame_widget,0,0,-1,1)
+        self.container_slider_layout.addWidget(QtWidgets.QLabel(" "),0,6)
+        self.container_slider_layout.setColumnStretch(0,3)
         self.container_slider_widget.setContentsMargins(0,0,0,0)
 
         # configure trigger button
@@ -4160,7 +4157,9 @@ class GatedAxisWidget(QtWidgets.QWidget):
 
 
         self.container_steps_layout.addWidget(self.add_gate_widget)
-        self.container_steps_layout.addWidget(QtWidgets.QLabel("Set gate count:"))
+        label = QtWidgets.QLabel("Set gate count:")
+        label.setToolTip("Determines the number of gates that will be added when pressing the 'set' button.")
+        self.container_steps_layout.addWidget(label)
         self.container_steps_layout.addWidget(self.sb_steps_widget)
         
         self.container_steps_layout.addWidget(self.set_steps_widget)
