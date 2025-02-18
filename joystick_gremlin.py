@@ -4164,6 +4164,7 @@ if __name__ == "__main__":
             os.environ["QT_QPA_PLATFORM"] = "windows:darkmode=2"
             gremlin.shared_state.is_dark_theme = True
             app = QtWidgets.QApplication(sys.argv)
+            # app.setStyleSheet(" QCheckBox::indicator {border-color: white;}")
 
         
     app.setStyle("Fusion")
