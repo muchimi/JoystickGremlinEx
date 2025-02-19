@@ -2793,8 +2793,8 @@ class ButtonStateWidget(QtWidgets.QWidget):
         if not position in self._hat_icons:
             match position:
                 case HatDirection.Center:
-                    png = f"{prefix}hat_ctr_inactive.png"
-                    png_active = f"{prefix}hat_ctr_active.png"
+                    png = "hat_ctr_inactive.png"
+                    png_active = "hat_ctr_active.png"
                 case HatDirection.North:
                     png = f"{prefix}hat_n.png"
                     png_active = "hat_n_active.png"

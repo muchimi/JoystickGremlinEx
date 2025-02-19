@@ -2849,8 +2849,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         # Toolbar actions
 
         
-        activate_icon = f"gfx{prefix}activate.svg"
-        activate_on_icon = f"gfx/{prefix}activate_on.svg"
+        activate_icon = f"gfx/{prefix}activate.svg"
+        activate_on_icon = f"gfx/activate_on.svg"
         pixmap_off = load_pixmap(activate_icon)
         pixmap_on = load_pixmap(activate_on_icon)
         if pixmap_off and pixmap_on:
