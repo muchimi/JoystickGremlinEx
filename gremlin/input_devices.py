@@ -443,15 +443,16 @@ class CallbackRegistry:
         self._current_id += 1
         function_name = f"{callback.__name__}_{self._current_id:d}"
 
+        key = event
+
         if event.device_guid not in self._registry:
             self._registry[event.device_guid] = {}
         if mode not in self._registry[event.device_guid]:
             self._registry[event.device_guid][mode] = {}
 
         if event not in self._registry[event.device_guid][mode]:
-            self._registry[event.device_guid][mode][event] = {}
-        self._registry[event.device_guid][mode][event][function_name] = \
-            (callback, always_execute)
+            self._registry[event.device_guid][mode][key] = {}
+        self._registry[event.device_guid][mode][key][function_name] = (callback, always_execute)
 
     @property
     def registry(self):
@@ -1754,6 +1755,49 @@ class JoystickDecorator:
         self.hat = functools.partial(
             _hat, device_guid=self.device_guid, mode=mode
         )
+
+
+class OscDecorator:
+    ''' creates a decorator for OSC inputs '''
+    def __init__(self, mode = "Default"):
+
+        self.mode = mode
+        self.message = functools.partial(_osc, mode = mode)
+
+
+def _osc(message, mode = "Default", always_execute=False):
+    ''' decorator for osc callbacks '''
+    
+    def wrap(callback):
+        import gremlin.ui.osc_device
+        import gremlin.input_types
+        import gremlin.shared_state
+        import gremlin.event_handler
+
+        @functools.wraps(callback)
+        def wrapper_fn(*args, **kwargs):
+            callback(*args, **kwargs)
+
+        input_item = gremlin.ui.osc_device.OscInputItem()
+        input_item.message = message
+        input_item.command_mode = gremlin.ui.osc_device.OscInputItem.CommandMode.Message
+        input_item.source_index = 0
+
+        event = gremlin.event_handler.Event(
+            event_type = gremlin.input_types.InputType.OpenSoundControl,
+            device_guid = gremlin.shared_state.osc_tab_guid,
+            identifier = input_item
+            )
+        
+        callback_registry.add(wrapper_fn, event, mode, always_execute)
+
+        return wrapper_fn
+
+    return wrap
+
+
+
+
 
 
 ButtonReleaseEntry = collections.namedtuple(

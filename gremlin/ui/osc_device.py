@@ -26,6 +26,8 @@ import gremlin.base_classes
 import gremlin.config
 import gremlin.event_handler
 import gremlin.input_devices
+import gremlin.input_devices
+import gremlin.shared_state
 import gremlin.shared_state
 from gremlin.types import DeviceType
 from gremlin.input_types import InputType
@@ -3525,10 +3527,14 @@ class InputOscClient(QtCore.QObject):
         
         '''
         import gremlin.execution_graph
+        import gremlin.input_devices
+        import gremlin.shared_state
+
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_osc
         # syslog = logging.getLogger("system")
         self._update_messages()
+
        
         if self._osc_map:
             if verbose:
@@ -3661,6 +3667,7 @@ class InputOscClient(QtCore.QObject):
 
         
         verbose = gremlin.config.Configuration().verbose_mode_osc
+        normalized_args = [gremlin.util.scale_to_range(value, source_min = 0, source_max = 1.0) for value in args]
         hits = [key for key in self._osc_map if key.startswith(message)]
         for hit_key in hits:
             if message != hit_key:
@@ -3684,7 +3691,7 @@ class InputOscClient(QtCore.QObject):
                 is_axis = False
                 
                 # scale each axis value
-                normalized_args = [gremlin.util.scale_to_range(value, source_min = 0, source_max = 1.0) for value in args]
+                
                 input_item._axis_values = normalized_args
                 index = source_index # input_item.source_index # source index of the param
                 if index < len(args):
@@ -3785,8 +3792,36 @@ class InputOscClient(QtCore.QObject):
                         timer = threading.Timer(delay, lambda: self._event_listener.osc_event.emit(release_event))
                         timer.start()
 
-        else:
-            if verbose: syslog.info(f"OSC: runtime: ignoring {message_key}")
+        # grab any defined callbacks
+        if gremlin.shared_state.is_running:
+            callbacks = gremlin.input_devices.callback_registry.registry
+            device_guid = gremlin.shared_state.osc_tab_guid
+            current_mode = gremlin.shared_state.runtime_mode
+            if device_guid in callbacks:
+                if current_mode in callbacks[device_guid]:
+                    for event in callbacks[device_guid][current_mode]:
+                        input_item = event.identifier
+                        if input_item.message == message:
+                            index = input_item.source_index
+                            if index < len(args):
+                                raw_value = args[index]
+                                value = normalized_args[index]
+                                syslog.info(f"OSC: source index: {input_item.source_index}  value: {raw_value:0.3f}")
+                            else:
+                                syslog.error(f"OSC: command [{input_item.command}] : source index {index} specifies an invalid parameter index. Valid parameters received: {args}")
+                                raw_value = args[0]
+                                value = normalized_args[0]
+                            
+                            event.value = value
+                            event.raw_value = raw_value
+                            event.data = normalized_args
+                            self._event_listener.osc_event.emit(event)
+
+
+
+                            
+
+
 
 
 # listen to OSC input
