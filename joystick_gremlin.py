@@ -2793,50 +2793,52 @@ class GremlinUi(QtWidgets.QMainWindow):
         #icon = self.load_icon("profile_open.svg"))
         self.ui.actionLoadProfile.setIcon(icon)
 
-        profile_new_icon = "gfx/dark_profile_new.svg" if is_dark else "gfx/profile_new.svg"
+        prefix = "dark_" if is_dark else ""
+
+        profile_new_icon = f"gfx/{prefix}profile_new.svg" 
 
         icon = load_icon(profile_new_icon)
         self.ui.actionNewProfile.setIcon(icon)
 
-        profile_save_icon = "gfx/dark_profile_save.svg" if is_dark else "gfx/profile_save.svg"
+        profile_save_icon = f"gfx/{prefix}profile_save.svg" 
         icon = load_icon(profile_save_icon)
         self.ui.actionSaveProfile.setIcon(icon)
 
-        profile_save_as_icon = "gfx/dark_profile_save_as.svg" if is_dark else "gfx/profile_save_as.svg"
+        profile_save_as_icon = f"gfx/{prefix}profile_save_as.svg" 
         icon = load_icon(profile_save_as_icon)
         self.ui.actionSaveProfileAs.setIcon(icon)
 
 
-        device_information_icon = "gfx/dark_device_information.svg" if is_dark else "gfx/device_information.svg"
+        device_information_icon = f"gfx/{prefix}device_information.svg"
         icon = load_icon(device_information_icon)
         self.ui.actionDeviceInformation.setIcon(icon)
 
-        manage_module_icon = "gfx/dark_manage_modules.svg" if is_dark else "gfx/manage_modules.svg"
+        manage_module_icon = f"gfx/{prefix}manage_modules.svg"
         icon = load_icon(manage_module_icon)
         self.ui.actionManageCustomModules.setIcon(icon)
 
-        manage_modes_icon = "gfx/dark_manage_modes.svg" if is_dark else "gfx/manage_modes.svg"
+        manage_modes_icon = f"gfx/{prefix}manage_modes.svg"
         icon = load_icon(manage_modes_icon)
         self.ui.actionManageModes.setIcon(icon)
 
-        input_repeater_icon = "gfx/dark_input_repeater.svg" if is_dark else "gfx/input_repeater.svg"
+        input_repeater_icon = f"gfx/{prefix}input_repeater.svg"
         icon = load_icon(input_repeater_icon)
         self.ui.actionInputRepeater.setIcon(icon)
 
 
-        input_viewer_icon = "gfx/dark_input_viewer.svg" if is_dark else "gfx/input_viewer.svg"
+        input_viewer_icon = f"gfx/{prefix}input_viewer.svg"
         icon = load_icon(input_viewer_icon)
         self.ui.actionInputViewer.setIcon(icon)
 
-        icon = load_icon("gfx/logview.png")
+        icon = load_icon(f"gfx/{prefix}logview.png")
         self.ui.actionLogDisplay.setIcon(icon)
         self.ui.actionLogEdit.setIcon(icon)
 
-        options_icon = "gfx/dark_options.svg" if is_dark else "gfx/options.svg"
+        options_icon = f"gfx/{prefix}options.svg"
         icon = load_icon(options_icon)
         self.ui.actionOptions.setIcon(icon)
 
-        about_icon = "gfx/dark_about.svg" if is_dark else "gfx/about.svg"
+        about_icon = f"gfx/{prefix}about.svg"
         icon = load_icon(about_icon)
         self.ui.actionAbout.setIcon(icon)
 
@@ -2847,8 +2849,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         # Toolbar actions
 
         
-        activate_icon = "gfx/dark_activate.svg" if is_dark else "gfx/activate.svg"
-        activate_on_icon = "gfx/dark_activate_on.svg" if is_dark else "gfx/activate_on.svg"
+        activate_icon = f"gfx{prefix}activate.svg"
+        activate_on_icon = f"gfx/{prefix}activate_on.svg"
         pixmap_off = load_pixmap(activate_icon)
         pixmap_on = load_pixmap(activate_on_icon)
         if pixmap_off and pixmap_on:
@@ -4164,10 +4166,10 @@ if __name__ == "__main__":
             os.environ["QT_QPA_PLATFORM"] = "windows:darkmode=2"
             gremlin.shared_state.is_dark_theme = True
             app = QtWidgets.QApplication(sys.argv)
-            # app.setStyleSheet(" QCheckBox::indicator {border-color: white;}")
 
         
     app.setStyle("Fusion")
+    app.setStyleSheet(gremlin.ui.ui_common.Color.cssCheckbox())
 
 
     

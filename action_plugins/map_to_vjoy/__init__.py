@@ -1308,15 +1308,19 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         source =  QtWidgets.QWidget()
         box = QtWidgets.QHBoxLayout(source)
-
+        
         self.chkb_exec_on_release = QtWidgets.QCheckBox("Exec on release")
         self.chkb_exec_on_release.setToolTip("If enabled, the trigger will execute on input release")
+        #self.chkb_exec_on_release.setStyleSheet(css)
         box.addWidget(self.chkb_exec_on_release)
-        self.chkb_ignore_release =  QtWidgets.QCheckBox("Ignore release")
+        self.chkb_ignore_release = QtWidgets.QCheckBox("Ignore release")
         self.chkb_ignore_release.setToolTip("If enabled, the action will ignore release triggers (this is input and container dependent) - normal is OFF")
+        self.chkb_ignore_release.setStyleSheet("")
+        
         box.addWidget(self.chkb_ignore_release)
 
         self.chkb_paired = QtWidgets.QCheckBox("Paired Group Member")
+        #self.chkb_paired.setStyleSheet(css)
         self.chkb_paired.setToolTip("Paired groups with a remote client - when enabled - sends a remote signal and a local signal (this is seldom used).")
         box.addWidget(self.chkb_paired)
 
@@ -3188,6 +3192,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
             if self.action_mode == VjoyAction.VJoyButton:
                 # normal default behavior
+                if verbose: syslog.info(f"VJOY: trigger on button press {self.vjoy_input_id} pressed: {event.is_pressed}")
                 if self.exec_on_release:
                     if not event.is_pressed:
                         if is_local:
@@ -3196,7 +3201,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                             self.remote_client.send_button(self.vjoy_device_id, self.vjoy_input_id, True, force_remote = force_remote )
                 else:
                     auto_release = False
-                    is_pressed = action_value.current
+                    is_pressed = action_value.is_pressed
                     if is_pressed:
                         auto_release = event.event_type in [InputType.Keyboard, InputType.KeyboardLatched, InputType.Midi, InputType.OpenSoundControl] and self.needs_auto_release
 
@@ -3211,12 +3216,15 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                             activate_on = False # released
                         )
 
+                    if verbose: syslog.info(f"\t{self.vjoy_input_id} pressed: {is_pressed}  ignore release: {self.action_data.ignore_release}")
                     trigger = is_pressed or (not auto_release and not is_pressed)  # trigger on press, or on release unless an auto-release was already registered for the release action to avoid double releases
                     if not is_pressed and self.action_data.ignore_release:
                         # ignore release action on press/release modes
+                        if verbose: syslog.info("\tignoring release")
                         trigger = False
+  
                     if trigger:
-                        if verbose: syslog.info(f"\tTrigger {self.vjoy_input_id} pressed: {is_pressed}")
+                        if verbose: syslog.info(f"\tTrigger {self.vjoy_input_id} pressed: {event.is_pressed}")
                         if is_local:
                             joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = is_pressed
                         if is_remote or is_paired:
@@ -3227,6 +3235,8 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
             elif self.action_mode == VjoyAction.VJoyButtonRelease:
                 # normal default behavior
+                if verbose: syslog.info(f"VJOY: trigger on button release {self.vjoy_input_id} pressed: {event.is_pressed}")
+
                 if event.is_pressed:
                     if is_local:
                         joystick_handling.VJoyProxy()[self.vjoy_device_id].button(self.vjoy_input_id).is_pressed = False
@@ -3238,6 +3248,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
             elif self.action_mode == VjoyAction.VJoyToggle:
                 # toggle action
+                if verbose: syslog.info(f"VJOY: trigger button toggle {self.vjoy_input_id} pressed: {event.is_pressed}")
                 if fire_event:
                     if event.event_type in [InputType.JoystickButton, InputType.Keyboard] \
                             and event.is_pressed:
@@ -3249,7 +3260,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
 
             elif self.action_mode == VjoyAction.VJoyPulse:
-
+                if verbose: syslog.info(f"VJOY: trigger pulse {self.vjoy_input_id} pressed: {event.is_pressed}")
                 # pulse action
                 if fire_event:
                     auto_complete = False

@@ -19,6 +19,7 @@
 from PySide6 import QtWidgets, QtCore, QtGui
 
 import gremlin
+import gremlin.shared_state
 import gremlin.types
 from gremlin.util import load_icon
 from gremlin.ui import ui_common
@@ -279,7 +280,8 @@ class VirtualHatButtonWidget(AbstractVirtualButtonWidget):
 
             self.main_layout.addStretch(1)
 
-            self.help_button = QtWidgets.QPushButton(load_icon("gfx/help.png"), "")
+            prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
+            self.help_button = QtWidgets.QPushButton(load_icon(f"gfx/{prefix}help.png"), "")
             self.help_button.clicked.connect(self._show_hint)
             self.main_layout.addWidget(self.help_button)
         finally:

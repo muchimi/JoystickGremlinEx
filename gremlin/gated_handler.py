@@ -149,6 +149,8 @@ class TriggerMode(Enum):
     ValueInRange = auto() # value is in range of the gate
     ValueOutOfRange = auto() # value is out of range of the gate
     GateCrossed = auto() # gate crossed - the gate_index contains the gate index crossed, the gate_value member contains the gate value that was crossed
+    GateDecrease = auto() # gate crossed, decreasing
+    GateIncrease = auto() # gate crossed, increasing
     FixedValue = auto() # fixed value output
     RangeEnter = auto() # fires when the value enters the range
     RangeExit = auto() # fires when the value exits the range
@@ -172,6 +174,8 @@ _trigger_mode_to_string = {
     TriggerMode.ValueInRange: "value_in_range",
     TriggerMode.ValueOutOfRange: "value_out_of_range",
     TriggerMode.GateCrossed: "gate_crossed",
+    TriggerMode.GateIncrease: "gate_increase",
+    TriggerMode.GateDecrease: "gate_decrease",
     TriggerMode.FixedValue: "fixed_value",
     TriggerMode.RangeEnter: "range_enter",
     TriggerMode.RangeExit: "range_exit",
@@ -184,6 +188,8 @@ _trigger_mode_to_display_name = {
     TriggerMode.ValueInRange: "In Range",
     TriggerMode.ValueOutOfRange: "Out of Range",
     TriggerMode.GateCrossed: "Gate Crossed",
+    TriggerMode.GateDecrease: "Gate Crossed (inc)",
+    TriggerMode.GateIncrease: "Gate Crossed (dec)",
     TriggerMode.FixedValue: "Fixed Value",
     TriggerMode.RangeEnter: "Range Enter",
     TriggerMode.RangeExit: "Range Exit"
@@ -196,6 +202,8 @@ _trigger_mode_to_enum = {
     "value_in_range": TriggerMode.ValueInRange,
     "value_out_of_range": TriggerMode.ValueOutOfRange,
     "gate_crossed": TriggerMode.GateCrossed,
+    "gate_increase": TriggerMode.GateIncrease,
+    "gate_decrease": TriggerMode.GateDecrease,
     "fixed_value": TriggerMode.FixedValue,
     "range_enter": TriggerMode.RangeEnter,
     "range_exit": TriggerMode.RangeExit,
@@ -584,7 +592,13 @@ class RangeInfo():
 
         # print (f"RangeInfo: create {self.range_display()} {self.range_gate_display()}")
 
-       
+    def to_display(self):
+        if self.v1 is None or self.v2 is None:
+            rr = f"N/A"
+        else:
+            rr = self.range_display()
+        return rr
+
 
     def valueInRange(self, value: float) -> bool:
         ''' true if the value is within the current range '''
@@ -955,6 +969,62 @@ class RangeInfo():
         return hash((self._g1_id, self._g2_id))
     
 
+
+@SingletonDecorator
+class TriggerTracking():
+    ''' class that holds trigger information for previously generated triggers by category '''
+
+    def __init__(self):
+        self._tracking_map = {} # map of gate or range by generated triggers
+        self._triggers = [] # list of triggers
+
+        eh = gremlin.event_handler.EventListener()
+        eh.profile_start.connect(self._profile_start)
+        
+
+    @QtCore.Slot()
+    def _profile_start(self):
+        self._tracking_map.clear() # reset tracking map on profile start
+        
+
+
+    @property
+    def triggers(self) -> list:
+        return self._triggers
+
+    def registerTrigger(self, owner, trigger : TriggerData):
+        ''' registers/overrides prior trigger '''
+        if not owner in self._tracking_map:
+            self._tracking_map[owner] = {}
+        self._tracking_map[owner][trigger.mode] = trigger
+        verbose = gremlin.config.Configuration().verbose_mode_gate
+        
+        if verbose:
+            if isinstance(owner, RangeInfo):
+                syslog.info(f"TRIGGER: register range {owner.range_display()}  trigger mode: {trigger.mode} ")
+            elif isinstance(owner, GateInfo):
+                syslog.info(f"TRIGGER: register gate {owner.slider_index}  trigger mode: {trigger.mode} ")
+
+
+    def getTrigger(self, owner, mode: TriggerMode):
+        ''' gets the registered trigger if present, none if not'''
+        if not owner in self._tracking_map:
+            return None
+        if not mode in self._tracking_map[owner]:
+            return None
+        return self._tracking_map[owner][mode]
+        
+    def clearTrigger(self, owner, mode: TriggerMode):
+        ''' removes a trigger '''
+        if owner in self._tracking_map:
+            if mode in self._tracking_map[owner]:
+                del self._tracking_map[owner][mode]
+                verbose = gremlin.config.Configuration().verbose_mode_gate
+                if verbose: syslog.info(f"TRIGGER: clear {str(owner)}  trigger mode: {mode} ")
+
+_trigger_tracking = TriggerTracking() # main instance
+
+
 @gremlin.singleton_decorator.SingletonDecorator
 class GateEventHandler(QtCore.QObject):
     ''' handler class for gate axis events '''
@@ -1320,41 +1390,48 @@ class GateData():
             for trigger in triggers:
                 short_press = False
                 delay = trigger.delay
-                if trigger.mode == TriggerMode.FixedValue:
-                    if verbose:
-                        syslog.info(f"Trigger: fixed value: {trigger.value}")
-                    value.current = trigger.value
-                elif trigger.mode == TriggerMode.ValueInRange:
-                    if verbose:
-                        syslog.info(f"Trigger: value in range: {trigger.value}")
-                    value.current = trigger.value
-                    event.is_pressed = True
-                    value.is_pressed = True
-                elif trigger.mode == TriggerMode.ValueOutOfRange:
-                    if verbose:
-                        syslog.info(f"Trigger: value out of range: {trigger.value}")
-                    value.current = trigger.value
-                    value.is_pressed = False
-                    event.is_pressed = False
-                elif trigger.mode == TriggerMode.GateCrossed:
-                    # mimic a joystick button press for a gate crossing
-                    if verbose:
-                        syslog.info(f"Trigger: gate crossing : {trigger.gate.slider_index}")
+                match trigger.mode:
+                    case TriggerMode.FixedValue:
+                        if verbose: syslog.info(f"Exec Trigger: fixed value: {trigger.range.range_display() if trigger.range else trigger.gate.slider_index} : value {input_value:0.3f}")
+                        value.current = trigger.value
+                    case TriggerMode.ValueInRange:
+                        if verbose: syslog.info(f"Exec Trigger: value in range: {trigger.range.range_display()} : value {input_value:0.3f}")
+                        value.current = trigger.value
+                        event.is_pressed = True
+                        value.is_pressed = True
+                    case TriggerMode.ValueOutOfRange:
+                        if verbose: syslog.info(f"Exec Trigger: value out of range: {trigger.range.range_display()} : value {input_value:0.3f}")
+                        value.current = trigger.value
+                        value.is_pressed = False
+                        event.is_pressed = False
+                    case TriggerMode.GateCrossed:
+                        # mimic a joystick button press for a gate crossing
+                        if verbose: syslog.info(f"Exec Trigger: gate crossing : {trigger.gate.slider_index} : value {input_value:0.3f} ")
+                        event.fake_button()
+                        short_press = True
+                    case TriggerMode.GateIncrease:
+                        # mimic a joystick button press for a gate crossing (increase)
+                        if verbose: syslog.info(f"Exec Trigger: gate crossing (inc): {trigger.gate.slider_index} : value {input_value:0.3f} ")
+                        event.fake_button()
+                        short_press = True
+                    case TriggerMode.GateDecrease:
+                        # mimic a joystick button press for a gate crossing (increase)
+                        if verbose: syslog.info(f"Exec Trigger: gate crossing (dec): {trigger.gate.slider_index} : value {input_value:0.3f} ")
+                        event.fake_button()
+                        short_press = True
+                    case TriggerMode.RangeEnter:
+                        # enter range
+                        if verbose: syslog.info(f"Exec Trigger: range enter: {trigger.range.range_display()} value {input_value:0.3f}")
+                        event.fake_button()
+                        event.is_pressed = True
+                        value.is_pressed = True
+                    case TriggerMode.RangeExit:
+                        # exit range
+                        if verbose: syslog.info(f"Exec Trigger: range exit:  {trigger.range.range_display()} value {input_value:0.3f}")
+                        event.fake_button()
+                        event.is_pressed = True
+                        value.is_pressed = True
                     
-                    event.fake_button()
-                    short_press = True
-                elif trigger.mode == TriggerMode.RangeEnter:
-                    # enter range
-                    if verbose:
-                        syslog.info("Trigger: range enter")
-                    event.fake_button()
-                    short_press = True
-                elif trigger.mode == TriggerMode.RangeExit:
-                    # exit range
-                    if verbose:
-                        syslog.info("Trigger: range exit")
-                    event.fake_button()
-                    short_press = True
 
                 if not gremlin.shared_state.is_running:
                     self._fire_trigger_callbacks(trigger)
@@ -1382,17 +1459,16 @@ class GateData():
                                 callbacks = callback_map[condition]
                         
                     # process container execution graphs
-                    if verbose:
-                        syslog.info(f"Trigger: executing {len(callbacks)} callbacks")
+                    if verbose and callbacks:
+                        syslog.info(f"Exec Trigger: executing {len(callbacks)} callbacks")
 
                     for cb in callbacks:
                         if not hasattr(cb.callback,"execution_graph"):
                             # skip items that do not implement execution graph functors
-                            if not value.is_pressed:
-                                pass
                             cb.callback(event, value)
                         else:
-                            for functor in cb.callback.execution_graph.functors:
+                            functors = cb.callback.execution_graph.functors
+                            for functor in functors:
                                 if functor.enabled:
                                     if short_press:
                                         thread = threading.Thread(target=lambda: self._short_press(functor, event, value, delay))
@@ -2259,17 +2335,53 @@ class GateData():
 
         with self._process_trigger_lock:
 
-        
-            #assert ranges
-            # self.dumpActiveRanges()                
-            # self.dumpRangeList(ranges)
 
-            triggers = [] # returns all the triggers from the value since the last update
+            tt = TriggerTracking() # tracking object
+            tt.triggers.clear() # reset any prior triggers
+
+
             last_value = self._last_value # last value processed
+            if last_value is None:
+                # not set, first go at processing - setup initial range triggers
+                ranges = self.getUsedRanges() # list of all ranges
+                for r in ranges:
+                    if r.valueInRange(current_value):
+                        # two triggers - in range and enter range
+                        modes = (TriggerMode.RangeEnter, TriggerMode.ValueInRange)
+                        
+                    else:
+                        # not in range, two triggers - out of range, 
+                        modes = (TriggerMode.RangeExit, TriggerMode.ValueOutOfRange)
+                        condition = GateCondition.ExitRange
+                    for mode in modes:
+                        td = TriggerData()
+                        td.mode = mode
+                        match mode:
+                            case TriggerMode.RangeEnter:
+                                condition = GateCondition.EnterRange
+                            case TriggerMode.RangeExit:
+                                condition = GateCondition.ExitRange
+                            case TriggerMode.ValueInRange:
+                                condition = GateCondition.InRange
+                            case TriggerMode.ValueOutOfRange:
+                                condition = GateCondition.OutsideRange
+
+                        td.condition = condition
+                        td.value = current_value
+                        td.range = r
+                        td.delay = r.delay
+                        td.is_range = True
+                        tt.triggers.append(td)
+                        tt.registerTrigger(r, td)
+                    
+            value = None
 
             value_changed = last_value is None or last_value != current_value
+
             if not value_changed:
-                return # nothing to do if the axix didn't move
+                # nothing changed
+                return tt.triggers
+            
             
             range_info: RangeInfo
             range_info = self._get_range_for_value_from_list(current_value, ranges)
@@ -2277,6 +2389,7 @@ class GateData():
             # the last range we saw            
             last_range = self._last_range
             
+            is_running = gremlin.shared_state.is_running
 
             if last_range is not None and (current_value < last_range.v1 or current_value > last_range.v2):
                 # ensure the last range min/max are set if the value is outside the range
@@ -2292,8 +2405,8 @@ class GateData():
                             td.value = value
                             td.raw_value = current_value    
                             # re-fire the trigger with the boundary value
-                            triggers.append(td)
-             
+                            tt.triggers.append(td)
+            
                     elif current_value > v2 and td.raw_value != v2:
                         value = self._get_filtered_range_value(last_range, v2)
                         if value is not None:
@@ -2301,8 +2414,8 @@ class GateData():
                             td.value = value
                             td.raw_value = current_value
                             # re-fire the trigger with the boundary value
-                            triggers.append(td)
-             
+                            tt.triggers.append(td)
+            
             
 
             if range_info is not None:
@@ -2310,11 +2423,11 @@ class GateData():
                 # print (f"Process triggers for range: {range_info.id} mode: {range_info.range_display_ex()}")
                 
                 
-                if range_info.hasContainers(GateCondition.InRange):
+                if not is_running or range_info.hasContainers(GateCondition.InRange):
                     # trigger on value in-range
                     if range_info.mode != GateRangeOutputMode.FilterOut:
                         value = self._get_filtered_range_value(range_info, current_value)
-                        if value is not None:
+                        if value is not None and not tt.getTrigger(range_info, TriggerMode.ValueInRange):
                             td = TriggerData()
                             mode = TriggerMode.ValueInRange
                             if range_info.mode == GateRangeOutputMode.Fixed:
@@ -2327,23 +2440,30 @@ class GateData():
                             td.range = range_info
                             td.is_range = True
                             td.delay = range_info.delay
-                            triggers.append(td)
+                            tt.triggers.append(td)
+                            tt.registerTrigger(range_info, td)
+                            tt.clearTrigger(range_info, TriggerMode.ValueOutOfRange)
                             self._last_in_range_trigger_map[range_info.id] = td
+
+
                 
 
             # process outside range condition ranges - those trigger if the value is outside the range
             outside_trigger_ranges = [rng for rng in self._active_ranges if rng != range_info and rng.hasContainers(GateCondition.OutsideRange)]
             for outside_range in outside_trigger_ranges:
-                td = TriggerData()
-                td.mode = TriggerMode.ValueOutOfRange
-                td.value = current_value
-                td.last_value = last_value
-                td.range = outside_range
-                td.last_range = self._last_range
-                td.condition = GateCondition.OutsideRange
-                td.is_range = True
-                td.delay = outside_range.delay
-                triggers.append(td)
+                if not tt.getTrigger(outside_range, TriggerMode.ValueOutOfRange):
+                    td = TriggerData()
+                    td.mode = TriggerMode.ValueOutOfRange
+                    td.value = current_value
+                    td.last_value = last_value
+                    td.range = outside_range
+                    td.last_range = self._last_range
+                    td.condition = GateCondition.OutsideRange
+                    td.is_range = True
+                    td.delay = outside_range.delay
+                    tt.triggers.append(td)
+                    tt.registerTrigger(outside_range, TriggerMode.ValueOutOfRange)
+                    tt.clearTrigger(range_info, TriggerMode.ValueInRange)
 
 
             # get the list of crossed gates since last check
@@ -2352,6 +2472,8 @@ class GateData():
 
             # process any the gate triggers
             gate : GateInfo
+
+            tt = TriggerTracking() # tracking data to remember what triggers were already issued so we don't issue them multiple times
 
             for gate in crossed_gates:
                 # check for one way gates we passed
@@ -2362,21 +2484,27 @@ class GateData():
                 for r in ranges:
                     if r is None:
                         continue
-
+                    if verbose: syslog.info(f"GATE CROSSED: processing range {r.range_display()}")
                     if r.valueInRange(last_value):
-                        # range exited
-                        td = TriggerData()
-                        td.mode = TriggerMode.RangeExit
-                        td.condition = GateCondition.ExitRange
-                        td.value = current_value
-                        td.range = r
-                        td.delay = r.delay
-                        td.is_range = True
-                        triggers.append(td)
+                        # range exited and previously entered
+                        if not tt.getTrigger(r,TriggerMode.RangeExit):
+                            td = TriggerData()
+                            td.mode = TriggerMode.RangeExit
+                            td.condition = GateCondition.ExitRange
+                            td.value = current_value
+                            td.range = r
+                            td.delay = r.delay
+                            td.is_range = True
+                            tt.triggers.append(td)
+                            tt.registerTrigger(r, td)
+                            tt.clearTrigger(r,TriggerMode.RangeEnter)
 
 
                     if r.valueInRange(current_value):
-                        # range enter
+                        if tt.getTrigger(r, TriggerMode.RangeEnter):
+                            if verbose: syslog.info(f"\talready has RangeEnter trigger")
+                            continue
+                        # range enter and previously exited
                         td = TriggerData()
                         td.mode = TriggerMode.RangeEnter
                         td.condition = GateCondition.EnterRange
@@ -2384,52 +2512,55 @@ class GateData():
                         td.range = r
                         td.delay = r.delay
                         td.is_range = True
-                        triggers.append(td)
-                        
-
+                        tt.triggers.append(td)
+                        tt.registerTrigger(r, td)
+                        tt.clearTrigger(r,TriggerMode.RangeExit)
 
                 v = gate.value
 
-                if gate.hasContainers(GateCondition.OnCross):
-                    # add a gate crossing trigger
+                if not is_running or gate.hasContainers(GateCondition.OnCross):
+                    # add a gate crossing trigger - # always fires
                     td = TriggerData()
-                    if verbose:
-                            syslog.info("Gate cross trigger")
+                    if verbose: syslog.info("Gate cross trigger")
                     td.gate = gate
                     td.delay = gate.delay
                     td.value = current_value
                     td.condition = GateCondition.OnCross
                     td.mode = TriggerMode.GateCrossed
-                    triggers.append(td)
+                    tt.triggers.append(td)
+                        
+
                 
-                if gate.hasContainers(GateCondition.OnCrossDecrease):
+                if not is_running or gate.hasContainers(GateCondition.OnCrossDecrease):
                     # add gate cross decrease trigger
                     if last_value > v:
-                        if verbose:
-                            syslog.info("Gate decrease trigger")
-                        td = TriggerData()
-                        td.gate = gate
-                        td.delay = gate.delay
-                        td.value = current_value
-                        td.condition = GateCondition.OnCrossDecrease
-                        td.mode = TriggerMode.GateCrossed
-                        triggers.append(td)
-
-        
-
+                        if not tt.getTrigger(gate,TriggerMode.GateDecrease):
+                            if verbose: syslog.info("Gate decrease trigger")
+                            td = TriggerData()
+                            td.gate = gate
+                            td.delay = gate.delay
+                            td.value = current_value
+                            td.condition = GateCondition.OnCrossDecrease
+                            td.mode = TriggerMode.GateDecrease
+                            tt.triggers.append(td)
+                            tt.registerTrigger(gate, td)
+                            tt.clearTrigger(gate, TriggerMode.GateIncrease)
 
                     
-                if gate.hasContainers(GateCondition.OnCrossIncrease):
+                if not is_running or gate.hasContainers(GateCondition.OnCrossIncrease):
                     # add gate cross increase trigger
                     if last_value < v:
-                        if verbose:
-                            syslog.info("Gate increase trigger")
-                        td = TriggerData()
-                        td.gate = gate
-                        td.value = current_value
-                        td.condition = GateCondition.OnCrossIncrease
-                        td.mode = TriggerMode.GateCrossed
-                        triggers.append(td)
+                        if not tt.getTrigger(gate,TriggerMode.GateIncrease):
+                            if verbose: syslog.info("Gate increase trigger")
+                            td = TriggerData()
+                            td.gate = gate
+                            td.value = current_value
+                            td.condition = GateCondition.OnCrossIncrease
+                            td.mode = TriggerMode.GateIncrease
+                            tt.triggers.append(td)
+                            tt.registerTrigger(gate, td)
+                            tt.clearTrigger(gate, TriggerMode.GateDecrease)
+
 
             # update last values
             self._last_range = range_info
@@ -2437,7 +2568,7 @@ class GateData():
 
             if not gremlin.shared_state.is_running:
                 # update trigger lines
-                for trigger in triggers:
+                for trigger in tt.triggers:
                     mode = trigger.mode
                     
                     if not mode in self.filter_map.keys():
@@ -2456,10 +2587,10 @@ class GateData():
             if verbose:
                 # dump the triggerrs
                 syslog.info(f"Trigger results for value {current_value}:")
-                for trigger in triggers:
+                for trigger in tt.triggers:
                     syslog.info(f"\t{str(trigger)}")
 
-            return triggers
+            return tt.triggers
 
         
     def _find_input_item(self):
@@ -2816,8 +2947,6 @@ class GateData():
         max = safe_read(node, "max", float, 1.0)
         return (min, max)
     
-
-
 
       
 class TriggerData():
@@ -4056,22 +4185,34 @@ class GatedAxisWidget(QtWidgets.QWidget):
     def _create_filter_widgets(self):
         gremlin.util.clear_layout(self.container_filter_layout)
         self._filter_widgets = []
+        row = 0
+        col = 0
         for _, trigger in enumerate(TriggerMode):
             widget = gremlin.ui.ui_common.QDataCheckbox(TriggerMode.to_display_name(trigger), data = trigger)
             if not trigger in self._gate_data.filter_map.keys():
                 self._gate_data.filter_map[trigger] = True
             widget.setChecked(self._gate_data.filter_map[trigger])
             widget.clicked.connect(self._filter_cb)
-            self.container_filter_layout.addWidget(widget)
+            self.container_filter_layout.addWidget(widget, row, col)
+            col +=1
+            if col > 5:
+                row+=1
+                col= 0
             self._filter_widgets.append(widget)
         
+        row += 1
+        col = 0
         select_all_widget = QtWidgets.QPushButton("All")
         select_all_widget.clicked.connect(self._select_all_filters_cb)
         clear_all_widget = QtWidgets.QPushButton("None")
         clear_all_widget.clicked.connect(self._clear_all_filters_cb)
-        self.container_filter_layout.addWidget(select_all_widget)
-        self.container_filter_layout.addWidget(clear_all_widget)
-        self.container_filter_layout.addStretch()
+        self.container_filter_layout.addWidget(select_all_widget, row, col)
+        col+=1
+        self.container_filter_layout.addWidget(clear_all_widget, row, col)
+
+        col = 6
+        self.container_filter_layout.addWidget(QtWidgets.QWidget(), row, col)        
+        self.container_filter_layout.setColumnStretch(col, 2)
 
     @QtCore.Slot()
     def _select_all_filters_cb(self):
@@ -4101,13 +4242,15 @@ class GatedAxisWidget(QtWidgets.QWidget):
         self.output_gate_trigger_widget = QtWidgets.QPlainTextEdit()
         self.output_gate_trigger_widget.setReadOnly(True)
         
+
+        
         self.container_output_widget = QtWidgets.QWidget()
         self.container_output_widget.setContentsMargins(0,0,0,0)
         self.container_output_layout = QtWidgets.QGridLayout(self.container_output_widget)
 
         self.container_filter_widget = QtWidgets.QWidget()
         self.container_filter_widget.setContentsMargins(0,0,0,0)
-        self.container_filter_layout = QtWidgets.QHBoxLayout(self.container_filter_widget)
+        self.container_filter_layout = QtWidgets.QGridLayout(self.container_filter_widget)
         self.container_filter_layout.setContentsMargins(0,0,0,0)
 
         self._create_filter_widgets()

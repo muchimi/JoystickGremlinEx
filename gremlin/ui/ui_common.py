@@ -2293,6 +2293,19 @@ class QDataCheckbox(QtWidgets.QCheckBox):
         self._ignore_keyboard = False
         self.installEventFilter(self)
 
+    #     foreground_color = Color.normalColor()
+    #     self._icon_unchecked = load_icon("fa.circle-thin", qta_color=QtGui.QColor(foreground_color))
+    #     self._icon_checked = load_icon("fa5.check-circle", qta_color=QtGui.QColor(foreground_color))
+
+    #     self.stateChanged.connect(self._update_state)
+
+    #     self._update_state()
+
+    # @QtCore.Slot()
+    # def _update_state(self):
+    #     icon = self._icon_checked if self.isChecked() else self._icon_unchecked
+    #     self.setIcon(icon)
+            
 
     @property
     def data(self):
@@ -2427,27 +2440,28 @@ class QHatSelectorComboBox(QDataComboBox):
         super().__init__(data, parent)
 
         self._direction = HatDirection.Center
+        prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
 
         for position in HatDirection:
             match position:
                 case HatDirection.Center:
-                    png = "hat_ctr.png"
+                    png = f"{prefix}hat_ctr.png"
                 case HatDirection.North:
-                    png = "hat_n.png"
+                    png = f"{prefix}hat_n.png"
                 case HatDirection.NorthEast:
-                    png = "hat_ne.png"
+                    png = f"{prefix}hat_ne.png"
                 case HatDirection.NorthWest:
-                    png = "hat_nw.png"
+                    png = f"{prefix}hat_nw.png"
                 case HatDirection.East:
-                    png = "hat_e.png"
+                    png = f"{prefix}hat_e.png"
                 case HatDirection.South:
-                    png = "hat_s.png"
+                    png = f"{prefix}hat_s.png"
                 case HatDirection.SouthEast:
-                    png = "hat_se.png"
+                    png = f"{prefix}hat_se.png"
                 case HatDirection.SouthWest:
-                    png = "hat_sw.png"      
+                    png = f"{prefix}hat_sw.png"      
                 case HatDirection.West:
-                    png = "hat_w.png"  
+                    png = f"{prefix}hat_w.png"  
             icon = load_icon(png)   
             #icon_active = load_icon(png_active)        
             self.addItem(icon, HatDirection.to_display_name(position), HatDirection.to_enum(position))
@@ -2769,39 +2783,41 @@ class ButtonStateWidget(QtWidgets.QWidget):
 
     def _update_hat(self, position):
         ''' updates a hat position '''
+        prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
         if not isinstance(position,tuple):
             # convert from value to position tuple
             import vjoy.vjoy
             position =  vjoy.vjoy.Hat.to_continuous_position[position]
         position = HatDirection.to_enum(position) 
+        
         if not position in self._hat_icons:
             match position:
                 case HatDirection.Center:
-                    png = "hat_ctr_inactive.png"
-                    png_active = "hat_ctr_active.png"
+                    png = f"{prefix}hat_ctr_inactive.png"
+                    png_active = f"{prefix}hat_ctr_active.png"
                 case HatDirection.North:
-                    png = "hat_n.png"
+                    png = f"{prefix}hat_n.png"
                     png_active = "hat_n_active.png"
                 case HatDirection.NorthEast:
-                    png = "hat_ne.png"
+                    png = f"{prefix}hat_ne.png"
                     png_active = "hat_ne_active.png"
                 case HatDirection.NorthWest:
-                    png = "hat_nw.png"
+                    png = f"{prefix}hat_nw.png"
                     png_active = "hat_nw_active.png"
                 case HatDirection.East:
-                    png = "hat_e.png"
+                    png = f"{prefix}hat_e.png"
                     png_active = "hat_e_active.png"
                 case HatDirection.South:
-                    png = "hat_s.png"
+                    png = f"{prefix}hat_s.png"
                     png_active = "hat_s_active.png"
                 case HatDirection.SouthEast:
-                    png = "hat_se.png"
+                    png = f"{prefix}hat_se.png"
                     png_active = "hat_se_active.png"
                 case HatDirection.SouthWest:
-                    png = "hat_sw.png"      
+                    png = f"{prefix}hat_sw.png"      
                     png_active = "hat_sw_active.png"
                 case HatDirection.West:
-                    png = "hat_w.png"  
+                    png = f"{prefix}hat_w.png"  
                     png_active = "hat_w_active.png"
             on_pixmap = load_icon(png_active).pixmap(self._icon_size)
             off_pixmap = load_icon(png).pixmap(self._icon_size)
@@ -6350,5 +6366,30 @@ class Color():
     def warningColor(): # color for the warning flag
         return "#ab8d18" if gremlin.shared_state.is_dark_theme else "#fc1900"
 
-    
+    @staticmethod
+    def cssCheckbox():
+        border_color = gremlin.ui.ui_common.Color.borderColor()
+        if gremlin.config.Configuration().is_debug:
+            relative_path = "gfx/"
+        else:
+            relative_path = "_internal/gfx/"
+        checked = "dark_checkbox.png" if gremlin.shared_state.is_dark_theme else "checkbox.png"
+        unchecked = "dark_unchecked.png" if gremlin.shared_state.is_dark_theme else "unchecked.png"
+        css = f'''
+            QCheckBox::indicator {{
+                width: 18px;
+                height: 18px;
+            }}
+            QCheckBox::indicator:checked {{
+                image: url({relative_path}{checked});
+            }}
+            QCheckBox::indicator:unchecked {{
+                image: url({relative_path}{unchecked}); 
+            }}
+            QPlainTextEdit {{ 
+                 border: 1px solid {border_color};
+            }}
+            
+            '''
+        return css
     

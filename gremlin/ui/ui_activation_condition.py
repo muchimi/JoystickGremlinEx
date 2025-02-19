@@ -194,8 +194,8 @@ class KeyboardConditionWidget(AbstractConditionWidget):
         
         self.record_button_widget = ui_common.NoKeyboardPushButton(load_icon("gfx/button_edit.png"), "Select Keys")
         self.record_button_widget.clicked.connect(self._request_user_input)
-        self.delete_button_widget = QtWidgets.QPushButton(
-            load_icon("gfx/button_delete.png"), ""
+        prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
+        self.delete_button_widget = QtWidgets.QPushButton(load_icon(f"gfx/{prefix}button_delete.png"), ""
         )
         self.delete_button_widget.clicked.connect(
             lambda: self.deleted.emit(self.condition_data)
@@ -292,15 +292,14 @@ class JoystickConditionWidget(AbstractConditionWidget):
     def _create_ui(self):
         """Creates the configuration UI for this widget."""
 
-        
+        prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
 
         ui_common.clear_layout(self.main_layout)
 
-        self.record_button = QtWidgets.QPushButton(load_icon("gfx/button_edit.png"), "Listen")
+        self.record_button = QtWidgets.QPushButton(load_icon(f"gfx/{prefix}button_edit.png"), "Listen")
         self.record_button.clicked.connect(self._request_user_input)
-        self.delete_button = QtWidgets.QPushButton(
-            load_icon("gfx/button_delete.png"), "")
         
+        self.delete_button = QtWidgets.QPushButton(load_icon(f"gfx/{prefix}button_delete.png"), "")        
         self.delete_button.clicked.connect(
             lambda: self.deleted.emit(self.condition_data)
         )
@@ -777,7 +776,7 @@ class VJoyConditionWidget(AbstractConditionWidget):
             self.condition_data.input_id
         )
         self.delete_button = QtWidgets.QPushButton(
-            load_icon("gfx/button_delete.png"), "")
+            load_icon("gfx/{prefix}button_delete.png"), "")
         self.delete_button.clicked.connect(
             lambda: self.deleted.emit(self.condition_data)
         )
@@ -959,7 +958,7 @@ class InputActionConditionWidget(AbstractConditionWidget):
 
     def _create_ui(self):
         """Creates the configuration UI for this widget."""
-
+        prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
 
         ui_common.clear_layout(self.main_layout)
         self.grid_widget =  QtWidgets.QWidget()
@@ -978,7 +977,7 @@ class InputActionConditionWidget(AbstractConditionWidget):
             self._state_selection_changed
         )
         self.delete_button = QtWidgets.QPushButton(
-            load_icon("gfx/button_delete.png"), "")
+            load_icon(f"gfx/{prefix}button_delete.png"), "")
         
         self.delete_button.clicked.connect(
             lambda: self.deleted.emit(self.condition_data)

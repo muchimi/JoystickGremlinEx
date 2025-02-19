@@ -224,7 +224,7 @@ class SwitchWidget(QtWidgets.QWidget):
 
 
         self.delete_button = QtWidgets.QPushButton(
-            gremlin.util.load_icon("gfx/button_delete.png"), "")
+            gremlin.util.load_icon("gfx/{prefix}button_delete.png"), "")
         self.delete_button.setToolTip("Delete this entry")
         self.delete_button.clicked.connect(self._delete_cb)
         device_layout.addStretch()

@@ -481,17 +481,12 @@ class EventListener(QtCore.QObject):
 		QtCore.QObject.__init__(self)
 		self.keyboard_hook = windows_event_hook.KeyboardHook()
 		self.keyboard_hook.register(self._keyboard_handler)
-		
-		self.mouse_hook = windows_event_hook.MouseHook()
-		# if in debug mode - don't hook the mouse
-		enable_mouse_hook = not gremlin.config.Configuration().is_debug
-		#enable_mouse_hook = False
-		
-		if enable_mouse_hook:
-			self.mouse_hook.start()
-			self.mouse_hook.register(self._mouse_handler)
-		else:
-			syslog.warning("************ DEBUG MODE - MOUSE HOOKS ARE DISABLED ")
+
+		config = gremlin.config.Configuration()
+		self.mouse_hook = None
+		self.enable_mouse_hook = not config.is_debug
+		self.enableMouse()
+
 
 		# Calibration function for each axis of all devices
 		self._calibrations = {}
@@ -604,13 +599,19 @@ class EventListener(QtCore.QObject):
 		return self.mouse_hook is not None
 	
 	def enableMouse(self):
-		if self.mouse_hook is None:
-			self.mouse_hook = windows_event_hook.MouseHook()
-			self.mouse_hook.register(self._mouse_handler)
+		if self.enable_mouse_hook:
+			if self.mouse_hook is None:
+				self.mouse_hook = windows_event_hook.MouseHook()
+				self.mouse_hook.register(self._mouse_handler)
+				self.mouse_hook.start()
+		else:
+			syslog.warning("************ DEBUG MODE - MOUSE HOOKS ARE DISABLED ")
+				
 
 	def disableMouse(self):
 		if self.mouse_hook is not None:
 			self.mouse_hook.stop()
+			self.mouse_hook.unregister(self._mouse_handler)
 			self.mouse_hook = None
 
 	def push_joystick(self):
@@ -727,15 +728,13 @@ class EventListener(QtCore.QObject):
 
 	def start(self):
 		''' starts the non regular listener '''
-		if self.mouse_hook is not None:
-			self.mouse_hook.start()
+		self.enableMouse()
 		self._key_listener_stop_requested = False
 		self.start_key_listener()
 
 
 	def stop(self):
-		if self.mouse_hook is not None:
-			self.mouse_hook.unregister(self._mouse_handler)
+		self.disableMouse()
 		self.stop_key_listener()
 
 
@@ -747,9 +746,7 @@ class EventListener(QtCore.QObject):
 		gremlin.shared_state.terminating = True # tell UI we're terminating to avoid uncessary updates if we're shutting down
 		self._running = False
 		self.keyboard_hook.stop()
-		if self.mouse_hook:
-			self.mouse_hook.stop()
-		
+		self.disableMouse()
 
 		# send the shutdown trigger to all code parts
 		if self._run_thread is not None:

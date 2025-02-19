@@ -22,6 +22,7 @@ from PySide6 import QtCore, QtGui, QtWidgets
 
 from gremlin.common import PluginVariableType
 import gremlin.config
+import gremlin.shared_state
 from gremlin.util import load_icon, userprofile_path
 import gremlin.base_profile
 from gremlin.input_types import InputType
@@ -447,14 +448,16 @@ class ModuleWidget(QtWidgets.QFrame):
         header_layout.addWidget(QtWidgets.QLabel(module_name))
         header_layout.addStretch()
 
+        prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
+
         if self.has_variables:
             self.btn_add_instance = QtWidgets.QPushButton(
-                load_icon("gfx/button_add.png"),""
+                load_icon(f"gfx/{prefix}button_add.png"),""
             )
             header_layout.addWidget(self.btn_add_instance)
 
         self.btn_delete = QtWidgets.QPushButton(
-            load_icon("gfx/button_delete.png"),"")
+            load_icon(f"gfx/{prefix}button_delete.png"),"")
         header_layout.addWidget(self.btn_delete)
 
         self.instance_layout = QtWidgets.QVBoxLayout()
@@ -504,7 +507,7 @@ class InstanceWidget(QtWidgets.QWidget):
         )
         self.btn_configure.setToolTip("Configure this instance")
         self.btn_delete = QtWidgets.QPushButton(
-             load_icon("gfx/button_delete.png"), ""
+             load_icon("gfx/{prefix}button_delete.png"), ""
         )
         self.btn_delete.setToolTip("Delete this instance")
         self.btn_copy = QtWidgets.QPushButton(load_icon("gfx/button_copy.svg"),"")

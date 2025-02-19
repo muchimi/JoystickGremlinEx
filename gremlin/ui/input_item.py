@@ -968,9 +968,10 @@ class ActionSetView(ui_common.AbstractView):
 
         self.controls_widget = QtWidgets.QWidget()
         self.controls_layout = QtWidgets.QVBoxLayout(self.controls_widget)
+        prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
         if ActionSetView.Interactions.Up in self.allowed_interactions:
             self.control_move_up = QtWidgets.QPushButton(
-                load_icon("gfx/button_up.png"), ""
+                load_icon(f"gfx/{prefix}button_up.png"), ""
             )
             self.control_move_up.clicked.connect(
                 lambda: self.interacted.emit(ActionSetView.Interactions.Up)
@@ -978,7 +979,7 @@ class ActionSetView(ui_common.AbstractView):
             self.controls_layout.addWidget(self.control_move_up)
         if ActionSetView.Interactions.Down in self.allowed_interactions:
             self.control_move_down = QtWidgets.QPushButton(
-                load_icon("gfx/button_down.png"), ""
+                load_icon(f"gfx/{prefix}button_down.png"), ""
             )
             self.control_move_down.clicked.connect(
                 lambda: self.interacted.emit(ActionSetView.Interactions.Down)
@@ -986,7 +987,7 @@ class ActionSetView(ui_common.AbstractView):
             self.controls_layout.addWidget(self.control_move_down)
         if ActionSetView.Interactions.Delete in self.allowed_interactions:
             self.control_delete = QtWidgets.QPushButton(
-                load_icon("gfx/button_delete.png"), ""
+                load_icon(f"gfx/{prefix}button_delete.png"), ""
             )
             # syslog.info(f"action: delete allowed")
             self.control_delete.clicked.connect(
@@ -995,7 +996,7 @@ class ActionSetView(ui_common.AbstractView):
             self.controls_layout.addWidget(self.control_delete)
         if ActionSetView.Interactions.Edit in self.allowed_interactions:
             self.control_edit = QtWidgets.QPushButton(
-                load_icon("gfx/button_edit.png"), ""
+                load_icon(f"gfx/{prefix}button_edit.png"), ""
             )
             self.control_edit.clicked.connect(
                 lambda: self.interacted.emit(ActionSetView.Interactions.Edit)
@@ -1003,7 +1004,7 @@ class ActionSetView(ui_common.AbstractView):
             self.controls_layout.addWidget(self.control_edit)
         if ActionSetView.Interactions.Copy in self.allowed_interactions:
             self.control_edit = QtWidgets.QPushButton(
-                load_icon("gfx/button_copy.svg"), ""
+                load_icon(f"gfx/{prefix}button_copy.svg"), ""
             )
             self.control_edit.clicked.connect(
                 lambda: self.interacted.emit(ActionSetView.Interactions.Copy)

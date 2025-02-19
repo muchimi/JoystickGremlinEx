@@ -1833,8 +1833,8 @@ class ButtonReleaseActions(QtCore.QObject):
         release_evt.is_pressed = activate_on
 
         key = release_evt.callbackKey
-
-        print (f"add autorelease release trigger: key: {key} {str(release_evt)}")
+        verbose = gremlin.config.Configuration().verbose_mode_outputs
+        if verbose: syslog.info(f"AUTORELEASE: register autorelease key: {key} event: {str(release_evt)}")
         if release_evt not in self._registry:
             self._registry[key] = []
             #self._registry_key_map[key] = release_evt
@@ -1874,19 +1874,19 @@ class ButtonReleaseActions(QtCore.QObject):
         Args:
             event: the event to process
         """
-        # if not event.is_axis:
-        #     print (f"received event: {str(event)}")
+        
+        verbose = gremlin.config.Configuration().verbose_mode_outputs
 
         key = event.callbackKey
-        #if evt in [e for e in self._registry if e.is_pressed != evt.is_pressed]:
+        
         if key in self._registry:
-            print (f"release trigger found: {key}")
+            if verbose: syslog.info(f"AUTORELEASE: execute trigger : {key}")
             new_list = []
             for entry in self._registry[key]:
 
                 if entry.event.is_pressed == event.is_pressed:
                     try:
-                        #print ("trigger release event")
+                        
                         entry.callback()
                     except:
                         pass
