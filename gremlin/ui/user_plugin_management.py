@@ -349,7 +349,8 @@ class ModuleManagementView(QtWidgets.QSplitter):
 
 
         # Button to add a new module
-        self.btn_add_module = QtWidgets.QPushButton(load_icon("gfx/list_add.svg"), "Add Plugin")
+        prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
+        self.btn_add_module = QtWidgets.QPushButton(load_icon(f"gfx/{prefix}list_add.svg"), "Add Plugin")
         
         self.btn_add_module.clicked.connect(self._prompt_user_for_module)
 
@@ -365,7 +366,6 @@ class ModuleManagementView(QtWidgets.QSplitter):
         self.addWidget(self.right_panel)
 
     def refresh_ui(self):
-        # TODO: stupid refresh code needs changing
         pass
 
     def _prompt_user_for_module(self):
@@ -441,7 +441,8 @@ class ModuleWidget(QtWidgets.QFrame):
 
         layout = QtWidgets.QVBoxLayout(self)
 
-        self.setStyleSheet("QFrame { background-color : '#ffffff'; }")
+        background_color = gremlin.ui.ui_common.Color.actionBackgroundColor()
+        self.setStyleSheet(f"QFrame {{ background-color : {background_color}; }}")
         self.setFrameShape(QtWidgets.QFrame.Box)
 
         header_layout = QtWidgets.QHBoxLayout()
@@ -494,23 +495,28 @@ class InstanceWidget(QtWidgets.QWidget):
         self._create_ui()
 
     def _create_ui(self):
+
+        
+        prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
+        icon_color = gremlin.ui.ui_common.Color.normalColor()
+
         self.label_name = QtWidgets.QLabel(self.name)
 
         self.btn_rename = QtWidgets.QPushButton(
-            load_icon("gfx/button_edit.png"), ""
+            load_icon(f"gfx/{prefix}button_edit.png"), ""
         )
         self.btn_rename.setToolTip("Rename this instance")
 
         self.btn_rename.clicked.connect(self.rename_instance)
         self.btn_configure = QtWidgets.QPushButton(
-            load_icon("fa.gear"), ""
+            load_icon("fa.gear", qta_color=icon_color), ""
         )
         self.btn_configure.setToolTip("Configure this instance")
         self.btn_delete = QtWidgets.QPushButton(
-             load_icon("gfx/{prefix}button_delete.png"), ""
+             load_icon(f"gfx/{prefix}button_delete.png"), ""
         )
         self.btn_delete.setToolTip("Delete this instance")
-        self.btn_copy = QtWidgets.QPushButton(load_icon("gfx/button_copy.svg"),"")
+        self.btn_copy = QtWidgets.QPushButton(load_icon(f"gfx/{prefix}button_copy.svg"),"")
         self.btn_copy.setToolTip("Copy this instance")
 
         self.main_layout.addWidget(self.label_name)
