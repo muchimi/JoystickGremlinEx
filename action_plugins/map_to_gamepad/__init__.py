@@ -24,6 +24,7 @@ from lxml import etree as ElementTree
 from PySide6 import QtCore, QtWidgets
 
 import gremlin.base_profile
+import gremlin.config
 import gremlin.event_handler
 from gremlin.input_types import InputType
 
@@ -46,7 +47,7 @@ from enum import Enum, auto
 import gremlin.util
 from gremlin.types import GamePadOutput
 
-
+syslog = logging.getLogger("system")
 
 
 class MapToGamepadWidget(gremlin.ui.input_item.AbstractActionWidget):
@@ -126,10 +127,6 @@ class MapToGamepadWidget(gremlin.ui.input_item.AbstractActionWidget):
                 self.output_selector.addItem("Button DPad Up", GamePadOutput.ButtonDpadUp)
                 self.output_selector.addItem("Button DPad Down", GamePadOutput.ButtonDpadDown)
 
-            index = self.output_selector.findData(self.action_data.output_mode)
-            if index != -1:
-                self.output_selector.setCurrentIndex(index)
-
             index = self.device_selector.findData(self.action_data.device_index)
             if index != -1:
                 self.device_selector.setCurrentIndex(index)
@@ -137,6 +134,14 @@ class MapToGamepadWidget(gremlin.ui.input_item.AbstractActionWidget):
                 # pick the first entry
                 self.device_selector.setCurrentIndex(0)
                 self.action_data.device_index = 0
+            
+
+            output_index = self.output_selector.findData(self.action_data.output_mode)
+            if index != -1:
+                self.output_selector.setCurrentIndex(output_index)
+                self.action_data.output_mode = self.output_selector.itemData(index)
+            else:        
+                self.action_data.output_mode = self.output_selector.currentData()
 
     @QtCore.Slot()
     def _gamepad_count_changed(self):
@@ -146,6 +151,8 @@ class MapToGamepadWidget(gremlin.ui.input_item.AbstractActionWidget):
     @QtCore.Slot()
     def _output_mode_changed(self):
         self.action_data.output_mode = self.output_selector.currentData()
+        verbose = gremlin.config.Configuration().verbose
+        if verbose: syslog.info(f"OUTPUT MODE: changed to {self.action_data.output_mode}")
 
     @QtCore.Slot()
     def _device_changed(self):
@@ -290,7 +297,14 @@ class MapToGamepad(gremlin.base_profile.AbstractAction):
         self.parent = parent
 
         self.device_index = 0
-        self.output_mode = GamePadOutput.NotSet
+        self._output_mode = GamePadOutput.NotSet
+
+    @property
+    def output_mode(self) -> GamePadOutput:
+        return self._output_mode
+    @output_mode.setter
+    def output_mode(self, value : GamePadOutput):
+        self._output_mode = value
 
  
     def display_name(self):
