@@ -1076,7 +1076,7 @@ class GateData():
                  ):
         ''' GateData constructor '''
 
-        assert profile_mode is not None, "profile mode must be provided"
+        #assert profile_mode is not None, "profile mode must be provided"
         self._process_trigger_lock = threading.Lock()
         self._action_data = action_data
         self.condition = condition
@@ -1335,6 +1335,14 @@ class GateData():
         if not event.is_axis:
             # ignore if not an axis event
             return
+        
+        if not hasattr(self,"_action_data"):
+            syslog.error("GateData: joystick handler called before class initialized.  This should not happen.")
+            return
+        
+        if not self._action_data:
+            # not initialized yet
+            return 
 
         if self._action_data.hardware_device_guid != event.device_guid:
             # ignore if a different input device
