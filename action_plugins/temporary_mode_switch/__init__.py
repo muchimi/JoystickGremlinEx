@@ -89,7 +89,7 @@ class TemporaryModeSwitchWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _populate_ui(self):
         assert self.mode_selector_widget.count() > 0
-        mode = self.action_data.mode
+        mode = self.action_data.mode_name
         if mode is None:
             index = 0
         else:
