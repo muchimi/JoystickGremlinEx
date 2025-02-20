@@ -3112,8 +3112,8 @@ class Mode:
                 key=lambda x: x.input_id
             )
             for item in item_list:
-                if item.is_valid_for_save():
-                    node.append(item.to_xml())
+                #if item.is_valid_for_save():
+                node.append(item.to_xml())
         return node
 
     def delete_data(self, input_type, input_id):
