@@ -759,7 +759,7 @@ class VJoyConditionWidget(AbstractConditionWidget):
 
         self.grid_widget =  QtWidgets.QWidget()
         self.grid_layout =  QtWidgets.QGridLayout(self.grid_widget)
-
+        prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
 
 
         self.vjoy_selector = ui_common.VJoySelector(
@@ -776,7 +776,7 @@ class VJoyConditionWidget(AbstractConditionWidget):
             self.condition_data.input_id
         )
         self.delete_button = QtWidgets.QPushButton(
-            load_icon("gfx/{prefix}button_delete.png"), "")
+            load_icon(f"gfx/{prefix}button_delete.png"), "")
         self.delete_button.clicked.connect(
             lambda: self.deleted.emit(self.condition_data)
         )
@@ -1169,8 +1169,8 @@ class ConditionView(ui_common.AbstractView):
         self.condition_add_button.clicked.connect(self._add_condition)
         self.controls_layout.addWidget(self.condition_selector)
         self.controls_layout.addWidget(self.condition_add_button)
-
-        self.help_button = QtWidgets.QPushButton(load_icon("gfx/help.png"), "")
+        prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
+        self.help_button = QtWidgets.QPushButton(load_icon(f"gfx/{prefix}help.png"), "")
         self.help_button.clicked.connect(self._show_hint)
         self.controls_layout.addWidget(self.help_button)
 
