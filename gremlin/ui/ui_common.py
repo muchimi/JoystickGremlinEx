@@ -56,6 +56,189 @@ from gremlin.types import HatDirection
 from dinput import DeviceSummary
 
 syslog = logging.getLogger("system")
+
+
+
+class Color():
+    @staticmethod
+    def activeColor():
+        return "#8ce2fa" if gremlin.shared_state.is_dark_theme else "#365a75"
+    @staticmethod
+    def normalColor():
+        return "#AAAAAA" if gremlin.shared_state.is_dark_theme else "#111111"
+    @staticmethod
+    def normalGradientColor():
+        return "#777777" if gremlin.shared_state.is_dark_theme else "#CCCCCC"
+    @staticmethod
+    def backgroundColor():
+        return "#020202" if gremlin.shared_state.is_dark_theme else "#EEEEEE"
+    @staticmethod
+    def borderColor():
+        return "#AAAAAA" if gremlin.shared_state.is_dark_theme else "#111111"
+    @staticmethod
+    def titleBackgroundColor():
+        return "#222222" if gremlin.shared_state.is_dark_theme else "#AAAAAA"
+    @staticmethod
+    def warningColor():
+        return "#b39f32"
+    @staticmethod
+    def selectColor():
+        return "#658265" if gremlin.shared_state.is_dark_theme else "#8FBC8F"
+    @staticmethod
+    def selectGradientColor():
+        return "#658265" if gremlin.shared_state.is_dark_theme else "#8FBC8F"
+    @staticmethod
+    def selectBorderColor():
+        return "#408540" if gremlin.shared_state.is_dark_theme else "#76c276"    
+    @staticmethod
+    def rangeColor():
+        return "#8FBC8F"
+    @staticmethod
+    def alternateRangeColor():
+        return "#8fb9bc"
+    @staticmethod
+    def rangeBorderColor():
+        return "#8FBC8F"
+    @staticmethod
+    def keyBackgroundColor():
+        return "#101010" if gremlin.shared_state.is_dark_theme else "#EEEEEE"
+    @staticmethod
+    def keyEntryBackgroundColor():
+        return "#293d2d" if gremlin.shared_state.is_dark_theme else "#EEEEEE"
+    @staticmethod
+    def keyForegroundColor():
+        return "#AAAAAA" if gremlin.shared_state.is_dark_theme else "#000000"
+    @staticmethod
+    def keyBorderColor():
+        return "#AAAAAA" if gremlin.shared_state.is_dark_theme else "#000000"
+    @staticmethod
+    def keyHoverBorderColor():
+        return "#457d45" if gremlin.shared_state.is_dark_theme else "#56b056"
+    @staticmethod
+    def containerBackgroundColor():
+        return "#101010" if gremlin.shared_state.is_dark_theme else "#EEEEEE"
+    @staticmethod
+    def actionBackgroundColor():
+        return "#202020" if gremlin.shared_state.is_dark_theme else "#CCCCCC"
+    @staticmethod
+    def sliderTickColor():
+        return "#303030" if gremlin.shared_state.is_dark_theme else "#232323"
+    @staticmethod
+    def sliderHandleColor():
+        return "#a7b59e" if gremlin.shared_state.is_dark_theme else "#a7b59e"
+    @staticmethod
+    def sliderHandleBorderColor():
+        return "#e0e0e0" if gremlin.shared_state.is_dark_theme else "#e0e0e0"
+    @staticmethod
+    def sliderRangeBorderColor():
+        return "#8fb9bc" if gremlin.shared_state.is_dark_theme else "#8fb9bc"
+    @staticmethod
+    def sliderRangeColor():
+        return "#8fb9bc" if gremlin.shared_state.is_dark_theme else "#8fb9bc"
+    @staticmethod
+    def sliderAlternateRangeColor():
+        return "#8fb9bc" if gremlin.shared_state.is_dark_theme else "#8fb9bc"
+    @staticmethod
+    def sliderBackgroundColor():
+        return "#060606" if gremlin.shared_state.is_dark_theme else "#c3c3c3"
+    
+    @staticmethod
+    def warningColor(): # color for the warning flag
+        return "#ab8d18" if gremlin.shared_state.is_dark_theme else "#fc1900"
+
+    @staticmethod
+    def cssCheckbox():
+        border_color = gremlin.ui.ui_common.Color.borderColor()
+        if gremlin.config.Configuration().is_debug:
+            relative_path = "gfx/"
+        else:
+            relative_path = "_internal/gfx/"
+        checked = "dark_checkbox.png" if gremlin.shared_state.is_dark_theme else "checkbox.png"
+        unchecked = "dark_unchecked.png" if gremlin.shared_state.is_dark_theme else "unchecked.png"
+        css = f'''
+            QCheckBox::indicator {{
+                width: 18px;
+                height: 18px;
+            }}
+            QCheckBox::indicator:checked {{
+                image: url({relative_path}{checked});
+            }}
+            QCheckBox::indicator:unchecked {{
+                image: url({relative_path}{unchecked}); 
+            }}
+            QPlainTextEdit {{ 
+                 border: 1px solid {border_color};
+            }}
+            
+            '''
+        return css
+    
+    @staticmethod
+    def cssButtonState():
+        ''' gets a pushbutton state for the input viewer '''
+
+        normal_color = Color.normalColor()
+        normal_gradient_color = Color.normalGradientColor()
+        background_color = Color.keyBackgroundColor()
+        
+        border_color = Color.borderColor()
+        selected_border_color = Color.selectBorderColor()
+        selected_color = Color.selectColor()
+        selected_gradient_color = Color.selectGradientColor()
+        css = f'''
+        QPushButton {{
+            border: 2px solid #8f8f91;
+            border-radius: 15px;
+            background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 {normal_color}, stop: 1 {normal_gradient_color});
+            min-width: 30px;
+            min-height: 30px;
+            max-width: 30px;
+            max-height: 30px;
+        }}
+
+        QPushButton:pressed {{
+            background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 {selected_color}, stop: 1 {selected_gradient_color});
+            border-color: {selected_border_color};
+        }}
+
+        QPushButton:flat {{
+            border: none; /* no border for a flat push button */
+        }}
+
+        QPushButton:!enabled
+        {{
+             color: {background_color};
+        }}
+        '''
+        return css
+    
+    @staticmethod
+    def PenColors():
+        ''' list of pen colors '''
+
+        colors = {
+            0: "#c0c0c0" if gremlin.shared_state.is_dark_theme else "#111111",
+            1: "#e41a1c",
+            2: "#377eb8",
+            3: "#4daf4a",
+            4: "#984ea3",
+            5: "#ff7f00",
+            6: "#ffff33",
+            7: "#9cad1c",
+            8: "#2cb2f5",
+        }
+        return colors
+        
+    
+    @staticmethod
+    def Pens():
+        # Pre-defined colors for eight time series
+        pens = {}
+        colors = Color.PenColors()
+        for index in colors.keys():
+            pens[index] = QtGui.QPen(QtGui.QColor(colors[index]), 2 if index else 1)
+        return pens
+
 class WidgetTracker():
 
     def __init__(self):
@@ -2844,7 +3027,7 @@ class ButtonStateWidget(QtWidgets.QWidget):
 
 
 
-_axis_widget_cache = []
+_widget_cache = []
 
 class AxisStateWidget(QtWidgets.QWidget):
 
@@ -3457,17 +3640,6 @@ class AxesTimeline(QtWidgets.QGroupBox):
 
     """Visualizes axes state as a timeline."""
 
-    color_list = {
-        1: "#e41a1c",
-        2: "#377eb8",
-        3: "#4daf4a",
-        4: "#984ea3",
-        5: "#ff7f00",
-        6: "#73732f", # yellow
-        7: "#a65628",
-        8: "#f781bf"
-    }
-
     def __init__(self, device, parent=None):
         """Creates a new instance.
 
@@ -3485,11 +3657,12 @@ class AxesTimeline(QtWidgets.QGroupBox):
         self.plot_widget = TimeLinePlotWidget()
         self.legend_layout = QtWidgets.QHBoxLayout()
         self.legend_layout.addStretch()
+        colors = Color.PenColors()
         for i in range(device.axis_count):
-            label = QtWidgets.QLabel(f"Axis {device.axis_map[i].axis_index:d}")
-            label.setStyleSheet(
-                f"QLabel {{ color: {AxesTimeline.color_list.get(device.axis_map[i].axis_index,"#000000")}; font-weight: bold }}"
-            )
+            index = device.axis_map[i].axis_index
+            label = QtWidgets.QLabel(f"Axis {index:d}")
+            css = f"QLabel {{ color: {colors.get(index,"#000000")}; font-weight: bold }}"
+            label.setStyleSheet(css)
             self.legend_layout.addWidget(label)
         self.layout().addWidget(self.plot_widget)
         self.layout().addLayout(self.legend_layout)
@@ -3511,21 +3684,7 @@ class TimeLinePlotWidget(QtWidgets.QWidget):
 
     """Visualizes temporal data as a line graph."""
 
-    # Pre-defined colors for eight time series
-    pens = {
-        1: QtGui.QPen(QtGui.QColor("#e41a1c"), 2),
-        2: QtGui.QPen(QtGui.QColor("#377eb8"), 2),
-        3: QtGui.QPen(QtGui.QColor("#4daf4a"), 2),
-        4: QtGui.QPen(QtGui.QColor("#984ea3"), 2),
-        5: QtGui.QPen(QtGui.QColor("#ff7f00"), 2),
-        6: QtGui.QPen(QtGui.QColor("#ffff33"), 2),
-        7: QtGui.QPen(QtGui.QColor("#a65628"), 2),
-        8: QtGui.QPen(QtGui.QColor("#f781bf"), 2),
-    }
-    for pen in pens.values():
-        pen.setWidth(2)
-    pens[0] = QtGui.QPen(QtGui.QColor("#c0c0c0"))
-    pens[0].setWidth(1)
+
 
     def __init__(self, parent=None):
         """Creates a new instance.
@@ -3534,11 +3693,17 @@ class TimeLinePlotWidget(QtWidgets.QWidget):
         """
         super().__init__(parent)
 
+        self._background_color = Color.actionBackgroundColor()
+
         self._render_flags = QtGui.QPainter.Antialiasing |  QtGui.QPainter.SmoothPixmapTransform
 
         # Plotting canvas
+        self._pens = Color.Pens()
         self._pixmap = QtGui.QPixmap(1000, 200)
         self._pixmap.fill()
+        self._rect = QtCore.QRect(0,0,1000,200)
+        self._background_qcolor = QtGui.QColor(self._background_color)
+        self._background_brush = QtGui.QBrush(self._background_qcolor)
 
         # Grid drawing variables
         self._horizontal_steps = 0
@@ -3568,7 +3733,7 @@ class TimeLinePlotWidget(QtWidgets.QWidget):
         :param event the resize event
         """
         self._pixmap = QtGui.QPixmap(event.size())
-        self._pixmap.fill()
+        self._pixmap.fill(self._background_qcolor)
         self._horizontal_steps = 0
         self._vertical_timestep = time.time()
 
@@ -3585,9 +3750,11 @@ class TimeLinePlotWidget(QtWidgets.QWidget):
         :param event the paint event
         """
         p = QtGui.QPainter(self)
-        # p.begin(self)
+        
+        
         p.drawPixmap(0, 0, self._pixmap)
         p.end()
+
 
 
 
@@ -3604,23 +3771,18 @@ class TimeLinePlotWidget(QtWidgets.QWidget):
     def _update_pixmap(self):
         """Updates the pixmap that contains the moving timeline."""
         p = QtGui.QPainter(self._pixmap)
+        p.setBackground(QtGui.QBrush(QtGui.QColor(self._background_color)))
+        
+
         # p.begin(self)
         p.setRenderHint(self._render_flags)
 
-        self._pixmap.scroll(
-            -self._step_size,
-            0,
-            QtCore.QRect(0, 0, self._pixmap.width(), self._pixmap.height())
+        self._pixmap.scroll(-self._step_size, 0, QtCore.QRect(0, 0, self._pixmap.width(), self._pixmap.height())
         )
-        p.eraseRect(
-            self._pixmap.width() - self._step_size,
-            0,
-            1,
-            self._pixmap.height()
-        )
+        p.eraseRect(self._pixmap.width() - self._step_size, 0, 1,self._pixmap.height())
 
         # Draw vertical line in one second intervals
-        p.setPen(TimeLinePlotWidget.pens[0])
+        p.setPen(self._pens[0])
         if self._vertical_timestep < time.time()-1:
             p.drawLine(
                 self._pixmap.width()-1,
@@ -3641,7 +3803,7 @@ class TimeLinePlotWidget(QtWidgets.QWidget):
 
         # Draw onto the pixmap all series data that has been accumulated
         for key, value in self._series.items():
-            p.setPen(TimeLinePlotWidget.pens[key])
+            p.setPen(self._pens[key])
             p.drawLine(
                 self._pixmap.width()-self._step_size-1,
                 int(2 + (self._pixmap.height()-4) * (value[0] + 1) / 2.0),
@@ -3788,34 +3950,6 @@ class ButtonState(QtWidgets.QGroupBox):
 
     """Widget representing the state of a device's buttons."""
 
-    style_sheet = """
-        QPushButton {
-            border: 2px solid #8f8f91;
-            border-radius: 15px;
-            background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
-                                              stop: 0 #f6f7fa, stop: 1 #dadbde);
-            min-width: 30px;
-            min-height: 30px;
-            max-width: 30px;
-            max-height: 30px;
-        }
-
-        QPushButton:pressed {
-            background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
-                                              stop: 0 #b0ebb0, stop: 1 #456e45);
-            border-color: #661714;
-        }
-
-        QPushButton:flat {
-            border: none; /* no border for a flat push button */
-        }
-
-        QPushButton:!enabled
-        {
-             color: #000000;
-        }
-        """
-
     def __init__(self, device : DeviceSummary, parent=None):
         """Creates a new instance.
 
@@ -3831,11 +3965,12 @@ class ButtonState(QtWidgets.QGroupBox):
         else:
             self.setTitle(f"{device.name} - Buttons")
 
+        css = Color.cssButtonState()
         self.buttons = [None]
         button_layout = QtWidgets.QGridLayout()
         for i in range(device.button_count):
             btn = QtWidgets.QPushButton(str(i+1))
-            btn.setStyleSheet(ButtonState.style_sheet)
+            btn.setStyleSheet(css)
             btn.setDisabled(True)
             # read the current state
             is_pressed = gremlin.joystick_handling.get_button(device.device_guid, i+1)
@@ -6294,109 +6429,3 @@ class QVjoySelector(QtWidgets.QWidget):
         self._current_input_id = input_id
         self._current_input_type = input_type
         self.selectionChanged.emit(self._current_device_guid, self._current_vjoy_id, input_type, input_id)
-
-class Color():
-    @staticmethod
-    def activeColor():
-        return "#8ce2fa" if gremlin.shared_state.is_dark_theme else "#365a75"
-    @staticmethod
-    def normalColor():
-        return "#AAAAAA" if gremlin.shared_state.is_dark_theme else "#111111"
-    @staticmethod
-    def backgroundColor():
-        return "#020202" if gremlin.shared_state.is_dark_theme else "#EEEEEE"
-    @staticmethod
-    def borderColor():
-        return "#AAAAAA" if gremlin.shared_state.is_dark_theme else "#111111"
-    @staticmethod
-    def titleBackgroundColor():
-        return "#222222" if gremlin.shared_state.is_dark_theme else "#AAAAAA"
-    @staticmethod
-    def warningColor():
-        return "#b39f32"
-    @staticmethod
-    def selectColor():
-        return "#658265" if gremlin.shared_state.is_dark_theme else "#8FBC8F"
-    @staticmethod
-    def rangeColor():
-        return "#8FBC8F"
-    @staticmethod
-    def alternateRangeColor():
-        return "#8fb9bc"
-    @staticmethod
-    def rangeBorderColor():
-        return "#8FBC8F"
-    @staticmethod
-    def keyBackgroundColor():
-        return "#101010" if gremlin.shared_state.is_dark_theme else "#EEEEEE"
-    @staticmethod
-    def keyEntryBackgroundColor():
-        return "#293d2d" if gremlin.shared_state.is_dark_theme else "#EEEEEE"
-    @staticmethod
-    def keyForegroundColor():
-        return "#AAAAAA" if gremlin.shared_state.is_dark_theme else "#000000"
-    @staticmethod
-    def keyBorderColor():
-        return "#AAAAAA" if gremlin.shared_state.is_dark_theme else "#000000"
-    @staticmethod
-    def keyHoverBorderColor():
-        return "#457d45" if gremlin.shared_state.is_dark_theme else "#56b056"
-    @staticmethod
-    def containerBackgroundColor():
-        return "#101010" if gremlin.shared_state.is_dark_theme else "#EEEEEE"
-    @staticmethod
-    def actionBackgroundColor():
-        return "#202020" if gremlin.shared_state.is_dark_theme else "#CCCCCC"
-    @staticmethod
-    def sliderTickColor():
-        return "#303030" if gremlin.shared_state.is_dark_theme else "#232323"
-    @staticmethod
-    def sliderHandleColor():
-        return "#a7b59e" if gremlin.shared_state.is_dark_theme else "#a7b59e"
-    @staticmethod
-    def sliderHandleBorderColor():
-        return "#e0e0e0" if gremlin.shared_state.is_dark_theme else "#e0e0e0"
-    @staticmethod
-    def sliderRangeBorderColor():
-        return "#8fb9bc" if gremlin.shared_state.is_dark_theme else "#8fb9bc"
-    @staticmethod
-    def sliderRangeColor():
-        return "#8fb9bc" if gremlin.shared_state.is_dark_theme else "#8fb9bc"
-    @staticmethod
-    def sliderAlternateRangeColor():
-        return "#8fb9bc" if gremlin.shared_state.is_dark_theme else "#8fb9bc"
-    @staticmethod
-    def sliderBackgroundColor():
-        return "#060606" if gremlin.shared_state.is_dark_theme else "#c3c3c3"
-    
-    @staticmethod
-    def warningColor(): # color for the warning flag
-        return "#ab8d18" if gremlin.shared_state.is_dark_theme else "#fc1900"
-
-    @staticmethod
-    def cssCheckbox():
-        border_color = gremlin.ui.ui_common.Color.borderColor()
-        if gremlin.config.Configuration().is_debug:
-            relative_path = "gfx/"
-        else:
-            relative_path = "_internal/gfx/"
-        checked = "dark_checkbox.png" if gremlin.shared_state.is_dark_theme else "checkbox.png"
-        unchecked = "dark_unchecked.png" if gremlin.shared_state.is_dark_theme else "unchecked.png"
-        css = f'''
-            QCheckBox::indicator {{
-                width: 18px;
-                height: 18px;
-            }}
-            QCheckBox::indicator:checked {{
-                image: url({relative_path}{checked});
-            }}
-            QCheckBox::indicator:unchecked {{
-                image: url({relative_path}{unchecked}); 
-            }}
-            QPlainTextEdit {{ 
-                 border: 1px solid {border_color};
-            }}
-            
-            '''
-        return css
-    

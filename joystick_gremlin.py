@@ -1137,10 +1137,14 @@ class GremlinUi(QtWidgets.QMainWindow):
             700,
             300
         )
+        gremlin.shared_state.push_suspend_highlighting()
         self.modal_windows["input_viewer"].show()
-        self.modal_windows["input_viewer"].closed.connect(
-            lambda: self._remove_modal_window("input_viewer")
-        )
+        self.modal_windows["input_viewer"].closed.connect(self._close_input_viewer)
+
+    def _close_input_viewer(self):
+        gremlin.shared_state.pop_suspend_highlighting()
+        self._remove_modal_window("input_viewer")
+
 
     def load_profile(self, fname = None):
         """Prompts the user to select a profile file to load."""
