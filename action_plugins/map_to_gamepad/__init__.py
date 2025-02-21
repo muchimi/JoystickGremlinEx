@@ -137,12 +137,12 @@ class MapToGamepadWidget(gremlin.ui.input_item.AbstractActionWidget):
                 self.action_data.device_index = 0
             
 
-            output_index = self.output_selector.findData(self.action_data.output_mode)
+            output_id = self.action_data.output_mode
+            output_index = self.output_selector.findData(output_id)
+            syslog.info(f"Mode: {output_id.name} Index: {output_index}")
             if index != -1:
                 self.output_selector.setCurrentIndex(output_index)
-                self.action_data.output_mode = self.output_selector.itemData(index)
-            else:        
-                self.action_data.output_mode = self.output_selector.currentData()
+
 
     @QtCore.Slot()
     def _gamepad_count_changed(self):
