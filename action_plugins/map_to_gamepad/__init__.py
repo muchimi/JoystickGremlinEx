@@ -36,6 +36,7 @@ import gremlin.sendinput
 import gremlin.gamepad_handling
 from gremlin import input_devices
 from gremlin.types import GamePadOutput
+from gremlin.input_devices import ButtonReleaseActions
 
 
 
@@ -178,6 +179,9 @@ class MapToGamepadFunctor(gremlin.base_profile.AbstractFunctor):
     def process_event(self, event, value):
 
         verbose = gremlin.config.Configuration().verbose_mode_outputs
+        if verbose: syslog.error(f"VIGEM: event: {str(event)}")
+
+        
         (is_local, is_remote) = input_devices.remote_state.state
         if event.force_remote:
             # force remote mode on if specified in the event
@@ -196,7 +200,7 @@ class MapToGamepadFunctor(gremlin.base_profile.AbstractFunctor):
         if output_mode == GamePadOutput.NotSet:
             return True # nothing to do
         # vigem : vg.VX360Gamepad
-        if event.event_type == InputType.JoystickAxis:
+        if event.is_axis:
             if is_local:
                 vscaled = value.current
                 if output_mode == GamePadOutput.LeftStickX:
@@ -223,7 +227,7 @@ class MapToGamepadFunctor(gremlin.base_profile.AbstractFunctor):
                 # remote
                 input_devices.remote_client.send_gamepad_axis(self.action_data.device_index, output_mode, vscaled)
                 return True
-        else:
+        else: # momentary
             if output_mode == GamePadOutput.ButtonA:
                 button =vc.XUSB_BUTTON.XUSB_GAMEPAD_A
             elif output_mode == GamePadOutput.ButtonB:
@@ -258,8 +262,18 @@ class MapToGamepadFunctor(gremlin.base_profile.AbstractFunctor):
                 button = None
 
             if button is not None:
+                is_pressed = event.is_pressed
+                if is_pressed:
+                    auto_release = event.event_type in [InputType.Keyboard, InputType.KeyboardLatched, InputType.Midi, InputType.OpenSoundControl] 
+                    if auto_release:
+                        if verbose: syslog.info(f"VjoyRemap: autorelease enabled for {str(event)}")
+                        event_release = event.clone()               
+                        event_release.is_pressed = False
+                        callback = lambda : self.process_event(event_release, value)
+                        ButtonReleaseActions().register_callback(callback, event_release)
+
                 if is_local:
-                    if value.is_pressed:
+                    if is_pressed:
                         if verbose: syslog.error(f"VIGEM: button {button.name}: press")
                         vigem.press_button(button)
                     else:

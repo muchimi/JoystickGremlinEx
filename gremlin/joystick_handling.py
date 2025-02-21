@@ -281,12 +281,12 @@ def device_name_from_guid(device_guid : str | dinput.GUID) -> str:
     assert (_joystick_initialized)
     if device_guid in _joystick_device_guid_map:
         return _joystick_device_guid_map[device_guid].name
-    syslog.warning(f"getDeviceName: {str(device_guid)} - name not found")
-    verbose = gremlin.config.Configuration().verbose
-    if verbose:
-        syslog.info("\tKnown devices:")
-        for guid in known_devices():
-            syslog.info(f"\t\t{str(guid)} {_joystick_device_guid_map[guid].name}")
+    #syslog.warning(f"getDeviceName: {str(device_guid)} - name not found")
+    # verbose = gremlin.config.Configuration().verbose
+    # if verbose:
+    #     syslog.info("\tKnown devices:")
+    #     for guid in known_devices():
+    #         syslog.info(f"\t\t{str(guid)} {_joystick_device_guid_map[guid].name}")
     return None
     
 def known_devices() -> list:
@@ -295,20 +295,22 @@ def known_devices() -> list:
 
 def device_info_from_guid(device_guid : str | dinput.GUID) -> DeviceSummary:
     ''' gets physical device information '''
+    import gremlin.shared_state
     assert (_joystick_initialized)
     if device_guid in _joystick_device_guid_map:
         return _joystick_device_guid_map[device_guid]
     # attempt to find it
-    _scan_dinput()
-    if device_guid in _joystick_device_guid_map:
-        return _joystick_device_guid_map[device_guid]
+    # if gremlin.shared_state.is_running:
+    #     _scan_dinput()
+    #     if device_guid in _joystick_device_guid_map:
+    #         return _joystick_device_guid_map[device_guid]
     
-    syslog.warning(f"getDeviceInfo: {device_guid} - info not found")
-    verbose = gremlin.config.Configuration().verbose
-    if verbose:
-        syslog.info("\tKnown devices:")
-        for guid in known_devices():
-            syslog.info(f"\t\t{guid} {_joystick_device_guid_map[guid].name}")
+    # syslog.warning(f"getDeviceInfo: {device_guid} - info not found")
+    # verbose = gremlin.config.Configuration().verbose
+    # if verbose:
+    #     syslog.info("\tKnown devices:")
+    #     for guid in known_devices():
+    #         syslog.info(f"\t\t{guid} {_joystick_device_guid_map[guid].name}")
     return None
 
 def vjoy_info_from_vjoy_id(id : int ) -> DeviceSummary:
@@ -317,12 +319,12 @@ def vjoy_info_from_vjoy_id(id : int ) -> DeviceSummary:
     for dev in vjoy_devices():
         if dev.vjoy_id == id:
             return dev
-    syslog.warning(f"getVjoyInfo: vjoy {id} not found")
-    verbose = gremlin.config.Configuration().verbose
-    if verbose:
-        syslog.info("\tKnown devices:")
-        for dev in vjoy_devices():
-            syslog.info(f"\t\t{str(dev.device_guid)} vjoy id: {dev.vjoy_id}")
+    # syslog.warning(f"getVjoyInfo: vjoy {id} not found")
+    # verbose = gremlin.config.Configuration().verbose
+    # if verbose:
+    #     syslog.info("\tKnown devices:")
+    #     for dev in vjoy_devices():
+    #         syslog.info(f"\t\t{str(dev.device_guid)} vjoy id: {dev.vjoy_id}")
     return None
 
 def is_device_connected(device_guid : str | dinput.GUID) -> bool:
