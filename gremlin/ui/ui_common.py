@@ -2668,6 +2668,7 @@ class ButtonStateWidget(QtWidgets.QWidget):
         height = self._icon_size.height()+2
         self._button_widget.setMinimumHeight(height)
         self._button_widget.setMaximumHeight(height)
+        self._button_widget.setStyleSheet("")
 
         self._hat_icons = {} # icon hats, keyed by position
         
@@ -2677,6 +2678,7 @@ class ButtonStateWidget(QtWidgets.QWidget):
         el = gremlin.event_handler.EventListener()
         el.tab_selected.connect(self._tab_selected)
         el.tab_unselected.connect(self._tab_unselected)
+        
         
 
     def _cleanup_ui(self):
@@ -2692,7 +2694,7 @@ class ButtonStateWidget(QtWidgets.QWidget):
         self._input_type = input_type
         self.updateState()
         self._tab_selected(device_guid)
-
+        
     def updateState(self):
         ''' updates the widget state with the cached state  '''
         tracker = StateTracker()
@@ -2702,6 +2704,7 @@ class ButtonStateWidget(QtWidgets.QWidget):
 
     def unhookDevice(self):
         self._tab_unselected(self._device_guid)
+        
  
 
     @QtCore.Slot(str)
@@ -2776,9 +2779,13 @@ class ButtonStateWidget(QtWidgets.QWidget):
         ''' updates a button position '''
         if is_pressed:
             self._button_widget.setPixmap(self._on_pixmap)
+            # syslog.info(f"button {self.input_id} pressed")
+            # self._button_widget.update()
             #self._button_widget.setText("pressed")
         else:
             self._button_widget.setPixmap(self._off_pixmap)
+            # syslog.info(f"button {self.input_id} released")
+            # self._button_widget.update()
             #self._button_widget.setText(" ")
 
     def _update_hat(self, position):

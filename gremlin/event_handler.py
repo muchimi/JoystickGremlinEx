@@ -484,7 +484,7 @@ class EventListener(QtCore.QObject):
 
 		config = gremlin.config.Configuration()
 		self.mouse_hook = None
-		self.enable_mouse_hook = not config.is_debug
+		self.enable_mouse_hook = True #not config.is_debug
 		self.enableMouse()
 
 

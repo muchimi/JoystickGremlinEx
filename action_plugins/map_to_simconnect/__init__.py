@@ -3478,7 +3478,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         self.last_reconnect_time = None
 
         
-        self.manager.reconnect()
+        self.manager.activate()
 
         # update the loaded aircraft so this sets the profile mode if needed
         self.manager.request_loaded_aircraft()

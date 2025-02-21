@@ -473,7 +473,7 @@ class SimConnectManager(QtCore.QObject):
         el.shutdown.connect(self._shutdown) # trap application shutdown
         el.abort.connect(self._abort) # trap abort
         el.profile_stop.connect(self._profile_stop) # trap profile stop
-        el.profile_start.connect(self.reconnect) # trap profile start
+        el.profile_start.connect(self.activate) # trap profile start
 
         self.verbose = gremlin.config.Configuration().verbose_mode_simconnect
 
@@ -752,7 +752,7 @@ class SimConnectManager(QtCore.QObject):
 
     def setSimvar(self, command, datatype, value):
         ''' sets a simvar without using a data block '''
-        self.reconnect()
+        self.activate()
         request = self.registerRequest(command, datatype, True)
         request.value = value
         request.transmit()
@@ -762,7 +762,7 @@ class SimConnectManager(QtCore.QObject):
     def sendEvent(self, command):
         ''' sends an event to Simconnect '''
         if command in self._block_map:
-            self.reconnect()
+            self.activate()
             block = self._block_map[command]
             syslog.info(f"Simconnect: send Event {command}")
             return block.execute(1)
@@ -1037,7 +1037,7 @@ class SimConnectManager(QtCore.QObject):
     def ok(self):
         if not self._sm.ok:
             # attempt to reconnect
-            self.reconnect(True)
+            self.activate(True)
         return self._sm.ok
     
     @property
@@ -1051,7 +1051,7 @@ class SimConnectManager(QtCore.QObject):
         return self._sm
     
 
-    def reconnect(self, force_retry = False):
+    def activate(self, force_retry = False):
         # not connected
 
         if self._connected:
@@ -1108,10 +1108,11 @@ class SimConnectManager(QtCore.QObject):
                 else:
                     syslog.info("Simconnect: connected to simulator")
             
-
+            self._connected = True
+            self._is_running = True
             self.bridge.start()
 
-            self._connected = True
+
 
             return True # connected  
         finally:
@@ -1130,7 +1131,7 @@ class SimConnectManager(QtCore.QObject):
         if self._sm.is_connected() and self._bridge_alive:
             return True
         self.reset()
-        return self.reconnect()
+        return self.activate()
 
     def sim_disconnect(self):
         ''' disconnect request '''
