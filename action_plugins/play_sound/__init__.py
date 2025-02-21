@@ -58,7 +58,7 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.volume_widget.valueChanged.connect(self._volume_changed)
 
         self.play_widget = QtWidgets.QPushButton("Play")
-        self.play_widget.setIcon(load_icon("fa.play",qta_color="green"))
+        self.play_widget.setIcon(load_icon("fa.play",qta_color = gremlin.ui.ui_common.Color.activeColor()))
         self.play_widget.setToolTip("Plays the audio as configured")
         self.play_widget.clicked.connect(self._play_cb)
 
@@ -94,7 +94,7 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
         fname = self.file_path_widget.text()
         valid =  os.path.isfile(fname)
         if valid:
-            self._setIcon("fa.check", color="green")
+            self._setIcon("fa.check", color = gremlin.ui.ui_common.Color.activeColor())
         else:
             self._setIcon("fa.exclamation-circle", color="red")
         self.play_widget.setEnabled(valid)

@@ -28,6 +28,7 @@ import gremlin.base_profile
 from gremlin.input_types import InputType
 import gremlin.user_plugin
 import gremlin.ui.ui_common
+from gremlin.ui.ui_common import QBoxFrame
 import os
 
 import gremlin.util
@@ -429,7 +430,7 @@ class ModuleListWidget(QtWidgets.QScrollArea):
         self.content.layout().addStretch()
 
 
-class ModuleWidget(QtWidgets.QFrame):
+class ModuleWidget(QBoxFrame):
 
     def __init__(self, module_name, parent=None):
         super().__init__(parent)
@@ -443,7 +444,7 @@ class ModuleWidget(QtWidgets.QFrame):
 
         background_color = gremlin.ui.ui_common.Color.actionBackgroundColor()
         self.setStyleSheet(f"QFrame {{ background-color : {background_color}; }}")
-        self.setFrameShape(QtWidgets.QFrame.Box)
+        
 
         header_layout = QtWidgets.QHBoxLayout()
         header_layout.addWidget(QtWidgets.QLabel(module_name))

@@ -213,8 +213,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         el.refresh_devices.connect(self._create_tabs) # refresh device list
 
         # highlighing options
-        self._icon_on = gremlin.util.load_icon("mdi.record", qta_color="green")
-        self._icon_off = gremlin.util.load_icon("mdi.record", qta_color="lightgray")
+        self._icon_on = gremlin.util.load_icon("mdi.checkbox-blank-circle", qta_color= gremlin.ui.ui_common.Color.activeColor())
+        self._icon_off = gremlin.util.load_icon("mdi.checkbox-blank-circle", qta_color= gremlin.ui.ui_common.Color.inactiveColor())
         self._button_highlighting_enabled = self.config.highlight_input_buttons # true if highlighting on buttons
         self._axis_highlighting_enabled = self.config.highlight_input_axis  # true if highligthing on axes
         self._input_highlighting_enabled = self.config.highlight_enabled  # on/off global
@@ -1440,13 +1440,13 @@ class GremlinUi(QtWidgets.QMainWindow):
         
 
         icon_size = QtCore.QSize(16,16)
-        icon = gremlin.util.load_icon("mdi.record", use_qta=True,qta_color="red")
+        icon = gremlin.util.load_icon("mdi.checkbox-blank-circle", use_qta=True,qta_color= gremlin.ui.ui_common.Color.recordColor())
         self._icon_red = icon
         self._status_red = icon.pixmap(icon_size)
-        icon = gremlin.util.load_icon("mdi.record", use_qta=True,qta_color="green")
+        icon = gremlin.util.load_icon("mdi.checkbox-blank-circle", use_qta=True,qta_color=gremlin.ui.ui_common.Color.activeColor())
         self._icon_green = icon
         self._status_green = icon.pixmap(icon_size)
-        icon = gremlin.util.load_icon("mdi.record", use_qta=True,qta_color="lightgray")
+        icon = gremlin.util.load_icon("mdi.checkbox-blank-circle", use_qta=True,qta_color=gremlin.ui.ui_common.Color.inactiveColor())
         self._icon_gray = icon
         self._status_gray = icon.pixmap(icon_size)
 

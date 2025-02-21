@@ -1917,7 +1917,7 @@ class ProcessWindow(ui_common.BaseDialogUi):
         self.button_bar_widget.setLayout(self.button_bar_layout)
 
         self.refresh_button =QtWidgets.QPushButton("Refresh")
-        self.refresh_button.setIcon(load_icon("fa.refresh",qta_color="green"))
+        self.refresh_button.setIcon(load_icon("fa.refresh",qta_color = gremlin.ui.ui_common.Color.activeColor()))
         self.refresh_button.clicked.connect(self._refresh)
 
         self.main_layout.addWidget(self.list_view)

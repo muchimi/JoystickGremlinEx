@@ -350,9 +350,7 @@ class Button:
                 self.vjoy_id,
                 self.button_id
         ):
-            raise VJoyError(
-                f"Failed setting button value - {_error_string(self.vjoy_id, self.button_id, self._is_pressed)}"
-            )
+            syslog.error(f"Failed setting button value - {_error_string(self.vjoy_id, self.button_id, self._is_pressed)}")
         self.vjoy_dev.used()
 
 
@@ -565,19 +563,15 @@ class VJoy:
         #     )
         #     raise VJoyError("Running incompatible vJoy version, 2.1.8  or later required")
         if VJoyInterface.GetVJDStatus(vjoy_id) != VJoyState.Free.value:
-            syslog.error(
-                f"Requested vJoy device is not available - vid: {vjoy_id}"
-            )
-            raise VJoyError(
-                f"Requested vJoy device is not available - vid: {vjoy_id}"
-            )
+            syslog.error(f"Requested vJoy device is not available - vid: {vjoy_id}")
+            # raise VJoyError(
+            #     f"Requested vJoy device is not available - vid: {vjoy_id}"
+            # )
         elif not VJoyInterface.AcquireVJD(vjoy_id):
-            syslog.error(
-                f"Failed to acquire the vJoy device - vid: {vjoy_id}"
-            )
-            raise VJoyError(
-                f"Failed to acquire the vJoy device - vid: {vjoy_id}"
-            )
+            syslog.error(f"Failed to acquire the vJoy device - vid: {vjoy_id}")
+            # raise VJoyError(
+            #     f"Failed to acquire the vJoy device - vid: {vjoy_id}"
+            # )
 
         self.vjoy_id = vjoy_id
         self.pid = os.getpid()

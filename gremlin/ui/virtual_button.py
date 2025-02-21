@@ -91,16 +91,16 @@ class VirtualAxisButtonWidget(AbstractVirtualButtonWidget):
         self.axis_repeater_widget.valueChanged.connect(self._axis_value_changed)
 
         self.range_status_widget = ui_common.QIconLabel()
-        self.range_status_widget.setIcon("fa.check", color="green")
+        self.range_status_widget.setIcon("fa.check", color= gremlin.ui.ui_common.Color.activeColor())
 
         self.grab_low_widget = ui_common.QDataPushButton()
-        self.grab_low_widget.setIcon(load_icon("mdi.record-rec",qta_color = "red"))
+        self.grab_low_widget.setIcon(load_icon("mdi.checkbox-blank-circle",qta_color = gremlin.ui.ui_common.Color.recordColor()))
         self.grab_low_widget.setMaximumWidth(20)
         self.grab_low_widget.clicked.connect(self._grab_low)
         self.grab_low_widget.setToolTip("Grab axis value")
 
         self.grab_high_widget = ui_common.QDataPushButton()
-        self.grab_high_widget.setIcon(load_icon("mdi.record-rec",qta_color = "red"))
+        self.grab_high_widget.setIcon(load_icon("mdi.checkbox-blank-circle",qta_color = gremlin.ui.ui_common.Color.recordColor()))
         self.grab_high_widget.setMaximumWidth(20)
         self.grab_high_widget.clicked.connect(self._grab_high)
         self.grab_high_widget.setToolTip("Grab axis value")

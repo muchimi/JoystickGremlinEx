@@ -931,7 +931,8 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         
         if data.input_type == InputType.JoystickAxis:
             widget = input_item.InputItemWidget(identifier = identifier, parent=parent, data = data)
-            widget.setIcon("joystick_no_frame.png",use_qta=False)
+            prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
+            widget.setIcon(f"{prefix}joystick.png", use_qta=False)
             if widget.axis_widget is not None and identifier.is_axis:
                 widget.axis_widget.valueChanged.connect(lambda x: self._update_input_value_changed_cb(index, x))
         elif data.input_type == InputType.JoystickButton:

@@ -40,6 +40,7 @@ import gremlin.ui.ui_common
 import gremlin.ui.joystick_device
 import gremlin.base_profile
 import gremlin.util
+from gremlin.ui.ui_common import QBoxFrame
 
 syslog = logging.getLogger("system")
 
@@ -650,7 +651,7 @@ class MidiInterface(QtCore.QObject):
 
 
     
-class MidiInputListenerWidget(QtWidgets.QFrame):
+class MidiInputListenerWidget(QBoxFrame):
 
     """ opens a centered modal midi message listener dialog
     
@@ -703,7 +704,7 @@ class MidiInputListenerWidget(QtWidgets.QFrame):
 
         self.setWindowModality(QtCore.Qt.ApplicationModal)
         self.setWindowFlags(QtCore.Qt.FramelessWindowHint)
-        self.setFrameStyle(QtWidgets.QFrame.Plain | QtWidgets.QFrame.Box)
+        
         palette = QtGui.QPalette()
         palette.setColor(QtGui.QPalette.ColorRole.Window, QtGui.QColorConstants.DarkGray)
         self.setPalette(palette)

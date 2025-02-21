@@ -28,6 +28,7 @@ import gremlin.joystick_handling
 import gremlin.shared_state
 import gremlin.types
 import gremlin.ui
+import gremlin.ui.ui_common
 from gremlin.util import load_icon
 import gremlin.util
 import gremlin.base_classes as bc
@@ -89,10 +90,10 @@ class ActivationConditionWidget(QtWidgets.QWidget):
         # conditions for the container
 
         
-        self.container_condition_frame_widget = QtWidgets.QFrame()
+        self.container_condition_frame_widget = gremlin.ui.ui_common.QBoxFrame()
         self.container_condition_frame_widget.setContentsMargins(0,0,0,0)
         self.container_condition_frame_layout = QtWidgets.QVBoxLayout(self.container_condition_frame_widget)
-        self.container_condition_frame_widget.setFrameShape(QtWidgets.QFrame.Shape.Box)
+        
 
         self.activation_count_widget = QtWidgets.QLabel()
         self.container_condition_frame_layout.addWidget(self.activation_count_widget)
@@ -486,7 +487,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
         self.lower_widget.setMaximum(1.0)
 
         self.grab_low_widget = ui_common.QDataPushButton()
-        self.grab_low_widget.setIcon(load_icon("mdi.record-rec",qta_color = "red"))
+        self.grab_low_widget.setIcon(load_icon("mdi.checkbox-blank-circle",qta_color = gremlin.ui.ui_common.Color.recordColor()))
         self.grab_low_widget.setMaximumWidth(20)
         self.grab_low_widget.clicked.connect(self._grab_low)
         self.grab_low_widget.setToolTip("Grab axis value")
@@ -505,7 +506,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
         self.upper_widget.valueChanged.connect(self._range_upper_changed_cb)
 
         self.grab_high_widget = ui_common.QDataPushButton()
-        self.grab_high_widget.setIcon(load_icon("mdi.record-rec",qta_color = "red"))
+        self.grab_high_widget.setIcon(load_icon("mdi.checkbox-blank-circle",qta_color = gremlin.ui.ui_common.Color.recordColor()))
         self.grab_high_widget.setMaximumWidth(20)
         self.grab_high_widget.clicked.connect(self._grab_high)
         self.grab_high_widget.setToolTip("Grab axis value")
@@ -521,7 +522,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
         self.comparison_dropdown.currentTextChanged.connect(self._comparison_changed_cb)
 
         self.range_status_widget = ui_common.QIconLabel()
-        self.range_status_widget.setIcon("fa.check", color="green")
+        self.range_status_widget.setIcon("fa.check", color = gremlin.ui.ui_common.Color.activeColor())
         
 
         range_layout = QtWidgets.QHBoxLayout()

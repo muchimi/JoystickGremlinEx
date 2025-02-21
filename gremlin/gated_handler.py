@@ -2435,7 +2435,8 @@ class GateData():
                     # trigger on value in-range
                     if range_info.mode != GateRangeOutputMode.FilterOut:
                         value = self._get_filtered_range_value(range_info, current_value)
-                        if value is not None and not tt.getTrigger(range_info, TriggerMode.ValueInRange):
+                        # always trigger for value in range
+                        if value is not None: #  and not tt.getTrigger(range_info, TriggerMode.ValueInRange):
                             td = TriggerData()
                             mode = TriggerMode.ValueInRange
                             if range_info.mode == GateRangeOutputMode.Fixed:
@@ -3042,12 +3043,11 @@ class GateWidgetInfo(ui_common.QDataWidget):
 
     def _update_icon(self):
         ''' updates the icon on the setup button depending on the container state '''
-        active_color = gremlin.ui.ui_common.Color().activeColor()
 
         if self.gate.hasAnyContainers():
-            self.setup_widget.setIcon(load_icon("ei.cog-alt",qta_color=active_color))
+            self.setup_widget.setIcon(load_icon("fa.gear",qta_color= gremlin.ui.ui_common.Color().activeContentColor()))
         else:
-            self.setup_widget.setIcon(load_icon("fa.gear"))
+            self.setup_widget.setIcon(load_icon("fa.gear",qta_color= gremlin.ui.ui_common.Color().inactiveColor()))
 
         if self.gate.isError:
             warning_color = gremlin.ui.ui_common.Color.warningColor()
@@ -3154,7 +3154,7 @@ class GateWidgetInfo(ui_common.QDataWidget):
         self.value_widget.valueChanged.connect(self._value_changed_cb) # hook manual changes made to the widget
 
         self.grab_widget = ui_common.QDataPushButton()
-        self.grab_widget.setIcon(load_icon("mdi.record-rec",qta_color = "red"))
+        self.grab_widget.setIcon(load_icon("mdi.checkbox-blank-circle",qta_color = gremlin.ui.ui_common.Color.recordColor()))
         self.grab_widget.setMaximumWidth(20)
         self.grab_widget.clicked.connect(grab_handler)
         self.grab_widget.setToolTip("Grab axis value")
@@ -3248,9 +3248,9 @@ class RangeWidgetInfo(QtWidgets.QWidget):
         
         has_containers = rng.hasAnyContainers()
         if has_containers:
-            self.setup_widget.setIcon(load_icon("ei.cog-alt",qta_color="#365a75"))
+            self.setup_widget.setIcon(load_icon("fa.gear",qta_color=gremlin.ui.ui_common.Color.activeContentColor()))
         else:
-            self.setup_widget.setIcon(load_icon("fa.gear"))
+            self.setup_widget.setIcon(load_icon("fa.gear",qta_color=gremlin.ui.ui_common.Color.inactiveColor()))
         self.setup_widget.setMaximumWidth(20)
         self.setup_widget.clicked.connect(configure_range_handler)
         self.setup_widget.setToolTip(f"Setup actions for range {id}")
@@ -3420,9 +3420,9 @@ class GatedAxisWidget(QtWidgets.QWidget):
             self.main_layout.addWidget(missing)
             return
 
-        self._grab_icon = load_icon("mdi.record-rec",qta_color = "red")
-        self._setup_icon = load_icon("fa.gear")
-        self._setup_container_icon = load_icon("ei.cog-alt",qta_color="#365a75")
+        self._grab_icon = load_icon("mdi.checkbox-blank-circle", qta_color = gremlin.ui.ui_common.Color.recordColor())
+        self._setup_icon = load_icon("fa.gear", qta_color = gremlin.ui.ui_common.Color.inactiveColor())
+        self._setup_container_icon = load_icon("fa.gear",qta_color = gremlin.ui.ui_common.Color.activeContentColor())
         
         # get the curent axis normalized value -1 to +1
         if  action_data.input_is_hardware():
@@ -4564,9 +4564,9 @@ class GatedAxisWidget(QtWidgets.QWidget):
         if gate is None:
             self._slider.setHandleIcon(index, None)
         elif gate.hasAnyContainers():
-            self._slider.setHandleIcon(index, 'ei.cog-alt', True, "#365a75")
+            self._slider.setHandleIcon(index, 'fa.gear', True, gremlin.ui.ui_common.Color.activeContentColor())
         else:
-            self._slider.setHandleIcon(index, "fa.gear",True,"#808080")
+            self._slider.setHandleIcon(index, "fa.gear",True,gremlin.ui.ui_common.Color.inactiveColor() )
 
         # find the widgets for the gate
         if gate in self._gwi_map:
@@ -4688,8 +4688,8 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
         self.container_condition_layout.setContentsMargins(0,0,0,0)
         self.container_condition_layout.addWidget(self._condition_tab)
 
-        self._icon_enabled = gremlin.util.load_icon("mdi.record", qta_color="green")
-        self._icon_disabled = gremlin.util.load_icon("mdi.record", qta_color="lightgray")
+        self._icon_enabled = gremlin.util.load_icon("mdi.checkbox-blank-circle", qta_color = gremlin.ui.ui_common.Color.activeColor())
+        self._icon_disabled = gremlin.util.load_icon("mdi.checkbox-blank-circle", qta_color=gremlin.ui.ui_common.Color.inactiveColor())
 
 
         if is_range:

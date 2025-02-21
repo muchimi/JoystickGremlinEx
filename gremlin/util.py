@@ -843,6 +843,9 @@ def load_pixmap(*paths):
     syslog.error(f"load_pixmap(): invalid path")
     return None
 
+
+
+
 def load_icon(*paths, use_qta = False, qta_color = None):
     ''' gets an icon (returns a QIcon) - uses the qtawesome library or does a raw file search '''
     from gremlin.config import Configuration
@@ -874,10 +877,9 @@ def load_icon(*paths, use_qta = False, qta_color = None):
         try:
             if not qta_color:
                 qta_color = gremlin.ui.ui_common.Color.normalColor()
-            if qta_color:
-                icon = QtGui.QIcon(qta.icon(the_path, color = qta_color))
-            else:
-                icon = QtGui.QIcon(qta.icon(the_path))
+            if isinstance(qta_color, str):
+                assert qta_color.startswith("#") and len(qta_color) == 7
+            icon = QtGui.QIcon(qta.icon(the_path, color = qta_color))
         except:
             pass
     if not icon:
@@ -1644,7 +1646,7 @@ def highlight_qcolor(color : QColor, factor : float = 1.1) -> QColor:
     
     '''
     h,s,v,a = color.getHsv()
-    v = v * factor
+    v = clamp(v * factor, 0, 255)
     new_color = color.fromHsv(h, s, v, a)
     return new_color
 

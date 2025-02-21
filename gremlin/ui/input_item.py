@@ -43,6 +43,7 @@ import gremlin.config
 import gremlin.plugin_manager
 
 import gremlin.ui.ui_common as ui_common
+from gremlin.ui.ui_common import QBoxFrame
 from functools import partial
 from  gremlin.clipboard import Clipboard, ObjectEncoder, EncoderType
 from gremlin.util import get_guid
@@ -520,7 +521,8 @@ class InputItemListView(ui_common.AbstractView):
                     else:
                         widget = InputItemWidget(identifier)
                         if data.input_type == InputType.JoystickAxis:
-                            widget.setIcon("joystick_no_frame.png",use_qta=False)
+                            prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
+                            widget.setIcon(f"{prefix}joystick.png")
                         elif data.input_type == InputType.JoystickButton:
                             widget.setIcon("mdi.gesture-tap-button")
                         elif data.input_type == InputType.JoystickHat:
@@ -1015,7 +1017,7 @@ class ActionSetView(ui_common.AbstractView):
         self.controls_layout.addStretch(1)
 
 
-class InputItemWidget(QtWidgets.QFrame):
+class InputItemWidget(QBoxFrame):
 
     """ holds the input widget (left side of the interface) for available inputs that get mapped.
     
@@ -1060,12 +1062,14 @@ class InputItemWidget(QtWidgets.QFrame):
         super().__init__()
         self.parent = parent
 
-        self.setFrameShape(QtWidgets.QFrame.Box)
+        
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.main_layout.setContentsMargins(0,0,0,0)
         self.main_layout.setSpacing(0)
         self.setObjectName("main_layout")
         self.setContentsMargins(1,1,1,1)
+
+        
 
         self._container_widget = QtWidgets.QWidget()
         self._container_layout = QtWidgets.QGridLayout(self._container_widget)
@@ -1288,6 +1292,8 @@ class InputItemWidget(QtWidgets.QFrame):
 
         if hasattr(identifier.input_id,"message_key_changed"):
             identifier.input_id.message_key_changed.connect(self._message_key_changed)
+
+        self._default_style()
 
     def _cleanup_ui(self):
         ''' called when widget is removed '''
@@ -1710,13 +1716,29 @@ class InputItemWidget(QtWidgets.QFrame):
         if value != self._selected:
             self._selected = value
             if value:
-                style = f"#main_layout{{background-color: {gremlin.ui.ui_common.Color.selectColor()}; }}"
+                style = f'''
+                        #main_layout {{
+                            background: {gremlin.ui.ui_common.Color.selectColor()}; 
+                            border: 2px solid {gremlin.ui.ui_common.Color.selectBorderColor()};
+                        }}
+                    '''
+                self.setStyleSheet(style)
             else:
-                style = f"#main_layout{{background-color: {gremlin.ui.ui_common.Color.backgroundColor()}; }}"
+                self._default_style()
+        
 
-            self.setStyleSheet(style)
+            
             self.selected_changed.emit(self)
 
+    def _default_style(self):
+        ''' sets the default style'''
+        style = f'''
+                    #main_layout {{
+                        background: {gremlin.ui.ui_common.Color.backgroundColor()}; 
+                        border: 1px solid {gremlin.ui.ui_common.Color.borderColor()};
+                        }}
+                        '''
+        self.setStyleSheet(style)
 
     def enable_close(self):
         ''' enables the close button on the input widget (keyboard only usually) '''
@@ -2006,8 +2028,8 @@ class ConditionStateTracker():
         el.condition_state_changed.connect(self._condition_state_changed)
         el.container_delete.connect(self._container_delete)
         el.mapping_changed.connect(self._mapping_changed)
-        self._icon_enabled = gremlin.util.load_icon("mdi.record", qta_color="green")
-        self._icon_disabled = gremlin.util.load_icon("mdi.record", qta_color="lightgray")
+        self._icon_enabled = gremlin.util.load_icon("mdi.checkbox-blank-circle", qta_color=gremlin.ui.ui_common.Color.activeColor())
+        self._icon_disabled = gremlin.util.load_icon("mdi.checkbox-blank-circle", qta_color=gremlin.ui.ui_common.Color.inactiveColor())
 
     def register(self, input_item, container, dock_tab : QtWidgets.QTabWidget):
         ''' registers a condition tracker '''
@@ -2141,8 +2163,8 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
         el = gremlin.event_handler.EventListener()
         el.condition_redraw.connect(self._condition_redraw)
-        self._icon_enabled = gremlin.util.load_icon("mdi.record", qta_color="green")
-        self._icon_disabled = gremlin.util.load_icon("mdi.record", qta_color="lightgray")
+        self._icon_enabled = gremlin.util.load_icon("mdi.checkbox-blank-circle", qta_color=gremlin.ui.ui_common.Color.activeColor())
+        self._icon_disabled = gremlin.util.load_icon("mdi.checkbox-blank-circle", qta_color=gremlin.ui.ui_common.Color.inactiveColor())
 
         if isinstance(profile_data, gremlin.base_profile.AbstractContainer):
             self.container = profile_data
@@ -2268,9 +2290,9 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
 
         # conditions for the actions in the container
-        self.action_condition_frame_widget = QtWidgets.QFrame()
+        self.action_condition_frame_widget = gremlin.ui.ui_common.QBoxFrame()
         self.action_condition_frame_widget.setContentsMargins(0,0,0,0)
-        self.action_condition_frame_widget.setFrameShape(QtWidgets.QFrame.Shape.Box)
+        
         
         border_color = gremlin.ui.ui_common.Color.borderColor()
         background_color = gremlin.ui.ui_common.Color.actionBackgroundColor()

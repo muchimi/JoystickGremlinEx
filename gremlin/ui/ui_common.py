@@ -62,7 +62,10 @@ syslog = logging.getLogger("system")
 class Color():
     @staticmethod
     def activeColor():
-        return "#8ce2fa" if gremlin.shared_state.is_dark_theme else "#365a75"
+        return "#51f56f" if gremlin.shared_state.is_dark_theme else "#365a75"
+    @staticmethod
+    def inactiveColor():
+        return "#686a6e" if gremlin.shared_state.is_dark_theme else "#8c8c8c"
     @staticmethod
     def normalColor():
         return "#AAAAAA" if gremlin.shared_state.is_dark_theme else "#111111"
@@ -71,10 +74,10 @@ class Color():
         return "#777777" if gremlin.shared_state.is_dark_theme else "#CCCCCC"
     @staticmethod
     def backgroundColor():
-        return "#020202" if gremlin.shared_state.is_dark_theme else "#EEEEEE"
+        return "#212121" if gremlin.shared_state.is_dark_theme else "#EEEEEE"
     @staticmethod
     def borderColor():
-        return "#AAAAAA" if gremlin.shared_state.is_dark_theme else "#111111"
+        return "#444444" if gremlin.shared_state.is_dark_theme else "#111111"
     @staticmethod
     def titleBackgroundColor():
         return "#222222" if gremlin.shared_state.is_dark_theme else "#AAAAAA"
@@ -141,14 +144,23 @@ class Color():
     @staticmethod
     def sliderBackgroundColor():
         return "#060606" if gremlin.shared_state.is_dark_theme else "#c3c3c3"
-    
+    @staticmethod
+    def recordColor():
+        return "#c7450e"
+    @staticmethod
+    def activeContentColor():
+        return "#458ae6"
+
+        
+
     @staticmethod
     def warningColor(): # color for the warning flag
         return "#ab8d18" if gremlin.shared_state.is_dark_theme else "#fc1900"
 
     @staticmethod
     def cssApplication():
-        border_color = gremlin.ui.ui_common.Color.borderColor()
+        border_color = Color.borderColor()
+        background_color = Color.backgroundColor()
         if gremlin.config.Configuration().is_debug:
             relative_path = "gfx/"
         else:
@@ -156,7 +168,7 @@ class Color():
         prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
 
         checkbox_unchecked = f"{prefix}checkbox_blank_outline.png"
-        checkbox_checked = f"{prefix}checkbox_blank_intermediate.png"
+        checkbox_checked = f"{prefix}checkbox_intermediate.png"
 
         radio_unchecked = f"{prefix}radiobox_blank.png"
         radio_checked = f"{prefix}radiobox_marked.png"
@@ -185,7 +197,8 @@ class Color():
             QPlainTextEdit {{ 
                  border: 1px solid {border_color};
             }}
-
+  
+            background-color: {background_color};
             
             '''
         return css
@@ -1588,7 +1601,8 @@ class ActionSelector(QtWidgets.QWidget):
 
         # clipboard
         self.paste_button = QtWidgets.QPushButton()
-        icon = gremlin.util.load_icon("button_paste.svg")
+        prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
+        icon = gremlin.util.load_icon(f"{prefix}button_paste.svg")
         self.paste_button.setIcon(icon)
         self.paste_button.clicked.connect(self._paste_action)
         self.paste_button.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Minimum)
@@ -2002,8 +2016,37 @@ class ModeWidget(QtWidgets.QWidget):
         ''' changes the label text if needed '''
         self.edit_label.setText(text)
 
+class QBoxFrame(QtWidgets.QFrame):
+    ''' boxed frame widget '''
+    def __init__(self, data = None, parent = None, selected = False):
+        super().__init__(parent)
 
-class InputListenerWidget(QtWidgets.QFrame):
+        border_color = Color.borderColor()
+        background_color = Color.backgroundColor()
+        css = f'''
+            QFrame {{
+                border: 1px solid {border_color};
+                background: {background_color};
+            }}
+            QLabel {{
+                border: none;
+            }}
+            '''
+        
+        self.setFrameStyle(QtWidgets.QFrame.Plain | QtWidgets.QFrame.Box)
+        self.setStyleSheet(css)
+
+
+    @property
+    def data(self):
+        return self._data
+
+    @data.setter
+    def data(self, value):
+        self._data = value
+
+
+class InputListenerWidget(QBoxFrame):
 
     """Widget overlaying the main gui while waiting for the user
     to press a key or a joystick button """
@@ -2846,9 +2889,9 @@ class QPathLineItem(QtWidgets.QWidget):
 
         valid = os.path.isdir(fname) if self._dir_mode else os.path.isfile(fname)
         if valid:
-            self._setIcon("fa.check", color="green")
+            self._setIcon("fa.check", color= Color.activeColor())
         else:
-            self._setIcon("fa.exclamation-circle", color="red")
+            self._setIcon("fa.exclamation-circle", color = Color.warningColor())
         self._text = fname
         self.pathChanged.emit(self, self._text)
 
@@ -2887,9 +2930,9 @@ class ButtonStateWidget(QtWidgets.QWidget):
         self._input_type = None
         self._button_widget = QtWidgets.QLabel()
         self._button_widget.setContentsMargins(0,0,0,0)
-        on_icon = load_icon("mdi.record",use_qta=True,qta_color="red")
+        on_icon = load_icon("mdi.checkbox-blank-circle",use_qta=True,qta_color=Color.activeColor())
         self._on_pixmap = on_icon.pixmap(self._icon_size)
-        off_icon = load_icon("mdi.record",use_qta=True,qta_color="#979EA8")
+        off_icon = load_icon("mdi.checkbox-blank-circle",use_qta=True,qta_color=Color.inactiveColor())
         self._off_pixmap = off_icon.pixmap(self._icon_size)
         height = self._icon_size.height()+2
         self._button_widget.setMinimumHeight(height)
@@ -3604,12 +3647,26 @@ class HatWidget(QtWidgets.QWidget):
         :param event the paint event
         """
         # Define pens and brushes
-        pen_default = QtGui.QPen(QtGui.QColor("#8f8f91"))
+
+        active_color = Color.activeColor()
+        border_color = Color.borderColor()
+        inactive_color = Color.inactiveColor()
+        
+        normal_color = Color.normalColor()
+
+        # pen_default = QtGui.QPen(QtGui.QColor("#8f8f91"))
+        # pen_default.setWidth(2)
+        # pen_active = QtGui.QPen(QtGui.QColor("#1f8c33"))
+        # pen_active.setWidth(2)
+        # brush_default = QtGui.QBrush(QtGui.QColor("#f6f7fa"))
+        # brush_active = QtGui.QBrush(QtGui.QColor("#69e060"))
+
+        pen_default = QtGui.QPen(QtGui.QColor(normal_color))
         pen_default.setWidth(2)
-        pen_active = QtGui.QPen(QtGui.QColor("#1f8c33"))
+        pen_active = QtGui.QPen(QtGui.QColor(active_color))
         pen_active.setWidth(2)
-        brush_default = QtGui.QBrush(QtGui.QColor("#f6f7fa"))
-        brush_active = QtGui.QBrush(QtGui.QColor("#69e060"))
+        brush_default = QtGui.QBrush(QtGui.QColor(inactive_color))
+        brush_active = QtGui.QBrush(QtGui.QColor(active_color))
 
         # Prepare painter instance
         p = QtGui.QPainter(self)

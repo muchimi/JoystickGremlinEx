@@ -234,8 +234,7 @@ class VJoyAxisDefaultsWidget(QtWidgets.QWidget):
         for input_id in self.device.axis_index_list():
             axis_name = self.device.get_axis_name(input_id)
             self.main_layout.addWidget(QtWidgets.QLabel(axis_name), row, 0)
-            frame = QtWidgets.QFrame()
-            frame.setFrameStyle(QtWidgets.QFrame.Plain | QtWidgets.QFrame.Box)
+            frame = gremlin.ui.ui_common.QBoxFrame()
             frame.setStyleSheet(f"border: 2px solid {gremlin.ui.ui_common.Color.selectColor()};")
             frame.setLayout(QtWidgets.QHBoxLayout())
 
