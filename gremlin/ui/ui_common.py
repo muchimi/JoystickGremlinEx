@@ -3915,6 +3915,42 @@ class TimeLinePlotWidget(QtWidgets.QWidget):
 
         p.end()
 
+class VigemDeviceWidget(QtWidgets.QWidget):
+
+    """ joystick visualization widget  """
+
+    def __init__(self, device, vis_type, parent=None):
+        super().__init__(parent)
+        self.pad = device
+        self.vis_type = vis_type
+        self.widgets = []
+        layout = QtWidgets.QHBoxLayout()
+        layout.setContentsMargins(0,0,0,0)
+        self.setLayout(layout)
+        self.vis_type = vis_type
+        self._hooked = False
+        
+
+    def unhook(self):
+        ''' unhooks events '''
+        if not self._hooked:
+            return
+        vis_type = self.vis_type
+        el = gremlin.event_handler.EventListener()
+        if vis_type == gremlin.types.VisualizationType.AxisCurrent:
+            el.joystick_event.disconnect(self._current_axis_update)
+        elif vis_type == gremlin.types.VisualizationType.AxisTemporal:
+            el.joystick_event.disconnect(self._temporal_axis_update)
+        elif vis_type == gremlin.types.VisualizationType.ButtonHat:
+            el.joystick_event.disconnect(self._button_hat_update)
+        self._hooked = False
+
+    def _clear_ui(self):
+        self.unhook()   
+
+
+
+
 class JoystickDeviceWidget(QtWidgets.QWidget):
 
     """ joystick visualization widget  """

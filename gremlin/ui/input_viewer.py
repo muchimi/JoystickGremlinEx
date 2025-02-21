@@ -25,6 +25,7 @@ import dinput
 
 import gremlin
 import gremlin.config
+import gremlin.gamepad_handling
 import gremlin.joystick_handling
 import gremlin.keyboard
 import gremlin.shared_state
@@ -38,6 +39,7 @@ from lxml import etree
 import gremlin.singleton_decorator
 import logging
 import gremlin.ui.ui_common
+from vigem import vigem_gamepad as vg
 
 syslog = logging.getLogger("system")
 
@@ -165,6 +167,7 @@ class VisualizationSelector(QtWidgets.QWidget):
         d_list.sort(key=lambda x: (x[0], x[1].vjoy_id, x[1].name))
         devices = [dev for _, dev in d_list]
 
+
         config = VisualizationConfig()
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
@@ -222,6 +225,60 @@ class VisualizationSelector(QtWidgets.QWidget):
             checked = config.getValue(device_guid, VisualizationType.ButtonHat)
             bh_cb.setChecked(checked)
             if checked: change_callback(dev, VisualizationType.ButtonHat, True)
+
+
+        # pad: vg.VX360Gamepad
+        #gamepad_devices = gremlin.gamepad_handling.gamepadDevices()
+        # for pad in gamepad_devices:
+            
+        #     box = QtWidgets.QGroupBox(f"X360 GamePad {pad.get_index()}")
+            
+        #     at_cb = gremlin.ui.ui_common.QDataCheckbox("Axes - Temporal", data = (VisualizationType.AxisTemporal, pad))
+        #     at_cb.setIgnoreKeyboard(True)
+        #     callback = self._create_callback(dev, VisualizationType.AxisTemporal, at_cb)
+        #     at_cb.clicked.connect(callback)
+        #     self._selector_callbacks[at_cb] = callback
+
+        #     ac_cb = gremlin.ui.ui_common.QDataCheckbox("Axes - Current",  data = (VisualizationType.AxisCurrent, pad))
+        #     ac_cb.setIgnoreKeyboard(True)
+        #     callback = self._create_callback(dev, VisualizationType.AxisCurrent, ac_cb)
+        #     ac_cb.clicked.connect(callback)
+        #     self._selector_callbacks[ac_cb] = callback
+
+        #     bh_cb = gremlin.ui.ui_common.QDataCheckbox("Buttons + Hats",  data = (VisualizationType.ButtonHat, pad))
+        #     bh_cb.setIgnoreKeyboard(True)
+        #     callback = self._create_callback(dev, VisualizationType.ButtonHat, bh_cb)
+        #     bh_cb.clicked.connect(callback)
+        #     self._selector_callbacks[bh_cb] = callback
+
+        #     layout = QtWidgets.QVBoxLayout()
+        #     layout.addWidget(at_cb)
+        #     layout.addWidget(ac_cb)
+        #     layout.addWidget(bh_cb)
+
+        #     self._selector_widgets.append(at_cb)
+        #     self._selector_widgets.append(ac_cb)
+        #     self._selector_widgets.append(bh_cb)
+
+        #     box.setLayout(layout)
+
+        #     self.main_layout.addWidget(box)
+
+        #                 # update based on settings
+        #     device_guid = f"vigem_{pad.get_vid()}_{pad.get_index}"
+        #     checked = config.getValue(device_guid, VisualizationType.AxisTemporal)
+        #     at_cb.setChecked(checked)
+        #     if checked: change_callback(dev, VisualizationType.AxisTemporal,True)
+
+        #     checked = config.getValue(device_guid, VisualizationType.AxisCurrent)
+        #     ac_cb.setChecked(checked)
+        #     if checked: change_callback(dev, VisualizationType.AxisCurrent, True)
+
+        #     checked = config.getValue(device_guid, VisualizationType.ButtonHat)
+        #     bh_cb.setChecked(checked)
+        #     if checked: change_callback(dev, VisualizationType.ButtonHat, True)
+
+
 
 
     @QtCore.Slot()
@@ -296,6 +353,8 @@ class InputViewerUi(ui_common.BaseDialogUi):
         self.setWindowFlag(QtCore.Qt.WindowMinimizeButtonHint, True)
 
         self.devices = gremlin.joystick_handling.joystick_devices()
+        self.gamepad_devices = gremlin.gamepad_handling.gamepadDevices()
+
         self.main_layout = QtWidgets.QVBoxLayout(self)
 
         self.keyboard_visualizer_widget = None
@@ -418,7 +477,7 @@ class InputViewerUi(ui_common.BaseDialogUi):
 
 
     @QtCore.Slot(dinput.DeviceSummary,VisualizationType,bool)
-    def _add_remove_visualization_widget(self, device : dinput.DeviceSummary, visualization : VisualizationType, is_active : bool):
+    def _add_remove_visualization_widget(self, device, visualization : VisualizationType, is_active : bool):
         """Adds or removes a visualization widget.
 
         :param device the device which is being updated
@@ -427,9 +486,9 @@ class InputViewerUi(ui_common.BaseDialogUi):
             removed
         """
         key = (device, visualization)
-        
         if is_active:
             widget = ui_common.JoystickDeviceWidget(device, visualization)
+
             self.views.add_widget(widget)
             self._widget_storage[key] = widget
             widget.hook()

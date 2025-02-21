@@ -21,6 +21,7 @@ import threading
 
 
 import dinput
+import time
 
 import gremlin.base_classes
 import gremlin.event_handler
@@ -297,6 +298,11 @@ def device_info_from_guid(device_guid : str | dinput.GUID) -> DeviceSummary:
     assert (_joystick_initialized)
     if device_guid in _joystick_device_guid_map:
         return _joystick_device_guid_map[device_guid]
+    # attempt to find it
+    _scan_dinput()
+    if device_guid in _joystick_device_guid_map:
+        return _joystick_device_guid_map[device_guid]
+    
     syslog.warning(f"getDeviceInfo: {device_guid} - info not found")
     verbose = gremlin.config.Configuration().verbose
     if verbose:
@@ -355,6 +361,31 @@ def reset_devices():
     el = gremlin.event_handler.EventListener()
 
     el.device_change_event.emit()
+
+def _scan_dinput():
+    ''' rescans dinput devices '''
+
+    dinput.DILL.init()
+    device_count = dinput.DILL.get_device_count()
+    if device_count == 0:
+        # no hardware input detected
+        syslog.info("INIT: no DirectInput devices detected - waiting for data")
+        max_retries = 3
+        attempt = 1
+        while device_count == 0 and attempt <= max_retries:
+            time.sleep(0.25)
+            device_count = dinput.DILL.get_device_count()
+            syslog.info(f"INIT: attempt number {attempt}")
+            attempt += 1
+
+    for device_index in range(device_count):
+        dev = dinput.DILL.get_device_information_by_index(device_index)
+        if not dev.device_guid in _joystick_device_guid_map:
+            syslog.info(f"\tindex: [{device_index}] {str(dev)}")
+            _joystick_devices.append(dev)
+            _joystick_device_guid_map[dev.device_guid] = dev # key by GUID
+            _joystick_device_guid_map[dev.device_id] = dev # key by string ID
+
 
 
 def joystick_devices_initialization():
