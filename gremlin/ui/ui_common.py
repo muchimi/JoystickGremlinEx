@@ -147,35 +147,78 @@ class Color():
         return "#ab8d18" if gremlin.shared_state.is_dark_theme else "#fc1900"
 
     @staticmethod
-    def cssCheckbox():
+    def cssApplication():
         border_color = gremlin.ui.ui_common.Color.borderColor()
         if gremlin.config.Configuration().is_debug:
             relative_path = "gfx/"
         else:
             relative_path = "_internal/gfx/"
-        checked = "dark_checkbox.png" if gremlin.shared_state.is_dark_theme else "checkbox.png"
-        unchecked = "dark_unchecked.png" if gremlin.shared_state.is_dark_theme else "unchecked.png"
+        prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
+
+        checkbox_unchecked = f"{prefix}checkbox_blank_outline.png"
+        checkbox_checked = f"{prefix}checkbox_blank_intermediate.png"
+
+        radio_unchecked = f"{prefix}radiobox_blank.png"
+        radio_checked = f"{prefix}radiobox_marked.png"
+        
         css = f'''
             QCheckBox::indicator {{
                 width: 18px;
                 height: 18px;
             }}
             QCheckBox::indicator:checked {{
-                image: url({relative_path}{checked});
+                image: url({relative_path}{checkbox_checked});
             }}
             QCheckBox::indicator:unchecked {{
-                image: url({relative_path}{unchecked}); 
+                image: url({relative_path}{checkbox_unchecked}); 
+            }}
+            QRadioButton::indicator {{
+                width: 18px;
+                height: 18px;
+            }}
+            QRadioButton::indicator:checked {{
+                image: url({relative_path}{radio_checked});
+            }}
+            QRadioButton::indicator:unchecked {{
+                image: url({relative_path}{radio_unchecked}); 
             }}
             QPlainTextEdit {{ 
                  border: 1px solid {border_color};
             }}
+
             
             '''
         return css
     
+
+    
     @staticmethod
     def cssButtonState():
         ''' gets a pushbutton state for the input viewer '''
+
+        # buttons = ("mdi.radiobox-blank","mdi.radiobox-marked","mdi.checkbox-blank-outline","mdi.checkbox-intermediate")
+        # colors = (
+        #     ("#AAAAAA","dark_"),
+        #     ("#111111","")
+        #     )
+
+
+        # root_folder = gremlin.shared_state.root_path
+        # icon_size = QtCore.QSize(64,64)
+        # for name in buttons:
+        #     for color, prefix in colors:
+        #         icon = load_icon(name, qta_color=color)
+        #         fname = prefix + name.replace("mdi.","").replace("-","_")
+        #         the_path = os.path.join(root_folder, "gfx", f"{fname}.png")
+        #         if os.path.isfile(the_path):
+        #             os.unlink(the_path)
+        #         the_path = the_path.replace("\\","/")
+                
+        #         # f = QtCore.QFile(the_path)
+        #         # f.open(QtCore.QIODeviceBase.OpenModeFlag.WriteOnly)
+        #         pixmap = icon.pixmap(icon_size)
+        #         pixmap.save(the_path,"PNG")
+        #         print (the_path)
 
         normal_color = Color.normalColor()
         normal_gradient_color = Color.normalGradientColor()

@@ -4003,33 +4003,6 @@ class GremlinUi(QtWidgets.QMainWindow):
             self.setWindowTitle(title)
 
 
-    # def update_theme(self):
-    #     import gremlin.shared_state
-    #     import gremlin.config
-    #     import gremlin.ui.theme
-    #     theme = gremlin.config.Configuration().theme
-    #     app = QtWidgets.QApplication.instance()
-    #     match theme:
-    #         case "auto":
-    #             is_dark = gremlin.shared_state.is_dark_theme
-    #             windows_dark = gremlin.ui.theme.theme() == "Dark"
-    #             if is_dark != windows_dark:
-    #                 gremlin.shared_state.is_dark_theme = windows_dark
-                
-    #             app.setStyle("Fusion")
-
-    #         case "light":
-    #             gremlin.shared_state.is_dark_theme = False
-    #             app.setStyle("")
-
-
-    #         case "dark":
-    #             gremlin.shared_state.is_dark_theme = True
-    #             app.setStyle("Fusion")
-
-    #     # force a full repaint
-    #     self.update()
-
 
 def configure_logger(config):
     """Creates a new logger instance.
@@ -4171,9 +4144,9 @@ if __name__ == "__main__":
             gremlin.shared_state.is_dark_theme = True
             app = QtWidgets.QApplication(sys.argv)
 
-        
+    # application style and css
     app.setStyle("Fusion")
-    app.setStyleSheet(gremlin.ui.ui_common.Color.cssCheckbox())
+    app.setStyleSheet(gremlin.ui.ui_common.Color.cssApplication())
 
 
     
