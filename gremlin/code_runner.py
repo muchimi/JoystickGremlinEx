@@ -135,6 +135,9 @@ class CodeRunner:
 
         self.disableUi()
 
+        # update hardware list for any missing devices 
+        gremlin.joystick_handling._scan_dinput()
+
         # indicate we're in run mode
         gremlin.shared_state.is_running = True
 
