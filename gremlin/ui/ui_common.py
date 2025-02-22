@@ -104,7 +104,7 @@ class Color():
         return "#8FBC8F"
     @staticmethod
     def keyBackgroundColor():
-        return "#101010" if gremlin.shared_state.is_dark_theme else "#EEEEEE"
+        return "#424242" if gremlin.shared_state.is_dark_theme else "#EEEEEE"
     @staticmethod
     def keyEntryBackgroundColor():
         return "#293d2d" if gremlin.shared_state.is_dark_theme else "#EEEEEE"
@@ -202,8 +202,6 @@ class Color():
             
             '''
         return css
-    
-
     
     @staticmethod
     def cssButtonState():

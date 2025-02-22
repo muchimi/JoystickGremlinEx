@@ -209,6 +209,8 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         gremlin.util.clear_layout(self.key_combination_layout)
         max_width = 32
+        background_color = gremlin.ui.ui_common.Color.keyBackgroundColor()
+        border_color = gremlin.ui.ui_common.Color.keyBorderColor()
         
         for index, name in enumerate(self.action_data._get_display_keys(as_list=True)):
             if index:
@@ -222,7 +224,8 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
                 delta = (max_width - w) // 2
                 css_pad = f" padding-left: {delta}px; padding-right:{delta}px;"  
             
-            lbl.setStyleSheet(f"background-color:white; border: 2px solid black; border-radius: 4px 8px;{css_pad}")
+            
+            lbl.setStyleSheet(f"background: {background_color}; border: 2px solid {border_color}; border-radius: 4px 8px;{css_pad}")
             lbl.setMinimumHeight(24)
             lbl.setMinimumWidth(32)
             self.key_combination_layout.addWidget(lbl)

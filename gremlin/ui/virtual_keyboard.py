@@ -43,8 +43,10 @@ class QKeyWidget(QtWidgets.QPushButton):
         selected_color = gremlin.ui.ui_common.Color.selectColor()
         border = gremlin.ui.ui_common.Color.keyBorderColor()
         hover_border = gremlin.ui.ui_common.Color.keyHoverBorderColor()
-        self._default_style = f"QPushButton {{font-size:10px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {background_color}; border-style: outset; padding: 2px; min-width: 32px; max-height: 30px;}} QPushButton:hover {{border: 2px {hover_border};}}"
-        self._selected_style = f"QPushButton {{font-size:10px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {selected_color}; border-style: outset; padding: 2px; min-width: 32px; max-height: 30px;}} QPushButton:hover {{border: 2px {hover_border};}}"
+        self._default_style = f"QPushButton {{font-size:10px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {background_color}; padding: 2px; min-width: 32px; max-height: 30px;}} QPushButton:hover {{border: 2px {hover_border};}}"
+        self._selected_style = f"QPushButton {{font-size:10px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {selected_color}; padding: 2px; min-width: 32px; max-height: 30px;}} QPushButton:hover {{border: 2px {hover_border};}}"
+
+        # border-style: outset;
 
         self.setStyleSheet(self._default_style)
         
