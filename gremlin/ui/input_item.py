@@ -20,33 +20,29 @@ from PySide6 import QtWidgets, QtCore, QtGui
 import lxml.etree
 
 import gremlin
+import gremlin.types
 import gremlin.base_conditions
 import gremlin.base_profile
-import gremlin.base_profile
 import gremlin.config
-
-import gremlin.event_handler
+import gremlin.actions
 import gremlin.event_handler
 import gremlin.keyboard
-import gremlin.shared_state
-import gremlin.shared_state
 import gremlin.shared_state
 import gremlin.ui.axis_calibration
 import gremlin.ui.midi_device
 import gremlin.ui.ui_common
-from gremlin.util import load_icon, load_pixmap
+from gremlin.util import load_icon, load_pixmap, get_guid
+import gremlin.util
 from gremlin.input_types import InputType
 from gremlin.base_buttons import *
 from gremlin.types import DeviceType
-import gremlin.util
-import gremlin.config
 import gremlin.plugin_manager
 
 import gremlin.ui.ui_common as ui_common
 from gremlin.ui.ui_common import QBoxFrame
 from functools import partial
 from  gremlin.clipboard import Clipboard, ObjectEncoder, EncoderType
-from gremlin.util import get_guid
+
 import logging
 import qtawesome as qta
 import gremlin.ui.input_item
@@ -2868,9 +2864,9 @@ class ConditionActionWrapper(AbstractActionWrapper):
         # if action_data.parent.has_action_conditions:
         if action_data.activation_condition is None:
             action_data.activation_condition = \
-                gremlin.base_classes.ActivationCondition(
+                gremlin.base_conditions.ActivationCondition(
                     [],
-                    gremlin.base_classes.ActivationRule.All
+                    gremlin.types.ActivationRule.All
                 )
 
         self.condition_model = ui_activation_condition.ConditionModel(

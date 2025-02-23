@@ -764,9 +764,9 @@ class SimConnectManager(QtCore.QObject):
         if command in self._block_map:
             self.activate()
             block = self._block_map[command]
-            syslog.info(f"Simconnect: send Event {command}")
-            return block.execute(1)
-        syslog.error(f"Simconnect: event not found: {command}")
+            syslog.info(f"SIMCONNECT: send Event {command}")
+            return block.execute()
+        syslog.error(f"SIMCONNECT: event not found: {command}")
 
 
 
@@ -2079,7 +2079,7 @@ class SimConnectBlock():
             return False
         
         mgr = SimConnectManager()
-        verbose = False # self.verbose
+        verbose = gremlin.config.Configuration().verbose_mode_details
 
         if verbose: syslog.info(f"SIMCONNECT: block execute: ({self._command})  value: ({value})")
 
@@ -2105,7 +2105,6 @@ class SimConnectBlock():
                 ae = AircraftEvents(self.sm)
                 request = mgr.findRequest(self._command)
                 if not request:
-                    # check if the request is actually a trigger
                     
                     trigger = ae.find(self._command)
                     if trigger:

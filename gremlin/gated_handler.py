@@ -1,5 +1,3 @@
-
-
 # -*- coding: utf-8; -*-
 
 # Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2025 
@@ -24,16 +22,11 @@ from PySide6 import QtWidgets, QtCore, QtGui #QtWebEngineWidgets
 
 import gremlin.base_profile
 import gremlin.config
-import gremlin.config
-import gremlin.event_handler
 import gremlin.event_handler
 import gremlin.execution_graph
 from gremlin.input_types import InputType
 import gremlin.joystick_handling
 import gremlin.shared_state
-import gremlin.macro
-import gremlin.shared_state
-from gremlin.ui import ui_common
 import gremlin.ui.joystick_device
 import gremlin.ui.input_item
 import gremlin.ui.ui_common
@@ -49,6 +42,7 @@ import gremlin.singleton_decorator
 from gremlin.util import InvokeUiMethod
 import gremlin.util
 from itertools import pairwise
+import gremlin.actions
 
 syslog = logging.getLogger("system")
 MAX_UNDO = 20 # number of steps on the UNDO stack
@@ -86,7 +80,7 @@ _display_mode_to_enum = {
 
     
 
-class GateCondition(Enum):
+class GateConditionType(Enum):
     ''' gate action trigger conditions'''
     # RANGE specific conditions (between gates)
     InRange = auto() # triggers when the value is in range
@@ -216,44 +210,44 @@ _single_step = 0.001
 
 
 _gate_condition_to_name = {
-    GateCondition.InRange: "in_range",
-    GateCondition.OutsideRange: "outside_range",
-    GateCondition.OnCross: "cross",
-    GateCondition.OnCrossIncrease: "cross_inc",
-    GateCondition.OnCrossDecrease: "cross_dec",
-    GateCondition.EnterRange: "enter_range",
-    GateCondition.ExitRange: "exit_range"
+    GateConditionType.InRange: "in_range",
+    GateConditionType.OutsideRange: "outside_range",
+    GateConditionType.OnCross: "cross",
+    GateConditionType.OnCrossIncrease: "cross_inc",
+    GateConditionType.OnCrossDecrease: "cross_dec",
+    GateConditionType.EnterRange: "enter_range",
+    GateConditionType.ExitRange: "exit_range"
 }
 
 
 _gate_condition_to_display_name = {
-    GateCondition.InRange: "In Range",
-    GateCondition.OutsideRange: "Outside of Range",
-    GateCondition.OnCross: "Crossed",
-    GateCondition.OnCrossIncrease: "Cross (inc)",
-    GateCondition.OnCrossDecrease: "Cross (dec)",
-    GateCondition.EnterRange: "Enter Range",
-    GateCondition.ExitRange: "Exit Range"
+    GateConditionType.InRange: "In Range",
+    GateConditionType.OutsideRange: "Outside of Range",
+    GateConditionType.OnCross: "Crossed",
+    GateConditionType.OnCrossIncrease: "Cross (inc)",
+    GateConditionType.OnCrossDecrease: "Cross (dec)",
+    GateConditionType.EnterRange: "Enter Range",
+    GateConditionType.ExitRange: "Exit Range"
 }
 
 _gate_condition_to_enum = {
-    "in_range": GateCondition.InRange,
-    "outside_range": GateCondition.OutsideRange,
-    "cross": GateCondition.OnCross,
-    "cross_inc": GateCondition.OnCrossIncrease,
-    "cross_dec": GateCondition.OnCrossDecrease,
-    "enter_range" : GateCondition.EnterRange,
-    "exit_range" : GateCondition.ExitRange
+    "in_range": GateConditionType.InRange,
+    "outside_range": GateConditionType.OutsideRange,
+    "cross": GateConditionType.OnCross,
+    "cross_inc": GateConditionType.OnCrossIncrease,
+    "cross_dec": GateConditionType.OnCrossDecrease,
+    "enter_range" : GateConditionType.EnterRange,
+    "exit_range" : GateConditionType.ExitRange
 }
 
 _gate_condition_description = {
-    GateCondition.InRange: "Triggers whenever the input value is in range",
-    GateCondition.OutsideRange: "Triggers whenever the input value is outside the range",
-    GateCondition.OnCross: "Triggers when the input crosses a gate",
-    GateCondition.OnCrossDecrease: "Triggers when the input crosses a gate (crossing from the right/above)",
-    GateCondition.OnCrossIncrease: "Triggers when the input crosses a gate (crossing from the left/below)",
-    GateCondition.EnterRange: "Triggers when the input value enters the range",
-    GateCondition.ExitRange: "Triggers when the input value exits the range"
+    GateConditionType.InRange: "Triggers whenever the input value is in range",
+    GateConditionType.OutsideRange: "Triggers whenever the input value is outside the range",
+    GateConditionType.OnCross: "Triggers when the input crosses a gate",
+    GateConditionType.OnCrossDecrease: "Triggers when the input crosses a gate (crossing from the right/above)",
+    GateConditionType.OnCrossIncrease: "Triggers when the input crosses a gate (crossing from the left/below)",
+    GateConditionType.EnterRange: "Triggers when the input value enters the range",
+    GateConditionType.ExitRange: "Triggers when the input value exits the range"
 }
 
 _gate_range_to_string = {
@@ -315,7 +309,7 @@ class GateInfo():
         value = gremlin.util.clamp(value, -1, 1)
         self._value = value
         self.profile_mode = profile_mode
-        self._last_condition = GateCondition.OnCross
+        self._last_condition = GateConditionType.OnCross
         self.item_data_map = {}
 
         self._used = is_used
@@ -337,7 +331,7 @@ class GateInfo():
         node.set("delay", safe_format(self.delay, int))
         for condition, item in self.item_data_map.items():
             condition_node = ElementTree.Element("gate-condition")
-            condition_node.set("condition", GateCondition.to_string(condition))
+            condition_node.set("condition", GateConditionType.to_string(condition))
             item_node = item.to_xml()
             condition_node.append(item_node)
             node.append(condition_node)
@@ -352,7 +346,7 @@ class GateInfo():
         self.used = safe_read(node,"used",bool,False)
         self.delay = safe_read(node,"delay",int,250)
         for condition_node in node:
-            condition = GateCondition.to_enum(condition_node.get("condition"))
+            condition = GateConditionType.to_enum(condition_node.get("condition"))
             item_node = condition[0]
             item = self.parent._new_item_data()
             item.from_xml(item_node)
@@ -382,7 +376,7 @@ class GateInfo():
         ''' last condition selected '''
         return self._last_condition
     
-    def setLastCondition(self, condition : GateCondition):
+    def setLastCondition(self, condition : GateConditionType):
         ''' sets the last used condition '''
         self._last_condition = condition
 
@@ -448,7 +442,7 @@ class GateInfo():
 
         
 
-    def itemData(self, condition : GateCondition):
+    def itemData(self, condition : GateConditionType):
         ''' gets the inputitem for the given condition '''
         if not condition in self.item_data_map.keys():
             data = self.parent._new_item_data()
@@ -472,7 +466,7 @@ class GateInfo():
 
         
 
-    def hasContainers(self, condition : GateCondition) -> bool:
+    def hasContainers(self, condition : GateConditionType) -> bool:
         ''' true if the range has any mappings in any mode '''
         if condition in self.item_data_map:
             item_data = self.item_data_map[condition]
@@ -557,7 +551,7 @@ class RangeInfo():
         self._output_mode = None
         self._output_range_min = None
         self._output_range_max = None
-        self._last_condition = GateCondition.InRange
+        self._last_condition = GateConditionType.InRange
         self.item_data_map = {}
         self.delay = 250 # default delay
 
@@ -602,6 +596,8 @@ class RangeInfo():
 
     def valueInRange(self, value: float) -> bool:
         ''' true if the value is within the current range '''
+        if value is None:
+            return False
         return value >= self.v1 and value <= self.v2
 
     @property
@@ -609,7 +605,7 @@ class RangeInfo():
         ''' last condition selected '''
         return self._last_condition
     
-    def setLastCondition(self, condition : GateCondition):
+    def setLastCondition(self, condition : GateConditionType):
         ''' sets the last used condition '''
         self._last_condition = condition
 
@@ -633,7 +629,7 @@ class RangeInfo():
         self._used = value
         
 
-    def hasContainers(self, condition : GateCondition) -> bool:
+    def hasContainers(self, condition : GateConditionType) -> bool:
         ''' true if the range has any mappings in any mode '''
         if condition in self.item_data_map:
             item_data = self.item_data_map[condition]
@@ -680,12 +676,12 @@ class RangeInfo():
             return None
         return gate
 
-    def itemData(self, condition : GateCondition):
+    def itemData(self, condition : GateConditionType):
         ''' gets the inputitem for the given condition '''
         if not condition in self.item_data_map.keys():
             item_data = self.parent._new_item_data()
             # use ranged containers/actions for range conditions, buttons for the others
-            input_type = InputType.JoystickAxis if condition in (GateCondition.InRange, GateCondition.OutsideRange) else InputType.JoystickButton
+            input_type = InputType.JoystickAxis if condition in (GateConditionType.InRange, GateConditionType.OutsideRange) else InputType.JoystickButton
             item_data.input_type = input_type
             # action_data = self.parent._action_data
             self.item_data_map[condition] = item_data
@@ -769,12 +765,12 @@ class RangeInfo():
         self._is_default = value
 
     @property
-    def condition(self) -> GateCondition:
+    def condition(self) -> GateConditionType:
         return self._last_condition
     
-    def setLastCondition(self, value : GateCondition):
+    def setLastCondition(self, value : GateConditionType):
         ''' sets the last condition '''
-        assert value in [c for c in GateCondition]
+        assert value in [c for c in GateConditionType]
         self._last_condition = value
         
 
@@ -1068,14 +1064,14 @@ class GateData():
                  action_data, # required - action data block (usually the object that contains a functor)
                  min = -1.0,
                  max = 1.0,
-                 condition = GateCondition.OnCross,
+                 condition = GateConditionType.OnCross,
                  mode = GateRangeOutputMode.Normal,
                  range_min = -1.0,
                  range_max = 1.0,
                  process_callback = None,  # callback for process changes
                  ):
         ''' GateData constructor '''
-
+        import gremlin.macro
         #assert profile_mode is not None, "profile mode must be provided"
         self._process_trigger_lock = threading.Lock()
         self._action_data = action_data
@@ -1273,7 +1269,7 @@ class GateData():
                     for container in item_data.containers:
                         callbacks.extend(container.generate_callbacks())
                     if verbose:
-                        syslog.info(f"Gate trigger: {gate.gate_display()} condition [{GateCondition.to_display_name(condition)}] callbacks: {len(callbacks)}")
+                        syslog.info(f"Gate trigger: {gate.gate_display()} condition [{GateConditionType.to_display_name(condition)}] callbacks: {len(callbacks)}")
                     
                     
                     callbacks_map[gate][condition] = callbacks
@@ -1282,7 +1278,7 @@ class GateData():
         # range entry/exit/transit
         for range_info in self._active_ranges:
             for condition, item_data in range_info.item_data_map.items():
-                if verbose:syslog.info(f"GATE: condition [{GateCondition.to_display_name(condition)}]")
+                if verbose:syslog.info(f"GATE: condition [{GateConditionType.to_display_name(condition)}]")
                 if item_data.containers:
                     callbacks = []
                     for container in item_data.containers:
@@ -1416,17 +1412,23 @@ class GateData():
                         # mimic a joystick button press for a gate crossing
                         if verbose: syslog.info(f"Exec Trigger: gate crossing : {trigger.gate.slider_index} : value {input_value:0.3f} ")
                         event.fake_button()
-                        short_press = True
+                        event.is_pressed = True
+                        value.is_pressed = True
+                        
                     case TriggerMode.GateIncrease:
                         # mimic a joystick button press for a gate crossing (increase)
                         if verbose: syslog.info(f"Exec Trigger: gate crossing (inc): {trigger.gate.slider_index} : value {input_value:0.3f} ")
                         event.fake_button()
-                        short_press = True
+                        event.is_pressed = True
+                        value.is_pressed = True
+                        
                     case TriggerMode.GateDecrease:
                         # mimic a joystick button press for a gate crossing (increase)
                         if verbose: syslog.info(f"Exec Trigger: gate crossing (dec): {trigger.gate.slider_index} : value {input_value:0.3f} ")
                         event.fake_button()
-                        short_press = True
+                        event.is_pressed = True
+                        value.is_pressed = True
+                        
                     case TriggerMode.RangeEnter:
                         # enter range
                         if verbose: syslog.info(f"Exec Trigger: range enter: {trigger.range.range_display()} value {input_value:0.3f}")
@@ -1529,15 +1531,15 @@ class GateData():
 
 
 
-    def populate_condition_widget(self, widget : ui_common.QComboBox, default = None, is_range = False):
+    def populate_condition_widget(self, widget : gremlin.ui.ui_common.QComboBox, default = None, is_range = False):
         ''' populates a condition widget ''' 
         widget.clear()
         if is_range:
             # range conditions
-            conditions = ( GateCondition.EnterRange, GateCondition.ExitRange, GateCondition.InRange, GateCondition.OutsideRange)
+            conditions = ( GateConditionType.EnterRange, GateConditionType.ExitRange, GateConditionType.InRange, GateConditionType.OutsideRange)
         else:
             # gate conditions
-            conditions = (GateCondition.OnCross, GateCondition.OnCrossIncrease, GateCondition.OnCrossDecrease)
+            conditions = (GateConditionType.OnCross, GateConditionType.OnCrossIncrease, GateConditionType.OnCrossDecrease)
         current_index = None
         for index, condition in enumerate(conditions):
             widget.addItem(_gate_condition_to_name[condition], condition)
@@ -1547,7 +1549,7 @@ class GateData():
         if current_index is not None:
             widget.setCurrentIndex(current_index)
 
-    def populate_output_widget(self, widget : ui_common.QComboBox, default = None):
+    def populate_output_widget(self, widget : gremlin.ui.ui_common.QComboBox, default = None):
         ''' populates a range widget '''
         current_index = None
         for index, output in enumerate(GateRangeOutputMode):
@@ -1577,7 +1579,7 @@ class GateData():
     def getGateCondition(self, index):
         ''' gets the condition for the given gate index '''
         if not index in self._gate_condition_map:
-            self._gate_condition_map[index] = GateCondition.OnCross
+            self._gate_condition_map[index] = GateConditionType.OnCross
         return self._gate_condition_map[index]
 
 
@@ -2326,7 +2328,7 @@ class GateData():
         
 
 
-    def process_triggers(self, current_value : float , ranges : list[RangeInfo]):
+    def process_triggers(self, current_value : float , ranges : list[RangeInfo], update_last = True):
         ''' processes an axis input value and returns all triggers collected since the last call based on the previous value
 
         **This is a high frequency call whenever an input is changed**
@@ -2360,19 +2362,19 @@ class GateData():
                     else:
                         # not in range, two triggers - out of range, 
                         modes = (TriggerMode.RangeExit, TriggerMode.ValueOutOfRange)
-                        condition = GateCondition.ExitRange
+                        condition = GateConditionType.ExitRange
                     for mode in modes:
                         td = TriggerData()
                         td.mode = mode
                         match mode:
                             case TriggerMode.RangeEnter:
-                                condition = GateCondition.EnterRange
+                                condition = GateConditionType.EnterRange
                             case TriggerMode.RangeExit:
-                                condition = GateCondition.ExitRange
+                                condition = GateConditionType.ExitRange
                             case TriggerMode.ValueInRange:
-                                condition = GateCondition.InRange
+                                condition = GateConditionType.InRange
                             case TriggerMode.ValueOutOfRange:
-                                condition = GateCondition.OutsideRange
+                                condition = GateConditionType.OutsideRange
 
                         td.condition = condition
                         td.value = current_value
@@ -2431,7 +2433,7 @@ class GateData():
                 # print (f"Process triggers for range: {range_info.id} mode: {range_info.range_display_ex()}")
                 
                 
-                if not is_running or range_info.hasContainers(GateCondition.InRange):
+                if not is_running or range_info.hasContainers(GateConditionType.InRange):
                     # trigger on value in-range
                     if range_info.mode != GateRangeOutputMode.FilterOut:
                         value = self._get_filtered_range_value(range_info, current_value)
@@ -2442,7 +2444,7 @@ class GateData():
                             if range_info.mode == GateRangeOutputMode.Fixed:
                                 mode = TriggerMode.FixedValue
                             td.mode = mode
-                            td.condition = GateCondition.InRange
+                            td.condition = GateConditionType.InRange
                             
                             td.value = value
                             td.raw_value = current_value
@@ -2458,7 +2460,7 @@ class GateData():
                 
 
             # process outside range condition ranges - those trigger if the value is outside the range
-            outside_trigger_ranges = [rng for rng in self._active_ranges if rng != range_info and rng.hasContainers(GateCondition.OutsideRange)]
+            outside_trigger_ranges = [rng for rng in self._active_ranges if rng != range_info and rng.hasContainers(GateConditionType.OutsideRange)]
             for outside_range in outside_trigger_ranges:
                 if not tt.getTrigger(outside_range, TriggerMode.ValueOutOfRange):
                     td = TriggerData()
@@ -2467,7 +2469,7 @@ class GateData():
                     td.last_value = last_value
                     td.range = outside_range
                     td.last_range = self._last_range
-                    td.condition = GateCondition.OutsideRange
+                    td.condition = GateConditionType.OutsideRange
                     td.is_range = True
                     td.delay = outside_range.delay
                     tt.triggers.append(td)
@@ -2499,7 +2501,7 @@ class GateData():
                         if not tt.getTrigger(r,TriggerMode.RangeExit):
                             td = TriggerData()
                             td.mode = TriggerMode.RangeExit
-                            td.condition = GateCondition.ExitRange
+                            td.condition = GateConditionType.ExitRange
                             td.value = current_value
                             td.range = r
                             td.delay = r.delay
@@ -2516,7 +2518,7 @@ class GateData():
                         # range enter and previously exited
                         td = TriggerData()
                         td.mode = TriggerMode.RangeEnter
-                        td.condition = GateCondition.EnterRange
+                        td.condition = GateConditionType.EnterRange
                         td.value = current_value
                         td.range = r
                         td.delay = r.delay
@@ -2527,20 +2529,20 @@ class GateData():
 
                 v = gate.value
 
-                if not is_running or gate.hasContainers(GateCondition.OnCross):
+                if not is_running or gate.hasContainers(GateConditionType.OnCross):
                     # add a gate crossing trigger - # always fires
                     td = TriggerData()
                     if verbose: syslog.info("Gate cross trigger")
                     td.gate = gate
                     td.delay = gate.delay
                     td.value = current_value
-                    td.condition = GateCondition.OnCross
+                    td.condition = GateConditionType.OnCross
                     td.mode = TriggerMode.GateCrossed
                     tt.triggers.append(td)
                         
 
                 
-                if not is_running or gate.hasContainers(GateCondition.OnCrossDecrease):
+                if not is_running or gate.hasContainers(GateConditionType.OnCrossDecrease):
                     # add gate cross decrease trigger
                     if last_value > v:
                         if not tt.getTrigger(gate,TriggerMode.GateDecrease):
@@ -2549,14 +2551,14 @@ class GateData():
                             td.gate = gate
                             td.delay = gate.delay
                             td.value = current_value
-                            td.condition = GateCondition.OnCrossDecrease
+                            td.condition = GateConditionType.OnCrossDecrease
                             td.mode = TriggerMode.GateDecrease
                             tt.triggers.append(td)
                             tt.registerTrigger(gate, td)
                             tt.clearTrigger(gate, TriggerMode.GateIncrease)
 
                     
-                if not is_running or gate.hasContainers(GateCondition.OnCrossIncrease):
+                if not is_running or gate.hasContainers(GateConditionType.OnCrossIncrease):
                     # add gate cross increase trigger
                     if last_value < v:
                         if not tt.getTrigger(gate,TriggerMode.GateIncrease):
@@ -2564,16 +2566,17 @@ class GateData():
                             td = TriggerData()
                             td.gate = gate
                             td.value = current_value
-                            td.condition = GateCondition.OnCrossIncrease
+                            td.condition = GateConditionType.OnCrossIncrease
                             td.mode = TriggerMode.GateIncrease
                             tt.triggers.append(td)
                             tt.registerTrigger(gate, td)
                             tt.clearTrigger(gate, TriggerMode.GateDecrease)
 
 
-            # update last values
-            self._last_range = range_info
-            self._last_value = current_value
+            # update last values if requested
+            if update_last:
+                self._last_range = range_info
+                self._last_value = current_value
 
             if not gremlin.shared_state.is_running:
                 # update trigger lines
@@ -2667,7 +2670,7 @@ class GateData():
                     item_node = item_data.to_xml()
                     if item_node is not None:
                         item_node.set("type", item_node.tag)
-                        item_node.set("condition", GateCondition.to_string(condition))
+                        item_node.set("condition", GateConditionType.to_string(condition))
                         item_node.tag = "action_containers"
                         child.append(item_node)
 
@@ -2707,7 +2710,7 @@ class GateData():
                     item_node = item_data.to_xml()
                     if item_node is not None:
                         item_node.set("type", item_node.tag)
-                        item_node.set("condition", GateCondition.to_string(condition))
+                        item_node.set("condition", GateConditionType.to_string(condition))
                         item_node.tag = "range_containers"
                         child.append(item_node)
             
@@ -2781,7 +2784,7 @@ class GateData():
             if not gate_condition in _gate_condition_to_enum.keys():
                 syslog.error(f"GateData: Invalid condition type {gate_condition} gate id: {gate_id}")
                 return
-            gate_condition = GateCondition.to_enum(gate_condition)
+            gate_condition = GateConditionType.to_enum(gate_condition)
             
             gate_info = GateInfo(index = index, 
                             id = gate_id,
@@ -2806,7 +2809,7 @@ class GateData():
                         condition = gate_condition
                     else:
                         condition_str = item_node.get("condition")
-                        condition = GateCondition.to_enum(condition_str)
+                        condition = GateConditionType.to_enum(condition_str)
                     item_node.tag = item_node.get("type")
                     item_data.from_xml(item_node, data)
                     gate_info.item_data_map[condition] = item_data
@@ -2909,10 +2912,10 @@ class GateData():
                         condition = range_condition
                     else:
                         condition_str = item_node.get("condition")
-                        condition = GateCondition.to_enum(condition_str)
+                        condition = GateConditionType.to_enum(condition_str)
                     item_data = self._new_item_data()
                     # use ranged containers/actions for range conditions, buttons for the others
-                    input_type = InputType.JoystickAxis if condition in (GateCondition.InRange, GateCondition.OutsideRange) else InputType.JoystickButton
+                    input_type = InputType.JoystickAxis if condition in (GateConditionType.InRange, GateConditionType.OutsideRange) else InputType.JoystickButton
                     item_data.input_type = input_type
                     item_data.from_xml(item_node, data)
                     range_info.item_data_map[condition] = item_data
@@ -2969,7 +2972,7 @@ class TriggerData():
         self.gate : GateInfo = None # the gate impacted (for gate triggers only, None for range triggers)
         self.range : RangeInfo = None # current range 
         self.last_range : RangeInfo = None # last range when crossing ranges, None if not crossing
-        self.condition : GateCondition = None # the condition for this trigger
+        self.condition : GateConditionType = None # the condition for this trigger
         self.last_value = None # prior value
         self.is_range = False # true if a range trigger, false if a gate trigger
         self.delay = 250 # default delay
@@ -3000,7 +3003,7 @@ class TriggerData():
             return f"{stub} value: {value_stub}% gate: {self.gate.slider_index+1} {self.gate.gate_display()}"
         
 
-class GateWidgetInfo(ui_common.QDataWidget):
+class GateWidgetInfo(gremlin.ui.ui_common.QDataWidget):
     ''' holds the data for a single gate '''
 
     def __init__(self, gate : GateInfo, 
@@ -3139,7 +3142,7 @@ class GateWidgetInfo(ui_common.QDataWidget):
 
         self.data = gate
     
-        label_width = ui_common.get_text_width("Range MM")
+        label_width = gremlin.ui.ui_common.get_text_width("Range MM")
 
         self.label_widget = QtWidgets.QLabel(f"Gate {gate.slider_index + 1}:") # the slider index is the ordered gate number
         self.label_widget.setMaximumWidth(label_width)
@@ -3149,11 +3152,11 @@ class GateWidgetInfo(ui_common.QDataWidget):
         self.label_warning.setMinimumWidth(20)
         #self.label_warning.setVisible(False)
         
-        self.value_widget = ui_common.QFloatLineEdit(gate, range_min, range_max, value = gate.display_value)
+        self.value_widget = gremlin.ui.ui_common.QFloatLineEdit(gate, range_min, range_max, value = gate.display_value)
 
         self.value_widget.valueChanged.connect(self._value_changed_cb) # hook manual changes made to the widget
 
-        self.grab_widget = ui_common.QDataPushButton()
+        self.grab_widget = gremlin.ui.ui_common.QDataPushButton()
         self.grab_widget.setIcon(load_icon("mdi.checkbox-blank-circle",qta_color = gremlin.ui.ui_common.Color.recordColor()))
         self.grab_widget.setMaximumWidth(20)
         self.grab_widget.clicked.connect(grab_handler)
@@ -3161,14 +3164,14 @@ class GateWidgetInfo(ui_common.QDataWidget):
         self.grab_widget.data = (gate, self.value_widget)
         
 
-        self.setup_widget = ui_common.QDataPushButton()
+        self.setup_widget = gremlin.ui.ui_common.QDataPushButton()
         self.setup_widget.setMaximumWidth(20)
         self.setup_widget.clicked.connect(configure_handler)
         self.setup_widget.setToolTip(f"Setup actions for gate {gate.id}")
         self.setup_widget.data = gate
         
 
-        self.clear_widget = ui_common.QDataPushButton()
+        self.clear_widget = gremlin.ui.ui_common.QDataPushButton()
         self.clear_widget.setIcon(load_icon("mdi.delete"))
         self.clear_widget.setMaximumWidth(20)
 
@@ -3241,10 +3244,10 @@ class RangeWidgetInfo(QtWidgets.QWidget):
         else:
             self.label_widget = QtWidgets.QLabel(f"Range {display_index}:")
 
-        self.range_widget = ui_common.QDataLineEdit()
+        self.range_widget = gremlin.ui.ui_common.QDataLineEdit()
         self.range_widget.setReadOnly(True)
         self.range_widget.data = (rng, self.range_widget)
-        self.setup_widget = ui_common.QDataPushButton(data = rng)
+        self.setup_widget = gremlin.ui.ui_common.QDataPushButton(data = rng)
         
         has_containers = rng.hasAnyContainers()
         if has_containers:
@@ -3315,7 +3318,7 @@ class RangeWidgetInfo(QtWidgets.QWidget):
 
 
     def update_value(self):
-        char_width = ui_common.get_text_width("M")
+        char_width = gremlin.ui.ui_common.get_text_width("M")
         g1 : GateInfo = self._rng.g1
         g2 : GateInfo= self._rng.g2
         g1v = g1.display_value
@@ -3386,7 +3389,8 @@ class GatedAxisWidget(QtWidgets.QWidget):
 
         import gremlin.event_handler
         import gremlin.joystick_handling
-        
+        import gremlin.ui.ui_common
+
         super().__init__(parent)
 
         self._stack = [] # save stack for saved state
@@ -3451,7 +3455,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
         self._slider.handleDragStart.connect(self._slider_drag_start_cb)
         
         warning_color = gremlin.ui.ui_common.Color.warningColor()
-        self.warning_widget = ui_common.QIconLabel("fa.warning", text="", use_qta = True,  icon_color=QtGui.QColor(warning_color))
+        self.warning_widget = gremlin.ui.ui_common.QIconLabel("fa.warning", text="", use_qta = True,  icon_color=QtGui.QColor(warning_color))
         self.warning_widget.setVisible(False)
 
         self.slider_frame_layout.addWidget(self._slider)
@@ -3498,7 +3502,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
         self._use_default_range_widget.setToolTip("When set, the axis output uses the default range setting for value output, sub-ranges can still be used to trigger actions based on entry/exit of ranges")
 
         self._display_label_widget = QtWidgets.QLabel("Display Mode:")
-        self._display_mode_widget = ui_common.QComboBox()
+        self._display_mode_widget = gremlin.ui.ui_common.QComboBox()
         self._show_output_mode = show_output_mode
         if show_output_mode:
             self._display_mode_widget.addItem("Output range", userData = DisplayMode.Normal)
@@ -3538,7 +3542,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
 
         self.container_range_widget = QtWidgets.QWidget()
         self.container_range_widget.setContentsMargins(0,0,0,0)
-        self.container_range_layout = ui_common.QFlowLayout(self.container_range_widget)        
+        self.container_range_layout = gremlin.ui.ui_common.QFlowLayout(self.container_range_widget)        
         self.container_range_layout.setContentsMargins(0,0,0,0)
 
         self.container_gate_ui_layout.addWidget(self.container_gate_widget)
@@ -3668,7 +3672,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
             gremlin.util.centerDialog(dialog,w,h)
             dialog.show()
         else:
-            ui_common.MessageBox(prompt ="Unable to locate help file")
+            gremlin.ui.ui_common.MessageBox(prompt ="Unable to locate help file")
 
 
     def hook(self):
@@ -4083,7 +4087,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
         count = len(self._gate_data._gate_used_gates())
         if count <= 2:
             syslog.warning("Unable to delete gate: at least two gates must be defined.")
-            ui_common.MessageBox(prompt="Unable to remove this gate.  At least two gates must be defined.")
+            gremlin.ui.ui_common.MessageBox(prompt="Unable to remove this gate.  At least two gates must be defined.")
             return # do not allow fewer than 2 gates
 
         message_box = QtWidgets.QMessageBox()
@@ -4716,7 +4720,7 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
             self.slider.setValue(values)
             self.slider.setReadOnly(True)
 
-            self.axis_widget = ui_common.AxisStateWidget(orientation = QtCore.Qt.Orientation.Horizontal, show_percentage=False)
+            self.axis_widget = gremlin.ui.ui_common.AxisStateWidget(orientation = QtCore.Qt.Orientation.Horizontal, show_percentage=False)
             
             self.output_mode_widget = gremlin.ui.ui_common.QComboBox()
             self.output_container_widget = QtWidgets.QWidget()
@@ -4738,16 +4742,16 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
             self.container_output_range_layout = QtWidgets.QHBoxLayout(self.container_output_range_widget)
             self.container_output_range_widget.setContentsMargins(0,0,0,0)
             
-            self.sb_range_min_widget = ui_common.QFloatLineEdit()
+            self.sb_range_min_widget = gremlin.ui.ui_common.QFloatLineEdit()
             self.sb_range_min_widget.setValue(info_object.output_range_min)
             self.sb_range_min_widget.valueChanged.connect(self._range_min_changed_cb)
 
-            self.sb_range_max_widget = ui_common.QFloatLineEdit()
+            self.sb_range_max_widget = gremlin.ui.ui_common.QFloatLineEdit()
             self.sb_range_max_widget.setValue(info_object.output_range_max)
 
             self.sb_range_max_widget.valueChanged.connect(self._range_max_changed_cb)
 
-            self.sb_fixed_value_widget = ui_common.QFloatLineEdit()
+            self.sb_fixed_value_widget = gremlin.ui.ui_common.QFloatLineEdit()
             if info_object.fixed_value is None:
                 info_object.fixed_value = info_object.v1
             self.sb_fixed_value_widget.setValue(info_object.fixed_value)
@@ -4956,7 +4960,7 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
     @QtCore.Slot(int)
     def _condition_changed_cb(self, index):
         widget = self._condition_tab.widget(index)
-        condition : GateCondition = widget.data
+        condition : GateConditionType = widget.data
         # remember the last selected page for next time
         if self._range_info:
             self._range_info.setLastCondition(condition)
@@ -4985,28 +4989,28 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
 
         if self._is_range:
             # valid range conditions
-            conditions = (GateCondition.InRange, GateCondition.EnterRange, GateCondition.ExitRange, GateCondition.OutsideRange)
+            conditions = (GateConditionType.InRange, GateConditionType.EnterRange, GateConditionType.ExitRange, GateConditionType.OutsideRange)
         else:
             # valid gate conditions
-            conditions = (GateCondition.OnCross, GateCondition.OnCrossIncrease, GateCondition.OnCrossDecrease)            
+            conditions = (GateConditionType.OnCross, GateConditionType.OnCrossIncrease, GateConditionType.OnCrossDecrease)            
 
 
         with QtCore.QSignalBlocker(self._condition_tab):     
             from gremlin.ui.joystick_device import InputItemConfiguration
             self._condition_tab.clear()
             for condition in conditions:
-                condition_container_widget = ui_common.QDataWidget()
+                condition_container_widget = gremlin.ui.ui_common.QDataWidget()
                 condition_container_widget.data = condition # store the condition as the data 
                 condition_container_layout = QtWidgets.QVBoxLayout(condition_container_widget)
                 self._condition_pages[condition] = condition_container_widget
-                self._condition_tab.addTab(condition_container_widget, f"Condition: {GateCondition.to_display_name(condition)}")
-                description_widget = QtWidgets.QLabel(GateCondition.to_description(condition))
+                self._condition_tab.addTab(condition_container_widget, f"Condition: {GateConditionType.to_display_name(condition)}")
+                description_widget = QtWidgets.QLabel(GateConditionType.to_description(condition))
                 condition_container_layout.addWidget(description_widget)
 
                 # all conditions are button type conditions except the in-range which is an axis
                 input_type = InputType.JoystickButton 
                 # condition specific widgets
-                if condition == GateCondition.InRange:
+                if condition == GateConditionType.InRange:
                     condition_container_layout.addWidget(self.output_container_widget)
                     condition_container_layout.addWidget(self.container_range_data_widget)
                     input_type = InputType.JoystickAxis
@@ -5044,3 +5048,92 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
             # one of ours - update the icon status
             self._update_tab_icons()
             
+
+
+class GatedAxisGateCondition(gremlin.actions.AbstractCondition):
+    ''' condition that applies to gates and ranges '''
+
+    def __init__(self, gate_data : GateData, gate_info: GateInfo):
+        self.comparison = "always"
+        super().__init__(self.comparison)
+        self.gate_data = gate_data
+        self.gate_info = gate_info
+        self.ranges = gate_data.getUsedRanges()
+        self._last_value = None
+
+    def __call__(self, event, value):
+        if not event.is_axis:
+            return True # not an axis, pass
+        
+        current_value = value.current
+        
+        if self._last_value is None:
+            self._last_value = current_value
+        gate_value = self.gate_info.value
+        verbose = gremlin.config.Configuration().verbose_mode_condition
+        verbose_detailed = gremlin.config.Configuration().verbose_mode_detailed
+        if verbose_detailed: syslog.info(f"Gate: {gate_value:0.3f} current value: {current_value:0.3f} last value: {self._last_value:0.3f}")
+        try:
+            if self._last_value > gate_value and current_value < gate_value:
+                # cross decreasing
+                if verbose: syslog.info(f"Gate: {self.gate_info.gate_display()}: trigger decreasing")
+                return True
+            if self._last_value < gate_value and current_value > gate_value:
+                # cross increasing
+                if verbose: syslog.info(f"Gate: {self.gate_info.gate_display()}: trigger increasing")
+                return True
+            if gate_value == current_value:
+                if verbose: syslog.info(f"Gate: {self.gate_info.gate_display()}: trigger equal")
+                # cross equal
+                return True
+            return False
+        finally:
+            self._last_value = current_value
+        
+    
+class GatedAxisRangeCondition(gremlin.actions.AbstractCondition):
+    ''' condition that applies to gates and ranges '''
+
+    def __init__(self, gate_data : GateData, range_info : RangeInfo):
+        self.comparison = "always"
+        super().__init__(self.comparison)
+        self.gate_data = gate_data
+        self.range_info = range_info
+        self._last_value = None
+
+    def __call__(self, event, value):
+        if not event.is_axis:
+            return True # not an axis, pass
+        
+        
+        current_value = value.current
+        range_info = self.range_info
+
+        syslog.info(f"Range: {range_info.to_display()} current value: {current_value:0.3f} last value: {self._last_value:0.3f}")
+        try:
+            if range_info.hasContainers(GateConditionType.InRange):
+                if range_info.valueInRange(current_value):
+                    # in range
+                    return True
+                    
+            if range_info.hasContainers(GateConditionType.EnterRange):
+                if not range_info.valueInRange(self._last_value) and range_info.valueInRange(current_value):
+                    # entering range
+                    return True
+                    
+            if range_info.hasContainers(GateConditionType.ExitRange):
+                if range_info.valueInRange(self._last_value) and not range_info.valueInRange(current_value):
+                    # exiting range
+                    return True
+                    
+            if range_info.hasContainers(GateConditionType.OutsideRange):
+                if not range_info.valueInRange(current_value):
+                    # outside of range
+                    return True
+            return False
+        finally:
+            self._last_value = current_value
+
+        
+        
+        

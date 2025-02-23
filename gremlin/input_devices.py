@@ -53,7 +53,7 @@ import socketserver, socket, msgpack
 import enum
 
 import gremlin.singleton_decorator
-import gremlin.event_handler
+
 
 
 syslog = logging.getLogger("system")
@@ -303,7 +303,7 @@ class RemoteControl():
         el.broadcast_changed.connect(self._broadcast_changed)
         
     def _update(self, value):
-        
+        import gremlin.event_handler
         is_local = self._is_local
         is_remote = self._is_remote
         is_paired = self._is_paired

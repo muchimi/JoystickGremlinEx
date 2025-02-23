@@ -25,7 +25,6 @@ import gremlin.joystick_handling
 from gremlin.util import load_icon
 from PySide6 import QtWidgets
 
-from gremlin.base_classes import InputActionCondition
 from gremlin.input_types import InputType
 from gremlin import input_devices, joystick_handling, util
 from gremlin.error import ProfileError

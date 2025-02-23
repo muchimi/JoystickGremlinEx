@@ -1834,3 +1834,11 @@ def decode(data) -> str:
         text = data.decode('ascii',errors='replace')
         return text.replace('\ufffd','') # remove junk characters
     return ''
+
+def valueInRange(value, r1, r2):
+    if value is None or r1 is None or r2 is None:
+        return False
+    if r1 > r2:
+        # swap
+        r2, r1 = r1, r2
+    return value >= r1 and value <= r2

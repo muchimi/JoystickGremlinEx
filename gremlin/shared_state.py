@@ -27,6 +27,7 @@ import gremlin.shared_state
 from gremlin.types import DeviceType
 import logging
 from PySide6 import QtWidgets, QtCore, QtGui
+import gremlin.util
 
 syslog = logging.getLogger("system")
 

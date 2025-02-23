@@ -3,26 +3,18 @@ from abc import abstractmethod, ABCMeta
 import enum
 import logging
 from lxml import etree as ElementTree
+import gremlin.base_profile
 from gremlin.input_types import InputType
-import gremlin.shared_state
 import gremlin.shared_state
 import gremlin.util
 from gremlin.util import safe_format, safe_read, parse_bool, parse_guid, write_guid
 from PySide6 import QtWidgets, QtCore, QtGui
 from gremlin.singleton_decorator import SingletonDecorator
+from gremlin.types import ActivationRule
+import dinput
 
 syslog = logging.getLogger("system")
 
-class ActivationRule(enum.Enum):
-
-    """Activation rules for collections of conditions.
-
-    All requires all the conditions in a collection to evaluate to True while
-    Any only requires a single condition to be True.
-    """
-
-    All = 1
-    Any = 2
 
 
 class ABCMetaQObject(ABCMeta, type(QtCore.QObject)):
@@ -165,7 +157,10 @@ class KeyboardCondition(AbstractCondition):
             self.is_extended is not None
     
 
-
+    def __str__(self):
+        from gremlin.ui.keyboard_device import Key
+        key = Key(scan_code=self.scan_code, is_extended=self.is_extended)
+        return f"Keyboard condition: id: {self.id} comparison: {self.comparison} key {key.debug_name}"
 
 
 class JoystickCondition(AbstractCondition):
@@ -241,6 +236,10 @@ class JoystickCondition(AbstractCondition):
         """
         return self.input_type is not None # super().is_valid() and self.input_type is not None
 
+    def __str__(self):
+        return f"Joystick Condition: id: {self.id} comparison: {self.comparison} input type: {self.input_type.name} device: {self.device_name} input id: {self.input_id}  range: [{self.range[0]:0.3f},{self.range[0]:0.3f}]  use calibrated: {self.use_calibrated_data}"
+
+
 class VJoyCondition(AbstractCondition):
 
     """vJoy device state based condition.
@@ -303,6 +302,8 @@ class VJoyCondition(AbstractCondition):
         """
         return super().is_valid() and self.input_type is not None
 
+    def __str__(self):
+        return f"Vjoy Condition: id: {self.id} comparison: {self.comparison} input type: {self.input_type.name} vjoy device: {self.vjoy_id} input id: {self.input_id}  range: [{self.range[0]:0.3f},{self.range[0]:0.3f}]"
  
 
 
@@ -339,7 +340,9 @@ class InputActionCondition(AbstractCondition):
         node.set("comparison", str(self.comparison))
         return node
 
-   
+    def __str__(self):
+        return f"Input Condition: id: {self.id} comparison: {self.comparison}"
+ 
 
 
 class AbstractFunctor(QtCore.QObject):
@@ -364,6 +367,8 @@ class AbstractFunctor(QtCore.QObject):
         self._name = action_data.name
         self.enabled = True
         self.node = parent
+        self.action_data = action_data
+        self.id = action_data.id
         
 
         el = gremlin.event_handler.EventListener()
@@ -393,6 +398,28 @@ class AbstractFunctor(QtCore.QObject):
         ''' called when the profile stops '''
         pass
     
+    @property 
+    def profile_mode(self) -> str:
+        ''' gets the mode of this action '''
+        return self.action_data.get_mode()
+    
+    @property
+    def hardware_device_guid(self) -> dinput.GUID:
+        ''' gets the currently attached hardware GUID '''
+        return self.action_data.hardware_device_guid
+        
+    @property
+    def hardware_device_id(self) -> str:
+        ''' gets the currently attached hardware GUID '''
+        return self.action_data.hardware_device_id
+    
+    @property 
+    def hardware_input_id(self):
+        return self.action_data.hardware_input_id
+    
+    @property
+    def hardware_input_type(self) -> InputType:
+        return self.action_data.hardware_input_type
 
     def latch_extra_inputs(self):
         ''' returns any extra inputs as a list of (device_guid, input_id) to latch to this action (trigger on change) '''
@@ -574,6 +601,15 @@ class ConditionTracker():
             conditions = [self._cache[mode][id] for id in id_list]
             return conditions
         return None
+    
+    def getConditionForAction(self, action):
+        ''' gets a condition for an action '''
+        data : ConditionTrackerData = self.getActionData(action)
+        if data:
+            return data.condition
+        return None
+            
+
 
     def owner(self, condition : AbstractCondition):
         ''' what input item owns the condition '''
@@ -586,14 +622,18 @@ class ConditionTracker():
         if condition.id in self._data_map:
             return self._data_map[condition.id]
         return None
-
+    
+    def getActionData(self, action):
+        if action.action_id in self._data_map:
+            return self._data_map[action.action_id]
+        return None
         
-        
 
 
-class ActivationCondition:
+class ActivationCondition(QtCore.QObject):
 
     """Dictates under what circumstances an associated code can be executed."""
+    id_changed = QtCore.Signal(str, str) # fires when id changes (old_id, new_id)
 
     rule_lookup = {
         # String to enum
@@ -613,10 +653,12 @@ class ActivationCondition:
 
     def __init__(self, conditions, rule):
         """Creates a new instance."""
+        super().__init__()
 
         self.rule = rule
         self.conditions = conditions
         self._id = gremlin.util.get_guid()
+        
 
     @property
     def id(self):
@@ -624,11 +666,16 @@ class ActivationCondition:
         if not self._id:
             import gremlin.util
             self._id = gremlin.util.get_guid()
+
         return self._id
     
     @id.setter
-    def id(self, value):
-        self._id = value
+    def id(self, new_id):
+        old_id = self._id
+        if old_id != new_id:
+            self._id = new_id
+            self.id_changed.emit(old_id, new_id)
+
 
 
     def from_xml(self, node, data = None):
@@ -681,3 +728,6 @@ class ActivationCondition:
             # save the condition, valid or not so the data is saved
             node.append(condition.to_xml())
         return node
+    
+    def __str__(self):
+        return f"Activation Condition: {self.id} rule: {self.rule.name} contains: {len(self.conditions)} condition(s)"

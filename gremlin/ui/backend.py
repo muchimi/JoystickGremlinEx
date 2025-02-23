@@ -91,10 +91,7 @@ class Backend(QtCore.QObject):
         if activate:
             # Generate the code for the profile and run it
             # self._profile_auto_activated = False
-            self.runner.start(
-                self.profile,
-                "Default"
-            )
+            self.runner.start(self.profile,"Default")
             
         else:
             # Stop running the code

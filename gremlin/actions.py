@@ -24,17 +24,17 @@ import dinput
 import gremlin.base_profile
 import gremlin.config
 from gremlin.input_types import InputType
-#from . import base_classes, event_handler, fsm, input_devices, joystick_handling, macro, util
-from gremlin.base_conditions import ActivationRule
+from gremlin.types import ActivationRule
+
 import gremlin.input_types
 import gremlin.joystick_handling
 
-import gremlin.event_handler
 import gremlin.shared_state
 import gremlin.util
 import gremlin.fsm
-import gremlin.macro
-from PySide6 import QtCore
+
+
+
 
 syslog = logging.getLogger("system")
 
@@ -129,17 +129,20 @@ class ActivationCondition:
     True or False.
     """
 
-
+    
     rule_function = {
         ActivationRule.All: smart_all,
         ActivationRule.Any: smart_any
     }
 
-    def __init__(self, conditions, rule, target):
+    def __init__(self, conditions, rule, target, is_container_condition = False):
         self._conditions = conditions
         self._rule = rule
         self.enabled = True # always enabled
         self.target = target # the target this condition applies to (container or action)
+        self.id = target.id # the id of this node is the same as the one for the container or action
+        self.is_container_condition = is_container_condition
+        
         
     @property
     def is_container(self) -> bool:
@@ -165,7 +168,7 @@ class ActivationCondition:
         condition_name = ""
         for index, c in enumerate(self._conditions):
             condition_name += f"[C{index}] {c.condition_name()} "
-        return f"Rule: {rule_name} Is container: {self.is_container} Conditions: {condition_name} "
+        return f"Rule: {rule_name} Is container: {self.is_container} Is container condition: {self.is_container_condition} Conditions: {condition_name} "
 
 class AbstractCondition(metaclass=ABCMeta):
 
@@ -211,6 +214,7 @@ class KeyboardCondition(AbstractCondition):
         :param is_extended whether or not the key code is extended
         :param comparison the comparison operation to perform when evaluated
         """
+        import gremlin.macro
         super().__init__(comparison)
         from gremlin.ui.keyboard_device import KeyboardInputItem
          
@@ -314,12 +318,15 @@ class JoystickCondition(AbstractCondition):
                 value = gremlin.joystick_handling.get_axis(self.device_guid, self.input_id)
                 if verbose: syslog.info(f"{logtabs}condition input value (raw): {value:0.3f}")
                 #value = joy.axis(self.input_id).value
-            
-            in_range = self.condition.range[0] <= value <= self.condition.range[1]
+            r1 = self.condition.range[0]
+            r2 = self.condition.range[1]
+            in_range = gremlin.util.valueInRange(value, r1, r2)
 
             if self.condition.comparison in ["inside", "outside"]:
                 retval = in_range if self.comparison == "inside" else not in_range
             if verbose: syslog.info(f"{logtabs}JoystickCondition: Axis range comparison: [{self.comparison}]: device {info.name} input: {self.input_id} range: {self.condition.range[0]:0.3f} to {self.condition.range[1]:0.3f} value: {joy.axis(self.input_id).value:0.3f} return: {"OK" if retval else "FAILED"}")
+            if not retval:
+                pass
             return retval
         
         elif self.input_type == InputType.JoystickButton:
@@ -330,8 +337,6 @@ class JoystickCondition(AbstractCondition):
             else: # released
                 retval = not is_pressed
             if verbose: syslog.info(f"{logtabs}JoystickCondition: Button {self.comparison}: device {info.name} input: {self.input_id} pressed: {is_pressed} return: {"OK" if retval else "FAILED"}")
-            if not retval and self.input_id == 3:
-                pass
             return retval
             
         elif self.input_type == InputType.JoystickHat:
@@ -497,9 +502,7 @@ class VirtualButton(metaclass=ABCMeta):
 
     """Implements a button like interface."""
 
-    # Single shared event  listener instance
-    event_listener = gremlin.event_handler.EventListener()
-
+    
     # Next identifier ID to use
     next_id = 1
 
@@ -558,7 +561,8 @@ class VirtualButton(metaclass=ABCMeta):
             is_pressed=self._is_pressed,
             raw_value=self._is_pressed
         )
-        VirtualButton.event_listener.virtual_event.emit(event)
+        eh = gremlin.event_handler.EventListener()
+        eh.virtual_event.emit(event)
         return True
 
     def _release(self):
@@ -571,7 +575,8 @@ class VirtualButton(metaclass=ABCMeta):
             is_pressed=self._is_pressed,
             raw_value=self._is_pressed
         )
-        VirtualButton.event_listener.virtual_event.emit(event)
+        eh = gremlin.event_handler.EventListener()
+        eh.virtual_event.emit(event)
         return True
 
     def _noop(self):

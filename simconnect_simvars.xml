@@ -781,7 +781,7 @@
     <range min="-16383" max="16383" toggle="False"/>
   </command>
   <command value="AXIS_MIXTURE_SET" type="event" datatype="int" units="int" category="None" settable="True" axis="True" indexed="False">
-    <description value="Set mixture lever 1 exact value (-16383 to +16383),"/>
+    <description value="Set mixture levers exact value (-16383 to +16383),"/>
     <range min="-16383" max="16383" toggle="False"/>
   </command>
   <command value="AXIS_PROPELLER1_SET" type="event" datatype="int" units="int" category="None" settable="True" axis="True" indexed="False">

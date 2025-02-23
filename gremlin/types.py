@@ -1053,3 +1053,15 @@ _gamepad_output_to_enum = {
     "button_dpad_left": GamePadOutput.ButtonDpadLeft,
     "button_dpad_right": GamePadOutput.ButtonDpadRight,
 }
+
+
+class ActivationRule(Enum):
+
+    """Activation rules for collections of conditions.
+
+    All requires all the conditions in a collection to evaluate to True while
+    Any only requires a single condition to be True.
+    """
+
+    All = 1
+    Any = 2

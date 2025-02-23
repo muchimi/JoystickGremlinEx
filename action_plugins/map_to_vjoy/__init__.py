@@ -2769,7 +2769,6 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
     def __init__(self, action_data, parent = None):
         super().__init__(action_data, parent)
-        self.action_data : VjoyRemap = action_data
         self.vjoy_device_id = action_data.vjoy_device_id
         self.vjoy_input_id = action_data.vjoy_input_id
         self.input_type = action_data.input_type

@@ -1353,9 +1353,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         """Populates the Recent submenu entry with the most recent profiles."""
         self.ui.menuRecent.clear()
         for entry in self.config.recent_profiles:
-            action = self.ui.menuRecent.addAction(
-                gremlin.util.truncate(entry, 5, 40)
-            )
+            action = self.ui.menuRecent.addAction(gremlin.util.truncate(entry, 5, 40))
             action.triggered.connect(self._create_load_profile_function(entry))
 
     def _create_statusbar(self):
@@ -2606,8 +2604,8 @@ class GremlinUi(QtWidgets.QMainWindow):
 
 
                     # should have contents now
-                    has_content = widget.hasRightContent()
-                    assert has_content,"Device widget has no content to display"
+                    #has_content = widget.hasRightContent()
+                    #assert has_content,"Device widget has no content to display"
 
                     if verbose: syslog.info(f"Select input: selected widget {input_type} {input_id}")
 
@@ -4243,6 +4241,8 @@ if __name__ == "__main__":
     el = gremlin.event_handler.EventListener()
     el.process_monitor_changed.emit()
 
+
+    ec = gremlin.execution_graph.ExecutionContext()
 
     # Run UI
     syslog.info("GremlinEx UI launching")

@@ -1398,7 +1398,7 @@ class EventHandler(QtCore.QObject):
 			syslog.info(f"Register InputItem: {input_item.display_name} mode {mode} {input_type} magic: {magic}")
 			pass
 
-	def add_callback(self, device_guid, mode, event, callback, permanent=False):
+	def add_callback(self, device_guid, mode, event, callback, permanent=False, node = None):
 		"""Installs the provided callback for the given event.
 
 		:param device_guid the GUID of the device the callback is
@@ -1409,6 +1409,7 @@ class EventHandler(QtCore.QObject):
 			event
 		:param permanent if True the callback is always active even
 			if the system is paused
+		:node: the execution tree node
 		"""
 		import gremlin.config
 		import gremlin.ui.keyboard_device

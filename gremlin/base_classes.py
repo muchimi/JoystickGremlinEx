@@ -16,8 +16,9 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from gremlin.base_conditions import *
 from collections.abc import MutableSequence
+from abc import abstractmethod, ABCMeta
+from PySide6 import QtCore
 
 
 

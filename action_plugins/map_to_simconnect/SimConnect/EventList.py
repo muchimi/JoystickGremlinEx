@@ -92,6 +92,8 @@ class AircraftEvents():
 				if key == test[0].decode():
 					return getattr(clas, key)
 		return None
+	
+
 
 	class __Engine(EventHelper):
 		list = [
@@ -230,7 +232,7 @@ class AircraftEvents():
 			(b'MIXTURE2_SET', "Set mixture lever 2 exact value (0 to 16383),", "Shared Cockpit"),
 			(b'MIXTURE3_SET', "Set mixture lever 3 exact value (0 to 16383),", "Shared Cockpit"),
 			(b'MIXTURE4_SET', "Set mixture lever 4 exact value (0 to 16383),", "Shared Cockpit"),
-			(b'AXIS_MIXTURE_SET', "Set mixture lever 1 exact value (-16383 to +16383),", "Shared Cockpit"),
+			(b'AXIS_MIXTURE_SET', "Set mixture levers exact value (-16383 to +16383),", "Shared Cockpit"),
 			(b'AXIS_MIXTURE1_SET', "Set mixture lever 1 exact value (-16383 to +16383),", "Shared Cockpit"),
 			(b'AXIS_MIXTURE2_SET', "Set mixture lever 2 exact value (-16383 to +16383),", "Shared Cockpit"),
 			(b'AXIS_MIXTURE3_SET', "Set mixture lever 3 exact value (-16383 to +16383),", "Shared Cockpit"),

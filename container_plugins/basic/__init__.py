@@ -27,6 +27,7 @@ import gremlin.types
 from gremlin.base_profile import AbstractContainer
 import gremlin.execution_graph
 from gremlin.ui.input_item import AbstractContainerWidget
+from gremlin.base_conditions import AbstractFunctor
 
 class BasicContainerWidget(AbstractContainerWidget):
 
@@ -131,7 +132,7 @@ class BasicContainerWidget(AbstractContainerWidget):
             return "Basic"
 
 
-class BasicContainerFunctor(gremlin.base_profile.AbstractFunctor):
+class BasicContainerFunctor(AbstractFunctor):
 
     """Executes the contents of the associated basic container."""
 

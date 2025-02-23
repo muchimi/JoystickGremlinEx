@@ -28,11 +28,9 @@ import PySide6.QtWidgets
 import gremlin.base_classes
 import gremlin.base_profile
 import gremlin.clipboard
-import gremlin.clipboard
 import gremlin.config
 import gremlin.error
 import qtawesome as qta
-import gremlin.event_handler
 import gremlin.event_handler
 from gremlin.input_types import InputType
 from  gremlin.clipboard import Clipboard
@@ -389,6 +387,7 @@ class DeviceWidgetTracker():
 class StateTracker():
     def __init__(self):
         self._axis_cache = {}
+        
         self._button_cache = {}
         self._state_cache = {}
         el = gremlin.event_handler.EventListener()
