@@ -2039,10 +2039,10 @@ class Profile():
     def setSimconnectMode(self, key, mode):
         ''' sets the simconnect startup mode for a given aicraft key - the key comes from the SimconnectAicraftDefinition for the aircraft'''
         # key is  (item.id, item.mode)
-        assert len(key) == 2
-        key_ap, key_cp = key
-        assert key_ap,"Invalid AP key"
-        assert key_cp,"Invalid CP key"
+        # assert len(key) == 2
+        # key_ap, key_cp = key
+        # assert key_ap,"Invalid AP key"
+        # assert key_cp,"Invalid CP key"
         self._simconnect_modes[key] = mode
 
     def getSimconnectMode(self, key):

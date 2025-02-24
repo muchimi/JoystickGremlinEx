@@ -167,6 +167,7 @@ class ExecutionContext():
        el.profile_changed.connect(self.reset) # reload data on profile change
        el.profile_modes_changed.connect(self.reset) # modes changed
        self._mode_tree = None
+       self.root = None
 
     def reset(self):
         ''' reloads the execution context to capture changes '''
@@ -341,6 +342,8 @@ class ExecutionContext():
         :param plugin_name: matches the name property of an action plugin
         '''
         nodes = []
+        if self.root is None:
+            self.reset()
         for node in anytree.PreOrderIter(self.root):
             if node.nodeType == ExecutionGraphNodeType.Action:
                 if node.action.name == plugin_name:

@@ -302,11 +302,16 @@ class SimConnectEventHandler(QtCore.QObject):
 	simconnect_event = QtCore.Signal(SimConnectEvent) # fires when we get a Simconnect data value notice
 	simconnect_state_changed = QtCore.Signal(int, float, str) # state change data (int, float, str)	
 	status_callback_clicked = QtCore.Signal() # fires when the status button is clicked 
+	simconnect_AircraftLiveriesReceived = QtCore.Signal(object) # fires when a list of user flyable aircraft is received (AicraftLiveries dict keyed by sim name)
+	simconnect_FacilitiesReceived = QtCore.Signal(list) # fires when a list of facilities is received
+	AircraftDefinitionsChanged = QtCore.Signal() # indicates the aircraft definitions have been updated in options
 
 
 @SingletonDecorator
 class SimConnect():
 	''' MSFS simconnect interface '''
+
+	
 
 	def __init__(self, handler : SimConnectEventHandler, auto_connect=True):
 		''' initializes sim connect 
@@ -314,9 +319,11 @@ class SimConnect():
 		:param handler: SimConnectEventHandler - the handler to signals
 		
 		'''
+		super().__init__()
 
 		self.Requests = {}
 		self.Facilities = []
+		self.AicraftLiveries = {} # data returned for user flyable aicraft livery pairs  [sim_name] = list[str] (liveries)
 		self.verbose = gremlin.config.Configuration().verbose_mode_simconnect
 		self.verbose_details = False
 		self._connecting = False # true if connecting
@@ -345,15 +352,6 @@ class SimConnect():
 		self._runThread = None
 		self._library_path = None
 		self._critical = False
-
-		
-
-		# el = gremlin.event_handler.EventListener()
-		# el.shutdown.connect(self._shutdown)
-
-	
-		# if auto_connect:
-		# 	self.connect()
 
 	def reset(self):
 		''' resets abort flag set due to a load error - this is necessary upon reconnect'''
@@ -516,7 +514,7 @@ class SimConnect():
 			if self.verbose:
 				syslog.info(f"SIMCONNECT: event: AIRCRAFT LOADED: {aircraft_cfg}")
 			self.handle_folder_event(aircraft_cfg.decode())
-		
+
 		# else:
 		# 	syslog.error(f"SIMCONNECT:received event {uEventID} - don't know how to handle")
 
@@ -592,6 +590,9 @@ class SimConnect():
 		return False
 		# # syslog = logging.getLogger("system")
 		# syslog.warning(f"SIMCONNECT:Event ID: {dwRequestID} is not handled")
+
+
+		
 
 	def handle_clientdata_event(self, pData):
 		''' handles client data receipt '''
@@ -699,11 +700,40 @@ class SimConnect():
 				pData, POINTER(SIMCONNECT_RECV_FACILITIES_LIST)
 			).contents
 			dwRequestID = pObjData.dwRequestID
+			dwEntryNumber = pObjData.dwEntryNumber
+			dwOutof = pObjData.dwOutOf
 			if verbose: syslog.info("dispatch: receive facility")
-			for _facility in self.Facilities:
-				if dwRequestID == _facility.REQUEST_ID.value:
-					_facility.parent.dump(pData)
-					_facility.dump(pData)
+			# for _facility in self.Facilities:
+			# 	if dwRequestID == _facility.REQUEST_ID.value:
+			# 		_facility.parent.dump(pData)
+			# 		_facility.dump(pData)
+
+			# fire an update event new data was received
+			if dwEntryNumber == dwOutof:
+				self.handler.simconnect_FacilitiesReceived.emit(self.Facilities)
+
+		elif dwID == SIMCONNECT_RECV_ID.SIMCONNECT_RECV_ID_ENUMERATE_SIMOBJECT_AND_LIVERY_LIST:
+			pObjData = cast(pData, POINTER(SIMCONNECT_RECV_ENUMERATE_SIMOBJECT_AND_LIVERY_LIST)).contents
+			dwRequestID = pObjData.dwRequestID
+			dwEntryNumber = pObjData.dwEntryNumber
+			dwOutof = pObjData.dwOutOf
+			count = pObjData.dwArraySize
+			if verbose: syslog.info(f"dispatch: received {count} aicraft livery item(s)")
+			items = SIMCONNECT_RECV_ENUMERATE_SIMOBJECT_AND_LIVERY_LIST_FACTORY(count)
+			pObjData = cast(pData, POINTER(items)).contents
+			for item in pObjData.rgData:
+				aircraft = item.AircraftTitle.decode()
+				livery = item.LiveryName.decode()
+				if not aircraft in self.AicraftLiveries:
+					self.AicraftLiveries[aircraft] = []
+				self.AicraftLiveries[aircraft].append(livery)
+				if verbose: syslog.info(f"\t{aircraft} / {livery}")
+
+			# fire an update event new data was received
+			if dwEntryNumber + 1 == dwOutof:
+				# all items received - fire the update
+				self.handler.simconnect_AircraftLiveriesReceived.emit(self.AicraftLiveries)
+
 
 		elif dwID == SIMCONNECT_RECV_ID.SIMCONNECT_RECV_ID_QUIT:
 			self._quit = 1
@@ -729,11 +759,11 @@ class SimConnect():
 			#syslog.info(f"received client data: request ID: {pObjData.dwRequestID} define ID: {pObjData.dwDefineID} ")
 			self.handle_clientdata_event(pData)
 
-
+		
 		else:
 			if verbose:
 				# syslog = logging.getLogger("system")
-				syslog.debug(f"SIMCONNECT:Received: {SIMCONNECT_RECV_ID(dwID)}")
+				syslog.warning(f"SIMCONNECT:Received: id {dwID}")
 		return
 
 
@@ -780,6 +810,7 @@ class SimConnect():
 		if verbose: syslog.info("SIMCONNECT: connect...")
 		
 		self._connecting = True
+		self._request_abort = False
 
 		try:
 		
@@ -787,10 +818,7 @@ class SimConnect():
 				# already connected
 				if verbose: syslog.info("\talready connected")
 				return True
-			if self._request_abort:
-				# abort
-				if verbose: syslog.info("\tabort set - request skipped")
-				return False
+
 			
 			el = gremlin.event_handler.EventListener()
 			el.module_state_register.emit("simconnect","SimConnect",None, self._sync_callback)
@@ -914,13 +942,13 @@ class SimConnect():
 		# syslog = logging.getLogger("system")
 		verbose = gremlin.config.Configuration().verbose_mode_simconnect
 		if verbose: syslog.info("SIMCONNECT: run loop start")
-		error_count = 10
+		error_count = 5
 		self._quit = 0 # keep on running until stop
 		while self._quit == 0:
 			try:
 				self._dll.CallDispatch(self._hSimConnect, self._my_dispatch_proc_rd, None)
 				time.sleep(.002)
-				error_count = 10
+				
 			except:
 				error_count -=1
 				if error_count == 0:
@@ -1009,14 +1037,6 @@ class SimConnect():
 			self._dll.AddClientEventToNotificationGroup(
 				self._hSimConnect, group, event, maskable
 			)
-
-	def requestAircraftLoaded(self):
-		''' makes a request for the current loaded aircraft '''
-		if self._dll:
-			self._dll.RequestSystemState(self._hSimConnect,
-									 self._dll.EventID.EVENT_SIM_REQUEST_AIRCRAFT.value,
-									 b"AircraftLoaded"
-                                         )        
 
 
 
@@ -1447,6 +1467,31 @@ class SimConnect():
 			return False
 		return True
 	
+	def requestAircraftLoaded(self):
+		''' makes a request for the current loaded aircraft '''
+		if self._dll:
+			hr = self._dll.RequestSystemState(self._hSimConnect,
+									 self._dll.EventID.EVENT_SIM_REQUEST_AIRCRAFT.value,
+									 b"AircraftLoaded"
+                                         )       
+			if not self.IsHR(hr, 0):
+				return False
+			return True
+		return False 
 
-
+	def requestSimObjectsAndLiveries(self):
+		''' makes a request for the user flyable aircraft list '''
+		if self._dll:
+			self.AicraftLiveries.clear()
+			hr = self._dll.EnumerateSimObjectsAndLiveries(self._hSimConnect,
+												 self._dll.EventID.EVENT_SIM_REQUEST_ENUMERATE_SIM_OBJECTS_AND_LIVERIES.value,
+												 SIMCONNECT_SIMOBJECT_TYPE.SIMCONNECT_SIMOBJECT_TYPE_USER)        
+			if not self.IsHR(hr, 0):
+				return False
+			return True
+		return False
 	
+	def getSimObjects(self) -> list[str]:
+		''' gets the current list of aircraft - gets the results of  requestSimObjectsAndLiveries() '''
+		return list(self.AicraftLiveries.keys())
+

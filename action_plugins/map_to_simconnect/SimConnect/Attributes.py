@@ -996,3 +996,15 @@ class SimConnectDll(object):
 			self.DATA_REQUEST_ID,
 		]
 
+		# SIMCONNECTAPI SimConnect_EnumerateSimObjectsAndLiveries(
+		#   HANDLE hSimConnect,
+		#   SIMCONNECT_DATA_REQUEST_ID RequestID,
+		#   SIMCONNECT_SIMOBJECT_TYPE Type);
+		self.EnumerateSimObjectsAndLiveries = (self.SimConnect.SimConnect_EnumerateSimObjectsAndLiveries)
+		self.EnumerateSimObjectsAndLiveries.restype = HRESULT
+		self.EnumerateSimObjectsAndLiveries.argtypes = [
+			HANDLE,
+			self.DATA_REQUEST_ID,
+			SIMCONNECT_SIMOBJECT_TYPE, 
+		]
+

@@ -318,7 +318,8 @@ class ActionPlugins:
                 except Exception as e:
                     # Log an error and ignore the action_plugins if
                     # anything is wrong with it
-                    log_sys_warn(f"\tLoading action_plugins '{root.split("\\")[-1]}' failed due to: {e}")
+                    syslog.error(f"\tLoading action_plugins '{root.split("\\")[-1]}'")
+                    syslog.error(e)
                     error_count += 1
 
         log_sys(f"Found {plugin_count} plugins")

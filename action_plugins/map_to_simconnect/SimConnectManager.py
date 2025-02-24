@@ -454,8 +454,6 @@ class SimConnectManager(QtCore.QObject):
     sim_paused = QtCore.Signal(bool) # fires when sim is paused or unpaused (state = pause state)
     lvars_updated = QtCore.Signal(object) # triggers when LVARs are updated (after the request to get LVARs)
     alive = QtCore.Signal() # fires when the bridge is connected and alive
-    
-    
     sim_state = QtCore.Signal(int, float, str) # fires when sim state data changes (depends on the state )
     _aircraft_loaded_internal = QtCore.Signal(str, str) # fires when aircraft (name, title)
     
@@ -489,13 +487,7 @@ class SimConnectManager(QtCore.QObject):
         self._connect_warning_issued = False
         sm = SimConnect(handler, auto_connect = False)
         self._sm : SimConnect = sm
-
-        # # mobiflight interface
-        # self._mobi_connected = False # not connected yet
-        # self.mobi = MobiFlightManager(sm)
-        # self.mobi.lvars_updated.connect(self._lvars_updated_cb)
-        # self.mobi.mobiflight_connected.connect(self._mobiflight_connected_cb)
-
+        
         self._bridge_alive = False
         self.bridge = SimConnectBridge(sm)
         self.bridge.alive.connect(self._bridge_alive_cb)
@@ -512,6 +504,7 @@ class SimConnectManager(QtCore.QObject):
         handler.simconnect_sim_start.connect(self._start_cb)
         handler.simconnect_sim_stop.connect(self._stop_cb)
         handler.status_callback_clicked.connect(self._status_callback_cb) # called when status is clicked on the UI
+        
         
 
         self._aircraft_events = AircraftEvents(self._sm)
@@ -894,6 +887,7 @@ class SimConnectManager(QtCore.QObject):
             self._is_started = True
             self.sim_start.emit()
             # update the aircraft
+            self.request_aircraft_list()
             self.request_loaded_aircraft()
 
     @QtCore.Slot()
@@ -1008,7 +1002,17 @@ class SimConnectManager(QtCore.QObject):
         except:
             pass
 
+    def request_aircraft_list(self):
+        ''' requests user flyable aircraft data '''
+        try:
+            if self._sm.ok:
+                self._sm.requestSimObjectsAndLiveries()
+        except:
+            pass
 
+    def get_aircraft_list(self) -> list[str]:
+        ''' retrieves the list of user flyable objects from simconnect '''
+        return self._sm.getSimObjects()
 
     def _aircraft_loaded_internal_cb(self, folder, name):
         # decode the data into useful bits
@@ -1068,8 +1072,9 @@ class SimConnectManager(QtCore.QObject):
         try:
             
             self._bridge_alive = False
-            self._connect_attempts = 5
+            self._connect_attempts = 10
             self._connect_warning_issued = False
+            self._request_abort = False
 
             enabled = gremlin.shared_state.getSimConnectEnabled()
             if not enabled:
@@ -1196,6 +1201,10 @@ class SimConnectManager(QtCore.QObject):
         if title:
             title = title.decode()
         return title
+    
+    def get_aircraft_list(self):
+        ''' gets the list of aircraft '''
+        self.bridge.getAircraftList()
     
 
         

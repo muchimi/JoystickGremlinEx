@@ -52,6 +52,8 @@ class BridgeCommands(IntEnum):
     GetNamedVariable = 1
     GetVariableList = 2
     Ping = 3
+    GetAircraftList = 4
+    SimConnectError = 5 # occurs when a simconnect error occurs inside the WASM module
 
 
 
@@ -81,6 +83,7 @@ class SimConnectBridge(QtCore.QObject):
     ''' Simconnect bridge for GremlinEx '''
 
     lvars_loaded = QtCore.Signal(object) # sent when lvars are received
+    aircraft_list_loaded = QtCore.Signal(object) # sends the aircraft list (map of [aircraft][list of liveries] )
     alive = QtCore.Signal() # sent when pong is received (alive signal)
 
     def __init__(self, sm : SimConnect):
@@ -94,6 +97,7 @@ class SimConnectBridge(QtCore.QObject):
         self._alive = False # true if alive (pong command received)
         self._id = 0 
         self._lvars = [] # list of received lvars 
+        self._aircraft_map = {} # list of aicrafts keyed by aircraft name, holds liveries as a list
         self._state = None # response state
         self._wait_event = threading.Event() # wait event
         self._wait_alive_event = threading.Event() # alive wait event when sending a ping
@@ -203,46 +207,76 @@ class SimConnectBridge(QtCore.QObject):
             # mobiflight core client data received on MobiFlight client registration
             packet = cast(client_data.dwData, POINTER(BRIDGE_PACKET)).contents
 
-            if packet.code == BridgeCommands.Ping:
-                data = packet.data.decode('ascii',errors='replace')
-                data = data.replace('\ufffd','') # remove junk characters
-                if data == "#pong#":
-                    syslog.info(f"SIMCONNECT BRIDGE: received pong alive")
-                    if self._alive_thread and self._alive_thread.is_alive():
-                        self._connect_in_progress = False
-                        self._alive_thread.join() # wait for it to finish
-                        self._alive_thread = None
-                        self._alive = True
-                        self.alive.emit() # report the bridge is alive
+            match packet.code:
+                case BridgeCommands.SimConnectError:
+                    data = packet.data.decode('ascii',errors='replace')
+                    data = data.replace('\ufffd','')
+                    syslog.error(f"WASM: error: {data}")
 
-            elif packet.code == BridgeCommands.GetNamedVariable:
-                # named variable
-                packet = cast(client_data.dwData, POINTER(BRIDGE_PACKET_DOUBLE)).contents
-                value = packet.data # double
-                #syslog.info(f"SIMCONNECT BRIDGE: received value: {value}")
-                
-            elif packet.code == BridgeCommands.GetVariableList:
-                data = packet.data.decode()
+                case BridgeCommands.Ping:
+                    data = packet.data.decode('ascii',errors='replace')
+                    data = data.replace('\ufffd','') # remove junk characters
+                    if data == "#pong#":
+                        syslog.info(f"SIMCONNECT BRIDGE: received pong alive")
+                        if self._alive_thread and self._alive_thread.is_alive():
+                            self._connect_in_progress = False
+                            self._alive_thread.join() # wait for it to finish
+                            self._alive_thread = None
+                            self._alive = True
+                            self.alive.emit() # report the bridge is alive
 
-
-                if data == "#lvar_begin#":
-                    self._lvars.clear()
-                    self._state = "loading"
-
-                elif data == "#lvar_end#":
-                    self._state = "complete"
-
-                elif self._state == "loading":
-                    self._lvars.append(data)  
-                                      
-                if self._state == "complete":
-                    thread = threading.Thread(target = lambda: self.lvars_loaded.emit(self._lvars))
-                    thread.start()
-                    self._state = None
+                case BridgeCommands.GetNamedVariable:
+                    # named variable
+                    packet = cast(client_data.dwData, POINTER(BRIDGE_PACKET_DOUBLE)).contents
+                    value = packet.data # double
+                    #syslog.info(f"SIMCONNECT BRIDGE: received value: {value}")
                     
-            elif packet.code == BridgeCommands.ExecuteCalculatorCode:
-                # mark done executing the command
-                self._wait_event.set()  
+                case BridgeCommands.GetVariableList:
+                    data = packet.data.decode()
+
+
+                    if data == "#lvar_begin#":
+                        self._lvars.clear()
+                        self._state = "loading"
+
+                    elif data == "#lvar_end#":
+                        self._state = "complete"
+
+                    elif self._state == "loading":
+                        self._lvars.append(data)  
+                                        
+                    if self._state == "complete":
+                        thread = threading.Thread(target = lambda: self.lvars_loaded.emit(self._lvars))
+                        thread.start()
+                        self._state = None
+                        
+                case BridgeCommands.ExecuteCalculatorCode:
+                    # mark done executing the command
+                    self._wait_event.set()  
+
+
+                case BridgeCommands.GetAircraftList:
+                    # gets aircraft data in the format aircraft_name###livery
+                    data = packet.data.decode('ascii',errors='replace')
+                    if data == "#ac_begin#":
+                        self._aircraft_map.clear()
+                        self._state = "loading"
+
+                    elif data == "#ac_end#":
+                        self._state = "complete"
+                        thread = threading.Thread(target = lambda: self.aircraft_list_loaded.emit(self._aircraft_map))
+                        thread.start()
+
+                    elif self._state == "loading":
+                        splits = data.split("###")
+                        aircraft = splits[0]
+                        livery = splits[1]
+                        if not aircraft in self._aircraft_map:
+                            self._aircraft_map[aircraft] = []
+                        self._aircraft_map[aircraft].append(livery)
+                        
+
+
 
             
             # find the terminating zero
@@ -352,16 +386,11 @@ class SimConnectBridge(QtCore.QObject):
 
 
         
-
-        
-
-    def get_lvars(self):
-        ''' gets the list of lvars from the sim '''
-        # syslog = logging.getLogger("system")
+    def _request_data(self, bridge_command : BridgeCommands):
         verbose = gremlin.config.Configuration().verbose_mode_simconnect
         try:
             id = self._get_next_id() # id is sequential so it's unique for each call and will roundrobin
-            packet = BRIDGE_PACKET(id, BridgeCommands.GetVariableList, b"")
+            packet = BRIDGE_PACKET(id, bridge_command, b"")
             packet_pointer = cast(pointer(packet), c_void_p)
             self.sm._dll.SetClientData(
                 self.sm._hSimConnect,
@@ -371,7 +400,16 @@ class SimConnectBridge(QtCore.QObject):
                 0, # dwReserved
                 kPacketSize, 
                 packet_pointer)
-            syslog.info(f"SIMCONNECT BRIDGE: get variable list")
+            syslog.info(f"SIMCONNECT BRIDGE: get bridge data: {bridge_command.name}")
         except:
-            syslog.error(f"SIMCONNECT BRIDGE: error getting variable list")
+            syslog.error(f"SIMCONNECT BRIDGE: error getting variable list: {bridge_command.name}")
+        
+
+    def get_lvars(self):
+        ''' gets the list of lvars from the sim '''
+        self._request_data(BridgeCommands.GetVariableList)
             
+
+    def getAircraftList(self):
+        ''' gets the list of aircraft and liveries available to the user '''
+        self._request_data(BridgeCommands.GetAircraftList)

@@ -45,7 +45,7 @@ from qtpy.QtCore import (
     Slot, Property)
 
 from qtpy.QtWidgets import QCheckBox
-from qtpy.QtGui import QColor, QBrush, QPaintEvent, QPen, QPainter
+from qtpy.QtGui import QColor, QBrush, QPaintEvent, QPen, QPainter, QStandardItemModel, QStandardItem
 from gremlin.util import load_pixmap, load_icon
 import gremlin.util
 import gremlin.ui.ui_common
@@ -2634,7 +2634,6 @@ class QDataLineEdit(QtWidgets.QLineEdit):
         super().textChanged.connect(self._text_changed_cb)
 
 
-
     def _text_changed_cb(self):
         self._text_changed = True
 
@@ -2791,6 +2790,7 @@ class QPathLineItem(QtWidgets.QWidget):
 
         self._file_widget = QtWidgets.QLineEdit()
         self._file_widget.installEventFilter(self)
+        self._file_widget.returnPressed.connect(self._open_button_cb) # open the dialog on enter
         self._file_widget.setText(text)
         self._file_widget.textChanged.connect(self._file_changed)
         self._open_button = QtWidgets.QPushButton("...")
@@ -2814,6 +2814,7 @@ class QPathLineItem(QtWidgets.QWidget):
         self._data = data
 
         self._file_changed()
+        
 
         self.setLayout(self._layout)
 
@@ -2829,14 +2830,14 @@ class QPathLineItem(QtWidgets.QWidget):
     def _open_button_cb(self):
         self.open.emit(self)
 
-    def eventFilter(self, object, event):
+    def eventFilter(self, widget, event):
         t = event.type()
         if t == QtCore.QEvent.Type.FocusOut:
             new_text = self._file_widget.text()
             if self._text != new_text:
                 self._text = new_text
                 self.pathChanged.emit(self, self._text)
-        return False
+        return super().eventFilter(widget, event)
 
     def _setIcon(self, icon_path = None, use_qta = True, color = None):
         ''' sets the icon of the label, pass a blank or None path to clear the icon'''
@@ -4142,6 +4143,11 @@ class QRowSelectorFrame(QtWidgets.QFrame):
         self.installEventFilter(self)
         self._selectable = True
 
+        border_color = Color.borderColor()
+        background_color = Color.actionBackgroundColor()
+        css = f"Qframe {{ border 1px solid {border_color}; border-top: none; background-color:{background_color} }}"
+        self.setStyleSheet(css)
+
 
     def setSelectable(self, value):
         self._selectable = value
@@ -4165,11 +4171,13 @@ class QRowSelectorFrame(QtWidgets.QFrame):
         # change selection mode
         if value != self._selected:
             self._selected = value
+            
             if value:
-                style = "QRowSelectorFrame{background-color: #8FBC8F; }"
+                background_color = Color.selectColor()
             else:
-                style = "QRowSelectorFrame{background-color: #E8E8E8; }"
+                background_color = Color.actionBackgroundColor()
 
+            style = f"QRowSelectorFrame{{background-color: {background_color}; }}"
             self.setStyleSheet(style)
             if self._emit:
                 self.selected_changed.emit(self)
@@ -6562,3 +6570,109 @@ class QVjoySelector(QtWidgets.QWidget):
         self._current_input_id = input_id
         self._current_input_type = input_type
         self.selectionChanged.emit(self._current_device_guid, self._current_vjoy_id, input_type, input_id)
+
+
+class QPaginator(QtWidgets.QWidget):
+    ''' table view that displays paginated data '''
+    pageChanged = QtCore.Signal(int, int, int) # fires when the page is changed (page_number, start_index, end_index)
+
+    def __init__(self, item_count = 0, page_size=10):
+        ''' setups the data model and callback to get a model by index '''
+        super().__init__()
+        self._item_count = item_count
+        self._page_size = page_size
+        self._current_page = 1
+        self._total_pages = 0
+        self._start_index = 0
+        self._end_index = 0
+
+        self.init_ui()
+        self._update_data()
+        
+    @property
+    def totalPages(self) -> int:
+        ''' number of total pages '''
+        return self._total_pages
+    
+    @property
+    def startIndex(self) -> int:
+        ''' gets the paginators first row index '''
+        return self._start_index
+    
+    @property
+    def endIndex(self) -> int:
+        ''' gets the paginator end row index '''
+        return self._end_index
+    
+    @property
+    def itemCount(self) -> int:
+        return self._item_count
+
+    def _update_data(self, emit = True):
+        self.total_pages = (self._item_count + self._page_size - 1) // self._page_size
+        self._update_data_view(emit)
+
+    def setItemCount(self, count, emit = True):
+        self._item_count = count
+        self._update_data(emit)
+    
+    def setPageSize(self, page_size: int, emit = True):
+        self._page_size = page_size
+        self._update_data(emit)
+
+    def setPageNumber(self, page_number: int, emit = True):
+        ''' set page 1 to n'''
+        if page_number < 1:
+            page_number = 1
+        self._current_page = page_number
+        self._update_data(emit)
+
+
+    def init_ui(self):
+        self._prev_button_widget = QtWidgets.QPushButton("Previous")
+        self._prev_button_widget.clicked.connect(self._prev_page)
+        self._next_button_widget = QtWidgets.QPushButton("Next")
+        self._next_button_widget.clicked.connect(self._next_page)
+
+        self._page_label_widget = QtWidgets.QLabel(f"Page {self._current_page} of {self._total_pages}")
+        self._page_input_widget = QtWidgets.QLineEdit()
+        self._page_input_widget.returnPressed.connect(self._go_to_page)
+
+        hbox = QtWidgets.QHBoxLayout()
+        hbox.addWidget(self._prev_button_widget)
+        hbox.addWidget(self._page_label_widget)
+        hbox.addWidget(self._page_input_widget)
+        hbox.addWidget(self._next_button_widget)
+
+        vbox = QtWidgets.QVBoxLayout()
+        vbox.addLayout(hbox)
+
+        self.setLayout(vbox)
+
+    def _update_data_view(self, emit = True):
+
+        self._page_label_widget.setText(f"Page {self._current_page} of {self.total_pages}")
+        if self._item_count:
+            self._start_index = (self._current_page - 1) * self._page_size
+            self._end_index = min(self._start_index + self._page_size,  self._item_count)
+            if emit:
+                self.pageChanged.emit(self._current_page, self._start_index, self._end_index)
+            
+
+    def _prev_page(self):
+        if self._current_page > 1:
+            self._current_page -= 1
+            self._update_data_view()
+
+    def _next_page(self):
+        if self._current_page < self.total_pages:
+            self._current_page += 1
+            self._update_data_view()
+    
+    def _go_to_page(self):
+        page_num = int(self._page_input_widget.text())
+        if 1 <= page_num <= self.total_pages:
+            self._current_page = page_num
+            self._update_data_view()
+        else:
+            self._page_input_widget.clear()

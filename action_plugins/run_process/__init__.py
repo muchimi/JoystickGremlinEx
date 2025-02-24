@@ -20,6 +20,7 @@ import os
 from PySide6 import QtWidgets, QtCore
 from lxml import etree as ElementTree
 import gremlin.base_profile
+import gremlin.config
 from gremlin.input_types import InputType
 import gremlin.ui.dialogs
 import gremlin.ui.input_item
@@ -254,7 +255,6 @@ class RunProcess(gremlin.base_profile.AbstractAction):
     
     def execute(self):
         ''' executes the process '''
-        syslog = logging.getLogger("system")
         try:
             if self.args_per_line:
                 args = self.arguments.splitlines()

@@ -66,7 +66,18 @@ class SIMCONNECT_RECV_ID(CtypesEnum):
 	SIMCONNECT_RECV_ID_EVENT_MULTIPLAYER_SESSION_ENDED = 24
 	SIMCONNECT_RECV_ID_EVENT_RACE_END = 25
 	SIMCONNECT_RECV_ID_EVENT_RACE_LAP = 26
-
+	SIMCONNECT_RECV_ID_EVENT_EX1 = 27
+	SIMCONNECT_RECV_ID_FACILITY_DATA = 28
+	SIMCONNECT_RECV_ID_FACILITY_DATA_END = 29
+	SIMCONNECT_RECV_ID_FACILITY_MINIMAL_LIST = 30
+	SIMCONNECT_RECV_ID_JETWAY_DATA = 31
+	SIMCONNECT_RECV_ID_CONTROLLERS_LIST = 32
+	SIMCONNECT_RECV_ID_ACTION_CALLBACK = 33
+	SIMCONNECT_RECV_ID_ENUMERATE_INPUT_EVENTS = 34
+	SIMCONNECT_RECV_ID_GET_INPUT_EVENT = 35
+	SIMCONNECT_RECV_ID_SUBSCRIBE_INPUT_EVENT = 36
+	SIMCONNECT_RECV_ID_ENUMERATE_INPUT_EVENT_PARAMS = 37
+	SIMCONNECT_RECV_ID_ENUMERATE_SIMOBJECT_AND_LIVERY_LIST = 38
 
 # Data data types
 class SIMCONNECT_DATATYPE(CtypesEnum):
@@ -88,8 +99,9 @@ class SIMCONNECT_DATATYPE(CtypesEnum):
 	SIMCONNECT_DATATYPE_WAYPOINT = 14  # see SIMCONNECT_DATA_WAYPOINT
 	SIMCONNECT_DATATYPE_LATLONALT = 15  # see SIMCONNECT_DATA_LATLONALT
 	SIMCONNECT_DATATYPE_XYZ = 16  # see SIMCONNECT_DATA_XYZ
+	SIMCONNECT_DATATYPE_INT8 = 17 # 8 bit integer number, char
 
-	SIMCONNECT_DATATYPE_MAX = 17  # enum limit
+	SIMCONNECT_DATATYPE_MAX = 18  # enum limit
 
 
 # Exception error types
@@ -133,6 +145,13 @@ class SIMCONNECT_EXCEPTION(CtypesEnum):
 	SIMCONNECT_EXCEPTION_OBJECT_AI = 35
 	SIMCONNECT_EXCEPTION_OBJECT_ATC = 36
 	SIMCONNECT_EXCEPTION_OBJECT_SCHEDULE = 37
+	SIMCONNECT_EXCEPTION_JETWAY_DATA = 38
+	SIMCONNECT_EXCEPTION_ACTION_NOT_FOUND = 39
+	SIMCONNECT_EXCEPTION_NOT_AN_ACTION = 40
+	SIMCONNECT_EXCEPTION_INCORRECT_ACTION_PARAMS = 41
+	SIMCONNECT_EXCEPTION_GET_INPUT_EVENT_FAILED = 42
+	SIMCONNECT_EXCEPTION_SET_INPUT_EVENT_FAILED = 43
+	SIMCONNECT_EXCEPTION_INTERNAL = 44
 
 
 # Object types
@@ -143,7 +162,10 @@ class SIMCONNECT_SIMOBJECT_TYPE(CtypesEnum):
 	SIMCONNECT_SIMOBJECT_TYPE_HELICOPTER = 3
 	SIMCONNECT_SIMOBJECT_TYPE_BOAT = 4
 	SIMCONNECT_SIMOBJECT_TYPE_GROUND = 5
-
+	SIMCONNECT_SIMOBJECT_TYPE_HOT_AIR_BALLOON = 6
+	SIMCONNECT_SIMOBJECT_TYPE_ANIMAL = 7
+	SIMCONNECT_SIMOBJECT_TYPE_USER_AVATAR = 8
+	SIMCONNECT_SIMOBJECT_TYPE_USER_CURRENT = 9
 
 # EventState values
 class SIMCONNECT_STATE(CtypesEnum):
@@ -220,6 +242,38 @@ class SIMCONNECT_WEATHER_MODE(CtypesEnum):  #
 	SIMCONNECT_WEATHER_MODE_GLOBAL = 3
 
 
+
+class SIMCONNECT_FACILITY_DATA_TYPE(CtypesEnum):
+	SIMCONNECT_FACILITY_DATA_AIRPORT = 0
+	SIMCONNECT_FACILITY_DATA_RUNWAY = 1
+	SIMCONNECT_FACILITY_DATA_START = 2
+	SIMCONNECT_FACILITY_DATA_FREQUENCY = 3
+	SIMCONNECT_FACILITY_DATA_HELIPAD = 4
+	SIMCONNECT_FACILITY_DATA_APPROACH = 5
+	SIMCONNECT_FACILITY_DATA_APPROACH_TRANSITION = 6
+	SIMCONNECT_FACILITY_DATA_APPROACH_LEG = 7
+	SIMCONNECT_FACILITY_DATA_FINAL_APPROACH_LEG = 8
+	SIMCONNECT_FACILITY_DATA_MISSED_APPROACH_LEG = 9
+	SIMCONNECT_FACILITY_DATA_DEPARTURE = 10
+	SIMCONNECT_FACILITY_DATA_ARRIVAL = 11
+	SIMCONNECT_FACILITY_DATA_RUNWAY_TRANSITION = 12
+	SIMCONNECT_FACILITY_DATA_ENROUTE_TRANSITION = 13
+	SIMCONNECT_FACILITY_DATA_TAXI_POINT = 14
+	SIMCONNECT_FACILITY_DATA_TAXI_PARKING = 15
+	SIMCONNECT_FACILITY_DATA_TAXI_PATH = 16
+	SIMCONNECT_FACILITY_DATA_TAXI_NAME = 17
+	SIMCONNECT_FACILITY_DATA_JETWAY = 18
+	SIMCONNECT_FACILITY_DATA_VOR = 19
+	SIMCONNECT_FACILITY_DATA_NDB = 20
+	SIMCONNECT_FACILITY_DATA_WAYPOINT = 21
+	SIMCONNECT_FACILITY_DATA_ROUTE = 22
+	SIMCONNECT_FACILITY_DATA_PAVEMENT = 23
+	SIMCONNECT_FACILITY_DATA_APPROACH_LIGHTS = 24
+	SIMCONNECT_FACILITY_DATA_VASI = 25
+	SIMCONNECT_FACILITY_DATA_VDGS = 26
+	SIMCONNECT_FACILITY_DATA_HOLDING_PATTERN = 27
+	SIMCONNECT_FACILITY_DATA_TAXI_PARKING_AIRLINE = 28
+
 class SIMCONNECT_FACILITY_LIST_TYPE(CtypesEnum):  #
 	SIMCONNECT_FACILITY_LIST_TYPE_AIRPORT = 0
 	SIMCONNECT_FACILITY_LIST_TYPE_WAYPOINT = 1
@@ -235,6 +289,8 @@ class SIMCONNECT_VOR_FLAGS(CtypesFlagEnum):  # flags for SIMCONNECT_RECV_ID_VOR_
 	SIMCONNECT_RECV_ID_VOR_LIST_HAS_DME = 0x00000008  # Station has DME
 
 
+
+
 # bits for the Waypoint Flags field: may be combined
 class SIMCONNECT_WAYPOINT_FLAGS(CtypesFlagEnum):  #
 	SIMCONNECT_WAYPOINT_NONE = 0x00  #
@@ -244,8 +300,10 @@ class SIMCONNECT_WAYPOINT_FLAGS(CtypesFlagEnum):  #
 	SIMCONNECT_WAYPOINT_ALTITUDE_IS_AGL = 0x20  # AltitudeIsAGL
 	SIMCONNECT_WAYPOINT_ON_GROUND = 0x00100000 # place this waypoint on the ground
 	SIMCONNECT_WAYPOINT_REVERSE = 0x00200000 # Back up to this waypoint. Only valid on first waypoint
-	SIMCONNECT_WAYPOINT_WRAP_TO_FIRST = 0x00400000
-
+	SIMCONNECT_WAYPOINT_WRAP_TO_FIRST = 0x00400000 # Wrap around back to first waypoint. Only valid on last waypoint.
+	SIMCONNECT_WAYPOINT_KEEP_LAST_HEADING = 0x01000000  # Object doesn't only go from waypoint to waypoint using position but it will also keep the same heading computed on the last 2 waypoints
+	SIMCONNECT_WAYPOINT_YIELD_TO_USER = 0x02000000  # Object will never be too close of the player. If waypoints pass too close of the player, the object will stop and wait
+	SIMCONNECT_WAYPOINT_CAN_REVERSE  = 0x04000000 # This flags handle the behaviour of the object if it can't reach a waypoint. By default, it will take a other way and try to reach this point again. With this flag, object will try some stuff to reach this waypoint in a better condition (moving backwards...)
 
 class SIMCONNECT_EVENT_FLAG(CtypesFlagEnum):  #
 	SIMCONNECT_EVENT_FLAG_DEFAULT = 0x00000000  #
@@ -299,6 +357,8 @@ class SIMCONNECT_PICK_FLAGS(CtypesFlagEnum):
 	SIMCONNECT_PICK_COORDSASPIXELS = 0x08  #
 
 
+
+
 # ----------------------------------------------------------------------------
 #        User-defined enums
 # ----------------------------------------------------------------------------
@@ -330,6 +390,7 @@ class SIMCONNECT_CLIENT_EVENT_ID(AutoName):  # client-defined client event ID
 	EVENT_SIM_AIRCRAFT_LOADED = auto()
 	EVENT_SIM_REQUEST_AIRCRAFT = auto()
 	EVENT_SIM_PAUSE_STATE = auto()
+	EVENT_SIM_REQUEST_ENUMERATE_SIM_OBJECTS_AND_LIVERIES = auto()
 	
 	pass
 
@@ -392,6 +453,14 @@ class SIMCONNECT_RECV_EVENT(SIMCONNECT_RECV):  # when dwID == SIMCONNECT_RECV_ID
 		("uEventID", DWORD),
 		("dwData", DWORD),  # uEventID-dependent context
 	]
+
+class SIMCONNECT_RECV_LIST_TEMPLATE(SIMCONNECT_RECV):
+	_fields_ = [
+		("dwRequestID", DWORD),
+		("dwArraySize", DWORD),
+		("dwEntryNumber", DWORD), # when the array of items is too big for one send, which send this is (0..dwOutOf-1)
+		("dwOutOf", DWORD), # total number of transmissions the list is chopped into
+		]
 
 
 class SIMCONNECT_RECV_EVENT_FILENAME(
@@ -565,16 +634,42 @@ class SIMCONNECT_RECV_EVENT_WEATHER_MODE(SIMCONNECT_RECV_EVENT):  #
 		[]
 	)  # No event specific data - the new weather mode is in the base structure dwData member.
 
+class SIMCONNECT_ENUMERATE_SIMOBJECT_LIVERY(Structure):
+			_fields_ = [
+				("AircraftTitle", c_char * 256),
+				("LiveryName", c_char * 256)]
+			
+
+# SIMCONNECT Object/Livery list
+class SIMCONNECT_RECV_ENUMERATE_SIMOBJECT_AND_LIVERY_LIST(SIMCONNECT_RECV):
+	_fields_ = [
+		("dwRequestID", DWORD),
+		("dwArraySize", DWORD),
+		("dwEntryNumber", DWORD,),  # when the array of items is too big for one send, which send this is (0..dwOutOf-1)
+		("dwOutOf", DWORD),  # total number of transmissions the list is chopped into
+	]
+
+
+
+def SIMCONNECT_RECV_ENUMERATE_SIMOBJECT_AND_LIVERY_LIST_FACTORY(num_items : int):
+	''' creates a dynamic structure holding the returned data once the number of items returned is known '''
+	class factory(SIMCONNECT_RECV):
+		_fields_ = [
+		("dwRequestID", DWORD),
+		("dwArraySize", DWORD),
+		("dwEntryNumber", DWORD,),  # when the array of items is too big for one send, which send this is (0..dwOutOf-1)
+		("dwOutOf", DWORD),  # total number of transmissions the list is chopped into
+		("rgData", SIMCONNECT_ENUMERATE_SIMOBJECT_LIVERY * num_items)
+		]
+
+	return factory
 
 # SIMCONNECT_RECV_FACILITIES_LIST
 class SIMCONNECT_RECV_FACILITIES_LIST(SIMCONNECT_RECV):  #
 	_fields_ = [
 		("dwRequestID", DWORD),
 		("dwArraySize", DWORD),
-		(
-			"dwEntryNumber",
-			DWORD,
-		),  # when the array of items is too big for one send, which send this is (0..dwOutOf-1)
+		("dwEntryNumber", DWORD,),  # when the array of items is too big for one send, which send this is (0..dwOutOf-1)
 		("dwOutOf", DWORD),  # total number of transmissions the list is chopped into
 	]
 
@@ -715,3 +810,4 @@ class SIMCONNECT_DATA_LATLONALT(Structure):  #
 # SIMCONNECT_DATA_XYZ
 class SIMCONNECT_DATA_XYZ(Structure):  #
 	_fields_ = [("x", c_double), ("y", c_double), ("z", c_double)]
+
