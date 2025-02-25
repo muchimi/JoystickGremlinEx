@@ -1543,14 +1543,19 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self.close_button_widget = QtWidgets.QPushButton("Close")
         self.close_button_widget.clicked.connect(self.close_button_cb)
 
+        flight save/load not functional in MSFS 2024
+        self.save_flight_widget = QtWidgets.QPushButton("Save Flight")
+        self.save_flight_widget.clicked.connect(self._handle_save_flight)
         
 
-
+        self.load_flight_widget = QtWidgets.QPushButton("Load Flight")
+        self.load_flight_widget.clicked.connect(self._handle_load_flight)
 
         button_bar_widget = QtWidgets.QWidget()
         button_bar_layout = QtWidgets.QHBoxLayout(button_bar_widget)
 
-        
+        button_bar_layout.addWidget(self.save_flight_widget)
+        button_bar_layout.addWidget(self.load_flight_widget)
         button_bar_layout.addStretch()
         button_bar_layout.addWidget(self.close_button_widget)
 
@@ -1798,6 +1803,15 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
     def close_button_cb(self):
         ''' called when close button clicked '''
         self.close()
+
+    @QtCore.Slot()
+    def _handle_save_flight(self):
+        self._manager.save_flight("c:\\gremlinex_test_flight.flt","test save","test description")
+
+    @QtCore.Slot()
+    def _handle_load_flight(self):
+        self._manager.load_flight("c:\\gremlinex_test_flight.flt")
+
 
     @QtCore.Slot()
     def _handle_clear_search(self):

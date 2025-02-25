@@ -2193,18 +2193,36 @@ class Profile():
         tree = {}
         nodes = {}
         
-        def addNode(name : str, parent = None) -> Node:
+        def addNode(name : str, parent : Node = None) -> Node:
             if not name in nodes:
+
+                if parent:
+                    # make sure the name is not already used by a parent node
+                    parent_modes = [parent.name]
+                    parent_modes.extend([n.name for n in parent.ancestors])
+                    if name in parent_modes:
+                        syslog.warning(f"MODE TREE: mode {name} is already used by a parent")
+                        return None
+                    
                 node = Node(name)
                 nodes[name] = node
                 if parent:
                     node.parent = parent
             return nodes[name]
         
-        root_node = addNode("__root__")
+        used_list = [] # list of used modes
+        
+        root_node = Node("")
         for _, device in self.devices.items():
             for mode_name, mode in device.modes.items():
+                if mode_name in used_list:
+                    # already processed - skip - modes can only appear once in the mode tree
+                    continue
+                used_list.append(mode_name)
                 node = addNode(mode_name, root_node)
+                
+                if node is None:
+                    continue # mode already used
                 if mode.inherit is None and mode_name and mode_name not in tree:
                     tree[mode_name] = {}
                     node.parent = root_node
@@ -2231,9 +2249,10 @@ class Profile():
 
                         branch = branch[entry]
                         
-
-        # for pre, fill, node in anytree.RenderTree(root_node, style=anytree.AsciiStyle()):
-        #     syslog.info(f"{pre}{str(node)}")
+        verbose = gremlin.config.Configuration().verbose_mode_execution
+        if verbose:
+            for pre, fill, node in anytree.RenderTree(root_node, style=anytree.AsciiStyle()):
+                syslog.info(f"{pre}{node.name}")
         if as_tree:
             return root_node       
         return tree

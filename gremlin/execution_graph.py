@@ -201,7 +201,7 @@ class ExecutionContext():
         ''' walks a mode tree manually to build the mode hierarchy (recursive)'''
         for mode, sub_branch in branch.items():
             if not mode:
-                # most but be valid
+                # must but be valid
                 continue
             child = ExecutionModeNode(mode)
             child.parent = node

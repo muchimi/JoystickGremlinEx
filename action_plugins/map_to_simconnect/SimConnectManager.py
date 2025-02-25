@@ -1202,11 +1202,19 @@ class SimConnectManager(QtCore.QObject):
             title = title.decode()
         return title
     
-    def get_aircraft_list(self):
-        ''' gets the list of aircraft '''
-        self.bridge.getAircraftList()
-    
 
+    def save_flight(self, the_path : str, title : str = "", description : str = ""):
+        ''' requests to save the flight data '''
+        if self._sm.ok:
+
+            # get the current aircraft position
+            
+
+            self._sm.save_flight(the_path, title, description)
+
+    def load_flight(self, the_path : str):
+        if self._sm.ok:
+            self._sm.load_flight(the_path)
         
 
     def _write_default_xml(self, xml_file):

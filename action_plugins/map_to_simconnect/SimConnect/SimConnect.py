@@ -1325,15 +1325,6 @@ class SimConnect():
 		else:
 			return False
 
-	def load_flight(self, flt_path):
-		if self._dll is None:
-			return False
-		hr = self._dll.FlightLoad(self._hSimConnect, flt_path.encode())
-		if self.IsHR(hr, 0):
-			return True
-		else:
-			return False
-
 	def load_flight_plan(self, pln_path):
 		if self._dll is None:
 			return False
@@ -1342,38 +1333,39 @@ class SimConnect():
 			return True
 		else:
 			return False
+		
+	
+	# def save_flight(
+	# 	self,
+	# 	flt_path,
+	# 	flt_title,
+	# 	flt_description,
+	# 	flt_mission_type='FreeFlight',
+	# 	flt_mission_location='Custom departure',
+	# 	flt_original_flight='',
+	# 	flt_flight_type='NORMAL'):
 
-	def save_flight(
-		self,
-		flt_path,
-		flt_title,
-		flt_description,
-		flt_mission_type='FreeFlight',
-		flt_mission_location='Custom departure',
-		flt_original_flight='',
-		flt_flight_type='NORMAL'):
+	# 	if self._dll is None:
+	# 		return False
+	# 	hr = self._dll.FlightSave(self._hSimConnect, flt_path.encode(), flt_title.encode(), flt_description.encode(), 0)
+	# 	if not self.IsHR(hr, 0):
+	# 		return False
 
-		if self._dll is None:
-			return False
-		hr = self._dll.FlightSave(self._hSimConnect, flt_path.encode(), flt_title.encode(), flt_description.encode(), 0)
-		if not self.IsHR(hr, 0):
-			return False
+	# 	dicp = self.flight_to_dic(flt_path)
+	# 	if 'MissionType' not in dicp['Main']:
+	# 		dicp['Main']['MissionType'] = flt_mission_type
 
-		dicp = self.flight_to_dic(flt_path)
-		if 'MissionType' not in dicp['Main']:
-			dicp['Main']['MissionType'] = flt_mission_type
+	# 	if 'MissionLocation' not in dicp['Main']:
+	# 		dicp['Main']['MissionLocation'] = flt_mission_location
 
-		if 'MissionLocation' not in dicp['Main']:
-			dicp['Main']['MissionLocation'] = flt_mission_location
+	# 	if 'FlightType' not in dicp['Main']:
+	# 		dicp['Main']['FlightType'] = flt_flight_type
 
-		if 'FlightType' not in dicp['Main']:
-			dicp['Main']['FlightType'] = flt_flight_type
+	# 	if 'OriginalFlight' not in dicp['Main']:
+	# 		dicp['Main']['OriginalFlight'] = flt_original_flight
+	# 	self.dic_to_flight(dicp, flt_path)
 
-		if 'OriginalFlight' not in dicp['Main']:
-			dicp['Main']['OriginalFlight'] = flt_original_flight
-		self.dic_to_flight(dicp, flt_path)
-
-		return False
+	# 	return False
 
 	def get_paused(self):
 		if self._dll is None:
@@ -1495,3 +1487,25 @@ class SimConnect():
 		''' gets the current list of aircraft - gets the results of  requestSimObjectsAndLiveries() '''
 		return list(self.AicraftLiveries.keys())
 
+	def save_flight(self, the_path : str, title: str = "", description : str = ""):
+		''' save the current flight '''
+		if self._dll:
+			b_the_path = the_path.encode()
+			b_title = title.encode()
+			b_description = description.encode()
+			hr = self._dll.FlightSave(self._hSimConnect, b_title, b_the_path, b_description, 0)
+			if not self.IsHR(hr, 0):
+				return False
+			return True
+		return False
+	
+		
+	def load_flight(self, the_path : str):
+		''' loads a saved flight '''
+		if self._dll:
+			b_the_path = the_path.encode()
+			hr = self._dll.FlightLoad(self._hSimConnect, b_the_path)
+			if not self.IsHR(hr, 0):
+				return False
+			return True
+		return False

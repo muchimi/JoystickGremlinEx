@@ -121,6 +121,8 @@ class RunProcessWidget(gremlin.ui.input_item.AbstractActionWidget):
         item.process = fname
         with QtCore.QSignalBlocker(w):
             w.setText(fname)
+        self.action_data.process = fname
+        self._update_ui()
         
     @QtCore.Slot(bool)
     def _args_per_line_changed(self, checked):
@@ -151,8 +153,8 @@ class RunProcessWidget(gremlin.ui.input_item.AbstractActionWidget):
             with QtCore.QSignalBlocker(self.process_widget):
                 self.process_widget.setText(text)
             self.action_data.process = text
-
-        self.run_widget.setEnabled(os.path.isfile(self.action_data.process))
+        enabled = os.path.isfile(self.action_data.process)
+        self.run_widget.setEnabled(enabled)
 
     @QtCore.Slot()
     def _args_changed_cb(self):
@@ -260,7 +262,9 @@ class RunProcess(gremlin.base_profile.AbstractAction):
                 args = self.arguments.splitlines()
             else:
                 args = self.arguments
-            process = subprocess.Popen([self.process, *args],stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            cmd_list = [self.process]
+            cmd_list.extend(arg for arg in args)
+            process = subprocess.Popen(cmd_list,stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             out, err = process.communicate()
             syslog.info(f"PROC: execute process: {self.process} {args}")
             if out:

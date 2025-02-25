@@ -2211,10 +2211,8 @@ class ModeManagerUi(ui_common.BaseDialogUi):
         self.scroll_layout.addWidget(self.add_button)
 
         label = QtWidgets.QLabel(
-            "Modes are by default self contained configurations. Specifying "
-            "a parent for a mode causes the the mode \"inherits\" all actions "
-            "defined in the parent, unless the mode configures its own actions "
-            "for specific inputs."
+            "A mode represents a unique set of mappings."
+            "A parent for a mode causes the the mode \"inherits\" all actions of the parent. "
         )
         label.setStyleSheet(f"QLabel {{ background-color : {gremlin.ui.ui_common.Color.selectColor()}; }}")
         label.setWordWrap(True)
@@ -2578,9 +2576,9 @@ The setting can be overriden by the global mode reload option set in Options for
         new_mode = None
         if user_input:
             if name in gremlin.profile.mode_list(self._profile):
-                gremlin.util.display_error(
-                    f"A mode with the name \"{name}\" already exists"
-                )
+                msg = f"A mode with the name \"{name}\" already exists"
+                gremlin.util.display_error(msg)
+                syslog.error(f"ADD MODE: {msg}")
             else:
                 for device in self._profile.devices.values():
                     new_mode = gremlin.base_profile.Mode(device)
