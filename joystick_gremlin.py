@@ -3481,6 +3481,9 @@ class GremlinUi(QtWidgets.QMainWindow):
                 gremlin.config.Configuration().set_profile_last_edit_mode(last_edit_mode)
             
             modes = new_profile.get_modes()
+            if last_edit_mode is None:
+                last_edit_mode = modes[0]
+
             if not last_edit_mode in modes:
                 # no longer in the current mode list
                 last_edit_mode = new_profile.get_default_mode()

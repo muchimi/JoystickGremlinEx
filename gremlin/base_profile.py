@@ -2453,7 +2453,10 @@ class Profile():
                     modes.append(mode.name.casefold())    
                 else:
                     modes.append(mode.name)
-        return list(set(modes))  # unduplicated
+        modes = list(set(modes))
+        if not modes:
+            modes = ["Default"]
+        return modes  # unduplicated
     
     def rename_mode(self, old_mode:str, new_mode:str):
         ''' renames an existing mode to a new mode '''

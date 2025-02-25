@@ -529,6 +529,16 @@ class GateInfo():
     def __str__(self):
         return self.gate_display()
         
+    def __eq__(self, other):
+        if other is None:
+            return False
+        if self.id == other.id:
+            return True # same gate
+        r1 = round(self.value, 3)
+        r2 = round(other.value, 3)
+        return r1 == r2
+    
+    
         
 
     def __hash__(self):
@@ -828,7 +838,8 @@ class RangeInfo():
 
     def set_gates(self, g1 : GateInfo, g2 : GateInfo):
         ''' sets both gates for the range '''
-        assert g1 != g2,"Ranges require two different gates"
+        
+        assert abs(g1.value < g2.value) >= 0.001,"Ranges require two different gates"
         if self._g1_id != g1.id or self._g2_id != g2.id:
             self._g1_id = g1.id
             self._g2_id = g2.id
@@ -1155,7 +1166,27 @@ class GateData():
 
         self._hooked = False
 
-    
+    def replace_gate(self, g1):
+        ''' replace a given gate with a new gate'''
+        g2 = GateInfo()
+        g2.value = g1.value
+        g2.index = g1.index
+        g2.slider_index = g1.slider_index
+        if g1 in self._gates:
+            self._gates.remove(g1)
+            del self._gate_item_map[g1.id]
+        self._gates.append(g2)
+        self._gate_item_map[g2.id] = g2
+
+        if self.default_min_gate == g1:
+            self.default_min_gate = g2
+        elif self.default_max_gate == g1:
+            self.default_max_gate = g2
+        return g2
+
+        
+
+
     def hook(self):
         ''' hook events '''
         if not self._hooked:
@@ -1828,7 +1859,7 @@ class GateData():
 
     def isGateRegistered(self, gate):
         ''' true if a gate is registered'''
-        return gate.id in self._gate_item_map.keys()
+        return gate.id in self._gate_item_map
         
     def getDefaultGates(self):
         ''' gets default gates only '''
@@ -2664,6 +2695,7 @@ class GateData():
             child.set("value", f"{gate.value:0.{_decimals}f}")
             child.set("delay", str(gate.delay))
             child.set("id", gate.id)
+            child.set("index", str(gate.slider_index))
 
             for condition, item_data in gate.item_data_map.items():
                 if item_data.containers:
@@ -2727,6 +2759,36 @@ class GateData():
         return node
     
 
+    def ensure_separation(self, g1 : GateInfo, g2 : GateInfo):
+
+        v1 = g1.value
+        v2 = g2.value
+        sep = 0.001
+        nv1 = v1
+        nv2 = v2
+        if abs(nv1 - nv2) < sep:
+            while abs(nv1 - nv2) < sep:
+                # not separated enough
+                if v1 <= v2:
+                    nv2 = v1 + sep
+                    if nv2 > 1.0:
+                        nv2 = 1.0
+                        nv1 = nv2 - sep
+                elif v1 > v2:
+                    nv1 = v2 - sep
+                    if nv1 < -1.0:
+                        nv1 = -1.0
+                        nv2 = nv1 + sep
+            g1._value = nv1
+            g2._value = nv2
+
+        assert abs(g1.value - g2.value) >= sep
+        return g1, g2
+
+        
+
+                
+                
 
 
 
@@ -2770,6 +2832,8 @@ class GateData():
         for rng in self._ranges:
             rng.setUsed(False)
 
+
+
         for index, child in enumerate(node_gates):
             gate_default = safe_read(child, "default", bool, False)
             if gate_default:
@@ -2781,24 +2845,25 @@ class GateData():
             gate_condition = safe_read(child, "condition", str, "")
             gate_delay = safe_read(child, "delay", int, 250)
             
+            
             if not gate_condition in _gate_condition_to_enum.keys():
                 syslog.error(f"GateData: Invalid condition type {gate_condition} gate id: {gate_id}")
                 return
             gate_condition = GateConditionType.to_enum(gate_condition)
             
-            gate_info = GateInfo(index = index, 
-                            id = gate_id,
-                            value = gate_value,
-                            profile_mode = profile_mode,
-                            is_default = gate_default,
-                            delay = gate_delay,
-                            parent = self)
             
-            gate_map[gate_info.id] = gate_info
-            gate_info = self.registerGate(gate_value, gate_default)
-            gate_info.setLastCondition(gate_condition)
+            gate_info : GateInfo = self.getUnusedGate()
+            gate_info.value = gate_value
+            if "index" in child.attrib:
+                gate_index = safe_read(child,"index",int)
+                gate_info.slider_index = gate_index
+            gate_info.profile_mode = profile_mode
             gate_info.is_default = gate_default
             gate_info.delay = gate_delay
+            gate_info = self.registerGate(gate_value, gate_default)
+            gate_info.setLastCondition(gate_condition)
+            gate_map[gate_id] = gate_info
+
             
             
             item_nodes = gremlin.util.get_xml_child(child, "action_containers", multiple=True)
@@ -2843,22 +2908,21 @@ class GateData():
                 # continue (bad data)
                 continue
 
+            assert min_id != max_id,"XML: invalid range gate IDs detected"
             # if not self.isGateRegistered(min_gate):
-            g1 : GateInfo = self.findGateById(min_id)
-            g2 : GateInfo = self.findGateById(max_id)
-            if not g1 or g2:
-                g1 = self.findGate(min_gate.value)
-                g2 = self.findGate(max_gate.value)
-                if g1 is not None and g2 is not None:
-                    if verbose:
-                        syslog.info(f"Read range: (by value) gate {g1.index} {g2.index} {g1.value} {g2.value}")
-                else:
-                    # bad data
-                    continue
-            else:
-                if verbose:
-                    syslog.info (f"Read range: (by id) gate {g1.index} {g2.index} {g1.value} {g2.value}")
+            # g1 = min_gate
+            # g2 = max_gate
 
+
+
+            g1 : GateInfo = gate_map[min_id]
+            g2 : GateInfo = gate_map[max_id]
+            if verbose:
+                syslog.info (f"Read range: (by id) gate [{g1.slider_index}] {g1.value:0.3f} [{g2.slider_index}]  {g2.value:0.3f}")
+                
+            if g1 == g2:
+                g1, g2 = self.ensure_separation(g1, g2)
+                assert g1 != g2,"XML: Ranges require two different gates"
             key = (g1, g2)
             if key in range_pairs:
                 range_info = range_pairs[key]
