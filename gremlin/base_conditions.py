@@ -4,6 +4,7 @@ import enum
 import logging
 from lxml import etree as ElementTree
 import gremlin.base_profile
+import gremlin.config
 from gremlin.input_types import InputType
 import gremlin.shared_state
 import gremlin.util
@@ -526,8 +527,10 @@ class ConditionTracker():
         self._data_map[condition.id] = data
         self._el.condition_added.emit(input_item, mode, condition)
         self._el.condition_state_changed.emit(data.container)
-        syslog = logging.getLogger("system")
-        syslog.info(f"creating condition: {condition.id} for input: {data.input_item.display_name if hasattr(data.input_item,"display_name") else data.input_item} mode: {data.mode}")
+        verbose = gremlin.config.Configuration().verbose_mode_condition
+        if verbose:
+            syslog = logging.getLogger("system")
+            syslog.info(f"creating condition: {condition.id} for input: {data.input_item.display_name if hasattr(data.input_item,"display_name") else data.input_item} mode: {data.mode}")
         data.condition.id_changed.connect(self._condition_id_changed)
 
 

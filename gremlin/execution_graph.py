@@ -172,7 +172,8 @@ class ExecutionContext():
     def reset(self):
         ''' reloads the execution context to capture changes '''
         # syslog = logging.getLogger("system")
-        syslog.info("CONTEXT: reload")
+        verbose = gremlin.config.Configuration().verbose_mode_exec
+        if verbose: syslog.info("CONTEXT: reload")
         if not gremlin.shared_state.current_profile:
             # no profile loaded
             return 
@@ -186,7 +187,7 @@ class ExecutionContext():
         self._walk_mode_tree(root_mode, tree)
         self._mode_tree = root_mode
 
-        verbose = gremlin.config.Configuration().verbose_mode_exec
+        
         if verbose:
             self.dump()
         

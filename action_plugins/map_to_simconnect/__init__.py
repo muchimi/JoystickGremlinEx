@@ -478,7 +478,8 @@ class SimconnectOptions():
     def find_definition_by_sim_name(self, key, is_scan = True, is_manual = True):
         ''' gets an item based on the state data which is a partial subfolder '''
         key = key.casefold()
-        self.dump()
+        verbose = gremlin.config.Configuration().verbose_mode_details
+        if verbose: self.dump()
         if is_scan:
             # lookup scanned entries
             if key in self._aircraft_definition_map:

@@ -21,6 +21,8 @@ import time
 
 from PySide6 import QtCore
 
+import gremlin.config
+
 from . import common, event_handler, input_devices, joystick_handling
 import logging
 from gremlin.input_types import InputType
@@ -157,7 +159,7 @@ class Repeater(QtCore.QObject):
         index = 0
         el = event_handler.EventListener()
         syslog = logging.getLogger("system")
-        verbose = True
+        verbose = gremlin.config.Configuration().verbose_mode_outputs
 
         
 

@@ -345,7 +345,7 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
 
         # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_keyboard
-        verbose = True
+        #verbose = True
 
         self.press = gremlin.macro.Macro()
         self.needs_auto_release = True
