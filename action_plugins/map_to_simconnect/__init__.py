@@ -644,13 +644,15 @@ class SimconnectOptions():
                     
 
             node_user_items = root.xpath("//user_items/item")
+            verbose = gremlin.config.Configuration().verbose_mode_details
             for node in node_user_items:
                 mode = safe_read(node,"mode", str, "")
                 id = safe_read(node,"id", str, "")
                 sim_name = safe_read(node,"sim_name", str, "")
                 item =SimconnectManualDefinition(id, sim_name, mode)
                 self._aircraft_manual_definitions.append(item)
-                print (f"manual: read mode: {mode} for item: {sim_name}")
+                
+                if verbose: syslog.info (f"SIMCONNECT: manual: read mode: {mode} for item: {sim_name}")
 
 
 
