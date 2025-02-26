@@ -1159,10 +1159,13 @@ class GateData():
         el = gremlin.event_handler.EventListener()
         el.profile_start.connect(self._profile_start_cb)
         el.profile_stop.connect(self._profile_stop_cb)
+        el.shutdown.connect(self.unhook) # unhook on shutdown
 
         # update the default range when the order of gates changes
         eh = GateEventHandler()
         eh.gate_order_changed.connect(self._update_default_range)
+
+        
 
         self._hooked = False
 
@@ -1364,7 +1367,8 @@ class GateData():
             return
         
         if not hasattr(self,"_action_data"):
-            syslog.error("GateData: joystick handler called before class initialized.  This should not happen.")
+            # this happens at shutdown usually as objects are removed
+            # syslog.error("GateData: joystick handler called before class initialized.  This should not happen.")
             return
         
         if not self._action_data:

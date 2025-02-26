@@ -4165,7 +4165,8 @@ if __name__ == "__main__":
     app.setWindowIcon(load_icon("gfx/icon.png"))
     app.setApplicationDisplayName(APPLICATION_NAME + " " + APPLICATION_VERSION)
     app.setApplicationVersion(APPLICATION_VERSION)
-    app.setAttribute(QtCore.Qt.ApplicationAttribute.AA_EnableHighDpiScaling)
+    # no longer needed in QT6
+    #app.setAttribute(QtCore.Qt.ApplicationAttribute.AA_EnableHighDpiScaling)
 
     # handle windows themes better
     app.setStyle('Fusion')

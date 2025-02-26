@@ -50,7 +50,7 @@ class Request(object):
 	def __init__(self, definitions, sm, time=10, dec=None, settable=False, attempts=10, callback = None, is_client_data = False):
 		''' request 
 		
-		:param deff:  definitions (command, datatype)
+		:param deff:  definitions (command : str, datatype : SIMCONNECT_DATATYPE)
 		:callback : callback to call when the value of this request is set by the simulator
 		
 		'''

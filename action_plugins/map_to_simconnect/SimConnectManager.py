@@ -733,7 +733,6 @@ class SimConnectManager(QtCore.QObject):
             self._registered_requests[key] = request
         
         return self._registered_requests[key]
-    
         
     def findRequest(self, command):
         ''' returns a registered request if it was registered before '''
@@ -1202,13 +1201,30 @@ class SimConnectManager(QtCore.QObject):
             title = title.decode()
         return title
     
+    def get_aicraft_position(self):
+
+        request_id = self._sm.new_request_id()
+        
+
+        definitions = [("SIM ON GROUND", "Bool", SIMCONNECT_DATATYPE.SIMCONNECT_DATATYPE_INT32),
+                        ("PLANE LATITUDE", "Degrees", SIMCONNECT_DATATYPE.SIMCONNECT_DATATYPE_FLOAT64),
+                        ("PLANE LONGITUDE", "Degrees", SIMCONNECT_DATATYPE.SIMCONNECT_DATATYPE_FLOAT64),
+                        ("PLANE ALTITUDE", "Feet", SIMCONNECT_DATATYPE.SIMCONNECT_DATATYPE_FLOAT64),
+        ]
+
+        request = Request(definitions, self._sm)
+        
+        # hr = SimConnect_AddToDataDefinition(hSimConnect, request_id, "SIM ON GROUND", "Bool", SIMCONNECT_DATATYPE_INT32)
+        # hr = SimConnect_AddToDataDefinition(hSimConnect, request_id, "PLANE LATITUDE", "Degrees", SIMCONNECT_DATATYPE_FLOAT64)
+        # hr = SimConnect_AddToDataDefinition(hSimConnect, request_id, "PLANE LONGITUDE", "Degrees", SIMCONNECT_DATATYPE_FLOAT64)
+        # hr = SimConnect_AddToDataDefinition(hSimConnect, request_id, "PLANE ALTITUDE", "Feet", SIMCONNECT_DATATYPE_FLOAT64)
 
     def save_flight(self, the_path : str, title : str = "", description : str = ""):
         ''' requests to save the flight data '''
         if self._sm.ok:
 
             # get the current aircraft position
-            
+
 
             self._sm.save_flight(the_path, title, description)
 

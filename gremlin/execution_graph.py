@@ -187,15 +187,12 @@ class ExecutionContext():
         self._mode_tree = root_mode
 
         verbose = gremlin.config.Configuration().verbose_mode_exec
-        verbose = True
         if verbose:
             self.dump()
         
         # tell the ui the execution context changed
         el = gremlin.event_handler.EventListener()
         el.execution_context_changed.emit()
-
-
 
     def _walk_mode_tree(self, node, branch):
         ''' walks a mode tree manually to build the mode hierarchy (recursive)'''
@@ -866,34 +863,34 @@ class AbstractExecutionGraph(QtCore.QObject):
                     condition_name = ""
                 if verbose_detailed: syslog.info(f"{logTabs}\t{index} -> {functor_names[index]} {condition_name}")
             
-            if verbose_detailed:
-                # output the transition plan
-                syslog.info(f"{logTabs}Transition plan:")
-                for key, next_index in self.transitions.items():
-                    syslog.info(f"{logTabs}\t{key} -> {next_index}")
-            
-
-
-            if verbose_detailed: syslog.info (f"{logTabs}Execution start:")
-            id = functor.id
-            if id:
+                if verbose_detailed:
+                    # output the transition plan
+                    syslog.info(f"{logTabs}Transition plan:")
+                    for key, next_index in self.transitions.items():
+                        syslog.info(f"{logTabs}\t{key} -> {next_index}")
                 
-                node = self.ec.getNode(id)
-                if node.nodeType == ExecutionGraphNodeType.Container:
-                    nodes = self.ec.getNodeActivationConditions(id)
-                    if nodes:
-                        if verbose: syslog.info(f"{logTabs}\t\t\t found container condition")
-                        if verbose_detailed:
-                            for n in nodes:
-                                syslog.info(f"node: {n.description}")
-                        for condition_node in nodes:
-                            if condition_node.functor:
-                                functor = condition_node.functor
-                                result = functor(event, value)
-                                if not result:
-                                    if verbose: syslog.info(f"{logTabs}\t\t\t FAIL condition on condition: {condition_node.description}")
-                                    return False
-                    if verbose: syslog.info("Container condition: PASS")
+
+
+                if verbose_detailed: syslog.info (f"{logTabs}Execution start:")
+                id = functor.id
+                if id:
+                    
+                    node = self.ec.getNode(id)
+                    if node.nodeType == ExecutionGraphNodeType.Container:
+                        nodes = self.ec.getNodeActivationConditions(id)
+                        if nodes:
+                            if verbose: syslog.info(f"{logTabs}\t\t\t found container condition")
+                            if verbose_detailed:
+                                for n in nodes:
+                                    syslog.info(f"node: {n.description}")
+                            for condition_node in nodes:
+                                if condition_node.functor:
+                                    functor = condition_node.functor
+                                    result = functor(event, value)
+                                    if not result:
+                                        if verbose: syslog.info(f"{logTabs}\t\t\t FAIL condition on condition: {condition_node.description}")
+                                        return False
+                        if verbose: syslog.info("Container condition: PASS")
 
             # container conditions
             for functor in self.condition_functors:

@@ -31,6 +31,7 @@ import gremlin.ui.ui_common
 import gremlin.ui.input_item
 from gremlin.ui.input_item import AbstractContainerWidget, AbstractActionWidget
 from gremlin.base_profile import AbstractContainer
+import gremlin.base_conditions
 import gremlin.joystick_handling
 from gremlin.input_types import InputType
 import enum
@@ -494,7 +495,7 @@ class SwitchContainerFunctor(gremlin.base_conditions.AbstractFunctor):
         self.switch_on_press = False
         if container.has_conditions:
             for cond in container.activation_condition.conditions:
-                if isinstance(cond, gremlin.base_classes.InputActionCondition):
+                if isinstance(cond, gremlin.base_conditions.InputActionCondition):
                     if cond.comparison == "press":
                         self.switch_on_press = True
 

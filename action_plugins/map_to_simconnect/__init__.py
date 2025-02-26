@@ -1542,8 +1542,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         
         self.close_button_widget = QtWidgets.QPushButton("Close")
         self.close_button_widget.clicked.connect(self.close_button_cb)
-
-        flight save/load not functional in MSFS 2024
+        
         self.save_flight_widget = QtWidgets.QPushButton("Save Flight")
         self.save_flight_widget.clicked.connect(self._handle_save_flight)
         
