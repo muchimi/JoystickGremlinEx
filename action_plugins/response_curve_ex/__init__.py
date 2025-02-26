@@ -154,7 +154,8 @@ class ResponseCurveEx(gremlin.base_profile.AbstractAction):
 
     def icon(self):
         """Returns the icon representing the action."""
-        return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
+        return "mdi.chart-bell-curve"
+        #return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
 
     def requires_virtual_button(self):
         """Returns whether or not an activation condition is needed.

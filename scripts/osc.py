@@ -464,7 +464,7 @@ class Osc:
         self._missed_count = 0
         self._start_requested = False
         self._lock = threading.Lock()
-        self._server_thread = threading.Thread(target=self.thread_loop)
+        self._server_thread = threading.Thread(target=self.thread_loop, daemon=True)
 
     @property
     def started(self):
@@ -487,7 +487,7 @@ class Osc:
             
             self._stop = False
             if not self._server_thread.is_alive():
-                self._server_thread = threading.Thread(target=self.thread_loop)
+                self._server_thread = threading.Thread(target=self.thread_loop, daemon=True)
                 self._server_thread.start()
             self._running = True
 

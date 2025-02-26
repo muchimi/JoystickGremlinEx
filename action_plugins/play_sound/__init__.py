@@ -199,7 +199,8 @@ class PlaySound(gremlin.base_profile.AbstractAction):
     widget = PlaySoundWidget
 
     def icon(self):
-        return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
+        return "ei.speaker"
+        #return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
 
     def __init__(self, parent):
         super().__init__(parent)

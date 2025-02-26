@@ -354,7 +354,7 @@ class RemoteControl():
             else:
                 msg = "Paired mode disabled"
             syslog.debug(f"Paired mode changed: {msg}")
-            threading.Thread(target = self.say, args=(msg,)).start()
+            threading.Thread(target = self.say, args=(msg,), daemon=True).start()
 
     def _config_changed(self):
         ''' called when broadcast config item changes '''
@@ -380,7 +380,7 @@ class RemoteControl():
             elif event.is_remote:
                 msg = "Remote control is enabled"
             if msg:
-                threading.Thread(target = self.say, args=(msg,)).start()
+                threading.Thread(target = self.say, args=(msg,), daemon=True).start()
         
     @property
     def mode(self):
@@ -475,7 +475,7 @@ class PeriodicRegistry:
         """Creates a new instance."""
         self._registry = {}
         self._running = False
-        self._thread = threading.Thread(target=self._thread_loop)
+        self._thread = threading.Thread(target=self._thread_loop, daemon=True)
         self._queue = []
         self._plugins = []
 
@@ -489,7 +489,7 @@ class PeriodicRegistry:
         # currently running
         self._running = True
         if not self._thread.is_alive():
-            self._thread = threading.Thread(target=self._thread_loop)
+            self._thread = threading.Thread(target=self._thread_loop, daemon=True)
             self._thread.start()
 
     def stop(self):
@@ -907,7 +907,7 @@ class RPCGremlin():
         import struct
         syslog.debug("Starting gremlin listener...")
         self._server = GremlinServer(('', self._port),GremlinSocketHandler)
-        self._server_thread = threading.Thread(target=self._server.serve_forever)
+        self._server_thread = threading.Thread(target=self._server.serve_forever, daemon=True)
         self._server_thread.daemon = True
         try:
             self._server_thread.start()
@@ -955,7 +955,7 @@ class RPCGremlin():
                 syslog.debug(f"Remote proxy VJOY [{key}] ok")
             except:
                 pass
-        self._thread = threading.Thread(target=self._run)
+        self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
 
         

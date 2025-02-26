@@ -103,7 +103,7 @@ class ExecutionGraphNode(anytree.NodeMixin):
         self.action_set: list[gremlin.base_profile.AbstractAction] = [] # list of actions
         self.mode : str = None
         self.input_type : InputType = InputType.NotSet
-        self.device = None
+        self.device = None # mapped device if a device node
         self.input_item = None
         self.gate = None # holds the gate info
         self.range = None # holds the range info
@@ -163,11 +163,12 @@ class ExecutionContext():
        
        el = gremlin.event_handler.EventListener()
        el.edit_mode_changed.connect(self.reset) # reload data on mode changes
-       el.profile_start.connect(self.reset) # reload data on profile start
+       el.profile_start.connect(self._profile_start) # reload data on profile start
        el.profile_changed.connect(self.reset) # reload data on profile change
        el.profile_modes_changed.connect(self.reset) # modes changed
        self._mode_tree = None
        self.root = None
+       self._last_hash = None
 
     def reset(self):
         ''' reloads the execution context to capture changes '''
@@ -178,8 +179,23 @@ class ExecutionContext():
             # no profile loaded
             return 
         self.root = ExecutionGraphNode(ExecutionGraphNodeType.Root) # root node
+        profile = gremlin.shared_state.current_profile
+
+        # detect changes
+        profile_hash = profile.getMappingHash()
+        rebuild = self._last_hash is None or self._last_hash != profile_hash
 
         # builds the tree
+        if rebuild:
+            self._last_hash = profile_hash
+            self._rebuild()
+            
+            
+
+    def _rebuild(self):
+        
+        verbose = gremlin.config.Configuration().verbose_mode_exec
+        if verbose: syslog.info("CONTEXT: rebuild")
         self._build_execution_tree(self.root)
 
         tree = gremlin.shared_state.current_profile.build_inheritance_tree()
@@ -187,13 +203,21 @@ class ExecutionContext():
         self._walk_mode_tree(root_mode, tree)
         self._mode_tree = root_mode
 
-        
-        if verbose:
-            self.dump()
-        
         # tell the ui the execution context changed
         el = gremlin.event_handler.EventListener()
         el.execution_context_changed.emit()
+
+       
+        if verbose:
+            self.dump()
+            
+
+    def _profile_start(self):
+        ''' profile start - rebuild the execution tree '''
+        verbose = gremlin.config.Configuration().verbose_mode_exec
+        if verbose: syslog.info("CONTEXT: rebuild on profile start")
+        self._rebuild()
+
 
     def _walk_mode_tree(self, node, branch):
         ''' walks a mode tree manually to build the mode hierarchy (recursive)'''
@@ -323,6 +347,21 @@ class ExecutionContext():
                     input_items.append(item)
 
         return input_items
+    
+    def deviceHasMappings(self, device_guid):
+        ''' true if a device has inputs defined '''
+        node: ExecutionGraphNode
+        if not isinstance(device_guid, str):
+            device_guid = str(device_guid)
+        if self.root is None:
+            self._rebuild()
+        if self.root:
+            for node in anytree.PreOrderIter(self.root):
+                if node.nodeType == ExecutionGraphNodeType.Device and node.device.device_id == device_guid:
+                    # found the device
+                    if anytree.find(node, filter_ = lambda n: n.nodeType == ExecutionGraphNodeType.Container):
+                        return True
+        return False
 
     
 
@@ -379,29 +418,30 @@ class ExecutionContext():
         # dumps the execution tree
         # syslog = logging.getLogger("system")
         syslog.info(f"Execution Tree:")
-
-        for pre, fill, node in anytree.RenderTree(self.root, style=anytree.AsciiStyle()):
-            if exclude_empty:
-                if node.nodeType == ExecutionGraphNodeType.InputItem:
-                    if node.is_leaf:
-                        continue # skip blank node
-            syslog.info(f"{pre}{str(node)}")
+        if self.root:
+            for pre, fill, node in anytree.RenderTree(self.root, style=anytree.AsciiStyle()):
+                if exclude_empty:
+                    if node.nodeType == ExecutionGraphNodeType.InputItem:
+                        if node.is_leaf:
+                            continue # skip blank node
+                syslog.info(f"{pre}{str(node)}")
 
     def dumpActive(self):
         ''' dumps active execution nodes ONLY'''
         # syslog = logging.getLogger("system")
         syslog.info(f"Execution Tree:")
-
-        for pre, fill, node in anytree.RenderTree(self.root, style=anytree.AsciiStyle()):
-            if anytree.search.findall_by_attr(node, ExecutionGraphNodeType.Action, "nodeType"):
-                syslog.info(f"{pre}{str(node)}")
+        if self.root:
+            for pre, fill, node in anytree.RenderTree(self.root, style=anytree.AsciiStyle()):
+                if anytree.search.findall_by_attr(node, ExecutionGraphNodeType.Action, "nodeType"):
+                    syslog.info(f"{pre}{str(node)}")
         
 
     def dumpModeTree(self):
         # syslog = logging.getLogger("system")
         syslog.info(f"Mode Tree:")
-        for pre, fill, node in anytree.RenderTree(self.modeTree, style=anytree.AsciiStyle()):
-            syslog.info(f"{pre}{node.display} [{node.mode}]")
+        if self.modeTree:
+            for pre, fill, node in anytree.RenderTree(self.modeTree, style=anytree.AsciiStyle()):
+                syslog.info(f"{pre}{node.display} [{node.mode}]")
 
 
 
@@ -483,6 +523,8 @@ class ExecutionContext():
         
         '''
         profile = gremlin.shared_state.current_profile
+
+
         mode_source = gremlin.shared_state.current_profile.traverse_mode()
         mode_source.sort(key = lambda x: x[0]) # sort parent to child
         mode_list = [mode for (_,mode) in mode_source if mode] # parent mode first
@@ -491,10 +533,11 @@ class ExecutionContext():
         tracker = gremlin.base_profile.ConditionTracker()
         eh = gremlin.event_handler.EventHandler()
 
+
+
         mode_nodes = {}
         for mode in mode_list:
             if not mode:
-                
                 syslog.error("Execution Tree: error: found a blank mode.")
                 continue
             mode_item = gremlin.execution_graph.ExecutionGraphNode(ExecutionGraphNodeType.Mode)
@@ -875,9 +918,10 @@ class AbstractExecutionGraph(QtCore.QObject):
                 if verbose_detailed: syslog.info (f"{logTabs}Execution start:")
                 id = functor.id
                 if id:
-                    
                     node = self.ec.getNode(id)
-                    if node.nodeType == ExecutionGraphNodeType.Container:
+                    if node is None:
+                        pass
+                    if node is not None and node.nodeType == ExecutionGraphNodeType.Container:
                         nodes = self.ec.getNodeActivationConditions(id)
                         if nodes:
                             if verbose: syslog.info(f"{logTabs}\t\t\t found container condition")

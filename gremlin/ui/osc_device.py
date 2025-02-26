@@ -1723,7 +1723,7 @@ class OscServer():
             self._callback = callback
             
             self._stop = False
-            self._server_thread = threading.Thread(target=self._server_thread_loop)
+            self._server_thread = threading.Thread(target=self._server_thread_loop, daemon=True)
             self._server_thread.setName("OSC server listener")
             self._server_thread.start()
             self._running = True

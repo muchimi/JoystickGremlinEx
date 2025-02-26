@@ -68,11 +68,20 @@ class Color():
     def normalColor():
         return "#AAAAAA" if gremlin.shared_state.is_dark_theme else "#111111"
     @staticmethod
+    def normalDarkColor():
+        return "#AAAAAA" 
+    @staticmethod
+    def normalLightColor():
+        return "#111111" 
+    @staticmethod
     def normalGradientColor():
         return "#777777" if gremlin.shared_state.is_dark_theme else "#CCCCCC"
     @staticmethod
     def backgroundColor():
         return "#212121" if gremlin.shared_state.is_dark_theme else "#EEEEEE"
+    @staticmethod
+    def highlightBackgroundColor():
+        return "#66612f" if gremlin.shared_state.is_dark_theme else "#FFF4B0"
     @staticmethod
     def borderColor():
         return "#444444" if gremlin.shared_state.is_dark_theme else "#111111"
@@ -100,6 +109,9 @@ class Color():
     @staticmethod
     def rangeBorderColor():
         return "#8FBC8F"
+    @staticmethod
+    def actionIconBackgroundColor():
+        return "#424242" if gremlin.shared_state.is_dark_theme else "#EEEEEE"
     @staticmethod
     def keyBackgroundColor():
         return "#424242" if gremlin.shared_state.is_dark_theme else "#EEEEEE"
@@ -195,10 +207,47 @@ class Color():
             QPlainTextEdit {{ 
                  border: 1px solid {border_color};
             }}
+            QMenu::separator {{
+                border: {border_color};
+            }}
   
-            background-color: {background_color};
             
             '''
+        # print (css)
+
+
+        
+        # css = '''  
+        #     QCheckBox::indicator {
+        #         width: 18px;
+        #         height: 18px;
+        #     }
+        #     QCheckBox::indicator:checked {
+        #         image: url(gfx/dark_checkbox_intermediate.png);
+        #     }
+        #     QCheckBox::indicator:unchecked {
+        #         image: url(gfx/dark_checkbox_blank_outline.png);
+        #     }
+        #     QRadioButton::indicator {
+        #         width: 18px;
+        #         height: 18px;
+        #     }
+        #     QRadioButton::indicator:checked {
+        #         image: url(gfx/dark_radiobox_marked.png);
+        #     }
+        #     QRadioButton::indicator:unchecked {
+        #         image: url(gfx/dark_radiobox_blank.png);
+        #     }
+        #     QPlainTextEdit {
+        #          border: 1px solid #444444;
+        #     }
+        #     QMenu::separator {
+        #         border: #444444;
+        #     }
+
+           
+        # '''
+
         return css
     
     @staticmethod
@@ -3566,7 +3615,7 @@ class AxisStateWidget(QtWidgets.QWidget):
 
 class AxesCurrentState(QtWidgets.QGroupBox):
 
-    """Displays the current state of all axes on a device."""
+    """Displays the current state of all axes on a device (input viewer)"""
 
     def __init__(self, device : DeviceSummary, parent=None):
         """Creates a new instance.
@@ -3601,7 +3650,7 @@ class AxesCurrentState(QtWidgets.QGroupBox):
                 self.index_map[axis_id] = index
                 axis = AxisStateWidget(index, show_value = False, show_label=False, show_percentage=False)
                 value = gremlin.joystick_handling.get_axis(device.device_guid, index)
-                
+                #print (f"Axis {axis_id} value: {value:0.3f}")
                 value_label = QtWidgets.QLabel(f"{value:+0.3f}")
                 #axis.setValue(value)
                 self.axes[index] = axis
@@ -3610,10 +3659,11 @@ class AxesCurrentState(QtWidgets.QGroupBox):
                 value_label = QtWidgets.QLabel(f"{value:+0.3f}")
                 percent_label = QtWidgets.QLabel(f"{percent:0.1f} %")
                 self.percent_labels[index] = percent_label
+                axis.setValue(value)
                 layout.addWidget(axis)
             else:
-                value_label = QtWidgets.QLabel()
-                percent_label = QtWidgets.QLabel()
+                value_label = QtWidgets.QLabel(" ")
+                percent_label = QtWidgets.QLabel(" ")
                 
             axes_layout.addWidget(widget, 0, i, alignment=QtCore.Qt.AlignCenter)
             axes_layout.addWidget(value_label, 1, i, alignment=QtCore.Qt.AlignCenter)
@@ -5270,7 +5320,7 @@ class QBubble(QtWidgets.QLabel):
 
 class ActionLabel(QtWidgets.QLabel):
 
-    """Handles showing the correct icon for the given action."""
+    """Handles showing the correct icon for the given action.  This control is used to display action icons in the input item."""
 
 
 
@@ -5298,9 +5348,15 @@ class ActionLabel(QtWidgets.QLabel):
         self.setPixmap(pixmap)
 
         self.action_entry = action_entry
+        # mask = QtGui.QBitmap(pixmap.createMaskFromColor(Qt.transparent))
+        # self.setMask(mask)
 
         # el = gremlin.event_handler.EventListener()
         # el.icon_changed.connect(self._icon_change)
+        background_color = Color.actionIconBackgroundColor()
+        border_color = Color.keyBorderColor()
+        self.setStyleSheet(f"QLabel {{ border: 1px solid {border_color}; border-radius: 4px; padding: 1px; background-color: {background_color}; }}")
+
 
     def _icon_change(self, event):
         icon = self.action_entry.icon()
@@ -6724,3 +6780,59 @@ class QPaginator(QtWidgets.QWidget):
             self._update_data_view()
         else:
             self._page_input_widget.clear()
+
+
+
+class IconGenerator():
+    def __init__(self):
+        for index in range(128):
+            text = f"{index+1}"
+            name = f"icon_button_{index+1:03}"
+            self.gen(text, name,  False)
+            self.gen(text, name, True)
+        axes = ["X","Y","Z","S1","S2","RX","RY","RZ"]
+        for index, text in enumerate(axes):
+            axis = index+1
+            name = f"icon_axis_{axis:03}"
+            self.gen(text, name, False)
+            self.gen(text, name, True)
+
+    def gen(self, text : str, name : str,  is_dark = False):
+        ''' creates the background for the image'''
+        size = 64
+        image = QtGui.QImage(size,size,QtGui.QImage.Format.Format_ARGB32)
+        painter = QtGui.QPainter(image)
+        background_color = QtGui.QColor(0x00, 0x00, 0x00, 0x00)
+        image.fill(background_color)
+
+        foreground_color = QtGui.QColor(Color.normalDarkColor() if is_dark else Color.normalLightColor())
+        painter.setPen(foreground_color)
+        font = QtGui.QFont("Arial", 24)
+        painter.setFont(font)
+
+        metrics = QtGui.QFontMetrics(font)
+        text_rect = metrics.boundingRect(text)
+        widget_rect = QtCore.QRect(0,0,size,size)
+        
+
+        text_y = widget_rect.y() + (widget_rect.height() - text_rect.height()) / 2 + metrics.ascent()
+        text_x = widget_rect.x() + (widget_rect.width() - text_rect.width()) / 2
+       
+
+        painter.drawText(text_x, text_y, text)
+
+        painter.end()
+
+        prefix = "dark_" if is_dark else ""
+        folder = os.path.join(gremlin.shared_state.root_path,"icons")
+        if not os.path.isdir(folder):
+            os.mkdir(folder)
+
+        image_path = os.path.join(folder,f"{prefix}{name.casefold()}.png")
+        if os.path.isfile(image_path):
+            os.unlink(image_path)
+
+        pixmap = QtGui.QPixmap.fromImage(image)
+        pixmap.save(image_path, "PNG")
+
+        

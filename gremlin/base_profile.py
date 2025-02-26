@@ -813,7 +813,7 @@ class Device:
 
     @property
     def device_type(self) -> DeviceType:
-        return self._device_type        
+        return self.type        
 
     def ensure_mode_exists(self, mode_name, device=None):
         """Ensures that a specified mode exists, creating it if needed.
@@ -2030,11 +2030,22 @@ class Profile():
         self._profile_data : Profile
         self._force_numlock_off = True # if set, forces numlock to be off if it isn't so numpad keys report the correct scan codes
         self._simconnect_modes = {} # map of simconnect startup modes to aicraft - the key is the SimconnectAicraftDefinition key which is unique per aicraft that can be loaded by MSFS
+        
 
         el = gremlin.event_handler.EventListener()
         el.edit_mode_changed.connect(self._edit_mode_changed_cb)
         
         self.initialize_regular_devices() # non joystick devices
+
+    def _evaluate_hash(self, obj, path):
+        print (path)
+        return False
+
+    def getMappingHash(self):
+        ''' gets the hash value of the device mapping '''
+        xml = self.to_xml()
+        return hash(xml)
+
 
     def setSimconnectMode(self, key, mode):
         ''' sets the simconnect startup mode for a given aicraft key - the key comes from the SimconnectAicraftDefinition for the aircraft'''
@@ -2732,10 +2743,10 @@ class Profile():
     
 
 
-    def to_xml(self, fname):
+    def to_xml(self, fname : str = None):
         """Generates XML code corresponding to this profile.
 
-        :param fname name of the file to save the XML to
+        :param fname: name of the file to save the XML to, if None the function returns the XML string of the profile
         """
         # Generate XML document
         root = etree.Element("profile")
@@ -2745,15 +2756,39 @@ class Profile():
         root.set("restore_last", str(self._restore_last_mode))
         root.set("force_numlock", str(self._force_numlock_off))
 
-
         # Device settings
         devices = etree.Element("devices")
         device_list = sorted(
             self.devices.values(),
             key=lambda x: str(x.device_guid)
         )
+        # strip the unused nodes that don't contain any data where possible to reduce the size of the profile
         for device in device_list:
-            devices.append(device.to_xml())
+            node = device.to_xml()
+            if device.device_type == DeviceType.Joystick:
+                # remove empty nodes
+                for axis_node in node.xpath("//axis"):
+                    if not list(axis_node):
+                         axis_node.getparent().remove(axis_node)
+                for button_node in node.xpath("//button"):
+                    if not list(button_node):
+                         button_node.getparent().remove(button_node)
+                has_container = node.xpath("//container")
+                if has_container:
+                    devices.append(node)
+            elif device.device_type == DeviceType.VJoy:
+                has_container = node.xpath("//container")
+                if has_container:
+                    devices.append(node)
+            else:
+                # check for inputs
+                if device.device_type in (DeviceType.Keyboard, DeviceType.Osc, DeviceType.Midi):
+                    has_inputs = node.xpath("//input")
+                    if has_inputs:
+                        devices.append(node)
+                else:
+                    devices.append(node)
+            
         root.append(devices)
 
         # simconnect settings
@@ -2776,9 +2811,12 @@ class Profile():
         add_vjoy = False
         vjoy_devices = etree.Element("vjoy-devices")
         for device in self.vjoy_devices.values():
-            if device.modes:
-                vjoy_devices.append(device.to_xml())
+            node = device.to_xml()
+            has_container = node.xpath("//container")
+            if has_container:
+                vjoy_devices.append(node)
                 add_vjoy = True
+            
         if add_vjoy:
             root.append(vjoy_devices)
 
@@ -2816,7 +2854,12 @@ class Profile():
 
         # Serialize XML document
         tree = etree.ElementTree(root)
-        tree.write(fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
+        if fname:
+            tree.write(fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
+        else:
+            # return the xml string
+            return etree.tostring(tree)
+        
 
     def get_device_modes(self, device_guid : dinput.GUID,
                                device_type : DeviceType,

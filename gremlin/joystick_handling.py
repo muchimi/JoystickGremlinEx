@@ -281,6 +281,9 @@ def device_name_from_guid(device_guid : str | dinput.GUID) -> str:
     assert (_joystick_initialized)
     if device_guid in _joystick_device_guid_map:
         return _joystick_device_guid_map[device_guid].name
+    joystick_devices_update()
+    if device_guid in _joystick_device_guid_map:
+        return _joystick_device_guid_map[device_guid].name
     #syslog.warning(f"getDeviceName: {str(device_guid)} - name not found")
     # verbose = gremlin.config.Configuration().verbose
     # if verbose:
@@ -299,6 +302,10 @@ def device_info_from_guid(device_guid : str | dinput.GUID) -> DeviceSummary:
     assert (_joystick_initialized)
     if device_guid in _joystick_device_guid_map:
         return _joystick_device_guid_map[device_guid]
+    joystick_devices_update()
+    if device_guid in _joystick_device_guid_map:
+        return _joystick_device_guid_map[device_guid]
+
     # attempt to find it
     # if gremlin.shared_state.is_running:
     #     _scan_dinput()
@@ -598,6 +605,19 @@ def joystick_devices_initialization():
     _joystick_initialized = True
 
     syslog.info("Joystick input initialized")
+
+
+def joystick_devices_update():
+    ''' updates any missing dynamic devices like VIGEM '''
+    device_count = dinput.DILL.get_device_count()
+    if device_count > len( _joystick_devices):
+        # add missing items
+        for device_index in range(device_count):
+            dev = dinput.DILL.get_device_information_by_index(device_index)
+            if not dev.device_guid in _joystick_device_guid_map:
+                _joystick_devices.append(dev)
+                _joystick_device_guid_map[dev.device_guid] = dev # key by GUID
+                _joystick_device_guid_map[dev.device_id] = dev # key by string ID
 
 
 MAX_VJOY_DEVICE = 16 # number of devices 1..16 supported by VJOY - this includes devices that may not be configured

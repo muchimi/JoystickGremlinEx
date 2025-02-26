@@ -128,7 +128,7 @@ virtual_device_guid_type_map = [
 ]
 
 
-# setup default device names
+# setup default device names that are not hardware devices
 def _init_special_device_guids():
     ''' setup the non HID hardware device name maps '''
     import dinput

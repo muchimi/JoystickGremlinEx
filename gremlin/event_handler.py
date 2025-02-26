@@ -525,7 +525,7 @@ class EventListener(QtCore.QObject):
 		self._run_thread.start()
 
 		self._keep_alive_event = threading.Event()
-		self._keep_alive_thread = threading.Thread(target = self._keep_alive)
+		self._keep_alive_thread = threading.Thread(target = self._keep_alive, daemon=True)
 		self._keep_alive_thread.setName("heartbeat")
 		self._keep_alive_thread.start()
 

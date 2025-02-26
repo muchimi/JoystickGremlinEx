@@ -214,9 +214,13 @@ class CodeRunner:
                         )
 
                     # Load the modules
-                    tmp = importlib.util.module_from_spec(spec)
-                    tmp.__gremlin_identifier = (plugin.file_name, instance.name)
-                    spec.loader.exec_module(tmp)
+                    if os.path.isfile(plugin.file_name):
+                        tmp = importlib.util.module_from_spec(spec)
+                        tmp.__gremlin_identifier = (plugin.file_name, instance.name)
+                        spec.loader.exec_module(tmp)
+                    else:
+                        basename = os.path.basename(plugin.file_name)
+                        gremlin.ui.ui_common.MessageBox(prompt = f"Plugin {basename} was not found and will not be loaded.")
            
             
 

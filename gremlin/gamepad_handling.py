@@ -3,6 +3,7 @@ import sys
 import logging
 
 import gremlin.event_handler
+import gremlin.joystick_handling
 from vigem import vigem_gamepad as vg
 from vigem.vigem_client import VigemClient as vc
 import gremlin.config
@@ -66,6 +67,7 @@ def gamepad_reset():
                 while len(_gamepad_devices) != device_count:
                     pad = vg.VX360Gamepad()
                     _gamepad_devices[pad.get_index()-1] = pad
+
                 
     if count_changed:
         # let items in the Ui know the device count changed

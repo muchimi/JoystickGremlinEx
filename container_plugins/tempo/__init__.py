@@ -295,7 +295,7 @@ class TempoContainerFunctor(gremlin.base_conditions.AbstractFunctor):
                         self.value_press,
                         event,
                         value
-                    )).start()
+                    ), daemon=True).start()
                 else:
                     self.short_set.process_event(event, value)
             # Long press

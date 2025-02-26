@@ -244,7 +244,7 @@ class MouseController:
         self._delta_generator = FixedMouseMotion(0, 0)
 
         self._is_running = False
-        self._thread = threading.Thread(target=self._control_loop)
+        self._thread = threading.Thread(target=self._control_loop, daemon=True)
 
     def set_absolute_motion(self, dx=None, dy=None):
         """Configures a motion using absolute velocities.
@@ -294,7 +294,7 @@ class MouseController:
     def start(self):
         """Starts the thread that will send motions when required."""
         if not self._is_running:
-            self._thread = threading.Thread(target=self._control_loop)
+            self._thread = threading.Thread(target=self._control_loop, daemon=True)
             self._thread.start()
 
     def stop(self):

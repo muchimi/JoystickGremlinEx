@@ -29,6 +29,7 @@ import gremlin.config
 import gremlin.event_handler
 from gremlin.input_types import InputType
 import gremlin.joystick_handling
+import gremlin.shared_state
 from gremlin.types import MouseButton
 from gremlin.profile import read_bool, safe_read, safe_format
 import gremlin.util
@@ -822,7 +823,8 @@ class MapToOsc(gremlin.base_profile.AbstractAction):
 
         :return icon representing this action
         """
-        return f"osc.png"
+        prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
+        return f"{prefix}osc.png"
 
     def requires_virtual_button(self):
         """Returns whether or not an activation condition is needed.

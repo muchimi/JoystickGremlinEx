@@ -195,7 +195,8 @@ class TemporaryModeSwitch(gremlin.base_profile.AbstractAction):
         return f"Switch to: {self.mode_name}"
 
     def icon(self):
-        return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
+        return "ei.fork"
+        #return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
 
     def requires_virtual_button(self):
         return self.get_input_type() in [

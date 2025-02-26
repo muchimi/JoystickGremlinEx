@@ -123,7 +123,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 syslog = logging.getLogger("system")
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_BASE = "m73t7"
+APPLICATION_BASE = "m73t8"
 APPLICATION_VERSION = f"13.40.16ex ({APPLICATION_BASE})"
 
 
@@ -174,6 +174,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         #self.update_theme()
         self.ui.setupUi(self)
         #self._recreate_tab_widget()
+
+        self._profile_hash = None # active profile hash to detect changes
         self.locked = False
         self.activate_locked = False
         self._selection_locked = False
@@ -1033,8 +1035,8 @@ class GremlinUi(QtWidgets.QMainWindow):
                 # Generate the code for the profile and run it
                 if verbose: syslog.info(f"Activate: activate profile")
                 self._profile_auto_activated = False
-                ec = gremlin.execution_graph.ExecutionContext()
-                ec.reset()
+                #ec = gremlin.execution_graph.ExecutionContext()
+                #ec.reset()
                 gremlin.shared_state.aborted = False # reset abort flag
 
 
@@ -1051,59 +1053,52 @@ class GremlinUi(QtWidgets.QMainWindow):
                 with QtCore.QSignalBlocker(self.ui.actionActivate):
                     self.ui.actionActivate.setChecked(True) # toolbar icon "on"
 
-                if verbose_mode_exec:
-                    ec.dumpActive()
-
-
                 # tell callbacks they are starting
-            
-                
                 el.profile_start.emit()
 
             else:
                 # Stop running the code
-                if verbose:
-                    syslog.info(f"Deactivate profile requested")
+
                 if is_running:
                     # running - save the last running mode to the executing profile
+                    if verbose: syslog.info(f"Deactivate profile requested")
                     self.profile.set_last_runtime_mode(gremlin.shared_state.runtime_mode)
-
                 
-                # stop listen
-                el.stop()
-                # tell modules the profile is stopping
-                el.profile_stop.emit()
+                    # stop listen
+                    el.stop()
+                    # tell modules the profile is stopping
+                    el.profile_stop.emit()
 
-                self.runner.stop()
+                    self.runner.stop()
 
-                if gremlin.shared_state.terminating:
-                    # terminate faster
-                    return
+                    if gremlin.shared_state.terminating:
+                        # terminate faster
+                      return
 
-                self._update_status_bar_active(False)
-                self._profile_auto_activated = False
-                current_index = self.ui.devices.currentIndex()
-                device_guid = self.getDeviceGuidForTabIndex(current_index)
-                widget = self.getWidget(device_guid)
+                    self._update_status_bar_active(False)
+                    self._profile_auto_activated = False
+                    current_index = self.ui.devices.currentIndex()
+                    device_guid = self.getDeviceGuidForTabIndex(current_index)
+                    widget = self.getWidget(device_guid)
 
-                if widget:
-                    tab_type = widget.data[0]
-                    if tab_type in (
-                    TabDeviceType.Joystick,
-                    TabDeviceType.Keyboard,
-                    TabDeviceType.Osc,
-                    TabDeviceType.Midi):
-                        widget.refresh()
+                    if widget:
+                        tab_type = widget.data[0]
+                        if tab_type in (
+                        TabDeviceType.Joystick,
+                        TabDeviceType.Keyboard,
+                        TabDeviceType.Osc,
+                        TabDeviceType.Midi):
+                            widget.refresh()
 
-                # toolbar icon
-                with QtCore.QSignalBlocker(self.ui.actionActivate):
-                    self.ui.actionActivate.setChecked(False) # toolbar icon "off"
+                    # toolbar icon
+                    with QtCore.QSignalBlocker(self.ui.actionActivate):
+                        self.ui.actionActivate.setChecked(False) # toolbar icon "off"
 
-                try:
-                    if self.ui.tray_icon is not None:
-                        self.ui.tray_icon.setIcon(load_icon("gfx/icon.ico"))
-                except:
-                    pass
+                    try:
+                        if self.ui.tray_icon is not None:
+                            self.ui.tray_icon.setIcon(load_icon("gfx/icon.ico"))
+                    except:
+                        pass
         except Exception as err:
             syslog.error(f"Activate: error: {err}\n{traceback.format_exc()}")
 
@@ -1160,7 +1155,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                 "XML files (*.xml)"
             )
 
-        if fname != "":
+        if os.path.isfile(fname):
             self._load_recent_profile(fname)
 
     def import_profile(self):
@@ -1238,9 +1233,12 @@ class GremlinUi(QtWidgets.QMainWindow):
         """
         if self.profile.profile_file is not None:
             self.profile.save()
+            # update the hash so we can detect changes
+            self._profile_hash = self.profile.getMappingHash()
         else:
             self.save_profile_as()
 
+        
 
     def save_profile_as(self):
         """Prompts the user for a file to save to profile to."""
@@ -1253,6 +1251,8 @@ class GremlinUi(QtWidgets.QMainWindow):
         if fname != "":
             self.profile.setProfileFile(fname)
             self.profile.save()
+            # update the hash so we can detect changes
+            self._profile_hash = self.profile.getMappingHash()
             self.config.last_profile = self.profile.profile_file
             self._create_recent_profiles()
             self._update_window_title()
@@ -1264,6 +1264,12 @@ class GremlinUi(QtWidgets.QMainWindow):
             path = os.path.dirname(profile_fname)
             path = os.path.realpath(path)
             webbrowser.open(path)
+
+    def reveal_logfile(self):
+        ''' opens the logfile in the current text editor '''
+        logfile = os.path.join(gremlin.util.userprofile_path(), "system.log")
+        if os.path.isfile(logfile):
+            webbrowser.open(logfile)
 
     def open_profile_xml(self):
         ''' views the profile as an xml in the default text editor '''
@@ -1296,6 +1302,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         self.ui.actionSaveProfile.triggered.connect(self.save_profile)
         self.ui.actionSaveProfileAs.triggered.connect(self.save_profile_as)
         self.ui.actionRevealProfile.triggered.connect(self.reveal_profile)
+        self.ui.actionOpenLogFile.triggered.connect(self.reveal_logfile)
         self.ui.actionOpenXmlProfile.triggered.connect(self.open_profile_xml)
         self.ui.actionOpenGremlinExFolder.triggered.connect(self.open_gremlinex_folder)
         self.ui.actionModifyProfile.triggered.connect(self.profile_creator)
@@ -2132,6 +2139,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             widget.data = (TabDeviceType.Plugins, device_guid, index)
             self._add_tab(device_guid, TabDeviceType.Plugins)
             index += 1
+
 
             # reorder the tabs based on user preferences if a tab order was previously saved
 
@@ -3509,7 +3517,8 @@ class GremlinUi(QtWidgets.QMainWindow):
             # ask the UI to update input curve icons
             el.update_input_icons.emit()
 
-            # select the last profile input 
+            # update the hash value
+            self._profile_hash = new_profile.getMappingHash()
 
 
 
@@ -3636,6 +3645,12 @@ class GremlinUi(QtWidgets.QMainWindow):
             return True
 
         else:
+
+            # get the current hash to detect changes
+            current_hash = self.profile.getMappingHash()
+            if self._profile_hash == current_hash:
+                return False
+
             # save the profile and compare to the original file
             #tmp_path = os.path.join(os.getenv("temp"), gremlin.util.get_guid() + ".xml")
             tmp_path = os.path.join(os.getenv("temp"), "gremlin.xml")
@@ -4174,12 +4189,14 @@ if __name__ == "__main__":
     # Ensure joystick devices are correctly setup
     dinput.DILL.init()
     time.sleep(0.25)
-    gremlin.joystick_handling.joystick_devices_initialization()
+    
 
     # check for gamepad availability via VIGEM
     if gremlin.gamepad_handling.gamepadAvailable():
         gremlin.gamepad_handling.gamepad_initialization()
 
+    # update device list
+    gremlin.joystick_handling.joystick_devices_initialization()
 
     # Check if vJoy is properly setup and if not display an error
     # and terminate GremlinEx
@@ -4254,6 +4271,10 @@ if __name__ == "__main__":
 
     el.ui_ready.emit()
 
+
+    # generate icons if needed
+    #_icon_generator = gremlin.ui.ui_common.IconGenerator()
+
     try:
         app.exec()
     except Exception as err:
@@ -4276,7 +4297,8 @@ if __name__ == "__main__":
     # Relinquish control over all VJoy devices used
     gremlin.joystick_handling.VJoyProxy.reset()
 
-    hg.remove_process(os.getpid())
+    #hg.remove_process(os.getpid())
 
     syslog.info("Terminating GremlinEx")
+    
     sys.exit(0)

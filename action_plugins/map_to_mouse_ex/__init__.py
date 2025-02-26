@@ -740,13 +740,13 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
         if is_local and not MapToMouseExFunctor._wiggle_local_thread:
             syslog.debug("Wiggle start local requested...")
             MapToMouseExFunctor._wiggle_local_stop_requested = False
-            MapToMouseExFunctor._wiggle_local_thread = threading.Thread(target=MapToMouseExFunctor._wiggle_local)
+            MapToMouseExFunctor._wiggle_local_thread = threading.Thread(target=MapToMouseExFunctor._wiggle_local, daemon=True)
             MapToMouseExFunctor._wiggle_local_thread.start()
 
         if is_remote and not MapToMouseExFunctor._wiggle_remote_thread:
             syslog.debug("Wiggle start remote requested...")
             MapToMouseExFunctor._wiggle_remote_stop_requested = False
-            MapToMouseExFunctor._wiggle_remote_thread = threading.Thread(target=MapToMouseExFunctor._wiggle_remote)
+            MapToMouseExFunctor._wiggle_remote_thread = threading.Thread(target=MapToMouseExFunctor._wiggle_remote, daemon=True)
             MapToMouseExFunctor._wiggle_remote_thread.start()
 
     def _wiggle_stop(self, is_local = False, is_remote = False):
@@ -877,7 +877,7 @@ class MapToMouseEx(gremlin.base_profile.AbstractAction):
 
         :return icon representing this action
         """
-        return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
+        return "mdi.mouse"
 
     def requires_virtual_button(self):
         """Returns whether or not an activation condition is needed.

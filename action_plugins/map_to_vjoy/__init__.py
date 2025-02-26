@@ -3126,7 +3126,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                             if isinstance(self.thread, threading.Thread):
                                 self.thread.join()
                             auto_complete = False
-                            self.thread = threading.Thread(target=self.relative_axis_thread)
+                            self.thread = threading.Thread(target=self.relative_axis_thread, daemon=True)
                             self.thread.start()
 
         elif self.action_mode == VjoyAction.VJoyHatToButton:

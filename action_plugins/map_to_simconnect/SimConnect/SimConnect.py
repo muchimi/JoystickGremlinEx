@@ -644,7 +644,7 @@ class SimConnect():
 		''' folder received '''
 		if not self._aircraft_loaded_event.is_set():
 			self._aircraft_loaded_event.set()
-			thread = threading.Thread(target = self._process_aircraft_string, args = [aircraft_cfg])
+			thread = threading.Thread(target = self._process_aircraft_string, args = [aircraft_cfg], daemon=True)
 			thread.setName("process aircraft file thread")
 			thread.start()
 

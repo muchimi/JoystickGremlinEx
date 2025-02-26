@@ -172,7 +172,8 @@ class SwitchMode(gremlin.base_profile.AbstractAction):
         return f"Switch to: {self.mode}"
 
     def icon(self):
-        return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
+        return "ei.fork"
+        #return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
     
     @property
     def priority(self):
@@ -187,7 +188,8 @@ class SwitchMode(gremlin.base_profile.AbstractAction):
 
     def _parse_xml(self, node, data = None):
         self._mode = node.get("name")
-        print (f"Read mode: {self._mode} from XML - edit mode: {gremlin.shared_state.edit_mode}")
+        verbose = gremlin.config.Configuration().verbose_mode_outputs
+        if verbose: syslog.info(f"Read mode: {self._mode} from XML - edit mode: {gremlin.shared_state.edit_mode}")
 
     def _generate_xml(self):
         node = ElementTree.Element("switch-mode")

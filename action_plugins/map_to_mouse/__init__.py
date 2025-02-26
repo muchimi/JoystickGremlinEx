@@ -499,7 +499,8 @@ class MapToMouse(gremlin.base_profile.AbstractAction):
 
         :return icon representing this action
         """
-        return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
+        return "mdi.mouse"
+        #return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
 
     def requires_virtual_button(self):
         """Returns whether or not an activation condition is needed.

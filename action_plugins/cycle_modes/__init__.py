@@ -309,7 +309,8 @@ class CycleModes(gremlin.base_profile.AbstractAction):
         self.mode_index = 0 # index of the current cycle mode
 
     def icon(self):
-        return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
+        return "ei.fork"
+        #return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
 
     def requires_virtual_button(self):
         return self.get_input_type() in [

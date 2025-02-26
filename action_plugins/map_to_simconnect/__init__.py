@@ -617,7 +617,7 @@ class SimconnectOptions():
                     if not key and sim_name:
                         key = sim_name.casefold()
 
-                    print (f"automatic: read mode: {mode} for item: {sim_name}")
+                    # print (f"automatic: read mode: {mode} for item: {sim_name}")
                     titles = []
                     node_titles = None
                     for child in node:
@@ -1140,7 +1140,7 @@ class SimconnectMonitor():
         eh.abort.connect(self.stop)
         
         # start the reconnect thread
-        self._auto_reconnect_thread = threading.Thread(target = self._auto_reconnect_loop)
+        self._auto_reconnect_thread = threading.Thread(target = self._auto_reconnect_loop, daemon=True)
         self._auto_reconnect_thread.setName("SCMONITOR: auto-reconnect")
         self._auto_reconnect_event.clear()
         self._auto_reconnect_thread.start()
@@ -2759,6 +2759,11 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         # output value widget - displays a min/max range or a fixed value
         self._value_widget = gremlin.ui.ui_common.QJoystickRangeWidget(show_mode_change=False, parent = self)
+        if self.action_data.command_min_range == self.action_data.command_max_range:
+            # reset range (old profiles may have the same value)
+            self.action_data.command_min_range = -16383
+            self.action_data.command_max_range = 16384
+
         self._value_widget.setRange(self.action_data.command_min_range, self.action_data.command_max_range)
         self._value_widget.setValue(self.action_data.min_range, self.action_data.max_range)
         self._value_widget.valueChanged.connect(self._value_changed)
@@ -3728,7 +3733,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         
         self._auto_repeat_thread = None
         self._auto_repeat_event = threading.Event()
-        self._auto_repeat_thread = threading.Thread(target = self._auto_repeat_command)
+        self._auto_repeat_thread = threading.Thread(target = self._auto_repeat_command, daemon=True)
         
         self.valid = True
 

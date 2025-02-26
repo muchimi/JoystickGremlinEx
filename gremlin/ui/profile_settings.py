@@ -105,9 +105,10 @@ class ProfileSettingsWidget(QDataWidget):
         # Information label
         label = QtWidgets.QLabel(
             "This tab allows setting default initialization of vJoy axis "
-            "values. These values  will be used when activating Gremlin."
+            "values. These values will be used when activating Gremlin."
         )
-        label.setStyleSheet("QLabel { background-color : '#FFF4B0'; }")
+        background_color = gremlin.ui.ui_common.Color.highlightBackgroundColor()
+        label.setStyleSheet(f"QLabel {{ background-color : {background_color}; }}")
         label.setWordWrap(True)
         label.setFrameShape(QtWidgets.QFrame.Box)
         label.setMargin(10)
@@ -337,15 +338,22 @@ class VJoyAsInputWidget(QtWidgets.QGroupBox):
             "Declaring a vJoy device as an input device will allow it to be"
             "used like a physical device, i.e. it can be forwarded to other"
             "vJoy devices. However, this also means that it won't be available"
-            "as a virtual device."
+            " as an output device."
         )
-        label.setStyleSheet("QLabel { background-color : '#FFF4B0'; }")
+
+        background_color = gremlin.ui.ui_common.Color.highlightBackgroundColor()
+        label.setStyleSheet(f"QLabel {{ background-color : {background_color}; }}")
+        
         label.setWordWrap(True)
         label.setFrameShape(QtWidgets.QFrame.Box)
         label.setMargin(10)
+        label.setMinimumWidth(300)
+
+        widget, layout = gremlin.ui.ui_common.getVContainer(label)
 
         self.main_layout.addLayout(self.vjoy_layout)
-        self.main_layout.addWidget(label)
+        self.main_layout.addWidget(widget)
+        self.main_layout.addStretch()
 
     def _update_state_cb(self, vid, state):
         """Callback executed when an entry is modified.

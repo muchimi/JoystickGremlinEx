@@ -1516,7 +1516,7 @@ class GateData():
                             for functor in functors:
                                 if functor.enabled:
                                     if short_press:
-                                        thread = threading.Thread(target=lambda: self._short_press(functor, event, value, delay))
+                                        thread = threading.Thread(target=lambda: self._short_press(functor, event, value, delay), daemon=True)
                                         thread.start()
                                     else:
                                         # not a momentary trigger
@@ -1529,7 +1529,7 @@ class GateData():
                     # process user provided functor callback if set (this is used by actions that must act on the modified output of the gated axis rather than the raw hardware input - example: simconnect action)
                     if self._process_callback is not None:
                         if short_press:
-                            thread = threading.Thread(target=lambda: self._short_press(self._process_callback, event, value, delay))
+                            thread = threading.Thread(target=lambda: self._short_press(self._process_callback, event, value, delay), daemon=True)
                             thread.start()
                         else:
                             self._process_callback(event, value)

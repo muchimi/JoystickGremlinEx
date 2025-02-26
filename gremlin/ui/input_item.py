@@ -1105,6 +1105,7 @@ class InputItemWidget(QBoxFrame):
         self._title_widget.setText("Input Not configured")
         self._title_widget.setObjectName("title")
         
+        # holds input item container icons
         self._icon_widget = QtWidgets.QWidget()
         self._icon_layout = QtWidgets.QHBoxLayout(self._icon_widget)
         self._icon_widget.setContentsMargins(0,0,0,0)

@@ -573,25 +573,29 @@ class SimConnectManager(QtCore.QObject):
 
     @QtCore.Slot()
     def _shutdown(self):
-        self._stop()
-        syslog.info("SIMCONNECT: shutdown")
+        if self._connected:
+            self._stop()
+            syslog.info("SIMCONNECT: shutdown")
         
     @QtCore.Slot()
     def _profile_stop(self):
         self._stop()
-        syslog.info("SIMCONNECT: stop")
+        
 
     @QtCore.Slot()
     def _abort(self):
-        self._stop()
-        syslog.info("SIMCONNECT: abort")
+        if self._connected:
+            self._stop()
+            syslog.info("SIMCONNECT: abort")
                 
 
     def _stop(self):
-        self.bridge.stop()
-        self._bridge_alive = False
-        self.sim_disconnect()
-        self._request_abort = True
+        if self._connected:
+            syslog.info("SIMCONNECT: stop")
+            self.bridge.stop()
+            self._bridge_alive = False
+            self.sim_disconnect()
+            self._request_abort = True
 
 
     def start_bridge(self):
@@ -1631,7 +1635,7 @@ class SimConnectManager(QtCore.QObject):
 
         # send event and wait for readback value or a timeout
         event = DataThreadingEvent()
-        thread = threading.Thread(target=self._send_readback_event_worker(event, event_id, value, b_readback, readback_value, timeout))
+        thread = threading.Thread(target=self._send_readback_event_worker(event, event_id, value, b_readback, readback_value, timeout), daemon=True)
         thread.start()
         event.wait()
 

@@ -235,9 +235,11 @@ class TextToSpeech:
 
             self._queue_thread.stop()
             self._queue_thread.join()
+            self._queue_thread = None
 
             self._tts_thread.stop()
             self._tts_thread.join()
+            self._tts_thread = None
             try:
                 self.engine.stop()
             except:

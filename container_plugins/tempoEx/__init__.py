@@ -507,7 +507,7 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractFunctor):
                         self.value_press,
                         event,
                         value
-                    )).start()
+                    ), daemon=True).start()
                 else:
                     self._trigger_short_press(event, value)
                 

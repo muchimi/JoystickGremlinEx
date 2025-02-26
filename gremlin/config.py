@@ -1133,7 +1133,7 @@ class Configuration:
     
     @property
     def verbose_mode_process(self):
-        ''' true if verbose mode is in OSC mode '''
+        ''' true if verbose mode is in process mode '''
         return self.verbose and VerboseMode.Process in self.verbose_mode
     
     @property

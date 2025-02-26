@@ -323,9 +323,7 @@ class RemapFunctor(gremlin.base_conditions.AbstractFunctor):
                 if self.thread_running is False:
                     if isinstance(self.thread, threading.Thread):
                         self.thread.join()
-                    self.thread = threading.Thread(
-                        target=self.relative_axis_thread
-                    )
+                    self.thread = threading.Thread(target=self.relative_axis_thread, daemon=True)
                     self.thread.start()
 
         elif input_type == InputType.JoystickButton:

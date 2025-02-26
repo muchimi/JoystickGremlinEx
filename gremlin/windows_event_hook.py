@@ -362,7 +362,7 @@ class KeyboardHook:
 
     def __init__(self):
         self._running = False
-        self._listen_thread = threading.Thread(target=self._listen)
+        self._listen_thread = threading.Thread(target=self._listen, daemon=True)
         
 
     def register(self, callback):
@@ -389,7 +389,7 @@ class KeyboardHook:
             user32.PostThreadMessageW(self._listen_thread.ident, WM_QUIT, 0, 0)
             self._listen_thread.join()
             # Recreate thread so we can launch it again
-            self._listen_thread = threading.Thread(target=self._listen)
+            self._listen_thread = threading.Thread(target=self._listen, daemon=True)
 
     def _listen(self):
         """Configures the hook and starts listening."""
@@ -421,7 +421,7 @@ class MouseHook:
 
     def __init__(self):
         self._running = False
-        self._listen_thread = threading.Thread(target=self._listen)
+        self._listen_thread = threading.Thread(target=self._listen, daemon=True)
 
     def register(self, callback):
         """Registers a new message callback.
@@ -453,7 +453,7 @@ class MouseHook:
             user32.PostThreadMessageW(self._listen_thread.ident, WM_QUIT, 0, 0)
             self._listen_thread.join()
             # Recreate thread so we can launch it again
-            self._listen_thread = threading.Thread(target=self._listen)
+            self._listen_thread = threading.Thread(target=self._listen, daemon=True)
 
     def _listen(self):
         """Configures the hook and starts listening."""

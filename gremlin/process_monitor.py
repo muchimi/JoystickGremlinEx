@@ -106,7 +106,7 @@ class ProcessMonitor(QtCore.QObject):
                 # verbose = gremlin.config.Configuration().verbose_mode_process
                 syslog.info("PROC: start")
                 self._running = True
-                self._update_thread = threading.Thread(target=self._update)
+                self._update_thread = threading.Thread(target=self._update, daemon=True)
                 self._update_thread.start()
             
 

@@ -100,7 +100,8 @@ class Macro(gremlin.base_profile.AbstractAction):
         return f"Macro sequence"
 
     def icon(self):
-        return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
+        return "ei.cogs"
+        #return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
 
     def requires_virtual_button(self):
         return self.get_input_type() in [
