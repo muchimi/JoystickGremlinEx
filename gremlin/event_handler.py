@@ -1393,10 +1393,9 @@ class EventHandler(QtCore.QObject):
 			self.input_item_map[device_guid][mode][input_type] = {}
 		self.input_item_map[device_guid][mode][input_type][magic] = input_item
 
-		verbose = gremlin.config.Configuration().verbose
-		if verbose:
-			syslog.info(f"Register InputItem: {input_item.display_name} mode {mode} {input_type} magic: {magic}")
-			pass
+		verbose = gremlin.config.Configuration().verbose_mode_inputs
+		if verbose: syslog.info(f"Register InputItem: {input_item.display_name} mode {mode} {input_type} magic: {magic}")
+			
 
 	def add_callback(self, device_guid, mode, event, callback, permanent=False, node = None):
 		"""Installs the provided callback for the given event.
