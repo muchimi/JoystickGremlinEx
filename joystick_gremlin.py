@@ -123,7 +123,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 syslog = logging.getLogger("system")
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_BASE = "m73t5"
+APPLICATION_BASE = "m73t7"
 APPLICATION_VERSION = f"13.40.16ex ({APPLICATION_BASE})"
 
 

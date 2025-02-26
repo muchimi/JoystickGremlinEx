@@ -2014,6 +2014,7 @@ class OscInputItem(AbstractInputItem):
 
     def __init__(self):
         super().__init__()
+        self.verbose = gremlin.config.Configuration().verbose_mode_osc
         self._message = None # the OSC message command
         self._message_data = None # the list of values associated with that command
         self._message_data_string = None # the string representation of the data args
@@ -2031,6 +2032,7 @@ class OscInputItem(AbstractInputItem):
         self._max_range = 1.0 
         self._autorelease = False # true if auto-release
         self._autorelease_delay = 250 # default release delay
+        
       
         self._axis_values = []
         current_mode = gremlin.shared_state.current_mode
@@ -2250,8 +2252,7 @@ class OscInputItem(AbstractInputItem):
                 if self._message_key:
                     osc_input.unregisterInput(self)
 
-                
-                syslog.info(f"OSC update message key from {self._message_key} to {value}")
+                if self.verbose: syslog.info(f"OSC update message key from {self._message_key} to {value}")
                 
                 self._message_key = value
 
@@ -2296,6 +2297,7 @@ class OscInputItem(AbstractInputItem):
 
     def parse_xml(self, node, data = None):
         ''' reads an input item from xml '''
+        
         if node.tag == "input":
             self.id = read_guid(node, "guid")
             self._message = safe_read(node, "cmd", str,"")
@@ -2306,7 +2308,7 @@ class OscInputItem(AbstractInputItem):
             self._min_range = safe_read(node,"min",float, 0.0)
             self._max_range = safe_read(node,"max",float, 1.0)
             self.source_index = safe_read(node,"source_index", int, 0)
-            syslog.info(f"OSC: xml source index: {self._source_index}")
+            if self.verbose: syslog.info(f"OSC: xml source index: {self._source_index}")
             if "autorelease" in node.attrib:
                 self._autorelease = safe_read(node,"autorelease", bool, False)
             if "autorelease_delay" in node.attrib:

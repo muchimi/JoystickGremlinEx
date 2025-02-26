@@ -3138,14 +3138,18 @@ class AxisStateWidget(QtWidgets.QWidget):
 
         self._joystick_hooked = False # true if joystick input is directly hooked to this widget 
         self._scale_factor = 1000
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+
         if orientation == QtCore.Qt.Orientation.Vertical:
-            self.main_layout = QtWidgets.QGridLayout(self)
+            self.container_layout = QtWidgets.QGridLayout()
         else:
-            self.main_layout = QtWidgets.QHBoxLayout(self)
+            self.container_layout = QtWidgets.QHBoxLayout()
             
         self.setContentsMargins(0,0,0,0)
-        self.main_layout.setSpacing(0)
         self.main_layout.setContentsMargins(0,0,0,0)
+        self.container_layout.setSpacing(0)
+        self.container_layout.setContentsMargins(0,0,0,0)
+       
         
         self._data = None
 
@@ -3164,10 +3168,6 @@ class AxisStateWidget(QtWidgets.QWidget):
             
         self._readout_widget = QtWidgets.QWidget()
         self._readout_layout = QtWidgets.QVBoxLayout(self._readout_widget)
-        w = gremlin.ui.ui_common.get_text_width("M"*15)
-        self._readout_widget.setMinimumWidth(w)
-
-
         self._label_widget = QtWidgets.QLabel()
         
         
@@ -3176,14 +3176,14 @@ class AxisStateWidget(QtWidgets.QWidget):
 
 
         if orientation == QtCore.Qt.Orientation.Vertical:
-            self.main_layout.addWidget(self._label_widget,0,0, alignment=QtCore.Qt.AlignCenter)
-            self.main_layout.addWidget(self._progress_widget,1,0, alignment=QtCore.Qt.AlignCenter)
-            self.main_layout.addWidget(self._readout_widget,2,0, alignment=QtCore.Qt.AlignCenter)
+            self.container_layout.addWidget(self._label_widget,0,0, alignment=QtCore.Qt.AlignCenter)
+            self.container_layout.addWidget(self._progress_widget,1,0, alignment=QtCore.Qt.AlignCenter)
+            self.container_layout.addWidget(self._readout_widget,2,0, alignment=QtCore.Qt.AlignCenter)
             
         else:
-            self.main_layout.addWidget(self._label_widget)
-            self.main_layout.addWidget(self._progress_widget)
-            self.main_layout.addWidget(self._readout_widget)
+            self.container_layout.addWidget(self._label_widget)
+            self.container_layout.addWidget(self._progress_widget)
+            self.container_layout.addWidget(self._readout_widget)
 
         self._min_range = -1.0
         self._max_range = 1.0
@@ -3206,11 +3206,15 @@ class AxisStateWidget(QtWidgets.QWidget):
         el.tab_unselected.connect(self._tab_unselected)
 
         if orientation == QtCore.Qt.Orientation.Horizontal:
-            self.main_layout.addStretch()
+            self.container_layout.addStretch()
             
         self._progress_widget.setContentsMargins(0,0,0,0)
         self._progress_widget.setOrientation(orientation)
         self._progress_widget.setTextVisible(False)
+
+        self.main_layout.addLayout(self.container_layout)
+
+        self._update_visible()
         
 
     def _cleanup_ui(self):
@@ -3254,14 +3258,19 @@ class AxisStateWidget(QtWidgets.QWidget):
             QtCore.QPoint(-5,10)
         ]
 
+    def _update_visible(self):
+        ''' updates visible state for data label'''
+        visible = self._show_label or self._show_percentage or self._show_value or self._show_curved
+        self._readout_widget.setVisible(visible)
+
     def setPercentageVisible(self, value: bool):
         ''' shows or hides the percentage value on the axis '''
         self._show_percentage = value
-        self._readout_widget.setVisible(value or self._show_value)
+        self._update_visible()
 
     def setValueVisible(self, value: bool):
         self._show_value = value
-        self._readout_widget.setVisible(value or self._show_percentage)
+        self._update_visible()
 
     def _update_css(self):
         if self._orientation == QtCore.Qt.Orientation.Vertical:
@@ -3281,6 +3290,7 @@ class AxisStateWidget(QtWidgets.QWidget):
     def setLabelVisible(self, value: bool):
         self._show_label = value
         self._label_widget.setVisible(value)
+        self._update_visible()
 
     def setWidth(self, value):
         if value > 0:
@@ -3325,40 +3335,43 @@ class AxisStateWidget(QtWidgets.QWidget):
         scaled_value = self._scale_factor * display_value
         self._progress_widget.setValue(scaled_value)
         self._progress_widget.update()
-        readout_list = []
-        if self._show_value:
-            readout_list.append(f"{value:+0.3f}")
-            if curve_visible:
-                readout_list.append(f"C{curve_value:+0.3f}")
-        if self._show_percentage:
-            if percent_value is None:
-                if curve_value is None:
-                    percent = gremlin.util.scale_to_range(value, target_min=0, target_max = 100)
+
+        if not self._readout_widget.isVisible():
+
+            readout_list = []
+            if self._show_value:
+                readout_list.append(f"{value:+0.3f}")
+                if curve_visible:
+                    readout_list.append(f"C{curve_value:+0.3f}")
+            if self._show_percentage:
+                if percent_value is None:
+                    if curve_value is None:
+                        percent = gremlin.util.scale_to_range(value, target_min=0, target_max = 100)
+                    else:
+                        percent = gremlin.util.scale_to_range(curve_value, target_min=0, target_max = 100)
                 else:
-                    percent = gremlin.util.scale_to_range(curve_value, target_min=0, target_max = 100)
+                    percent = percent_value
+                readout_list.append(f"{int(percent)} %")
+
+            if other_value is not None:
+                readout_list.append(f"{other_value}")
+
+            clear_layout(self._readout_layout)
+
+            
+            widget_list = [QtWidgets.QLabel(text) for text in readout_list]
+            if self._orientation == QtCore.Qt.Orientation.Vertical:
+                widget = QtWidgets.QWidget()
+                layout = QtWidgets.QGridLayout(widget)
+                widget.setMinimumWidth(80)
+                row = 0
+                for wl in widget_list:
+                    layout.addWidget(wl, row, 0, alignment = QtCore.Qt.AlignCenter)
+                    row +=1
+                self._readout_layout.addWidget(widget, alignment = QtCore.Qt.AlignCenter)
             else:
-                percent = percent_value
-            readout_list.append(f"{int(percent)} %")
-
-        if other_value is not None:
-            readout_list.append(f"{other_value}")
-
-
-        clear_layout(self._readout_layout)
-
-        widget_list = [QtWidgets.QLabel(text) for text in readout_list]
-        if self._orientation == QtCore.Qt.Orientation.Vertical:
-            widget = QtWidgets.QWidget()
-            layout = QtWidgets.QGridLayout(widget)
-            widget.setMinimumWidth(80)
-            row = 0
-            for w in widget_list:
-                layout.addWidget(w, row, 0, alignment = QtCore.Qt.AlignCenter)
-                row +=1
-            self._readout_layout.addWidget(widget, alignment = QtCore.Qt.AlignCenter)
-        else:
-            widget, _ = getHContainer(widget_list)
-            self._readout_layout.addWidget(widget)
+                widget, _ = getHContainer(widget_list)
+                self._readout_layout.addWidget(widget)
 
         self.valueChanged.emit(self._value, self._curve_value)
 
@@ -3569,15 +3582,45 @@ class AxesCurrentState(QtWidgets.QGroupBox):
         else:
             self.setTitle(f"{device.name} - Axes")
 
-        self.axes = [None]
-        axes_layout = QtWidgets.QHBoxLayout()
-        for i in device.axis_index_list(): #range(device.axis_count):
-            axis = AxisStateWidget(i)
-            value = gremlin.joystick_handling.get_axis(device.device_guid, i)
-            axis.setValue(value)
-            self.axes.append(axis)
-            axes_layout.addWidget(axis)
-        axes_layout.addStretch()
+        self.axes = {}
+        self.value_labels = {}
+        self.percent_labels = {}
+        self.index_map = {}
+        axes_layout = QtWidgets.QGridLayout()
+        axes_layout.setSpacing(0)
+        axis_list = device.axis_index_list() 
+
+        for i in range(8): 
+            index = i + 1
+            
+            widget,layout = getVContainer()
+            # widget.setStyleSheet("border: 1px solid;")
+            widget.setFixedWidth(80)
+            if index in axis_list:
+                axis_id = gremlin.joystick_handling.linear_axis_index(self.device.axis_map,index)
+                self.index_map[axis_id] = index
+                axis = AxisStateWidget(index, show_value = False, show_label=False, show_percentage=False)
+                value = gremlin.joystick_handling.get_axis(device.device_guid, index)
+                
+                value_label = QtWidgets.QLabel(f"{value:+0.3f}")
+                #axis.setValue(value)
+                self.axes[index] = axis
+                self.value_labels[index] = value_label
+                percent = gremlin.util.scale_to_range(value,target_min=0, target_max=100)
+                value_label = QtWidgets.QLabel(f"{value:+0.3f}")
+                percent_label = QtWidgets.QLabel(f"{percent:0.1f} %")
+                self.percent_labels[index] = percent_label
+                layout.addWidget(axis)
+            else:
+                value_label = QtWidgets.QLabel()
+                percent_label = QtWidgets.QLabel()
+                
+            axes_layout.addWidget(widget, 0, i, alignment=QtCore.Qt.AlignCenter)
+            axes_layout.addWidget(value_label, 1, i, alignment=QtCore.Qt.AlignCenter)
+            axes_layout.addWidget(percent_label, 2, i, alignment=QtCore.Qt.AlignCenter)
+
+        #axes_layout.addStretch()
+        axes_layout.setColumnStretch(i+1,2)
         self.setLayout(axes_layout)
 
     def process_event(self, event):
@@ -3590,7 +3633,12 @@ class AxesCurrentState(QtWidgets.QGroupBox):
                 self.device.axis_map,
                 event.identifier
             )
-            self.axes[axis_id].setValue(event.value)
+            index = self.index_map[axis_id]
+            value = event.value
+            self.axes[index].setValue(value)
+            self.value_labels[index].setText(f"{value:+0.3f}")
+            percent = gremlin.util.scale_to_range(value,target_min=0, target_max=100)
+            self.percent_labels[index].setText(f"{percent:0.1f} %")
 
 
 class HatWidget(QtWidgets.QWidget):
