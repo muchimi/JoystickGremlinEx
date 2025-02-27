@@ -272,6 +272,9 @@ class CodeRunner:
             # Create input callbacks based on the profile's content
 
             for device in profile.devices.values():
+                if verbose:
+                    device_name = gremlin.joystick_handling.device_name_from_guid(device.device_guid)
+                    syslog.info(f"CALLBACK: device: {device_name}")
                 for mode in device.modes.values():
                     mode_node = mode_nodes[mode.name]
                     for input_items in mode.config.values():
@@ -279,8 +282,11 @@ class CodeRunner:
                             # Only add callbacks for input items that actually
                             # contain actions
                             
+                            
+                            
                             if len(input_item.containers) == 0:
                                 # no containers = no actions = skip
+                                syslog.info(f"\tno containers")
                                 continue
 
                             self.event_handler.registerInputItem(mode.name, input_item)
@@ -291,17 +297,16 @@ class CodeRunner:
                                 identifier=input_item.input_id
                             )
 
-                       
+                            
+
 
                             # Create possibly several callbacks depending
                             # on the input item's content
                             callbacks = []
                             for container in input_item.containers:
                                 if not container.is_valid():
-                                    test = container.is_valid()
-                                    syslog.warning(
-                                        "Incomplete container ignored"
-                                    )
+                                    #test = container.is_valid()
+                                    syslog.warning("Incomplete container ignored")
                                     continue
                                 callbacks.extend(container.generate_callbacks(mode_node))
 

@@ -471,11 +471,13 @@ class ExecutionContext():
         condition_node.container = container
         condition_node.parent = parent
         condition_node.description = f"Condition node: {str(container)}"
+        conditions = None
         if isinstance(container, gremlin.base_profile.AbstractContainer):
             conditions = container.activation_container_condition.conditions
             condition_node.condition =  container.activation_container_condition
         elif isinstance(container, gremlin.base_profile.AbstractAction):
-            conditions = container.activation_condition.conditions
+            if container.activation_condition:
+                conditions = container.activation_condition.conditions
             condition_node.condition = container.activation_condition
         else:
             assert False,f"don't know how to handle: {container.__class__.__name__}"
