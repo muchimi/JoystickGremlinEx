@@ -914,28 +914,28 @@ class AbstractExecutionGraph(QtCore.QObject):
                         syslog.info(f"{logTabs}\t{key} -> {next_index}")
                 
 
-
-                if verbose_detailed: syslog.info (f"{logTabs}Execution start:")
-                id = functor.id
-                if id:
-                    node = self.ec.getNode(id)
-                    if node is None:
-                        pass
-                    if node is not None and node.nodeType == ExecutionGraphNodeType.Container:
-                        nodes = self.ec.getNodeActivationConditions(id)
-                        if nodes:
-                            if verbose: syslog.info(f"{logTabs}\t\t\t found container condition")
-                            if verbose_detailed:
-                                for n in nodes:
-                                    syslog.info(f"node: {n.description}")
-                            for condition_node in nodes:
-                                if condition_node.functor:
-                                    functor = condition_node.functor
-                                    result = functor(event, value)
-                                    if not result:
-                                        if verbose: syslog.info(f"{logTabs}\t\t\t FAIL condition on condition: {condition_node.description}")
-                                        return False
-                        if verbose: syslog.info("Container condition: PASS")
+                
+                # if verbose_detailed: syslog.info (f"{logTabs}Execution start:")
+                # id = functor.id
+                # if id:
+                #     node = self.ec.getNode(id)
+                #     if node is None:
+                #         pass
+                #     if node is not None and node.nodeType == ExecutionGraphNodeType.Container:
+                #         nodes = self.ec.getNodeActivationConditions(id)
+                #         if nodes:
+                #             if verbose: syslog.info(f"{logTabs}\t\t\t found container condition")
+                #             if verbose_detailed:
+                #                 for n in nodes:
+                #                     syslog.info(f"node: {n.description}")
+                #             for condition_node in nodes:
+                #                 if condition_node.functor:
+                #                     functor = condition_node.functor
+                #                     result = functor(event, value)
+                #                     if not result:
+                #                         if verbose: syslog.info(f"{logTabs}\t\t\t FAIL condition on condition: {condition_node.description}")
+                #                         return False
+                #         if verbose: syslog.info("Container condition: PASS")
 
             # container conditions
             for functor in self.condition_functors:

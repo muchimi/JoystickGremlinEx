@@ -356,13 +356,18 @@ class WidgetTracker():
             if hasattr(widget, "_cleanup_ui"):
                 widget._cleanup_ui()
             del self._widget_cache[widget]
+            widget.setParent(None)
 
     def clearRegisteredWidgets(self):
         ''' cleanup all widgets '''
         for widget in self._widget_cache.values():
             if hasattr(widget, "_cleanup_ui"):
                 widget._cleanup_ui()
-        self._widget_cache.clear()
+            widget.setParent(None)
+        self._widget_cache = {}
+        verbose = gremlin.config.Configuration().verbose
+        if verbose: syslog.info("TRACKER: clear()")
+        
 
 
 
@@ -398,10 +403,13 @@ class DeviceWidgetTracker():
                 if input_type in self._widget_cache[device_guid][mode]:
                     if input_id in self._widget_cache[device_guid][mode][input_type]:
                         if key in self._widget_cache[device_guid][mode][input_type][input_id]:
-                            del self._widget_cache[device_guid][mode][input_type][input_id]
+                            self._widget_cache[device_guid][mode][input_type][input_id] = None
+
 
     def clear(self):
-        self._widget_cache.clear()
+        self._widget_cache = {}
+        verbose = gremlin.config.Configuration().verbose
+        if verbose: syslog.info("DEVICE WIDGET TRACKER: clear()")
 
     def getWidget(self, device_guid, mode, input_type, input_id, key):
         if not mode:

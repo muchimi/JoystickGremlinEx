@@ -123,7 +123,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 syslog = logging.getLogger("system")
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_BASE = "m73t8"
+APPLICATION_BASE = "m73t9"
 APPLICATION_VERSION = f"13.40.16ex ({APPLICATION_BASE})"
 
 
@@ -1606,6 +1606,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             syslog.error(f"TAB: widget already exists for tab: {device_guid} {device_name}")
             return
         self._widget_cache[device_guid] = widget
+
         self.ui.tab_content_layout.addWidget(widget)
         
         if hide:
@@ -1623,6 +1624,8 @@ class GremlinUi(QtWidgets.QMainWindow):
             if hasattr(widget, "_cleanup_ui"):
                 widget._cleanup_ui()
             del self._widget_cache[device_guid]
+        if device_guid in gremlin.shared_state.device_widget_map:
+            del gremlin.shared_state.device_widget_map[device_guid]
 
 
     def unregisterAllWidgets(self):
@@ -1631,13 +1634,24 @@ class GremlinUi(QtWidgets.QMainWindow):
             # cleanup widgets
             if hasattr(widget, "_cleanup_ui"):
                 widget._cleanup_ui()
+                widget.setParent(None)
         self._widget_cache.clear()
-
+        gremlin.shared_state.device_widget_map = {}
+        
 
     def clearWidgets(self):
         ''' clears the device cache'''
-        self.unregisterAllWidgets()
+        self._current_tab_widget = None # remove reference to tab widget
         gremlin.util.clear_layout(self.ui.tab_content_layout)
+        tracker = gremlin.ui.ui_common.WidgetTracker()
+        tracker.clearRegisteredWidgets()
+        tracker = gremlin.ui.ui_common.StateTracker()
+        tracker.clear()
+        self.unregisterAllWidgets()
+        verbose = gremlin.config.Configuration().verbose
+        gc.collect()
+        if verbose: syslog.info("TABS TRACKER: clear()")
+        
 
     def getTabIndexForDevice(self, device_guid):
         if not isinstance(device_guid, str):

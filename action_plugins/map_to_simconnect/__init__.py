@@ -2812,11 +2812,11 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._axis_value_widget.setDecimals(0)
 
 
-        self._axis_alt_repeater_widget = gremlin.ui.ui_common.AxisStateWidget(show_percentage=True,orientation=QtCore.Qt.Orientation.Horizontal)
-        self._axis_alt_value_widget = gremlin.ui.ui_common.QFloatLineEdit()
-        self._axis_alt_value_widget.setReadOnly(True)
-        self._axis_alt_value_widget.setMinimumWidth(w)
-        self._axis_alt_value_widget.setDecimals(0)
+        # self._axis_alt_repeater_widget = gremlin.ui.ui_common.AxisStateWidget(show_percentage=True,orientation=QtCore.Qt.Orientation.Horizontal)
+        # self._axis_alt_value_widget = gremlin.ui.ui_common.QFloatLineEdit()
+        # self._axis_alt_value_widget.setReadOnly(True)
+        # self._axis_alt_value_widget.setMinimumWidth(w)
+        # self._axis_alt_value_widget.setDecimals(0)
 
         self._calculator_value_widget = QtWidgets.QPlainTextEdit()
         self._calculator_value_widget.setReadOnly(True)
@@ -2825,7 +2825,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.container_repeater_layout.addWidget(self.curve_button_widget)
         self.container_repeater_layout.addWidget(self.curve_clear_widget)
         self.container_repeater_layout.addWidget(self._axis_repeater_widget)
-        self.container_repeater_layout.addWidget(self._axis_alt_repeater_widget)
+        #self.container_repeater_layout.addWidget(self._axis_alt_repeater_widget)
         self.container_repeater_layout.addWidget(QtWidgets.QLabel("SimConnect Output:"))
         self.container_repeater_layout.addWidget(self._axis_value_widget)
         self.container_repeater_layout.addWidget(self._calculator_value_widget)
@@ -3187,6 +3187,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 
         verbose = gremlin.config.Configuration().verbose_mode_simconnect
+        verbose = True
         # syslog = logging.getLogger("system")
         if self.input_type == InputType.JoystickAxis:
             
@@ -3209,7 +3210,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
                 # update the curved window if displayed
                 percent = gremlin.util.scale_to_range(curved_value, target_min=0, target_max=100) # convert to percent
                 output_value = gremlin.util.scale_to_range(curved_value, target_min = self.action_data.min_range, target_max = self.action_data.max_range, invert = self.action_data.inverted) # conver to output range
-                #if verbose: syslog.info(f"SIMCONNECT: {raw:0.3f} normalized {normalized:0.3f} curved {curved_value:0.3f} percent: {percent:0.3f} output: {output_value}")
+                if verbose: syslog.info(f"SIMCONNECT: {raw:0.3f} normalized {normalized:0.3f} curved {curved_value:0.3f} percent: {percent:0.3f} output: {output_value}")
             else:
                 output_value = value
                 percent = gremlin.util.scale_to_range(value, source_min = self.action_data.min_range, source_max = self.action_data.max_range, target_min=0, target_max=100) # convert to percent
@@ -3220,7 +3221,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
             else:
                 self._axis_repeater_widget.show_curved = False
 
-            self._axis_repeater_widget.setValue(output_value, percent_value=percent)
+            self._axis_repeater_widget.setValue(normalized, percent_value=percent)
 
             if self.action_data.command_mode == SimConnectCommandMode.Simvar:
                 self._axis_value_widget.setValue(output_value)
