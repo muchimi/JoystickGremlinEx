@@ -183,7 +183,7 @@ class DefaultModeSelector(QtWidgets.QGroupBox):
 
         self.dropdown = gremlin.ui.ui_common.QComboBox()
         # self.dropdown.addItem("Use Heuristic")
-        for mode in gremlin.profile.mode_list(self.profile_data):
+        for mode in gremlin.profile.mode_list():
             self.dropdown.addItem(mode)
         start_mode = gremlin.shared_state.current_profile.get_start_mode()
         if start_mode:

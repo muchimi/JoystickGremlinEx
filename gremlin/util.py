@@ -1333,7 +1333,10 @@ def scale_to_range(value, source_min = -1.0, source_max = 1.0, target_min = -1.0
     if value is None:
         return None
     
-    assert source_min != source_max, "Invalid source range - cannot be the same"
+    if source_min == source_max:
+        syslog.warning("SCALE: scaling failed: source range is identical")
+        return value
+    
     # bracket value to input range if outside that range
     if value < source_min: 
         value = source_min

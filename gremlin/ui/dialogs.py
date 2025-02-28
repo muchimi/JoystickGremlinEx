@@ -2453,7 +2453,7 @@ The setting can be overriden by the global mode reload option set in Options for
             return
         
         if user_input:
-            if new_name in gremlin.profile.mode_list(self._profile):
+            if new_name in gremlin.profile.mode_list():
                 gremlin.util.display_error(
                     f"A mode with the name \"{new_name}\" already exists"
                 )
@@ -2575,7 +2575,7 @@ The setting can be overriden by the global mode reload option set in Options for
         name = name.strip()
         new_mode = None
         if user_input:
-            if name in gremlin.profile.mode_list(self._profile):
+            if name in gremlin.profile.mode_list():
                 msg = f"A mode with the name \"{name}\" already exists"
                 gremlin.util.display_error(msg)
                 syslog.error(f"ADD MODE: {msg}")

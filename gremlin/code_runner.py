@@ -23,6 +23,7 @@ import string
 import sys
 import time
 
+import action_plugins.map_to_simconnect
 import dinput
 
 import gremlin
@@ -30,6 +31,7 @@ import gremlin
 #     joystick_handling, macro, sendinput, user_plugin, util
 
 
+import gremlin.actions
 import gremlin.base_profile
 from gremlin.input_types import InputType
 import gremlin.keyboard
@@ -244,7 +246,7 @@ class CodeRunner:
 
             # Add a fake keyboard action which does nothing to the callbacks
             # in every mode in order to have empty modes be "present"
-            for mode_name in gremlin.profile.mode_list(profile):
+            for mode_name in gremlin.profile.mode_list():
                 self.event_handler.add_callback(
                     0,
                     mode_name,
@@ -271,6 +273,7 @@ class CodeRunner:
 
             # Create input callbacks based on the profile's content
 
+            verbose = gremlin.config.Configuration().verbose_mode_exec
             for device in profile.devices.values():
                 if verbose:
                     device_name = gremlin.joystick_handling.device_name_from_guid(device.device_guid)
@@ -282,12 +285,12 @@ class CodeRunner:
                             # Only add callbacks for input items that actually
                             # contain actions
                             
-                            
-                            
                             if len(input_item.containers) == 0:
                                 # no containers = no actions = skip
-                                syslog.info(f"\tno containers")
+                                #if verbose: syslog.info(f"\t\tno containers")
                                 continue
+
+                            if verbose: syslog.info(f"\t{input_item.display_name}")
 
                             self.event_handler.registerInputItem(mode.name, input_item)
 
@@ -306,12 +309,26 @@ class CodeRunner:
                             for container in input_item.containers:
                                 if not container.is_valid():
                                     #test = container.is_valid()
-                                    syslog.warning("Incomplete container ignored")
+                                    syslog.warning(f"CALLBACK: device: {device_name}: input: {input_item.display_name}: warning: Incomplete container ignored")
                                     continue
                                 callbacks.extend(container.generate_callbacks(mode_node))
 
                             for cb_data in callbacks:
                                 if cb_data.event is None:
+                                    if verbose: 
+                                        syslog.info(f"\t\tcallback: ")
+                                        for functor in cb_data.callback.execution_graph.functors:
+                                            if hasattr(functor,"action_set"):
+                                                for action in functor.action_set.functors:
+                                                    if isinstance(action, gremlin.actions.ActivationCondition):
+                                                        syslog.info(f"\t\t\tActivation Condition: target :{action.target.name}")
+                                                    else:
+                                                        import action_plugins.map_to_simconnect
+                                                        syslog.info(f"\t\t\tAction: {action._name}")
+                                                        if isinstance(action, action_plugins.map_to_simconnect.MapToSimConnectFunctor):
+                                                            syslog.info(f"\t\t\t\tCommand:: {action.command}")
+                                            else:
+                                                syslog.info(f"\t\t\tFunctor: {functor._name}")
                                     self.event_handler.add_callback(
                                         device.device_guid,
                                         mode.name,
@@ -329,8 +346,8 @@ class CodeRunner:
                                     )
 
                             
-                            if verbose_detailed:
-                                self.event_handler.dump_callbacks()
+            if verbose_detailed:
+                self.event_handler.dump_callbacks()
                                 
 
             # Create merge axis callbacks

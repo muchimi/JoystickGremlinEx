@@ -169,6 +169,13 @@ class ExecutionContext():
        self._mode_tree = None
        self.root = None
        self._last_hash = None
+       self._condition_map = {} # map of node ID to conditions that have conditions
+       self._functor_map = {} # map of node ID to action nodes to execute for condition checking
+
+    @property
+    def functor_map(self) -> dict:
+        ''' map of container condition functors '''
+        return self._functor_map
 
     def reset(self):
         ''' reloads the execution context to capture changes '''
@@ -179,6 +186,8 @@ class ExecutionContext():
             # no profile loaded
             return 
         self.root = ExecutionGraphNode(ExecutionGraphNodeType.Root) # root node
+        
+
         profile = gremlin.shared_state.current_profile
 
         # detect changes
@@ -196,7 +205,10 @@ class ExecutionContext():
         
         verbose = gremlin.config.Configuration().verbose_mode_exec
         if verbose: syslog.info("CONTEXT: rebuild")
+        self._functor_map = {} # quick access to functor IDs
         self._build_execution_tree(self.root)
+
+        
 
         tree = gremlin.shared_state.current_profile.build_inheritance_tree()
         root_mode = ExecutionModeNode()
@@ -286,7 +298,7 @@ class ExecutionContext():
         action_nodes = []
         node = self.getNode(id)
         if node:
-            action_nodes = [n for n in node.descendants if n.nodeType == ExecutionGraphNodeType.ActivationCondition]
+            action_nodes = [n for n in node.children if n.nodeType == ExecutionGraphNodeType.ActivationCondition]
 
         return action_nodes
 
@@ -588,6 +600,8 @@ class ExecutionContext():
                             container_node.container = container
                             container_node.mode = mode.name
                             container_node.container_condition = container.activation_container_condition # conditions for container
+                            if container_node.container_condition:
+                                self._condition_map[container_node.id] = container_node
                             container_node.action_condition = container.activation_condition # conditions for container actions
                             condition_node = self._get_condition_node(container, container_node)
 
@@ -633,6 +647,8 @@ class ExecutionContext():
                                                     container.refresh_conditions()
                                                     gate_container_node.container_condition = container.activation_container_condition # conditions for the container
                                                     gate_container_node.action_condition = container.activation_condition # conditions for container actions
+                                                    if gate_container_node.container_condition:
+                                                        self._condition_map[gate_container_node.id] = container_node
 
                                                     # add a condition to trigger the gate 
                                                     functor = gremlin.gated_handler.GatedAxisGateCondition(gate_data, gate_info)
@@ -679,6 +695,10 @@ class ExecutionContext():
                                                     range_container_node.action_condition = container.activation_condition # conditions for container actions
                                                     container.refresh_conditions()
 
+                                                    if range_container_node.container_condition:
+                                                        self._condition_map[range_container_node.id] = container_node
+
+
                                                     # add a condition to trigger the gate 
                                                     functor = gremlin.gated_handler.GatedAxisGateCondition(gate_data, range_info)
                                                     range_trigger_node = ExecutionGraphNode(ExecutionGraphNodeType.ActivationCondition)
@@ -705,6 +725,19 @@ class ExecutionContext():
                                                             range_action_node.action = range_action
                                                             range_action_node.mode = mode.name
                                                             range_action_node.action_condition = action_condition
+        # pre-build container condition functors list
+        for id in self._condition_map.keys():
+            functors = []
+            nodes = self.getNodeActivationConditions(id)
+            for condition_node in nodes:
+                if condition_node.functor:
+                    functor = condition_node.functor
+                    functors.append(functor)
+
+            self._functor_map[id] = functors
+
+        pass
+
 
 
 
@@ -872,6 +905,9 @@ class AbstractExecutionGraph(QtCore.QObject):
     def process_event(self, event, value):
         """Executes the graph with the provided data.
 
+
+        #### CRITICAL EXECUTION PATH ####
+
         :param event the raw event that caused the execution of this graph
         :param value the possibly modified value extracted from the event
         """
@@ -884,6 +920,8 @@ class AbstractExecutionGraph(QtCore.QObject):
         process_again = False
         self.run_event.clear()
 
+        ec = ExecutionContext()
+        functor_map = ec.functor_map
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_condition
         verbose_detailed = False
@@ -903,13 +941,13 @@ class AbstractExecutionGraph(QtCore.QObject):
             functor_names = []
             for index, functor in enumerate(self.functors):
                 functor_names.append(type(functor).__name__)
-                if hasattr(functor, "condition_name"):
-                    condition_name = functor.condition_name()
-                else:
-                    condition_name = ""
-                if verbose_detailed: syslog.info(f"{logTabs}\t{index} -> {functor_names[index]} {condition_name}")
-            
                 if verbose_detailed:
+                    if hasattr(functor, "condition_name"):
+                        condition_name = functor.condition_name()
+                    else:
+                        condition_name = ""
+                    syslog.info(f"{logTabs}\t{index} -> {functor_names[index]} {condition_name}")
+            
                     # output the transition plan
                     syslog.info(f"{logTabs}Transition plan:")
                     for key, next_index in self.transitions.items():
@@ -917,27 +955,37 @@ class AbstractExecutionGraph(QtCore.QObject):
                 
 
                 
-                # if verbose_detailed: syslog.info (f"{logTabs}Execution start:")
-                # id = functor.id
-                # if id:
-                #     node = self.ec.getNode(id)
-                #     if node is None:
-                #         pass
-                #     if node is not None and node.nodeType == ExecutionGraphNodeType.Container:
-                #         nodes = self.ec.getNodeActivationConditions(id)
-                #         if nodes:
-                #             if verbose: syslog.info(f"{logTabs}\t\t\t found container condition")
-                #             if verbose_detailed:
-                #                 for n in nodes:
-                #                     syslog.info(f"node: {n.description}")
-                #             for condition_node in nodes:
-                #                 if condition_node.functor:
-                #                     functor = condition_node.functor
-                #                     result = functor(event, value)
-                #                     if not result:
-                #                         if verbose: syslog.info(f"{logTabs}\t\t\t FAIL condition on condition: {condition_node.description}")
-                #                         return False
-                #         if verbose: syslog.info("Container condition: PASS")
+            #     # if verbose_detailed: syslog.info (f"{logTabs}Execution start:")
+            #     # id = functor.id
+            #     # if id:
+            #     #     node = self.ec.getNode(id)
+            #     #     if node is None:
+            #     #         pass
+            #     #     if node is not None and node.nodeType == ExecutionGraphNodeType.Container:
+            #     #         nodes = self.ec.getNodeActivationConditions(id)
+            #     #         if nodes:
+            #     #             if verbose: syslog.info(f"{logTabs}\t\t\t found container condition")
+            #     #             if verbose_detailed:
+            #     #                 for n in nodes:
+            #     #                     syslog.info(f"node: {n.description}")
+            #     #             for condition_node in nodes:
+            #     #                 if condition_node.functor:
+            #     #                     functor = condition_node.functor
+            #     #                     result = functor(event, value)
+            #     #                     if not result:
+            #     #                         if verbose: syslog.info(f"{logTabs}\t\t\t FAIL condition on condition: {condition_node.description}")
+            #     #                         return False
+            #     #         if verbose: syslog.info("Container condition: PASS")
+
+                # container condition checks - first encountered condition fails the condition
+                id = functor.id
+                if id in functor_map:
+                    for action_functor in functor_map[id]:
+                        result = action_functor(event, value)
+                        if not result:
+                            if verbose: syslog.info(f"{logTabs}\t\t\t FAIL condition on condition: {condition_name}")
+                            return False
+                    if verbose: syslog.info("Container condition: PASS")
 
             # container conditions
             for functor in self.condition_functors:

@@ -123,7 +123,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 syslog = logging.getLogger("system")
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_BASE = "m73t10"
+APPLICATION_BASE = "m73t11"
 APPLICATION_VERSION = f"13.40.16ex ({APPLICATION_BASE})"
 
 
@@ -3755,7 +3755,7 @@ class GremlinUi(QtWidgets.QMainWindow):
             last_mode = self.profile.get_default_mode()
             syslog.info(f"\tusing profile default start mode [{last_mode}]")
         
-        mode_list = gremlin.profile.mode_list(self.profile)
+        mode_list = gremlin.profile.mode_list()
 
         if not last_mode in mode_list:
             syslog.info(f"\tMode {last_mode} not found")

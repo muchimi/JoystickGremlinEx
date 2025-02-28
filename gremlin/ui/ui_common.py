@@ -1784,6 +1784,7 @@ def _inheritance_tree_to_labels(labels, tree, level):
         _inheritance_tree_to_labels(labels, children, level+1)
 
 def get_mode_list(profile_data):
+    ''' gets a pairs (display_name, mode) '''
     profile = profile_data
     mode_list = []
     modes = gremlin.shared_state.current_profile.get_modes()
@@ -1794,22 +1795,25 @@ def get_mode_list(profile_data):
 
     # Filter the mode names such that they only occur once below
     # their correct parent
-    mode_names = []
-    display_names = []
-    for entry in labels:
-        if not entry[0] in modes:
-            continue
-        if entry[0] in mode_names:
-                idx = mode_names.index(entry[0])
-                if len(entry[1]) > len(display_names[idx]):
-                    del mode_names[idx]
-                    del display_names[idx]
-                    mode_names.append(entry[0])
-                    display_names.append(entry[1])
-        else:
+    mode_names = [n[0] for n in labels]
+    display_names = [n[1] for n in labels]
 
-            mode_names.append(entry[0])
-            display_names.append(entry[1])
+
+
+    # for entry in labels:
+    #     if not entry[0] in modes:
+    #         continue
+    #     if entry[0] in mode_names:
+    #             idx = mode_names.index(entry[0])
+    #             if len(entry[1]) > len(display_names[idx]):
+    #                 del mode_names[idx]
+    #                 del display_names[idx]
+    #                 mode_names.append(entry[0])
+    #                 display_names.append(entry[1])
+    #     else:
+
+    #         mode_names.append(entry[0])
+    #         display_names.append(entry[1])
 
     # Add properly arranged mode names to the drop down list
     for display_name, mode_name in zip(display_names, mode_names):
@@ -1906,28 +1910,28 @@ class ModeWidget(QtWidgets.QWidget):
             while self.edit_mode_selector.count() > 0:
                     self.edit_mode_selector.removeItem(0)
 
-            mode_list = get_mode_list(profile)
-            self.mode_list = [x[1] for x in mode_list]
+            mode_list_pairs = get_mode_list(profile)
+            self.mode_list = [x[1] for x in mode_list_pairs]
             # Create mode name labels visualizing the tree structure
-            inheritance_tree = self.profile.build_inheritance_tree()
-            labels = []
-            _inheritance_tree_to_labels(labels, inheritance_tree, 0)
+            # inheritance_tree = self.profile.build_inheritance_tree()
+            # labels = []
+            # _inheritance_tree_to_labels(labels, inheritance_tree, 0)
 
-            # Filter the mode names such that they only occur once below
-            # their correct parent
-            mode_names = []
-            display_names = []
-            for entry in labels:
-                if entry[0] in mode_names:
-                    idx = mode_names.index(entry[0])
-                    if len(entry[1]) > len(display_names[idx]):
-                        del mode_names[idx]
-                        del display_names[idx]
-                        mode_names.append(entry[0])
-                        display_names.append(entry[1])
-                else:
-                    mode_names.append(entry[0])
-                    display_names.append(entry[1])
+            # # Filter the mode names such that they only occur once below
+            # # their correct parent
+            # mode_names = []
+            # display_names = []
+            # for entry in labels:
+            #     if entry[0] in mode_names:
+            #         idx = mode_names.index(entry[0])
+            #         if len(entry[1]) > len(display_names[idx]):
+            #             del mode_names[idx]
+            #             del display_names[idx]
+            #             mode_names.append(entry[0])
+            #             display_names.append(entry[1])
+            #     else:
+            #         mode_names.append(entry[0])
+            #         display_names.append(entry[1])
 
             # Add properly arranged mode names to the drop down list
             index = 0
@@ -1937,9 +1941,10 @@ class ModeWidget(QtWidgets.QWidget):
 
             if not last_edit_mode in modes:
                 last_edit_mode = gremlin.shared_state.current_profile.get_default_mode()
-            for display_name, mode_name in zip(display_names, mode_names):
+
+            for display_name, mode_name in mode_list_pairs:
                 self.edit_mode_selector.addItem(display_name, mode_name)
-                self.mode_list.append(mode_name)
+                # self.mode_list.append(mode_name)
                 if mode_to_select and select_index is None and mode_to_select == mode_name:
                     select_index = index
                 if mode_name == last_edit_mode:
@@ -3221,11 +3226,27 @@ class AxisStateWidget(QtWidgets.QWidget):
         self._show_curved = show_curve
 
 
-        # if orientation == QtCore.Qt.Orientation.Vertical:
-            
-        self._readout_widget = QtWidgets.QWidget()
-        self._readout_layout = QtWidgets.QVBoxLayout(self._readout_widget)
-        self._label_widget = QtWidgets.QLabel()
+        self._display_value_widget = QtWidgets.QLabel()
+        self._display_percent_widget = QtWidgets.QLabel()
+        self._display_curve_widget = QtWidgets.QLabel()
+        self._display_label_widget = QtWidgets.QLabel()
+
+        widget_list = [self._display_label_widget,
+                       self._display_value_widget,
+                       self._display_percent_widget,
+                       self._display_curve_widget,
+                       ]
+
+        if orientation == QtCore.Qt.Orientation.Vertical:
+            widget, layout = getVContainer(widget_list)
+        else:
+            widget, layout = getHContainer(widget_list)
+        
+        self._readout_widget = widget
+        self._readout_layout = layout
+
+        
+
         
         
         if axis_id:
@@ -3233,12 +3254,12 @@ class AxisStateWidget(QtWidgets.QWidget):
 
 
         if orientation == QtCore.Qt.Orientation.Vertical:
-            self.container_layout.addWidget(self._label_widget,0,0, alignment=QtCore.Qt.AlignCenter)
+            self.container_layout.addWidget(self._display_label_widget,0,0, alignment=QtCore.Qt.AlignCenter)
             self.container_layout.addWidget(self._progress_widget,1,0, alignment=QtCore.Qt.AlignCenter)
             self.container_layout.addWidget(self._readout_widget,2,0, alignment=QtCore.Qt.AlignCenter)
             
         else:
-            self.container_layout.addWidget(self._label_widget)
+            self.container_layout.addWidget(self._display_label_widget)
             self.container_layout.addWidget(self._progress_widget)
             self.container_layout.addWidget(self._readout_widget)
 
@@ -3271,8 +3292,13 @@ class AxisStateWidget(QtWidgets.QWidget):
 
         self.main_layout.addLayout(self.container_layout)
 
-        self._update_visible()
+        el = gremlin.event_handler.EventListener()
+        el.ui_ready.connect(self._ui_ready)
         
+    @QtCore.Slot()
+    def _ui_ready(self):
+        ''' fires when the UI is ready '''
+        self._setValue(self._value, self._curve_value)
 
     def _cleanup_ui(self):
         ''' item is being deleted '''
@@ -3317,8 +3343,13 @@ class AxisStateWidget(QtWidgets.QWidget):
 
     def _update_visible(self):
         ''' updates visible state for data label'''
-        visible = self._show_label or self._show_percentage or self._show_value or self._show_curved
-        self._readout_widget.setVisible(visible)
+        if gremlin.shared_state.ui_ready and self.parent() is not None:
+            self._display_value_widget.setVisible(self._show_value)
+            self._display_percent_widget.setVisible(self._show_percentage)
+            self._display_curve_widget.setVisible(self._show_curved)
+            self._display_label_widget.setVisible(self._show_label)
+            visible = self._show_label or self._show_percentage or self._show_value or self._show_curved
+            self._readout_widget.setVisible(visible)
 
     def setPercentageVisible(self, value: bool):
         ''' shows or hides the percentage value on the axis '''
@@ -3342,11 +3373,11 @@ class AxisStateWidget(QtWidgets.QWidget):
 
     def setLabel(self, value : str):
         ''' sets the label for the axis '''
-        self._label_widget.setText(value)
+        self._display_label_widget.setText(value)
 
     def setLabelVisible(self, value: bool):
         self._show_label = value
-        self._label_widget.setVisible(value)
+        self._display_label_widget.setVisible(value)
         self._update_visible()
 
     def setWidth(self, value):
@@ -3366,71 +3397,55 @@ class AxisStateWidget(QtWidgets.QWidget):
 
     def _setValue(self, value, curve_value = None, percent_value = None, other_value = None):
         ''' internal set value '''
-        if value < self._min_range:
-            value = self._min_range
-        if value > self._max_range:
-            value = self._max_range
-        value += 0   # avoid negative 0 (WHY?)
-        self._value = value
+        try:
+            if value < self._min_range:
+                value = self._min_range
+            if value > self._max_range:
+                value = self._max_range
+            value += 0   # avoid negative 0 (WHY?)
+            self._value = value
 
-        if curve_value is not None:
-            # eh = gremlin.event_handler.EventListener()
-            # curve_value = eh._apply_curve_ex(self._device_guid, self._input_id, value)
-            self._curve_value = curve_value
-            display_value = curve_value
-            curve_visible = self._show_curved
-
-        else:
-            display_value = value
-            curve_visible = False
-            self._curve_value = value
-
-
-        if self._reverse:
-            display_value = gremlin.util.scale_to_range(display_value, invert=True)
-
-        scaled_value = self._scale_factor * display_value
-        self._progress_widget.setValue(scaled_value)
-        self._progress_widget.update()
-
-        if not self._readout_widget.isVisible():
-
-            readout_list = []
-            if self._show_value:
-                readout_list.append(f"{value:+0.3f}")
-                if curve_visible:
-                    readout_list.append(f"C{curve_value:+0.3f}")
-            if self._show_percentage:
-                if percent_value is None:
-                    if curve_value is None:
-                        percent = gremlin.util.scale_to_range(value, target_min=0, target_max = 100)
-                    else:
-                        percent = gremlin.util.scale_to_range(curve_value, target_min=0, target_max = 100)
-                else:
-                    percent = percent_value
-                readout_list.append(f"{int(percent)} %")
-
-            if other_value is not None:
-                readout_list.append(f"{other_value}")
-
-            clear_layout(self._readout_layout)
-
-            
-            widget_list = [QtWidgets.QLabel(text) for text in readout_list]
-            if self._orientation == QtCore.Qt.Orientation.Vertical:
-                widget = QtWidgets.QWidget()
-                layout = QtWidgets.QGridLayout(widget)
-                widget.setMinimumWidth(80)
-                row = 0
-                for wl in widget_list:
-                    layout.addWidget(wl, row, 0, alignment = QtCore.Qt.AlignCenter)
-                    row +=1
-                self._readout_layout.addWidget(widget, alignment = QtCore.Qt.AlignCenter)
+            if curve_value is not None:
+                # eh = gremlin.event_handler.EventListener()
+                # curve_value = eh._apply_curve_ex(self._device_guid, self._input_id, value)
+                self._curve_value = curve_value
+                display_value = curve_value
             else:
-                widget, _ = getHContainer(widget_list)
-                self._readout_layout.addWidget(widget)
+                display_value = value
+                self._curve_value = value
 
-        self.valueChanged.emit(self._value, self._curve_value)
+
+            if self._reverse:
+                display_value = gremlin.util.scale_to_range(display_value, invert=True)
+
+            if value is None:
+                display_value = None
+            else:
+                scaled_value = self._scale_factor * display_value
+                
+
+            self._progress_widget.setValue(scaled_value)
+            self._progress_widget.update()
+
+            self._update_visible()
+            if self._readout_widget.isVisible():
+                if self._show_value and display_value is not None:
+                    self._display_value_widget.setText(f"{display_value:+0.3f}")
+                if self._show_curved and curve_value is not None:
+                    self._display_curve_widget.setText(f"C{curve_value:+0.3f}")
+                if self._show_percentage:
+                    if percent_value is None:
+                        if curve_value is None:
+                            percent = gremlin.util.scale_to_range(display_value, target_min=0, target_max = 100)
+                        else:
+                            percent = gremlin.util.scale_to_range(curve_value, target_min=0, target_max = 100)
+                    else:
+                        percent = percent_value
+                    self._display_percent_widget.setText(f"{percent:0.1f} %")
+
+            self.valueChanged.emit(self._value, self._curve_value)
+        except:
+            pass # C++ QT exception because of sync issues with Python/QT
 
     def value(self):
         ''' gets the current value '''
@@ -5886,7 +5901,7 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
     ''' a widget that displays and collects range information for a joytick '''
 
 
-    valueChanged = QtCore.Signal(object) # occurs when the data range value changes ((min,max)) or (value)
+    valueChanged = QtCore.Signal(object) # occurs when the data range value changes ((min,max)) or (value) - passes the normalized values or single value
     modeChanged = QtCore.Signal() # occurs if the mode changes from single value to range mode
     invertChanged = QtCore.Signal() # occurs when inversion flag is changed
 
@@ -6096,10 +6111,8 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
         is_range = widget.data
         self.isRange = is_range
         
-        
 
-
-    def _update_from_normalized(self, value : float,  emit = True):
+    def _update_from_normalized(self, emit = True):
         min_norm = self._normalized_min_widget.value()
         max_norm = self._normalized_max_widget.value()
         min_cmd = self._command_min_widget.value() # minimum range
@@ -6137,9 +6150,9 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
 
             if emit:
                 if self._is_range:
-                    self.valueChanged.emit((min_value, max_value))
+                    self.valueChanged.emit((min_norm, max_norm))
                 else:
-                    self.valueChanged.emit(min_value)
+                    self.valueChanged.emit(min_norm)
 
     def _update_from_percent(self, value : float,  emit = True):
         min_percent = self._percent_min_widget.value()
@@ -6174,9 +6187,9 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
 
             if emit:
                 if self._is_range:
-                    self.valueChanged.emit((min_value, max_value))
+                    self.valueChanged.emit((min_norm, max_norm))
                 else:
-                    self.valueChanged.emit(min_value)
+                    self.valueChanged.emit(min_norm)
 
 
     def _update_from_data(self, value, emit = True):
@@ -6217,9 +6230,9 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
 
             if emit:
                 if self._is_range:
-                    self.valueChanged.emit((min_value, max_value))
+                    self.valueChanged.emit((min_norm, max_norm))
                 else:
-                    self.valueChanged.emit(min_value)
+                    self.valueChanged.emit(min_norm)
             
 
     def _update_from_command(self, value, emit = True):
@@ -6320,47 +6333,63 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
                 self._invert_output_widget.setChecked(value)
 
 
-    def setRange(self, min_value, max_value):
-        ''' updates the range min and max values '''
-        if min_value == max_value:
+    def setRange(self, value : float, max_value : float = None):
+        ''' updates the overall range min and max values '''
+        if value == max_value:
             # syslog = logging.getLogger("system")
-            syslog.error(f"RANGE WIDGET: cannot set range to the same value: {min_value:0.3f} - skipping")
+            syslog.error(f"RANGE WIDGET: cannot set range to the same value: {value:0.3f} - skipping")
             return
         with QtCore.QSignalBlocker(self._command_min_widget):
-            self._command_min_widget.setRange(min_value, max_value)
-            self._command_min_widget.setValue(min_value)
-        with QtCore.QSignalBlocker(self._command_max_widget):
-            self._command_max_widget.setRange(min_value, max_value)
-            self._command_max_widget.setValue(max_value)
+            self._command_min_widget.setRange(value, max_value)
+            self._command_min_widget.setValue(value)
+        
         with QtCore.QSignalBlocker(self._data_min_widget):
-            self._data_min_widget.setRange(min_value, max_value)
-        with QtCore.QSignalBlocker(self._data_max_widget):
-            self._data_max_widget.setRange(min_value, max_value)
+            self._data_min_widget.setRange(value, max_value)
+
+        if self._is_range:
+            assert max_value is not None,"Missing max value must be provided in range mode"
+            with QtCore.QSignalBlocker(self._command_max_widget):
+                self._command_max_widget.setRange(value, max_value)
+                self._command_max_widget.setValue(max_value)
+        
+            with QtCore.QSignalBlocker(self._data_max_widget):
+                self._data_max_widget.setRange(value, max_value)
         self._update_from_command(None, False)
 
-    def setPercent(self, min_percent, max_percent):
+    def setPercent(self, percent : float, max_percent : float = None):
         ''' updates based on percentage'''
-        min_percent = gremlin.util.clamp(min_percent,0, 100)
-        max_percent = gremlin.util.clamp(max_percent,0, 100)
-
+        percent = gremlin.util.clamp(percent,0, 100)
         with QtCore.QSignalBlocker(self._percent_min_widget):
-            self._percent_min_widget.setValue(min_percent)
-        with QtCore.QSignalBlocker(self._percent_max_widget):
-            self._percent_min_widget.setValue(max_percent)
+            self._percent_min_widget.setValue(percent)
+
+        if self._is_range:            
+            assert max_percent is not None,"Missing max value must be provided in range mode"
+            max_percent = gremlin.util.clamp(max_percent,0, 100)
+            with QtCore.QSignalBlocker(self._percent_max_widget):
+                self._percent_max_widget.setValue(max_percent)
         self._update_from_percent(None, False)
 
-    def setNormalized(self, min_norm, max_norm):
+    def setNormalized(self, norm : float, max_norm : float = None):
         ''' updates range from normalized values (-1 to +1)'''
-        min_norm = gremlin.util.clamp(min_norm,-1,1)
-        max_norm = gremlin.util.clamp(max_norm,-1,1)
+        norm = gremlin.util.clamp(norm,-1,1)
         with QtCore.QSignalBlocker(self._normalized_min_widget):
-            self._normalized_min_widget.setValue(min_norm)
-        with QtCore.QSignalBlocker(self._normalized_max_widget):
-            self._normalized_max_widget.setValue(max_norm)
-        self._update_from_normalized(None, False)
+            self._normalized_min_widget.setValue(norm)
 
-    def setValue(self, min_value, max_value = None):
-        ''' sets the range value '''
+        if self._is_range:
+            assert max_norm is not None,"Missing max value must be provided in range mode"
+            max_norm = gremlin.util.clamp(max_norm,-1,1)
+            with QtCore.QSignalBlocker(self._normalized_max_widget):
+                self._normalized_max_widget.setValue(max_norm)
+        
+        self._update_from_normalized(False)
+
+    def setValue(self, value : float, max_value: float = None):
+        ''' updates normalized value '''
+        self.setNormalized(value, max_value)
+
+
+    def setOutput(self, min_value, max_value = None):
+        ''' sets the output range value '''
 
         if self._is_range and max_value is None:
             # if the widget is a range value, expecting two data points
@@ -6384,12 +6413,16 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
         if verbose: syslog.info(f"Range widget set value: {min_value:0.3f} {max_value:0.3f}  commmand: {min_cmd:0.3f} {max_cmd:0.3f}")
         self._update_from_data(None, False)
 
-    def value(self):
-        ''' gets the value '''
+    def getNormalized(self) -> tuple | float:
+        ''' gets the normalized value '''
         if self._is_range:
             return (self._data_min_widget.value(), self._data_max_widget.value())
         else:
             return self._data_min_widget.value()
+        
+    def getValue(self) -> tuple | float:
+        ''' returns normalized values -1 to + 1 (min,max)'''
+        return self.getNormalized()
 
 
     def showCommandRange(self, value : bool):

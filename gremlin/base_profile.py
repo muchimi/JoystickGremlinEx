@@ -1998,8 +1998,18 @@ class InputItem():
         )
     
 
+class ModeNode(anytree.NodeMixin):
+    ''' mode tree node '''
+    def __init__(self, name : str = None, mode_object = None):
+        self.name = name
+        self.mode_object = mode_object
 
-
+    @property
+    def parent_mode(self) -> str:
+        ''' gets the parent mode name, None if none'''
+        if self.parent and self.parent.name:
+            return self.parent.name
+        return None
 
 class Profile():
 
@@ -2012,7 +2022,7 @@ class Profile():
     def __init__(self, parent = None):
         """Constructor creating a new instance."""
 
-        
+        self._mode_tree = None # holds the mode tree (anytree, m73 and later) - this holds the profile's mode hiarchy
         self.devices : dict[Device] = {} # holds devices attached to this profile
         self.vjoy_devices = {}
         self.merge_axes = []
@@ -2192,19 +2202,12 @@ class Profile():
 
     
     def build_inheritance_tree(self, as_tree = False):
-        """Returns a tree structure encoding the inheritance between the
-        various modes.
-
-        :return tree (dictionary keyed by mode name) encoding mode inheritance
-        """
-
+        """Returns a tree structure encoding the inheritance between the modes in the profile and builds the profile mode tree """
         
-
-
         tree = {}
         nodes = {}
         
-        def addNode(name : str, parent : Node = None) -> Node:
+        def addNode(name : str, parent : Node = None, mode_object = None) -> Node:
             if not name in nodes:
 
                 if parent:
@@ -2215,7 +2218,7 @@ class Profile():
                         syslog.warning(f"MODE TREE: mode {name} is already used by a parent")
                         return None
                     
-                node = Node(name)
+                node = ModeNode(name, mode_object)
                 nodes[name] = node
                 if parent:
                     node.parent = parent
@@ -2223,7 +2226,7 @@ class Profile():
         
         used_list = [] # list of used modes
         
-        root_node = Node("")
+        root_node = ModeNode("")
         for _, device in self.devices.items():
             for mode_name, mode in device.modes.items():
                 if mode_name in used_list:
@@ -2264,6 +2267,8 @@ class Profile():
         if verbose:
             for pre, fill, node in anytree.RenderTree(root_node, style=anytree.AsciiStyle()):
                 syslog.info(f"{pre}{node.name}")
+
+        self._mode_tree = root_node
         if as_tree:
             return root_node       
         return tree
@@ -2281,32 +2286,49 @@ class Profile():
         return data
     
     def mode_map(self):
-        mode_list = self.traverse_mode()
-        mode_list.reverse()
+        ''' converts the mode tree to a map [mode] = [children modes]'''
         data = {}
-        max_index = len(mode_list) - 1
-        for index, (level, mode) in enumerate(mode_list):
-            if index < max_index:
-                parent_level, parent_mode = mode_list[index+1]
-                data[mode] = parent_mode
-            else:
-                data[mode] = None
+        if self._mode_tree:
+            for node in anytree.PostOrderIter(self._mode_tree):
+                mode = node.name
+                if not mode:
+                    continue
+                data[mode] = []
+                parent_node = node.parent
+                if parent_node and parent_node.name:
+                    data[parent_node.name].append(mode)
+        else:
+            mode_list = self.traverse_mode()
+            mode_list.reverse()
+            data = {}
+            max_index = len(mode_list) - 1
+            for index, (level, mode) in enumerate(mode_list):
+                if index < max_index:
+                    parent_level, parent_mode = mode_list[index+1]
+                    data[mode] = parent_mode
+                else:
+                    data[mode] = None
         return data
     
     def get_root_mode(self):
         ''' gets the top mode from a profile - that would be the default startup mode - sorted by name of the root nodes'''
-        tree = self.build_inheritance_tree()
-        modes = sorted(tree.keys())
-        if "Default" in modes:
-            # return the default mode as that is what we start with
-            return "Default"
-        # pick the first sorted mode
-        if modes:
-            return modes[0]
-        return None
+
+        if self._mode_tree:
+            modes = [node.name for node in self._mode_tree.children]
+            return modes
+        else:
+            tree = self.build_inheritance_tree()
+            modes = sorted(tree.keys())
+            if "Default" in modes:
+                # return the default mode as that is what we start with
+                return "Default"
+            # pick the first sorted mode
+            if modes:
+                return modes[0]
+            return None
         
     
-    def set_last_runtime_mode(self, mode):
+    def set_last_runtime_mode(self, mode : str):
         ''' sets the last used mode - this is persisted in the configuration  '''
         if mode != self._last_runtime_mode:
             self._last_runtime_mode = mode
@@ -2367,6 +2389,12 @@ class Profile():
         :param node a node from a profile tree
         :return list of mode names
         """
+
+        if self._mode_tree:
+            modes = self.get_modes()
+            return modes
+
+
         # Get profile root node
         parent = self
         while parent.parent is not None:
@@ -2390,6 +2418,7 @@ class Profile():
         if name in self.mode_list():
             syslog.warning(f"Add Mode: error: mode {name} already exists")
             return False
+        
         for device in self.devices.values():
             new_mode = Mode(device)
             new_mode.name = name
@@ -2399,6 +2428,20 @@ class Profile():
                 new_mode.inherit = self.get_default_mode()
             new_mode.parent = device
             device.modes[name] = new_mode
+
+        if self._mode_tree:
+            # add the mode 
+            node = ModeNode(name)
+            parent_node = self._mode_tree
+            if inherited_name:
+                existing_parent_node = next((node for node in self._mode_tree.descendants if node.name == inherited_name), None)
+                if existing_parent_node:
+                    parent_node = existing_parent_node
+                
+            node.parent = parent_node
+                    
+
+
 
         if emit:
             eh = gremlin.event_handler.EventListener()
@@ -2419,9 +2462,11 @@ class Profile():
             return True
         return False
     
-    def mode_tree(self):
-        ''' gets the parent/child hiearchy of modes - returns a map '''
-        return self.build_inheritance_tree()
+    def mode_tree(self, as_tree = False):
+        ''' gets the parent/child hiearchy of modes - returns a map or an anytree '''
+        if as_tree and self._mode_tree:
+            return self._mode_tree
+        return self.build_inheritance_tree(as_tree)
         
 
 
@@ -2455,6 +2500,15 @@ class Profile():
         for device in self.devices.values():
             del device.modes[name]
 
+
+        if self._mode_tree:
+            node = next((node for node in self._mode_tree.descendants if node.name == name), None)
+            if node:
+                # reparent children
+                for child in node.children:
+                    child.parent = node.parent
+                node.parent = None # delete the node
+
         eh = gremlin.event_handler.EventListener()
         eh.edit_mode_changed.emit()
 
@@ -2463,6 +2517,10 @@ class Profile():
 
         :return list of root modes
         """
+        if self._mode_tree:
+            root_modes = [node.name for node in self._mode_tree.children]
+            return root_modes
+        
         root_modes = []
         for device in self.devices.values():
             if device.type != DeviceType.Keyboard:
@@ -2474,18 +2532,30 @@ class Profile():
     
     def get_modes(self, casefold = False) -> list[str]:
         ''' get all profile mode names '''
-        modes = []
-        for device in self.devices.values():
-            if device.type != DeviceType.Keyboard:
-                continue
-            for _, mode in device.modes.items():
-                if casefold:
-                    modes.append(mode.name.casefold())    
-                else:
-                    modes.append(mode.name)
-        modes = list(set(modes))
+
+        if self._mode_tree:
+            if casefold:
+                modes = [node.name.casefold() for node in self._mode_tree.descendants]    
+            else:
+                modes = [node.name for node in self._mode_tree.descendants]
+
+        else:
+            modes = []
+            for device in self.devices.values():
+                if device.type != DeviceType.Keyboard:
+                    continue
+                for _, mode in device.modes.items():
+                    if casefold:
+                        modes.append(mode.name.casefold())    
+                    else:
+                        modes.append(mode.name)
+            modes = list(set(modes))
         if not modes:
             modes = ["Default"]
+            self._mode_tree = Node("")
+            default_node = Node("Default")
+            default_node.parent = self._mode_tree
+
         return modes  # unduplicated
     
     def rename_mode(self, old_mode:str, new_mode:str):
@@ -2616,11 +2686,12 @@ class Profile():
     
 
     def from_xml(self, fname, data = None):
-        """Parses the global XML document into the profile data structure.
+        """Parses the profile XML document into the profile data structure.
 
         :param fname the path to the XML file to parse
         """
         # Check for outdated profile structure and warn user / convert
+        verbose = gremlin.config.Configuration().verbose
         profile_converter = gremlin.profile.ProfileConverter()
         profile_was_updated = False
         if not profile_converter.is_current(fname):
@@ -2648,6 +2719,48 @@ class Profile():
         if "force_numlock" in root.attrib:
             self._force_numlock_off = safe_read(root, "force_numlock", bool, True)
 
+        # read mode information (m73 and later profiles only)
+        mode_tree = ModeNode("")
+        
+        # profile mode definitions
+
+
+        root_mode_node = gremlin.util.get_xml_child(root, "modes")
+        mode_list = None
+        mode_node_map = {}
+        if root_mode_node is not None:
+            nodes = {}
+            nodes[""] = mode_tree
+            mode_node_map[""] = mode_tree
+            for node in root_mode_node.iter():
+                mode = node.get("mode")
+                if not mode:
+                    continue
+                tree_node = ModeNode(mode)
+                mode_node_map[mode] = tree_node
+                nodes[mode] = tree_node
+                parent_node = node.getparent()
+                if parent_node is not None:
+                    parent_mode = parent_node.get("mode")
+                    if parent_mode:
+                        parent_tree_node = nodes[parent_mode]
+                        tree_node.parent = parent_tree_node
+                        continue
+            
+                # no parent - parent to root
+                tree_node.parent = mode_tree
+
+            if verbose:
+                syslog.info("Profile mode tree:")
+                for pre, fill, node in anytree.RenderTree(mode_tree, style=anytree.AsciiStyle()):
+                    syslog.info(f"{pre}{node.name}")
+
+            # profile mode list
+            mode_list = [n.name for n in mode_tree.descendants if n.name]
+            
+        self._mode_tree = mode_tree
+
+        
 
 
 
@@ -2701,16 +2814,17 @@ class Profile():
                     new_device.device_guid = dev.device_guid
                     self.devices[dev.device_guid] = new_device
 
-                # Create required modes
-                for mode in gremlin.profile.mode_list(new_device):
+                # Create required mode objects
+                if not mode_list:
+                    mode_list = gremlin.profile.mode_list()
+                for mode in mode_list:
                     if mode not in new_device.modes:
-                        new_device.modes[mode] = Mode(new_device)
-                        new_device.modes[mode].name = mode
-
-                # # global mode
-                # mode = Mode(new_device)
-                # mode.name ="Global mode (internal)"
-                # new_device.modes[gremlin.shared_state.global_mode] = mode
+                        mode_object = Mode(new_device)
+                        mode_object.name = mode
+                        new_device.modes[mode] = mode_object
+                        if mode in mode_node_map:
+                            mode_node_map[mode].mode_object = mode_object
+                        
 
         # Parse merge axis entries
         for child in root.iter("merge-axis"):
@@ -2755,6 +2869,35 @@ class Profile():
         root.set("default_mode", self.get_default_start_mode())
         root.set("restore_last", str(self._restore_last_mode))
         root.set("force_numlock", str(self._force_numlock_off))
+
+        # mode list
+        
+        mode_tree_root = self.mode_tree(True)
+        root_mode_node = etree.Element("modes")
+        root.append(root_mode_node)
+
+        # new as of m73 - new mode node for mode hieararchy
+        nodes = {}
+        for tree_node in anytree.PreOrderIter(mode_tree_root):
+            mode = tree_node.name
+            if not mode:
+                continue # root node
+            node = etree.Element("mode") # new xml child
+            node.set("mode",mode) # set mode value
+            nodes[mode] = node # track it
+            parent_mode = tree_node.parent.name if tree_node.parent else None
+            if parent_mode:
+                parent_node = nodes[parent_mode]
+                parent_node.append(node)
+            else:
+                root_mode_node.append(node)
+
+        
+
+
+
+
+
 
         # Device settings
         devices = etree.Element("devices")
@@ -3085,7 +3228,7 @@ class Profile():
 
 class Mode:
 
-    """Represents the configuration of the mode of a single device."""
+    """ mode object - represents the configuration of the mode of a single device."""
 
     # list of input types to save for each mode
     SaveInputTypes =  [
@@ -3099,12 +3242,12 @@ class Mode:
             InputType.ModeControl,
         ]
 
-    def __init__(self, parent):
+    def __init__(self, device : Device):
         """Creates a new DeviceConfiguration instance.
 
         :param parent the parent device of this mode
         """
-        self.parent = parent
+        self.parent = device
         self.inherit = None # name of the mode we inherit properties from
         self._name = None # name of the current mode
        
