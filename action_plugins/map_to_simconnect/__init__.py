@@ -2971,12 +2971,14 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _set_command_range(self):
         widget = self.sender()
         min_value, max_value = widget.data
+
+        self._value_widget.setOutput(min_value, max_value)
         self._value_widget.setRange(min_value, max_value)
-        self._value_widget.setValue(min_value, max_value)
         self.action_data.command_min_range = min_value
         self.action_data.command_max_range = max_value
         self.action_data.output_min_range = min_value
         self.action_data.output_max_range = max_value
+        self.action_data._update_from_output()
         self._update_axis_widget(self._current_value)
 
     def _update_curve_icon(self):
@@ -3219,7 +3221,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
                                                            target_min = self.action_data.output_min_range, 
                                                            target_max = self.action_data.output_max_range,
                                                            invert = self.action_data.inverted) # conver to output range
-                #if verbose: syslog.info(f"SIMCONNECT: {raw:0.4f} output range: [{self.action_data.output_min_range:0.3f}, {self.action_data.output_max_range:0.3f}] normalized range: [{self.action_data.normalized_min_range:0.4f}, {self.action_data.normalized_max_range:0.4f}] normalized {normalized:0.4f} scaled norm: {scaled_value:0.3f} curved {curved_value:0.3f} percent: {percent:0.3f} output: {output_value}")
+                if verbose: syslog.info(f"SIMCONNECT: {raw:0.4f} output range: [{self.action_data.output_min_range:0.3f}, {self.action_data.output_max_range:0.3f}] normalized range: [{self.action_data.normalized_min_range:0.4f}, {self.action_data.normalized_max_range:0.4f}] normalized {normalized:0.4f} scaled norm: {scaled_value:0.3f} curved {curved_value:0.3f} percent: {percent:0.3f} output: {output_value}")
             else:
                 output_value = value
                 percent = gremlin.util.scale_to_range(value, source_min = self.action_data.output_min_range, source_max = self.action_data.output_max_range, target_min=0, target_max=100) # convert to percent
@@ -3944,12 +3946,12 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                         # send as LVAR
                         
                         command = self.action_data.command
-                        #if verbose: syslog.info(f"SIMCONNECT: send lvar (axis): {command} input: {action_value.current:0.3f} scaled: {normalized:0.3f} curved: {curved:0.3f} min: {self.action_data.output_min_range:0.3f} max: {self.action_data.output_max_range:0.3f} -> scaled: {output_value}")
+                        if verbose: syslog.info(f"SIMCONNECT: send lvar (axis): {command} input: {action_value.current:0.3f} scaled: {normalized:0.3f} curved: {curved:0.3f} min: {self.action_data.output_min_range:0.3f} max: {self.action_data.output_max_range:0.3f} -> scaled: {output_value}")
                         request = manager.registerRequest(command, "number", settable = True)
                         request.value = output_value
                         request.transmit()
                     else:
-                        #if verbose: syslog.info(f"SIMCONNECT: send simvar (axis): {block.command} input: {action_value.current:0.3f} scaled: {normalized:0.3f} curved: {curved:0.3f} min: {self.action_data.output_min_range:0.3f} max: {self.action_data.output_max_range:0.3f} -> scaled: {output_value}")
+                        if verbose: syslog.info(f"SIMCONNECT: send simvar (axis): {block.command} input: {action_value.current:0.3f} scaled: {normalized:0.3f} curved: {curved:0.3f} min: {self.action_data.output_min_range:0.3f} max: {self.action_data.output_max_range:0.3f} -> scaled: {output_value}")
                         block.execute(output_value)
 
             elif output_mode == SimConnectActionMode.Trigger:
