@@ -2314,8 +2314,7 @@ class Profile():
         ''' gets the top mode from a profile - that would be the default startup mode - sorted by name of the root nodes'''
 
         if self._mode_tree:
-            modes = [node.name for node in self._mode_tree.children]
-            return modes
+            return next((node.name for node in self._mode_tree.children), None)
         else:
             tree = self.build_inheritance_tree()
             modes = sorted(tree.keys())

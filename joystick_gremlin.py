@@ -123,7 +123,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 syslog = logging.getLogger("system")
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_BASE = "m73t11"
+APPLICATION_BASE = "m73t13"
 APPLICATION_VERSION = f"13.40.16ex ({APPLICATION_BASE})"
 
 
@@ -4315,4 +4315,5 @@ if __name__ == "__main__":
 
     syslog.info("Terminating GremlinEx")
     
+    gc.collect()
     sys.exit(0)

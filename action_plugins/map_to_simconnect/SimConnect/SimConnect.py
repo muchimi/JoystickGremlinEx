@@ -551,14 +551,18 @@ class SimConnect():
 		splits = work_cfg.split(os.sep)
 		max_index = len(splits)
 		index = 0
-		while splits[index] != "simobjects" and index < max_index:
-			index+=1
-		index+=1
-		if index < max_index:
-			while splits[index] != "airplanes" and index < max_index:
-				index+=1
-		index+=1
-		if index < max_index:
+		if "config" in splits:
+			index = splits.index("config")
+			index-=1
+
+		# while splits[index] != "simobjects" and index < max_index:
+		# 	index+=1
+		# index+=1
+		# if index < max_index:
+		# 	while splits[index] != "airplanes" and index < max_index:
+		# 		index+=1
+		# index+=1
+		if index >= 0 and index < max_index:
 			aircraft_name = splits[index]
 			if verbose: syslog.info(f"SIMCONNECT:found {aircraft_name}")
 			return aircraft_name

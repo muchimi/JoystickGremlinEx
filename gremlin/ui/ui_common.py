@@ -6815,12 +6815,14 @@ class QPaginator(QtWidgets.QWidget):
             self._update_data_view()
     
     def _go_to_page(self):
-        page_num = int(self._page_input_widget.text())
-        if 1 <= page_num <= self.total_pages:
-            self._current_page = page_num
-            self._update_data_view()
-        else:
-            self._page_input_widget.clear()
+        text = self._page_input_widget.text()
+        if text and text.isnumeric():
+            page_num = int(text)
+            if 1 <= page_num <= self.total_pages:
+                self._current_page = page_num
+                self._update_data_view()
+            else:
+                self._page_input_widget.clear()
 
 
 

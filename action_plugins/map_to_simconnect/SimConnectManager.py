@@ -447,7 +447,7 @@ _simconnect_event_category_to_enum_lookup = {
 class SimConnectManager(QtCore.QObject):
     ''' holds simconnect data and manages simconnect '''
 
-    sim_aircraft_loaded = QtCore.Signal(str, str, str) # fires when aircraft title changes (param folder, name, title)
+    sim_aircraft_loaded = QtCore.Signal(str) # fires when aircraft title changes (param folder, name, title)
     sim_start = QtCore.Signal() # fires when the sim starts
     sim_stop = QtCore.Signal() # fires when the sim stops
     sim_running = QtCore.Signal(bool) # fires when the sim is running
@@ -970,7 +970,8 @@ class SimConnectManager(QtCore.QObject):
         if self._aircraft_name != name or self._aircraft_folder != folder:
             self._aircraft_folder = folder
             self._aircraft_name = name
-            self._aircraft_loaded_internal.emit(folder, name)
+            self._aircraft_loaded_internal.emit(folder, name)  # fires self.sim_aircraft_loaded.emit(name)
+            
 
     def _state_data_cb(self, int_data, float_data, str_data):
         ''' occurs when state data is requested '''
@@ -983,6 +984,10 @@ class SimConnectManager(QtCore.QObject):
 
         self.sim_state.emit(int_data, float_data, str_data)
 
+    def get_loaded_aircraft(self):
+        ''' gets the loaded aircraft '''
+        return self._aircraft_name
+    
 
     def get_aircraft_title(self, force_update = False):
         if not self._aircraft_title or force_update:
@@ -996,9 +1001,7 @@ class SimConnectManager(QtCore.QObject):
         return self._aircraft_title
     
     def request_loaded_aircraft(self):
-        ''' gets the current aircraft data '''
-        if self._aircraft_name:
-            return self._aircraft_name
+        ''' gets the current player aircraft in the sim '''
         try:
             if self._sm.ok:
                 self._sm.requestAircraftLoaded()
@@ -1026,7 +1029,7 @@ class SimConnectManager(QtCore.QObject):
         self._aircraft_folder = folder
         self._aircraft_name = name
         if verbose: syslog.info(f"SIMCONNECT MGR: sim aircraft loaded event: {title}/{name}")
-        self.sim_aircraft_loaded.emit(folder, name, title)
+        self.sim_aircraft_loaded.emit(name)
 
 
 

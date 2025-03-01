@@ -939,6 +939,7 @@ class AbstractExecutionGraph(QtCore.QObject):
             
             if verbose_detailed: syslog.info (f"{logTabs}Execution plan:")
             functor_names = []
+            functor_pass_list = []
             for index, functor in enumerate(self.functors):
                 functor_names.append(type(functor).__name__)
                 if verbose_detailed:
@@ -996,26 +997,32 @@ class AbstractExecutionGraph(QtCore.QObject):
                     if result is None or not result:
                         # condition is not met
                         if verbose_detailed: syslog.info (f"{logTabs}\t\t\t{index} -> container condition failed")
-                        return False
+                        break
+                    else:
+                        functor_pass_list.append(functor) # add pass functor
 
             # regular functors
             while self.current_index is not None and len(self.functors) > 0 and not self.run_event.is_set():
                 index = self.current_index
                 functor = self.functors[index]
                 if isinstance(functor, gremlin.actions.ActivationCondition):
+                    if functor in functor_pass_list:
+                        continue # already tested
                     if verbose_detailed: syslog.info(f"{logTabs}\t\tIndex {index} -> executing condition {functor_names[index]} {functor.condition_name()}")
                     result = functor.process_event(event, value)
-                    if verbose_detailed: syslog.info (f"{logTabs}\t\t\t{index} -> condition result: {result}")
-                    if result is None or not result:
-                        # condition is not met
-                        if verbose_detailed: syslog.info (f"{logTabs}\t\t\t{index} -> condition failed")
+                    if verbose_detailed: 
+                        syslog.info (f"{logTabs}\t\t\t{index} -> condition result: {result}")
+                        if result is None or not result:
+                            # condition is not met
+                            if verbose_detailed: syslog.info (f"{logTabs}\t\t\t{index} -> condition failed")
+                            #return False
                         
                 else:
                     if verbose_detailed: syslog.info(f"{logTabs}\t\t{index} -> executing action {functor_names[index]}")
                     result = functor.process_event(event, value)
                     if verbose: syslog.info (f"{logTabs}\t\t\t{index} -> action result: {result}")
-                    if result is None or not result:
-                        return False
+                    #if result is None or not result:
+                        #return False
                     #     syslog.warning(f"Process event returned no data or FALSE - functor: {type(functor).__name__}")
 
                     if isinstance(functor, gremlin.actions.AxisButton):

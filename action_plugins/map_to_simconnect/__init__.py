@@ -339,12 +339,16 @@ class SimconnectOptions():
         ''' triggered when simconnect sends aircraft data '''
         added = False
         verbose = gremlin.config.Configuration().verbose_mode_simconnect
-        for aircraft in data.keys():
+        name_list = [name for name in data.keys()]
+        name_list.sort(key = lambda x: x.casefold()) # sort case insensitive
+        for aircraft in name_list:
             key = aircraft.casefold()
             if "fsltl" in key or "passiveaircraft" in key:
                 # skip FSLTL AI aircraft
                 # skip passive aircraft
                 continue
+            if "a350" in key:
+                pass
             if not key in self._aircraft_definition_map:
                 item = SimconnectAicraftDefinition(sim_name = aircraft, 
                                                    entry_type=SimconnectAicraftDefinition.EntryType.Sim,
@@ -1081,19 +1085,18 @@ class SimconnectMonitor():
         
 
 
-    def getStartupMode(self):
+    def getStartupMode(self, name : str = None):
         ''' gets the startup mode for the current aicraft '''
 
         if self._manager.connected:
             # sim is running
             
-            state_folder = self._manager.current_aircraft_folder
-            name = self._manager.current_aircraft_sim_name
-            title = self._manager.current_aircraft_title
+            if not name:
+                name = self._manager.current_aircraft_sim_name
 
             # syslog = logging.getLogger("system")
 
-            syslog.info(f"SCMONITOR: Aircraft changed: mode lookup for {title}/{name}")
+            syslog.info(f"SCMONITOR: Aircraft changed: mode lookup for {name}")
 
             if name:
                 #item = self._options.find_definition_by_state(state_folder)
@@ -1177,21 +1180,13 @@ class SimconnectMonitor():
             time.sleep(1)
 
 
-    def _get_aircraft(self):
-        ''' updates the current aircraft '''
+    def _get_aircraft_list(self):
+        ''' requests the current list of aircraft known to the sim'''
+        self._manager.request_aircraft_list()
 
-        # this is the primary key for mode matching because it works using streamed or local content
-        # SimconnectManager keeps tabs on the current aircraft
-        sim_name =  self._manager.current_aircraft_sim_name 
-        title =  self._manager.current_aircraft_title
-        folder = self._manager.current_aircraft_folder
-        if sim_name:
-            # aircraft found 
-            self._sim_aircraft_loaded(folder, sim_name, title)
-        else:
-            # no aicraft yet - ask for what's currently loaded
-            self._manager.request_aircraft_list()
-            self._manager.request_loaded_aircraft()
+    def _get_aircraft(self):
+        ''' updates the current player aircraft in the sim'''
+        self._manager.request_loaded_aircraft()
 
 
 
@@ -1214,14 +1209,21 @@ class SimconnectMonitor():
         self._manager = None
 
     @QtCore.Slot(str, str)
-    def _sim_aircraft_loaded(self, folder = None, name = None, title = None):
+    def _sim_aircraft_loaded(self, name = None):
         ''' called when a new aicraft has been detected '''
         # syslog = logging.getLogger("system")
-        syslog.info(f"SCMONITOR: Aircraft changed detected: {title}/{name}")
-        mode = self.getStartupMode() # get the mode to use for this profile
-        if mode:
+        syslog.info(f"SCMONITOR: Aircraft loaded: {name}")
+        self.changeModeForAicraft(name)
+        
+
+    def changeModeForAicraft(self, name : str):
+        ''' changes the mode for the current aircraft '''
+        mode = self.getStartupMode(name) # get the mode to use for this profile
+        if mode and gremlin.shared_state.runtime_mode != mode:
             # suitable mode found - if this is the current mode - change_mode will do nothing
             self.change_mode(mode)
+        return mode
+
 
     @QtCore.Slot()
     def _sim_start(self):
@@ -3732,6 +3734,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         self.command = action.command # the command to execute
         self.value = action.value # the value to send (None if no data to send)
         self.manager : SimConnectManager = SimConnectManager()
+        self.monitor : SimconnectMonitor = SimconnectMonitor()
         self.valid = False
         self._significant = gremlin.input_devices.JoystickInputSignificant()
         
@@ -3765,7 +3768,11 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         self.manager.activate()
 
         # update the loaded aircraft so this sets the profile mode if needed
-        self.manager.request_loaded_aircraft()
+        name = self.manager.get_loaded_aircraft()
+        if name:
+            self.monitor.changeModeForAicraft(name)
+        else:            
+            self.manager.request_loaded_aircraft()
         
 
 
@@ -3946,12 +3953,12 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                         # send as LVAR
                         
                         command = self.action_data.command
-                        if verbose: syslog.info(f"SIMCONNECT: send lvar (axis): {command} input: {action_value.current:0.3f} scaled: {normalized:0.3f} curved: {curved:0.3f} min: {self.action_data.output_min_range:0.3f} max: {self.action_data.output_max_range:0.3f} -> scaled: {output_value}")
+                        if verbose: syslog.info(f"SIMCONNECT: send lvar (axis): {command} input: {action_value.current:0.3f} scaled: {normalized:0.3f} curved: {curved:0.3f} min: {self.action_data.output_min_range:0.3f} max: {self.action_data.output_max_range:0.3f} -> scaled: {output_value:0.3f}")
                         request = manager.registerRequest(command, "number", settable = True)
                         request.value = output_value
                         request.transmit()
                     else:
-                        if verbose: syslog.info(f"SIMCONNECT: send simvar (axis): {block.command} input: {action_value.current:0.3f} scaled: {normalized:0.3f} curved: {curved:0.3f} min: {self.action_data.output_min_range:0.3f} max: {self.action_data.output_max_range:0.3f} -> scaled: {output_value}")
+                        if verbose: syslog.info(f"SIMCONNECT: send simvar (axis): {block.command} input: {action_value.current:0.3f} scaled: {normalized:0.3f} curved: {curved:0.3f} min: {self.action_data.output_min_range:0.3f} max: {self.action_data.output_max_range:0.3f} -> scaled: {output_value:0.3f}")
                         block.execute(output_value)
 
             elif output_mode == SimConnectActionMode.Trigger:
@@ -3971,22 +3978,44 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
 
             elif output_mode == SimConnectActionMode.SetValue:
                 # set value mode 
+                min_value = self.action_data.output_min_range
+                max_value = self.action_data.output_max_range
                 value = self.action_data.value
+                command = self.action_data.command
+                output_value = gremlin.util.scale_to_range(value, 
+                                                           source_min = self.action_data.normalized_min_range,
+                                                           source_max = self.action_data.normalized_max_range,
+                                                           target_min = self.action_data.output_min_range,
+                                                           target_max = self.action_data.output_max_range,
+                                                           invert = self.action_data.inverted)
+                
                 trigger = (self.action_data.trigger_on_press and event.is_pressed) or \
                             self.action_data.trigger_on_release and not event.is_pressed
                 if trigger:
                     if command_type == SimConnectCommandType.LVar:
-                        if verbose_details: syslog.info(f"SIMCONNECT: Set lvar {self.action_data.command}  value: {value:0.3f}")
+                        if verbose: syslog.info(f"SIMCONNECT: send lvar (trigger): {command} input: {value:0.3f} min: {self.action_data.output_min_range:0.3f} max: {self.action_data.output_max_range:0.3f} -> scaled: {output_value:0.3f}")
                         request = manager.registerRequest(self.action_data.command, "number", settable = True)
-                        request.value = value
+                        request.value = output_value
                         request.transmit()
                     else:
-                        if verbose_details: syslog.info(f"SIMCONNECT: Set simvar {block.command} value: {value:0.3f}")
-                        block.execute(value)   
+                        if verbose: syslog.info(f"SIMCONNECT: send block: {block.command} input: {value:0.3f} min: {self.action_data.output_min_range:0.3f} max: {self.action_data.output_max_range:0.3f} -> scaled: {output_value:0.3f}")
+                        block.execute(output_value)   
                 
             elif self.action_data.mode == SimConnectActionMode.Trigger:
                 # trigger action 
-                block.execute(action_value.value)
+                min_value = self.action_data.output_min_range
+                max_value = self.action_data.output_max_range
+                value = self.action_data.value
+                command = self.action_data.command
+                output_value = gremlin.util.scale_to_range(value, 
+                                                           source_min = self.action_data.normalized_min_range,
+                                                           source_max = self.action_data.normalized_max_range,
+                                                           target_min = self.action_data.output_min_range,
+                                                           target_max = self.action_data.output_max_range,
+                                                           invert = self.action_data.inverted)
+                if verbose: syslog.info(f"SIMCONNECT: send block trigger: {block.command} input: {value:0.3f} min: {self.action_data.output_min_range:0.3f} max: {self.action_data.output_max_range:0.3f} -> scaled: {output_value:0.3f}")
+
+                block.execute(output_value)
 
         return True
     

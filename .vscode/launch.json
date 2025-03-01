@@ -4,6 +4,7 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+        
         {
             "name": "Python: Current File",
             "type": "python",
@@ -12,6 +13,16 @@
             "console": "integratedTerminal",
             "env": {"PYTHONPATH": "${workspaceFolder};${env:PYTHONPATH}"},
             "restart": true
+        },
+        {
+            "name": "Python: Current File with profiler",
+            "type": "python",
+            "request": "launch",
+            "module": "cProfile",
+            "env": {"PYTHONPATH": "${workspaceFolder};${env:PYTHONPATH}"},
+            "args": [
+                "-o", "/tmp/tmp.prof", "${workspaceFolder}/joystick_gremlin.py"
+            ]
         }
     ]
 }

@@ -897,7 +897,8 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         ''' called on edit mode change '''
         self.set_mode(mode)
         # syslog = logging.getLogger("system")
-        syslog.info(f"DeviceWidget: {self.device_name} change mode: [{mode}]")
+        verbose = gremlin.config.Configuration().verbose_mode_detailed
+        if verbose: syslog.info(f"DeviceWidget: {self.device_name} change mode: [{mode}]")
         self.update_curve_icons()
 
 

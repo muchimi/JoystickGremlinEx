@@ -3199,21 +3199,21 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                         if is_remote or is_paired:
                             self.remote_client.send_button(self.vjoy_device_id, self.vjoy_input_id, True, force_remote = force_remote )
                 else:
-                    auto_release = False
+                    
                     is_pressed = action_value.is_pressed
-                    if is_pressed:
-                        auto_release = event.event_type in [InputType.Keyboard, InputType.KeyboardLatched, InputType.Midi, InputType.OpenSoundControl] and self.needs_auto_release
-
-                    if auto_release:
-                        if verbose: syslog.info(f"VjoyRemap: autorelease enabled for {str(event)}")
-                        input_devices.ButtonReleaseActions().register_button_release(
-                            (self.vjoy_device_id, self.vjoy_input_id),
-                            event,
-                            is_local = is_local,
-                            is_remote = is_remote,
-                            force_remote = force_remote,
-                            activate_on = False # released
-                        )
+                    auto_release = False
+                    if is_pressed and not self.action_data.ignore_release:
+                        auto_release = event.event_type in [InputType.Keyboard, InputType.KeyboardLatched, InputType.Midi, InputType.OpenSoundControl] and self.needs_auto_release 
+                        if auto_release:
+                            if verbose: syslog.info(f"VjoyRemap: autorelease enabled for {str(event)}")
+                            input_devices.ButtonReleaseActions().register_button_release(
+                                (self.vjoy_device_id, self.vjoy_input_id),
+                                event,
+                                is_local = is_local,
+                                is_remote = is_remote,
+                                force_remote = force_remote,
+                                activate_on = False # released
+                            )
 
                     if verbose: syslog.info(f"\t{self.vjoy_input_id} pressed: {is_pressed}  ignore release: {self.action_data.ignore_release}")
                     trigger = is_pressed or (not auto_release and not is_pressed)  # trigger on press, or on release unless an auto-release was already registered for the release action to avoid double releases
