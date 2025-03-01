@@ -2293,7 +2293,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         )
         if fname:
             # get the container nodes
-            node = self.to_xml()
+            node = self.container.to_xml()
             root = etree.Element("container_template")
             root.append(node)
             tree = etree.ElementTree(root)
