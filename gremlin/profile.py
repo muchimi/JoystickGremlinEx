@@ -41,16 +41,19 @@ from . import error, joystick_handling
 
 syslog = logging.getLogger("system")
 
-def mode_list():
+def mode_list(profile = None):
     """Returns a list of all modes based on the given node.
 
     :param node a node from a profile tree
     :return list of modes in the profile 
     """
-    
-    profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
-    mode_names = profile.mode_list()
-    return mode_names
+    profile : gremlin.base_profile.Profile
+    if not profile:
+        profile = gremlin.shared_state.current_profile
+    if profile:
+        mode_names = profile.mode_list()
+        return mode_names
+    return []
 
 
 
