@@ -20,7 +20,8 @@ import logging
 
 from PySide6 import QtWidgets, QtCore
 import lxml.etree
-
+from lxml import etree
+import os
 
 import gremlin
 import gremlin.base_buttons
@@ -41,7 +42,7 @@ import gremlin.util
 import gremlin.ui.input_item as input_item
 import gremlin.ui.ui_common
 from  gremlin.clipboard import Clipboard, ObjectEncoder, EncoderType
-import lxml
+
 
 syslog = logging.getLogger("system")
 
@@ -282,7 +283,66 @@ class InputItemConfiguration(QtWidgets.QFrame):
             syslog.info(f"multi container copied to clipboard")
     
 
+    @QtCore.Slot(object)    
+    def _load_container_from_template(self):
 
+        fname, _ = QtWidgets.QFileDialog.getOpenFileName(
+            None,
+            "Container template",
+            gremlin.util.userprofile_path(),
+            "XML files (*.xml)"
+        )
+        if fname and os.path.isfile(fname):
+            container_list = []
+            plugin_manager = gremlin.plugin_manager.ContainerPlugins()
+            parser = etree.XMLParser(remove_comments=True, remove_blank_text=True)
+            msg_list = []
+            try:
+                tree = etree.parse(fname, parser=parser)
+                root = tree.getroot()
+                if root.tag == "container_template":
+                    for node in root.xpath("//container"):
+                        container_type = node.get("type")
+                        container_plugins = gremlin.plugin_manager.ContainerPlugins()
+                        container_tag_map = container_plugins.tag_map
+
+                        # verify the container is valid for the input type
+                        valid_containers_names = self.item_data.get_valid_container_list()
+                        if container_type in container_tag_map:
+                            container_name = container_tag_map[container_type].name
+                            if container_name in valid_containers_names:
+                                new_container = container_tag_map[container_type](self.item_data)
+                                new_container.from_xml(node, self.item_data)
+                                new_container.generateGuids()
+                                container_list.append(new_container)
+                        else:
+                            msg = f"Container {container_type.name} is not valid for the current input"
+                            msg_list.append(msg)
+                            syslog.warning(msg)
+
+
+                if msg_list:
+                    prompt = "".join((msg + "\n" for msg in msg_list))
+                    gremlin.ui.ui_common.MessageBox(title="Load Template", prompt = prompt)
+
+            except:
+                pass
+            if container_list:
+                for new_container in container_list:
+                    if hasattr(new_container, "action_model"):
+                        new_container.action_model = self.action_model
+                    
+                        plugin_manager.set_container_data(self.item_data, new_container)
+                        self.action_model.add_container(new_container)
+                    
+
+
+                el = gremlin.event_handler.EventListener()
+                el.mapping_changed.emit(self.item_data)
+                self.notify_changed()
+
+
+    @QtCore.Slot(object)
     def _paste_container(self, container):
         """Adds a new container to the input item.
 
@@ -292,7 +352,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
         plugin_manager = gremlin.plugin_manager.ContainerPlugins()
         container_list = []
 
-        tracker = gremlin.base_conditions.ConditionTracker()
+        # tracker = gremlin.base_conditions.ConditionTracker()
 
         if isinstance(container, ObjectEncoder):
             oc = container
@@ -425,6 +485,7 @@ class InputItemConfiguration(QtWidgets.QFrame):
         self.container_selector.container_added.connect(self._add_container)
         self.container_selector.container_copy.connect(self._copy_container)
         self.container_selector.container_paste.connect(self._paste_container)
+        self.container_selector.container_from_template.connect(self._load_container_from_template)
         self.container_selector.container_delete.connect(self._delete_container)
         self.always_execute = QtWidgets.QCheckBox("Always execute")
         self.always_execute.setChecked(self.item_data.always_execute)

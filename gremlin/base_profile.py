@@ -610,6 +610,7 @@ class AbstractContainer(ProfileData):
 
 
         return callbacks
+    
 
     def from_xml(self, node, data = None):
         """Populates the instance with data from the given XML node.

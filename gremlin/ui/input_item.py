@@ -17,6 +17,7 @@
 
 import enum
 from PySide6 import QtWidgets, QtCore, QtGui
+from lxml import etree
 import lxml.etree
 
 import gremlin
@@ -1879,6 +1880,7 @@ class ContainerSelector(QtWidgets.QWidget):
     container_copy =  QtCore.Signal() # copy all containers
     container_paste = QtCore.Signal(object) # paste containers
     container_delete = QtCore.Signal() # delete all containers
+    container_from_template = QtCore.Signal() # load a new container from template
 
     def __init__(self, input_type, is_axis = False, parent=None):
         """Creates a new selector instance.
@@ -1897,8 +1899,19 @@ class ContainerSelector(QtWidgets.QWidget):
         self.container_dropdown = ui_common.QComboBox()
         for name in self._valid_container_list():
             self.container_dropdown.addItem(name)
-        self.add_button = QtWidgets.QPushButton("Add")
-        self.add_button.clicked.connect(self._add_container)
+        self.add_container_widget = QtWidgets.QPushButton("Add")
+        self.add_container_widget.setToolTip("Adds a container")
+        self.add_container_widget.clicked.connect(self._add_container)
+
+
+        self.load_template_widget =  QtWidgets.QPushButton()
+        icon = gremlin.ui.ui_common.load_icon("fa.folder-open-o")
+        self.load_template_widget.setIcon(icon)
+        self.load_template_widget.setToolTip("Load from template")
+        self.load_template_widget.clicked.connect(self._load_container_from_template)
+        
+
+
         default_container = gremlin.config.Configuration().last_container
         self.container_dropdown.setCurrentText(default_container)
         self.container_dropdown.currentIndexChanged.connect(self._container_changed)
@@ -1931,7 +1944,8 @@ class ContainerSelector(QtWidgets.QWidget):
         self.delete_button.setToolTip("Delete container(s)")
 
         self.main_layout.addWidget(self.container_dropdown)
-        self.main_layout.addWidget(self.add_button)
+        self.main_layout.addWidget(self.add_container_widget)
+        self.main_layout.addWidget(self.load_template_widget)
         self.main_layout.addWidget(self.copy_button)
         self.main_layout.addWidget(self.paste_button)
         self.main_layout.addWidget(self.delete_button)
@@ -2005,6 +2019,10 @@ class ContainerSelector(QtWidgets.QWidget):
         ''' delete container '''
         self.container_delete.emit()
 
+    @QtCore.Slot()
+    def _load_container_from_template(self):
+        ''' loads container from template '''
+        self.container_from_template.emit()
 
 class ConditionTrackerInfo:
     def __init__(self, input_item, device_guid, input_id, container, dock_tabs):
@@ -2151,7 +2169,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         # palette.setColor(QtGui.QPalette.ColorRole.Window, QtGui.QColorConstants.LightGray)
 
         #if gremlin.shared_state.is_dark_theme:
-        border_color = gremlin.ui.ui_common.Color.borderColor()
+        # border_color = gremlin.ui.ui_common.Color.borderColor()
         background_color = gremlin.ui.ui_common.Color.containerBackgroundColor()
         css = f"background-color:{background_color}"
         self.setStyleSheet(css)
@@ -2171,15 +2189,15 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         self.action_widgets = []
 
         mode = self.profile_data.get_mode()
-        widget = TitleBar(
+        self._title_bar_widget = TitleBar(
             f"{self._get_window_title()} ({mode})",
             gremlin.hints.hint.get(self.profile_data.tag, ""),
             self._container_remove,
             self._container_copy)
         
-        widget.setBackgroundColor(gremlin.ui.ui_common.Color.containerBackgroundColor())
+        self._title_bar_widget.setBackgroundColor(gremlin.ui.ui_common.Color.containerBackgroundColor())
         
-        self.setTitleBarWidget(widget)
+        self.setTitleBarWidget(self._title_bar_widget)
 
         # Create tab widget to display various UI controls in
         self.dock_tabs =  gremlin.ui.ui_common.QDataTab()
@@ -2202,6 +2220,24 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
         tracker = ConditionStateTracker()
         tracker.register(self.profile_data.input_item, self.profile_data, self.dock_tabs)
+        
+        
+        # templates
+        # open_widget = QtWidgets.QPushButton("Load")
+        # open_widget.setToolTip("Load Template")
+        # icon = gremlin.ui.ui_common.load_icon("fa.folder-open-o")
+        # open_widget.setIcon(icon)
+        # open_widget.clicked.connect(self._open_template)
+
+        save_widget = QtWidgets.QPushButton("Save") # TitleBarButton()
+        save_widget.setToolTip("Save Template")
+        icon = gremlin.ui.ui_common.load_icon("fa.save")
+        save_widget.setIcon(icon)
+        save_widget.clicked.connect(self._save_template)
+
+        
+        #self._title_bar_widget.extra_layout.addWidget(open_widget)
+        self._title_bar_widget.extra_layout.addWidget(save_widget)
 
         # this is for CONTAINER CONDITIONS only (Action conditions are handled elsewhere) - this hooks the condition state tab to the conditions added to the container
         el = gremlin.event_handler.EventListener()
@@ -2209,7 +2245,68 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
         self.activation_count_widget = None
         el.condition_state_changed.emit(self.container)
-        #self._update_ui(self.container)
+        
+        
+    @QtCore.Slot()
+    def _open_template(self):
+        fname, _ = QtWidgets.QFileDialog.getOpenFileName(
+            None,
+            "Container template",
+            gremlin.util.userprofile_path(),
+            "XML files (*.xml)"
+        )
+        if fname and os.path.isfile(fname):
+            parser = etree.XMLParser(remove_comments=True, remove_blank_text=True)
+            try:
+                tree = etree.parse(fname, parser=parser)
+                root = tree.getRoot()
+                if root.tag == "container_template":
+                    for node in root.xpath("//container"):
+                        container_type = node.get("type")
+                        container_plugins = gremlin.plugin_manager.ContainerPlugins()
+                        container_tag_map = container_plugins.tag_map
+                        valid_containers_names = self.profile_data.get_valid_container_list()
+
+                        # verify the container is valid for the input
+                        if container_type in container_tag_map:
+                            container_name = container_tag_map[container_type].name
+                            if container_name in valid_containers_names:
+                                new_container = container_tag_map[container_type](self.item_data)
+                                new_container.from_xml(node, self.profile_data)
+                                new_container.generateGuids()
+                                self.container = new_container
+                                self.container_modified.emit()
+
+            except:
+                pass
+
+    @QtCore.Slot()
+    def _save_template(self):
+        if not self.container:
+            # no container to save
+            return
+        fname, _ = QtWidgets.QFileDialog.getSaveFileName(
+            None,
+            "Container template",
+            gremlin.util.userprofile_path(),
+            "XML files (*.xml)"
+        )
+        if fname:
+            # get the container nodes
+            node = self.to_xml()
+            root = etree.Element("container_template")
+            root.append(node)
+            tree = etree.ElementTree(root)
+            try:
+                if os.path.isfile(fname):
+                    # blitz existing file
+                    os.unlink(fname)
+                tree.write(fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
+            except:
+                syslog.error(f"Error writing template to: {fname}")
+                return False
+            return True
+            
         
 
     @QtCore.Slot(object)
@@ -2715,6 +2812,10 @@ class TitleBar(QtWidgets.QFrame):
         self._close_callback = close_callback
         size = 12
 
+        widget, layout = gremlin.ui.ui_common.getHContainer()
+        self.extra_widget = widget
+        self.extra_layout = layout
+        
         # help button
         self.help_button = TitleBarButton()
 
@@ -2734,8 +2835,9 @@ class TitleBar(QtWidgets.QFrame):
 
         # close button
         self.close_button = TitleBarButton()
-
         close_icon = load_icon("fa.close")
+
+        
 
         pixmap_close = close_icon.pixmap(size,size) # load_pixmap("gfx/close.png")
         if not pixmap_close or pixmap_close.isNull():
@@ -2768,6 +2870,8 @@ class TitleBar(QtWidgets.QFrame):
 
         self.layout.addWidget(self.label)
         self.layout.addStretch()
+        self.layout.addWidget(self.extra_widget)
+
         if clipboard_cb:
             self.layout.addWidget(self.copy_button)
 

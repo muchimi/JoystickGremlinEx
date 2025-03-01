@@ -18,7 +18,6 @@
 from __future__ import annotations
 import os
 import shutil
-import lxml
 from lxml import etree
 
 from PySide6 import QtWidgets, QtCore, QtGui
