@@ -46,7 +46,11 @@ class QKeyWidget(QtWidgets.QPushButton):
         self._default_style = f"QPushButton {{font-size:10px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {background_color}; padding: 2px; min-width: 32px; max-height: 30px;}} QPushButton:hover {{border: 2px {hover_border};}}"
         self._selected_style = f"QPushButton {{font-size:10px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {selected_color}; padding: 2px; min-width: 32px; max-height: 30px;}} QPushButton:hover {{border: 2px {hover_border};}}"
 
+        self._x2_default_style = f"QPushButton {{font-size:12px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {background_color}; padding: 2px; min-width: 64px; max-height: 60px;}} QPushButton:hover {{border: 2px {hover_border};}}"
+        self._x2_selected_style = f"QPushButton {{font-size:12px; border: 2px solid {border}; border-radius: 4px; color: {foreground_color}; background-color: {selected_color}; padding: 2px; min-width: 64px; max-height: 60px;}} QPushButton:hover {{border: 2px {hover_border};}}"
+
         # border-style: outset;
+        self._key_size = 1
 
         self.setStyleSheet(self._default_style)
         
@@ -59,6 +63,19 @@ class QKeyWidget(QtWidgets.QPushButton):
     def key(self) -> Key:
         ''' returns the associated key '''
         return self._key
+    
+    @property
+    def keySize(self) -> int:
+        return self._key_size
+    @keySize.setter
+    def keySize(self, value : int):
+        self._key_size = value
+        match value:
+            case 1:
+                self.setStyleSheet(self._default_style)
+            case 2:
+                self.setStyleSheet(self._x2_default_style)
+    
     
     @key.setter
     def key(self, value : Key):
@@ -86,15 +103,22 @@ class QKeyWidget(QtWidgets.QPushButton):
         if self._selected != value:
             self._selected = value
             self._update_state()
-            # tell listeners status changed
-            #self.selected_changed.emit(self, self._click_shifted)
+
 
     def _update_state(self):
         ''' updates the color of the button based on the selection state '''
+        match self._key_size:
+            case 2:
+                plain = self._x2_default_style
+                selected = self._x2_selected_style
+            case _:
+                plain = self._default_style
+                selected = self._selected_style
+    
         if self._selected:
-            self.setStyleSheet(self._selected_style)
+            self.setStyleSheet(plain)
         else:
-            self.setStyleSheet(self._default_style)
+            self.setStyleSheet(selected)
 
   
     def eventFilter(self, widget, event):
@@ -587,6 +611,7 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
         self._latched_key = None # contains a single primary key latched to all the others
         self._display_shifted = False
         self._solo_select = False
+        
 
         self._modifier_keys = gremlin.keyboard.KeyMap._keyboard_modifiers
 
@@ -607,6 +632,26 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
         self.listen_widget = QtWidgets.QPushButton("Listen")
         self.listen_widget.clicked.connect(self._listen_cb)
 
+        widgets = [gremlin.ui.ui_common.QDataRadioButton("Small",1),
+                   gremlin.ui.ui_common.QDataRadioButton("Large",2)
+        ]
+
+        current  = gremlin.config.Configuration().keySize
+        if current > len(widgets):
+            current = 1
+            gremlin.config.Configuration().keySize = 1
+
+        widgets[current-1].setChecked(True)
+        for widget in self._key_widget_map.values():
+            widget.keySize = current
+
+        for w in widgets:
+            w.clicked.connect(self._size_changed)
+
+
+        self.size_container_widget, _ = gremlin.ui.ui_common.getHContainer(widgets)
+
+
         self.numlock_widget = QtWidgets.QCheckBox("Force numlock Off")
         self.numlock_widget.setChecked(gremlin.shared_state.current_profile.get_force_numlock())
         self.numlock_widget.clicked.connect(self._force_numlock_cb)
@@ -621,6 +666,7 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
 
         self.button_layout.addWidget(self.clear_widget)
         self.button_layout.addWidget(self.listen_widget)
+        self.button_layout.addWidget(self.size_container_widget)
         self.button_layout.addWidget(QtWidgets.QLabel(" "))
         self.button_layout.addWidget(self.key_description)
         self.button_layout.addStretch(1)
@@ -706,6 +752,7 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
     def _force_numlock_cb(self, checked):
         gremlin.shared_state.current_profile.set_force_numlock(checked)
 
+    @QtCore.Slot()
     def _listen_cb(self):
         """Handles adding of new keyboard keys to the list.
 
@@ -734,8 +781,20 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
         )
 
         self.button_press_dialog.show()
+
+    @QtCore.Slot()
+    def _size_changed(self):
+        widget = self.sender()
+        data = widget.data
+        gremlin.config.Configuration().keySize = data
+        for w in self._key_widget_map.values():
+            w.keySize = data
+        # resize window to fit the new size
+        QtCore.QTimer.singleShot(0, self.adjustSize)
         
 
+        
+    @QtCore.Slot()
     def _add_keyboard_listener_key_cb(self, keys):
         """Adds the provided key to the list of keys.
 

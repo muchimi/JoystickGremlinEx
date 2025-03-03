@@ -1121,50 +1121,82 @@ class AbstractExecutionGraph(QtCore.QObject):
 
                 result = True
                 id = functor.id
-                verbose_id = False
+                verbose_id = True
+
                 if id in functor_map:
-                    if verbose_id: syslog.info("Functor ID found")
+                    # cache hit
+                    if verbose_id: syslog.info(f"{logTabs}\t\t\t Functor ID found")
+                    processed_functors.append(functor)
+                    is_condition = isinstance(functor, gremlin.actions.ActivationCondition)
+                    if is_condition:
+                        if verbose_id: 
+                            condition_name = functor.condition_name()
+                            syslog.info(f"{logTabs}\t\tIndex {index} -> executing condition {condition_name}")
+                        result = functor.process_event(event, value)
+                        if not result:
+                            # condition failed - abort chain
+                            if verbose_id: syslog.info(f"{logTabs}\t\t\t FAIL")
+                            break
+                        if verbose_id: syslog.info(f"{logTabs}\t\t\t PASS")
+
                     for action_functor in functor_map[id]:
                         if not action_functor in processed_functors:
                             processed_functors.append(action_functor)
                             if verbose_id: condition_name = action_functor.condition_name()
                             if isinstance(action_functor, gremlin.actions.ActivationCondition):
+                                if verbose_id: 
+                                    condition_name = action_functor.condition_name()
+                                    syslog.info(f"{logTabs}\t\tIndex {index} -> executing action condition {condition_name}")
                                 result = action_functor.process_event(event, value)
                             else:
                                 result = action_functor(event, value)
                             if not result:
-                                if verbose_id: syslog.info(f"{logTabs}\t\t\t FAIL condition: {condition_name}")
+                                # condition failed - abort chain
+                                if verbose_id: syslog.info(f"{logTabs}\t\t\t FAIL")
                                 break
-                            if verbose_id: syslog.info(f"{logTabs}\t\t\t PASS condition: {condition_name}")
+                            if verbose_id: syslog.info(f"{logTabs}\t\t\t PASS")
+
+                    if result and not is_condition:
+                        if verbose_id: syslog.info(f"{logTabs}\t\t{index} -> executing action {functor}")
+                        result = functor.process_event(event, value)
+                        if not result:
+                            if verbose_id: syslog.info(f"{logTabs}\t\t\t FAIL")
+                        else:
+                            syslog.info(f"{logTabs}\t\t\t PASS")
+
                 else:
-                    if verbose_id: syslog.info("Functor ID not found")
+                    if id in condition_map:
+                        node = condition_map[id]
+                        if verbose_id: syslog.ifo(f"{logTabs}\t\t\t Found {node.description}")
+                        pass
+                    if verbose_id: syslog.info(f"{logTabs}\t\t\t Functor ID not found")
 
 
-                if result:
-                    if not functor in processed_functors:
-                        processed_functors.append(functor)
-                        if isinstance(functor, gremlin.actions.ActivationCondition):
-                            # if functor in functor_pass_list:
-                            #     continue # already tested
-                            if verbose_detailed: syslog.info(f"{logTabs}\t\tIndex {index} -> executing condition {functor_names[index]} {functor.condition_name()}")
-                            result = functor.process_event(event, value)
-                            if verbose_detailed: 
-                                syslog.info (f"{logTabs}\t\t\t{index} -> condition result: {result}")
-                                if result is None or not result:
-                                    # condition is not met
-                                    if verbose_detailed: syslog.info (f"{logTabs}\t\t\t{index} -> condition failed")
+                # if result:
+                #     if not functor in processed_functors:
+                #         processed_functors.append(functor)
+                #         if isinstance(functor, gremlin.actions.ActivationCondition):
+                #             # if functor in functor_pass_list:
+                #             #     continue # already tested
+                #             if verbose_id: syslog.info(f"{logTabs}\t\tIndex {index} -> executing condition {functor.condition_name()}")
+                #             result = functor.process_event(event, value)
+                #             if verbose_id: 
+                #                 syslog.info (f"{logTabs}\t\t\t{index} -> condition result: {result}")
+                #                 if result is None or not result:
+                #                     # condition is not met
+                #                     if verbose_detailed: syslog.info (f"{logTabs}\t\t\t{index} -> condition failed")
                                     
                                 
-                        else:
-                            if verbose_detailed: syslog.info(f"{logTabs}\t\t{index} -> executing action {functor_names[index]}")
-                            result = functor.process_event(event, value)
-                            if verbose: syslog.info (f"{logTabs}\t\t\t{index} -> action result: {result}")
-                            #if result is None or not result:
-                                #return False
-                            #     syslog.warning(f"Process event returned no data or FALSE - functor: {type(functor).__name__}")
+                #         else:
+                #             if verbose_id: syslog.info(f"{logTabs}\t\t{index} -> executing action {functor_names[index]}")
+                #             result = functor.process_event(event, value)
+                #             if verbose_id: syslog.info (f"{logTabs}\t\t\t{index} -> action result: {result}")
+                #             #if result is None or not result:
+                #                 #return False
+                #             #     syslog.warning(f"Process event returned no data or FALSE - functor: {type(functor).__name__}")
 
-                            if isinstance(functor, gremlin.actions.AxisButton):
-                                process_again = functor.forced_activation
+                #             if isinstance(functor, gremlin.actions.AxisButton):
+                #                 process_again = functor.forced_activation
 
                 self.current_index = self.transitions.get((index, result),None)
                 if verbose_detailed: syslog.info (f"{logTabs}\t\tNext step: {(index, result)} -> {self.current_index}")

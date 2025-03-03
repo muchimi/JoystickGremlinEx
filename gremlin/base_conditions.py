@@ -688,6 +688,7 @@ class ActivationCondition(QtCore.QObject):
         :param data: tuple containing (input_item, container) associated with this condition
         """
         import gremlin.base_profile
+        import gremlin.ui.ui_common
 
         if "condition_id" in node.attrib:
             str_id = node.get("condition_id")
@@ -707,7 +708,11 @@ class ActivationCondition(QtCore.QObject):
             mode = gremlin.shared_state.edit_mode
         assert data is not None,"XML: error: data not provided for activation condition"    
         input_item, container = data
-        assert input_item is not None,"XML: error:input_item not provided for activation condition"
+        #assert input_item is not None,"XML: error:input_item not provided for activation condition"
+        if input_item is None:
+            gremlin.ui.ui_common.MessageBox(prompt="The source action does not support pasting conditions to the new input.")
+            return
+        
         for cond_node in node.findall("condition"):
             condition_type = safe_read(cond_node, "condition-type")
             condition = ActivationCondition.condition_lookup[condition_type]()

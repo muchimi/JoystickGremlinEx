@@ -3508,7 +3508,9 @@ class PluginVariable:
         if self.type is None or self.name is None:
             return False
         if self.type == PluginVariableType.PhysicalInput:
-            return self.value["device_id"] is not None
+            if self.value and "device_id" in self.value:
+                return self.value["device_id"] is not None
+            return False
         
         if self.type != PluginVariableType.String:
             return self.value is not None

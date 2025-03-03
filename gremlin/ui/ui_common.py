@@ -5756,7 +5756,7 @@ class QSplitTabWidget(QDataWidget):
 class QRememberDialog(QtWidgets.QDialog):
     ''' a dialog window that remembers its size and location '''
 
-    def __init__(self, key: str, center : bool = True, parent = None):
+    def __init__(self, key: str, parent = None):
         super().__init__(parent)
 
         self._resize_count = 0
@@ -5764,17 +5764,6 @@ class QRememberDialog(QtWidgets.QDialog):
         self.window_key = key
         self.apply_window_settings()
 
-        if center:
-            QtCore.QTimer.singleShot(100, self.centerOnParent)
-        
-
-    def centerOnParent(self):
-        ''' centers the window on the parent window'''
-        parent = self.parent()
-        if parent:
-            center = self.parent().frameGeometry().center()
-            geo = self.frameGeometry()
-            self.move(center.x() - geo.width()/2, center.y() - geo.height()/2)
 
 
     def getResizable(self) -> bool:

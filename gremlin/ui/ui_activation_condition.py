@@ -192,26 +192,17 @@ class KeyboardConditionWidget(AbstractConditionWidget):
         self.key_label = QtWidgets.QLabel("")
         if self.condition_data.input_item:
             self.key_label.setText(f"<b>{self.condition_data.input_item.display_name}</b>")
-        
-        self.record_button_widget = ui_common.NoKeyboardPushButton(load_icon("gfx/button_edit.png"), "Select Keys")
-        self.record_button_widget.clicked.connect(self._request_user_input)
         prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
-        self.delete_button_widget = QtWidgets.QPushButton(load_icon(f"gfx/{prefix}button_delete.png"), ""
-        )
-        self.delete_button_widget.clicked.connect(
-            lambda: self.deleted.emit(self.condition_data)
-        )
+        self.record_button_widget = ui_common.NoKeyboardPushButton(load_icon(f"gfx/{prefix}button_edit.png"), "Select Keys")
+        self.record_button_widget.clicked.connect(self._request_user_input)
+        self.delete_button_widget = QtWidgets.QPushButton(load_icon(f"gfx/{prefix}button_delete.png"), "")
+        self.delete_button_widget.clicked.connect(lambda: self.deleted.emit(self.condition_data))
 
         self.comparison_dropdown = ui_common.QComboBox()
         self.comparison_dropdown.addItem("Pressed")
         self.comparison_dropdown.addItem("Released")
-        if self.condition_data.comparison:
-            self.comparison_dropdown.setCurrentText(
-                self.condition_data.comparison.capitalize()
-            )
-        self.comparison_dropdown.currentTextChanged.connect(
-            self._comparison_changed_cb
-        )
+        if self.condition_data.comparison:self.comparison_dropdown.setCurrentText(self.condition_data.comparison.capitalize())
+        self.comparison_dropdown.currentTextChanged.connect(self._comparison_changed_cb)
 
 
 
@@ -264,6 +255,7 @@ class KeyboardConditionWidget(AbstractConditionWidget):
         self._keyboard_dialog = InputKeyboardDialog(sequence = sequence, parent = self, select_single = False, index = -1)
         self._keyboard_dialog.setModal(True)
         self._keyboard_dialog.accepted.connect(self._dialog_ok_cb)
+        gremlin.util.centerDialog(self._keyboard_dialog)
         self._keyboard_dialog.showNormal()  
 
     @QtCore.Slot()

@@ -1896,7 +1896,7 @@ class Configuration:
         self.save()
 
     @property
-    def theme(self):
+    def theme(self) -> str:
         return self._data.get("theme","auto")
     @theme.setter
     def theme(self, value :str):
@@ -1905,3 +1905,12 @@ class Configuration:
             if value in ("auto","light","dark"):
                 self._data["theme"] = value
                 self.save()
+
+    @property
+    def keySize(self) -> int:
+        ''' size of keys for the virtual keyboard'''
+        return self._data.get("keySize",1)
+    @keySize.setter
+    def keySize(self, value : int):
+         self._data["keySize"] = value
+         self.save()
