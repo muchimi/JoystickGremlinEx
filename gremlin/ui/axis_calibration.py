@@ -601,7 +601,7 @@ class CalibrationDialogEx(gremlin.ui.ui_common.QRememberDialog):
             input_id -- axis number
         
         '''
-        super().__init__(self.__class__.__name__, parent)
+        super().__init__(self.__class__.__name__, parent = parent)
 
         from gremlin.curve_handler import DeadzoneWidget
 

@@ -327,8 +327,18 @@ class CodeRunner:
                                                         syslog.info(f"\t\t\tAction: {action._name}")
                                                         if isinstance(action, action_plugins.map_to_simconnect.MapToSimConnectFunctor):
                                                             syslog.info(f"\t\t\t\tCommand:: {action.command}")
+                                            elif hasattr(functor,"action_sets"):
+                                                for action_set in functor.action_sets:
+                                                    for action in action_set.functors:
+                                                        if isinstance(action, gremlin.actions.ActivationCondition):
+                                                            syslog.info(f"\t\t\tActivation Condition: target :{action.target.name}")
+                                                        else:
+                                                            import action_plugins.map_to_simconnect
+                                                            syslog.info(f"\t\t\tAction: {action._name}")
+                                                            if isinstance(action, action_plugins.map_to_simconnect.MapToSimConnectFunctor):
+                                                                syslog.info(f"\t\t\t\tCommand:: {action.command}")                                                            
                                             else:
-                                                syslog.info(f"\t\t\tFunctor: {functor._name}")
+                                                syslog.info(f"\t\t\tFunctor: {functor}")
                                     self.event_handler.add_callback(
                                         device.device_guid,
                                         mode.name,

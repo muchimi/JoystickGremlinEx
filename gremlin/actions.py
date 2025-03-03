@@ -196,7 +196,7 @@ class AbstractCondition(metaclass=ABCMeta):
         pass
 
     def condition_name(self)->str:
-        return "Condition not set"
+        return "condition_name() member not implemented: Condition not set"
     
 
 class KeyboardCondition(AbstractCondition):
@@ -289,7 +289,7 @@ class JoystickCondition(AbstractCondition):
         
 
         verbose = gremlin.config.Configuration().verbose_mode_condition
-        syslog = logging.getLogger("system")
+        
 
         if verbose:
             logtabs = gremlin.shared_state.logTabs(True)

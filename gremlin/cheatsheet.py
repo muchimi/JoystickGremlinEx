@@ -422,7 +422,7 @@ class ViewInput(gremlin.ui.ui_common.QRememberDialog):
     ''' displays a dialog that lets the user pick from a list of mapped inputs '''
 
     def __init__(self, parent=None):
-        super().__init__(self.__class__.__name__, parent)
+        super().__init__(self.__class__.__name__, parent = parent)
         # make modal
         self.setWindowModality(QtCore.Qt.ApplicationModal)
         self.setMinimumWidth(600)

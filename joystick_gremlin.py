@@ -123,7 +123,7 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 syslog = logging.getLogger("system")
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_BASE = "m73t14"
+APPLICATION_BASE = "m73t15"
 APPLICATION_VERSION = f"13.40.16ex ({APPLICATION_BASE})"
 
 
@@ -4278,6 +4278,8 @@ if __name__ == "__main__":
 
 
     ec = gremlin.execution_graph.ExecutionContext()
+
+    gremlin.shared_state.char_width = gremlin.ui.ui_common.get_text_width("M")
 
     # Run UI
     syslog.info("GremlinEx UI launching")

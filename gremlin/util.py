@@ -312,7 +312,11 @@ def clamp(value, min_val, max_val):
     """
     if min_val > max_val:
         min_val, max_val = max_val, min_val
-    return min(max_val, max(min_val, value))
+    if value > max_val:
+        value = max_val
+    elif value < min_val:
+        value = min_val
+    return value
 
 
 def hat_tuple_to_direction(value):
@@ -1489,6 +1493,9 @@ def centerDialog(dialog, width = 300, height = 150):
         while root.parent():
             root = root.parent()
         geom = root.geometry()
+
+
+    #dialog.move(geom.x() - geom.width()/2, geom.y() - geom.height()/2)        
     dialog.setGeometry(
         int(geom.x() + geom.width() / 2 - width/2),
         int(geom.y() + geom.height() / 2 - height/2),

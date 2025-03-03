@@ -732,5 +732,8 @@ class ActivationCondition(QtCore.QObject):
             node.append(condition.to_xml())
         return node
     
+    def condition_name(self):
+        return f"Activation Condition: {self.id} rule: {self.rule.name} contains: {len(self.conditions)} condition(s)"
+    
     def __str__(self):
         return f"Activation Condition: {self.id} rule: {self.rule.name} contains: {len(self.conditions)} condition(s)"

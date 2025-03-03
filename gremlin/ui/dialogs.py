@@ -59,7 +59,7 @@ class ProfileOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
     def __init__(self, mode = None, parent=None):
         ''' creates a mode UI - if a mode is specified - selects that mode to start '''
-        super().__init__(self.__class__.__name__, parent)
+        super().__init__(self.__class__.__name__, parent = parent)
 
         # make modal
         self.setWindowModality(QtCore.Qt.ApplicationModal)
@@ -2943,7 +2943,7 @@ class SubstituteDialog(gremlin.ui.ui_common.QRememberDialog):
     ''' device substitution - allows the swap of one device_guid for another '''
 
     def __init__(self, device_guid, device_name, parent = None):
-        super().__init__(self.__class__.__name__, parent)
+        super().__init__(self.__class__.__name__, parent = parent)
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self._device_guid = device_guid # current device GUID

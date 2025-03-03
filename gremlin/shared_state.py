@@ -83,6 +83,9 @@ ui_ready = False
 # holds the main UI reference
 ui = None
 
+# width of a single chart (this can be expensive to compute so we store it here once)
+char_width = 10 
+
 
 # true if a profile is running
 is_running = False

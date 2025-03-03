@@ -227,8 +227,8 @@ class GridButton(QtWidgets.QPushButton):
 
 
 class GridPopupWindow(gremlin.ui.ui_common.QRememberDialog):
-    def __init__(self, vjoy_device_id, input_type, vjoy_input_id):
-        super().__init__(self.__class__.__name__)
+    def __init__(self, vjoy_device_id, input_type, vjoy_input_id, parent = None):
+        super().__init__(self.__class__.__name__, parent = parent)
 
         self.vjoy_device_id = vjoy_device_id
         self.input_type = input_type

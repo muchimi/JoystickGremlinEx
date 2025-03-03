@@ -906,7 +906,209 @@ class NoKeyboardPushButton(QtWidgets.QPushButton):
         self._data = value
 
 
+
+
 class QFloatLineEdit(QtWidgets.QLineEdit):
+    ''' double input validator with optional range limits for input axis
+
+        this line edit behaves like a spin box so it's interchangeable
+
+    '''
+
+    valueChanged = QtCore.Signal(float) # fires when the value changes
+    doubleClick = QtCore.Signal() # fires when the input is double clicked
+
+    def __init__(self, data = None, min_range = -1.0, max_range = 1.0, decimals = 3, step = 0.01, value = 0.0, chars = 8, parent = None):
+        super().__init__(parent)
+        self._min_range = min_range
+        self._max_range = max_range
+        self._step = step
+        self._decimals = decimals
+
+        #self._validator = QFloatLineEdit.FloatValidator(bottom=min_range, top=max_range)
+        # self._validator = QtGui.QDoubleValidator(bottom=min_range, top=max_range)
+        # self._validator.setLocale(self.locale()) # handle correct floating point separator
+        # self._validator.setNotation(QtGui.QDoubleValidator.Notation.StandardNotation)
+        #self.setValidator(self._validator)
+        self.textChanged.connect(self._validate)
+        self.installEventFilter(self)
+        #self.setText("0")
+        self.setValue(value)
+        self._data = data
+        if chars > 0:
+            self._chars = chars
+            self._update_width(chars)
+        else:
+            self.chars = 0
+
+
+    @property
+    def chars(self) -> int:
+        return self._chars
+    @chars.setter
+    def chars(self, value : int):
+        if value > 0 and value != self._chars:
+            self._chars = value
+            self._update_width(value)
+        else:
+            self._chars = 0
+            self.setMaximumWidth(QSize.maxQSize().width())
+
+    def _update_width(self, chars):
+        w = get_text_width(str("m"*chars))
+        self.setMaximumWidth(w)
+
+
+
+
+
+    def eventFilter(self, widget, event):
+        t = event.type()
+        if t == QtCore.QEvent.Type.Wheel:
+            # handle wheel up/down change
+            if self.isReadOnly():
+                return True # cannot change the value if readonly
+            v = self._to_value()
+            if v is not None:
+                eh = gremlin.event_handler.EventListener()
+                is_shifted = eh.get_shifted_state()
+                factor = 0.1 if is_shifted else 1.0
+                if event.angleDelta().y() > 0:
+                    # up
+                    v += self._step * factor
+                else:
+                    # down
+                    v -= self._step * factor
+                v = gremlin.util.clamp(v, self._min_range, self._max_range)
+                self.setValue(v)
+
+            return True # filter the wheel event
+        elif t == QtCore.QEvent.Type.FocusAboutToChange:
+            value = self._to_value()
+            if value is None:
+                return True # skip the event
+        elif t == QtCore.QEvent.Type.FocusOut:
+            # format the input to the correct decimals
+            self.setValue(self.value())
+        elif t == QtCore.QEvent.Type.MouseButtonDblClick:
+            self.doubleClick.emit()
+        return False
+    
+    def keyPressEvent(self, event):
+        if event == QtGui.QKeySequence.StandardKey.Paste:
+            text = QtWidgets.QApplication.clipboard().text()
+            if text:
+                text = text.strip()
+            try:
+                value = float(text)
+                self.setValue(value)
+                return True
+            except:
+                pass
+
+        return super().keyPressEvent(event)
+
+
+    def _update_value(self, value):
+        if value is None:
+            return
+        s_value = f"{float(value):0.{self._decimals}f}"
+        self.setText(s_value)
+        self.valueChanged.emit(value)
+
+
+
+    @QtCore.Slot()
+    def _validate(self):
+        ''' called whenever the text changes '''
+        text = self.text()
+        value = self._to_value(text)
+        return value is not None
+
+    def setValue(self, value : float):
+        ''' sets the value '''
+        self._update_value(value)
+
+    def _to_value(self, text : str = None):
+        if text is None:
+            text = self.text()
+        try:
+            value = float(text)
+        except:
+            return None
+        
+        if value < self._min_range:
+            value = self._min_range
+            with QtCore.QSignalBlocker(self):
+                self.setText(f"{value:0.{self._decimals}f}")
+        elif value > self._max_range:
+            value = self._max_range
+            with QtCore.QSignalBlocker(self):
+                self.setText(f"{value:0.{self._decimals}f}")
+        return value
+        
+
+    def value(self) -> float:
+        ''' current value, None if not a valid input'''
+        value = self._to_value()
+        if value is not None:
+            return value
+        return None
+
+    def isValid(self):
+        ''' true if the input in the box is currently valid'''
+        return self.hasAcceptableInput()
+
+    def step(self):
+        ''' mouse wheel step value'''
+        return self._step
+
+    def setStep(self, step):
+        self._step = step
+
+    def setSingleStep(self, step):
+        self._step = step
+
+    def decimals(self):
+        return self._decimals
+
+    def setDecimals(self, decimals):
+        if decimals < 0:
+            decimals = 0
+        if self._decimals != decimals:
+            self._decimals = decimals
+            v = self._to_value()
+            if v is not None:
+                # correct to the new number of decimals
+                self.setValue(v)
+
+    def setRange(self, bottom, top):
+        if top < bottom:
+            bottom, top = top, bottom
+        self._min_range = bottom
+        self._max_range = top
+        # self._validator.setBottom(bottom)
+        # self._validator.setTop(top)
+        self._update_value(self.value())
+
+    def setMaximum(self, top):
+        self._max_range = top
+        #self._validator.setTop(top)
+        self._update_value(self.value())
+
+    def setMinimum(self, bottom):
+        self._min_range = bottom
+        #self._validator.setBottom(bottom)
+        self._update_value(self.value())
+
+    def minimum(self):
+        return self._min_range
+
+    def maximum(self):
+        return self._max_range
+    
+
+class QFloatLineEditEx(QtWidgets.QLineEdit):
     ''' double input validator with optional range limits for input axis
 
         this line edit behaves like a spin box so it's interchangeable
@@ -1080,7 +1282,7 @@ class QFloatLineEdit(QtWidgets.QLineEdit):
         return self._min_range
 
     def maximum(self):
-        return self._max_range
+        return self._max_range    
 
 class QIntLineEdit(QtWidgets.QLineEdit):
     ''' integer input validator with optional range limits for input axis
@@ -5554,13 +5756,25 @@ class QSplitTabWidget(QDataWidget):
 class QRememberDialog(QtWidgets.QDialog):
     ''' a dialog window that remembers its size and location '''
 
-    def __init__(self, key: str, parent = None):
+    def __init__(self, key: str, center : bool = True, parent = None):
         super().__init__(parent)
 
         self._resize_count = 0
         assert key,"unique key must be provided"
         self.window_key = key
         self.apply_window_settings()
+
+        if center:
+            QtCore.QTimer.singleShot(100, self.centerOnParent)
+        
+
+    def centerOnParent(self):
+        ''' centers the window on the parent window'''
+        parent = self.parent()
+        if parent:
+            center = self.parent().frameGeometry().center()
+            geo = self.frameGeometry()
+            self.move(center.x() - geo.width()/2, center.y() - geo.height()/2)
 
 
     def getResizable(self) -> bool:
@@ -5613,7 +5827,7 @@ class MarkdownDialog(QRememberDialog):
     Dialog box for instructions in markdown format
     '''
     def __init__(self, title = "Markdown Instructions", source = None, parent = None):
-        super().__init__(self.__class__.__name__, parent)
+        super().__init__(self.__class__.__name__, parent = parent)
         self.setWindowTitle(title)
         self.setWindowModality(QtCore.Qt.ApplicationModal)
         self._view = QtWidgets.QTextEdit()
@@ -5658,7 +5872,7 @@ class BaseDialogUi(QRememberDialog):
 
         :param parent the parent of this widget
         """
-        super().__init__(key, parent)
+        super().__init__(key, parent = parent)
 
     def closeEvent(self, event):
         """Closes the calibration window.
@@ -5903,9 +6117,23 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
 
     valueChanged = QtCore.Signal(object) # occurs when the data range value changes ((min,max)) or (value) - passes the normalized values or single value
     modeChanged = QtCore.Signal() # occurs if the mode changes from single value to range mode
+    rangeChanged = QtCore.Signal(object) # occurs when the range (command) data changes  ((min,max)) or (value) - passes the new command data or single value
     invertChanged = QtCore.Signal() # occurs when inversion flag is changed
 
-    def __init__(self, data = None, min_range = -1, max_range = 1, decimals = 3, is_range = True, show_mode_change = False, show_inverted = True, inverted = False,  parent = None):
+    def __init__(self,
+                 data = None, 
+                 min_cmd = -1, 
+                 max_cmd = 1,
+                 min_norm = -1, 
+                 max_norm = 1, 
+                 decimals = 3, 
+                 min_range = -1,
+                 max_range = 1,
+                 is_range = True, 
+                 show_mode_change = False, 
+                 show_inverted = True, 
+                 inverted = False,
+                 parent = None):
         '''
         :param data: the data object if any
         :param min_range: the default min range of the widget
@@ -5917,7 +6145,11 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
         
         self.data = data
 
-   
+        assert gremlin.util.valueInRange(min_norm,-1,1)
+        assert gremlin.util.valueInRange(max_norm,-1,1)
+
+        self._min_range = min_range # min possible input range
+        self._max_range = max_range # max possible input range
         self._showCommandRange = True
         self._showNormalizedRange = True
         self._showPercentRange = True
@@ -5926,17 +6158,21 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
         self._decimals = decimals
         self._is_range = is_range
         self._inverted = inverted
+        self._verbose = gremlin.config.Configuration().verbose
 
-        self._last_cmd_min = min_range
-        self._last_cmd_max = max_range
-        self._last_min = min_range
-        self._last_max = max_range
+        min_cmd = gremlin.util.clamp(min_cmd, min_range, max_range)
+        max_cmd = gremlin.util.clamp(max_cmd, min_range, max_range)
+
+        self._last_cmd_min = min_cmd
+        self._last_cmd_max = max_cmd
+
+        self._last_min = min_cmd
+        self._last_max = max_cmd
+
 
         main_layout = QtWidgets.QVBoxLayout(self)
 
-        
-
-        w = gremlin.ui.ui_common.get_text_width("0000000.0000")
+        w = gremlin.shared_state.char_width * 12 # gremlin.ui.ui_common.get_text_width("0000000.0000")
 
         output_data_entry_widget = QtWidgets.QWidget()
         output_data_entry_layout = QtWidgets.QGridLayout(output_data_entry_widget)
@@ -5944,57 +6180,73 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
 
          # output range                 
         self._command_min_widget = QFloatLineEdit()
-        self._command_min_widget.setRange(min_range,max_range)
-        self._command_min_widget.setValue(min_range)
+        self._command_min_widget.setRange(min_range, max_range)
+        self._command_min_widget.setValue(min_cmd)
         self._command_min_widget.valueChanged.connect(self._update_from_command)
         self._command_min_widget.setMinimumWidth(w)
-        
+
+        # output value
+        min_output = gremlin.util.scale_to_range(min_norm, target_min = min_cmd, target_max = max_cmd)
+        max_output = gremlin.util.scale_to_range(max_norm, target_min = min_cmd, target_max = max_cmd)
+
+        # output percentage
+        min_percent = gremlin.util.scale_to_range(min_norm, target_min = 0, target_max = 100) 
+        max_percent = gremlin.util.scale_to_range(max_norm, target_min = 0, target_max = 100)
 
         # output range                 
         self._command_max_widget = QFloatLineEdit()
         self._command_max_widget.setRange(min_range, max_range)
-        self._command_max_widget.setValue(max_range)
-        self._command_max_widget.valueChanged.connect(self._update_from_command)
+        self._command_max_widget.setValue(max_cmd)
         self._command_max_widget.setMinimumWidth(w)
+        self._command_max_widget.valueChanged.connect(self._update_from_command)
         
 
-        # controller scaled output value (integer)
+        # output min
         self._data_min_widget = QFloatLineEdit()
         self._data_min_widget.setRange(min_range, max_range)
-        self._data_min_widget.valueChanged.connect(self._update_from_data)
+        self._data_min_widget.setValue(min_output)
         self._data_min_widget.setMinimumWidth(w)
+        self._data_min_widget.valueChanged.connect(self._update_from_output)
 
+        # output max
         self._data_max_widget = QFloatLineEdit()
         self._data_max_widget.setRange(min_range, max_range)
-        self._data_max_widget.valueChanged.connect(self._update_from_data)
+        self._data_max_widget.setValue(max_output)
         self._data_max_widget.setMinimumWidth(w)
+        self._data_max_widget.valueChanged.connect(self._update_from_output)
+
         
         
 
         # normalized is -1 to + 1
         self._normalized_min_widget = gremlin.ui.ui_common.QFloatLineEdit()
-        self._normalized_min_widget.valueChanged.connect(self._update_from_normalized)
-        self._normalized_min_widget.setMinimumWidth(w)
         self._normalized_min_widget.setRange(-1,1)
+        self._normalized_min_widget.setValue(min_norm)
+        self._normalized_min_widget.setMinimumWidth(w)
+        self._normalized_min_widget.valueChanged.connect(self._update_from_normalized)
         
         
         
         self._normalized_max_widget = gremlin.ui.ui_common.QFloatLineEdit()
-        self._normalized_max_widget.valueChanged.connect(self._update_from_normalized)
-        self._normalized_max_widget.setMinimumWidth(w)
         self._normalized_max_widget.setRange(-1,1)
+        self._normalized_max_widget.setValue(max_norm)
+        self._normalized_max_widget.setMinimumWidth(w)
+        
+        self._normalized_max_widget.valueChanged.connect(self._update_from_normalized)
         
         
 
         self._percent_min_widget = gremlin.ui.ui_common.QFloatLineEdit(decimals=2)
         #self._output_min_percent_range_widget.setReadOnly(True)
         self._percent_min_widget.setRange(0,100)
+        self._percent_min_widget.setValue(min_percent)
         self._percent_min_widget.setMinimumWidth(w)
         self._percent_min_widget.valueChanged.connect(self._update_from_percent)
 
         self._percent_max_widget = gremlin.ui.ui_common.QFloatLineEdit(decimals=2)
         #self._output_max_percent_range_widget.setReadOnly(True)
         self._percent_max_widget.setRange(0,100)
+        self._percent_max_widget.setValue(max_percent)
         self._percent_max_widget.setMinimumWidth(w)
         self._percent_max_widget.valueChanged.connect(self._update_from_percent)
         
@@ -6098,6 +6350,10 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
         self._data_max_widget.setVisible(is_range)
         self._invert_output_widget.setVisible(is_range)
 
+
+        if self._verbose: syslog.info(f"JRANGE: init():   output: {min_output:0.3f} {max_output:0.3f} normalized: {min_norm:0.3f} {max_norm:0.3f} percent: {min_percent:0.3f} {max_percent:0.3f} cmd: {min_cmd:0.3f} {max_cmd:0.3f} ")
+
+
     @QtCore.Slot(bool)
     def _inverted_changed(self, checked):
         self.inverted = checked
@@ -6113,27 +6369,33 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
         
 
     def _update_from_normalized(self, emit = True):
-        min_norm = self._normalized_min_widget.value()
-        max_norm = self._normalized_max_widget.value()
-        min_cmd = self._command_min_widget.value() # minimum range
-        max_cmd = self._command_max_widget.value() # maximum range
-        min_value = gremlin.util.scale_to_range(min_norm, target_min=min_cmd, target_max=max_cmd) 
-        max_value = gremlin.util.scale_to_range(max_norm, target_min=min_cmd, target_max=max_cmd) 
 
         min_cmd = self._command_min_widget.value() # minimum range
+        if min_cmd is None:
+            return # bad data
+        
         max_cmd = self._command_max_widget.value() # maximum range
+        if max_cmd is None:
+            return # bad data
+
+        min_norm = self._normalized_min_widget.value()
+        if min_norm is None:
+            return # bad data
+        max_norm = self._normalized_max_widget.value()
+        if max_norm is None:
+            return # bad data
+        min_cmd = self._command_min_widget.value() # minimum range
+        max_cmd = self._command_max_widget.value() # maximum range
+
+        min_value = gremlin.util.scale_to_range(min_norm, source_min = min_norm, source_max = max_norm, target_min=min_cmd, target_max=max_cmd) 
+        max_value = gremlin.util.scale_to_range(max_norm, source_min = min_norm, source_max = max_norm, target_min=min_cmd, target_max=max_cmd) 
    
-        if self._last_cmd_min != min_cmd or \
-           self._last_cmd_max != max_cmd or \
-           self._last_min != min_value or \
+        if self._last_min != min_value or \
            self._last_max != max_value:
 
 
             min_percent = gremlin.util.scale_to_range(min_value, source_min=min_cmd, source_max=max_cmd, target_min = 0, target_max = 100) 
             max_percent = gremlin.util.scale_to_range(max_value, source_min=min_cmd, source_max=max_cmd, target_min = 0, target_max = 100)
-
-            self._last_cmd_min = min_cmd
-            self._last_cmd_max = max_cmd
             
             self._last_min = min_value
             self._last_max = max_value
@@ -6148,29 +6410,36 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
             with QtCore.QSignalBlocker(self._percent_max_widget):
                 self._percent_max_widget.setValue(max_percent)
 
+
+            if self._verbose: syslog.info(f"JRANGE: update from normalized:   output: {min_value:0.3f} {max_value:0.3f} normalized: {min_norm:0.3f} {max_norm:0.3f} percent: {min_percent:0.3f} {max_percent:0.3f} cmd: {min_cmd:0.3f} {max_cmd:0.3f} ")
+
             if emit:
                 if self._is_range:
                     self.valueChanged.emit((min_norm, max_norm))
                 else:
                     self.valueChanged.emit(min_norm)
 
+
     def _update_from_percent(self, value : float,  emit = True):
         min_percent = self._percent_min_widget.value()
+        if min_percent is None:
+            return # bad data
         max_percent = self._percent_max_widget.value()
+        if max_percent is None:
+            return # bad data
         min_cmd = self._command_min_widget.value() # minimum range
+        if min_cmd is None:
+            return # bad data
         max_cmd = self._command_max_widget.value() # maximum range
+        if max_cmd is None:
+            return # bad data
         min_value = gremlin.util.scale_to_range(min_percent, source_min = 0, source_max = 100, target_min=min_cmd, target_max=max_cmd) 
         max_value = gremlin.util.scale_to_range(max_percent, source_min = 0, source_max = 100, target_min=min_cmd, target_max=max_cmd) 
         min_norm = gremlin.util.scale_to_range(min_value, source_min=min_cmd, source_max=max_cmd) # to -1, 1
         max_norm = gremlin.util.scale_to_range(max_value, source_min=min_cmd, source_max=max_cmd) # to -1, 1
 
-        if self._last_cmd_min != min_cmd or \
-           self._last_cmd_max != max_cmd or \
-           self._last_min != min_value or \
+        if self._last_min != min_value or \
            self._last_max != max_value:
-            
-            self._last_cmd_min = min_cmd
-            self._last_cmd_max = max_cmd
             
             self._last_min = min_value
             self._last_max = max_value
@@ -6183,7 +6452,11 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
             with QtCore.QSignalBlocker(self._normalized_min_widget):
                 self._normalized_min_widget.setValue(min_norm)
             with QtCore.QSignalBlocker(self._normalized_max_widget):
+                if max_norm == -1:
+                    pass
                 self._normalized_max_widget.setValue(max_norm)
+
+            if self._verbose: syslog.info(f"JRANGE: update from percent:   output: {min_value:0.3f} {max_value:0.3f} normalized: {min_norm:0.3f} {max_norm:0.3f} percent: {min_percent:0.3f} {max_percent:0.3f} cmd: {min_cmd:0.3f} {max_cmd:0.3f} ")
 
             if emit:
                 if self._is_range:
@@ -6192,71 +6465,90 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
                     self.valueChanged.emit(min_norm)
 
 
-    def _update_from_data(self, value, emit = True):
+    def _update_from_output(self, value, emit = True):
+        min_cmd = self._command_min_widget.value() # minimum range
+        if min_cmd is None:
+            return # bad data
+        
+        max_cmd = self._command_max_widget.value() # maximum range
+        if max_cmd is None:
+            return # bad data
+
+        min_norm = self._normalized_min_widget.value()
+        if min_norm is None:
+            return # bad data
+        max_norm = self._normalized_max_widget.value()
+        if max_norm is None:
+            return # bad data
         min_cmd = self._command_min_widget.value() # minimum range
         max_cmd = self._command_max_widget.value() # maximum range
+
         min_source = self._data_min_widget.value()
+        if min_source is None:
+            return # bad data
         max_source = self._data_max_widget.value()
+        if max_source is None:
+            return # bad data
+        
+        min_range = self._min_range
+        max_range = self._max_range
 
-        if self._last_cmd_min != min_cmd or \
-           self._last_cmd_max != max_cmd or \
-           self._last_min != min_source or \
-           self._last_max != max_source:
+        min_value = gremlin.util.clamp(min_source, min_range, max_range)
+        max_value = gremlin.util.clamp(max_source, min_range, max_range)
 
+        min_norm = gremlin.util.scale_to_range(min_value, source_min=min_cmd, source_max=max_cmd) # to -1, 1
+        max_norm = gremlin.util.scale_to_range(max_value, source_min=min_cmd, source_max=max_cmd) # to -1, 1
+        min_percent = gremlin.util.scale_to_range(min_norm, source_min=min_norm, source_max=max_norm, target_min = 0, target_max = 100) 
+        max_percent = gremlin.util.scale_to_range(max_norm, source_min=min_norm, source_max=max_norm, target_min = 0, target_max = 100)
 
-            min_value = gremlin.util.clamp(min_source, min_cmd, max_cmd)
-            max_value = gremlin.util.clamp(max_source, min_cmd, max_cmd)
+        self._last_cmd_min = min_cmd
+        self._last_cmd_max = max_cmd
+        
+        self._last_min = min_value
+        self._last_max = max_value
 
-            min_norm = gremlin.util.scale_to_range(min_value, source_min=min_cmd, source_max=max_cmd) # to -1, 1
-            max_norm = gremlin.util.scale_to_range(max_value, source_min=min_cmd, source_max=max_cmd) # to -1, 1
-            min_percent = gremlin.util.scale_to_range(min_value, source_min=min_cmd, source_max=max_cmd, target_min = 0, target_max = 100) 
-            max_percent = gremlin.util.scale_to_range(max_value, source_min=min_cmd, source_max=max_cmd, target_min = 0, target_max = 100)
+        with QtCore.QSignalBlocker(self._normalized_min_widget):
+            self._normalized_min_widget.setValue(min_norm)
+        with QtCore.QSignalBlocker(self._normalized_max_widget):
+            self._normalized_max_widget.setValue(max_norm)
 
-            self._last_cmd_min = min_cmd
-            self._last_cmd_max = max_cmd
-            
-            self._last_min = min_value
-            self._last_max = max_value
+        with QtCore.QSignalBlocker(self._percent_min_widget):
+            self._percent_min_widget.setValue(min_percent)
+        with QtCore.QSignalBlocker(self._percent_max_widget):
+            self._percent_max_widget.setValue(max_percent)
 
-            with QtCore.QSignalBlocker(self._normalized_min_widget):
-                self._normalized_min_widget.setValue(min_norm)
-            with QtCore.QSignalBlocker(self._normalized_max_widget):
-                self._normalized_max_widget.setValue(max_norm)
+        if self._verbose: syslog.info(f"JRANGE: update from output:   output: {min_value:0.3f} {max_value:0.3f} normalized: {min_norm:0.3f} {max_norm:0.3f} percent: {min_percent:0.3f} {max_percent:0.3f} cmd: {min_cmd:0.3f} {max_cmd:0.3f} ")
 
-            with QtCore.QSignalBlocker(self._percent_min_widget):
-                self._percent_min_widget.setValue(min_percent)
-            with QtCore.QSignalBlocker(self._percent_max_widget):
-                self._percent_max_widget.setValue(max_percent)
-
-            if emit:
-                if self._is_range:
-                    self.valueChanged.emit((min_norm, max_norm))
-                else:
-                    self.valueChanged.emit(min_norm)
-            
+        if emit:
+            if self._is_range:
+                self.valueChanged.emit((min_norm, max_norm))
+            else:
+                self.valueChanged.emit(min_norm)
+        
 
     def _update_from_command(self, value, emit = True):
         
         
         min_cmd = self._command_min_widget.value() # minimum range
+        if min_cmd is None:
+            return # bad data
+        
         max_cmd = self._command_max_widget.value() # maximum range
-        min_source = self._data_min_widget.value()
-        max_source = self._data_max_widget.value()
+        if max_cmd is None:
+            return # bad data
+
+        min_norm = self._normalized_min_widget.value()
+        if min_norm is None:
+            return # bad data
+        max_norm = self._normalized_max_widget.value()
+        if max_norm is None:
+            return # bad data
 
         if self._last_cmd_min != min_cmd or \
-           self._last_cmd_max != max_cmd or \
-           self._last_min != min_source or \
-           self._last_max != max_source:
-            
-            
-            min_value = gremlin.util.clamp(min_source, min_cmd, max_cmd)
-            max_value = gremlin.util.clamp(max_source, min_cmd, max_cmd)
-            
-
-            min_norm = gremlin.util.scale_to_range(min_value, source_min=min_cmd, source_max=max_cmd) # to -1, 1
-            max_norm = gremlin.util.scale_to_range(max_value, source_min=min_cmd, source_max=max_cmd) # to -1, 1
-            min_percent = gremlin.util.scale_to_range(min_value, source_min=min_cmd, source_max=max_cmd, target_min = 0, target_max = 100) 
-            max_percent = gremlin.util.scale_to_range(max_value, source_min=min_cmd, source_max=max_cmd, target_min = 0, target_max = 100)
+           self._last_cmd_max != max_cmd:
+        
+            min_value = gremlin.util.scale_to_range(min_norm, source_min = min_norm, source_max = max_norm, target_min= min_cmd, target_max = max_cmd)
+            max_value = gremlin.util.scale_to_range(max_norm, source_min = min_norm, source_max = max_norm, target_min= min_cmd, target_max = max_cmd)
 
             self._last_cmd_min = min_cmd
             self._last_cmd_max = max_cmd
@@ -6264,27 +6556,30 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
             self._last_min = min_value
             self._last_max = max_value
 
-            with QtCore.QSignalBlocker(self._normalized_min_widget):
-                self._normalized_min_widget.setValue(min_norm)
-            with QtCore.QSignalBlocker(self._normalized_max_widget):
-                self._normalized_max_widget.setValue(max_norm)
+            with QtCore.QSignalBlocker(self._data_min_widget):
+                self._data_min_widget.setValue(min_value)
+            with QtCore.QSignalBlocker(self._data_max_widget):
+                self._data_max_widget.setValue(max_value)
 
-            with QtCore.QSignalBlocker(self._percent_min_widget):
-                self._percent_min_widget.setValue(min_percent)
-            with QtCore.QSignalBlocker(self._percent_max_widget):
-                self._percent_max_widget.setValue(max_percent)
+            
+            if self._verbose:
+                min_percent = self._percent_min_widget.value()
+                max_percent = self._percent_max_widget.value()
+                if min_percent is None:
+                    min_percent = self._percent_min_widget.value()
+                    min_percent = 0
+                if max_percent is None:
+                    max_percent = 0
 
-            if min_value != min_source or max_value != max_source:
+                syslog.info(f"JRANGE: update from command:   output: {min_value:0.3f} {max_value:0.3f} normalized: {min_norm:0.3f} {max_norm:0.3f} percent: {min_percent:0.3f} {max_percent:0.3f} cmd: {min_cmd:0.3f} {max_cmd:0.3f} ")
 
-                with QtCore.QSignalBlocker(self._data_min_widget):
-                    self._data_min_widget.setValue(min_value)
-                with QtCore.QSignalBlocker(self._data_max_widget):
-                    self._data_max_widget.setValue(max_value)
-                if emit:
-                    if self._is_range:
-                        self.valueChanged.emit((min_value, max_value))
-                    else:
-                        self.valueChanged.emit(min_value)
+            if emit:
+                if self._is_range:
+                    self.rangeChanged.emit((min_cmd, max_cmd))
+                    self.valueChanged.emit((min_norm, max_norm))
+                else:
+                    self.rangeChanged.emit(min_cmd)
+                    self.valueChanged.emit(min_norm)
 
 
 
@@ -6332,28 +6627,50 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
             with QtCore.QSignalBlocker(self._invert_output_widget):
                 self._invert_output_widget.setChecked(value)
 
-
-    def setRange(self, value : float, max_value : float = None):
-        ''' updates the overall range min and max values '''
+    def setLimits(self, value : float, max_value : float = None):
+        ''' sets the overall max values for command range and output values'''
         if value == max_value:
             # syslog = logging.getLogger("system")
             syslog.error(f"RANGE WIDGET: cannot set range to the same value: {value:0.3f} - skipping")
             return
+        
+        self._min_range = value
+        self._max_range = value
+        min_value = self._data_min_widget.value()
+        max_value = self._data_min_widget.value()
+        min_cmd = self._command_min_widget.value()
+        max_cmd = self._command_max_widget.value()
+        if not gremlin.util.valueInRange(min_value, self._min_range, self._max_range):
+            value = gremlin.util.clamp(min_value, self._min_range, self._max_range)
+            self._data_min_widget.setValue(value)
+        if not gremlin.util.valueInRange(max_value, self._min_range, self._max_range):
+            value = gremlin.util.clamp(max_value, self._min_range, self._max_range)
+            self._data_max_widget.setValue(value)
+        if not gremlin.util.valueInRange(min_cmd, self._min_range, self._max_range):
+            value = gremlin.util.clamp(min_cmd, self._min_range, self._max_range)
+            self._command_min_widget.setValue(value)
+        if not gremlin.util.valueInRange(max_cmd, self._min_range, self._max_range):
+            value = gremlin.util.clamp(max_cmd, self._min_range, self._max_range)
+            self._command_max_widget.setValue(value)
+        self._update_from_normalized()
+
+    def setRange(self, value : float, max_value : float):
+        ''' updates the overall command range min and max values '''
+        
         with QtCore.QSignalBlocker(self._command_min_widget):
             self._command_min_widget.setRange(value, max_value)
             self._command_min_widget.setValue(value)
         
         with QtCore.QSignalBlocker(self._data_min_widget):
             self._data_min_widget.setRange(value, max_value)
-
-        if self._is_range:
-            assert max_value is not None,"Missing max value must be provided in range mode"
-            with QtCore.QSignalBlocker(self._command_max_widget):
-                self._command_max_widget.setRange(value, max_value)
-                self._command_max_widget.setValue(max_value)
         
-            with QtCore.QSignalBlocker(self._data_max_widget):
-                self._data_max_widget.setRange(value, max_value)
+        with QtCore.QSignalBlocker(self._command_max_widget):
+            self._command_max_widget.setRange(value, max_value)
+            self._command_max_widget.setValue(max_value)
+    
+        with QtCore.QSignalBlocker(self._data_max_widget):
+            self._data_max_widget.setRange(value, max_value)
+
         self._update_from_command(None, False)
 
     def setPercent(self, percent : float, max_percent : float = None):
@@ -6401,7 +6718,11 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
         # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_detailed
         min_cmd = self._command_min_widget.value()
+        if min_cmd is None:
+            return # bad data
         max_cmd = self._command_max_widget.value()
+        if max_cmd is None:
+            return # bad data
         min_value = gremlin.util.clamp(min_value, min_cmd, max_cmd)
         max_value = gremlin.util.clamp(max_value, min_cmd, max_cmd)
 
@@ -6411,7 +6732,7 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
             self._data_max_widget.setValue(max_value)
         
         if verbose: syslog.info(f"Range widget set value: {min_value:0.3f} {max_value:0.3f}  commmand: {min_cmd:0.3f} {max_cmd:0.3f}")
-        self._update_from_data(None, False)
+        self._update_from_output(None, False)
 
     def getNormalized(self) -> tuple | float:
         ''' gets the normalized value '''

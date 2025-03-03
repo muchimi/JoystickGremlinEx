@@ -425,7 +425,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
 
     def __init__(self, profile_path, parent=None):
 
-        super().__init__(self.__class__.__name__, parent)
+        super().__init__(self.__class__.__name__, parent = parent)
 
         # make modal
         self.setWindowModality(QtCore.Qt.ApplicationModal)
@@ -1728,7 +1728,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                     remap_widget.data = (import_item, device_node)
 
                     detail_widget = None
-                    width = gremlin.ui.ui_common.get_text_width("MMM")
+                    width = gremlin.shared_state.char_width * 3
                     if import_item.device_type in (DeviceType.Joystick, DeviceType.VJoy):
                         detail_widget = ui_common.QDataPushButton("...")
                         detail_widget.setToolTip("Details")
@@ -2330,7 +2330,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
 
 class ImportDetailDialog(gremlin.ui.ui_common.QRememberDialog):
     def __init__(self, import_item : ImportItem, target_device_guid : dinput.GUID, parent=None):
-        super().__init__(self.__class__.__name__, parent)
+        super().__init__(self.__class__.__name__, parent = parent)
 
         # make modal
         self.setWindowModality(QtCore.Qt.ApplicationModal)
@@ -2380,7 +2380,7 @@ class Mapper():
 
         def __init__(self, device_info : dinput.DeviceSummary, parent=None):
 
-            super().__init__(self.__class__.__name__, parent)
+            super().__init__(self.__class__.__name__, parent = parent)
 
             # make modal
             self.setWindowModality(QtCore.Qt.ApplicationModal)

@@ -217,7 +217,7 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
                 lbl = QtWidgets.QLabel("+")
                 self.key_combination_layout.addWidget(lbl)
             lbl = QtWidgets.QLabel(name)
-            w = gremlin.ui.ui_common.get_text_width(name)
+            w = gremlin.shared_state.char_width * len(name)
             # center text if needed as cscc text align isn't supported by QT labels
             css_pad = ""
             if w < max_width:

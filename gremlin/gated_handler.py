@@ -290,8 +290,6 @@ _gate_range_description = {
 }
 
 
-
-
 class GateInfo():
     ''' holds gate data information '''
     
@@ -810,6 +808,37 @@ class RangeInfo():
                 data = 1.0
             if self._fixed_value is None or data != self._fixed_value:
                 self._fixed_value = data
+
+    # def filterEventValue(self, event):
+    #     ''' takes an axis event input value and changes it to reflect the value of the input '''
+
+    #     match self.mode:
+            
+    #         case GateRangeOutputMode.Rebased:
+    #             # rebased between -1 and + 1 for the range
+    #             value = value.current
+    #             delta = value.current - self.v1 
+    #             pos = delta/(self.v2-self.v1) 
+    #             output_value = gremlin.util.scale_to_range(pos,source_min=0, source_max =1)
+    #             syslog.info(f"RANGE rebase input: {value:0.3f} range: {self.to_display()} pos: {pos:0.3f} output value: {output_value:0.3f}")
+    #             return output_value
+            
+    #         case GateRangeOutputMode.Ranged:
+    #             # ranged to specific value
+    #             value = value.current
+    #             delta = value.current - self.v1 
+    #             pos = delta/(self.v2-self.v1) 
+    #             output_value = gremlin.util.scale_to_range(pos,source_min=0, source_max =1, target_min = self.range_min, target_max = self.range_max)
+    #             syslog.info(f"RANGE rebase input: {value:0.3f} range: {self.to_display()}  pos: {pos:0.3f} output value: {output_value:0.3f}")
+    #             return output_value
+            
+    #         case _:
+    #             output_value = event.value
+        
+    #     # any other mode
+    #     return output_value
+
+        
 
 
     @property
@@ -2299,8 +2328,8 @@ class GateData():
     def _get_filtered_range_value(self, range_info : RangeInfo, value : float):
         ''' gets a range filtered value '''
         range_info : RangeInfo
-        verbose = gremlin.config.Configuration().verbose_mode_details
-
+        verbose = gremlin.config.Configuration().verbose_mode_exec
+        
         if value < range_info.v1 or value > range_info.v2:
             # not in range
             if verbose:
@@ -2310,18 +2339,18 @@ class GateData():
             match range_info.mode:
                 case GateRangeOutputMode.Normal:
                     # as is
-                    if verbose:
-                        log_info(f"{value} as is [{range_info.v1},{range_info.v2}] -> {value}")
+                    # if verbose:
+                    #     log_info(f"range [NORMAL]: {v1:0.3f} {v2:0.3f} input: {value:0.3f} as is [{range_info.v1},{range_info.v2}] -> {value}")
                     return value
                 case GateRangeOutputMode.FilterOut:
                     if verbose:
-                        log_info(f"{value} filtered out [{range_info.v1},{range_info.v2}] -> none")
+                        log_info(f"range [FILTER OUT]: {v1:0.3f} {v2:0.3f} input: {value:0.3f} filtered out -> none")
                     return None # filter the data out
                 case GateRangeOutputMode.Fixed:
                     # return the range's fixed value
                     output_value = range_info.fixed_value
                     if verbose:
-                        log_info(f"{value} Fixed  -> {output_value}")
+                        log_info(f"range [FIXED]: {v1:0.3f} {v2:0.3f} input: {value:0.3f} Fixed  -> {output_value:0.3f}")
                     return output_value
                 case GateRangeOutputMode.Ranged:
                     #p = self._get_range_percent(value, range_info.v1, range_info.v2)
@@ -2329,7 +2358,7 @@ class GateData():
                     v2 = range_info.range_max
                     output_value = gremlin.util.scale_to_range(value, v1, v2, target_min = range_info.output_range_min, target_max=range_info.output_range_max)
                     if verbose:
-                        log_info(f"{value} scaled [{range_info.output_range_min},{range_info.output_range_max}]-> {output_value}")
+                        log_info(f"range [RANGED]: {v1:0.3f} {v2:0.3f} input: {value:0.3f} scaled [{range_info.output_range_min:0.3f},{range_info.output_range_max:0.3f}]-> {output_value:0.3f}")
                     return output_value
                 case GateRangeOutputMode.Rebased:
                     # scale to the output range but position the data in the range (lower gate is -1, upper gate is +1)
@@ -2337,7 +2366,7 @@ class GateData():
                     v2 = range_info.range_max
                     output_value = gremlin.util.scale_to_range(value, v1, v2, target_min = -1, target_max= 1)
                     if verbose:
-                        log_info(f"{value} rebased value: -> {output_value}")
+                        log_info(f"range [REBASE]: {v1:0.3f} {v2:0.3f} input: {value:0.3f} rebased value: -> {output_value:0.3f}")
                     return output_value
 
         # use unchanged value
@@ -3210,7 +3239,7 @@ class GateWidgetInfo(gremlin.ui.ui_common.QDataWidget):
 
         self.data = gate
     
-        label_width = gremlin.ui.ui_common.get_text_width("Range MM")
+        label_width = gremlin.shared_state.char_width * 2
 
         self.label_widget = QtWidgets.QLabel(f"Gate {gate.slider_index + 1}:") # the slider index is the ordered gate number
         self.label_widget.setMaximumWidth(label_width)
@@ -3304,7 +3333,7 @@ class RangeWidgetInfo(QtWidgets.QWidget):
         
         self._rng : RangeInfo = rng
         self.decimals : int = decimals
-        id : str = rng.id
+        #id : str = rng.id
 
         if rng.is_default:
             # default range
@@ -3312,25 +3341,29 @@ class RangeWidgetInfo(QtWidgets.QWidget):
         else:
             self.label_widget = QtWidgets.QLabel(f"Range {display_index}:")
 
-        self.range_widget = gremlin.ui.ui_common.QDataLineEdit()
-        self.range_widget.setReadOnly(True)
+
+        self.range_widget = gremlin.ui.ui_common.QDataLabel() #  gremlin.ui.ui_common.QDataLineEdit()
+        #self.range_widget.setStyleSheet("background: red;")
+        
+        #self.range_widget.setReadOnly(True)
         self.range_widget.data = (rng, self.range_widget)
         self.setup_widget = gremlin.ui.ui_common.QDataPushButton(data = rng)
         
-        has_containers = rng.hasAnyContainers()
-        if has_containers:
-            self.setup_widget.setIcon(load_icon("fa.gear",qta_color=gremlin.ui.ui_common.Color.activeContentColor()))
-        else:
-            self.setup_widget.setIcon(load_icon("fa.gear",qta_color=gremlin.ui.ui_common.Color.inactiveColor()))
+        
+
         self.setup_widget.setMaximumWidth(20)
         self.setup_widget.clicked.connect(configure_range_handler)
-        self.setup_widget.setToolTip(f"Setup actions for range {id}")
+        self.setup_widget.setToolTip(f"Setup actions for range [{self.display_name()}]")
 
         main_layout = QtWidgets.QHBoxLayout(self)
+        main_layout.setContentsMargins(0,0,0,0)
 
         main_layout.addWidget(self.label_widget)
         main_layout.addWidget(self.range_widget)
         main_layout.addWidget(self.setup_widget)
+        main_layout.addStretch()
+
+
         self.setContentsMargins(0,0,0,0)
 
         self.setVisible(rng.used)
@@ -3342,9 +3375,18 @@ class RangeWidgetInfo(QtWidgets.QWidget):
         eh.gate_value_changed.connect(self._gate_value_changed) #  gate value changes for display value updates
         eh.range_used_changed.connect(self._range_used_changed) # gate usage for range visibility
         eh.display_mode_changed.connect(self._display_mode_changed)
+        eh.range_configuration_changed.connect(self._range_configuration_changed) # called when range data changes
         
         # display default value
         self.update_value()
+        self._update_icon()
+
+    def _update_icon(self):
+        has_containers = self._rng.hasAnyContainers()
+        if has_containers:
+            self.setup_widget.setIcon(load_icon("fa.gear",qta_color=gremlin.ui.ui_common.Color.activeContentColor()))
+        else:
+            self.setup_widget.setIcon(load_icon("fa.gear",qta_color=gremlin.ui.ui_common.Color.inactiveColor()))
 
     def cleanup(self):
         eh = GateEventHandler()
@@ -3353,6 +3395,10 @@ class RangeWidgetInfo(QtWidgets.QWidget):
         eh.display_mode_changed.disconnect(self._display_mode_changed)
 
 
+    @QtCore.Slot(RangeInfo)
+    def _range_configuration_changed(self, rnginfo):
+        if self._rng == rnginfo:
+            self._update_icon()
 
     @QtCore.Slot(DisplayMode)
     def _display_mode_changed(self, display_mode):
@@ -3386,7 +3432,7 @@ class RangeWidgetInfo(QtWidgets.QWidget):
 
 
     def update_value(self):
-        char_width = gremlin.ui.ui_common.get_text_width("M")
+        char_width = gremlin.shared_state.char_width
         g1 : GateInfo = self._rng.g1
         g2 : GateInfo= self._rng.g2
         g1v = g1.display_value
@@ -3394,7 +3440,8 @@ class RangeWidgetInfo(QtWidgets.QWidget):
         decimals = self.decimals        
         txt = f"[{g1v:0.{decimals}f} to {g2v:0.{decimals}f}]"
         self.range_widget.setText(txt)
-        self.range_widget.setMinimumWidth(char_width * len(txt))
+        self.range_widget.setMinimumWidth(char_width * 8)
+        self.setup_widget.setToolTip(f"Setup actions for range [{self.display_name()}]")
 
     def display_name(self):
         if self.range_info:
@@ -3407,13 +3454,15 @@ class GatedAxisInstructions(gremlin.ui.ui_common.QRememberDialog):
     Dialog box for instructions
     '''
     def __init__(self, parent = None):
-        super().__init__(self.__class__.__name__, parent)
+        super().__init__(self.__class__.__name__, parent = parent)
         self.setWindowTitle("Gated Axis Mapper Instructions")
         self.setWindowModality(QtCore.Qt.ApplicationModal)
         #self._view = QtWebEngineWidgets.QWebEngineView()
         self._view = QtWidgets.QTextEdit()
         layout = QtWidgets.QVBoxLayout(self)
         layout.addWidget(self._view)
+
+        
 
 
     def load(self, location):
@@ -3559,7 +3608,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
 
         self.container_options_widget = QtWidgets.QWidget()
         self.container_options_widget.setContentsMargins(0,0,0,0)
-        #self.container_options_widget.setStyleSheet("Background-color: orange;")
+        
 
         self.container_options_layout = QtWidgets.QHBoxLayout(self.container_options_widget)
         self.container_options_widget.setContentsMargins(0,0,0,0)
@@ -3592,7 +3641,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
         self.container_options_layout.addStretch()
 
         self.container_gate_ui_widget = QtWidgets.QWidget()
-        #self.container_gate_ui_widget.setStyleSheet("Background-color: red;")
+        
         self.container_gate_ui_widget.setContentsMargins(8,0,0,0)
         self.container_gate_ui_layout = QtWidgets.QVBoxLayout(self.container_gate_ui_widget)
         #self.container_gate_ui_layout.setContentsMargins(0,0,0,0)
@@ -3610,7 +3659,9 @@ class GatedAxisWidget(QtWidgets.QWidget):
 
         self.container_range_widget = QtWidgets.QWidget()
         self.container_range_widget.setContentsMargins(0,0,0,0)
-        self.container_range_layout = gremlin.ui.ui_common.QFlowLayout(self.container_range_widget)        
+
+
+        self.container_range_layout = QtWidgets.QVBoxLayout(self.container_range_widget)        
         self.container_range_layout.setContentsMargins(0,0,0,0)
 
         self.container_gate_ui_layout.addWidget(self.container_gate_widget)
@@ -3763,7 +3814,7 @@ class GatedAxisWidget(QtWidgets.QWidget):
         gh.gatedata_valueChanged.connect(self._update_values_cb)
         gh.slider_marker_update.connect(self._slider_update_value_handler)
         # eh.slider_marker_update.connect(self._slider_marker_update_handler)
-        # eh.range_value_changed.connect(self._range_changed_cb)
+        gh.range_value_changed.connect(self._range_changed_cb)
         gh.gate_order_changed.connect(self._gate_order_changed_cb)
         gh.gate_value_changed.connect(self._gate_value_changed)
         gh.use_default_range_changed.connect(self._update_range_display)
@@ -3914,16 +3965,21 @@ class GatedAxisWidget(QtWidgets.QWidget):
         # remove existing ranges 
 
         self._rwi_map = {} # map of range widgets by range
-
-        # for rwi in self._rwi_map.values():
-        #     rwi.cleanup()
-        #     rwi.widget = None
         
         self._rwi_widgets_index_map.clear()
         self._rwi_map.clear()
 
         # remove + delete existing widgets
         gremlin.util.clear_layout(self.container_range_layout)
+        
+
+
+        container_widget = QtWidgets.QWidget()
+        container_widget.setContentsMargins(0,0,0,0)
+        layout = QtWidgets.QGridLayout(container_widget)
+        
+        container_widget.setUpdatesEnabled(False)
+        max_col = 4
 
         
         ranges = self._gate_data.updateRanges()
@@ -3931,23 +3987,31 @@ class GatedAxisWidget(QtWidgets.QWidget):
         if verbose: syslog.info(f"Reload range: found {len(ranges)} used ranges")
     
         index = 0
+        row = 1
+        col = 0
         decimals = self._gate_data.decimals
         for index, rng in enumerate(ranges):
             
-            rwi = RangeWidgetInfo(index + 1, 
+            widget = RangeWidgetInfo(index + 1, 
                                 rng,
                                 decimals,
                                 self._configure_range_cb,
-                                parent = self.container_range_widget
                                 )
             
-            #syslog.info(f"RWI: {rwi.rng.range_display_ex()}")
-            rwi.setVisible(rng.used)
             
-            self.container_range_layout.addWidget(rwi)
-            self._rwi_map[rng] = rwi
-            self._rwi_widgets_index_map[index] = rwi
+            layout.addWidget(widget, row, col, alignment=QtCore.Qt.AlignmentFlag.AlignLeft)
+            
+            self._rwi_map[rng] = widget
+            self._rwi_widgets_index_map[index] = widget
+            col += 1
+            if col >= max_col:
+                col = 0
+                row += 1
 
+        self.container_range_layout.addWidget(container_widget)
+        container_widget.setUpdatesEnabled(True)
+        
+        container_widget.update()
         self._update_range_display()
 
     def _update_range_display(self):
@@ -4198,6 +4262,8 @@ class GatedAxisWidget(QtWidgets.QWidget):
         else:
             dialog = ActionContainerUi(gate_data = self._gate_data, info_object = rng, action_data = self.action_data, input_type = InputType.JoystickAxis)
             dialog.exec()
+            gh = GateEventHandler()
+            gh.range_configuration_changed.emit(rng)
             
 
     @QtCore.Slot(int)
@@ -4725,7 +4791,7 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
 
         from gremlin.ui.joystick_device import InputConfigurationWidgetCache
         
-        super().__init__(self.__class__.__name__, parent)
+        super().__init__(self.__class__.__name__, parent = parent)
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
 
@@ -5177,11 +5243,15 @@ class GatedAxisRangeCondition(gremlin.actions.AbstractCondition):
         current_value = value.current
         range_info = self.range_info
 
-        syslog.info(f"Range: {range_info.to_display()} current value: {current_value:0.3f} last value: {self._last_value:0.3f}")
+        syslog.info(f"Range: {range_info.to_display()} current value: {current_value:0.3f}")
         try:
+            if range_info.mode == GateRangeOutputMode.FilterOut:
+                # fail the condition if the range should filter the event out
+                return False
             if range_info.hasContainers(GateConditionType.InRange):
                 if range_info.valueInRange(current_value):
                     # in range
+                    #event.value = range_info.filterEventValue(event.value)
                     return True
                     
             if range_info.hasContainers(GateConditionType.EnterRange):

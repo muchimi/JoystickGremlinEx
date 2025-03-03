@@ -49,7 +49,7 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
         :index: the gate number of the gated input - there will at least be two for low and high - index is an integer 
         '''
         
-        super().__init__(self.__class__.__name__, parent)
+        super().__init__(self.__class__.__name__, parent = parent)
 
         # make modal
         self.setWindowModality(QtCore.Qt.ApplicationModal)

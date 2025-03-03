@@ -2490,7 +2490,7 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
         :param identifier - the input item identifier 
         '''
         
-        super().__init__(self.__class__.__name__,parent)
+        super().__init__(self.__class__.__name__,parent = parent)
         # self._sequence = InputKeyboardModel(sequence=sequence)
         main_layout = QtWidgets.QVBoxLayout()
         self.setWindowTitle("OSC Input Mapper")

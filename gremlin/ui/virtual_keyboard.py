@@ -577,7 +577,7 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QRememberDialog):
         :param select_single - if set, only can select a single key
         :param allow_modifiers - if set - modifier keys along with regular keys are allowed
         '''
-        super().__init__(self.__class__.__name__,parent)
+        super().__init__(self.__class__.__name__,parent = parent)
         # self._sequence = InputKeyboardModel(sequence=sequence)
         main_layout = QtWidgets.QVBoxLayout()
         self.setWindowTitle("Keyboard & Mouse Input Mapper")

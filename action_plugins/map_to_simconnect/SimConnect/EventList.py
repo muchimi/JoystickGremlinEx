@@ -8,7 +8,7 @@ class Event(object):
 		if self.event is None:
 			self.event = self.sm.map_to_sim_event(self.deff)
 		if self.sm._dll:
-			syslog.info(f"Simcnnect: send {self.description} {value}")
+			# syslog.info(f"SIMCONNECT: send {self.description} {value:0.3f}")
 			self.sm.send_event(self.event, DWORD(int(value)))
 
 	def __init__(self, definition, sm, description=''):
