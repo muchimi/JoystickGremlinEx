@@ -1070,47 +1070,9 @@ class AbstractExecutionGraph(QtCore.QObject):
             if verbose_input: syslog.info(f"{logTabs}{str(event)}")
             
             if verbose_detailed: syslog.info (f"{logTabs}Execution plan:")
-            functor_names = []
-            functor_pass_list = []
-            # for index, functor in enumerate(self.functors):
-            #     functor_names.append(type(functor).__name__)
-            #     if verbose_detailed:
-            #         if hasattr(functor, "condition_name"):
-            #             condition_name = functor.condition_name()
-            #         else:
-            #             condition_name = ""
-            #         syslog.info(f"{logTabs}\t{index} -> {functor_names[index]} {condition_name}")
-            
-            #         # output the transition plan
-            #         syslog.info(f"{logTabs}Transition plan:")
-            #         for key, next_index in self.transitions.items():
-            #             syslog.info(f"{logTabs}\t{key} -> {next_index}")
-                
+            # functor_names = []
+            # functor_pass_list = []
 
-                
-            #     # if verbose_detailed: syslog.info (f"{logTabs}Execution start:")
-            #     # id = functor.id
-            #     # if id:
-            #     #     node = self.ec.getNode(id)
-            #     #     if node is None:
-            #     #         pass
-            #     #     if node is not None and node.nodeType == ExecutionGraphNodeType.Container:
-            #     #         nodes = self.ec.getNodeActivationConditions(id)
-            #     #         if nodes:
-            #     #             if verbose: syslog.info(f"{logTabs}\t\t\t found container condition")
-            #     #             if verbose_detailed:
-            #     #                 for n in nodes:
-            #     #                     syslog.info(f"node: {n.description}")
-            #     #             for condition_node in nodes:
-            #     #                 if condition_node.functor:
-            #     #                     functor = condition_node.functor
-            #     #                     result = functor(event, value)
-            #     #                     if not result:
-            #     #                         if verbose: syslog.info(f"{logTabs}\t\t\t FAIL condition on condition: {condition_node.description}")
-            #     #                         return False
-            #     #         if verbose: syslog.info("Container condition: PASS")
-
-                # container condition checks - first encountered condition fails the condition
                 
  
             # regular functors
@@ -1121,7 +1083,7 @@ class AbstractExecutionGraph(QtCore.QObject):
 
                 result = True
                 id = functor.id
-                verbose_id = True
+                verbose_id = False
 
                 if id in functor_map:
                     # cache hit
@@ -1170,33 +1132,6 @@ class AbstractExecutionGraph(QtCore.QObject):
                         if verbose_id: syslog.ifo(f"{logTabs}\t\t\t Found {node.description}")
                         pass
                     if verbose_id: syslog.info(f"{logTabs}\t\t\t Functor ID not found")
-
-
-                # if result:
-                #     if not functor in processed_functors:
-                #         processed_functors.append(functor)
-                #         if isinstance(functor, gremlin.actions.ActivationCondition):
-                #             # if functor in functor_pass_list:
-                #             #     continue # already tested
-                #             if verbose_id: syslog.info(f"{logTabs}\t\tIndex {index} -> executing condition {functor.condition_name()}")
-                #             result = functor.process_event(event, value)
-                #             if verbose_id: 
-                #                 syslog.info (f"{logTabs}\t\t\t{index} -> condition result: {result}")
-                #                 if result is None or not result:
-                #                     # condition is not met
-                #                     if verbose_detailed: syslog.info (f"{logTabs}\t\t\t{index} -> condition failed")
-                                    
-                                
-                #         else:
-                #             if verbose_id: syslog.info(f"{logTabs}\t\t{index} -> executing action {functor_names[index]}")
-                #             result = functor.process_event(event, value)
-                #             if verbose_id: syslog.info (f"{logTabs}\t\t\t{index} -> action result: {result}")
-                #             #if result is None or not result:
-                #                 #return False
-                #             #     syslog.warning(f"Process event returned no data or FALSE - functor: {type(functor).__name__}")
-
-                #             if isinstance(functor, gremlin.actions.AxisButton):
-                #                 process_again = functor.forced_activation
 
                 self.current_index = self.transitions.get((index, result),None)
                 if verbose_detailed: syslog.info (f"{logTabs}\t\tNext step: {(index, result)} -> {self.current_index}")
