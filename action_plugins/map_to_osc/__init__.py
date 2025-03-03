@@ -695,6 +695,7 @@ class MapToOscFunctor(gremlin.base_profile.AbstractFunctor):
         self.action_data = action
         self.config = action
         self.oscInterface = OscInterface()
+        self.osc_client = None
         
 
     def profile_start(self):

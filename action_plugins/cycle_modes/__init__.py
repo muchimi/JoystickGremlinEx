@@ -132,15 +132,16 @@ class CycleModesWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         # Add widgets which allow modifying the mode list
         self.mode_list_widget = gremlin.ui.ui_common.NoWheelComboBox()
-        self.add = QtWidgets.QPushButton(load_icon("list_add.svg"),  "Add") 
+        prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
+        self.add = QtWidgets.QPushButton(load_icon(f"{prefix}list_add.svg"),  "Add") 
         self.add.clicked.connect(self._add_cb)
-        self.delete = QtWidgets.QPushButton(load_icon("list_delete.svg"), "Delete")
+        self.delete = QtWidgets.QPushButton(load_icon(f"{prefix}list_delete.svg"), "Delete")
         
         self.delete.clicked.connect(self._remove_cb)
-        self.up = QtWidgets.QPushButton(load_icon("list_up.svg"), "Up")
+        self.up = QtWidgets.QPushButton(load_icon(f"{prefix}list_up.svg"), "Up")
         
         self.up.clicked.connect(self._up_cb)
-        self.down = QtWidgets.QPushButton(load_icon("list_down.svg"), "Down")
+        self.down = QtWidgets.QPushButton(load_icon(f"{prefix}list_down.svg"), "Down")
 
         self.down.clicked.connect(self._down_cb)
 
@@ -238,7 +239,7 @@ class CycleModesWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _remove_cb(self):
         """Removes the currently selected mode from the list of modes."""
         index = self.view.currentIndex().row()
-        self.mode.remove(index)
+        self.model.remove(index)
         self.save_changes()
 
 
