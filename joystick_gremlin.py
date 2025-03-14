@@ -122,9 +122,9 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 
 syslog = logging.getLogger("system")
 
-APPLICATION_NAME = "Joystick Gremlin Ex"
+APPLICATION_NAME = "Gremlin Ex"
 APPLICATION_BASE = "m73t16"
-APPLICATION_VERSION = f"0.16ex ({APPLICATION_BASE})"
+APPLICATION_VERSION = f"1.0ex ({APPLICATION_BASE})"
 
 
 # the main ui
@@ -1651,7 +1651,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         tracker = gremlin.ui.ui_common.StateTracker()
         tracker.clear()
         self.unregisterAllWidgets()
-        verbose = gremlin.config.Configuration().verbose
+        verbose = gremlin.config.Configuration().verbose_mode_ui
         gc.collect()
         if verbose: syslog.info("TABS TRACKER: clear()")
         
@@ -2373,7 +2373,7 @@ class GremlinUi(QtWidgets.QMainWindow):
         # update the UI widgets that listen to inputs to disable the ones not visible 
         device_guid, input_type, input_id = self.restore_input
         # syslog = logging.getLogger("system")
-        verbose = self.config.verbose
+        verbose = self.config.verbose_mode_details
         
         if device_guid is None:
             # no default selected, pick the first tab
@@ -2907,11 +2907,17 @@ class GremlinUi(QtWidgets.QMainWindow):
         # record the device change
         self._device_change_queue +=1
         #print (f"device change detected {self._device_change_queue}")
+        
 
         if not self.device_change_locked:
+
+            config = gremlin.config.Configuration()
+            verbose = config.verbose_mode_device
+            verbose_detailed = config.verbose_mode_details
+
             self.device_change_locked = True
             while self._device_change_queue > 0:
-                verbose = gremlin.config.Configuration().verbose_mode_device
+
                 try:
                     # syslog =syslog
                     if verbose:
@@ -2947,7 +2953,7 @@ class GremlinUi(QtWidgets.QMainWindow):
                     self.activate(restart)
                 finally:
 
-                    if verbose:
+                    if verbose_detailed:
                         syslog.info(f"Device change end")
                     self.device_change_locked = False
                 # mark items processed

@@ -890,18 +890,18 @@ class ExecutionContext():
                             #container.refresh_conditions() # refresh any conditions for this container
                             container_node = ExecutionGraphNode(ExecutionGraphNodeType.Container)
                             container_node.id = container.id
-                            
+                            container_node.parent = input_container_group # container node parents to its condition node
                             container_node.container = container
                             container_node.mode = mode.name
-                            condition_node = self._get_condition_node(container, container_node)
                             container_node.description = f"Container type: [{container.__class__.__name__}] ID: [{container.id}]"
 
-                            condition_node.parent = input_container_group  # condition for the container
-                            container_node.parent = condition_node # container node parents to its condition node
+                            # container condition
+                            condition_node = self._get_condition_node(container, container_node)
+                            condition_node.parent = container_node  # condition for container - appears after the container node as the entry point is the container
 
                             for action_set in container.action_sets:
                                 for action in action_set:
-                                    action_condition_node = self._get_condition_node(action, container_node)
+                                    action_condition_node = self._get_condition_node(action, condition_node)
 
                                     # action node
                                     action_node = ExecutionGraphNode(ExecutionGraphNodeType.Action)
@@ -942,10 +942,11 @@ class ExecutionContext():
                                                     gate_container_node.id = container.id
                                                     gate_container_node.container = container
                                                     gate_container_node.description = f"Gate container for gate: {gate_info.to_display()}: condition: [{condition_type.name}] {str(container)}"
+                                                    gate_container_node.parent = group_node # gate container is owned by the gate condition
 
-                                                    gate_activation_condition_node = self._get_condition_node(container, group_node)
+                                                    gate_activation_condition_node = self._get_condition_node(container, gate_activation_condition_node)
 
-                                                    gate_container_node.parent = gate_activation_condition_node # gate container is owned by the gate condition
+                                                    
                                                     
 
                                                     # build gate container subtree
@@ -1162,13 +1163,13 @@ class ExecutionContext():
         gremlin.shared_state.pushLog()
         logTabs = gremlin.shared_state.logTabs()
 
-        syslog.info(f"{logTabs}EXEC: node: [{node.id}] [{node.nodeType.name}] {node.description}")
+        if verbose_id: syslog.info(f"{logTabs}EXEC:[{node.id}] [{node.nodeType.name}] {node.description}")
         try:
             match node.nodeType:
                 case ExecutionGraphNodeType.Group:
                     for child in node.children:
                         result = self.execute_node(child, event, value, manual, extra_data)
-                        # dont care if result fails for groups
+                        # dont care if result fails for individual groups
                         pass
 
 
@@ -1176,13 +1177,13 @@ class ExecutionContext():
                     for child in node.children:
                         result = self.execute_node(child, event, value, manual, extra_data)
                         if result:
-                            # pass the whole group
+                            # pass the whole group on first group that doesn't fail
                             break
                 
                 case _:
                     # any other node - execute the functor list - first one that fails fails the complete branch to this point
-                    if node.nodeType == ExecutionGraphNodeType.GatedAxisCondition:
-                        pass
+                    # if node.nodeType == ExecutionGraphNodeType.GatedAxisCondition:
+                    #     pass
                     functor_list = [] if node.functors is None else (node.functors if  isinstance(node.functors, list) else [node.functors])
                     for functor in functor_list:
                         result = self.process_functor(functor, event, value, manual, extra_data)
@@ -1194,7 +1195,7 @@ class ExecutionContext():
                                 condition_name = functor.condition_name()
                                 syslog.info(f"{logTabs}>Executed condition {condition_name} result: {'PASS' if result else 'FAIL'}")
                             else:
-                                syslog.info(f"{logTabs}>Executed action {functor.__class__.__name__} result: {'PASS' if result else 'FAIL'}")
+                                syslog.info(f"{logTabs}> !!! Executed action {functor.__class__.__name__} result: {'PASS' if result else 'FAIL'}")
                         if not result:
                             break
 
@@ -1211,7 +1212,7 @@ class ExecutionContext():
             return result
         
         finally:
-            syslog.info(f"{logTabs}>Overall Result: {'PASS' if result else 'FAIL'}")
+            if verbose_id: syslog.info(f"{logTabs}>Overall Result: {'PASS' if result else 'FAIL'}")
             gremlin.shared_state.popLog()
 
     
@@ -1293,9 +1294,7 @@ class ContainerCallback:
 
         if event == InputType.VirtualButton:
             # TODO: remove this at a future stage
-            syslog.error(
-                "Virtual button code path being used"
-            )
+            syslog.error("Virtual button code path being used")
         else:
             self.execution_graph.process_event(event, shared_value)
 
@@ -1321,7 +1320,8 @@ class VirtualButtonCallback:
 
         event.is_virtual_button = True # tell the functors this is a virtual button
         event.is_axis = False
-        print (f"Send virtual button {event.is_pressed} ---------------------------------------------------------------------------")
+        verbose = gremlin.config.Configuration().verbose_mode_execution
+        if verbose: syslog.info (f"Send virtual button {event.is_pressed} ---------------------------------------------------------------------------")
         return self._execution_graph.process_event(event,value)
 
 

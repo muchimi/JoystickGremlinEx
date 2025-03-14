@@ -72,7 +72,7 @@ exe = EXE(
     pyz,
     a.scripts,
     exclude_binaries=True,
-    name="joystick_gremlin",
+    name="gremlinEx",
     debug=False,
     strip=None,
     upx=True,
@@ -87,5 +87,5 @@ coll = COLLECT(
     a.datas,
     strip=None,
     upx=True,
-    name="joystick_gremlin"
+    name="gremlinEx"
 )

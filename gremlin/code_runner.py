@@ -531,6 +531,7 @@ class CodeRunner:
                                 
 
             # tell GremlinEx the profile started
+            el.profile_start.emit()
             el.profile_started.emit()
 
 

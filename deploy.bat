@@ -1,22 +1,24 @@
-@echo "Starting to build Gremlin ..."
+@echo "Starting to build Gremlin Ex..."
 cd /d %0\..
 cd dist
-if exist joystick_gremlin\ (
- rmdir joystick_gremlin\ /q /s
+if exist gremlinEx\ (
+ rmdir gremlinEx\ /q /s
 ) 
-md joystick_gremlin
+md gremlinEx
 
 cd ..
 
 @echo "Building executable ..."
-c:\python\python313\python -m PyInstaller -y --log-level INFO --clean joystick_gremlin.spec
+c:\python\python313\python -m PyInstaller -y --log-level INFO --clean gremlinEx.spec
 cd dist
 
 
 
 if exist joystick_gremlin.zip del joystick_gremlin.zip
-cd joystick_gremlin
+if exist gremlinEx.zip del gremlinEx.zip
+cd gremlinEx
 
-"C:\Program Files\7-Zip\7z" a -r ../joystick_gremlin.zip *
+
+"C:\Program Files\7-Zip\7z" a -r ../gremlinEx.zip *
 cd ..\..
 pause

@@ -646,7 +646,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self.container_axis_layout = QtWidgets.QGridLayout(self.container_axis_widget)
         self.container_axis_layout.setColumnStretch(8,1)
-        self.container_axis_layout.setContentsMargins(0,0,0,0)
+        #self.container_axis_layout.setContentsMargins(0,0,0,0)
 
         self.reverse_checkbox = QtWidgets.QCheckBox("Reverse")
 
@@ -712,8 +712,12 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         row = 0
         col+=1
-        self.container_axis_layout.addWidget(QtWidgets.QLabel("Start Value:"),row,col,1,3)
 
+        self._axis_start_value_enabled_widget = QtWidgets.QCheckBox("Start Value:")
+        self._axis_start_value_enabled_widget.setChecked(self.action_data.axis_start_value_enabled)
+        self._axis_start_value_enabled_widget.clicked.connect(self._axis_start_value_enabled)
+        self._axis_start_value_enabled_widget.setToolTip("When set, sets the axis to the specified startup value on profile start.\nIf not set, uses the current axis input value on start.")
+        self.container_axis_layout.addWidget(self._axis_start_value_enabled_widget,row,col,1,3)
         row+=1
 
 
@@ -723,7 +727,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.sb_start_value.setMinimum(-1.0)
         self.sb_start_value.setMaximum(1.0)
         self.sb_start_value.setDecimals(3)
-
+    
         self.container_axis_layout.addWidget(self.sb_start_value,row,col,1,3)
 
         row+=1
@@ -734,6 +738,8 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.container_axis_layout.addWidget(self.b_max_value,row,col)
 
         row = 0
+        col+=1
+        self.container_axis_layout.addWidget(QtWidgets.QLabel(" "),row,col)
         col+=1
         self.container_axis_layout.addWidget(QtWidgets.QLabel("Axis"),row,col)
         row+=1
@@ -746,6 +752,8 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.container_axis_layout.addWidget(self.relative_scaling_widget,row,col)
 
         row = 0
+        col+=1
+        self.container_axis_layout.addWidget(QtWidgets.QLabel(" "),row,col)
         col+=1
         self.container_axis_layout.addWidget(QtWidgets.QLabel("Axis Output Range:"),row,col,1,2)
         row+=1
@@ -769,6 +777,11 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.sb_axis_range_high_widget.setDecimals(3)
 
         self.container_axis_layout.addWidget(self.sb_axis_range_high_widget,row,col)
+
+        row = 0
+        col+=1
+        self.container_axis_layout.addWidget(QtWidgets.QLabel(" "),row,col)
+        self.container_axis_layout.setColumnStretch(col,2)
 
         self.main_layout.addWidget(self.container_axis_widget)
         self.main_layout.addWidget(self.container_repeater_widget)
@@ -1122,16 +1135,17 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
                 # filter and merge the data
                 filtered_value = self.action_data.get_filtered_axis_value(raw_value)
                 value = filtered_value
+
             if self.action_data.curve_data is not None:
                 # curve the data
-                curved_value = self.action_data.curve_data.curve_value(value)
+                value = self.action_data.curve_data.curve_value(value)
                 self._axis_repeater_widget.show_curved = True
-                self._axis_repeater_widget.setValue(value, curved_value)
-                # print (f"merge value + curve: {value}")
             else:
                 self._axis_repeater_widget.show_curved = False
-                self._axis_repeater_widget.setValue(value)
-                # print (f"merge value: {value}")
+
+            value = self.action_data.get_ranged_axis_value(value)
+
+            self._axis_repeater_widget.setValue(value)
 
             # update the curved window if displayed
             if self.curve_update_handler is not None:
@@ -2167,7 +2181,7 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
         action = action_data.action_mode
         input_type = action_data.input_type
 
-
+        start_value_enabled = action_data.axis_start_value_enabled
         axis_visible = False
         pulse_visible = False
         start_visible = False
@@ -2282,6 +2296,8 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self.cb_vjoy_input_selector.setVisible(input_selector_visible)
         self.lbl_vjoy_input_selector.setVisible(input_selector_visible)
+
+        self.sb_start_value.setEnabled(start_value_enabled)
 
     def _action_mode_changed(self, index):
         ''' called when the drop down value changes '''
@@ -2652,6 +2668,12 @@ class VJoyWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _axis_range_low_changed(self):
         self.action_data.range_low = self.sb_axis_range_low_widget.value()
 
+    @QtCore.Slot(bool)
+    def _axis_start_value_enabled(self, checked):
+        self.action_data.axis_start_value_enabled = checked
+        self._update_ui()
+
+
     @QtCore.Slot()
     def _axis_range_high_changed(self):
         self.action_data.range_high = self.sb_axis_range_high_widget.value()
@@ -2780,8 +2802,13 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         self.target_value = action_data.target_value
         self.target_is_relative = action_data.target_is_relative
         self.target_value_valid = action_data.target_value_valid
-        self.range_low = action_data.range_low
-        self.range_high = action_data.range_high
+        v1 = action_data.range_low
+        v2 = action_data.range_high
+        if v1 > v2:
+                # swap range so v1 < v2
+                v1,v2 = v2, v1
+        self.range_low = v1
+        self.range_high = v2
 
 
         self.exec_on_release = action_data.exec_on_release
@@ -2949,8 +2976,19 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
             match self.action_mode:
                 case VjoyAction.VJoyAxis:
-                    joystick_handling.VJoyProxy()[self.vjoy_device_id].axis(self.vjoy_input_id).value = self.axis_start_value
-                    self.remote_client.send_axis(self.vjoy_device_id, self.vjoy_input_id, self.axis_start_value)
+                    # straight axis
+                    if self.action_data.axis_start_value_enabled:
+                        value = self.axis_start_value
+                    else:
+                        # read the current value
+                        fake_event = gremlin.event_handler.Event(self.hardware_input_type, self.hardware_input_id, device_guid = self.hardware_device_guid,value = 0,is_axis = True)
+                        action_value = gremlin.actions.Value(0)
+                        curves = self.getCurveData(fake_event, action_value)
+                        value = self.action_data.get_filtered_axis_value(curves = curves)
+                        value = self.action_data.get_ranged_axis_value(value)
+
+                    joystick_handling.VJoyProxy()[self.vjoy_device_id].axis(self.vjoy_input_id).value = value
+                    self.remote_client.send_axis(self.vjoy_device_id, self.vjoy_input_id, value)
 
                 case VjoyAction.VJoyAxisToButton:
                     device_guid = self.action_data.hardware_device_guid
@@ -3048,6 +3086,8 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
                 value = self.action_data.get_filtered_axis_value(curves = curves)
 
+                value = self.action_data.get_ranged_axis_value(value)
+
                 # # syslog = logging.getLogger("system")
                 # syslog.info(f"VjoyRemap: raw {raw_value:0.3f} received: {received:0.3f}  computed: {value:0.3f}  ")
 
@@ -3075,14 +3115,14 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         if event.is_axis: # self.input_type == InputType.JoystickAxis:
             # axis response mode
 
-            target = action_value.current
+            value = action_value.current
 
             # axis mode
             match self.action_mode:
                 case VjoyAction.VJoyAxisToButton:
-                    r_min = self.range_low
-                    r_max = self.range_high
-                    if action_value.current >= r_min and action_value.current <= r_max:
+                    v1 = self.range_low
+                    v2 = self.range_high
+                    if action_value.current >= v1 and action_value.current <= v2:
                         if not self.in_range:
                             # axis in range
                             self.in_range = True
@@ -3105,19 +3145,18 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                 case _:
                     if self.axis_mode == "absolute":
                         # apply any range function to the raw position
-                        r_min, r_max = usage_data.get_range(self.vjoy_device_id, self.vjoy_input_id)
-                        if self.reverse:
-                            target = -target
 
-                        value = r_min + (target + 1.0)*((r_max - r_min)/2.0)
+
+                        if verbose: syslog.info(f"OUTPUT: send vjoy {self.vjoy_device_id} axis {self.vjoy_input_id} range: [{self.range_low:0.3f},{self.range_high:0.3f}] scale: {self.axis_scaling:0.3f} value: {value:0.3f}")
 
                         if is_local:
                             joystick_handling.VJoyProxy()[self.vjoy_device_id].axis(self.vjoy_input_id).value = value
-                            #syslog.info(f"send vjoy {self.vjoy_device_id} axis {self.vjoy_input_id} {value}")
+                        
+                        
                         if is_remote:
                             self.remote_client.send_axis(self.vjoy_device_id, self.vjoy_input_id, value)
                     else:
-                        value = -target if self.reverse else target
+                        #value = -target if self.reverse else target
                         self.should_stop_thread = abs(event.value) < 0.05
                         self.axis_delta_value = value * (self.axis_scaling / 1000.0)
 
@@ -3426,7 +3465,8 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         self._reverse : bool = False
         self.axis_mode = "absolute"
         self.axis_scaling : float  = 1.0
-        self.axis_start_value : float = 0.0
+        self.axis_start_value : float = 0 # start value
+        self.axis_start_value_enabled = False
         self.curve_data = None # present if curve data is needed
 
         config = gremlin.config.Configuration()
@@ -3483,7 +3523,9 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
 
         self.vjoy_map = {}  # list of vjoy devices by their vjoy index ID
         self.refresh_vjoy()
-
+       
+    
+    
     def refresh_vjoy(self):
         ''' updates vjoy devices device map  '''
         self.vjoy_map = {} # holds the map of devices keyed by VJOYID
@@ -3504,8 +3546,7 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
         if value is None:
 
             if self.input_is_hardware():
-                value = gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid,
-                                                        self.hardware_input_id)
+                value = gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, self.hardware_input_id)
             else:
                 value = self.hardware_input_id.axis_value
                 # print (value)
@@ -3575,6 +3616,19 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
                                                 target_min=self.output_range_min,
                                                 target_max=self.output_range_max,
                                                 invert = self.merge_invert)
+
+        return value
+    
+    def get_ranged_axis_value(self, value : float) -> float:
+        ''' get scaled and ranged and inverted axis value'''
+        v1 = self.range_low
+        v2 = self.range_high
+        s = self.axis_scaling
+        inverted = self.reverse
+        if v1 != -1.0 or v2 != 1.0 or s != 1.0:
+            value = gremlin.util.scale_to_range(value*s,target_min=v1,target_max=v2, invert=inverted)        
+        elif inverted:
+            value = gremlin.util.scale_to_range(value, invert=True)
         return value
 
     @property
@@ -3712,8 +3766,9 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
     @property
     def reverse(self):
         # axis reversed state
-        usage_data = gremlin.joystick_handling.VJoyUsageState()
-        return usage_data.is_inverted(self.vjoy_device_id, self.vjoy_axis_id) or self._reverse
+        return self._reverse
+        # usage_data = gremlin.joystick_handling.VJoyUsageState()
+        # return usage_data.is_inverted(self.vjoy_device_id, self.vjoy_axis_id) or self._reverse
 
     @reverse.setter
     def reverse(self,value):
@@ -3889,7 +3944,6 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
             if "reverse" in node.attrib:
                 self.reverse = safe_read(node,"reverse",bool,False)
 
-
             if "axis-type" in node.attrib:
                 self.axis_mode = safe_read(node, "axis-type", str, "absolute")
             if "axis-scaling" in node.attrib:
@@ -3916,6 +3970,10 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
 
             if "axis_start_value" in node.attrib:
                 self.axis_start_value = safe_read(node,"axis_start_value", float, -1.0)
+
+            if "axis_start_value_enabled" in node.attrib:
+                self.axis_start_value_enabled = safe_read(node,"axis_start_value_enabled", bool, False)
+            
 
             if "exec_on_release" in node.attrib:
                 self.exec_on_release = safe_read(node,"exec_on_release",bool, False)
@@ -4039,6 +4097,7 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
                 node.set("axis-type", safe_format(self.axis_mode, str))
                 node.set("axis-scaling", safe_format(self.axis_scaling, float))
                 node.set("axis_start_value", safe_format(self.axis_start_value, float))
+                node.set("axis_start_value_enabled", safe_format(self.axis_start_value_enabled, bool))
                 node.set("range_low", safe_format(self.range_low, float))
                 node.set("range_high", safe_format(self.range_high, float))
                 reverse = safe_format(self.reverse_configured, bool)

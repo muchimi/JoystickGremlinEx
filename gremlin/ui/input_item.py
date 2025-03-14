@@ -846,6 +846,7 @@ class ActionSetView(ui_common.AbstractView):
         self.profile_data = profile_data
         self.allowed_interactions = profile_data.interaction_types
         self.label = label
+        self._selected = False # true if the object is selected
 
         # Create a group box widget in which everything else will be placed
         self.group_widget = QtWidgets.QGroupBox(self.label)
@@ -879,6 +880,19 @@ class ActionSetView(ui_common.AbstractView):
 
         # holds the widgets created in this action set
         self._widgets = []
+
+    def setSelected(self, value:bool):
+        ''' sets selected state'''
+        if value and not self._selected:
+            self._selected = True
+            background_color = gremlin.ui.ui_common.Color.selectedDockTabBackgroundColor()
+            self.setStyleSheet = f"background: {background_color};"
+        elif not value and not self._selected:
+            self._selected = False
+            self.setStyleSheet("")
+            
+        
+            
 
     def redraw(self):
 
@@ -2203,7 +2217,10 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         # Create tab widget to display various UI controls in
         self.dock_tabs =  gremlin.ui.ui_common.QDataTab()
         background_color = gremlin.ui.ui_common.Color.selectedDockTabBackgroundColor()
+        self.setStyleSheet = f"QDockWidget: {{ background-color: {background_color}; }}"
+
         self.dock_tabs.setStyleSheet(f"QTabBar::tab:selected {{ background-color: {background_color}; }}")
+        
         self.dock_tabs.setTabPosition(QtWidgets.QTabWidget.East)
         self.setWidget(self.dock_tabs)
         self.dock_tabs.data = self.container # associated the data tab with the container
@@ -2412,6 +2429,8 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
         self._update_counts()
 
+        self._update_selected(self.dock_tabs.currentIndex())
+
     
     def _update_counts(self):
         ''' refreshes counts '''   
@@ -2456,23 +2475,33 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
         except gremlin.error.GremlinError:
             return
+        
+    def _update_selected(self, index):
+        ''' selection state for the tab page'''
+        widget : ActionSetView
+        for i, widget in enumerate(self.action_widgets):
+            widget.setSelected(i == index)
 
     def _tab_changed(self, index):
         ''' called when a device tab is selected '''
-        verbose = gremlin.config.Configuration().verbose
+        config = gremlin.config.Configuration()
+        verbose = config.verbose_mode_device
+        verbose_detailed = config.verbose_mode_details
         try:
-            if verbose:
-                   syslog.info(f"Device change begin")
+            if verbose: syslog.info(f"Device change begin")
             tab_text = self.dock_tabs.tabText(index)
             self.profile_data.current_view_type = ui_common.ContainerViewTypes.to_enum(tab_text.lower())
-            
+            self._update_selected(index)
+        
 
 
         except gremlin.error.GremlinError:
             return
         finally:
-            if verbose:
-                   syslog.info(f"Device change end")
+            if verbose_detailed:
+                syslog.info(f"Device change end")
+
+    
 
     def _get_widget_index(self, widget):
         """Returns the index of the provided widget.

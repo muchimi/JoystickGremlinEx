@@ -209,17 +209,23 @@ Joystick Gremlin EX
 
 
 <!-- TOC --><a name="134016ex-pre-release"></a>
-## 0.16ex (pre-release)
+## 1.0ex (pre-release)
 
 ### (m73)
-- New graph based execution logic:
+- Due to significant core changes, changed versioning scheme to drop original Gremlin version and restart at 1.0 as this is now a different product.  
+- EXE: name change to GremlinEx to distinguish it from the original gremlin (note, HIDHide update needed to add the EXE)
+- New graph based execution logic (WIP)
 	+ Graph structure represents complete profile
 	+ Graph nodes include conditions and actions
 	+ Execution can start at any node
-	+ Support for ANY and ALL and GROUP (multi containers)
+	+ Shortcut evaluation with PASS/FAIL nodes during execution
+	+ Graph nodes support group/any/all evaluations
 - Improved handling of profile start errors (inability to connect for example)
 - Added notes field for all containers
-- Changed version number from base Gremlin to reflect the product is now significantly different to 0.16ex
+- Changed version number from base Gremlin to reflect the product is now significantly different to 16ex
+- VjoyRemap: startup axis value optional, will read raw hardware on start if not set.  
+- VjoyRemap: range and scale correctly applied to output
+- Theme color fixes for UI components
 
 ## 13.40.16ex (pre-release)
 ### (m72)

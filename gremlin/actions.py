@@ -359,8 +359,11 @@ class JoystickCondition(AbstractCondition):
             is_pressed = gremlin.joystick_handling.get_button(self.device_guid, self.input_id)
             if self.comparison == "pressed":
                 retval = is_pressed
-            else: # released
+            elif self.comparison == "released":
                 retval = not is_pressed
+            else:
+                syslog.error(f"Don't know how to handle joystick condition: {self.comparison}")
+                return False
             if verbose: syslog.info(f"{logtabs}JoystickCondition: Button {self.comparison}: device {info.name} input: {self.input_id} pressed: {is_pressed} return: {"OK" if retval else "FAILED"}")
             return retval
             

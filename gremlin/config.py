@@ -1084,6 +1084,13 @@ class Configuration:
         ''' true if verbose mode is in keyboard mode '''
         return self.verbose and VerboseMode.Keyboard in self.verbose_mode
     
+
+    @property
+    def verbose_mode_ui(self):
+        ''' true if verbose mode is in UI mode '''
+        return self.verbose and VerboseMode.UI in self.verbose_mode
+        
+    
     @property
     def verbose_mode_joystick(self):
         ''' true if verbose mode is in joystick mode '''

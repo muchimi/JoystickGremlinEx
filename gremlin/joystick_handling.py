@@ -270,7 +270,7 @@ def registerSpecialDevice(dev : DeviceSummary):
     if not device_id in _joystick_device_guid_map:
         _joystick_device_guid_map[device_guid] = dev
         _joystick_device_guid_map[device_id] = dev
-        verbose = gremlin.config.Configuration().verbose
+        verbose = gremlin.config.Configuration().verbose_mode_details
         if verbose:
             syslog.info("SYSTEM: register special device")
             syslog.info(f"\t{dev.device_id} -> {dev.name}")

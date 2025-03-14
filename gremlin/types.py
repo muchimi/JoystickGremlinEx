@@ -920,8 +920,9 @@ class VerboseMode(IntFlag):
     Macro = auto() # macro 
     Gate = auto() # auto
     Outputs = auto() # list outputs
+    UI = auto() # UI mode
     
-    All = Keyboard | Joystick | Inputs | Mouse | Details | SimConnect | Condition | Process | Exec | Midi | Device | Macro | Gate | Outputs
+    All = Keyboard | Joystick | Inputs | Mouse | Details | SimConnect | Condition | Process | Exec | Midi | Device | Macro | Gate | Outputs | UI
 
     def __contains__(self, item):
         return  (self.value & item.value) == item.value

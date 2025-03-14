@@ -213,7 +213,9 @@ class Color():
             QMenu::separator {{
                 border: {border_color};
             }}
-  
+            QLineEdit {{
+                border: 1px solid {border_color};
+            }}
             
             '''
         # print (css)
@@ -368,7 +370,7 @@ class WidgetTracker():
                 widget._cleanup_ui()
             widget.setParent(None)
         self._widget_cache = {}
-        verbose = gremlin.config.Configuration().verbose
+        verbose = gremlin.config.Configuration().verbose_mode_ui
         if verbose: syslog.info("TRACKER: clear()")
         
 
@@ -411,7 +413,7 @@ class DeviceWidgetTracker():
 
     def clear(self):
         self._widget_cache = {}
-        verbose = gremlin.config.Configuration().verbose
+        verbose = gremlin.config.Configuration().verbose_mode_ui
         if verbose: syslog.info("DEVICE WIDGET TRACKER: clear()")
 
     def getWidget(self, device_guid, mode, input_type, input_id, key):
@@ -6124,6 +6126,7 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
                  is_range = True, 
                  show_mode_change = False, 
                  show_inverted = True, 
+                 show_command = True,
                  inverted = False,
                  parent = None):
         '''

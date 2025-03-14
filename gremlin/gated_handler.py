@@ -319,6 +319,12 @@ class GateInfo():
         eh = gremlin.event_handler.EventListener()
         eh.mapping_changed.connect(self._item_data_changed)
 
+        self.autorelease_map = {
+            GateConditionType.OnCross: True,
+            GateConditionType.OnCrossDecrease: True,
+            GateConditionType.OnCrossIncrease: True,
+        }
+
     def to_xml(self):
         ''' generates an xml node from the gate data '''
         node = ElementTree.Element("gate-info")
@@ -566,6 +572,15 @@ class RangeInfo():
         self._last_condition = GateConditionType.InRange
         self.item_data_map = {}
         self.delay = 250 # default delay
+
+        # autorelease map for modes that support autorelease (non-linear modes), key = GateConditionType, value = boolean, true for autorelease
+        self.autorelease_map = {
+            GateConditionType.EnterRange: True,
+            GateConditionType.ExitRange: True,
+            GateConditionType.InRange: False,
+            GateConditionType.OutsideRange: False
+        }
+        
 
         assert id is not None, "ID must be provided"
         assert min_gate is not None,"Min gate must be provided "
@@ -1463,8 +1478,8 @@ class GateData():
         
         if triggers:
             value = gremlin.actions.Value(event.value)
-            button_event = event.clone()
-            button_event.fake_button()
+            button_press_event = event.clone()
+            button_press_event.fake_button()
             button_action_value = gremlin.actions.Value(input_value, True)
             button_action_value.current = True
             range_event = event.clone()
@@ -1523,70 +1538,37 @@ class GateData():
                     
 
                 if not gremlin.shared_state.is_running:
+                    # non-runtime trigger updates for the UI
                     self._fire_trigger_callbacks(trigger)
-                    
-
-                # if verbose and self.filter_map[trigger.mode]:
-                #     syslog.info(f"Trigger: {str(trigger)}  input: {input_value:0.{_decimals}f} value: {value.current:0.{_decimals}f}")
-
                 else:
-                    # running
-                    # container: gremlin.base_profile.AbstractContainer
-                    # condition = trigger.condition
-                    # callbacks = []
-                    syslog.info(f"GATED AXIS TRIGGER: {trigger.mode.name}")
+                    # profile is running - trigger the execution node for the containers
+                    # the extra data contains the trigger condition type so the correct execution path is taken
+                    if verbose: syslog.info(f"GATED AXIS TRIGGER: {trigger.mode.name}")
                     if trigger.is_range:
+                        # linear range trigger event for in-range or outside-range
                         action_value = gremlin.actions.Value(input_value)
                         self._ec.execute_functor_id(self._action_data.id, range_event, action_value, True, trigger.condition)
-                        # if trigger.range in self._callbacks:
-                            
-                        #     callback_map = self._callbacks[trigger.range]
-                        #     if condition in callback_map:
-                        #         callbacks = callback_map[condition]
                     else:
                         # non range trigger (gate crossing or range enter/exit)
-
                         # use a fake button for momentary event
-                        self._ec.execute_functor_id(self._action_data.id, button_event, button_action_value, True, trigger.condition)
-                        
-                        # if trigger.gate in self._callbacks:
-                        #     callback_map = self._callbacks[trigger.gate]
-                        #     if condition in callback_map:
-                        #         callbacks = callback_map[condition]
-                        
-                    # process container execution graphs
-                    # if verbose and callbacks:
-                    #     syslog.info(f"Exec Trigger: executing {len(callbacks)} callbacks")
-
-                    # ec = gremlin.execution_graph.ExecutionContext()
-
-                    # for cb in callbacks:
-                    #     if not hasattr(cb.callback,"execution_graph"):
-                    #         # skip items that do not implement execution graph functors
-                    #         cb.callback(event, value)
-                    #     else:
-                    #         functors = cb.callback.execution_graph.functors
-                    #         for functor in functors:
-                    #             if functor.enabled:
-                    #                 if short_press:
-                    #                     thread = threading.Thread(target=lambda: self._short_press(functor, event, value, delay), daemon=True)
-                    #                     thread.start()
-                    #                 else:
-                    #                     # not a momentary trigger
-                    #                     #print (f"trigger mode: {trigger.mode} sending event value: {value.current}")
-                    #                     result = functor.process_event(event, value)
-                    #                     if not result:
-                    #                         break
-                
-                                    
-                    # # process user provided functor callback if set (this is used by actions that must act on the modified output of the gated axis rather than the raw hardware input - example: simconnect action)
-                    # if self._process_callback is not None:
-                    #     if short_press:
-                    #         thread = threading.Thread(target=lambda: self._short_press(self._process_callback, event, value, delay), daemon=True)
-                    #         thread.start()
-                    #     else:
-                    #         self._process_callback(event, value)
-
+                        self._ec.execute_functor_id(self._action_data.id, button_press_event, button_action_value, True, trigger.condition)
+                        autorelease = False
+                        if trigger.condition in (GateConditionType.OnCross, GateConditionType.OnCrossDecrease, GateConditionType.OnCrossIncrease):
+                            # gate condition
+                            autorelease = trigger.gate.autorelease_map[trigger.condition]
+                        elif trigger.condition in (GateConditionType.EnterRange, GateConditionType.ExitRange):
+                            # range condition
+                            autorelease = trigger.range.autorelease_map[trigger.condition]
+                        if autorelease:
+                            # handle autorelease based on trigger delay
+                            if verbose: syslog.info(f"GATED AXIS AUTORELEASE TRIGGER: {trigger.mode.name}")
+                            button_release_event = button_press_event.clone()
+                            button_release_event.is_pressed = False
+                            button_release_value = gremlin.actions.Value(input_value, False)
+                            delay = trigger.delay/1000 # delay in seconds
+                            timer = threading.Timer(delay, lambda : self._ec.execute_functor_id(self._action_data.id, button_release_event, button_release_value, True, trigger.condition))
+                            timer.start()
+                    
             
         # if verbose:
         #     syslog.info("Trigger: end")
@@ -3266,7 +3248,7 @@ class GateWidgetInfo(gremlin.ui.ui_common.QDataWidget):
         label_width = gremlin.shared_state.char_width * 2
 
         self.label_widget = QtWidgets.QLabel(f"Gate {gate.slider_index + 1}:") # the slider index is the ordered gate number
-        self.label_widget.setMaximumWidth(label_width)
+        #self.label_widget.setMaximumWidth(label_width)
 
         self.label_warning = QtWidgets.QLabel(" ")
         self.label_warning.setMaximumWidth(20)
@@ -3975,6 +3957,9 @@ class GatedAxisWidget(QtWidgets.QWidget):
                 col = 0
                 row += 1
         
+        layout.addWidget(QtWidgets.QLabel(" "),0,max_col)
+        layout.setColumnStretch(max_col, 2)
+
         container_widget.setUpdatesEnabled(True)
         self.container_gate_layout.addWidget(container_widget)
         container_widget.update()
@@ -4031,6 +4016,9 @@ class GatedAxisWidget(QtWidgets.QWidget):
             if col >= max_col:
                 col = 0
                 row += 1
+
+        layout.addWidget(QtWidgets.QLabel(" "),0,max_col)
+        layout.setColumnStretch(max_col,2)
 
         self.container_range_layout.addWidget(container_widget)
         container_widget.setUpdatesEnabled(True)
@@ -4820,7 +4808,7 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
         self.main_layout = QtWidgets.QVBoxLayout(self)
 
         self._range_info : RangeInfo = None
-        self._gate : GateInfo = None
+        self._gate_info : GateInfo = None
         is_range = isinstance(info_object, RangeInfo)
         self._gate_data : GateData = gate_data
         self._is_range = is_range
@@ -4838,6 +4826,7 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
         
         self.trigger_container_widget = QtWidgets.QWidget()
         self.trigger_condition_layout = QtWidgets.QHBoxLayout(self.trigger_container_widget)
+        
 
         # the tab container contains all possible trigger modes for the range or gate as a tab
         # each tab contains the mappings and options for that trigger condition
@@ -4869,6 +4858,7 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
             self.slider.setMinimumHeight(48)
             self.slider.setRange(-1,1)
             self.slider_frame_layout.addWidget(self.slider)
+
 
             self._gate_data.registerTriggerCallback(self._trigger_handler)
             self._gate_data.registerValueChangedCallback(self._input_value_changed_handler)
@@ -4957,15 +4947,15 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
 
         else:
             # gate configuration
-            self._gate = info_object
-            self.trigger_condition_layout.addWidget(QtWidgets.QLabel(f"Gate {self._gate.slider_index + 1} Configuration:"))
+            self._gate_info = info_object
+            self.trigger_condition_layout.addWidget(QtWidgets.QLabel(f"Gate {self._gate_info.slider_index + 1} Configuration:"))
 
             
         # delay
         self.delay_widget = gremlin.ui.ui_common.QIntLineEdit()
         self.delay_widget.setRange(0,5000)
-        if self._gate:
-            self.delay_widget.setValue(self._gate.delay)
+        if self._gate_info:
+            self.delay_widget.setValue(self._gate_info.delay)
         else:
             self.delay_widget.setValue(self._range_info.delay)
 
@@ -5008,7 +4998,7 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
 
         self._cache.clear() # release cache objects
         self._range_info = None
-        self._gate = None
+        self._gate_info = None
 
     def _current_input_axis(self):
         ''' gets the current input axis value '''
@@ -5050,8 +5040,8 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
     QtCore.Slot()
     def _delay_changed_cb(self):
         ''' delay value changed for gates or ranges '''
-        if self._gate:
-            self._gate.delay = self.delay_widget.value()
+        if self._gate_info:
+            self._gate_info.delay = self.delay_widget.value()
         elif self._range_info:
             self._range_info.delay = self.delay_widget.value()
 
@@ -5123,7 +5113,7 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
         if self._range_info:
             self._range_info.setLastCondition(condition)
         else:
-            self._gate.setLastCondition(condition)
+            self._gate_info.setLastCondition(condition)
 
 
 
@@ -5164,6 +5154,24 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
                 self._condition_tab.addTab(condition_container_widget, f"Condition: {GateConditionType.to_display_name(condition)}")
                 description_widget = QtWidgets.QLabel(GateConditionType.to_description(condition))
                 condition_container_layout.addWidget(description_widget)
+                
+                
+        
+                if self._is_range: # range action
+                    if condition not in (GateConditionType.InRange, GateConditionType.OutsideRange):
+                        autorelease_widget = gremlin.ui.ui_common.QDataCheckbox("Autorelease")
+                        autorelease_widget.setChecked(self._range_info.autorelease_map[condition])
+                        autorelease_widget.data = (self._range_info, condition)
+                        condition_container_layout.addWidget(autorelease_widget)
+                        autorelease_widget.clicked.connect(self._autorelease_changed)
+                else:
+                    autorelease_widget = gremlin.ui.ui_common.QDataCheckbox("Autorelease")
+                    autorelease_widget.setChecked(self._gate_info.autorelease_map[condition])
+                    autorelease_widget.data = (self._gate_info, condition)
+                    condition_container_layout.addWidget(autorelease_widget)
+                    autorelease_widget.clicked.connect(self._autorelease_changed)
+                    
+                
 
                 # all conditions are button type conditions except the in-range which is an axis
                 input_type = InputType.JoystickButton 
@@ -5173,7 +5181,7 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
                     condition_container_layout.addWidget(self.container_range_data_widget)
                     input_type = InputType.JoystickAxis
 
-                item_data = self._range_info.itemData(condition) if self._is_range else self._gate.itemData(condition)
+                item_data = self._range_info.itemData(condition) if self._is_range else self._gate_info.itemData(condition)
                 container_widget = self._cache.retrieve_by_data(item_data)        
                 if not container_widget:
                     # create the container, cache it
@@ -5183,11 +5191,18 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
                 
 
             # pick the last used condition
-            condition = self._range_info.condition if self._is_range else self._gate.condition
+            condition = self._range_info.condition if self._is_range else self._gate_info.condition
             index = conditions.index(condition)
             self._condition_tab.setCurrentIndex(index)
 
         self._update_tab_icons()
+
+    @QtCore.Slot(bool)
+    def _autorelease_changed(self, checked):
+        ''' called when the autorelease checkbox is changed '''
+        info, condition = self.sender().data
+        info.autorelease_map[condition] = checked
+
 
     def _update_tab_icons(self):
         ''' updates the tab icons based on the container status '''
@@ -5195,13 +5210,13 @@ class ActionContainerUi(gremlin.ui.ui_common.QRememberDialog):
         for index in range(self._condition_tab.count()):
             widget = self._condition_tab.widget(index)
             condition = widget.data
-            has_condition = self._range_info.hasContainers(condition) if self._is_range else self._gate.hasContainers(condition)
+            has_condition = self._range_info.hasContainers(condition) if self._is_range else self._gate_info.hasContainers(condition)
             self._condition_tab.setTabIcon(index, self._icon_enabled if has_condition else self._icon_disabled)
                 
     QtCore.Slot(gremlin.ui.joystick_device.InputItemConfiguration)
     def _mapping_changed_cb(self, item_data : gremlin.ui.joystick_device.InputItemConfiguration):
         ''' hooks a mapping change '''
-        item_data_map = self._range_info.item_data_map if self._is_range else self._gate.item_data_map
+        item_data_map = self._range_info.item_data_map if self._is_range else self._gate_info.item_data_map
         if item_data in item_data_map.values():
             # one of ours - update the icon status
             self._update_tab_icons()
@@ -5261,6 +5276,10 @@ class GatedAxisGateCondition(gremlin.actions.AbstractCondition):
         #     return False
         # finally:
         #     self._last_value = current_value
+
+        
+    def condition_name(self) -> str:
+        return f"Gated Axis Gate Condition: condition: {self._condition_type.name} range: {self.gate_info.to_display()}"        
         
     
 class GatedAxisRangeCondition(gremlin.actions.AbstractCondition):
@@ -5322,5 +5341,6 @@ class GatedAxisRangeCondition(gremlin.actions.AbstractCondition):
         #     self._last_value = current_value
 
         
-        
+    def condition_name(self) -> str:
+        return f"Gated Axis Range Condition: condition: {self._condition_type.name} range: {self.range_info.to_display()}"
         
