@@ -178,31 +178,20 @@ class VJoyInterface:
                     syslog.critical(msg)
                     os._exit(1) 
 
-            # check vjoy driver version and that it's installed
-            # removed to see if this fixes UAC issues and false positives
-            # driver_version = get_vjoy_driver_version()
-            # if driver_version:
-            #     min_version = "12.53.21.621"
-            #     if not version_valid(driver_version, min_version):
-            #         msg = f"Invalid VJOY driver: {min_version} required, found {driver_version}"
-            #         display_error(msg)
-            #         syslog.critical(msg)
-            #         os._exit(1) 
-
-            #     syslog.info(f"Found VJOY driver {driver_version}")
-            # else:
-            #     # no driver
-            #     msg = f"VJOY driver not detected - unable to continue - expecting version {min_version}"
-            #     display_error(msg)
-            #     syslog.critical(msg)
-            #     os._exit(1)             
-
-
+  
             # check DLL version                
             min_version = "2.1.9.1"
-            dll_version = get_dll_version(_dll_path)
-            if not version_valid(dll_version, min_version):
-                msg = f"Invalid version dll: {_dll_path}\nVersion {min_version} required, found {dll_version}"
+            try:
+
+                dll_version = get_dll_version(_dll_path)
+            
+                if not version_valid(dll_version, min_version):
+                    msg = f"Invalid version dll: {_dll_path}\nVersion {min_version} required, found {dll_version}"
+                    display_error(msg)
+                    syslog.critical(msg)
+                    os._exit(1)
+            except:
+                msg = "Error: VJOY is not installed or not configured."
                 display_error(msg)
                 syslog.critical(msg)
                 os._exit(1)

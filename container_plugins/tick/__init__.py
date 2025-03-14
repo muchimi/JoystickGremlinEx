@@ -304,7 +304,7 @@ class TickContainerFunctor(gremlin.base_conditions.AbstractFunctor):
         self._tick_map = [-1.0 + x * interval for x in range(count)]
         self._last_value = self.action_data._get_value()
       
-    def process_event(self, event, value):
+    def process_event(self, event, value, extra_data = None):
         
         if not event.is_axis:
             return

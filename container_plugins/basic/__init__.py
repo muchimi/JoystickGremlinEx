@@ -143,7 +143,7 @@ class BasicContainerFunctor(AbstractFunctor):
             parent
         )
 
-    def process_event(self, event, value):
+    def process_event(self, event, value, extra_data = None):
         """Executes the content with the provided data.
 
         :param event the event to process
@@ -212,7 +212,7 @@ class BasicContainer(AbstractContainer):
                 index = len(self.action_sets) - 1
             self.action_sets[index].append(action)
 
-        self.refresh_conditions()
+        #self.refresh_conditions()
 
         self.create_or_delete_virtual_button()
 

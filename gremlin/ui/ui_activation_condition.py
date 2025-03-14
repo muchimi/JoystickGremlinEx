@@ -97,7 +97,7 @@ class ActivationConditionWidget(QtWidgets.QWidget):
 
         self.activation_count_widget = QtWidgets.QLabel()
         self.container_condition_frame_layout.addWidget(self.activation_count_widget)
-        self.container_condition_model = ConditionModel(self.profile_data, self.profile_data.activation_container_condition)
+        self.container_condition_model = ConditionModel(self.profile_data, self.profile_data.activation_condition)
         self.container_condition_view = ConditionView()
         self.container_condition_view.set_model(self.container_condition_model)
         
@@ -122,10 +122,10 @@ class ActivationConditionWidget(QtWidgets.QWidget):
     def _update_counts(self):
         ''' refreshes counts '''   
         if self.container:
-            self.activation_count_widget.setText(f"Container conditions ({self.container.condition_count} found):")
+            self.activation_count_widget.setText(f"Container action conditions ({self.container.condition_count} found):")
         else:
             # not a container
-            self.activation_count_widget.setText(f"Container conditions (N/A):")  
+            self.activation_count_widget.setText(f"Conditions:")  
 
     def _show_hint(self, state):
         """Shows a help message.
@@ -691,6 +691,9 @@ class JoystickConditionWidget(AbstractConditionWidget):
             visible = False
             
             v1, v2 = self.condition_data.range
+            if v1 > v2:
+                # swap
+                v1,v2 = v2, v1
             match self.condition_data.comparison:
                 case "inside":
                     if value >= v1 and value <= v2:
@@ -1049,7 +1052,7 @@ class ConditionModel(ui_common.AbstractModel):
         mode = gremlin.shared_state.current_mode
         container = self.container
         input_item = self.input_item
-        data = ConditionTrackerData(mode, input_item, container, condition)
+        data = ConditionTrackerData(mode, input_item, container, condition, rule = ActivationRule.All)
         tracker.registerCondition(data)
         self.data_changed.emit()
         el = gremlin.event_handler.EventListener()
@@ -1082,7 +1085,7 @@ class ConditionModel(ui_common.AbstractModel):
 
         :return current application rule of conditions
         """
-        return self.condition_data.rule
+        return self.condition_data._rule
 
     @rule.setter
     def rule(self, rule):
@@ -1090,7 +1093,7 @@ class ConditionModel(ui_common.AbstractModel):
 
         :param rule the new application type
         """
-        self.condition_data.rule = rule
+        self.condition_data._rule = rule
 
 
 class ConditionView(ui_common.AbstractView):

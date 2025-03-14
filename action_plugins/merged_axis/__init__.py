@@ -452,7 +452,7 @@ class MergedAxisFunctor(gremlin.base_profile.AbstractContainerActionFunctor):
         self._callbacks = {}
 
 
-    def process_event(self, event, value):
+    def process_event(self, event, value, extra_data = None):
         ''' do nothing because the container will not be called through the normal hierarchy '''
         return True
     

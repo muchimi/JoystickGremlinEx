@@ -370,11 +370,11 @@ class AbstractContainer(ProfileData):
         self._condition_enabled = True
         self._virtual_button_enabled = True # determines if the callbacks can be virtualized or not - if not - the callback is "raw" to the functor - action / container set
         self._virtual_button_user_enabled = False # determins if callbacks use the virtual button function - user set 
-        self.activation_container_condition = ActivationCondition([],ActivationRule.All) # activation condition that applies to the container
-        self.activation_condition = ActivationCondition([],ActivationRule.All) # activation condition that applies to the actions
+        self.activation_condition = ActivationCondition([],ActivationRule.All) # activation condition that applies to the container
         self.virtual_button = None
         self.current_view_type = None
         self.parent_node = node
+        self.comment = None # user comment
 
         self._action_sets_callback = None # callback to return different action sets if needed for containers that do their own thing
 
@@ -403,21 +403,12 @@ class AbstractContainer(ProfileData):
                 action.id = gremlin.util.get_guid()
                 action.action_id = gremlin.util.get_guid()
 
-        self.activation_container_condition.id = gremlin.util.get_guid()
-        for condition in self.activation_container_condition.conditions:
-            data = tracker.getData(condition)
-            condition.id = gremlin.util.get_guid()
-            if data:
-                new_data = ConditionTrackerData(data.mode, data.input_item, self, condition)
-                tracker.registerCondition(new_data)
-
-
         self.activation_condition.id = gremlin.util.get_guid()
         for condition in self.activation_condition.conditions:
             data = tracker.getData(condition)
             condition.id = gremlin.util.get_guid()
             if data:
-                new_data = ConditionTrackerData(data.mode, data.input_item, self, condition)
+                new_data = ConditionTrackerData(data.mode, data.input_item, self, condition, data.rule)
                 tracker.registerCondition(new_data)
 
 
@@ -436,34 +427,35 @@ class AbstractContainer(ProfileData):
     @property
     def has_conditions(self):
         ''' true if the container has conditions defined '''
-        return self.activation_container_condition is not None and len(self.activation_container_condition.conditions) > 0
+        return self.activation_condition is not None and len(self.activation_condition.conditions) > 0
 
     @property
     def has_action_conditions(self):
         ''' true if the container has action conditions defined '''
         
         if self.activation_condition is not None:
-            if len(self.activation_condition.conditions) == 0:
-                self.refresh_conditions()
+            # if len(self.activation_condition.conditions) == 0:
+            #     self.refresh_conditions()
             return len(self.activation_condition.conditions) > 0
         return False
     
-    def refresh_conditions(self):
-        ''' updates action conditions '''
-        input_item = _get_input_item(self.parent)
-        tracker = ConditionTracker()
-        if self.activation_condition is not None:
-            self.activation_condition.conditions = []    
-            for action_set in self.action_sets:
-                action : AbstractAction
-                if action_set:
-                    for action in action_set:
-                        condition = action.activation_condition
-                        if condition:
-                            if not condition in self.activation_condition.conditions:
-                                self.activation_condition.conditions.append(condition)
-                                data = ConditionTrackerData(gremlin.shared_state.current_mode, input_item, self, condition)
-                                tracker.registerCondition(data)
+    # def refresh_conditions(self):
+    #     ''' updates action conditions '''
+    #     input_item = _get_input_item(self.parent)
+    #     tracker = ConditionTracker()
+    #     if self.activation_condition is not None:
+    #         self.activation_condition.conditions = []    
+    #         for action_set in self.action_sets:
+    #             action : AbstractAction
+    #             if action_set:
+    #                 for action in action_set:
+    #                     condition = action.activation_condition
+    #                     if condition:
+    #                         if not condition in self.activation_condition.conditions:
+    #                             self.activation_condition.conditions.append(condition)
+    #                             data = ConditionTrackerData(gremlin.shared_state.current_mode, input_item, self, condition, condition.rule)
+    #                             tracker.registerCondition(data)
+    #                             self.activation_condition.conditions.append(condition)
 
 
 
@@ -473,22 +465,10 @@ class AbstractContainer(ProfileData):
     @property
     def condition_count(self)->int:
         ''' gets the count of container conditions currently defined '''
-        if self.activation_container_condition is not None:
-            return len(self.activation_container_condition.conditions)
+        if self.activation_condition is not None:
+            return len(self.activation_condition.conditions)
         return 0
     
-    @property
-    def action_condition_count(self) -> int:
-        ''' gets the count of action conditions currently defined '''
-        count = 0
-        for action_set in self.action_sets:
-            action : AbstractAction
-            if action_set:
-                for action in action_set:
-                    if action.activation_condition:
-                        count += len(action.activation_condition.conditions)
-        return count                            
-
     @property
     def id(self):
         return self._id
@@ -621,6 +601,8 @@ class AbstractContainer(ProfileData):
         if "container_id" in node.attrib:
             self.id = node.get("container_id")
 
+        if "comment" in node.attrib:
+            self.comment = node.get("comment")
         self._parse_action_set_xml(node, data)
         self._parse_virtual_button_xml(node, data)
         self._parse_activation_condition_xml(node, data)
@@ -632,12 +614,16 @@ class AbstractContainer(ProfileData):
         """
         node = super().to_xml()
         node.set("container_id", self.id)
+
+        if self.comment:
+            node.set("comment", self.comment)
+
         # Add activation condition if needed
         if self.virtual_button:
             node.append(self.virtual_button.to_xml())
         
-        if self.activation_container_condition:
-            condition_node = self.activation_container_condition.to_xml()
+        if self.activation_condition:
+            condition_node = self.activation_condition.to_xml()
             if condition_node is not None:
                 node.append(condition_node)
 
@@ -716,14 +702,12 @@ class AbstractContainer(ProfileData):
 
     def _parse_activation_condition_xml(self, node, data):
         ''' load the container condition '''
-        self.activation_container_condition = ActivationCondition([], ActivationRule.All)
         self.activation_condition = ActivationCondition([], ActivationRule.All)
 
         input_item = data
         activation_node = gremlin.util.get_xml_child(node,"activation-condition")
         if activation_node is not None:
-            self.activation_container_condition.from_xml(activation_node, (input_item, self))
-
+            self.activation_condition.from_xml(activation_node, (input_item, self))
 
 
     def _is_valid(self):
@@ -916,7 +900,7 @@ class AbstractAction(ProfileData):
         # assert isinstance(parent, AbstractContainer)
         super().__init__(parent)
 
-        self.activation_condition = None
+        self.activation_condition = None # stores the conditions attached to that action
         self._id = None
         self._action_type = None
         self._enabled = False # true if the action is enabled
@@ -924,11 +908,13 @@ class AbstractAction(ProfileData):
         self.parent_container = parent # holds the reference to the parent container holding this action
         self._is_axis = False
         self._is_hardware = None
+        self.comment = None # user comments/notes
 
         eh = gremlin.event_handler.EventListener()
         eh.action_created.emit(self)
         eh.profile_unload.connect(self._cleanup)
         eh.action_delete.connect(self._action_delete)
+
 
 
     @property
@@ -1065,6 +1051,9 @@ class AbstractAction(ProfileData):
         if "action_id" in node.attrib:
             self.action_id = safe_read(node, "action_id", str)
 
+        if "comment" in node.attrib:
+            self.comment = node.get("comment")
+
 
         super().from_xml(node, data)
 
@@ -1074,6 +1063,7 @@ class AbstractAction(ProfileData):
             cond_node = node.find("activation-condition")
             if cond_node is not None:
                 self.activation_condition.from_xml(cond_node, data)
+                
 
         # record the type of this action
         self._action_name = node.tag
@@ -1090,6 +1080,11 @@ class AbstractAction(ProfileData):
 
         # output the ID
         node.set("action_id", self.action_id)
+
+        # output any notes
+        if self.comment:
+            node.set("comment", self.comment)
+
         return node
 
     def requires_virtual_button(self):
@@ -1201,9 +1196,6 @@ class AbstractContainerAction(AbstractAction):
     def __setstate__(self, state):
         self.__dict__.update(state)
         self.item_data = InputItem(parent = self)
-        
-
-
     
     @property
     def functors(self):
@@ -2274,58 +2266,70 @@ class Profile():
             return root_node       
         return tree
     
-    def _inheritance_tree_to_list(self, data, tree, level = 0):
-        for mode, children in sorted(tree.items()):
-            data.append((level, mode))
-            self._inheritance_tree_to_list(data, children, level+1)
+    # def _inheritance_tree_to_list(self, data, tree, level = 0):
+
+
+    #     for mode, children in sorted(tree.items()):
+    #         data.append((level, mode))
+    #         self._inheritance_tree_to_list(data, children, level+1)
     
     def traverse_mode(self):
         ''' returns the current mode list as a list of (level, mode) '''
-        tree = self.build_inheritance_tree()
-        data = []
-        self._inheritance_tree_to_list(data, tree)
-        return data
+        nodes = [(node.depth-1, node.name) for node in anytree.PreOrderIter(self._mode_tree) if node.name]
+        return nodes
+        # tree = self.build_inheritance_tree()
+        # data = []
+        # self._inheritance_tree_to_list(data, tree)
+        # return data
     
     def mode_map(self):
         ''' converts the mode tree to a map [mode] = [children modes]'''
         data = {}
-        if self._mode_tree:
-            for node in anytree.PostOrderIter(self._mode_tree):
-                mode = node.name
-                if not mode:
-                    continue
-                data[mode] = []
-                parent_node = node.parent
-                if parent_node and parent_node.name:
-                    data[parent_node.name].append(mode)
-        else:
-            mode_list = self.traverse_mode()
-            mode_list.reverse()
-            data = {}
-            max_index = len(mode_list) - 1
-            for index, (level, mode) in enumerate(mode_list):
-                if index < max_index:
-                    parent_level, parent_mode = mode_list[index+1]
-                    data[mode] = parent_mode
-                else:
-                    data[mode] = None
+        for node in anytree.PreOrderIter(self._mode_tree):
+            if node.name:
+                data[node.name] = [n.name for n in node.children]
         return data
+
+
+        # data = {}
+        # if self._mode_tree:
+        #     for node in anytree.PostOrderIter(self._mode_tree):
+        #         mode = node.name
+        #         if not mode:
+        #             continue
+        #         data[mode] = []
+        #         parent_node = node.parent
+        #         if parent_node and parent_node.name:
+        #             data[parent_node.name].append(mode)
+        # else:
+        #     mode_list = self.traverse_mode()
+        #     mode_list.reverse()
+        #     data = {}
+        #     max_index = len(mode_list) - 1
+        #     for index, (level, mode) in enumerate(mode_list):
+        #         if index < max_index:
+        #             parent_level, parent_mode = mode_list[index+1]
+        #             data[mode] = parent_mode
+        #         else:
+        #             data[mode] = None
+        # return data
     
     def get_root_mode(self):
         ''' gets the top mode from a profile - that would be the default startup mode - sorted by name of the root nodes'''
 
         if self._mode_tree:
             return next((node.name for node in self._mode_tree.children), None)
-        else:
-            tree = self.build_inheritance_tree()
-            modes = sorted(tree.keys())
-            if "Default" in modes:
-                # return the default mode as that is what we start with
-                return "Default"
-            # pick the first sorted mode
-            if modes:
-                return modes[0]
-            return None
+        return None
+        # else:
+        #     tree = self.build_inheritance_tree()
+        #     modes = sorted(tree.keys())
+        #     if "Default" in modes:
+        #         # return the default mode as that is what we start with
+        #         return "Default"
+        #     # pick the first sorted mode
+        #     if modes:
+        #         return modes[0]
+        #     return None
         
     
     def set_last_runtime_mode(self, mode : str):
@@ -2393,22 +2397,23 @@ class Profile():
         if self._mode_tree:
             modes = self.get_modes()
             return modes
+        return []
 
 
         # Get profile root node
-        parent = self
-        while parent.parent is not None:
-            parent = parent.parent
-        assert(type(parent) == Profile)
-        # Generate list of modes
-        mode_names = []
-        for device in parent.devices.values():
-            mode_names.extend(device.modes.keys())
-        mode_names = [mode for mode in mode_names if mode is not None]
-        if mode_names:
-            mode_names = list(set(mode_names))
-            mode_names.sort(key=lambda x: x.casefold())
-        return mode_names
+        # parent = self
+        # while parent.parent is not None:
+        #     parent = parent.parent
+        # assert(type(parent) == Profile)
+        # # Generate list of modes
+        # mode_names = []
+        # for device in parent.devices.values():
+        #     mode_names.extend(device.modes.keys())
+        # mode_names = [mode for mode in mode_names if mode is not None]
+        # if mode_names:
+        #     mode_names = list(set(mode_names))
+        #     mode_names.sort(key=lambda x: x.casefold())
+        # return mode_names
 
 
 

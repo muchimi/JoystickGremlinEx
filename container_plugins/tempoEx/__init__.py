@@ -465,7 +465,7 @@ class TempoExContainerFunctor(gremlin.base_conditions.AbstractFunctor):
             self.long_index = (self.long_index + 1) % len(self.long_set)
             # syslog.info(f"bump long index {self.long_index}")            
 
-    def process_event(self, event, value):
+    def process_event(self, event, value, extra_data = None):
         # TODO: Currently this does not handle hat or axis events, however
         #       virtual buttons created on those inputs is supported
         if event.event_type == InputType.JoystickHat:

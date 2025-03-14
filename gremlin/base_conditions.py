@@ -370,6 +370,7 @@ class AbstractFunctor(QtCore.QObject):
         self.node = parent
         self.action_data = action_data
         self.id = action_data.id
+        self.manual_callback = False # functor uses automatic mode
         
 
         el = gremlin.event_handler.EventListener()
@@ -380,7 +381,7 @@ class AbstractFunctor(QtCore.QObject):
         
 
     
-    def process_event(self, event, value):
+    def process_event(self, event, value, extra_data = None):
         """Processes the functor using the provided event and value data.
 
         :param event the raw event that caused the functor to be executed
@@ -469,11 +470,16 @@ class AbstractFunctor(QtCore.QObject):
                         needs_auto_release = False
 
         return needs_auto_release
+    
+    def __str__(self):
+        if self.action_data:
+            return str(self.action_data)
+        return "Plugin Functor"
 
 
 class AbstractContainerActionFunctor(AbstractFunctor):
     ''' used by action functors for actions that have containers '''
-    def process_event(self, event, value):
+    def process_event(self, event, value, extra_data = None):
         ''' Processes the functor using the provided event '''
         result = True
         for functor in self.action_data.functors:
@@ -488,11 +494,12 @@ class AbstractContainerActionFunctor(AbstractFunctor):
     
 
 class ConditionTrackerData():
-    def __init__(self, mode, input_item, container, condition):
+    def __init__(self, mode, input_item, container, condition, rule):
         self.condition = condition
         self.container = container
         self.input_item = input_item
         self.mode = mode
+        self.rule = rule
     
 @SingletonDecorator
 class ConditionTracker():
@@ -612,6 +619,12 @@ class ConditionTracker():
             return data.condition
         return None
             
+    def getRuleForAction(self, action):
+        ''' gets the condition rule for an action '''
+        data : ConditionTrackerData = self.getActionData(action)
+        if data:
+            return data.rule
+        return None
 
 
     def owner(self, condition : AbstractCondition):
@@ -657,10 +670,18 @@ class ActivationCondition(QtCore.QObject):
     def __init__(self, conditions, rule):
         """Creates a new instance."""
         super().__init__()
-
-        self.rule = rule
+        self._rule = rule
         self.conditions = conditions
         self._id = gremlin.util.get_guid()
+
+    @property 
+    def rule(self) -> ActivationRule:
+        # rule for the activation condition
+        return self._rule
+
+    @rule.setter
+    def rule(self, value : ActivationRule):
+        self._rule = value
         
 
     @property
@@ -696,7 +717,7 @@ class ActivationCondition(QtCore.QObject):
                 self._id = str_id
 
 
-        self.rule = ActivationCondition.rule_lookup[safe_read(node, "rule")]
+        rule = ActivationCondition.rule_lookup[safe_read(node, "rule")]
         tracker = ConditionTracker()
         mode_node = node
         while mode_node is not None and mode_node.tag != "mode":
@@ -708,6 +729,9 @@ class ActivationCondition(QtCore.QObject):
             mode = gremlin.shared_state.edit_mode
         assert data is not None,"XML: error: data not provided for activation condition"    
         input_item, container = data
+        self.rule = rule
+
+        
         #assert input_item is not None,"XML: error:input_item not provided for activation condition"
         if input_item is None:
             gremlin.ui.ui_common.MessageBox(prompt="The source action does not support pasting conditions to the new input.")
@@ -718,7 +742,7 @@ class ActivationCondition(QtCore.QObject):
             condition = ActivationCondition.condition_lookup[condition_type]()
             condition.from_xml(cond_node, data)
             self.conditions.append(condition)
-            item = ConditionTrackerData(mode, input_item, container, condition)
+            item = ConditionTrackerData(mode, input_item, container, condition, rule)
             tracker.registerCondition(item)
             
             
@@ -729,7 +753,7 @@ class ActivationCondition(QtCore.QObject):
         :return XML node containing information about the activation condition
         """
         node = ElementTree.Element("activation-condition")
-        node.set("rule", ActivationCondition.rule_lookup[self.rule])
+        node.set("rule", ActivationCondition.rule_lookup[self._rule])
         node.set("condition_id", self._id)
 
         for condition in self.conditions:
@@ -738,7 +762,7 @@ class ActivationCondition(QtCore.QObject):
         return node
     
     def condition_name(self):
-        return f"Activation Condition: {self.id} rule: {self.rule.name} contains: {len(self.conditions)} condition(s)"
+        return f"Activation Condition: [{self.id}] rule: {self._rule.name} contains: {len(self.conditions)} condition(s)"
     
     def __str__(self):
-        return f"Activation Condition: {self.id} rule: {self.rule.name} contains: {len(self.conditions)} condition(s)"
+        return f"Activation Condition: [{self.id}] rule: {self._rule.name} contains: {len(self.conditions)} condition(s)"

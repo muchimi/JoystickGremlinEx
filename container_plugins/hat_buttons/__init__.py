@@ -231,7 +231,7 @@ class HatButtonsContainerFunctor(gremlin.base_conditions.AbstractFunctor):
     def __init__(self, container, parent = None):
         super().__init__(container, parent)
 
-    def process_event(self, event, value):
+    def process_event(self, event, value, extra_data = None):
         """Executes the content with the provided data.
 
         :param event the event to process
@@ -291,7 +291,7 @@ class HatButtonsContainer(AbstractContainer):
             basic_container = BasicContainer(self, parent)
             basic_container.action_sets = [action_set]
             basic_container.activation_condition = self.activation_condition
-            basic_container.activation_container_condition = self.activation_container_condition
+            
             
 
             # Callback reacting to virtual button events

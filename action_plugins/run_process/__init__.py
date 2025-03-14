@@ -180,7 +180,7 @@ class RunProcessFunctor(gremlin.base_profile.AbstractFunctor):
         self.action_data = action
 
     
-    def process_event(self, event, value):
+    def process_event(self, event, value, extra_data = None):
         execute = False
         if self.action_data.exec_on_release and not event.is_pressed:
             execute = True

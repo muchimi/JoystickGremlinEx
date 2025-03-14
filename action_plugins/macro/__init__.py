@@ -52,7 +52,7 @@ class MacroFunctor(gremlin.base_profile.AbstractFunctor):
         self.macro.exclusive = action.exclusive
         self.macro.repeat = action.repeat
 
-    def process_event(self, event, value):
+    def process_event(self, event, value, extra_data = None):
         MacroFunctor.manager.queue_macro(self.macro)
         if isinstance(self.macro.repeat, gremlin.macro.HoldRepeat):
             gremlin.input_devices.ButtonReleaseActions().register_callback(

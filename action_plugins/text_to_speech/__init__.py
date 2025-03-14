@@ -164,7 +164,7 @@ class TextToSpeechFunctor(gremlin.base_profile.AbstractFunctor):
     #     if self.action_data.enabled:
     #         self.tts.end()
     
-    def process_event(self, event, value):
+    def process_event(self, event, value, extra_data = None):
         if not self.action_data.enabled:
             return True
 

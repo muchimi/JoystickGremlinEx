@@ -176,7 +176,7 @@ class MapToGamepadFunctor(gremlin.base_profile.AbstractFunctor):
         super().__init__(action_data, parent)
         self.action_data = action_data
 
-    def process_event(self, event, value):
+    def process_event(self, event, value, extra_data = None):
 
         verbose = gremlin.config.Configuration().verbose_mode_outputs
         if verbose: syslog.error(f"VIGEM: event: {str(event)}")

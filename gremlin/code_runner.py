@@ -133,7 +133,8 @@ class CodeRunner:
 
         config = gremlin.config.Configuration()
 
-        syslog = logging.getLogger("system")
+        gremlin.shared_state.profile_state = True # assume profile start ok
+        gremlin.shared_state.profile_start_error = None # assume no error
 
         self.disableUi()
 
@@ -177,6 +178,7 @@ class CodeRunner:
         system_paths = [os.path.normcase(os.path.abspath(p)) for p in sys.path]
 
         ec = gremlin.execution_graph.ExecutionContext()
+        
 
         # Load the generated code
         try:
@@ -356,9 +358,10 @@ class CodeRunner:
                                     )
 
                             
-            if verbose_detailed:
-                self.event_handler.dump_callbacks()
-                                
+            # if verbose_detailed:
+            #     self.event_handler.dump_callbacks()
+
+ 
 
             # Create merge axis callbacks
             for entry in profile.merge_axes:
@@ -519,8 +522,17 @@ class CodeRunner:
             #print ("resume!")
             self.event_handler.resume()
 
+
+            # register callbacks with the execution tree
+            eh = gremlin.event_handler.EventHandler()
+            ec.reset(force_rebuild = True) # rebuild the execution tree
+            ec.registerCallbacks(eh.callbacks)
+            
+                                
+
             # tell GremlinEx the profile started
             el.profile_started.emit()
+
 
 
         except Exception as e:
@@ -545,6 +557,9 @@ class CodeRunner:
 
         el = gremlin.event_handler.EventListener()
         eh = gremlin.event_handler.EventHandler()
+        
+        # tell components we're stopping
+        el.profile_stop.emit()
 
 
 

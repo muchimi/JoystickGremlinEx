@@ -1040,22 +1040,19 @@ class RemoteClient(QtCore.QObject):
         self._id = get_guid()
         self._alive_thread = None
         self._alive_thread_stop_requested = False
+        self._started = False
 
         el = gremlin.event_handler.EventListener()
-        el.heartbeat.connect(self._alive_ticker)
+        el.profile_stop.connect(self.stop) # hook stop event
 
     def start(self):
-        ''' creates a multicast client send socket'''
-        # if self._broadcast_enabled:
-        #     # alive thread is only on master machine
-        #     if not self._alive_thread:
-        #         syslog.debug("Starting Alive thread...")
-        #         # self._alive_thread_stop_requested = False
-        #         # self._alive_thread = threading.Thread(target=self._alive_ticker)
-        #         # self._alive_thread.setName("remote_alive")
-        #         # self._alive_thread.start()
-
-        self.ensure_socket()
+        ''' creates a multicast client send socket on profile start '''
+        if not self._started:
+            self._started = True
+            self.ensure_socket()
+            el = gremlin.event_handler.EventListener()
+            el.heartbeat.connect(self._alive_ticker)
+            
 
 
     def ensure_socket(self):
@@ -1069,19 +1066,26 @@ class RemoteClient(QtCore.QObject):
 
     def stop(self):
         ''' closes the client socket'''
-        if self._alive_thread:
-            syslog.debug("Alive stop requested...")
-            self._alive_thread_stop_requested = True
-            if self._alive_thread.is_alive():
-                self._alive_thread.join()
-            syslog.debug("Alive thread stopped")
-            self._alive_thread = None
+        if self._started:
+            el = gremlin.event_handler.EventListener()
+            el.heartbeat.disconnect(self._alive_ticker)
+
+            if self._alive_thread:
+                syslog.debug("Alive stop requested...")
+
+    
+                self._alive_thread_stop_requested = True
+                if self._alive_thread.is_alive():
+                    self._alive_thread.join()
+                syslog.debug("Alive thread stopped")
+                self._alive_thread = None
             
-        
-        if self._sock:
-            self._sock.close()
-            self._sock = None
-            syslog.debug("Gremlin RPC client stopped.")
+            if self._sock:
+                self._sock.close()
+                self._sock = None
+                syslog.debug("Gremlin RPC client stopped.")
+
+            self._started = False
 
     def _alive_ticker(self):
         ''' sends an alive packet to keep the ports alive '''

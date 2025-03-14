@@ -1420,7 +1420,7 @@ class ResponseCurveFunctor(gremlin.base_profile.AbstractFunctor):
         else:
             raise gremlin.error.GremlinError("Invalid curve type")
 
-    def process_event(self, event, value):
+    def process_event(self, event, value, extra_data = None):
         value.current = self.response_fn(self.deadzone_fn(value.current))
         # print ("response curve")
         return True

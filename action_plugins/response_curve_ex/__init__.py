@@ -116,7 +116,7 @@ class ResponseCurveExFunctor(gremlin.base_profile.AbstractFunctor):
         self.curve_data = action_data.curve_data
         self.curve_data.curve_update()
 
-    def process_event(self, event, value):
+    def process_event(self, event, value, extra_data = None):
         if event.is_axis:
             value.current = self.curve_data.curve_value(value.current)
         return True

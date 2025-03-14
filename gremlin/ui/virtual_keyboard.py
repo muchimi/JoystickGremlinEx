@@ -7,7 +7,6 @@ import gremlin.base_profile
 import gremlin.config
 import gremlin.event_handler
 from gremlin.input_types import InputType
-from gremlin.input_devices import ButtonReleaseActions
 import gremlin.keyboard
 import gremlin.macro
 import gremlin.shared_state

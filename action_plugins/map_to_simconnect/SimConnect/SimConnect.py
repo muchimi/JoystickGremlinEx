@@ -352,10 +352,12 @@ class SimConnect():
 		self._runThread = None
 		self._library_path = None
 		self._critical = False
+		self._state_handled = {} # tracks state change messages 
 
 	def reset(self):
 		''' resets abort flag set due to a load error - this is necessary upon reconnect'''
 		self._request_abort = False
+		self._state_handled = {}
 
 
 
@@ -547,13 +549,15 @@ class SimConnect():
 		
 		# Example 1: SimObjects\Airplanes\a400m\presets\inibuilds\a400m_cargo\config\aircraft.CFG
 		# Example 2: c:\users\XXXX\appdata\local\packages\microsoft.limitless_8wekyb3d8bbwe\localstate\streamedpackages\asobo-aircraft-h125\content\simobjects\airplanes\asobo_h125\presets\asobo\h125_rescue\config
+		# Example 3: c:\users\XXXX\appdata\local\packages\microsoft.limitless_8wekyb3d8bbwe\localcache\packages\community\bksq-aircraft-turbineduke\simobjects\airplanes\bksq-aircraft-turbineduke
+
 		work_cfg = aircraft_cfg.replace("/", os.sep).casefold()			
 		splits = work_cfg.split(os.sep)
 		max_index = len(splits)
 		index = 0
-		if "config" in splits:
-			index = splits.index("config")
-			index-=1
+		if "airplanes" in splits:
+			index = splits.index("airplanes")
+			index +=1
 
 		# while splits[index] != "simobjects" and index < max_index:
 		# 	index+=1
@@ -633,16 +637,22 @@ class SimConnect():
 		int_data = pData.dwInteger
 		float_data = pData.fFloat
 		str_data = pData.szString
-		if self.verbose:
-			# syslog = logging.getLogger("system")
-			syslog.info(f"SIMCONNECT:state event: int: {pData.dwInteger} float: {pData.fFloat} str: {pData.szString}")
+		key = (int_data, float_data, str_data)
+		if not key in self._state_handled:
 
-		if str_data:
-			aircraft_cfg = str_data.decode()
-			if not self._aircraft_loaded_event.is_set():
-				self._aircraft_loaded_event.set()
-				self._process_aircraft_string(aircraft_cfg)
-		self.handler.simconnect_state_changed.emit(int_data, float_data, str_data)
+			if self.verbose:
+				# syslog = logging.getLogger("system")
+				syslog.info(f"SIMCONNECT:state event: int: {pData.dwInteger} float: {pData.fFloat} str: {pData.szString}")
+
+			if str_data:
+				aircraft_cfg = str_data.decode()
+				if not self._aircraft_loaded_event.is_set():
+					self._aircraft_loaded_event.set()
+					self._process_aircraft_string(aircraft_cfg)
+			self.handler.simconnect_state_changed.emit(int_data, float_data, str_data)
+			self._state_handled[key] = True
+
+		
 
 	def handle_folder_event(self, aircraft_cfg):
 		''' folder received '''
@@ -670,7 +680,7 @@ class SimConnect():
 
 
 		elif dwID == SIMCONNECT_RECV_ID.SIMCONNECT_RECV_ID_SYSTEM_STATE:
-			if verbose: syslog.info("dispatch: receive state")
+			#if verbose: syslog.info("dispatch: receive state")
 			data = cast(pData, POINTER(SIMCONNECT_RECV_SYSTEM_STATE)).contents
 			self.handle_state_event(data)
 
@@ -907,19 +917,13 @@ class SimConnect():
 					self._dll.SubscribeToSystemEvent(
 						self._hSimConnect, self._dll.EventID.EVENT_SIM_REQUEST_AIRCRAFT.value, b"AircraftLoaded"
 					)
-
 					
 					syslog.info(f"\tinterface connected")
 					self.run()
-		
-					
-
 
 				else:
+					# error 
 					self._request_abort = True
-					el.module_state_change.emit("simconnect",False)
-					syslog.error(f"SIMCONNECT:Failed to connect: return code: 0x{err:X}")
-					el.request_profile_stop.emit("Error opening SimConnect")
 					return False
 
 

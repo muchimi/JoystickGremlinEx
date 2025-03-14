@@ -167,13 +167,15 @@ class Event:
 	# 		pass
 	# 	self._is_pressed = value
 
-	def fake_button(self, is_pressed = True):
+	def fake_button(self, is_pressed = True, clone = False):
 		''' converts the event to a fake button '''
-		self.event_type = InputType.JoystickButton
-		self.identifier = 1
-		self.is_axis = False # range exit is a button type event
-		self.value = is_pressed
-		self.is_pressed = is_pressed
+		e = self.clone() if clone else self
+		e.event_type = InputType.JoystickButton
+		e.identifier = 1
+		e.is_axis = False # range exit is a button type event
+		e.value = is_pressed
+		e.is_pressed = is_pressed
+		return e
 		
 
 
@@ -474,7 +476,6 @@ class EventListener(QtCore.QObject):
 	# notify when an input is selected
 	input_selection_changed = QtCore.Signal(object, object, object) # (device_guid, input_type, input_id)
 	
-
 
 	def __init__(self):
 		"""Creates a new instance."""

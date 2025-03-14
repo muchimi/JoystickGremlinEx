@@ -46,7 +46,7 @@ class TogglePauseActionFunctor(gremlin.base_profile.AbstractFunctor):
     def __init__(self, action, parent = None):
         super().__init__(action, parent)
 
-    def process_event(self, event, value):
+    def process_event(self, event, value, extra_data = None):
         import gremlin.control_action
         gremlin.control_action.toggle_pause_resume()
         return True

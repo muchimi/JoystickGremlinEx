@@ -712,7 +712,7 @@ class MapToOscFunctor(gremlin.base_profile.AbstractFunctor):
             self.osc_client = None
 
 
-    def process_event(self, event : gremlin.event_handler.Event, value : gremlin.actions.Value):
+    def process_event(self, event : gremlin.event_handler.Event, value : gremlin.actions.Value, extra_data = None):
 
         is_axis = self.action_data.input_is_axis()
         if is_axis:

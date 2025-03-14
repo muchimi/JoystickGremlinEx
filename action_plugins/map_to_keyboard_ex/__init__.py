@@ -449,7 +449,7 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
             gremlin.macro.MacroManager().queue_macro(self.release)
 
 
-    def process_event(self, event, value):
+    def process_event(self, event, value, extra_data = None):
         # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_keyboard
       

@@ -516,7 +516,7 @@ class RangeContainerFunctor(gremlin.base_conditions.AbstractFunctor):
         self.last_range_min = -2.0
         self.last_range_max = -2.0
 
-    def process_event(self, event, value):
+    def process_event(self, event, value, extra_data = None):
         """Executes the content with the provided data.
 
         :param event the event to process

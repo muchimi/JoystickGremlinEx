@@ -1077,7 +1077,7 @@ class SimConnectManager(QtCore.QObject):
         try:
             
             self._bridge_alive = False
-            self._connect_attempts = 10
+            self._connect_attempts = 2
             self._connect_warning_issued = False
             self._request_abort = False
 
@@ -1095,6 +1095,7 @@ class SimConnectManager(QtCore.QObject):
                             self._connect_attempts -= 1
                             self._sm.connect()
                             if self._sm.ok:
+                                # connect is ok 
                                 break
                             time.sleep(0.5)
                             if verbose: syslog.info(f"SIMCONNECT: connect attempt {attempt_count}")
@@ -1104,14 +1105,16 @@ class SimConnectManager(QtCore.QObject):
 
                 if not self._sm.ok:
                     syslog.error(f"SIMCONNECT: connect failed")
-                    if self._connect_attempts == 0 and gremlin.shared_state.is_running:
+                    el = gremlin.event_handler.EventListener()
+                    if gremlin.shared_state.is_running:
                         if not self._connect_warning_issued:
                             msg = "Simconnect: failed to connect to simulator - terminating profile"
                             syslog.error(msg)
                             self._connect_warning_issued = True
                             # request the profile to stop
-                            eh = gremlin.event_handler.EventListener()
-                        eh.request_profile_stop.emit(msg)
+                            el.module_state_change.emit("simconnect",False)
+                            el.request_profile_stop.emit(msg)
+                            gremlin.shared_state.profile_state = False # indicate a profile start error occured
                         syslog.error("SIMCONNECT: failed to start.")
                     return False
                 

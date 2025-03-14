@@ -169,7 +169,7 @@ class PlaySoundFunctor(gremlin.base_profile.AbstractFunctor):
         PlaySoundFunctor.player.setAudioOutput(PlaySoundFunctor.audio)
 
 
-    def process_event(self, event, value):
+    def process_event(self, event, value, extra_data = None):
         if os.path.isfile(self.sound_file):
             media = QtCore.QUrl(self.sound_file)
             PlaySoundFunctor.player.setSource(media)

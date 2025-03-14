@@ -508,7 +508,7 @@ class SwitchContainerFunctor(gremlin.base_conditions.AbstractFunctor):
             latch_list.append((data.device_guid, InputType.JoystickButton, data.input_id))
         return latch_list
 
-    def process_event(self, event : gremlin.event_handler.Event, value : gremlin.actions.Value):
+    def process_event(self, event : gremlin.event_handler.Event, value : gremlin.actions.Value, extra_data = None):
         if event.is_axis:
             return True
         if event.event_type == InputType.JoystickHat:

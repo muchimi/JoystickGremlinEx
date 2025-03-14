@@ -172,7 +172,7 @@ class SplitAxisFunctor(gremlin.base_profile.AbstractFunctor):
         self.action = action
         self.vjoy = gremlin.joystick_handling.VJoyProxy()
 
-    def process_event(self, event, value):
+    def process_event(self, event, value, extra_data = None):
         if value.current < self.action.center_point:
             value_range = -1.0 - self.action.center_point
 

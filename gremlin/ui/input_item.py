@@ -2193,7 +2193,8 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
             f"{self._get_window_title()} ({mode})",
             gremlin.hints.hint.get(self.profile_data.tag, ""),
             self._container_remove,
-            self._container_copy)
+            self._container_copy,
+            data = profile_data)
         
         self._title_bar_widget.setBackgroundColor(gremlin.ui.ui_common.Color.containerBackgroundColor())
         
@@ -2201,6 +2202,8 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
         # Create tab widget to display various UI controls in
         self.dock_tabs =  gremlin.ui.ui_common.QDataTab()
+        background_color = gremlin.ui.ui_common.Color.selectedDockTabBackgroundColor()
+        self.dock_tabs.setStyleSheet(f"QTabBar::tab:selected {{ background-color: {background_color}; }}")
         self.dock_tabs.setTabPosition(QtWidgets.QTabWidget.East)
         self.setWidget(self.dock_tabs)
         self.dock_tabs.data = self.container # associated the data tab with the container
@@ -2414,10 +2417,10 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         ''' refreshes counts '''   
         if self.activation_count_widget:  # can get called before all is loaded
             if self.container:
-                self.activation_count_widget.setText(f"Action conditions ({self.container.action_condition_count} found):")
+                self.activation_count_widget.setText(f"Container conditions ({self.container.condition_count} found):")
             else:
                 # not a container
-                self.activation_count_widget.setText(f"Action conditions (N/A):")
+                self.activation_count_widget.setText(f"Container conditions (N/A):")
 
 
 
@@ -2787,7 +2790,7 @@ class TitleBar(QtWidgets.QFrame):
     about the content of the widget.
     """
 
-    def __init__(self, label, hint, close_callback, clipboard_cb = None, parent=None):
+    def __init__(self, label, hint, close_callback, clipboard_cb = None, parent=None, data = None):
         """Creates a new instance.
 
         :param label the label of the title bar
@@ -2864,11 +2867,22 @@ class TitleBar(QtWidgets.QFrame):
             self.copy_button.setToolTip("Copy")
 
 
+        self.comment_widget = gremlin.ui.ui_common.QDataLineEdit()
+        self.comment_widget.data = data
+        if hasattr(data,"comment"):
+            self.comment_widget.setText(data.comment)
+        self.comment_widget.textChanged.connect(self._comment_changed)
+
+
+
+
         self.layout = QtWidgets.QHBoxLayout(self)
-        self.layout.setSpacing(0)
+        #self.layout.setSpacing(0)
         self.layout.setContentsMargins(5, 0, 5, 0)
 
         self.layout.addWidget(self.label)
+        self.layout.addWidget(QtWidgets.QLabel("Notes:"))
+        self.layout.addWidget(self.comment_widget)
         self.layout.addStretch()
         self.layout.addWidget(self.extra_widget)
 
@@ -2882,7 +2896,13 @@ class TitleBar(QtWidgets.QFrame):
         self.setFrameShape(QtWidgets.QFrame.Box)
         self.setObjectName("frame")
         
-        
+    @QtCore.Slot()
+    def _comment_changed(self):
+        ''' called when comment text is changed '''
+        widget = self.sender()
+        data = widget.data
+        data.comment = widget.text()
+
 
     def _show_hint(self):
         """Displays a hint, explaining the purpose of the action."""
@@ -2924,7 +2944,8 @@ class BasicActionWrapper(AbstractActionWrapper):
             f"{action_widget.action_data.name} ({mode})",
             gremlin.hints.hint.get(self.action_widget.action_data.tag, ""),
             self._remove,
-            self._clipboard_copy)
+            self._clipboard_copy,
+            data = action_widget.action_data)
 
         widget.setBackgroundColor(gremlin.ui.ui_common.Color.actionBackgroundColor())
         self.setTitleBarWidget(widget)

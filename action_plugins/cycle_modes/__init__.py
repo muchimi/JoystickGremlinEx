@@ -250,7 +250,7 @@ class CycleModesFunctor(gremlin.base_profile.AbstractFunctor):
         self.action_data : CycleModes = action
         
 
-    def process_event(self, event, value):
+    def process_event(self, event, value, extra_data = None):
         if event.is_pressed:
             mode_list = self.action_data.mode_list
             index = self.action_data.mode_index

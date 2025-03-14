@@ -1072,6 +1072,9 @@ class SimconnectMonitor():
         self._manager.sim_start.connect(self._sim_start)
         self._manager.sim_stop.connect(self._sim_stop)
         self._started = False
+        self._startup_mode = {}
+        self._verbose = gremlin.config.Configuration().verbose_mode_simconnect
+        self._verbose_detailed = gremlin.config.Configuration().verbose_mode_details
         self._options = SimconnectOptions(self._manager)
         el= gremlin.event_handler.EventListener()
         el.profile_started.connect(self._profile_start) # trap profile start
@@ -1091,13 +1094,15 @@ class SimconnectMonitor():
 
         if self._manager.connected:
             # sim is running
-            
+
+            profile = gremlin.shared_state.current_profile
             if not name:
                 name = self._manager.current_aircraft_sim_name
 
-            # syslog = logging.getLogger("system")
+            if name in self._startup_mode:
+                return self._startup_mode[name]
 
-            syslog.info(f"SCMONITOR: Aircraft changed: mode lookup for {name}")
+            mode = None
 
             if name:
                 #item = self._options.find_definition_by_state(state_folder)
@@ -1105,15 +1110,16 @@ class SimconnectMonitor():
                 if item is not None:
                     # found the aicraft entry
                     key = item.key
-                    profile = gremlin.shared_state.current_profile
+                    
                     mode = profile.getSimconnectMode(key)
                     if not mode:
                         mode = item.mode
-                    if not mode:
-                        mode = profile.get_start_mode()
-                                        
-                    syslog.info(f"SCMONITOR: Aircraft changed profile mode select: {mode}")
-                    return mode
+            if not mode:
+                mode = profile.get_start_mode()
+                                
+            if self._verbose: syslog.info(f"SCMONITOR: Aircraft changed to: [{name}] - activating profile mode [{mode}]")
+            self._startup_mode[name] = mode
+            return mode
             
         return None
     
@@ -1121,6 +1127,7 @@ class SimconnectMonitor():
     def _profile_start(self):
         ''' occurs when a profile starts '''
         enabled = gremlin.shared_state.getSimConnectEnabled()
+        self._startup_mode = {} # reset the mode cache
         self._enabled = enabled
         if enabled:
             syslog.info(f"SCMONITOR: Start")
@@ -1155,8 +1162,6 @@ class SimconnectMonitor():
         if self._options.auto_mode_select:
             if self._manager.connected:
                 self._get_aircraft()
-        
-        
     
     
     def stop(self):
@@ -1213,7 +1218,7 @@ class SimconnectMonitor():
     def _sim_aircraft_loaded(self, name = None):
         ''' called when a new aicraft has been detected '''
         # syslog = logging.getLogger("system")
-        syslog.info(f"SCMONITOR: Aircraft loaded: {name}")
+        if self._verbose: syslog.info(f"SCMONITOR: Aircraft loaded: [{name}]")
         self.changeModeForAicraft(name)
         
 
@@ -1230,14 +1235,14 @@ class SimconnectMonitor():
     def _sim_start(self):
         ''' sim started event '''
         # syslog = logging.getLogger("system")
-        syslog.info(f"SCMONITOR: sim start")
+        if self._verbose: syslog.info(f"SCMONITOR: sim start")
 
 
     @QtCore.Slot()
     def _sim_stop(self):
         ''' sim stop event '''
         # syslog = logging.getLogger("system")
-        syslog.info(f"SCMONITOR: sim stop")        
+        if self._verbose: syslog.info(f"SCMONITOR: sim stop")        
 
     def _mode_change_validator(self, new_mode) -> bool:
         ''' hook called when a request for a mode change is made.
@@ -1247,11 +1252,11 @@ class SimconnectMonitor():
             return True
         
         # syslog = logging.getLogger("system")
-        syslog.info(f"SCMONITOR: Profile mode change request to: {new_mode}")
+        if self._verbose: syslog.info(f"SCMONITOR: Profile mode change request to: {new_mode}")
         mode = self.getStartupMode()
         if mode and mode != new_mode and self._options.auto_mode_lock:
             # not allowed
-            syslog.warning(f"SCMONITOR: per option request denied - aicraft mode lock is enabled and locked to mode [{mode}]")
+            if self._verbose: syslog.warning(f"SCMONITOR: per option request denied - aicraft mode lock is enabled and locked to mode [{mode}]")
             return False
         
         # allowed
@@ -1264,18 +1269,7 @@ class SimconnectMonitor():
         eh = gremlin.event_handler.EventHandler()
         eh.change_mode(mode)
 
-    # @QtCore.Slot(str)
-    # def _mode_changed(self, new_mode):        
-    #     ''' triggered on runtime mode changes '''
-
-    #     if self._enabled:
-    #         # syslog = logging.getLogger("system")
-    #         syslog.info(f"SCMONITOR: Profile mode change request to mode [{new_mode}]")
-            
-    #         mode = self.getStartupMode()
-    #         if mode and mode != new_mode and self._options.auto_mode_select:
-    #             syslog.info(f"SCMONITOR: per option - restoring mode for aicraft mode [{mode}]")
-    #             self.change_mode(mode)
+ 
 
 
         
@@ -1296,7 +1290,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self._manager.activate()
         self._manager.sim_aircraft_loaded.connect(self._aircraft_loaded)
         self._manager.sim_state.connect(self._sim_state)
-
+        self._verbose = gremlin.config.Configuration().verbose_mode_simconnect
         
         self.options = SimconnectOptions(simconnect)
         self._data = None # sorted list of aircraft definitions
@@ -2400,7 +2394,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
     def _mode_from_aircraft_button_cb(self):
         ''' mode from aicraft button '''
         aircraft, model, title = self._sm_data.get_aircraft_data()
-        syslog.info(f"Aircraft: {aircraft} model: {model} title: {title}")
+        if self._verbose: syslog.info(f"Aircraft: {aircraft} model: {model} title: {title}")
         if not title in self._mode_list:
             self.profile.add_mode(title)
             
@@ -3241,7 +3235,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
                 percent = gremlin.util.scale_to_range(curved, target_min = 0, target_max = 100)    
                 output_value = gremlin.util.scale_to_range(curved, target_min = min_range, target_max = max_range, invert = self.action_data.inverted)
                                 
-                if verbose: syslog.info(f"SIMCONNECT: {value:0.3f} output range: [{self.action_data.output_min_range:0.3f}, {self.action_data.output_max_range:0.3f}] normalized range: [{self.action_data.normalized_min_range:0.4f}, {self.action_data.normalized_max_range:0.4f}] normalized {normalized:0.4f} curved {curved:0.3f} percent: {percent:0.3f} output: {output_value}")
+                if verbose: syslog.info(f"SIMCONNECT UI: {value:0.3f} output range: [{self.action_data.output_min_range:0.3f}, {self.action_data.output_max_range:0.3f}] normalized range: [{self.action_data.normalized_min_range:0.4f}, {self.action_data.normalized_max_range:0.4f}] normalized {normalized:0.4f} curved {curved:0.3f} percent: {percent:0.3f} output: {output_value}")
             else:
                 output_value = value
                 percent = gremlin.util.scale_to_range(value, source_min = self.action_data.output_min_range, source_max = self.action_data.output_max_range, target_min=0, target_max=100) # convert to percent
@@ -3812,7 +3806,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
     
     
     
-    def process_event(self, event, action_value : gremlin.actions.Value):
+    def process_event(self, event, action_value : gremlin.actions.Value, extra_data = None):
         ''' runs when a joystick event occurs like a button press or axis movement when a profile is running '''
 
         if not gremlin.shared_state.is_running or gremlin.shared_state.abort:
@@ -3830,7 +3824,9 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                 eh.request_connect.emit()
             return True
 
-        return self._process_event(event, action_value)                    
+        return self._process_event(event, action_value)           
+
+
 
     def _process_event(self, event, action_value : gremlin.actions.Value):
         ''' handles default input data '''
@@ -4080,7 +4076,7 @@ class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
         super().__init__(parent)
         self.parent = parent
         self.events = MapToSimConnectHelper()
-        self._verbose = gremlin.config.Configuration().verbose
+        self._verbose = gremlin.config.Configuration().verbose_mode_details
 
         #eh = SimConnectEventHandler()
         from .SimConnectManager import SimConnectManager

@@ -110,7 +110,7 @@ class SwitchModeFunctor(gremlin.base_profile.AbstractFunctor):
         super().__init__(action, parent)
         self.action_data = action
 
-    def process_event(self, event, value):
+    def process_event(self, event, value, extra_data = None):
         import gremlin.control_action
         import gremlin.config        
         import logging

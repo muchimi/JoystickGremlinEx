@@ -508,12 +508,13 @@ class Configuration:
         if value is not None:
             value = os.path.normpath(value.casefold()) # normalize the profile path
             current = self.recent_profiles
+
             if value in current:
                 del current[current.index(value)]
             current.insert(0, value)
             # normalize and remove duplicates
             current = list(set([os.path.normpath(item.casefold()) for item in current]))
-            current = current[0:14] # remember up to 15
+            current = current[0:19] # limit
 
             
             self._data["recent_profiles"] = current
@@ -526,6 +527,13 @@ class Configuration:
         :return list of recently used profiles
         """
         return self._data.get("recent_profiles", [])
+    
+
+
+        
+
+
+
 
     @property
     def autoload_profiles(self):

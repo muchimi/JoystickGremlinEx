@@ -187,7 +187,7 @@ class SmartToggleContainerFunctor(gremlin.base_conditions.AbstractFunctor):
             if "needs_auto_release" in functor.__dict__:
                 functor.needs_auto_release = False
 
-    def process_event(self, event, value):
+    def process_event(self, event, value, extra_data = None):
         # TODO: Currently this does not handle hat or axis events, however
         #       virtual buttons created on those inputs is supported
         if not isinstance(value.current, bool):

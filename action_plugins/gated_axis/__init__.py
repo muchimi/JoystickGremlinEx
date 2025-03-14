@@ -28,6 +28,8 @@ import gremlin.gated_handler
 import gremlin.shared_state
 import logging
 
+syslog = logging.getLogger("system")
+
 class GatedAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     """Widget associated with the action of switching to the previous mode."""
@@ -73,11 +75,18 @@ class GatedAxisFunctor(gremlin.base_profile.AbstractContainerActionFunctor):
 
     def __init__(self, action, parent = None):
         super().__init__(action, parent)
+        self.manual_callback = True # indicate this functor only uses manual callbacks
 
-    def process_event(self, event, value):
-        # all the work happens in the gate widget - nothing to do
-        return True
+    # def profile_start(self):
+    #     ''' register the gated functor'''
+    #     #self.action_data.gate_data.setActionId(self.action_data.id)
+    #     pass
 
+    def process_event(self, event, value, extra_data = None):
+        # all the work happens in the gate widget hook function - nothing to do
+        #self.action_data.gate_data.process_event(event, value)
+        #syslog.info("Gated Axis: trigger")
+        return True # prevent child from executing
 
 class GatedAxis(gremlin.base_profile.AbstractAction):
 

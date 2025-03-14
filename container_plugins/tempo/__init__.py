@@ -255,7 +255,7 @@ class TempoContainerFunctor(gremlin.base_conditions.AbstractFunctor):
         self.event_press = None
 
 
-    def process_event(self, event, value):
+    def process_event(self, event, value, extra_data = None):
         if event.event_type == InputType.JoystickHat:
             is_pressed = value.current != (0,0)
         elif not isinstance(value.current, bool):

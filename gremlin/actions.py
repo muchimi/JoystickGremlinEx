@@ -142,6 +142,7 @@ class ActivationCondition:
         self.target = target # the target this condition applies to (container or action)
         self.id = target.id # the id of this node is the same as the one for the container or action
         self.is_container_condition = is_container_condition
+        self.manual_callback = False
         
         
     @property
@@ -149,8 +150,13 @@ class ActivationCondition:
         if self.target:
             return isinstance(self.target, gremlin.base_profile.AbstractContainer)
         return False
+    
+    @property 
+    def isAny(self) -> bool:
+        ''' true if the activiation condition is any sub condition '''
+        return self._rule == ActivationRule.Any
 
-    def process_event(self, event, value):
+    def process_event(self, event, value, extra_data = None):
         """Returns whether or not a condition is satisfied, i.e. true.
 
         :param event the event this condition was triggered through
@@ -169,6 +175,9 @@ class ActivationCondition:
         for index, c in enumerate(self._conditions):
             condition_name += f"[C{index}] {c.condition_name()} "
         return f"Rule: {rule_name} Is container: {self.is_container} Is container condition: {self.is_container_condition} Conditions: {condition_name} "
+    
+    def __str__(self):
+        return self.condition_name()
 
 class AbstractCondition(metaclass=ABCMeta):
 
@@ -184,15 +193,21 @@ class AbstractCondition(metaclass=ABCMeta):
         :param comparison the comparison operation to perform when evaluated
         """
         self.comparison = comparison
+        self.id = gremlin.util.get_guid()
+        self.manual_callback = False
 
     @abstractmethod
-    def __call__(self, event, value):
+    def __call__(self, event, value, extra_data = None):
         """Evaluates the condition using the condition and provided data.
 
         :param event raw event that caused the condition to be evaluated
         :param value the possibly modified value
         :return True if the condition is satisfied, False otherwise
         """
+        pass
+
+    @abstractmethod
+    def process_event(self, event, value, extra_data = None):
         pass
 
     def condition_name(self)->str:
@@ -225,8 +240,11 @@ class KeyboardCondition(AbstractCondition):
 
         self.input_item = input_item
        
+    def __call__(self, event, value, extra_data = None):
+        # default call
+        return self.process_event(event, value, extra_data)
 
-    def __call__(self, event, value):
+    def process_event(self, event, value, extra_data = None):
         """Evaluates the condition using the condition and provided data.
 
         :param event raw event that caused the condition to be evaluated
@@ -252,6 +270,9 @@ class KeyboardCondition(AbstractCondition):
         
     def condition_name(self)->str:
         return f"KeyboardCondition {self.input_item.display_name}"
+    
+    def __str__(self):
+        return self.condition_name()
 
 
 class JoystickCondition(AbstractCondition):
@@ -278,7 +299,11 @@ class JoystickCondition(AbstractCondition):
         self.condition = condition
 
 
-    def __call__(self, event, value):
+    def __call__(self, event, value, extra_data = None):
+        # default call
+        return self.process_event(event, value, extra_data)
+
+    def process_event(self, event, value, extra_data = None):
         """Evaluates the condition using the condition and provided data.
 
         :param event raw event that caused the condition to be evaluated
@@ -320,13 +345,13 @@ class JoystickCondition(AbstractCondition):
                 #value = joy.axis(self.input_id).value
             r1 = self.condition.range[0]
             r2 = self.condition.range[1]
-            in_range = gremlin.util.valueInRange(value, r1, r2)
+            if r1 > r2:
+                r1,r2 = r2,r1
+            in_range = value >= r1 and value <= r2
 
             if self.condition.comparison in ["inside", "outside"]:
                 retval = in_range if self.comparison == "inside" else not in_range
             if verbose: syslog.info(f"{logtabs}JoystickCondition: Axis range comparison: [{self.comparison}]: device {info.name} input: {self.input_id} range: {self.condition.range[0]:0.3f} to {self.condition.range[1]:0.3f} value: {joy.axis(self.input_id).value:0.3f} return: {"OK" if retval else "FAILED"}")
-            if not retval:
-                pass
             return retval
         
         elif self.input_type == InputType.JoystickButton:
@@ -359,8 +384,11 @@ class JoystickCondition(AbstractCondition):
                 state = f"{gremlin.joystick_handling.get_axis(self.device_guid, self.input_id):0.3f}"
             case _:
                 state = "N/A"
-        return f"JoystickCondition: mode: {self.comparison} type: {gremlin.input_types.InputType.to_display_name(self.input_type)} input: {self.input_id} device: {info.name} state: {state} "
+        logtabs = gremlin.shared_state.logTabs()
+        return f"{logtabs}\tJoystickCondition: mode: {self.comparison} type: {gremlin.input_types.InputType.to_display_name(self.input_type)} input: {self.input_id} device: {info.name} state: {state} "
 
+    def __str__(self):
+        return self.condition_name()
 
 class VJoyCondition(AbstractCondition):
 
@@ -394,7 +422,11 @@ class VJoyCondition(AbstractCondition):
         
         self.condition = condition
 
-    def __call__(self, event, value):
+    def __call__(self, event, value, extra_data = None):
+        # default call
+        return self.process_event(event, value, extra_data)
+
+    def process_event(self, event, value, extra_data = None):
         """Evaluates the condition using the condition and provided data.
 
         :param event raw event that caused the condition to be evaluated
@@ -455,6 +487,10 @@ class VJoyCondition(AbstractCondition):
         info = gremlin.joystick_handling.device_info_from_guid(self.device_guid)
         return f"VJoyCondition: mode: {self.comparison} type: {gremlin.input_types.InputType.to_display_name(self.input_type)} input: {self.input_id} device: {info.name} "
 
+
+    def __str__(self):
+        return self.condition_name()
+    
 class InputActionCondition(AbstractCondition):
 
     """Condition verifying the state of the triggering input itself. (ActionActivationCondition)
@@ -470,7 +506,11 @@ class InputActionCondition(AbstractCondition):
         """
         super().__init__(comparison)
 
-    def __call__(self, event, value):
+    def __call__(self, event, value, extra_data = None):
+        # default call
+        return self.process_event(event, value, extra_data)
+
+    def process_event(self, event, value, extra_data = None):
         """Evaluates the condition using the condition and provided data.
 
         :param event raw event that caused the condition to be evaluated

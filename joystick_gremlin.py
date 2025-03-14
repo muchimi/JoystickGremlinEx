@@ -123,8 +123,8 @@ from gremlin.ui.ui_gremlin import Ui_Gremlin
 syslog = logging.getLogger("system")
 
 APPLICATION_NAME = "Joystick Gremlin Ex"
-APPLICATION_BASE = "m73t15"
-APPLICATION_VERSION = f"13.40.16ex ({APPLICATION_BASE})"
+APPLICATION_BASE = "m73t16"
+APPLICATION_VERSION = f"0.16ex ({APPLICATION_BASE})"
 
 
 # the main ui
@@ -1022,8 +1022,9 @@ class GremlinUi(QtWidgets.QMainWindow):
             self.abort_reason = None
             #syslog.info("Activate: start")
             self.activate_locked = True
-
             is_running = gremlin.shared_state.is_running
+            gremlin.shared_state.profile_state = True # assume all ok
+
 
 
             from gremlin.config import Configuration
@@ -1047,58 +1048,60 @@ class GremlinUi(QtWidgets.QMainWindow):
                     self._last_runtime_mode(),
                     self.profile
                 )
-                #print ("set icon ACTIVE")
-                self.ui.tray_icon.setIcon(load_icon("gfx/icon_active.ico"))
 
-                with QtCore.QSignalBlocker(self.ui.actionActivate):
-                    self.ui.actionActivate.setChecked(True) # toolbar icon "on"
+                
 
-                # tell callbacks they are starting
-                el.profile_start.emit()
+                if gremlin.shared_state.profile_state:
+                    #print ("set icon ACTIVE")
+                    self.ui.tray_icon.setIcon(load_icon("gfx/icon_active.ico"))
 
-            else:
+                    with QtCore.QSignalBlocker(self.ui.actionActivate):
+                        self.ui.actionActivate.setChecked(True) # toolbar icon "on"
+
+                    return
+
+
+            if not gremlin.shared_state.profile_state or is_running:
                 # Stop running the code
 
-                if is_running:
-                    # running - save the last running mode to the executing profile
-                    if verbose: syslog.info(f"Deactivate profile requested")
-                    self.profile.set_last_runtime_mode(gremlin.shared_state.runtime_mode)
-                
-                    # stop listen
-                    el.stop()
-                    # tell modules the profile is stopping
-                    el.profile_stop.emit()
+                # running - save the last running mode to the executing profile
+                if verbose: syslog.info(f"Deactivate profile requested")
+                self.profile.set_last_runtime_mode(gremlin.shared_state.runtime_mode)
+            
+                # stop listen
+                el.stop()
 
-                    self.runner.stop()
+                # tell runner to stop
+                self.runner.stop()
 
-                    if gremlin.shared_state.terminating:
-                        # terminate faster
-                      return
+                if gremlin.shared_state.terminating:
+                    # terminate faster
+                    return
 
-                    self._update_status_bar_active(False)
-                    self._profile_auto_activated = False
-                    current_index = self.ui.devices.currentIndex()
-                    device_guid = self.getDeviceGuidForTabIndex(current_index)
-                    widget = self.getWidget(device_guid)
+                self._update_status_bar_active(False)
+                self._profile_auto_activated = False
+                current_index = self.ui.devices.currentIndex()
+                device_guid = self.getDeviceGuidForTabIndex(current_index)
+                widget = self.getWidget(device_guid)
 
-                    if widget:
-                        tab_type = widget.data[0]
-                        if tab_type in (
-                        TabDeviceType.Joystick,
-                        TabDeviceType.Keyboard,
-                        TabDeviceType.Osc,
-                        TabDeviceType.Midi):
-                            widget.refresh()
+                if widget:
+                    tab_type = widget.data[0]
+                    if tab_type in (
+                    TabDeviceType.Joystick,
+                    TabDeviceType.Keyboard,
+                    TabDeviceType.Osc,
+                    TabDeviceType.Midi):
+                        widget.refresh()
 
-                    # toolbar icon
-                    with QtCore.QSignalBlocker(self.ui.actionActivate):
-                        self.ui.actionActivate.setChecked(False) # toolbar icon "off"
+                # toolbar icon
+                with QtCore.QSignalBlocker(self.ui.actionActivate):
+                    self.ui.actionActivate.setChecked(False) # toolbar icon "off"
 
-                    try:
-                        if self.ui.tray_icon is not None:
-                            self.ui.tray_icon.setIcon(load_icon("gfx/icon.ico"))
-                    except:
-                        pass
+                try:
+                    if self.ui.tray_icon is not None:
+                        self.ui.tray_icon.setIcon(load_icon("gfx/icon.ico"))
+                except:
+                    pass
         except Exception as err:
             syslog.error(f"Activate: error: {err}\n{traceback.format_exc()}")
 

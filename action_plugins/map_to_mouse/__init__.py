@@ -338,7 +338,7 @@ class MapToMouseFunctor(gremlin.base_profile.AbstractFunctor):
         self.config = action
         self.mouse_controller = gremlin.sendinput.MouseController()
 
-    def process_event(self, event, value):
+    def process_event(self, event, value, extra_data = None):
         if self.config.motion_input:
             if event.event_type == InputType.JoystickAxis:
                 self._perform_axis_motion(event, value)

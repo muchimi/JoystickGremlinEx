@@ -207,7 +207,7 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractFunctor):
         self._macro_id = None
 
 
-    def process_event(self, event : gremlin.event_handler.Event, value : gremlin.actions.Value):
+    def process_event(self, event : gremlin.event_handler.Event, value : gremlin.actions.Value, extra_data = None):
         syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose
 

@@ -546,7 +546,7 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
         self.click_mode = action.click_mode
     
 
-    def process_event(self, event, value):
+    def process_event(self, event, value, extra_data = None):
         ''' processes an input event - must return True on success, False to abort the input sequence '''
 
         #syslog.debug(f"Process mouse functor event: {self.action_mode.name}  {self.action.action_id} exec on release: {self.action.exec_on_release}")

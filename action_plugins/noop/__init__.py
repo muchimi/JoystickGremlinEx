@@ -52,7 +52,7 @@ class NoOpActionFunctor(gremlin.base_profile.AbstractFunctor):
     def __init__(self, action, parent = None):
         super().__init__(action, parent)
 
-    def process_event(self, event, value):
+    def process_event(self, event, value, extra_data = None):
         return True
 
 

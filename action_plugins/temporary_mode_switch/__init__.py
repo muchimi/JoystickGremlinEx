@@ -105,7 +105,7 @@ class TemporaryModeSwitchFunctor(gremlin.base_profile.AbstractFunctor):
         super().__init__(action, parent)
         self.action_data : TemporaryModeSwitch = action
         
-    def process_event(self, event, value):
+    def process_event(self, event, value, extra_data = None):
         import gremlin.control_action
         import gremlin.shared_state
         verbose = gremlin.config.Configuration().verbose

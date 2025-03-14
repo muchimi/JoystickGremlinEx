@@ -209,6 +209,18 @@ Joystick Gremlin EX
 
 
 <!-- TOC --><a name="134016ex-pre-release"></a>
+## 0.16ex (pre-release)
+
+### (m73)
+- New graph based execution logic:
+	+ Graph structure represents complete profile
+	+ Graph nodes include conditions and actions
+	+ Execution can start at any node
+	+ Support for ANY and ALL and GROUP (multi containers)
+- Improved handling of profile start errors (inability to connect for example)
+- Added notes field for all containers
+- Changed version number from base Gremlin to reflect the product is now significantly different to 0.16ex
+
 ## 13.40.16ex (pre-release)
 ### (m72)
 - Improvements: new "outputs" verbose mode to track outputs (warning, very verbose, will slow things down considerably)  

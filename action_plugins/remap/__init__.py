@@ -306,7 +306,7 @@ class RemapFunctor(gremlin.base_conditions.AbstractFunctor):
         self.axis_value = 0.0
         self.test = False
 
-    def process_event(self, event, value):
+    def process_event(self, event, value, extra_data = None):
         input_type = event.getInputType()
         if event.is_axis:
             if event.is_repeater:

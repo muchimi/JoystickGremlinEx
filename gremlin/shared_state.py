@@ -80,6 +80,9 @@ abort = False # global abort flag - used to mark a profile start should abort - 
 
 ui_ready = False
 
+# profile state status = ok - all components loaded, false an error occured
+profile_state = True
+
 # holds the main UI reference
 ui = None
 
@@ -130,20 +133,24 @@ virtual_device_guid_type_map = [
     (mode_tab_guid, DeviceType.ModeControl)
 ]
 
+virtual_device_guid = None
 
 # setup default device names that are not hardware devices
 def _init_special_device_guids():
     ''' setup the non HID hardware device name maps '''
     import dinput
-    global _virtual_device_guid_to_name_map
+    global _virtual_device_guid_to_name_map, virtual_device_guid
     _virtual_device_guid_to_name_map[str(keyboard_tab_guid).casefold()] = "Keyboard"
     _virtual_device_guid_to_name_map[str(osc_tab_guid).casefold()] = "OSC"
     _virtual_device_guid_to_name_map[str(midi_tab_guid).casefold()] = "MIDI"
     _virtual_device_guid_to_name_map[str(settings_tab_guid).casefold()] = "Settings"
     _virtual_device_guid_to_name_map[str(plugins_tab_guid).casefold()] = "Plugins"
     _virtual_device_guid_to_name_map[str(mode_tab_guid).casefold()] = "Modes"
-    _virtual_device_guid_to_name_map[str(dinput.GUID_Virtual).casefold()] = "(VirtualButton)"
+
+    virtual_device_guid = str(dinput.GUID_Virtual).casefold()
+    _virtual_device_guid_to_name_map[virtual_device_guid] = "(VirtualButton)"
     _virtual_device_guid_to_name_map[str(dinput.GUID_Invalid).casefold()] = "(Invalid)"
+    
             
 
 

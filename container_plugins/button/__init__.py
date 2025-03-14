@@ -199,7 +199,7 @@ class ButtonContainerFunctor(gremlin.base_conditions.AbstractFunctor):
             container.action_sets[1], parent
         )
 
-    def process_event(self, event, value):
+    def process_event(self, event, value, extra_data = None):
 
         if event.event_type == InputType.JoystickHat:
             is_hat = True

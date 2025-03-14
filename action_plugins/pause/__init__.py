@@ -110,7 +110,7 @@ class PauseActionFunctor(gremlin.base_profile.AbstractFunctor):
         self.action_data = action_data
         
 
-    def process_event(self, event : gremlin.event_handler.Event, value : gremlin.actions.Value):
+    def process_event(self, event : gremlin.event_handler.Event, value : gremlin.actions.Value, extra_data = None):
         
         syslog = logging.getLogger("system")
         if value.is_pressed:

@@ -3025,7 +3025,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
     #     return pow((value - v_start) / v_end, power) * v_end + v_start
 
 
-    def process_event(self, event, action_value : gremlin.actions.Value):
+    def process_event(self, event, action_value : gremlin.actions.Value, extra_data = None):
         ''' runs when a joystick event occurs like a button press or axis movement when a profile is running '''
         # if self.action_data.merged and event.is_axis:
         #     # merged axis data is handled by the internal hook - ignore
@@ -3053,9 +3053,9 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
 
             action_value = gremlin.actions.Value(value)
 
-        return self._process_event(event, action_value)
+        return self._process_event(event, action_value, extra_data)
 
-    def _process_event(self, event, action_value):
+    def _process_event(self, event, action_value, extra_data):
         ''' runs when a joystick even occurs like a button press or axis movement when a profile is running '''
         (is_local, is_remote) = input_devices.remote_state.state
         usage_data = gremlin.joystick_handling.VJoyUsageState()
@@ -4125,6 +4125,15 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
             return False
         return True
 
+
+    def __str__(self):
+        if self.action_mode in (VjoyAction.VJoySetAxis, VjoyAction.VJoyInvertAxis, VjoyAction.VJoyAxis):
+            input_string = "axis"
+        elif self.action_mode == VjoyAction.VJoyHat:
+            input_string = "hat"
+        elif self.action_mode in (VjoyAction.VJoyButton, VjoyAction.VJoyButtonRelease, VjoyAction.VJoyPulse, VjoyAction.VJoyHatToButton):
+            input_string = "button"
+        return f"VjoyRemap: VJOY device: {self.vjoy_device_id} {input_string}: {self.vjoy_input_id}"
 version = 1
 name = "Vjoy Remap"
 create = VjoyRemap

@@ -71,6 +71,9 @@ class Color():
     def normalDarkColor():
         return "#AAAAAA" 
     @staticmethod
+    def selectedDockTabBackgroundColor():
+        return "#303030" if gremlin.shared_state.is_dark_theme else "#DDDDDD"
+    @staticmethod
     def normalLightColor():
         return "#111111" 
     @staticmethod
@@ -4516,9 +4519,9 @@ class QRowSelectorFrame(QtWidgets.QFrame):
 
 def get_text_width(text):
     ''' gets the average text width '''
-    lbl = QtWidgets.QLabel("w")
+    lbl = QtWidgets.QLabel("M")
     char_width = lbl.fontMetrics().averageCharWidth()
-    return char_width * len(text)
+    return char_width * (len(text) if text else 1)
 
 def get_text_height(text = None):
     ''' gets the average text width '''

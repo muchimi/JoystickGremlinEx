@@ -118,7 +118,7 @@ class MapToKeyboardFunctor(gremlin.base_profile.AbstractFunctor):
         for key in reversed(action.keys):
             self.release.release(key_from_code(key[0], key[1]))
 
-    def process_event(self, event, value):
+    def process_event(self, event, value, extra_data = None):
         if value.current:
             gremlin.macro.MacroManager().queue_macro(self.press)
             # print("press")
