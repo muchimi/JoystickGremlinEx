@@ -944,15 +944,12 @@ class ExecutionContext():
                                                     gate_container_node.description = f"Gate container for gate: {gate_info.to_display()}: condition: [{condition_type.name}] {str(container)}"
                                                     gate_container_node.parent = group_node # gate container is owned by the gate condition
 
-                                                    gate_activation_condition_node = self._get_condition_node(container, gate_activation_condition_node)
-
-                                                    
-                                                    
+                                                    gate_activation_condition_node = self._get_condition_node(container, gate_container_node)
 
                                                     # build gate container subtree
                                                     for action_set in container.action_sets:
                                                         for gate_action in action_set:
-                                                            gate_action_condition_node = self._get_condition_node(gate_action, gate_container_node)
+                                                            gate_action_condition_node = self._get_condition_node(gate_action, gate_activation_condition_node)
                                                             gate_action_node = ExecutionGraphNode(ExecutionGraphNodeType.Action)
                                                             gate_action_node.id = gate_action.id
                                                             gate_action_node.parent = gate_action_condition_node  # gate action is owned by its condition
