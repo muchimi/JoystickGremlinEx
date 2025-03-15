@@ -4192,6 +4192,8 @@ class VjoyRemap(gremlin.base_profile.AbstractAction):
             input_string = "hat"
         elif self.action_mode in (VjoyAction.VJoyButton, VjoyAction.VJoyButtonRelease, VjoyAction.VJoyPulse, VjoyAction.VJoyHatToButton):
             input_string = "button"
+        else:
+            input_string = "not founded input"
         return f"VjoyRemap: VJOY device: {self.vjoy_device_id} {input_string}: {self.vjoy_input_id}"
 version = 1
 name = "Vjoy Remap"
