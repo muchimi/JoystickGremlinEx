@@ -1040,13 +1040,14 @@ class ExecutionContext():
                 for key in callbacks[device_guid][mode]:
                     callback : ContainerCallback
                     for callback, _ in callbacks[device_guid][mode][key]:
-                        container_graph : ContainerExecutionGraph = callback.execution_graph
-                        container = container_graph.instance
-                        id = container.id
-                        syslog.info(f"Looking for id: {id}")
-                        node = next((n for n in anytree.PreOrderIter(self.root) if  n.nodeType == ExecutionGraphNodeType.Container and n.id == id), None)
-                        if node:
-                            self.registerNode(node)
+                        if hasattr(callback, 'execution_graph'):
+                            container_graph : ContainerExecutionGraph = callback.execution_graph
+                            container = container_graph.instance
+                            id = container.id
+                            syslog.info(f"Looking for id: {id}")
+                            node = next((n for n in anytree.PreOrderIter(self.root) if  n.nodeType == ExecutionGraphNodeType.Container and n.id == id), None)
+                            if node:
+                                self.registerNode(node)
 
 
         for node in anytree.PreOrderIter(self.root):
