@@ -127,7 +127,7 @@ class GatedAxis(gremlin.base_profile.AbstractAction):
 
 
     def icon(self):
-        return "fa.sliders"
+        return "ph.sliders"
 
     def requires_virtual_button(self):
         return False

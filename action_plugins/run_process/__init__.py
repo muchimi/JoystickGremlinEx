@@ -58,7 +58,7 @@ class RunProcessWidget(gremlin.ui.input_item.AbstractActionWidget):
 
       
         self.run_widget = QtWidgets.QPushButton("Test")
-        self.run_widget.setIcon(gremlin.util.load_icon("fa.play",qta_color = gremlin.ui.ui_common.Color.activeColor()))
+        self.run_widget.setIcon(gremlin.util.load_icon("fa6s.play",qta_color = gremlin.ui.ui_common.Color.activeColor()))
         self.run_widget.setToolTip("Runs the process")
         self.run_widget.clicked.connect(self._run_process)
 
@@ -227,7 +227,7 @@ class RunProcess(gremlin.base_profile.AbstractAction):
         return f"Run Process: [{self.process}]  Args: [{self.arguments}]" 
 
     def icon(self):
-        return "fa.bolt"
+        return "fa6s.bolt"
 
     def requires_virtual_button(self):
         return self.get_input_type() in [

@@ -67,7 +67,7 @@ class TextToSpeechWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.rate_widget.doubleClick.connect(self._rate_reset_cb)
 
         self.play_widget = QtWidgets.QPushButton("Play")
-        self.play_widget.setIcon(gremlin.util.load_icon("fa.play",qta_color = gremlin.ui.ui_common.Color.activeColor()))
+        self.play_widget.setIcon(gremlin.util.load_icon("fa6s.play",qta_color = gremlin.ui.ui_common.Color.activeColor()))
         self.play_widget.setToolTip("Plays the audio as configured")
         self.play_widget.clicked.connect(self._play_cb)
 

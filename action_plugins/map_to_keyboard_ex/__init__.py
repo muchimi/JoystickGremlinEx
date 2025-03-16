@@ -673,7 +673,7 @@ class MapToKeyboardEx(gremlin.base_profile.AbstractAction):
 
         :return icon representing this action
         """
-        return "fa.keyboard-o"
+        return "fa6s.keyboard"
         #return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
 
     def requires_virtual_button(self):

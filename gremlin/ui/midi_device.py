@@ -530,12 +530,12 @@ class MidiInterface(QtCore.QObject):
         self._event_handler = gremlin.event_handler.EventHandler()
         self._event_listener = gremlin.event_handler.EventListener()
         self._event_listener.shutdown.connect(self.stop)
-        
+        self._port_names = []
         try:
 
             # get a list of available devices to listen into
             mido.set_backend('mido.backends.rtmidi')
-            self._port_names = []
+
             self._port_map = {}
             for index, name in enumerate(mido.get_input_names()):
                 self._port_names.append(name)
@@ -546,8 +546,10 @@ class MidiInterface(QtCore.QObject):
 
             self.midi_enabled = True
 
-        except:
-            pass
+        except Exception as e:
+            logging.error(f"Failed to initialize MIDI backend: {e}")
+            self.midi_enabled = False
+            self._port_count = 0
 
     
         for port in self._port_names:
@@ -995,7 +997,7 @@ class MidiInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
             pass
 
         if self._mode_locked:
-            self._mode_locked_widget.setIcon("fa.lock")
+            self._mode_locked_widget.setIcon("fa6s.lock")
             stub = "Axis to button" if self._mode == MidiInputItem.InputMode.Axis else "Button to axis"
             msg = f"{stub} change is locked because InputItem has containers defined for that specific input type.<br>Clear the containers to unlock."
             self._mode_locked_widget.setToolTip(msg)
@@ -1158,7 +1160,7 @@ class MidiInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
                 self._validation_message_widget.setText(f"The current MIDI command cannot be setup as an axis input.")
                 warning_color = gremlin.ui.ui_common.Color.warningColor()
                 icon_color= QtGui.QColor(warning_color)
-                self._validation_message_widget.setIcon("fa.warning",True,color=icon_color)
+                self._validation_message_widget.setIcon("ph.warning-light",True,color=icon_color)
             else:
                 # allowed
                 self._mode = MidiInputItem.InputMode.Axis
@@ -1373,7 +1375,7 @@ class MidiInputConfigDialog(gremlin.ui.ui_common.QRememberDialog):
                         self._validation_message_widget.setText(f"Input conflict detected with input [{index+1}] - ensure inputs are unique")
                         warning_color = gremlin.ui.ui_common.Color.warningColor()
                         icon_color= QtGui.QColor(warning_color)
-                        self._validation_message_widget.setIcon("fa.warning",True, color=icon_color)
+                        self._validation_message_widget.setIcon("ph.warning-light",True, color=icon_color)
                         valid = False
                         return
                         
@@ -1482,7 +1484,7 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         # clear inputs button
         clear_button = ui_common.ConfirmPushButton("Clear MIDI Inputs", show_callback = self._show_clear_cb)
-        icon = gremlin.util.load_icon("fa.trash-o")
+        icon = gremlin.util.load_icon("fa6.trash-can")
         clear_button.setIcon(icon)
         clear_button.confirmed.connect(self._clear_inputs_cb)
         button_container_layout.addWidget(clear_button)
@@ -1681,9 +1683,9 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         if mode == MidiInputItem.InputMode.Button:
             widget.setIcon("mdi.gesture-tap-button")
         elif mode == MidiInputItem.InputMode.Axis:
-            widget.setIcon("fa.sliders")
+            widget.setIcon("fa6s.sliders")
         elif mode == MidiInputItem.InputMode.OnChange:
-            widget.setIcon("fa.exchange")
+            widget.setIcon("fa6s.exchange")
 
         # remember what widget is at what index
         widget.index = index
@@ -1766,8 +1768,8 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 other_key = other_input.message_key
                 if key == other_key:
                     index = widgets.index(widget)
-                    self._set_status(widget,"fa.warning", f"Input conflict detected with input [{input_widget_index + 1}]", color = "red")
-                    self._set_status(input_widget,"fa.warning", f"Input conflict detected with input [{index + 1}]", color = "red")
+                    self._set_status(widget,"ph.warning-light", f"Input conflict detected with input [{input_widget_index + 1}]", color = "red")
+                    self._set_status(input_widget,"ph.warning-light", f"Input conflict detected with input [{index + 1}]", color = "red")
                     conflicted_widgets.append(widget)
                     conflicted_widgets.append(input_widget)
                     break
@@ -1812,7 +1814,7 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         icon = None
         if is_warning:
-            icon = gremlin.util.load_icon("fa.warning", use_qta=True, qta_color="red")
+            icon = gremlin.util.load_icon("ph.warning-light", use_qta=True, qta_color="red")
 
 
         input_widget.setStatus(status_text, icon)

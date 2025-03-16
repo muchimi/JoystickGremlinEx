@@ -91,7 +91,7 @@ class VirtualAxisButtonWidget(AbstractVirtualButtonWidget):
         self.axis_repeater_widget.valueChanged.connect(self._axis_value_changed)
 
         self.range_status_widget = ui_common.QIconLabel()
-        self.range_status_widget.setIcon("fa.check", color= gremlin.ui.ui_common.Color.activeColor())
+        self.range_status_widget.setIcon("mdi.checkbox-marked-outline", color= gremlin.ui.ui_common.Color.activeColor())
 
         self.grab_low_widget = ui_common.QDataPushButton()
         self.grab_low_widget.setIcon(load_icon("mdi.checkbox-blank-circle",qta_color = gremlin.ui.ui_common.Color.recordColor()))

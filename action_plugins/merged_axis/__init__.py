@@ -136,8 +136,8 @@ class MergeAxisEntryWidget(QtWidgets.QDockWidget):
         # configure button
     
         active_color = gremlin.ui.ui_common.Color.activeContentColor()
-        self.configure_icon_active = gremlin.util.load_icon("fa.gear",qta_color= active_color)
-        self.configure_icon_inactive = gremlin.util.load_icon("fa.gear")
+        self.configure_icon_active = gremlin.util.load_icon("fa6s.gear",qta_color= active_color)
+        self.configure_icon_inactive = gremlin.util.load_icon("fa6s.gear")
 
         self.configure_button_widget = QtWidgets.QPushButton("Actions") 
 
@@ -177,7 +177,7 @@ class MergeAxisEntryWidget(QtWidgets.QDockWidget):
         )
 
         warning_color = gremlin.ui.ui_common.Color.warningColor()
-        self.status_widget = ui_common.QIconLabel("fa.warning",use_qta=True,icon_color=QtGui.QColor(warning_color), use_wrap=False)
+        self.status_widget = ui_common.QIconLabel("ph.warning-light",use_qta=True,icon_color=QtGui.QColor(warning_color), use_wrap=False)
         
         
         self.grid_layout.addWidget(self.joy1_selector, 1, 0)

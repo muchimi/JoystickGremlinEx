@@ -348,7 +348,7 @@ class Control(gremlin.base_profile.AbstractAction):
         self.target_input_item = None
 
     def icon(self):
-        return "fa.gears"
+        return "fa6s.gears"
     
     def requires_virtual_button(self):
         return False
