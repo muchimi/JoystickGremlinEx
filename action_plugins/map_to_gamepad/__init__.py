@@ -341,7 +341,7 @@ class MapToGamepad(gremlin.base_profile.AbstractAction):
 
         :return icon representing this action
         """
-        return "fa.gamepad"
+        return "fa6s.gamepad"
         
 
     def requires_virtual_button(self):

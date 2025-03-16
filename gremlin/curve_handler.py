@@ -1418,12 +1418,12 @@ class ControlPointEditorWidget(QtWidgets.QWidget):
         self.active_handle = None
 
         self.next_control_point = QtWidgets.QPushButton()
-        self.next_control_point.setIcon(gremlin.util.load_icon("fa.caret-up"))
+        self.next_control_point.setIcon(gremlin.util.load_icon("ph.caret-up-fill"))
         self.next_control_point.setMaximumWidth(20)
         self.next_control_point.setToolTip("Select next control point")
 
         self.prev_control_point = QtWidgets.QPushButton()
-        self.prev_control_point.setIcon(gremlin.util.load_icon("fa.caret-down"))
+        self.prev_control_point.setIcon(gremlin.util.load_icon("ph.caret-down-fill"))
         self.prev_control_point.setMaximumWidth(20)
         self.prev_control_point.setToolTip("Select previous control point")
 

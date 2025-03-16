@@ -936,7 +936,7 @@ This setting is also available on a profile by profile basis on the profile tab,
         
         page_layout.addWidget(container)
         text = "Warning: these options can degrade performance significantly due to the amount of log entries generated.  Log file size can also grow to become very large. Only use the modes to diagnose a specific subsystem.  Avoid detailed mode unless directed to."
-        warning_widget = gremlin.ui.ui_common.QIconLabel("fa.warning",use_qta=True,icon_color=QtGui.QColor("orange"),text= text, use_wrap=True)
+        warning_widget = gremlin.ui.ui_common.QIconLabel("ph.warning-light",use_qta=True,icon_color=QtGui.QColor("orange"),text= text, use_wrap=True)
         page_layout.addWidget(warning_widget)
         
         page_layout.addStretch()
@@ -1733,7 +1733,7 @@ This setting is also available on a profile by profile basis on the profile tab,
 
                 if not item.valid:
                     warning_color = gremlin.ui.ui_common.Color.warningColor()
-                    warning_widget = ui_common.QIconLabel("fa.warning", text=item.warning, use_qta = True,  icon_color= QtGui.QColor(warning_color))
+                    warning_widget = ui_common.QIconLabel("ph.warning-light", text=item.warning, use_qta = True,  icon_color= QtGui.QColor(warning_color))
                     container_layout.addWidget(warning_widget, row, 0, 1, -1)
                     row+=1
 
@@ -1917,7 +1917,7 @@ class ProcessWindow(ui_common.BaseDialogUi):
         self.button_bar_widget.setLayout(self.button_bar_layout)
 
         self.refresh_button =QtWidgets.QPushButton("Refresh")
-        self.refresh_button.setIcon(load_icon("fa.refresh",qta_color = gremlin.ui.ui_common.Color.activeColor()))
+        self.refresh_button.setIcon(load_icon("ei.refresh",qta_color = gremlin.ui.ui_common.Color.activeColor()))
         self.refresh_button.clicked.connect(self._refresh)
 
         self.main_layout.addWidget(self.list_view)
@@ -2299,7 +2299,7 @@ class ModeManagerUi(ui_common.BaseDialogUi):
 
             # Rename mode button
             self.mode_rename[mode] = QtWidgets.QPushButton(
-                load_icon("fa.edit"), ""
+                load_icon("ei.edit"), ""
             )
             self.mode_rename[mode].setMaximumWidth(20)
             self.mode_layout.addWidget(self.mode_rename[mode], row, 2)

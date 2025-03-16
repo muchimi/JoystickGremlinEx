@@ -52,7 +52,7 @@ class MapToKeyboardWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.main_layout.addWidget(self.record_button)
 
         warning_color = gremlin.ui.ui_common.Color.warningColor()
-        warning_widget = gremlin.ui.ui_common.QIconLabel("fa.warning",use_qta=True,icon_color=QtGui.QColor(warning_color),text="Legacy mapper - consider using <i>Map to Keyboard Ex</i> for additional functionality", use_wrap=False)
+        warning_widget = gremlin.ui.ui_common.QIconLabel("ph.shield-warning-fill",use_qta=True,icon_color=QtGui.QColor(warning_color),text="Legacy mapper - consider using <i>Map to Keyboard Ex</i> for additional functionality", use_wrap=False)
         warning_container, warning_layout = gremlin.ui.ui_common.getHContainer(warning_widget)
         self.main_layout.addWidget(warning_container)
 
@@ -175,7 +175,7 @@ class MapToKeyboard(gremlin.base_profile.AbstractAction):
 
         :return icon representing this action
         """
-        return "fa.keyboard-o"
+        return "fa6s.keyboard"
         #return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
 
     def requires_virtual_button(self):
