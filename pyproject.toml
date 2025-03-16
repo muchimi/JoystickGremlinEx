@@ -16,6 +16,7 @@ dependencies = [
     "pymidi",
     "pyside6>=6.8.2.1",
     "pytest==8.2.0",
+    "python-rtmidi",
     "pyttsx3",
     "pywin32==306",
     "qtawesome>=1.4.0",
