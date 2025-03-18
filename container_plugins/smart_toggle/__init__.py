@@ -204,10 +204,7 @@ class SmartToggleContainerFunctor(gremlin.base_conditions.AbstractFunctor):
 
             # Run release logic when the second press happens in toggle mode
             elif self.mode == "toggle":
-                self.action_set.process_event(
-                    self.release_event,
-                    self.release_value
-                )
+                self.action_set.process_event(self.release_event, self.release_value)
                 self.activation_time = 0.0
                 self.mode = None
         else:

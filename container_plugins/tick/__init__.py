@@ -339,7 +339,6 @@ class TickContainerFunctor(gremlin.base_conditions.AbstractFunctor):
                 # going up 
                 #print (f"increase set trigger  value: {value:0.3f} tick: {tick} last tick: {last_tick} count: {trigger_count}")
                 for _ in range(trigger_count):
-                    
                     self.increase_set.process_event(event, value)
             elif last_value > value:
                 # going down

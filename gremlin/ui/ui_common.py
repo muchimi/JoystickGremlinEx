@@ -4386,14 +4386,14 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
             return
 
         for widget in self.widgets:
-            widget.process_event(event)
+            widget.process_event(event, )
 
     def _current_axis_update(self, event):
         if self.device_guid != event.device_guid:
             return
 
         for widget in self.widgets:
-            widget.process_event(event)
+            widget.process_event(event, )
 
     def _temporal_axis_update(self, event):
         """Updates the temporal axes display.

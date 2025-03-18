@@ -543,8 +543,6 @@ class SwitchContainerFunctor(gremlin.base_conditions.AbstractFunctor):
             if value.current is None:
                 value.current = (0,0) if is_hat else is_pressed
 
-            
-
             self.action_sets[data.index].process_event(event, value)
 
         
