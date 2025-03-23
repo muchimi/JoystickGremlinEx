@@ -419,7 +419,6 @@ class AbstractFunctor(QtCore.QObject):
         import gremlin.execution_graph
 
         if self.node:
-            container_node = None
             for node in self.node.ancestors:
                 if (
                     node.nodeType

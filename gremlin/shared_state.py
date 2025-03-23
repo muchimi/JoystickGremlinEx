@@ -252,10 +252,6 @@ def _current_mode() -> str:
 
 def resetState():
     device_profile_map.clear()
-    current_profile = None
-    runtime_mode = None
-    edit_mode = None
-    previous_runtime_mode = None
 
 
 def ui_keyinput_suspended():

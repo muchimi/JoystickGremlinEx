@@ -961,7 +961,7 @@ class RPCGremlin:
         ]
         for key in vjoyid_list:
             try:
-                device = gremlin.joystick_handling.VJoyProxy()[key]
+                gremlin.joystick_handling.VJoyProxy()[key]
                 syslog.debug(f"Remote proxy VJOY [{key}] ok")
             except:
                 pass
@@ -2199,7 +2199,7 @@ def gremlin_start():
         def wrapper_fn(*args, **kwargs):
             callback(*args, **kwargs)
 
-        vjoy = gremlin.joystick_handling.VJoyProxy()
+        gremlin.joystick_handling.VJoyProxy()
         start_registry.add(wrapper_fn)
 
         return wrapper_fn

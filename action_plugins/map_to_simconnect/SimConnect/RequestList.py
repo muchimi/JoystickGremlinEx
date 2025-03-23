@@ -401,12 +401,6 @@ class AircraftRequests:
                 b"Enum",
                 "N",
             ],
-            "ENGINE_TYPE": [
-                "Engine type:; 0 = Piston; 1 = Jet; 2 = None; 3 = Helo(Bell) turbine; 4 = Unsupported; 5 = Turboprop",
-                b"ENGINE TYPE",
-                b"Enum",
-                "N",
-            ],
             "RECIP_ENG_FUEL_NUMBER_TANKS_USED:index": [
                 "Number of tanks currently being used",
                 b"RECIP ENG FUEL NUMBER TANKS USED:index",
@@ -494,12 +488,6 @@ class AircraftRequests:
             "TURB_ENG_TANK_SELECTOR:index": [
                 "Fuel tank selected for engine. See fuel tank list.",
                 b"TURB ENG TANK SELECTOR:index",
-                b"Enum",
-                "N",
-            ],
-            "ENGINE_TYPE": [
-                "Engine type:; 0 = Piston; 1 = Jet; 2 = None; 3 = Helo(Bell) turbine; 4 = Unsupported; 5 = Turboprop",
-                b"ENGINE TYPE",
                 b"Enum",
                 "N",
             ],
@@ -4351,12 +4339,6 @@ class AircraftRequests:
                 b"GPWS SYSTEM ACTIVE",
                 b"Bool",
                 "Y",
-            ],
-            "CRASH_FLAG": [
-                "One of:; 0: None; 2: Mountain; 4: General; 6: Building; 8: Splash; 10: Gear up; 12: Overstress; 14: Building; 16: Aircraft; 18: Fuel Truck",
-                b"CRASH FLAG",
-                b"Enum",
-                "N",
             ],
             "IS_ALTITUDE_FREEZE_ON": [
                 "True if the altitude of the aircraft is frozen.",

@@ -18,14 +18,14 @@
 
 import os
 from PySide6 import QtWidgets
+# noinspection PyPep8Naming
 from lxml import etree as ElementTree
+from gremlin.ui.input_item import AbstractActionWidget
+from gremlin.base_profile import AbstractFunctor, AbstractAction
+from gremlin.util import safe_read
 
-import gremlin.base_classes
-from gremlin.input_types import InputType
-import gremlin.ui.input_item
 
-
-class DescriptionActionWidget(gremlin.ui.input_item.AbstractActionWidget):
+class DescriptionActionWidget(AbstractActionWidget):
     """Widget for the description action."""
 
     def __init__(self, action_data, parent=None):
@@ -50,7 +50,7 @@ class DescriptionActionWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.action_data.description = value
 
 
-class DescriptionActionFunctor(gremlin.base_profile.AbstractFunctor):
+class DescriptionActionFunctor(AbstractFunctor):
     def __init__(self, action, parent=None):
         super().__init__(action, parent)
 
@@ -58,7 +58,7 @@ class DescriptionActionFunctor(gremlin.base_profile.AbstractFunctor):
         return True
 
 
-class DescriptionAction(gremlin.base_profile.AbstractAction):
+class DescriptionAction(AbstractAction):
     """Action for adding a description to a set of actions."""
 
     name = "Description"
@@ -89,7 +89,7 @@ class DescriptionAction(gremlin.base_profile.AbstractAction):
         return False
 
     def _parse_xml(self, node, data=None):
-        self.description = gremlin.profile.safe_read(node, "description", str, "")
+        self.description = safe_read(node, "description", str, "")
 
     def _generate_xml(self):
         node = ElementTree.Element("description")

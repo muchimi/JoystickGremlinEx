@@ -245,7 +245,6 @@ class SimConnectBridge(QtCore.QObject):
                     packet = cast(
                         client_data.dwData, POINTER(BRIDGE_PACKET_DOUBLE)
                     ).contents
-                    value = packet.data  # double
                     # syslog.info(f"SIMCONNECT BRIDGE: received value: {value}")
 
                 case BridgeCommands.GetVariableList:
@@ -416,7 +415,7 @@ class SimConnectBridge(QtCore.QObject):
             self._alive = False
 
     def _request_data(self, bridge_command: BridgeCommands):
-        verbose = gremlin.config.Configuration().verbose_mode_simconnect
+        gremlin.config.Configuration().verbose_mode_simconnect
         try:
             id = (
                 self._get_next_id()

@@ -16,8 +16,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import annotations
-import os
-from PySide6 import QtWidgets, QtCore
+from PySide6 import QtWidgets
+# noinspection PyPep8Naming
 from lxml import etree as ElementTree
 
 import gremlin.base_profile

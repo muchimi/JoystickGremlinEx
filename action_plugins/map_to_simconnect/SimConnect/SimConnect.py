@@ -721,7 +721,6 @@ class SimConnect:
             or (dwID == SIMCONNECT_RECV_ID.SIMCONNECT_RECV_ID_VOR_LIST)
         ):
             pObjData = cast(pData, POINTER(SIMCONNECT_RECV_FACILITIES_LIST)).contents
-            dwRequestID = pObjData.dwRequestID
             dwEntryNumber = pObjData.dwEntryNumber
             dwOutof = pObjData.dwOutOf
             if verbose:
@@ -742,7 +741,6 @@ class SimConnect:
             pObjData = cast(
                 pData, POINTER(SIMCONNECT_RECV_ENUMERATE_SIMOBJECT_AND_LIVERY_LIST)
             ).contents
-            dwRequestID = pObjData.dwRequestID
             dwEntryNumber = pObjData.dwEntryNumber
             dwOutof = pObjData.dwOutOf
             count = pObjData.dwArraySize
@@ -1295,7 +1293,7 @@ class SimConnect:
             return
         if self.DEFINITION_WAYPOINT is None:
             self.DEFINITION_WAYPOINT = self.new_def_id()
-            err = self._dll.AddToDataDefinition(
+            self._dll.AddToDataDefinition(
                 self._hSimConnect,
                 self.DEFINITION_WAYPOINT.value,
                 b"AI WAYPOINT LIST",
@@ -1309,8 +1307,8 @@ class SimConnect:
             for e in waypt._fields_:
                 pyarr.append(getattr(waypt, e[0]))
         dataarray = (ctypes.c_double * len(pyarr))(*pyarr)
-        pObjData = cast(dataarray, c_void_p)
-        sx = int(sizeof(ctypes.c_double) * (len(pyarr) / len(_waypointlist)))
+        cast(dataarray, c_void_p)
+        int(sizeof(ctypes.c_double) * (len(pyarr) / len(_waypointlist)))
         return
 
     def set_pos(
@@ -1339,7 +1337,7 @@ class SimConnect:
 
         if self.DEFINITION_POS is None:
             self.DEFINITION_POS = self.new_def_id()
-            err = self._dll.AddToDataDefinition(
+            self._dll.AddToDataDefinition(
                 self._hSimConnect,
                 self.DEFINITION_POS.value,
                 b"Initial Position",
@@ -1407,7 +1405,7 @@ class SimConnect:
     def get_paused(self):
         if self._dll is None:
             return False
-        hr = self._dll.RequestSystemState(
+        self._dll.RequestSystemState(
             self._hSimConnect, self._dll.EventID.EVENT_SIM_PAUSED, b"Sim"
         )
 

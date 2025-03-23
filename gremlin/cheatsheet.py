@@ -341,7 +341,7 @@ def generate_cheatsheet(fname, profile):
     doc = BaseDocTemplate(fname, pageTemplates=[main_template])
 
     story = []
-    style = styles["Normal"]
+    styles["Normal"]
 
     # Build device actions considering inheritance
     inheritance_tree = profile.build_inheritance_tree()
@@ -368,7 +368,7 @@ def generate_cheatsheet(fname, profile):
             for entry in mode_data.values():
                 table_data.extend(entry.table_data())
 
-            table_style = style = [
+            table_style = [
                 ("LINEBELOW", (0, 0), (-1, -2), 0.25, HexColor("#c0c0c0")),
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
             ]

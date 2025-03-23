@@ -1542,7 +1542,7 @@ class InputItem:
         from gremlin.base_classes import AbstractInputItem
 
         assert (
-            value == None
+            value is None
             or isinstance(value, int)
             or isinstance(value, AbstractInputItem)
         )
@@ -1733,7 +1733,7 @@ class InputItem:
             if "id" in node.attrib and node.tag == "key":
                 # legacy format
                 scan_code = safe_read(node, "id", int, 0)
-                description = safe_read(node, "description", str, "")
+                safe_read(node, "description", str, "")
                 key = Key(scan_code=scan_code, is_extended=False, is_mouse=False)
                 input_item.key = key
             else:

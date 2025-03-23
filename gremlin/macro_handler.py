@@ -1401,12 +1401,12 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
 
             # Create buttons used to modify and interact with the macro actions
             self.button_new_entry = self._create_toolbutton(
-                "list_add.svg", "Add a new action", False
+                "gfx/list_add.svg", "Add a new action", False
             )
             self.button_new_entry.clicked.connect(self._add_entry)
 
             self.button_delete = self._create_toolbutton(
-                "list_delete.svg", "Delete currently selected entry", False
+                "gfx/list_delete.svg", "Delete currently selected entry", False
             )
             self.button_delete.clicked.connect(self._delete_cb)
 
@@ -1582,7 +1582,7 @@ class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
         add_new_entry = True
         if event.event_type == InputType.JoystickAxis:
             cur_index = self.list_view.currentIndex().row()
-            entry = self.model.get_entry(cur_index)
+            self.model.get_entry(cur_index)
 
             if event in self._recording_times:
                 if time.time() - self._recording_times[event] < self._polling_rate:

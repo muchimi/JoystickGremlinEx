@@ -1,5 +1,4 @@
 import os
-from abc import ABC
 
 from decouple import config
 from PySide6 import QtWidgets, QtCore
@@ -8,7 +7,7 @@ from gremlin.input_types import InputType
 from gremlin.ui.input_item import AbstractActionWidget
 from gremlin.base_profile import AbstractFunctor, AbstractAction
 from gremlin.profile import safe_read
-from ha_request import JGHAClient
+from .ha_request import JGHAClient
 
 light_entities = config("HA_ENTITY_LIGHT")
 ha_client = JGHAClient()

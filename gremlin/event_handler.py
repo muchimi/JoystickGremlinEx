@@ -1325,7 +1325,6 @@ class EventHandler(QtCore.QObject):
         if not verbose:
             return
 
-        get_device_name = gremlin.shared_state.get_device_name
         device_name = gremlin.shared_state.get_device_name(device_guid)
 
         for callbacks in self.callbacks[device_guid][mode][event.callbackKey]:
@@ -1371,7 +1370,6 @@ class EventHandler(QtCore.QObject):
         import gremlin.ui.keyboard_device
         import gremlin.shared_state
 
-        get_device_name = gremlin.shared_state.get_device_name
 
         syslog.debug("------------ Latched Events ----------------")
         for device_guid in self.latched_events.keys():

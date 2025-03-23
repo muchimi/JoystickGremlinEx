@@ -475,7 +475,6 @@ class InputItemListView(ui_common.AbstractView):
                 row_count = self.model.rows()
                 device_name = self.current_device.name
 
-                selected_index = -1  # nothing selected
 
                 # remember the index of the item that was previously selected
                 selected_input_id = None
@@ -533,7 +532,7 @@ class InputItemListView(ui_common.AbstractView):
                     widget.index = index  # assigned index
                     if selected:
                         # remember which item to select
-                        selected_index = index
+                        pass
 
                     widget.edit.connect(self._create_edit_callback(index))
                     widget.edit_curve.connect(self._create_edit_curve_callback(index))

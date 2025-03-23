@@ -712,7 +712,6 @@ class ActionContainerView(gremlin.ui.ui_common.AbstractView):
                         self._widgets.append(widget)
 
                 else:
-                    input_type = self.model.input_type  # InputType.JoystickAxis
                     label = QtWidgets.QLabel(
                         f"Please add an action or container for {self.model.item_data.display_name}"
                     )  # ({InputType.to_display_name(input_type)})")
@@ -768,7 +767,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         # self.widget_tracker = gremlin.ui.ui_common.DeviceWidgetTracker() # caches the  InputConfigurationItem for this item
         self.last_item_data_key = None
-        self.last_selected_index = index = 0
+        self.last_selected_index = 0
         self.device_guid = device.device_guid
         self.device_name = device.name
         self._debug_widget = None
@@ -954,7 +953,6 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def _update_curve_icon(self, index: int, data):
         widget = self.input_item_list_view.widget_map[index]
-        input_item = widget.data
         enabled = data.curve_data is not None
         widget.update_curve_icon(enabled)
 

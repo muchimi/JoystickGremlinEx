@@ -1608,11 +1608,11 @@ class AbstractInputSelector(QtWidgets.QWidget):
 
             if input_index == -1:
                 input_index = 0
-                input_value = self.input_item_dropdowns[device_index].itemText(
+                self.input_item_dropdowns[device_index].itemText(
                     input_index
                 )
             else:
-                input_value = self.input_item_dropdowns[device_index].currentText()
+                self.input_item_dropdowns[device_index].currentText()
 
             input_type, input_id = self.input_item_dropdowns[device_index].itemData(
                 input_index
@@ -1872,7 +1872,7 @@ class ActionSelector(QtWidgets.QWidget):
         # clipboard
         self.paste_button = QtWidgets.QPushButton()
         prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
-        icon = gremlin.util.load_icon(f"{prefix}button_paste.svg")
+        icon = gremlin.util.load_icon(f"gfx/{prefix}button_paste.svg")
         self.paste_button.setIcon(icon)
         self.paste_button.clicked.connect(self._paste_action)
         self.paste_button.setSizePolicy(
@@ -3895,7 +3895,7 @@ class AxisStateWidget(QtWidgets.QWidget):
             if isinstance(device_guid, str):
                 device_guid = gremlin.util.parse_guid(device_guid)
             disconnect = self._device_guid == device_guid
-            device_name = gremlin.shared_state.get_device_name(device_guid)
+            gremlin.shared_state.get_device_name(device_guid)
         else:
             disconnect = True
 

@@ -1394,8 +1394,8 @@ class GateData:
 
         item_data: gremlin.ui.joystick_device.InputItemConfiguration
 
-        eh = gremlin.event_handler.EventHandler()
-        ec = gremlin.execution_graph.ExecutionContext()
+        gremlin.event_handler.EventHandler()
+        gremlin.execution_graph.ExecutionContext()
 
         # register gate crossings
         for gate in gates:
@@ -1544,7 +1544,6 @@ class GateData:
             range_event.event_type = InputType.JoystickAxis  # force linear
 
             for trigger in triggers:
-                short_press = False
                 delay = trigger.delay
                 match trigger.mode:
                     case TriggerMode.FixedValue:
@@ -2082,7 +2081,7 @@ class GateData:
 
     def getUsedGates(self):
         """gets a sorted list of used gates (gate is used and has a value)"""
-        gate_list = [gate for gate in self._gates if gate.used and gate.value != None]
+        gate_list = [gate for gate in self._gates if gate.used and gate.value is not None]
         gate_list.sort(key=lambda x: x.value)
         return gate_list
 
@@ -2244,7 +2243,6 @@ class GateData:
         value_list = self.getUsedGates()
         # save the current range data
         range_item_data = []
-        range_condition = []
         range_is_default = []
         range_mode = []
         range_data = []
@@ -3459,7 +3457,7 @@ class GateWidgetInfo(gremlin.ui.ui_common.QDataWidget):
 
         self.data = gate
 
-        label_width = gremlin.shared_state.char_width * 2
+        gremlin.shared_state.char_width * 2
 
         self.label_widget = QtWidgets.QLabel(
             f"Gate {gate.slider_index + 1}:"

@@ -1,10 +1,8 @@
 from __future__ import annotations
 import logging
-import threading
-import time
+# noinspection PyPep8Naming
 from lxml import etree as ElementTree
-
-from PySide6 import QtWidgets, QtCore, QtGui
+from PySide6 import QtWidgets, QtCore
 import gremlin.actions
 import gremlin.base_conditions
 import gremlin.base_profile
@@ -15,26 +13,20 @@ import gremlin.input_types
 import gremlin.joystick_handling
 import gremlin.shared_state
 import gremlin.types
-from gremlin.util import load_icon
-
-from gremlin.base_conditions import InputActionCondition
 from gremlin.input_types import InputType
-from gremlin import input_devices, joystick_handling, util
-from gremlin.error import ProfileError
-from gremlin.util import safe_format, safe_read
 import gremlin.ui.ui_common
-import gremlin.ui.input_item
-import os
-import enum
-from gremlin.input_devices import ControlAction, remote_state
-from gremlin.util import *
-import gremlin.util
+from gremlin.ui.input_item import AbstractActionWidget
+from gremlin.input_devices import ControlAction
+from gremlin.util import parse_guid
+# import gremlin.util
+# noinspection PyProtectedMember
+from gremlin.ui.ui_common import _inheritance_tree_to_labels
 
 
 syslog = logging.getLogger("system")
 
 
-class ControlWidget(gremlin.ui.input_item.AbstractActionWidget):
+class ControlWidget(AbstractActionWidget):
     """control plugin UI"""
 
     def __init__(self, action_data, parent=None):
@@ -121,7 +113,7 @@ class ControlWidget(gremlin.ui.input_item.AbstractActionWidget):
             # Create mode name labels visualizing the tree structure
             inheritance_tree = self.profile.build_inheritance_tree()
             labels = []
-            gremlin.ui.ui_common._inheritance_tree_to_labels(
+            _inheritance_tree_to_labels(
                 labels, inheritance_tree, 0
             )
 
@@ -129,7 +121,6 @@ class ControlWidget(gremlin.ui.input_item.AbstractActionWidget):
             # their correct parent
             mode_names = []
             display_names = []
-            mode_list = []
             for entry in labels:
                 if entry[0] in mode_names:
                     idx = mode_names.index(entry[0])

@@ -86,7 +86,6 @@ class DeviceListModel(QtCore.QAbstractListModel):
 
     def update_model(self) -> None:
         """Updates the model if the connected devices change."""
-        old_count = len(self._devices)
         self._devices = joystick_handling.joystick_devices()
         new_count = len(self._devices)
 
@@ -203,7 +202,6 @@ class Device(QtCore.QAbstractListModel):
     def _convert_index(self, index: int) -> typing.Tuple[InputType, int]:
         axis_count = self._device.axis_count
         button_count = self._device.button_count
-        hat_count = self._device.hat_count
 
         if index < axis_count:
             return (InputType.JoystickAxis, self._device.axis_map[index].axis_index)

@@ -1182,7 +1182,7 @@ class SimConnectManager(QtCore.QObject):
         return title
 
     def get_aicraft_position(self):
-        request_id = self._sm.new_request_id()
+        self._sm.new_request_id()
 
         definitions = [
             ("SIM ON GROUND", "Bool", SIMCONNECT_DATATYPE.SIMCONNECT_DATATYPE_INT32),
@@ -1199,7 +1199,7 @@ class SimConnectManager(QtCore.QObject):
             ("PLANE ALTITUDE", "Feet", SIMCONNECT_DATATYPE.SIMCONNECT_DATATYPE_FLOAT64),
         ]
 
-        request = Request(definitions, self._sm)
+        Request(definitions, self._sm)
 
         # hr = SimConnect_AddToDataDefinition(hSimConnect, request_id, "SIM ON GROUND", "Bool", SIMCONNECT_DATATYPE_INT32)
         # hr = SimConnect_AddToDataDefinition(hSimConnect, request_id, "PLANE LATITUDE", "Degrees", SIMCONNECT_DATATYPE_FLOAT64)
@@ -1370,7 +1370,7 @@ class SimConnectManager(QtCore.QObject):
             command_node.attrib["settable"] = str(settable)
             command_node.attrib["axis"] = str(is_axis)
             command_node.attrib["indexed"] = str(is_indexed)
-            description_node = etree.SubElement(
+            etree.SubElement(
                 command_node, "description", value=description
             )
             if is_range:

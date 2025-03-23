@@ -16,27 +16,20 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-import collections
-import logging
-import os
-import pickle
-import time
-from PySide6 import QtCore, QtGui, QtWidgets
 from lxml import etree as ElementTree
-
-from PySide6.QtGui import QIcon
-
+import logging
 import gremlin.base_profile
-from gremlin.input_types import InputType
 import gremlin.keyboard
 import gremlin.macro
+from gremlin.input_types import InputType
+from gremlin.macro_handler import MacroWidget
 from gremlin.profile import safe_format, safe_read, parse_guid, write_guid
 import gremlin.ui.input_item
 import gremlin.input_devices
 from gremlin.input_devices import VjoyAction
 from gremlin.keyboard import key_from_code, key_from_name
 import gremlin.types
-from gremlin.macro_handler import *
+#from gremlin.macro_handler import *
 
 syslog = logging.getLogger("system")
 

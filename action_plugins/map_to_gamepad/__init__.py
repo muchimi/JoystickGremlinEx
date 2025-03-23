@@ -17,8 +17,6 @@
 
 
 import logging
-import math
-import os
 from lxml import etree as ElementTree
 
 from PySide6 import QtCore, QtWidgets
@@ -28,7 +26,7 @@ import gremlin.config
 import gremlin.event_handler
 from gremlin.input_types import InputType
 
-from gremlin.profile import read_bool, safe_read, safe_format
+from gremlin.profile import safe_read
 from gremlin.util import rad2deg
 import gremlin.ui.ui_common
 import gremlin.ui.input_item
@@ -41,8 +39,6 @@ from gremlin.input_devices import ButtonReleaseActions
 
 # import vigem.vigem_gamepad as vg
 import vigem.vigem_commons as vc
-
-from enum import Enum, auto
 
 import gremlin.util
 
@@ -207,7 +203,6 @@ class MapToGamepadFunctor(gremlin.base_profile.AbstractFunctor):
         (is_local, is_remote) = input_devices.remote_state.state
         if event.force_remote:
             # force remote mode on if specified in the event
-            is_remote = True
             is_local = False
 
         if is_local:
@@ -258,6 +253,9 @@ class MapToGamepadFunctor(gremlin.base_profile.AbstractFunctor):
                     vigem.right_trigger_float(vscaled)
             else:
                 # remote
+                vscaled = gremlin.util.scale_to_range(
+                    value.current, target_min=0.0, target_max=1.0
+                )
                 input_devices.remote_client.send_gamepad_axis(
                     self.action_data.device_index, output_mode, vscaled
                 )
@@ -312,7 +310,8 @@ class MapToGamepadFunctor(gremlin.base_profile.AbstractFunctor):
                             )
                         event_release = event.clone()
                         event_release.is_pressed = False
-                        callback = lambda: self.process_event(event_release, value)
+                        def callback():
+                            return self.process_event(event_release, value)
                         ButtonReleaseActions().register_callback(
                             callback, event_release
                         )
