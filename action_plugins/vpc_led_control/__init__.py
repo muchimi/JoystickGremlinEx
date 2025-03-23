@@ -1,6 +1,7 @@
 """
 VPC Led Control is a modul to send Colour States from Joystick Gremlin to the Virpil Joystick LEDs.
 """
+
 import logging
 import os
 
@@ -20,42 +21,87 @@ import threading
 
 syslog = logging.getLogger("system")
 
-COMMAND_LIST = ["00 - Set Default",
-                "01 - Set Add-boards LED 01", "02 - Set Add-boards LED 02",
-                "03 - Set Add-boards LED 03", "04 - Set Add-boards LED 04",
-                "05 - Set On-board LED 01", "06 - Set On-board LED 02", "07 - Set On-board LED 03",
-                "08 - Set On-board LED 04", "09 - Set On-board LED 05", "10 - Set On-board LED 06",
-                "11 - Set On-board LED 07", "12 - Set On-board LED 08", "13 - Set On-board LED 09",
-                "14 - Set On-board LED 10", "15 - Set On-board LED 11", "16 - Set On-board LED 12",
-                "17 - Set On-board LED 13", "18 - Set On-board LED 14", "19 - Set On-board LED 15",
-                "20 - Set On-board LED 16", "21 - Set On-board LED 17", "22 - Set On-board LED 18",
-                "23 - Set On-board LED 19", "24 - Set On-board LED 20",
-                "25 - Set Slave-board LED 01 ", "26 - Set Slave-board LED 02 ", "27 - Set Slave-board LED 03 ",
-                "28 - Set Slave-board LED 04 ", "29 - Set Slave-board LED 05 ", "30 - Set Slave-board LED 06 ",
-                "31 - Set Slave-board LED 07 ", "32 - Set Slave-board LED 08 ", "33 - Set Slave-board LED 09 ",
-                "34 - Set Slave-board LED 10 ", "35 - Set Slave-board LED 11 ", "36 - Set Slave-board LED 12 ",
-                "37 - Set Slave-board LED 13 ", "38 - Set Slave-board LED 14 ", "39 - Set Slave-board LED 15 ",
-                "40 - Set Slave-board LED 16 ", "41 - Set Slave-board LED 17 ", "42 - Set Slave-board LED 18 ",
-                "43 - Set Slave-board LED 19 ", "44 - Set Slave-board LED 20 "
-                ]
+COMMAND_LIST = [
+    "00 - Set Default",
+    "01 - Set Add-boards LED 01",
+    "02 - Set Add-boards LED 02",
+    "03 - Set Add-boards LED 03",
+    "04 - Set Add-boards LED 04",
+    "05 - Set On-board LED 01",
+    "06 - Set On-board LED 02",
+    "07 - Set On-board LED 03",
+    "08 - Set On-board LED 04",
+    "09 - Set On-board LED 05",
+    "10 - Set On-board LED 06",
+    "11 - Set On-board LED 07",
+    "12 - Set On-board LED 08",
+    "13 - Set On-board LED 09",
+    "14 - Set On-board LED 10",
+    "15 - Set On-board LED 11",
+    "16 - Set On-board LED 12",
+    "17 - Set On-board LED 13",
+    "18 - Set On-board LED 14",
+    "19 - Set On-board LED 15",
+    "20 - Set On-board LED 16",
+    "21 - Set On-board LED 17",
+    "22 - Set On-board LED 18",
+    "23 - Set On-board LED 19",
+    "24 - Set On-board LED 20",
+    "25 - Set Slave-board LED 01 ",
+    "26 - Set Slave-board LED 02 ",
+    "27 - Set Slave-board LED 03 ",
+    "28 - Set Slave-board LED 04 ",
+    "29 - Set Slave-board LED 05 ",
+    "30 - Set Slave-board LED 06 ",
+    "31 - Set Slave-board LED 07 ",
+    "32 - Set Slave-board LED 08 ",
+    "33 - Set Slave-board LED 09 ",
+    "34 - Set Slave-board LED 10 ",
+    "35 - Set Slave-board LED 11 ",
+    "36 - Set Slave-board LED 12 ",
+    "37 - Set Slave-board LED 13 ",
+    "38 - Set Slave-board LED 14 ",
+    "39 - Set Slave-board LED 15 ",
+    "40 - Set Slave-board LED 16 ",
+    "41 - Set Slave-board LED 17 ",
+    "42 - Set Slave-board LED 18 ",
+    "43 - Set Slave-board LED 19 ",
+    "44 - Set Slave-board LED 20 ",
+]
 
-COLOR_DICT = {"Black": "000000",
-              "White_30": "404040", "White_60": "808080", "White_100": "FFFFFF",
-              "Red_30": "400000", "Red_60": "800000", "Red_100": "FF0000",
-              "Green_30": "004000", "Green_60": "008000", "Green_100": "00FF00",
-              "Blue_30": "000040", "Blue_60": "000080", "Blue_100": "0000FF",
-              "Yellow_30": "404000", "Yellow_60": "808000", "Yellow_100": "FFFF00",
-              "Cyan_30": "004040", "Cyan_60": "008080", "Cyan_100": "00FFFF",
-              "Magenta_30": "400040", "Magenta_60": "800080", "Magenta_100": "FF00FF"
-              }
+COLOR_DICT = {
+    "Black": "000000",
+    "White_30": "404040",
+    "White_60": "808080",
+    "White_100": "FFFFFF",
+    "Red_30": "400000",
+    "Red_60": "800000",
+    "Red_100": "FF0000",
+    "Green_30": "004000",
+    "Green_60": "008000",
+    "Green_100": "00FF00",
+    "Blue_30": "000040",
+    "Blue_60": "000080",
+    "Blue_100": "0000FF",
+    "Yellow_30": "404000",
+    "Yellow_60": "808000",
+    "Yellow_100": "FFFF00",
+    "Cyan_30": "004040",
+    "Cyan_60": "008080",
+    "Cyan_100": "00FFFF",
+    "Magenta_30": "400040",
+    "Magenta_60": "800080",
+    "Magenta_100": "FF00FF",
+}
+
 
 class VPCLedControlWidget(AbstractActionWidget):
     """
-        VPC Led Control is a modul to send Colour States from Joystick Gremlin to the Virpil Joystick LEDs.
-        the VPC_Led_Control.exe is from the Virpil Software Suite.
-        More Information about at
-        https://forum.virpil.com/index.php?/topic/2326-vpc_led_control-new-small-tool-to-control-leds-on-your-vpc-device/
-        Modul is written by Tholo
+    VPC Led Control is a modul to send Colour States from Joystick Gremlin to the Virpil Joystick LEDs.
+    the VPC_Led_Control.exe is from the Virpil Software Suite.
+    More Information about at
+    https://forum.virpil.com/index.php?/topic/2326-vpc_led_control-new-small-tool-to-control-leds-on-your-vpc-device/
+    Modul is written by Tholo
     """
 
     def __init__(self, action_data, parent=None):
@@ -63,7 +109,7 @@ class VPCLedControlWidget(AbstractActionWidget):
         assert isinstance(action_data, VPCLEDMode)
 
     def display_name(self):
-        """ returns a display string for the current configuration """
+        """returns a display string for the current configuration"""
         return "VPC Led Control Action"
 
     def _create_ui(self):
@@ -122,14 +168,18 @@ class VPCLedControlWidget(AbstractActionWidget):
                     vendor_id = str(format(int(dev.vendor_id), "x"))
                     self.action_data.device_vid = vendor_id
                 elif len(format(int(dev.vendor_id), "#x")) >= 5:
-                    vendor_id_format = str(format(int(dev.vendor_id), "#x")).replace("0x", "0")
+                    vendor_id_format = str(format(int(dev.vendor_id), "#x")).replace(
+                        "0x", "0"
+                    )
                     self.action_data.device_vid = vendor_id_format
 
                 if len(format(int(dev.product_id), "#x")) == 4:
                     p_id = str(format(int(dev.product_id), "#x"))
                     self.action_data.device_pid = p_id
                 elif len(format(int(dev.product_id), "#x")) >= 5:
-                    p_id_format = str(format(int(dev.product_id), "x")).replace("0x", "0")
+                    p_id_format = str(format(int(dev.product_id), "x")).replace(
+                        "0x", "0"
+                    )
                     if len(p_id_format) == 3:
                         p_id_format = f"0{p_id_format}"
                     self.action_data.device_pid = p_id_format
@@ -144,9 +194,11 @@ class VPCLedControlWidget(AbstractActionWidget):
                 break
         self.command_list.setCurrentIndex(command_id)
         self.device_list.setCurrentIndex(device_id)
-        self.last_color.setText(f"Current Color is: 'HexCode': #{self.action_data.color} "
-                                f"'rgb': {self.hex_to_rgb(self.action_data.color)}")
-        self.last_color.setStyleSheet(f'color: #{self.action_data.color}')
+        self.last_color.setText(
+            f"Current Color is: 'HexCode': #{self.action_data.color} "
+            f"'rgb': {self.hex_to_rgb(self.action_data.color)}"
+        )
+        self.last_color.setStyleSheet(f"color: #{self.action_data.color}")
 
     @staticmethod
     def hex_to_rgb(color):
@@ -195,10 +247,9 @@ class LEDThread:
 
     def _thread_wrapper(self, fn, args, kwargs):
         try:
-            # Führe die eigentliche Funktion aus
             fn(*args, **kwargs)
         finally:
-            # Wenn Thread beendet, prüfe die Warteschlange
+            # if thread is finished, remove it from the list
             with self._lock:
                 if self.queue:
                     next_fn, next_args, next_kwargs = self.queue.pop(0)
@@ -218,7 +269,7 @@ class LEDThread:
 class LEDWorker(QObject):
     finished = Signal(bool)
 
-    def __init__(self, vid, pid, command, hex_color, filepath = None):
+    def __init__(self, vid, pid, command, hex_color, filepath=None):
         super().__init__()
         self.vid = vid
         self.pid = pid
@@ -228,7 +279,9 @@ class LEDWorker(QObject):
 
     def run(self):
         if self.filepath is None:
-            self.filepath = os.path.join(os.path.dirname(os.path.realpath(__file__)), "VPC_LED_Control.exe")
+            self.filepath = os.path.join(
+                os.path.dirname(os.path.realpath(__file__)), "VPC_LED_Control.exe"
+            )
         cmd = self.command[:2]
         hex_color_red = self.hex_color[:2]
         hex_color_green = self.hex_color[2:4]
@@ -253,10 +306,7 @@ class VPCLedControlFunctor(AbstractFunctor):
         self.thread_manager.run_thread(self._process_event, event, value, extra_data)
 
     def _process_event(self, event, value, extra_data=None):
-        # Lokale Variablen und Trace-Logging hinzufügen
-        syslog.debug(
-            f"Starte Thread für Farbe: {self.color}, Gerät: {self.device_name}"
-        )
+        syslog.debug(f"Start Thread for color: {self.color}, Gerät: {self.device_name}")
 
         thread = QThread()
         worker = LEDWorker(self.device_vid, self.device_pid, self.command, self.color)
@@ -281,7 +331,7 @@ class VPCLedControlFunctor(AbstractFunctor):
 
         def cleanup_thread():
             try:
-                # Einfach auf Thread-Ende warten und Ressourcen freigeben
+                # wait for the thread to finish
                 if context["thread"].isRunning():
                     context["thread"].wait(1000)
 
@@ -293,12 +343,10 @@ class VPCLedControlFunctor(AbstractFunctor):
             except Exception as e:
                 syslog.error(f"Fehler beim Bereinigen des Threads: {str(e)}")
 
-        # Einfachere Signalverbindungen ohne Liste zu speichern
         worker.finished.connect(on_finished)
         thread.started.connect(worker.run)
         thread.finished.connect(cleanup_thread)
 
-        # Thread starten
         try:
             thread.start()
             syslog.debug(f"Thread für {self.device_name} gestartet")
@@ -308,9 +356,9 @@ class VPCLedControlFunctor(AbstractFunctor):
             thread.deleteLater()
 
 
-
 class VPCLEDMode(AbstractAction):
     """Action representing the change of mode."""
+
     name = "VPC LED Control"
     tag = "vpc-led"
     default_button_activation = (True, False)
@@ -318,7 +366,7 @@ class VPCLEDMode(AbstractAction):
         InputType.JoystickAxis,
         InputType.JoystickButton,
         InputType.JoystickHat,
-        InputType.Keyboard
+        InputType.Keyboard,
     ]
     widget = VPCLedControlWidget
     functor = VPCLedControlFunctor
@@ -336,15 +384,10 @@ class VPCLEDMode(AbstractAction):
         return "{}/icon.png".format(os.path.dirname(os.path.realpath(__file__)))
 
     def requires_virtual_button(self):
-        return self.get_input_type() in [
-            InputType.JoystickAxis,
-            InputType.JoystickHat
-        ]
+        return self.get_input_type() in [InputType.JoystickAxis, InputType.JoystickHat]
 
     def _parse_xml(self, node, data=None):
-        self.color = safe_read(
-            node, "color-hex", str, ""
-        )
+        self.color = safe_read(node, "color-hex", str, "")
         for child in node:
             if child.tag == "led-command":
                 self.command = child.get("command")
@@ -357,7 +400,10 @@ class VPCLEDMode(AbstractAction):
                 self.device_pid = child.get("pid")
         self.mode_name = node.get("mode_name")
         verbose = Configuration().verbose_mode_outputs
-        if verbose: syslog.info(f"Read mode: {self.mode_name} from XML - edit mode: {shared_state.edit_mode}")
+        if verbose:
+            syslog.info(
+                f"Read mode: {self.mode_name} from XML - edit mode: {shared_state.edit_mode}"
+            )
 
     def _generate_xml(self):
         node = ElementTree.Element("vpc-led")
