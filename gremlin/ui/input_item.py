@@ -1944,7 +1944,7 @@ class ContainerSelector(QtWidgets.QWidget):
         self.paste_button.setIcon(icon)
         self.paste_button.clicked.connect(self._paste_container)
         self.paste_button.setSizePolicy(
-            QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Minimum
+            QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Minimum
         )
         self.paste_button.setToolTip("Paste container(s)")
 
